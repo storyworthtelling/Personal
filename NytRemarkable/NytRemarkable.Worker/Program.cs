@@ -3,19 +3,24 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NytRemarkable.Domain.Interfaces;
 using NytRemarkable.Infrastructure.Nyt;
+using NytRemarkable.Infrastructure.Pdf;
 using NytRemarkable.Infrastructure.Remarkable;
 using NytRemarkable.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.Configure<NytOptions>(builder.Configuration.GetSection(NytOptions.SectionName));
+builder.Services.Configure<NytApiOptions>(builder.Configuration.GetSection(NytApiOptions.SectionName));
 builder.Services.Configure<RemarkableOptions>(builder.Configuration.GetSection(RemarkableOptions.SectionName));
 builder.Services.Configure<ScheduleOptions>(builder.Configuration.GetSection(ScheduleOptions.SectionName));
 
 builder.Services.AddHttpClient<INytCrosswordClient, NytCrosswordClient>();
+builder.Services.AddHttpClient<INytTopStoriesClient, NytTopStoriesClient>();
+builder.Services.AddHttpClient<INytArticleClient, NytArticleClient>();
 builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>();
 builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>();
 
+builder.Services.AddTransient<IPdfComposer, PdfComposer>();
 builder.Services.AddTransient<CrosswordDeliveryService>();
 builder.Services.AddHostedService<CrosswordScheduler>();
 

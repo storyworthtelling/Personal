@@ -1,21 +1,27 @@
 using Microsoft.Extensions.Logging;
 using NytRemarkable.Domain.Interfaces;
+using NytRemarkable.Domain.Models;
 
 namespace NytRemarkable.Worker;
 
 public class CrosswordDeliveryService(
     INytCrosswordClient nytClient,
     IRemarkableClient remarkableClient,
+    INytTopStoriesClient topStoriesClient,
+    INytArticleClient articleClient,
+    IPdfComposer pdfComposer,
     ILogger<CrosswordDeliveryService> logger)
 {
     public async Task DeliverDailyPuzzle(DateOnly date)
     {
         logger.LogInformation("Downloading daily crossword for {Date}", date);
-        var pdfBytes = await nytClient.DownloadDailyPuzzle(date);
+        var crosswordBytes = await nytClient.DownloadDailyPuzzle(date);
+
+        var finalBytes = await TryComposeWithNews(crosswordBytes, date);
 
         var title = $"NYT Crossword {date:yyyy-MM-dd}";
         logger.LogInformation("Uploading to reMarkable: {Title}", title);
-        await remarkableClient.Upload(title, pdfBytes);
+        await remarkableClient.Upload(title, finalBytes);
 
         logger.LogInformation("Delivered: {Title}", title);
     }
@@ -30,5 +36,43 @@ public class CrosswordDeliveryService(
         await remarkableClient.Upload(title, pdfBytes);
 
         logger.LogInformation("Delivered: {Title}", title);
+    }
+
+    private async Task<byte[]> TryComposeWithNews(byte[] crosswordBytes, DateOnly date)
+    {
+        try
+        {
+            var newsTask = topStoriesClient.GetTopNewsStories(5);
+            var opinionTask = topStoriesClient.GetTopOpinionArticles(3);
+            await Task.WhenAll(newsTask, opinionTask);
+
+            var allStories = newsTask.Result.Concat(opinionTask.Result).ToList();
+            if (allStories.Count == 0)
+                return crosswordBytes;
+
+            var articles = new List<ArticleContent>();
+            foreach (var story in allStories)
+            {
+                try
+                {
+                    articles.Add(await articleClient.GetArticle(story.Url));
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to fetch article {Url}, skipping", story.Url);
+                }
+            }
+
+            if (articles.Count == 0)
+                return crosswordBytes;
+
+            logger.LogInformation("Composing {Count} articles with crossword for {Date}", articles.Count, date);
+            return pdfComposer.Compose(articles, crosswordBytes);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to fetch news for {Date}, delivering crossword only", date);
+            return crosswordBytes;
+        }
     }
 }
