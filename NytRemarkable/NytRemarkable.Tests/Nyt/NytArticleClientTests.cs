@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NytRemarkable.Domain.Models;
 using NytRemarkable.Infrastructure.Nyt;
@@ -37,7 +38,7 @@ public class NytArticleClientTests
 
         var httpClient = new HttpClient(handler);
         var options = Options.Create(new NytOptions { SessionCookie = "test-cookie" });
-        return new NytArticleClient(httpClient, options);
+        return new NytArticleClient(httpClient, options, NullLogger<NytArticleClient>.Instance);
     }
 
     [Fact]
