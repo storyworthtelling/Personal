@@ -21,7 +21,10 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: NytRemarkable
-        run: pwsh NytRemarkable.Worker/bin/Release/net9.0/playwright.ps1 install chromium --with-deps
+        run: |
+          echo "Build output contents:"
+          ls NytRemarkable.Worker/bin/Release/net9.0/
+          pwsh NytRemarkable.Worker/bin/Release/net9.0/playwright.ps1 install chromium --with-deps
 
       - name: Deliver crossword
         working-directory: NytRemarkable

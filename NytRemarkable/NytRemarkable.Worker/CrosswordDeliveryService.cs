@@ -55,11 +55,14 @@ public class CrosswordDeliveryService(
             {
                 try
                 {
-                    articles.Add(await articleClient.GetArticle(story.Url));
+                    var article = await articleClient.GetArticle(story.Url);
+                    logger.LogInformation("[FULL ARTICLE] {Title} — {Blocks} block(s)", article.Title, article.Body.Count);
+                    articles.Add(article);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to fetch article {Url}, falling back to abstract", story.Url);
+                    logger.LogWarning(ex, "[ABSTRACT FALLBACK] {Title} ({Url}): {Error}",
+                        story.Title, story.Url, ex.Message);
                     if (!string.IsNullOrEmpty(story.Abstract))
                         articles.Add(new ArticleContent
                         {

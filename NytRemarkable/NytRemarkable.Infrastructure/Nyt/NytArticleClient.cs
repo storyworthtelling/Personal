@@ -35,8 +35,14 @@ public class NytArticleClient : INytArticleClient
         var context = BrowsingContext.New(Configuration.Default);
         var document = await context.OpenAsync(req => req.Content(html));
 
+        // Log the <title> tag to confirm we got the article page and not a login/paywall redirect
+        var pageTitle = document.QuerySelector("title")?.TextContent.Trim();
+        logger.LogInformation("Parsing {Url} — page <title>: {PageTitle}", url, pageTitle);
+
         var title = document.QuerySelector("h1")?.TextContent.Trim() ?? string.Empty;
         var body = await ExtractArticleBody(document, url);
+
+        logger.LogInformation("Parsed {Blocks} block(s) from {Url}", body.Count, url);
 
         return new ArticleContent
         {
