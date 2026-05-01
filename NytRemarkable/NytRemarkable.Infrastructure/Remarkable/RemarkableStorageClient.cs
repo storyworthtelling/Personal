@@ -8,9 +8,8 @@ namespace NytRemarkable.Infrastructure.Remarkable;
 
 public class RemarkableStorageClient : IRemarkableClient
 {
-    private const string ServiceDiscoveryUrl =
-        "https://service-manager-production-dot-remarkable-production.appspot.com" +
-        "/service/json/1/document-storage?environment=production&group={0}&apiVer=2";
+    private const string StorageHost =
+        "document-storage-production-dot-remarkable-production.appspot.com";
 
     private readonly HttpClient httpClient;
     private readonly IRemarkableAuthProvider authProvider;
@@ -24,34 +23,13 @@ public class RemarkableStorageClient : IRemarkableClient
     public async Task Upload(string title, byte[] pdfBytes)
     {
         var userToken = await authProvider.GetUserToken();
-        var (userId, _) = JwtPayload.Parse(userToken);
-
-        var storageHost = await DiscoverStorageHost(userToken, userId);
         var documentId = Guid.NewGuid().ToString();
-        var blobUrl = await RequestUploadSlot(storageHost, userToken, documentId);
+        var blobUrl = await RequestUploadSlot(StorageHost, userToken, documentId);
 
         var zipBytes = CreateDocumentPackage(documentId, pdfBytes);
         await UploadToBlob(blobUrl, zipBytes);
 
-        await UpdateDocumentStatus(storageHost, userToken, documentId, title);
-    }
-
-    private async Task<string> DiscoverStorageHost(string userToken, string userId)
-    {
-        var url = string.Format(ServiceDiscoveryUrl, Uri.EscapeDataString(userId));
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
-
-        var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"reMarkable service discovery failed: {(int)response.StatusCode} ({response.StatusCode})");
-
-        var json = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(json);
-        return doc.RootElement.GetProperty("Host").GetString()
-            ?? throw new InvalidOperationException("Service discovery response missing 'Host'");
+        await UpdateDocumentStatus(StorageHost, userToken, documentId, title);
     }
 
     private async Task<string> RequestUploadSlot(string host, string userToken, string documentId)
