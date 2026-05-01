@@ -1,0 +1,23 @@
+name: Deliver NYT Crossword
+
+on:
+  schedule:
+    - cron: '0 11 * * *'  # 11:00 UTC = 6 AM EST (7 AM EDT in summer)
+  workflow_dispatch:        # allows manual trigger from GitHub Actions UI
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0'
+
+      - name: Deliver crossword
+        working-directory: NytRemarkable
+        env:
+          Nyt__SessionCookie: ${{ secrets.NYT_SESSION_COOKIE }}
+          Remarkable__DeviceToken: ${{ secrets.REMARKABLE_DEVICE_TOKEN }}
+        run: dotnet run --project NytRemarkable.Worker -c Release -- --deliver
