@@ -21,3 +21,28 @@ jobs:
           Nyt__SessionCookie: ${{ secrets.NYT_SESSION_COOKIE }}
           Remarkable__DeviceToken: ${{ secrets.REMARKABLE_DEVICE_TOKEN }}
         run: dotnet run --project NytRemarkable.Worker -c Release -- --deliver
+
+      - name: Notify on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: storyworthtelling@gmail.com
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          to: storyworthtelling@gmail.com
+          from: NYT Crossword Delivery
+          subject: "Crossword delivery failed — NYT-S cookie probably expired"
+          body: |
+            The daily crossword delivery failed. This usually means your NYT-S
+            session cookie has expired and needs to be refreshed.
+
+            To fix it:
+            1. Go to nytimes.com in your browser (make sure you're logged in)
+            2. Open DevTools → Application → Cookies → nytimes.com
+            3. Copy the value of the NYT-S cookie
+            4. Go to your GitHub repo → Settings → Secrets and variables → Actions
+            5. Update the NYT_SESSION_COOKIE secret with the new value
+            6. Re-run the failed workflow from the link below
+
+            Failed run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
