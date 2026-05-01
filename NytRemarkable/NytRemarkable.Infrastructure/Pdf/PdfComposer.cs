@@ -12,7 +12,7 @@ public class PdfComposer : IPdfComposer
 {
     static PdfComposer()
     {
-        Settings.License = LicenseType.Community;
+        QuestPDF.Settings.License = LicenseType.Community;
     }
 
     public byte[] Compose(IReadOnlyList<ArticleContent> articles, byte[] crosswordPdfBytes)
