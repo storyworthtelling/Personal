@@ -9,6 +9,14 @@ namespace NytRemarkable.Infrastructure.Nyt;
 
 public class NytArticleClient : INytArticleClient
 {
+    // Known paths to the article body array in NYT's __NEXT_DATA__ JSON
+    private static readonly string[][] BodyPaths =
+    [
+        ["props", "pageProps", "initialData", "data", "article", "body"],
+        ["props", "pageProps", "initialData", "data", "article", "sprinkledBody"],
+        ["props", "pageProps", "initialData", "data", "article", "bodyWithSponsorship"],
+    ];
+
     private readonly HttpClient httpClient;
     private readonly NytOptions options;
 
@@ -26,7 +34,6 @@ public class NytArticleClient : INytArticleClient
         var document = await context.OpenAsync(req => req.Content(html));
 
         var title = document.QuerySelector("h1")?.TextContent.Trim() ?? string.Empty;
-
         var body = await ExtractArticleBody(document);
 
         return new ArticleContent
@@ -40,12 +47,11 @@ public class NytArticleClient : INytArticleClient
 
     private async Task<IReadOnlyList<ContentBlock>> ExtractArticleBody(IDocument document)
     {
-        // Try structured __NEXT_DATA__ JSON first — most reliable
         var blocks = await TryParseNextData(document);
         if (blocks.Count > 0)
             return blocks;
 
-        // Fall back to HTML selectors
+        // HTML fallback
         var articleBody =
             document.QuerySelector("section[name='articleBody']") ??
             document.QuerySelector("[name='articleBody']") ??
@@ -55,7 +61,6 @@ public class NytArticleClient : INytArticleClient
         return articleBody != null ? await WalkElement(articleBody) : [];
     }
 
-    // NYT embeds full article JSON in a __NEXT_DATA__ script tag
     private async Task<IReadOnlyList<ContentBlock>> TryParseNextData(IDocument document)
     {
         var script = document.QuerySelector("script#__NEXT_DATA__");
@@ -64,47 +69,34 @@ public class NytArticleClient : INytArticleClient
         try
         {
             using var doc = JsonDocument.Parse(script.TextContent);
-            var bodyArray = FindBodyArray(doc.RootElement);
-            if (bodyArray == null) return [];
 
-            return await ParseBodyBlocks(bodyArray.Value);
+            // Navigate specific known paths — avoids accidentally picking up
+            // a body array from a related/recommended article embedded in the JSON
+            foreach (var path in BodyPaths)
+            {
+                var bodyArray = NavigatePath(doc.RootElement, path);
+                if (bodyArray is { ValueKind: JsonValueKind.Array })
+                    return await ParseBodyBlocks(bodyArray.Value);
+            }
         }
         catch
         {
-            return [];
+            // ignore — fall through to HTML
         }
+
+        return [];
     }
 
-    // Recursively search the JSON tree for an array of article body blocks
-    private static JsonElement? FindBodyArray(JsonElement element)
+    private static JsonElement? NavigatePath(JsonElement root, string[] path)
     {
-        if (element.ValueKind == JsonValueKind.Array && IsBodyArray(element))
-            return element;
-
-        if (element.ValueKind == JsonValueKind.Object)
+        var current = root;
+        foreach (var key in path)
         {
-            foreach (var prop in element.EnumerateObject())
-            {
-                var found = FindBodyArray(prop.Value);
-                if (found != null) return found;
-            }
+            if (current.ValueKind != JsonValueKind.Object) return null;
+            if (!current.TryGetProperty(key, out var next)) return null;
+            current = next;
         }
-
-        return null;
-    }
-
-    private static bool IsBodyArray(JsonElement array)
-    {
-        // A body array has objects with __typename of Paragraph, Image, etc.
-        foreach (var item in array.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object) return false;
-            if (!item.TryGetProperty("__typename", out var tn)) return false;
-            var name = tn.GetString();
-            if (name is "Paragraph" or "Image" or "Heading" or "DetailBlock")
-                return true;
-        }
-        return false;
+        return current;
     }
 
     private async Task<IReadOnlyList<ContentBlock>> ParseBodyBlocks(JsonElement bodyArray)
@@ -135,7 +127,6 @@ public class NytArticleClient : INytArticleClient
 
     private static string ExtractTextFromBlock(JsonElement block)
     {
-        // Paragraphs have a "content" array of inline text nodes
         if (!block.TryGetProperty("content", out var content)) return string.Empty;
 
         var sb = new System.Text.StringBuilder();
@@ -149,7 +140,6 @@ public class NytArticleClient : INytArticleClient
 
     private async Task<ImageBlock?> TryExtractNextDataImage(JsonElement block)
     {
-        // Navigate: crops[0].renditions[0].url OR media.url
         string? imageUrl = null;
 
         if (block.TryGetProperty("crops", out var crops))
@@ -158,10 +148,9 @@ public class NytArticleClient : INytArticleClient
             if (firstCrop.ValueKind == JsonValueKind.Object &&
                 firstCrop.TryGetProperty("renditions", out var renditions))
             {
-                var bestRendition = renditions.EnumerateArray()
-                    .LastOrDefault(); // last is typically largest
-                if (bestRendition.ValueKind == JsonValueKind.Object &&
-                    bestRendition.TryGetProperty("url", out var urlEl))
+                var best = renditions.EnumerateArray().LastOrDefault();
+                if (best.ValueKind == JsonValueKind.Object &&
+                    best.TryGetProperty("url", out var urlEl))
                     imageUrl = urlEl.GetString();
             }
         }
@@ -169,8 +158,7 @@ public class NytArticleClient : INytArticleClient
         if (imageUrl == null) return null;
 
         string? caption = null;
-        if (block.TryGetProperty("caption", out var cap) &&
-            cap.TryGetProperty("content", out var capContent))
+        if (block.TryGetProperty("caption", out var cap))
             caption = ExtractTextFromBlock(cap);
 
         try
@@ -210,8 +198,7 @@ public class NytArticleClient : INytArticleClient
     {
         foreach (var child in element.Children)
         {
-            if (child.LocalName == "figcaption")
-                continue;
+            if (child.LocalName == "figcaption") continue;
 
             if (child.LocalName == "p")
             {
