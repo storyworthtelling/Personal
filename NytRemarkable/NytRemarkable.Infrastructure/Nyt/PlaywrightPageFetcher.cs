@@ -37,15 +37,39 @@ public class PlaywrightPageFetcher : IArticlePageFetcher, IAsyncDisposable
         }]);
 
         var page = await context.NewPageAsync();
-        var response = await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.Load });
+
+        // Remove the navigator.webdriver property that headless browsers expose
+        await page.AddInitScriptAsync("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+
+        logger.LogInformation("Navigating to {Url}", url);
+
+        IResponse? response;
+        try
+        {
+            response = await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.Load });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Playwright navigation threw for {Url}", url);
+            throw;
+        }
+
+        var status = response?.Status ?? 0;
+        logger.LogInformation("Navigation result: HTTP {Status} for {Url}", status, url);
 
         if (response == null || !response.Ok)
         {
-            var status = response?.Status ?? 0;
+            try
+            {
+                var content = await page.ContentAsync();
+                logger.LogWarning("Non-OK page content (first 500 chars): {Snippet}",
+                    content.Length > 500 ? content[..500] : content);
+            }
+            catch { /* best-effort */ }
+
             throw new HttpRequestException($"NYT article fetch failed: {status} for {url}");
         }
 
-        logger.LogInformation("Playwright fetched {Url} (HTTP {Status})", url, response.Status);
         return await page.ContentAsync();
     }
 
@@ -57,12 +81,14 @@ public class PlaywrightPageFetcher : IArticlePageFetcher, IAsyncDisposable
         try
         {
             if (browser != null) return browser;
+            logger.LogInformation("Launching Chromium");
             playwright = await Playwright.CreateAsync();
             browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
             {
                 Headless = true,
-                Args = ["--no-sandbox", "--disable-setuid-sandbox"]
+                Args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
             });
+            logger.LogInformation("Chromium launched");
         }
         finally
         {
