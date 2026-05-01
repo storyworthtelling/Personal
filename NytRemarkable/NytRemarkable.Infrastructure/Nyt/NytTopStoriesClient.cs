@@ -44,7 +44,8 @@ public class NytTopStoriesClient : INytTopStoriesClient
                 Title = el.GetProperty("title").GetString() ?? string.Empty,
                 Byline = el.GetProperty("byline").GetString() ?? string.Empty,
                 Section = el.GetProperty("section").GetString() ?? string.Empty,
-                Url = el.GetProperty("url").GetString() ?? string.Empty
+                Url = el.GetProperty("url").GetString() ?? string.Empty,
+                Abstract = el.TryGetProperty("abstract", out var abs) ? abs.GetString() ?? string.Empty : string.Empty
             })
             .Where(filter)
             .Take(count)

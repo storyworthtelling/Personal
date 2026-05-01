@@ -21,14 +21,16 @@ public class NytTopStoriesClientTests
         return new NytTopStoriesClient(httpClient, options);
     }
 
-    private static HttpResponseMessage StoriesResponse(params (string title, string byline, string section, string url)[] stories)
+    private static HttpResponseMessage StoriesResponse(
+        params (string title, string byline, string section, string url, string @abstract)[] stories)
     {
         var results = stories.Select(s => new
         {
             title = s.title,
             byline = s.byline,
             section = s.section,
-            url = s.url
+            url = s.url,
+            @abstract = s.@abstract
         });
         var json = JsonSerializer.Serialize(new { status = "OK", results });
         return new HttpResponseMessage(HttpStatusCode.OK)
@@ -62,13 +64,13 @@ public class NytTopStoriesClientTests
     public async Task GetTopNewsStories_ReturnsUpToCountNonOpinionStories()
     {
         var response = StoriesResponse(
-            ("News 1", "By A", "U.S.", "https://nytimes.com/1"),
-            ("Opinion 1", "By B", "Opinion", "https://nytimes.com/2"),
-            ("News 2", "By C", "World", "https://nytimes.com/3"),
-            ("News 3", "By D", "Business", "https://nytimes.com/4"),
-            ("News 4", "By E", "Science", "https://nytimes.com/5"),
-            ("News 5", "By F", "Health", "https://nytimes.com/6"),
-            ("News 6", "By G", "U.S.", "https://nytimes.com/7"));
+            ("News 1", "By A", "U.S.", "https://nytimes.com/1", ""),
+            ("Opinion 1", "By B", "Opinion", "https://nytimes.com/2", ""),
+            ("News 2", "By C", "World", "https://nytimes.com/3", ""),
+            ("News 3", "By D", "Business", "https://nytimes.com/4", ""),
+            ("News 4", "By E", "Science", "https://nytimes.com/5", ""),
+            ("News 5", "By F", "Health", "https://nytimes.com/6", ""),
+            ("News 6", "By G", "U.S.", "https://nytimes.com/7", ""));
         var client = CreateClient(response, out _);
 
         var stories = await client.GetTopNewsStories(5);
@@ -78,9 +80,10 @@ public class NytTopStoriesClientTests
     }
 
     [Fact]
-    public async Task GetTopNewsStories_MapsTitleBylineAndUrl()
+    public async Task GetTopNewsStories_MapsTitleBylineUrlAndAbstract()
     {
-        var response = StoriesResponse(("Big Story", "By Jane Smith", "U.S.", "https://nytimes.com/big-story"));
+        var response = StoriesResponse(
+            ("Big Story", "By Jane Smith", "U.S.", "https://nytimes.com/big-story", "A brief summary."));
         var client = CreateClient(response, out _);
 
         var stories = await client.GetTopNewsStories(5);
@@ -90,6 +93,7 @@ public class NytTopStoriesClientTests
         Assert.Equal("By Jane Smith", stories[0].Byline);
         Assert.Equal("U.S.", stories[0].Section);
         Assert.Equal("https://nytimes.com/big-story", stories[0].Url);
+        Assert.Equal("A brief summary.", stories[0].Abstract);
     }
 
     [Fact]
@@ -107,10 +111,10 @@ public class NytTopStoriesClientTests
     public async Task GetTopOpinionArticles_ReturnsUpToCountStories()
     {
         var response = StoriesResponse(
-            ("Op 1", "By A", "Opinion", "https://nytimes.com/op1"),
-            ("Op 2", "By B", "Opinion", "https://nytimes.com/op2"),
-            ("Op 3", "By C", "Opinion", "https://nytimes.com/op3"),
-            ("Op 4", "By D", "Opinion", "https://nytimes.com/op4"));
+            ("Op 1", "By A", "Opinion", "https://nytimes.com/op1", ""),
+            ("Op 2", "By B", "Opinion", "https://nytimes.com/op2", ""),
+            ("Op 3", "By C", "Opinion", "https://nytimes.com/op3", ""),
+            ("Op 4", "By D", "Opinion", "https://nytimes.com/op4", ""));
         var client = CreateClient(response, out _);
 
         var stories = await client.GetTopOpinionArticles(3);

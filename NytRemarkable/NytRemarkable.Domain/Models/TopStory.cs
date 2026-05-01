@@ -6,4 +6,5 @@ public class TopStory
     public required string Byline { get; init; }
     public required string Section { get; init; }
     public required string Url { get; init; }
+    public string Abstract { get; init; } = string.Empty;
 }

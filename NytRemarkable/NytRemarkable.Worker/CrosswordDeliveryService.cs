@@ -59,7 +59,15 @@ public class CrosswordDeliveryService(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to fetch article {Url}, skipping", story.Url);
+                    logger.LogWarning(ex, "Failed to fetch article {Url}, falling back to abstract", story.Url);
+                    if (!string.IsNullOrEmpty(story.Abstract))
+                        articles.Add(new ArticleContent
+                        {
+                            Title = story.Title,
+                            Byline = story.Byline,
+                            Section = story.Section,
+                            Body = [new TextBlock { Text = story.Abstract }]
+                        });
                 }
             }
 

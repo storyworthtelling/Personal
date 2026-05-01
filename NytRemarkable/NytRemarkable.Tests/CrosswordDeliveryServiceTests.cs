@@ -17,11 +17,13 @@ public class CrosswordDeliveryServiceTests
 
     private static readonly TopStory FakeNewsStory = new()
     {
-        Title = "News", Byline = "By A", Section = "U.S.", Url = "https://nytimes.com/news"
+        Title = "News", Byline = "By A", Section = "U.S.", Url = "https://nytimes.com/news",
+        Abstract = "News summary."
     };
     private static readonly TopStory FakeOpinionStory = new()
     {
-        Title = "Opinion", Byline = "By B", Section = "Opinion", Url = "https://nytimes.com/opinion"
+        Title = "Opinion", Byline = "By B", Section = "Opinion", Url = "https://nytimes.com/opinion",
+        Abstract = "Opinion summary."
     };
     private static readonly ArticleContent FakeArticle = new()
     {
@@ -128,21 +130,25 @@ public class CrosswordDeliveryServiceTests
     }
 
     [Fact]
-    public async Task DeliverDailyPuzzle_SkipsFailedArticleFetchesAndStillComposes()
+    public async Task DeliverDailyPuzzle_UsesAbstractWhenArticleFetchFails()
     {
         var date = new DateOnly(2025, 4, 14);
         var crosswordBytes = new byte[] { 1, 2, 3 };
         nytClient.Setup(c => c.DownloadDailyPuzzle(date)).ReturnsAsync(crosswordBytes);
         topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([FakeNewsStory]);
         topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([FakeOpinionStory]);
-        articleClient.Setup(c => c.GetArticle(FakeNewsStory.Url)).ThrowsAsync(new HttpRequestException("404"));
+        articleClient.Setup(c => c.GetArticle(FakeNewsStory.Url)).ThrowsAsync(new HttpRequestException("403"));
         articleClient.Setup(c => c.GetArticle(FakeOpinionStory.Url)).ReturnsAsync(FakeArticle);
         pdfComposer.Setup(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), crosswordBytes)).Returns([9]);
 
         await CreateService().DeliverDailyPuzzle(date);
 
         pdfComposer.Verify(c => c.Compose(
-            It.Is<IReadOnlyList<ArticleContent>>(list => list.Count == 1),
+            It.Is<IReadOnlyList<ArticleContent>>(list =>
+                list.Count == 2 &&
+                list[0].Title == FakeNewsStory.Title &&
+                list[0].Body.Count == 1 &&
+                list[0].Body[0] is TextBlock tb && tb.Text == FakeNewsStory.Abstract),
             crosswordBytes), Times.Once);
     }
 

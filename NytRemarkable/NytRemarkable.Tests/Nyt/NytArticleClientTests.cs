@@ -54,6 +54,18 @@ public class NytArticleClientTests
     }
 
     [Fact]
+    public async Task GetArticle_SendsBrowserLikeHeaders()
+    {
+        var client = CreateClient(MinimalHtml("Title", []), out var requests);
+
+        await client.GetArticle(ArticleUrl);
+
+        var articleRequest = requests.First(r => r.RequestUri!.ToString() == ArticleUrl);
+        Assert.True(articleRequest.Headers.TryGetValues("Accept", out _));
+        Assert.True(articleRequest.Headers.TryGetValues("Accept-Language", out _));
+    }
+
+    [Fact]
     public async Task GetArticle_ReturnsArticleTitle()
     {
         var client = CreateClient(MinimalHtml("Big News Story", []), out _);
