@@ -44,7 +44,7 @@ public class NytCrosswordClientTests
 
         Assert.Single(requests);
         Assert.Equal(
-            "https://www.nytimes.com/svc/crosswords/v2/puzzle/print/2025/03/07.pdf",
+            "https://www.nytimes.com/svc/crosswords/v2/puzzle/print/Mar725.pdf",
             requests[0].RequestUri!.ToString());
     }
 
@@ -83,7 +83,7 @@ public class NytCrosswordClientTests
 
         Assert.Single(requests);
         Assert.Equal(
-            "https://www.nytimes.com/svc/crosswords/v2/puzzle/print/2025/02/02.pdf",
+            "https://www.nytimes.com/svc/crosswords/v2/puzzle/print/Feb225.pdf",
             requests[0].RequestUri!.ToString());
     }
 

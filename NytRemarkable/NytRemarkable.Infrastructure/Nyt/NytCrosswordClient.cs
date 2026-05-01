@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Options;
 using NytRemarkable.Domain.Interfaces;
 
@@ -17,10 +18,14 @@ public class NytCrosswordClient : INytCrosswordClient
     }
 
     public Task<byte[]> DownloadDailyPuzzle(DateOnly date) =>
-        DownloadPdf($"{BaseUrl}/print/{date.Year}/{date.Month:D2}/{date.Day:D2}.pdf");
+        DownloadPdf($"{BaseUrl}/print/{PuzzleDateSegment(date)}.pdf");
 
     public Task<byte[]> DownloadBonusPuzzle(DateOnly date) =>
-        DownloadPdf($"{BaseUrl}/print/{date.Year}/{date.Month:D2}/{date.Day:D2}.pdf");
+        DownloadPdf($"{BaseUrl}/print/{PuzzleDateSegment(date)}.pdf");
+
+    // NYT uses MMMdyy format: Apr3026 = April 30, 2026
+    private static string PuzzleDateSegment(DateOnly date) =>
+        date.ToString("MMMdyy", CultureInfo.InvariantCulture);
 
     private async Task<byte[]> DownloadPdf(string url)
     {
