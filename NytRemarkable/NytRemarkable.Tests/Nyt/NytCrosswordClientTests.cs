@@ -44,7 +44,7 @@ public class NytCrosswordClientTests
 
         Assert.Single(requests);
         Assert.Equal(
-            "https://www.nytimes.com/svc/crosswords/v2/puzzle/print/Mar725.pdf",
+            "https://www.nytimes.com/svc/crosswords/v2/puzzle/print/Mar0725.pdf",
             requests[0].RequestUri!.ToString());
     }
 

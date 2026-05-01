@@ -23,9 +23,9 @@ public class NytCrosswordClient : INytCrosswordClient
     public Task<byte[]> DownloadBonusPuzzle(DateOnly date) =>
         DownloadPdf($"{BaseUrl}/print/{PuzzleDateSegment(date)}.pdf");
 
-    // NYT uses MMMdyy format: Apr3026 = April 30, 2026
+    // NYT uses MMMddyy format: Apr3026 = April 30, Mar0725 = March 7, 2025
     private static string PuzzleDateSegment(DateOnly date) =>
-        date.ToString("MMMdyy", CultureInfo.InvariantCulture);
+        date.ToString("MMMddyy", CultureInfo.InvariantCulture);
 
     private async Task<byte[]> DownloadPdf(string url)
     {
