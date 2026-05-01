@@ -15,13 +15,21 @@ jobs:
         with:
           dotnet-version: '9.0'
 
+      - name: Build
+        working-directory: NytRemarkable
+        run: dotnet build NytRemarkable.Worker -c Release
+
+      - name: Install Playwright browsers
+        working-directory: NytRemarkable
+        run: pwsh NytRemarkable.Worker/bin/Release/net9.0/playwright.ps1 install chromium --with-deps
+
       - name: Deliver crossword
         working-directory: NytRemarkable
         env:
           Nyt__SessionCookie: ${{ secrets.NYT_SESSION_COOKIE }}
           NytApi__ApiKey: ${{ secrets.NYT_API_KEY }}
           Remarkable__DeviceToken: ${{ secrets.REMARKABLE_DEVICE_TOKEN }}
-        run: dotnet run --project NytRemarkable.Worker -c Release -- --deliver
+        run: dotnet run --project NytRemarkable.Worker -c Release --no-build -- --deliver
 
       - name: Notify on failure
         if: failure()

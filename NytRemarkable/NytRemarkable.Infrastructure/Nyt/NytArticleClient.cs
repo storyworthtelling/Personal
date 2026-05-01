@@ -2,7 +2,6 @@ using System.Text.Json;
 using AngleSharp;
 using AngleSharp.Dom;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NytRemarkable.Domain.Interfaces;
 using NytRemarkable.Domain.Models;
 
@@ -18,20 +17,20 @@ public class NytArticleClient : INytArticleClient
         ["props", "pageProps", "initialData", "data", "article", "bodyWithSponsorship"],
     ];
 
+    private readonly IArticlePageFetcher pageFetcher;
     private readonly HttpClient httpClient;
-    private readonly NytOptions options;
     private readonly ILogger<NytArticleClient> logger;
 
-    public NytArticleClient(HttpClient httpClient, IOptions<NytOptions> options, ILogger<NytArticleClient> logger)
+    public NytArticleClient(IArticlePageFetcher pageFetcher, HttpClient httpClient, ILogger<NytArticleClient> logger)
     {
+        this.pageFetcher = pageFetcher;
         this.httpClient = httpClient;
-        this.options = options.Value;
         this.logger = logger;
     }
 
     public async Task<ArticleContent> GetArticle(string url)
     {
-        var html = await FetchHtml(url);
+        var html = await pageFetcher.FetchPageHtmlAsync(url);
 
         var context = BrowsingContext.New(Configuration.Default);
         var document = await context.OpenAsync(req => req.Content(html));
@@ -96,7 +95,6 @@ public class NytArticleClient : INytArticleClient
                 }
             }
 
-            // Log the keys available at props.pageProps to help diagnose the right path
             var pageProps = NavigatePath(doc.RootElement, ["props", "pageProps"]);
             if (pageProps is { ValueKind: JsonValueKind.Object })
             {
@@ -203,31 +201,6 @@ public class NytArticleClient : INytArticleClient
         {
             return null;
         }
-    }
-
-    private async Task<string> FetchHtml(string url)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Add("Cookie", $"NYT-S={options.SessionCookie}");
-        request.Headers.Add("User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-        request.Headers.Add("Accept",
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
-        request.Headers.Add("Accept-Language", "en-US,en;q=0.9");
-        request.Headers.Add("Accept-Encoding", "gzip, deflate, br");
-        request.Headers.Add("Referer", "https://www.nytimes.com/");
-        request.Headers.Add("Upgrade-Insecure-Requests", "1");
-        request.Headers.Add("Sec-Fetch-Dest", "document");
-        request.Headers.Add("Sec-Fetch-Mode", "navigate");
-        request.Headers.Add("Sec-Fetch-Site", "same-origin");
-        request.Headers.Add("Sec-Fetch-User", "?1");
-
-        var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"NYT article fetch failed: {(int)response.StatusCode} ({response.StatusCode}) for {url}");
-
-        return await response.Content.ReadAsStringAsync();
     }
 
     private async Task<IReadOnlyList<ContentBlock>> WalkElement(IElement element)
