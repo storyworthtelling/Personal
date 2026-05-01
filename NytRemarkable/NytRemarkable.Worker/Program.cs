@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using NytRemarkable.Domain.Interfaces;
 using NytRemarkable.Infrastructure.Nyt;
 using NytRemarkable.Infrastructure.Remarkable;
@@ -23,6 +24,22 @@ var host = builder.Build();
 if (args.Contains("--setup"))
 {
     await RemarkableSetup.RegisterDevice(host.Services);
+    return;
+}
+
+if (args.Contains("--deliver"))
+{
+    using var scope = host.Services.CreateScope();
+    var delivery = scope.ServiceProvider.GetRequiredService<CrosswordDeliveryService>();
+    var scheduleOptions = scope.ServiceProvider.GetRequiredService<IOptions<ScheduleOptions>>().Value;
+    var timeZone = TimeZoneInfo.FindSystemTimeZoneById(scheduleOptions.TimeZoneId);
+    var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone));
+
+    await delivery.DeliverDailyPuzzle(today);
+
+    if (ScheduleHelper.IsFirstSundayOfMonth(today))
+        await delivery.DeliverBonusPuzzle(today);
+
     return;
 }
 
