@@ -1,7 +1,5 @@
 using System.Net;
-using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NytRemarkable.Domain.Models;
 using NytRemarkable.Infrastructure.Nyt;
 using Xunit;
@@ -14,61 +12,18 @@ public class NytArticleClientTests
 
     private static readonly byte[] FakeImageBytes = [137, 80, 78, 71]; // PNG header
 
-    private static NytArticleClient CreateClient(
-        string articleHtml,
-        out List<HttpRequestMessage> capturedRequests)
+    private static NytArticleClient CreateClient(string articleHtml)
     {
-        var requests = new List<HttpRequestMessage>();
-        capturedRequests = requests;
-
-        var handler = new RoutingHandler(req =>
-        {
-            requests.Add(req);
-            if (req.RequestUri!.Host.Contains("nytimes.com"))
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(articleHtml, Encoding.UTF8, "text/html")
-                };
-            // Image CDN
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent(FakeImageBytes)
-            };
-        });
-
+        var pageFetcher = new FakePageFetcher(articleHtml);
+        var handler = new ImageHandler();
         var httpClient = new HttpClient(handler);
-        var options = Options.Create(new NytOptions { SessionCookie = "test-cookie" });
-        return new NytArticleClient(httpClient, options, NullLogger<NytArticleClient>.Instance);
-    }
-
-    [Fact]
-    public async Task GetArticle_FetchesArticleUrlWithSessionCookie()
-    {
-        var client = CreateClient(MinimalHtml("Title", []), out var requests);
-
-        await client.GetArticle(ArticleUrl);
-
-        var articleRequest = requests.First(r => r.RequestUri!.ToString() == ArticleUrl);
-        Assert.True(articleRequest.Headers.TryGetValues("Cookie", out var values));
-        Assert.Contains("NYT-S=test-cookie", values);
-    }
-
-    [Fact]
-    public async Task GetArticle_SendsBrowserLikeHeaders()
-    {
-        var client = CreateClient(MinimalHtml("Title", []), out var requests);
-
-        await client.GetArticle(ArticleUrl);
-
-        var articleRequest = requests.First(r => r.RequestUri!.ToString() == ArticleUrl);
-        Assert.True(articleRequest.Headers.TryGetValues("Accept", out _));
-        Assert.True(articleRequest.Headers.TryGetValues("Accept-Language", out _));
+        return new NytArticleClient(pageFetcher, httpClient, NullLogger<NytArticleClient>.Instance);
     }
 
     [Fact]
     public async Task GetArticle_ReturnsArticleTitle()
     {
-        var client = CreateClient(MinimalHtml("Big News Story", []), out _);
+        var client = CreateClient(MinimalHtml("Big News Story", []));
 
         var article = await client.GetArticle(ArticleUrl);
 
@@ -78,7 +33,7 @@ public class NytArticleClientTests
     [Fact]
     public async Task GetArticle_ExtractsParagraphsInOrder()
     {
-        var client = CreateClient(MinimalHtml("Title", ["First paragraph.", "Second paragraph."]), out _);
+        var client = CreateClient(MinimalHtml("Title", ["First paragraph.", "Second paragraph."]));
 
         var article = await client.GetArticle(ArticleUrl);
 
@@ -93,7 +48,7 @@ public class NytArticleClientTests
     {
         const string imageUrl = "https://static01.nyt.com/images/2026/04/30/test.jpg";
         var html = HtmlWithImage("Title", imageUrl, "Image caption.");
-        var client = CreateClient(html, out _);
+        var client = CreateClient(html);
 
         var article = await client.GetArticle(ArticleUrl);
 
@@ -113,7 +68,7 @@ public class NytArticleClientTests
                 <figure><img src=""{imageUrl}"" /><figcaption>Caption.</figcaption></figure>
                 <p>After image.</p>
             </section></body></html>";
-        var client = CreateClient(html, out _);
+        var client = CreateClient(html);
 
         var article = await client.GetArticle(ArticleUrl);
 
@@ -133,7 +88,7 @@ public class NytArticleClientTests
                 <p>Real paragraph.</p>
                 <figure><img src=""{imageUrl}"" /><figcaption>Caption text.</figcaption></figure>
             </section></body></html>";
-        var client = CreateClient(html, out _);
+        var client = CreateClient(html);
 
         var article = await client.GetArticle(ArticleUrl);
 
@@ -146,7 +101,7 @@ public class NytArticleClientTests
     public async Task GetArticle_ReturnsEmptyBodyWhenNoArticleBodySection()
     {
         var html = "<!DOCTYPE html><html><body><h1>Title</h1><p>No article body section here.</p></body></html>";
-        var client = CreateClient(html, out _);
+        var client = CreateClient(html);
 
         var article = await client.GetArticle(ArticleUrl);
 
@@ -172,11 +127,18 @@ public class NytArticleClientTests
                 </figure>
             </section></body></html>";
 
-    private sealed class RoutingHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)
-        : HttpMessageHandler
+    private sealed class FakePageFetcher(string html) : IArticlePageFetcher
+    {
+        public Task<string> FetchPageHtmlAsync(string url) => Task.FromResult(html);
+    }
+
+    private sealed class ImageHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(handler(request));
+            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(FakeImageBytes)
+            });
     }
 }

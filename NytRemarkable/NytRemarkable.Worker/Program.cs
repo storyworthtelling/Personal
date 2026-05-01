@@ -16,6 +16,7 @@ builder.Services.Configure<ScheduleOptions>(builder.Configuration.GetSection(Sch
 
 builder.Services.AddHttpClient<INytCrosswordClient, NytCrosswordClient>();
 builder.Services.AddHttpClient<INytTopStoriesClient, NytTopStoriesClient>();
+builder.Services.AddSingleton<IArticlePageFetcher, PlaywrightPageFetcher>();
 builder.Services.AddHttpClient<INytArticleClient, NytArticleClient>();
 builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>();
 builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>();
