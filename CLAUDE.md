@@ -26,6 +26,10 @@ Each project lives in a single `.sln` with multiple `.csproj` files — typicall
 - Use SignalR for pushing real-time updates to clients.
 - Expose APIs via controllers with Swagger documentation.
 
+## Code Style
+
+Follow standard Microsoft C# naming conventions throughout. Do not use underscores in any identifier — this includes private fields (use `camelCase`, not `_camelCase`).
+
 ## Async
 
 Use `async`/`await` only where I/O actually warrants it or where it will meaningfully improve expected performance. Do not make everything async by default.
