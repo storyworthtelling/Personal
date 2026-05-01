@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AngleSharp;
 using AngleSharp.Dom;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NytRemarkable.Domain.Interfaces;
 using NytRemarkable.Domain.Models;
@@ -19,11 +20,13 @@ public class NytArticleClient : INytArticleClient
 
     private readonly HttpClient httpClient;
     private readonly NytOptions options;
+    private readonly ILogger<NytArticleClient> logger;
 
-    public NytArticleClient(HttpClient httpClient, IOptions<NytOptions> options)
+    public NytArticleClient(HttpClient httpClient, IOptions<NytOptions> options, ILogger<NytArticleClient> logger)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
+        this.logger = logger;
     }
 
     public async Task<ArticleContent> GetArticle(string url)
@@ -34,7 +37,7 @@ public class NytArticleClient : INytArticleClient
         var document = await context.OpenAsync(req => req.Content(html));
 
         var title = document.QuerySelector("h1")?.TextContent.Trim() ?? string.Empty;
-        var body = await ExtractArticleBody(document);
+        var body = await ExtractArticleBody(document, url);
 
         return new ArticleContent
         {
@@ -45,9 +48,9 @@ public class NytArticleClient : INytArticleClient
         };
     }
 
-    private async Task<IReadOnlyList<ContentBlock>> ExtractArticleBody(IDocument document)
+    private async Task<IReadOnlyList<ContentBlock>> ExtractArticleBody(IDocument document, string url)
     {
-        var blocks = await TryParseNextData(document);
+        var blocks = await TryParseNextData(document, url);
         if (blocks.Count > 0)
             return blocks;
 
@@ -58,25 +61,55 @@ public class NytArticleClient : INytArticleClient
             document.QuerySelector("[data-testid='article-body']") ??
             document.QuerySelector("article");
 
-        return articleBody != null ? await WalkElement(articleBody) : [];
+        if (articleBody == null)
+        {
+            logger.LogWarning("No article body found via any selector for {Url}", url);
+            return [];
+        }
+
+        var htmlBlocks = await WalkElement(articleBody);
+        logger.LogInformation("HTML fallback found {Count} blocks for {Url}", htmlBlocks.Count, url);
+        return htmlBlocks;
     }
 
-    private async Task<IReadOnlyList<ContentBlock>> TryParseNextData(IDocument document)
+    private async Task<IReadOnlyList<ContentBlock>> TryParseNextData(IDocument document, string url)
     {
         var script = document.QuerySelector("script#__NEXT_DATA__");
-        if (script == null) return [];
+        if (script == null)
+        {
+            logger.LogWarning("No __NEXT_DATA__ script found for {Url}", url);
+            return [];
+        }
 
         try
         {
             using var doc = JsonDocument.Parse(script.TextContent);
 
-            // Navigate specific known paths — avoids accidentally picking up
-            // a body array from a related/recommended article embedded in the JSON
             foreach (var path in BodyPaths)
             {
                 var bodyArray = NavigatePath(doc.RootElement, path);
                 if (bodyArray is { ValueKind: JsonValueKind.Array })
+                {
+                    logger.LogInformation("Found body via path [{Path}] for {Url}",
+                        string.Join(".", path), url);
                     return await ParseBodyBlocks(bodyArray.Value);
+                }
+            }
+
+            // Log the keys available at props.pageProps to help diagnose the right path
+            var pageProps = NavigatePath(doc.RootElement, ["props", "pageProps"]);
+            if (pageProps is { ValueKind: JsonValueKind.Object })
+            {
+                var keys = pageProps.Value.EnumerateObject().Select(p => p.Name);
+                logger.LogWarning("No body path matched for {Url}. pageProps keys: {Keys}",
+                    url, string.Join(", ", keys));
+
+                var initialData = NavigatePath(pageProps.Value, ["initialData", "data"]);
+                if (initialData is { ValueKind: JsonValueKind.Object })
+                {
+                    var dataKeys = initialData.Value.EnumerateObject().Select(p => p.Name);
+                    logger.LogWarning("initialData.data keys for {Url}: {Keys}", url, string.Join(", ", dataKeys));
+                }
             }
         }
         catch
