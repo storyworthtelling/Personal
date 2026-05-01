@@ -4,20 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Personal projects repository — primarily background automation apps, with occasional Android apps and Angular frontends. Projects are added incrementally; update this file with project-specific build/test commands when a new one lands.
+Personal projects repository — primarily background automation apps, with occasional MAUI mobile apps and Angular frontends. Projects are added incrementally; update this file with project-specific build/test commands when a new one lands.
 
 ## Languages & Frameworks
 
 - **Primary**: C# / .NET
 - **Frontend** (when needed): Angular
-- **Mobile** (when needed): Android
+- **Mobile** (when needed): .NET MAUI
+- **IDE**: Visual Studio
+
+## Project Structure
+
+Each project lives in a single `.sln` with multiple `.csproj` files — typically split by concern (e.g. `Domain`, `Infrastructure`, `API`, `Tests`). Keep projects coarse-grained until complexity actually demands splitting.
 
 ## Architecture Preferences
 
 - Object-oriented; avoid functional-style abstractions that don't fit naturally in C#.
-- Services sit on top of a database abstraction layer — do not access the database directly from controllers or higher layers.
+- Controllers handle HTTP; services handle logic; EF Core `DbContext` is the data access layer. Do not add a repository layer on top of `DbContext`.
+- Do not access `DbContext` directly from controllers or above the service layer.
 - Prefer fewer layers over more. Avoid redundant typecasts and pass-through classes that add no value.
-- API-level integration tests + unit-heavy test coverage. Follow TDD: write the test first.
+- Use SignalR for pushing real-time updates to clients.
+- Expose APIs via controllers with Swagger documentation.
+
+## Async
+
+Use `async`/`await` only where I/O actually warrants it or where it will meaningfully improve expected performance. Do not make everything async by default.
+
+## Error Handling
+
+Handle errors where they occur. Propagate failures with a descriptive, specific message and preserve the stack trace for debugging. Do not swallow exceptions or replace them with vague messages.
 
 ## Testing
 
