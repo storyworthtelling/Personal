@@ -46,7 +46,8 @@ public class PlaywrightPageFetcher : IArticlePageFetcher, IAsyncDisposable
         IResponse? response;
         try
         {
-            response = await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.Load });
+            // NetworkIdle waits for the Cloudflare JS challenge to resolve before reading the page
+            response = await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
         }
         catch (Exception ex)
         {
