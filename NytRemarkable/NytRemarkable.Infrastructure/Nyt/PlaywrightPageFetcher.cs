@@ -38,15 +38,18 @@ public class PlaywrightPageFetcher : IArticlePageFetcher, IAsyncDisposable
 
         var page = await context.NewPageAsync();
 
-        // Remove the navigator.webdriver property that headless browsers expose
-        await page.AddInitScriptAsync("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+        await page.AddInitScriptAsync(@"
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            Object.defineProperty(window, 'chrome', {
+                get: () => ({ runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} })
+            });
+        ");
 
         logger.LogInformation("Navigating to {Url}", url);
 
         IResponse? response;
         try
         {
-            // NetworkIdle waits for the Cloudflare JS challenge to resolve before reading the page
             response = await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
         }
         catch (Exception ex)
@@ -60,15 +63,26 @@ public class PlaywrightPageFetcher : IArticlePageFetcher, IAsyncDisposable
 
         if (response == null || !response.Ok)
         {
+            // Cloudflare serves a JS challenge as a 403 — wait up to 30s for it to complete
+            // and redirect to the actual article before giving up
+            logger.LogInformation("Non-OK response for {Url}, waiting for Cloudflare challenge to resolve", url);
             try
             {
-                var content = await page.ContentAsync();
-                logger.LogWarning("Non-OK page content (first 500 chars): {Snippet}",
-                    content.Length > 500 ? content[..500] : content);
+                await page.WaitForSelectorAsync("h1", new PageWaitForSelectorOptions { Timeout = 30000 });
+                logger.LogInformation("Challenge resolved, article loaded for {Url}", url);
             }
-            catch { /* best-effort */ }
+            catch (TimeoutException)
+            {
+                try
+                {
+                    var content = await page.ContentAsync();
+                    logger.LogWarning("Challenge did not resolve (first 500 chars): {Snippet}",
+                        content.Length > 500 ? content[..500] : content);
+                }
+                catch { /* best-effort */ }
 
-            throw new HttpRequestException($"NYT article fetch failed: {status} for {url}");
+                throw new HttpRequestException($"NYT article fetch failed: {status} for {url}");
+            }
         }
 
         return await page.ContentAsync();
