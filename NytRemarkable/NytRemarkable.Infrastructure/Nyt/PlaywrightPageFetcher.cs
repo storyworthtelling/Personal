@@ -86,9 +86,9 @@ public class PlaywrightPageFetcher : IArticlePageFetcher, IAsyncDisposable
             playwright = await Playwright.CreateAsync();
             browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
             {
-                Headless = true,
+                Headless = false,
                 Channel = "chrome",
-                Args = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
+                Args = ["--disable-blink-features=AutomationControlled"]
             });
             logger.LogInformation("Chrome launched");
         }
