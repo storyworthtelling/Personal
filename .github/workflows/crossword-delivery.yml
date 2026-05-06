@@ -2,7 +2,7 @@ name: Deliver NYT Crossword
 
 on:
   schedule:
-    - cron: '0 11 * * *'  # 11:00 UTC = 6 AM EST (7 AM EDT in summer)
+    - cron: '45 10 * * *'  # 10:45 UTC = 5:45 AM EST (6:45 AM EDT in summer)
   workflow_dispatch:        # allows manual trigger from GitHub Actions UI
 
 jobs:

@@ -53,6 +53,9 @@ public class CrosswordDeliveryService(
             var articles = new List<ArticleContent>();
             foreach (var story in allStories)
             {
+                if (articles.Count > 0)
+                    await Task.Delay(TimeSpan.FromMinutes(1));
+
                 try
                 {
                     var article = await articleClient.GetArticle(story.Url);
