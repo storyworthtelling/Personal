@@ -38,12 +38,7 @@ public class PlaywrightPageFetcher : IArticlePageFetcher, IAsyncDisposable
 
         var page = await context.NewPageAsync();
 
-        await page.AddInitScriptAsync(@"
-            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-            Object.defineProperty(window, 'chrome', {
-                get: () => ({ runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} })
-            });
-        ");
+        await page.AddInitScriptAsync("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
 
         logger.LogInformation("Navigating to {Url}", url);
 
@@ -84,6 +79,11 @@ public class PlaywrightPageFetcher : IArticlePageFetcher, IAsyncDisposable
                 throw new HttpRequestException($"NYT article fetch failed: {status} for {url}");
             }
         }
+
+        // Brief pause and scroll to appear human before reading the page
+        await Task.Delay(2000);
+        await page.EvaluateAsync("window.scrollBy(0, 300)");
+        await Task.Delay(1000);
 
         return await page.ContentAsync();
     }
