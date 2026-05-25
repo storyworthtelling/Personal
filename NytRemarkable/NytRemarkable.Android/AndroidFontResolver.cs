@@ -37,7 +37,9 @@ public sealed class AndroidFontResolver : IFontResolver
         using var typeface = SKTypeface.FromFamilyName(family, skStyle)
                           ?? SKTypeface.FromFamilyName("sans-serif", skStyle)
                           ?? SKTypeface.Default;
-        using var data = typeface.Serialize();
-        return data?.ToArray();
+        using var stream = typeface.OpenStream(out _);
+        var bytes = new byte[stream.Length];
+        stream.Read(bytes, bytes.Length);
+        return bytes;
     }
 }
