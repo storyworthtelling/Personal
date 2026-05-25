@@ -62,6 +62,7 @@ public static class MauiProgram
 #if DEBUG
         builder.Logging.AddDebug();
 #endif
+        builder.Logging.AddProvider(DeliveryFileLogger.Instance);
 
         return builder.Build();
     }

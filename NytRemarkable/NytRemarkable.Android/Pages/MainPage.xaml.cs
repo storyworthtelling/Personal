@@ -8,6 +8,9 @@ public partial class MainPage : ContentPage
     private static string CrashLogPath =>
         System.IO.Path.Combine(FileSystem.AppDataDirectory, "crash.log");
 
+    private static string DeliveryLogPath =>
+        System.IO.Path.Combine(FileSystem.AppDataDirectory, "delivery.log");
+
     public MainPage()
     {
         InitializeComponent();
@@ -18,6 +21,8 @@ public partial class MainPage : ContentPage
         base.OnAppearing();
         StatusLabel.Text = CredentialStore.LastDeliveryResult;
         ConfigWarningLabel.IsVisible = !CredentialStore.IsConfigured;
+        DeliveryLogButton.IsVisible = System.IO.File.Exists(DeliveryLogPath) &&
+                                      new System.IO.FileInfo(DeliveryLogPath).Length > 0;
         CrashLogButton.IsVisible = System.IO.File.Exists(CrashLogPath);
     }
 
@@ -30,6 +35,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        DeliveryFileLogger.Clear();
         DeliverNowButton.IsEnabled = false;
         Spinner.IsVisible = true;
         Spinner.IsRunning = true;
@@ -51,6 +57,7 @@ public partial class MainPage : ContentPage
             });
 
             StatusLabel.Text = CredentialStore.LastDeliveryResult;
+            DeliveryLogButton.IsVisible = true;
             await DisplayAlert("Done", CredentialStore.LastDeliveryResult, "OK");
         }
         catch (Exception ex)
@@ -58,6 +65,7 @@ public partial class MainPage : ContentPage
             var fullMessage = FlattenException(ex);
             CredentialStore.LastDeliveryResult = $"Failed — {DateTime.Today:MMM d}: {ex.Message}";
             StatusLabel.Text = CredentialStore.LastDeliveryResult;
+            DeliveryLogButton.IsVisible = true;
             await Clipboard.SetTextAsync(fullMessage);
             await DisplayAlert("Delivery Failed (copied to clipboard)", fullMessage, "OK");
         }
@@ -90,6 +98,38 @@ public partial class MainPage : ContentPage
             IPlatformApplication.Current!.Services.GetRequiredService<SetupPage>());
     }
 
+    private async void OnDeliveryLogClicked(object sender, EventArgs e)
+    {
+        if (!System.IO.File.Exists(DeliveryLogPath))
+        {
+            await DisplayAlert("Delivery Log", "No delivery log found.", "OK");
+            return;
+        }
+
+        var log = System.IO.File.ReadAllText(DeliveryLogPath);
+        if (string.IsNullOrWhiteSpace(log))
+        {
+            await DisplayAlert("Delivery Log", "Log is empty.", "OK");
+            return;
+        }
+
+        var action = await DisplayActionSheet("Delivery Log", "Cancel", null, "View & Copy", "Share");
+        if (action == "View & Copy")
+        {
+            var display = log.Length > 3000 ? "(truncated — use Share for full log)\n\n" + log[^3000..] : log;
+            await Clipboard.SetTextAsync(log);
+            await DisplayAlert("Delivery Log (copied to clipboard)", display, "OK");
+        }
+        else if (action == "Share")
+        {
+            await Share.RequestAsync(new ShareFileRequest
+            {
+                Title = "NytRemarkable Delivery Log",
+                File = new ShareFile(DeliveryLogPath)
+            });
+        }
+    }
+
     private async void OnCrashLogClicked(object sender, EventArgs e)
     {
         if (!System.IO.File.Exists(CrashLogPath))
@@ -100,8 +140,8 @@ public partial class MainPage : ContentPage
 
         var log = System.IO.File.ReadAllText(CrashLogPath);
 
-        var action = await DisplayActionSheet("Crash Log", "Cancel", null, "View", "Share", "Clear");
-        if (action == "View")
+        var action = await DisplayActionSheet("Crash Log", "Cancel", null, "View & Copy", "Share", "Clear");
+        if (action == "View & Copy")
         {
             var display = log.Length > 3000 ? "(truncated — use Share for full log)\n\n" + log[^3000..] : log;
             await Clipboard.SetTextAsync(log);
