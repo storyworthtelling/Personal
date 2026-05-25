@@ -1,5 +1,4 @@
-using global::Android.Webkit;
-using AWebView = global::WebView;
+using Webkit = global::Android.Webkit;
 using Microsoft.Extensions.Logging;
 using NytRemarkable.Infrastructure.Nyt;
 
@@ -12,24 +11,24 @@ public class WebViewPageFetcher(ILogger<WebViewPageFetcher> logger) : IArticlePa
         var cookie = CredentialStore.NytSessionCookie;
         if (!string.IsNullOrEmpty(cookie))
         {
-            CookieManager.Instance!.SetAcceptCookie(true);
-            CookieManager.Instance.SetCookie(".nytimes.com",
+            Webkit.CookieManager.Instance!.SetAcceptCookie(true);
+            Webkit.CookieManager.Instance.SetCookie(".nytimes.com",
                 $"NYT-S={cookie}; Domain=.nytimes.com; Path=/; Secure");
-            CookieManager.Instance.Flush();
+            Webkit.CookieManager.Instance.Flush();
         }
 
         logger.LogInformation("Navigating to {Url}", url);
 
         var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-        AWebView? webView = null;
+        Webkit.WebView? webView = null;
 
         MainThread.BeginInvokeOnMainThread(() =>
         {
             var context = global::Android.App.Application.Context;
-            webView = new AWebView(context);
+            webView = new Webkit.WebView(context);
             webView.Settings.JavaScriptEnabled = true;
             webView.Settings.DomStorageEnabled = true;
-            CookieManager.Instance!.SetAcceptThirdPartyCookies(webView, true);
+            Webkit.CookieManager.Instance!.SetAcceptThirdPartyCookies(webView, true);
             webView.SetWebViewClient(new ArticleWebViewClient(tcs, logger));
             webView.LoadUrl(url);
         });
@@ -54,9 +53,9 @@ public class WebViewPageFetcher(ILogger<WebViewPageFetcher> logger) : IArticlePa
     }
 
     private sealed class ArticleWebViewClient(TaskCompletionSource<string> tcs, ILogger logger)
-        : WebViewClient
+        : Webkit.WebViewClient
     {
-        public override void OnPageFinished(AWebView? view, string? url)
+        public override void OnPageFinished(Webkit.WebView? view, string? url)
         {
             base.OnPageFinished(view, url);
 
@@ -70,8 +69,8 @@ public class WebViewPageFetcher(ILogger<WebViewPageFetcher> logger) : IArticlePa
                 new HtmlExtractCallback(tcs, logger));
         }
 
-        public override void OnReceivedError(AWebView? view, IWebResourceRequest? request,
-            WebResourceError? error)
+        public override void OnReceivedError(Webkit.WebView? view, Webkit.IWebResourceRequest? request,
+            Webkit.WebResourceError? error)
         {
             if (request?.IsForMainFrame == true)
             {
@@ -83,7 +82,7 @@ public class WebViewPageFetcher(ILogger<WebViewPageFetcher> logger) : IArticlePa
     }
 
     private sealed class HtmlExtractCallback(TaskCompletionSource<string> tcs, ILogger logger)
-        : Java.Lang.Object, IValueCallback
+        : Java.Lang.Object, Webkit.IValueCallback
     {
         public void OnReceiveValue(Java.Lang.Object? value)
         {
