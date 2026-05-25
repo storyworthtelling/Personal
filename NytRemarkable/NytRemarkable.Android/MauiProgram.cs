@@ -24,6 +24,12 @@ public static class MauiProgram
         builder.Services.Configure<RemarkableOptions>(opts =>
             opts.DeviceToken = CredentialStore.RemarkableDeviceToken);
 
+        // AndroidMessageHandler routes through Android's HttpsURLConnection, which is
+        // the only handler allowed by SELinux for network access in Android apps.
+        builder.Services.ConfigureHttpClientDefaults(b =>
+            b.ConfigurePrimaryHttpMessageHandler(
+                () => new Xamarin.Android.Net.AndroidMessageHandler()));
+
         builder.Services.AddHttpClient<INytCrosswordClient, NytCrosswordClient>();
         builder.Services.AddHttpClient<INytTopStoriesClient, NytTopStoriesClient>();
         builder.Services.AddSingleton<IArticlePageFetcher, WebViewPageFetcher>();
