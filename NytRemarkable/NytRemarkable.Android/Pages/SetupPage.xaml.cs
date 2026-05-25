@@ -24,7 +24,7 @@ public partial class SetupPage : ContentPage
         CredentialStore.NytApiKey = NytApiKeyEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.RemarkableDeviceToken = RemarkableTokenEntry.Text?.Trim() ?? string.Empty;
 
-        await DisplayAlert("Saved", "Settings saved. Restart the app to apply changes.", "OK");
+        await DisplayAlert("Saved", "Settings saved.", "OK");
         await Navigation.PopAsync();
     }
 
@@ -73,8 +73,9 @@ public partial class SetupPage : ContentPage
             }
 
             var token = (await response.Content.ReadAsStringAsync()).Trim().Trim('"');
+            CredentialStore.RemarkableDeviceToken = token;
             RemarkableTokenEntry.Text = token;
-            await DisplayAlert("Registered!", "Device registered successfully. Tap Save to store the token.", "OK");
+            await DisplayAlert("Registered!", "Device registered and token saved.", "OK");
         }
         catch (Exception ex)
         {

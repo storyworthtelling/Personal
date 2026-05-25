@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using NytRemarkable.Domain.Interfaces;
@@ -12,17 +13,25 @@ namespace NytRemarkable.Android;
 
 public static class MauiProgram
 {
+    // IOptions<T> is a singleton whose Configure delegate runs once and caches.
+    // This wrapper reads from CredentialStore on every access so credential
+    // updates (or late saves) are always picked up without restarting the app.
+    private sealed class LiveOptions<T>(Func<T> factory) : IOptions<T> where T : class
+    {
+        public T Value => factory();
+    }
+
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>();
 
-        builder.Services.Configure<NytOptions>(opts =>
-            opts.SessionCookie = CredentialStore.NytSessionCookie);
-        builder.Services.Configure<NytApiOptions>(opts =>
-            opts.ApiKey = CredentialStore.NytApiKey);
-        builder.Services.Configure<RemarkableOptions>(opts =>
-            opts.DeviceToken = CredentialStore.RemarkableDeviceToken);
+        builder.Services.AddSingleton<IOptions<NytOptions>>(
+            _ => new LiveOptions<NytOptions>(() => new NytOptions { SessionCookie = CredentialStore.NytSessionCookie }));
+        builder.Services.AddSingleton<IOptions<NytApiOptions>>(
+            _ => new LiveOptions<NytApiOptions>(() => new NytApiOptions { ApiKey = CredentialStore.NytApiKey }));
+        builder.Services.AddSingleton<IOptions<RemarkableOptions>>(
+            _ => new LiveOptions<RemarkableOptions>(() => new RemarkableOptions { DeviceToken = CredentialStore.RemarkableDeviceToken }));
 
         // AndroidMessageHandler routes through Android's HttpsURLConnection (Java layer),
         // which is required for SELinux to permit network access. SocketsHttpHandler
