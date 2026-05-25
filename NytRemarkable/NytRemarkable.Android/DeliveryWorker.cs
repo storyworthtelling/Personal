@@ -25,12 +25,12 @@ public class DeliveryWorker : Worker
             var delivery = scope.ServiceProvider.GetRequiredService<CrosswordDeliveryService>();
             var today = DateOnly.FromDateTime(DateTime.Today);
 
-            delivery.DeliverDailyPuzzle(today).GetAwaiter().GetResult();
+            var newsStatus = delivery.DeliverDailyPuzzle(today).GetAwaiter().GetResult();
 
             if (CrosswordDeliveryService.IsFirstSundayOfMonth(today))
                 delivery.DeliverBonusPuzzle(today).GetAwaiter().GetResult();
 
-            CredentialStore.LastDeliveryResult = $"Success — {today:MMM d, yyyy}";
+            CredentialStore.LastDeliveryResult = $"Success — {today:MMM d, yyyy} ({newsStatus})";
             return Result.InvokeSuccess();
         }
         catch (Exception ex)

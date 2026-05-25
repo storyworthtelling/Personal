@@ -42,16 +42,16 @@ public partial class MainPage : ContentPage
                 using var scope = IPlatformApplication.Current!.Services.CreateScope();
                 var delivery = scope.ServiceProvider.GetRequiredService<CrosswordDeliveryService>();
                 var today = DateOnly.FromDateTime(DateTime.Today);
-                await delivery.DeliverDailyPuzzle(today);
+                var newsStatus = await delivery.DeliverDailyPuzzle(today);
 
                 if (CrosswordDeliveryService.IsFirstSundayOfMonth(today))
                     await delivery.DeliverBonusPuzzle(today);
 
-                CredentialStore.LastDeliveryResult = $"Success — {today:MMM d, yyyy}";
+                CredentialStore.LastDeliveryResult = $"Success — {today:MMM d, yyyy} ({newsStatus})";
             });
 
             StatusLabel.Text = CredentialStore.LastDeliveryResult;
-            await DisplayAlert("Done", "Crossword delivered to your reMarkable!", "OK");
+            await DisplayAlert("Done", CredentialStore.LastDeliveryResult, "OK");
         }
         catch (Exception ex)
         {
