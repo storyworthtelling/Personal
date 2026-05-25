@@ -6,9 +6,12 @@ using NytRemarkable.Infrastructure.Delivery;
 namespace NytRemarkable.Android;
 
 [global::Android.Runtime.Register("com.storyworthtelling.nytremarkable.DeliveryWorker")]
-public class DeliveryWorker(Context context, WorkerParameters parameters)
-    : Worker(context, parameters)
+public class DeliveryWorker : Worker
 {
+    public DeliveryWorker(Context context, WorkerParameters parameters)
+        : base(context, parameters)
+    {
+    }
     private const string WorkName = "crossword-delivery";
 
     public override Result DoWork()
