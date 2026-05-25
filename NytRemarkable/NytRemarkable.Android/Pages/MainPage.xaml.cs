@@ -5,6 +5,9 @@ namespace NytRemarkable.Android.Pages;
 
 public partial class MainPage : ContentPage
 {
+    private static string CrashLogPath =>
+        System.IO.Path.Combine(FileSystem.AppDataDirectory, "crash.log");
+
     public MainPage()
     {
         InitializeComponent();
@@ -15,6 +18,7 @@ public partial class MainPage : ContentPage
         base.OnAppearing();
         StatusLabel.Text = CredentialStore.LastDeliveryResult;
         ConfigWarningLabel.IsVisible = !CredentialStore.IsConfigured;
+        CrashLogButton.IsVisible = System.IO.File.Exists(CrashLogPath);
     }
 
     private async void OnDeliverNowClicked(object sender, EventArgs e)
@@ -67,5 +71,36 @@ public partial class MainPage : ContentPage
     {
         await Navigation.PushAsync(
             IPlatformApplication.Current!.Services.GetRequiredService<SetupPage>());
+    }
+
+    private async void OnCrashLogClicked(object sender, EventArgs e)
+    {
+        if (!System.IO.File.Exists(CrashLogPath))
+        {
+            await DisplayAlert("Crash Log", "No crash log found.", "OK");
+            return;
+        }
+
+        var log = System.IO.File.ReadAllText(CrashLogPath);
+
+        var action = await DisplayActionSheet("Crash Log", "Cancel", null, "View", "Share", "Clear");
+        if (action == "View")
+        {
+            var display = log.Length > 3000 ? "(truncated — use Share for full log)\n\n" + log[^3000..] : log;
+            await DisplayAlert("Crash Log", display, "OK");
+        }
+        else if (action == "Share")
+        {
+            await Share.RequestAsync(new ShareFileRequest
+            {
+                Title = "NytRemarkable Crash Log",
+                File = new ShareFile(CrashLogPath)
+            });
+        }
+        else if (action == "Clear")
+        {
+            System.IO.File.Delete(CrashLogPath);
+            CrashLogButton.IsVisible = false;
+        }
     }
 }
