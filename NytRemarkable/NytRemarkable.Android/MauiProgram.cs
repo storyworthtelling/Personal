@@ -8,6 +8,7 @@ using NytRemarkable.Infrastructure.Delivery;
 using NytRemarkable.Infrastructure.Nyt;
 using NytRemarkable.Infrastructure.Pdf;
 using NytRemarkable.Infrastructure.Remarkable;
+using PdfSharp.Fonts;
 
 namespace NytRemarkable.Android;
 
@@ -23,6 +24,10 @@ public static class MauiProgram
 
     public static MauiApp CreateMauiApp()
     {
+        // PDFsharp requires a font resolver on non-Windows; without one its SkiaSharp
+        // font lookup returns null and the first draw call throws NullReferenceException.
+        GlobalFontSettings.FontResolver = AndroidFontResolver.Instance;
+
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>();
 

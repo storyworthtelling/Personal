@@ -23,11 +23,11 @@ public class PdfComposer : IPdfComposer
         var doc = new PdfDocument();
         var ctx = new LayoutContext(doc);
 
-        var h1Font    = new XFont("Arial", 22, XFontStyleEx.Bold);
-        var dateFont  = new XFont("Arial", 11, XFontStyleEx.Regular);
-        var artFont   = new XFont("Arial", 16, XFontStyleEx.Bold);
-        var metaFont  = new XFont("Arial",  9, XFontStyleEx.Italic);
-        var bodyFont  = new XFont("Arial", 11, XFontStyleEx.Regular);
+        var h1Font    = new XFont("sans-serif", 22, XFontStyleEx.Bold);
+        var dateFont  = new XFont("sans-serif", 11, XFontStyleEx.Regular);
+        var artFont   = new XFont("sans-serif", 16, XFontStyleEx.Bold);
+        var metaFont  = new XFont("sans-serif",  9, XFontStyleEx.Italic);
+        var bodyFont  = new XFont("sans-serif", 11, XFontStyleEx.Regular);
 
         // Header
         DrawCentered(ctx, "The New York Times", h1Font, 28);
@@ -40,7 +40,7 @@ public class PdfComposer : IPdfComposer
         {
             var article = articles[i];
 
-            DrawWrapped(ctx, article.Title, artFont);
+            DrawWrapped(ctx, article.Title ?? string.Empty, artFont);
             ctx.Advance(4);
 
             var meta = string.Join(" · ",
@@ -53,7 +53,7 @@ public class PdfComposer : IPdfComposer
 
             foreach (var block in article.Body)
             {
-                if (block is TextBlock text && !string.IsNullOrWhiteSpace(text.Text))
+                if (block is TextBlock text && !string.IsNullOrWhiteSpace(text?.Text))
                 {
                     DrawWrapped(ctx, text.Text, bodyFont);
                     ctx.Advance(4);
