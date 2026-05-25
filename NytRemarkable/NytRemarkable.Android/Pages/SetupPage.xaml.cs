@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -6,8 +5,11 @@ namespace NytRemarkable.Android.Pages;
 
 public partial class SetupPage : ContentPage
 {
-    public SetupPage()
+    private readonly IHttpClientFactory httpClientFactory;
+
+    public SetupPage(IHttpClientFactory httpClientFactory)
     {
+        this.httpClientFactory = httpClientFactory;
         InitializeComponent();
     }
 
@@ -53,7 +55,7 @@ public partial class SetupPage : ContentPage
 
         try
         {
-            using var http = new HttpClient();
+            using var http = httpClientFactory.CreateClient();
             var body = JsonSerializer.Serialize(new
             {
                 code = code.Trim(),
