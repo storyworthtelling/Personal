@@ -17,12 +17,44 @@ public class MainApplication : MauiApplication
 
     public override void OnCreate()
     {
-        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-        {
-            var msg = e.ExceptionObject?.ToString() ?? "Unknown error";
-            CredentialStore.LastDeliveryResult = $"CRASH: {msg}";
-        };
+        var prevHandler = Java.Lang.Thread.DefaultUncaughtExceptionHandler;
+        Java.Lang.Thread.DefaultUncaughtExceptionHandler = new CrashLogger(prevHandler);
+
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            CrashLogger.Log(args.ExceptionObject?.ToString() ?? "(no details)");
 
         base.OnCreate();
+    }
+
+    private sealed class CrashLogger : Java.Lang.Object, Java.Lang.Thread.IUncaughtExceptionHandler
+    {
+        private const string LogTag = "NytRemarkable";
+        private readonly Java.Lang.Thread.IUncaughtExceptionHandler? previous;
+
+        public CrashLogger(Java.Lang.Thread.IUncaughtExceptionHandler? previous)
+        {
+            this.previous = previous;
+        }
+
+        public void UncaughtException(Java.Lang.Thread? thread, Java.Lang.Throwable? ex)
+        {
+            Log($"Uncaught exception on thread '{thread?.Name}':\n{ex}");
+            previous?.UncaughtException(thread, ex);
+        }
+
+        internal static void Log(string message)
+        {
+            global::Android.Util.Log.Error(LogTag, message);
+            try
+            {
+                var path = global::System.IO.Path.Combine(
+                    global::Android.App.Application.Context.FilesDir!.AbsolutePath,
+                    "crash.log");
+                global::System.IO.File.AppendAllText(
+                    path,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}]\n{message}\n\n---\n\n");
+            }
+            catch { }
+        }
     }
 }

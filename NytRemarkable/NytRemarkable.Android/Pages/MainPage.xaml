@@ -41,5 +41,12 @@
                 BackgroundColor="#333333"
                 HorizontalOptions="Fill" />
 
+        <Button x:Name="CrashLogButton"
+                Text="View Crash Log"
+                Clicked="OnCrashLogClicked"
+                BackgroundColor="#5a1a1a"
+                IsVisible="False"
+                HorizontalOptions="Fill" />
+
     </VerticalStackLayout>
 </ContentPage>
