@@ -10,7 +10,7 @@ namespace NytRemarkable.Infrastructure.Pdf;
 
 public class PdfComposer : IPdfComposer
 {
-    static PdfComposer()
+    public PdfComposer()
     {
         QuestPDF.Settings.License = LicenseType.Community;
     }

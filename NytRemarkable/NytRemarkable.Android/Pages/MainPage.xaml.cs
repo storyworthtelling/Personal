@@ -55,9 +55,10 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
+            var fullMessage = FlattenException(ex);
             CredentialStore.LastDeliveryResult = $"Failed — {DateTime.Today:MMM d}: {ex.Message}";
             StatusLabel.Text = CredentialStore.LastDeliveryResult;
-            await DisplayAlert("Delivery Failed", ex.Message, "OK");
+            await DisplayAlert("Delivery Failed", fullMessage, "OK");
         }
         finally
         {
@@ -65,6 +66,19 @@ public partial class MainPage : ContentPage
             Spinner.IsVisible = false;
             DeliverNowButton.IsEnabled = true;
         }
+    }
+
+    private static string FlattenException(Exception ex)
+    {
+        var parts = new System.Text.StringBuilder();
+        var current = ex;
+        while (current != null)
+        {
+            parts.AppendLine(current.Message);
+            current = current.InnerException;
+            if (current != null) parts.AppendLine("Caused by:");
+        }
+        return parts.ToString().Trim();
     }
 
     private async void OnSettingsClicked(object sender, EventArgs e)
