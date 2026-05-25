@@ -5,8 +5,11 @@
     <UseMaui>true</UseMaui>
     <RootNamespace>NytRemarkable.Android</RootNamespace>
     <ApplicationId>com.storyworthtelling.nytremarkable</ApplicationId>
-    <ApplicationVersion>$([System.DateTime]::UtcNow.ToString('yyyyMMdd'))</ApplicationVersion>
-    <ApplicationDisplayVersion>1.1</ApplicationDisplayVersion>
+    <!-- yyyyMMddHHmm overflows Android's int32 versionCode limit (2,147,483,647).
+         Using last digit of year keeps the 9-digit result within range. -->
+    <_VersionYearDigit>$([MSBuild]::Modulo($([System.DateTime]::UtcNow.Year), 10))</_VersionYearDigit>
+    <ApplicationVersion>$(_VersionYearDigit)$([System.DateTime]::UtcNow.ToString('MMddHHmm'))</ApplicationVersion>
+    <ApplicationDisplayVersion>$([System.DateTime]::UtcNow.ToString('yyyy.MM.dd.HHmm'))</ApplicationDisplayVersion>
     <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
