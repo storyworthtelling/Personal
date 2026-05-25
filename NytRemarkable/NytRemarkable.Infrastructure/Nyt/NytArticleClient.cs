@@ -43,7 +43,10 @@ public class NytArticleClient : INytArticleClient
         var title = document.QuerySelector("h1")?.TextContent.Trim() ?? string.Empty;
         var body = await ExtractArticleBody(document, url);
 
-        logger.LogInformation("Parsed {Blocks} block(s) from {Url}", body.Count, url);
+        var imageCount = body.Count(b => b is ImageBlock);
+        var textCount  = body.Count(b => b is TextBlock);
+        logger.LogInformation("Parsed {Total} block(s) from {Url} — {Text} text, {Images} image(s)",
+            body.Count, url, textCount, imageCount);
 
         return new ArticleContent
         {
@@ -206,13 +209,16 @@ public class NytArticleClient : INytArticleClient
         if (block.TryGetProperty("caption", out var cap))
             caption = ExtractTextFromBlock(cap);
 
+        var fetchUrl = StripWebP(imageUrl);
         try
         {
-            var imageBytes = await httpClient.GetByteArrayAsync(StripWebP(imageUrl));
+            var imageBytes = await httpClient.GetByteArrayAsync(fetchUrl);
+            logger.LogInformation("Image downloaded: {Bytes} bytes from {Url}", imageBytes.Length, fetchUrl);
             return new ImageBlock { ImageBytes = imageBytes, Caption = caption };
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning("Image download failed for {Url}: {Error}", fetchUrl, ex.Message);
             return null;
         }
     }
