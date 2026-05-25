@@ -1,8 +1,8 @@
+using System.Text;
+using PdfSharp;
+using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
 using NytRemarkable.Domain.Interfaces;
 using NytRemarkable.Domain.Models;
 
@@ -10,10 +10,7 @@ namespace NytRemarkable.Infrastructure.Pdf;
 
 public class PdfComposer : IPdfComposer
 {
-    public PdfComposer()
-    {
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
+    private const double Margin = 54; // 0.75 inch in points
 
     public byte[] Compose(IReadOnlyList<ArticleContent> articles, byte[] crosswordPdfBytes)
     {
@@ -23,62 +20,128 @@ public class PdfComposer : IPdfComposer
 
     private static byte[] GenerateNewsPages(IReadOnlyList<ArticleContent> articles)
     {
-        return Document.Create(container =>
+        var doc = new PdfDocument();
+        var ctx = new LayoutContext(doc);
+
+        var h1Font    = new XFont("Arial", 22, XFontStyleEx.Bold);
+        var dateFont  = new XFont("Arial", 11, XFontStyleEx.Regular);
+        var artFont   = new XFont("Arial", 16, XFontStyleEx.Bold);
+        var metaFont  = new XFont("Arial",  9, XFontStyleEx.Italic);
+        var bodyFont  = new XFont("Arial", 11, XFontStyleEx.Regular);
+
+        // Header
+        DrawCentered(ctx, "The New York Times", h1Font, 28);
+        DrawCentered(ctx, DateTime.Today.ToString("MMMM d, yyyy"), dateFont, 18);
+        ctx.Gfx.DrawLine(new XPen(XColors.Black, 1.5),
+            Margin, ctx.Y, Margin + LayoutContext.ContentWidth, ctx.Y);
+        ctx.Advance(14);
+
+        for (var i = 0; i < articles.Count; i++)
         {
-            container.Page(page =>
+            var article = articles[i];
+
+            DrawWrapped(ctx, article.Title, artFont);
+            ctx.Advance(4);
+
+            var meta = string.Join(" · ",
+                new[] { article.Section, article.Byline }.Where(s => !string.IsNullOrEmpty(s)));
+            if (!string.IsNullOrEmpty(meta))
             {
-                page.Size(PageSizes.Letter);
-                page.Margin(0.75f, Unit.Inch);
-                page.DefaultTextStyle(x => x.FontFamily("Arial").FontSize(11));
+                DrawWrapped(ctx, meta, metaFont);
+                ctx.Advance(6);
+            }
 
-                page.Content().Column(col =>
+            foreach (var block in article.Body)
+            {
+                if (block is TextBlock text && !string.IsNullOrWhiteSpace(text.Text))
                 {
-                    col.Item().Text("The New York Times")
-                        .Bold().FontSize(22).AlignCenter();
-                    col.Item().PaddingBottom(4)
-                        .Text(DateTime.Today.ToString("MMMM d, yyyy"))
-                        .FontSize(11).AlignCenter();
-                    col.Item().PaddingBottom(16).LineHorizontal(1.5f);
+                    DrawWrapped(ctx, text.Text, bodyFont);
+                    ctx.Advance(4);
+                }
+                else if (block is ImageBlock image)
+                {
+                    TryDrawImage(ctx, image, metaFont);
+                }
+            }
 
-                    for (var i = 0; i < articles.Count; i++)
-                    {
-                        RenderArticle(col, articles[i]);
+            if (i < articles.Count - 1)
+            {
+                ctx.Advance(8);
+                ctx.NewPageIfNeeded(20);
+                ctx.Gfx.DrawLine(new XPen(XColors.LightGray, 0.5),
+                    Margin, ctx.Y, Margin + LayoutContext.ContentWidth, ctx.Y);
+                ctx.Advance(12);
+            }
+        }
 
-                        if (i < articles.Count - 1)
-                        {
-                            col.Item().PaddingVertical(12).LineHorizontal(0.5f);
-                        }
-                    }
-                });
-            });
-        }).GeneratePdf();
+        using var ms = new MemoryStream();
+        doc.Save(ms);
+        return ms.ToArray();
     }
 
-    private static void RenderArticle(ColumnDescriptor col, ArticleContent article)
+    private static void DrawCentered(LayoutContext ctx, string text, XFont font, double height)
     {
-        col.Item().Text(article.Title).Bold().FontSize(16);
+        ctx.NewPageIfNeeded(height);
+        ctx.Gfx.DrawString(text, font, XBrushes.Black,
+            new XRect(Margin, ctx.Y, LayoutContext.ContentWidth, height),
+            XStringFormats.TopCenter);
+        ctx.Advance(height);
+    }
 
-        if (!string.IsNullOrEmpty(article.Byline) || !string.IsNullOrEmpty(article.Section))
+    private static void DrawWrapped(LayoutContext ctx, string text, XFont font, double lineSpacing = 1.4)
+    {
+        var lineH = font.GetHeight() * lineSpacing;
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var line = new StringBuilder();
+
+        foreach (var word in words)
         {
-            var meta = string.Join(" · ", new[] { article.Section, article.Byline }
-                .Where(s => !string.IsNullOrEmpty(s)));
-            col.Item().PaddingBottom(6).Text(meta).Italic().FontSize(9).FontColor(Colors.Grey.Darken2);
+            var test = line.Length > 0 ? $"{line} {word}" : word;
+            if (ctx.Gfx.MeasureString(test, font).Width > LayoutContext.ContentWidth && line.Length > 0)
+            {
+                FlushLine(ctx, line.ToString(), font, lineH);
+                line.Clear().Append(word);
+            }
+            else
+            {
+                if (line.Length > 0) line.Append(' ');
+                line.Append(word);
+            }
         }
 
-        foreach (var block in article.Body)
+        if (line.Length > 0)
+            FlushLine(ctx, line.ToString(), font, lineH);
+    }
+
+    private static void FlushLine(LayoutContext ctx, string line, XFont font, double lineH)
+    {
+        ctx.NewPageIfNeeded(lineH);
+        ctx.Gfx.DrawString(line, font, XBrushes.Black,
+            new XRect(Margin, ctx.Y, LayoutContext.ContentWidth, lineH),
+            XStringFormats.TopLeft);
+        ctx.Advance(lineH);
+    }
+
+    private static void TryDrawImage(LayoutContext ctx, ImageBlock image, XFont captionFont)
+    {
+        try
         {
-            if (block is TextBlock text)
+            using var stream = new MemoryStream(image.ImageBytes);
+            var xImg = XImage.FromStream(stream);
+            var imgW = Math.Min(xImg.PointWidth, LayoutContext.ContentWidth);
+            var imgH = xImg.PointHeight * imgW / xImg.PointWidth;
+
+            ctx.NewPageIfNeeded(imgH);
+            ctx.Gfx.DrawImage(xImg, Margin, ctx.Y, imgW, imgH);
+            ctx.Advance(imgH + 4);
+
+            if (!string.IsNullOrEmpty(image.Caption))
             {
-                col.Item().PaddingBottom(4).Text(text.Text).FontSize(11);
-            }
-            else if (block is ImageBlock image)
-            {
-                col.Item().PaddingVertical(6).MaxWidth(400).Image(image.ImageBytes);
-                if (!string.IsNullOrEmpty(image.Caption))
-                    col.Item().PaddingBottom(6).Text(image.Caption).Italic().FontSize(9)
-                        .FontColor(Colors.Grey.Darken2);
+                DrawWrapped(ctx, image.Caption, captionFont);
+                ctx.Advance(4);
             }
         }
+        catch { /* skip image if it can't be decoded */ }
     }
 
     private static byte[] MergePdfs(byte[] first, byte[] second)
@@ -102,5 +165,45 @@ public class PdfComposer : IPdfComposer
         using var outputStream = new MemoryStream();
         output.Save(outputStream);
         return outputStream.ToArray();
+    }
+
+    private sealed class LayoutContext
+    {
+        private readonly PdfDocument doc;
+        private const double PageWidth = 612;   // US Letter in points
+        private const double PageHeight = 792;
+        public const double ContentWidth = PageWidth - 2 * Margin;
+        private const double BottomY = PageHeight - Margin;
+
+        public XGraphics Gfx { get; private set; }
+        public double Y { get; private set; }
+
+        public LayoutContext(PdfDocument doc)
+        {
+            this.doc = doc;
+            Gfx = XGraphics.FromPdfPage(AddLetter());
+            Y = Margin;
+        }
+
+        public void NewPageIfNeeded(double spaceNeeded)
+        {
+            if (Y + spaceNeeded > BottomY)
+                NewPage();
+        }
+
+        public void NewPage()
+        {
+            Gfx = XGraphics.FromPdfPage(AddLetter());
+            Y = Margin;
+        }
+
+        public void Advance(double amount) => Y += amount;
+
+        private PdfPage AddLetter()
+        {
+            var page = doc.AddPage();
+            page.Size = PageSize.Letter;
+            return page;
+        }
     }
 }
