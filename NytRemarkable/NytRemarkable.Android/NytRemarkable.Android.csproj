@@ -5,8 +5,8 @@
     <UseMaui>true</UseMaui>
     <RootNamespace>NytRemarkable.Android</RootNamespace>
     <ApplicationId>com.storyworthtelling.nytremarkable</ApplicationId>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>$([System.DateTime]::UtcNow.ToString('yyyyMMdd'))</ApplicationVersion>
+    <ApplicationDisplayVersion>1.1</ApplicationDisplayVersion>
     <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
