@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.Extensions.Logging;
 using PdfSharp;
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
@@ -12,13 +13,20 @@ public class PdfComposer : IPdfComposer
 {
     private const double Margin = 54; // 0.75 inch in points
 
+    private readonly ILogger<PdfComposer> logger;
+
+    public PdfComposer(ILogger<PdfComposer> logger)
+    {
+        this.logger = logger;
+    }
+
     public byte[] Compose(IReadOnlyList<ArticleContent> articles, byte[] crosswordPdfBytes)
     {
         var newsPdfBytes = GenerateNewsPages(articles);
         return MergePdfs(newsPdfBytes, crosswordPdfBytes);
     }
 
-    private static byte[] GenerateNewsPages(IReadOnlyList<ArticleContent> articles)
+    private byte[] GenerateNewsPages(IReadOnlyList<ArticleContent> articles)
     {
         var doc = new PdfDocument();
         var ctx = new LayoutContext(doc);
@@ -60,7 +68,7 @@ public class PdfComposer : IPdfComposer
                 }
                 else if (block is ImageBlock image)
                 {
-                    TryDrawImage(ctx, image, metaFont);
+                    TryDrawImage(ctx, image, metaFont, logger);
                 }
             }
 
@@ -122,7 +130,7 @@ public class PdfComposer : IPdfComposer
         ctx.Advance(lineH);
     }
 
-    private static void TryDrawImage(LayoutContext ctx, ImageBlock image, XFont captionFont)
+    private static void TryDrawImage(LayoutContext ctx, ImageBlock image, XFont captionFont, ILogger logger)
     {
         try
         {
@@ -130,6 +138,8 @@ public class PdfComposer : IPdfComposer
             var xImg = XImage.FromStream(stream);
             var imgW = Math.Min(xImg.PointWidth, LayoutContext.ContentWidth);
             var imgH = xImg.PointHeight * imgW / xImg.PointWidth;
+
+            logger.LogInformation("Drawing image {W}x{H}pt from {Bytes} bytes", imgW, imgH, image.ImageBytes.Length);
 
             ctx.NewPageIfNeeded(imgH);
             ctx.Gfx.DrawImage(xImg, Margin, ctx.Y, imgW, imgH);
@@ -141,7 +151,10 @@ public class PdfComposer : IPdfComposer
                 ctx.Advance(4);
             }
         }
-        catch { /* skip image if it can't be decoded */ }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Image render failed ({Bytes} bytes): {Error}", image.ImageBytes.Length, ex.Message);
+        }
     }
 
     private static byte[] MergePdfs(byte[] first, byte[] second)
