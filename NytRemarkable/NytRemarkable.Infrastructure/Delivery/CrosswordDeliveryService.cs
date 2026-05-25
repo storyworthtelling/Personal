@@ -12,18 +12,20 @@ public class CrosswordDeliveryService(
     IPdfComposer pdfComposer,
     ILogger<CrosswordDeliveryService> logger)
 {
-    public async Task DeliverDailyPuzzle(DateOnly date)
+    // Returns a human-readable summary of what was delivered, e.g. "8 articles + crossword"
+    // or "crossword only — <reason>" so callers can surface it to the user.
+    public async Task<string> DeliverDailyPuzzle(DateOnly date)
     {
         logger.LogInformation("Downloading daily crossword for {Date}", date);
         var crosswordBytes = await nytClient.DownloadDailyPuzzle(date);
 
-        var finalBytes = await TryComposeWithNews(crosswordBytes, date);
+        var (finalBytes, newsStatus) = await TryComposeWithNews(crosswordBytes, date);
 
         var title = $"NYT Crossword {date:yyyy-MM-dd}";
-        logger.LogInformation("Uploading to reMarkable: {Title}", title);
+        logger.LogInformation("Uploading to reMarkable: {Title} ({NewsStatus})", title, newsStatus);
         await remarkableClient.Upload(title, finalBytes);
 
-        logger.LogInformation("Delivered: {Title}", title);
+        return newsStatus;
     }
 
     public async Task DeliverBonusPuzzle(DateOnly date)
@@ -34,62 +36,66 @@ public class CrosswordDeliveryService(
         var title = $"NYT Bonus Crossword {date:MMMM yyyy}";
         logger.LogInformation("Uploading to reMarkable: {Title}", title);
         await remarkableClient.Upload(title, pdfBytes);
-
-        logger.LogInformation("Delivered: {Title}", title);
     }
 
     public static bool IsFirstSundayOfMonth(DateOnly date) =>
         date.DayOfWeek == DayOfWeek.Sunday && date.Day <= 7;
 
-    private async Task<byte[]> TryComposeWithNews(byte[] crosswordBytes, DateOnly date)
+    private async Task<(byte[] bytes, string status)> TryComposeWithNews(byte[] crosswordBytes, DateOnly date)
     {
+        List<TopStory> allStories;
         try
         {
             var newsTask = topStoriesClient.GetTopNewsStories(5);
             var opinionTask = topStoriesClient.GetTopOpinionArticles(3);
             await Task.WhenAll(newsTask, opinionTask);
-
-            var allStories = newsTask.Result.Concat(opinionTask.Result).ToList();
-            if (allStories.Count == 0)
-                return crosswordBytes;
-
-            var articles = new List<ArticleContent>();
-            foreach (var story in allStories)
-            {
-                if (articles.Count > 0)
-                    await Task.Delay(TimeSpan.FromMinutes(1));
-
-                try
-                {
-                    var article = await articleClient.GetArticle(story.Url);
-                    logger.LogInformation("[FULL ARTICLE] {Title} — {Blocks} block(s)", article.Title, article.Body.Count);
-                    articles.Add(article);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "[ABSTRACT FALLBACK] {Title} ({Url}): {Error}",
-                        story.Title, story.Url, ex.Message);
-                    if (!string.IsNullOrEmpty(story.Abstract))
-                        articles.Add(new ArticleContent
-                        {
-                            Title = story.Title,
-                            Byline = story.Byline,
-                            Section = story.Section,
-                            Body = [new TextBlock { Text = story.Abstract }]
-                        });
-                }
-            }
-
-            if (articles.Count == 0)
-                return crosswordBytes;
-
-            logger.LogInformation("Composing {Count} articles with crossword for {Date}", articles.Count, date);
-            return pdfComposer.Compose(articles, crosswordBytes);
+            allStories = newsTask.Result.Concat(opinionTask.Result).ToList();
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to fetch news for {Date}, delivering crossword only", date);
-            return crosswordBytes;
+            logger.LogWarning(ex, "Top Stories API failed for {Date}", date);
+            return (crosswordBytes, $"crossword only — news API error: {ex.Message}");
+        }
+
+        if (allStories.Count == 0)
+            return (crosswordBytes, "crossword only — no stories returned by API");
+
+        var articles = new List<ArticleContent>();
+        foreach (var story in allStories)
+        {
+            try
+            {
+                var article = await articleClient.GetArticle(story.Url);
+                logger.LogInformation("[FULL ARTICLE] {Title} — {Blocks} block(s)", article.Title, article.Body.Count);
+                articles.Add(article);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "[ABSTRACT FALLBACK] {Title}: {Error}", story.Title, ex.Message);
+                if (!string.IsNullOrEmpty(story.Abstract))
+                    articles.Add(new ArticleContent
+                    {
+                        Title = story.Title,
+                        Byline = story.Byline,
+                        Section = story.Section,
+                        Body = [new TextBlock { Text = story.Abstract }]
+                    });
+            }
+        }
+
+        if (articles.Count == 0)
+            return (crosswordBytes, "crossword only — all articles failed and abstracts were empty");
+
+        try
+        {
+            logger.LogInformation("Composing {Count} articles with crossword for {Date}", articles.Count, date);
+            var composed = pdfComposer.Compose(articles, crosswordBytes);
+            return (composed, $"{articles.Count} article(s) + crossword");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "PDF composition failed for {Date}", date);
+            return (crosswordBytes, $"crossword only — PDF composition error: {ex.Message}");
         }
     }
 }
