@@ -5,7 +5,7 @@ using NytRemarkable.Infrastructure.Delivery;
 
 namespace NytRemarkable.Android;
 
-[Android.Runtime.Register("com.storyworthtelling.nytremarkable.DeliveryWorker")]
+[global::Android.Runtime.Register("com.storyworthtelling.nytremarkable.DeliveryWorker")]
 public class DeliveryWorker(Context context, WorkerParameters parameters)
     : Worker(context, parameters)
 {

@@ -14,7 +14,7 @@ namespace NytRemarkable.Android.Platforms.Android;
                            ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
 public class MainActivity : MauiAppCompatActivity
 {
-    protected override void OnCreate(Android.OS.Bundle? savedInstanceState)
+    protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
         DeliveryWorker.Schedule(this);
