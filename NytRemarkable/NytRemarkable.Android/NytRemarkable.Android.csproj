@@ -29,8 +29,6 @@
   <!-- Preserve PDF libraries from the Release IL trimmer — both use reflection internally -->
   <ItemGroup>
     <TrimmerRootAssembly Include="QuestPDF" RootMode="All" />
-    <TrimmerRootAssembly Include="PDFsharp" RootMode="All" />
-    <TrimmerRootAssembly Include="SkiaSharp" RootMode="All" />
-    <TrimmerRootAssembly Include="HarfBuzzSharp" RootMode="All" />
+    <TrimmerRootAssembly Include="PdfSharp" RootMode="All" />
   </ItemGroup>
 </Project>
