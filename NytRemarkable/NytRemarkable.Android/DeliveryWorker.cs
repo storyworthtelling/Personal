@@ -16,6 +16,9 @@ public class DeliveryWorker : Worker
 
     public override Result DoWork()
     {
+        if (!CredentialStore.IsConfigured)
+            return Result.InvokeSuccess();
+
         try
         {
             using var scope = IPlatformApplication.Current!.Services.CreateScope();
