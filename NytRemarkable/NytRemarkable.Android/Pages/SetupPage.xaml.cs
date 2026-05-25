@@ -29,6 +29,19 @@ public partial class SetupPage : ContentPage
         await Navigation.PopAsync();
     }
 
+    private static string FlattenException(Exception ex)
+    {
+        var parts = new System.Text.StringBuilder();
+        var current = ex;
+        while (current != null)
+        {
+            parts.AppendLine(current.Message);
+            current = current.InnerException;
+            if (current != null) parts.AppendLine("Caused by:");
+        }
+        return parts.ToString().Trim();
+    }
+
     private async void OnRegisterRemarkableClicked(object sender, EventArgs e)
     {
         var code = await DisplayPromptAsync(
@@ -66,7 +79,9 @@ public partial class SetupPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Error", ex.Message, "OK");
+            var fullMessage = FlattenException(ex);
+            await Clipboard.SetTextAsync(fullMessage);
+            await DisplayAlert("Error (copied to clipboard)", fullMessage, "OK");
         }
     }
 }
