@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AngleSharp;
 using AngleSharp.Dom;
 using Microsoft.Extensions.Logging;
@@ -148,7 +149,7 @@ public class NytArticleClient : INytArticleClient
             if (typeName is "Paragraph" or "Heading" or "DetailBlock")
             {
                 var text = ExtractTextFromBlock(block);
-                if (!string.IsNullOrWhiteSpace(text))
+                if (!string.IsNullOrWhiteSpace(text) && !IsBoilerplate(text))
                     blocks.Add(new TextBlock { Text = text });
             }
             else if (typeName is "Image" or "GridImage")
@@ -185,9 +186,16 @@ public class NytArticleClient : INytArticleClient
             if (firstCrop.ValueKind == JsonValueKind.Object &&
                 firstCrop.TryGetProperty("renditions", out var renditions))
             {
-                var best = renditions.EnumerateArray().LastOrDefault();
-                if (best.ValueKind == JsonValueKind.Object &&
-                    best.TryGetProperty("url", out var urlEl))
+                // Prefer a non-WebP rendition; fall back to last if all are WebP
+                var best = renditions.EnumerateArray()
+                    .Where(r => r.TryGetProperty("url", out var u) &&
+                                !(u.GetString() ?? "").EndsWith(".webp", StringComparison.OrdinalIgnoreCase))
+                    .Cast<JsonElement?>()
+                    .LastOrDefault()
+                    ?? renditions.EnumerateArray().Cast<JsonElement?>().LastOrDefault();
+
+                if (best is { ValueKind: JsonValueKind.Object } b &&
+                    b.TryGetProperty("url", out var urlEl))
                     imageUrl = urlEl.GetString();
             }
         }
@@ -200,7 +208,7 @@ public class NytArticleClient : INytArticleClient
 
         try
         {
-            var imageBytes = await httpClient.GetByteArrayAsync(imageUrl);
+            var imageBytes = await httpClient.GetByteArrayAsync(StripWebP(imageUrl));
             return new ImageBlock { ImageBytes = imageBytes, Caption = caption };
         }
         catch
@@ -225,7 +233,7 @@ public class NytArticleClient : INytArticleClient
             if (child.LocalName == "p")
             {
                 var text = child.TextContent.Trim();
-                if (!string.IsNullOrEmpty(text))
+                if (!string.IsNullOrEmpty(text) && !IsBoilerplate(text))
                     blocks.Add(new TextBlock { Text = text });
             }
             else if (child.LocalName == "figure")
@@ -252,7 +260,7 @@ public class NytArticleClient : INytArticleClient
 
         try
         {
-            var imageBytes = await httpClient.GetByteArrayAsync(src);
+            var imageBytes = await httpClient.GetByteArrayAsync(StripWebP(src));
             return new ImageBlock { ImageBytes = imageBytes, Caption = caption };
         }
         catch
@@ -260,6 +268,13 @@ public class NytArticleClient : INytArticleClient
             return null;
         }
     }
+
+    private static bool IsBoilerplate(string text) =>
+        text.Equals("Advertisement", StringComparison.OrdinalIgnoreCase);
+
+    private static string StripWebP(string url) =>
+        Regex.Replace(url, @"[?&]auto=webp", m => m.Value.StartsWith('?') ? "?" : "")
+             .TrimEnd('?').TrimEnd('&');
 
     private static string ExtractByline(IDocument document)
     {
