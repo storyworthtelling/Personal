@@ -24,18 +24,22 @@ public static class MauiProgram
         builder.Services.Configure<RemarkableOptions>(opts =>
             opts.DeviceToken = CredentialStore.RemarkableDeviceToken);
 
-        // AndroidMessageHandler routes through Android's HttpsURLConnection, which is
-        // the only handler allowed by SELinux for network access in Android apps.
-        builder.Services.ConfigureHttpClientDefaults(b =>
-            b.ConfigurePrimaryHttpMessageHandler(
-                () => new Xamarin.Android.Net.AndroidMessageHandler()));
+        // AndroidMessageHandler routes through Android's HttpsURLConnection (Java layer),
+        // which is required for SELinux to permit network access. SocketsHttpHandler
+        // (the .NET default) opens raw sockets that SELinux blocks in Android app processes.
+        static Xamarin.Android.Net.AndroidMessageHandler AndroidHandler() => new();
 
-        builder.Services.AddHttpClient<INytCrosswordClient, NytCrosswordClient>();
-        builder.Services.AddHttpClient<INytTopStoriesClient, NytTopStoriesClient>();
+        builder.Services.AddHttpClient<INytCrosswordClient, NytCrosswordClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<INytTopStoriesClient, NytTopStoriesClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddSingleton<IArticlePageFetcher, WebViewPageFetcher>();
-        builder.Services.AddHttpClient<INytArticleClient, NytArticleClient>();
-        builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>();
-        builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>();
+        builder.Services.AddHttpClient<INytArticleClient, NytArticleClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         builder.Services.AddTransient<IPdfComposer, PdfComposer>();
         builder.Services.AddTransient<CrosswordDeliveryService>();
