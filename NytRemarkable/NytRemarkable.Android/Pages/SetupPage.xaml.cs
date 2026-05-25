@@ -5,11 +5,8 @@ namespace NytRemarkable.Android.Pages;
 
 public partial class SetupPage : ContentPage
 {
-    private readonly IHttpClientFactory httpClientFactory;
-
-    public SetupPage(IHttpClientFactory httpClientFactory)
+    public SetupPage()
     {
-        this.httpClientFactory = httpClientFactory;
         InitializeComponent();
     }
 
@@ -55,7 +52,7 @@ public partial class SetupPage : ContentPage
 
         try
         {
-            using var http = httpClientFactory.CreateClient();
+            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
             var body = JsonSerializer.Serialize(new
             {
                 code = code.Trim(),
