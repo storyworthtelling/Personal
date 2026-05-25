@@ -134,7 +134,7 @@ public class PdfComposer : IPdfComposer
     {
         try
         {
-            using var stream = new MemoryStream(image.ImageBytes);
+            using var stream = new MemoryStream(image.ImageBytes, 0, image.ImageBytes.Length, false, true);
             var xImg = XImage.FromStream(stream);
             var imgW = Math.Min(xImg.PointWidth, LayoutContext.ContentWidth);
             var imgH = xImg.PointHeight * imgW / xImg.PointWidth;
