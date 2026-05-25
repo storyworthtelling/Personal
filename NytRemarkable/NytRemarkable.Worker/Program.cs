@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NytRemarkable.Domain.Interfaces;
+using NytRemarkable.Infrastructure.Delivery;
 using NytRemarkable.Infrastructure.Nyt;
 using NytRemarkable.Infrastructure.Pdf;
 using NytRemarkable.Infrastructure.Remarkable;
