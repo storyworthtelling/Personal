@@ -3,6 +3,13 @@ using global::Android.Runtime;
 using Microsoft.Maui;
 using Microsoft.Maui.Hosting;
 
+// Declare permissions via assembly attributes so MAUI's manifest merger
+// always includes them, even if the XML manifest is partially overwritten.
+[assembly: UsesPermission(global::Android.Manifest.Permission.Internet)]
+[assembly: UsesPermission(global::Android.Manifest.Permission.ReceiveBootCompleted)]
+[assembly: UsesPermission(global::Android.Manifest.Permission.WakeLock)]
+[assembly: UsesPermission("android.permission.POST_NOTIFICATIONS")]
+
 namespace NytRemarkable.Android.Platforms.Android;
 
 [Application]
