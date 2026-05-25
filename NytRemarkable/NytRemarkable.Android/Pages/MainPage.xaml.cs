@@ -55,9 +55,11 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
+            var fullMessage = FlattenException(ex);
             CredentialStore.LastDeliveryResult = $"Failed — {DateTime.Today:MMM d}: {ex.Message}";
             StatusLabel.Text = CredentialStore.LastDeliveryResult;
-            await DisplayAlert("Delivery Failed", ex.Message, "OK");
+            await Clipboard.SetTextAsync(fullMessage);
+            await DisplayAlert("Delivery Failed (copied to clipboard)", fullMessage, "OK");
         }
         finally
         {
@@ -65,6 +67,19 @@ public partial class MainPage : ContentPage
             Spinner.IsVisible = false;
             DeliverNowButton.IsEnabled = true;
         }
+    }
+
+    private static string FlattenException(Exception ex)
+    {
+        var parts = new System.Text.StringBuilder();
+        var current = ex;
+        while (current != null)
+        {
+            parts.AppendLine(current.Message);
+            current = current.InnerException;
+            if (current != null) parts.AppendLine("Caused by:");
+        }
+        return parts.ToString().Trim();
     }
 
     private async void OnSettingsClicked(object sender, EventArgs e)
@@ -87,7 +102,8 @@ public partial class MainPage : ContentPage
         if (action == "View")
         {
             var display = log.Length > 3000 ? "(truncated — use Share for full log)\n\n" + log[^3000..] : log;
-            await DisplayAlert("Crash Log", display, "OK");
+            await Clipboard.SetTextAsync(log);
+            await DisplayAlert("Crash Log (copied to clipboard)", display, "OK");
         }
         else if (action == "Share")
         {
