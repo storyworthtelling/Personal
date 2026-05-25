@@ -35,6 +35,8 @@ public partial class SetupPage : ContentPage
         while (current != null)
         {
             parts.AppendLine(current.Message);
+            if (!string.IsNullOrWhiteSpace(current.StackTrace))
+                parts.AppendLine(current.StackTrace);
             current = current.InnerException;
             if (current != null) parts.AppendLine("Caused by:");
         }
