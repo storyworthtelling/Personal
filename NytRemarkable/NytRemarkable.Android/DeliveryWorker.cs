@@ -46,12 +46,24 @@ public class DeliveryWorker : Worker
                 Java.Lang.Class.FromType(typeof(DeliveryWorker)),
                 24,
                 Java.Util.Concurrent.TimeUnit.Hours!)
+            .SetInitialDelay(DelayUntilNext(hour: 10, minute: 45), Java.Util.Concurrent.TimeUnit.Milliseconds!)
             .AddTag(WorkName)
             .Build();
 
+        // Update (not Keep) so re-launches recalculate the initial delay
+        // if the schedule has drifted.
         WorkManager.GetInstance(context)
             .EnqueueUniquePeriodicWork(WorkName,
-                ExistingPeriodicWorkPolicy.Keep,
+                ExistingPeriodicWorkPolicy.Update,
                 request);
+    }
+
+    private static long DelayUntilNext(int hour, int minute)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var target = new DateTimeOffset(now.Year, now.Month, now.Day, hour, minute, 0, TimeSpan.Zero);
+        if (target <= now)
+            target = target.AddDays(1);
+        return (long)(target - now).TotalMilliseconds;
     }
 }
