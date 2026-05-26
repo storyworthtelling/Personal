@@ -9,6 +9,7 @@ using Microsoft.Maui.Hosting;
 [assembly: UsesPermission(global::Android.Manifest.Permission.ReceiveBootCompleted)]
 [assembly: UsesPermission(global::Android.Manifest.Permission.WakeLock)]
 [assembly: UsesPermission("android.permission.POST_NOTIFICATIONS")]
+[assembly: UsesPermission("android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")]
 
 namespace NytRemarkable.Android.Platforms.Android;
 

@@ -24,6 +24,28 @@ public partial class MainPage : ContentPage
         DeliveryLogButton.IsVisible = System.IO.File.Exists(DeliveryLogPath) &&
                                       new System.IO.FileInfo(DeliveryLogPath).Length > 0;
         CrashLogButton.IsVisible = System.IO.File.Exists(CrashLogPath);
+
+        var batteryOptimized = IsBatteryOptimized();
+        BatteryWarningLabel.IsVisible = batteryOptimized;
+        BatterySettingsButton.IsVisible = batteryOptimized;
+    }
+
+    private static bool IsBatteryOptimized()
+    {
+        var pm = Android.App.Application.Context
+            .GetSystemService(global::Android.Content.Context.PowerService)
+            as Android.OS.PowerManager;
+        return pm != null &&
+               !pm.IsIgnoringBatteryOptimizations(Android.App.Application.Context.PackageName);
+    }
+
+    private void OnBatterySettingsClicked(object sender, EventArgs e)
+    {
+        var intent = new Android.Content.Intent(
+            Android.Provider.Settings.ActionRequestIgnoreBatteryOptimizations);
+        intent.SetData(Android.Net.Uri.Parse(
+            $"package:{Android.App.Application.Context.PackageName}"));
+        Platform.CurrentActivity!.StartActivity(intent);
     }
 
     private async void OnDeliverNowClicked(object sender, EventArgs e)

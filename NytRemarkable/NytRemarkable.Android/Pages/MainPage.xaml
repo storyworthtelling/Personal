@@ -25,6 +25,21 @@
                HorizontalTextAlignment="Center"
                IsVisible="False" />
 
+        <Label x:Name="BatteryWarningLabel"
+               Text="⚠ Battery optimization is on — automatic delivery may be blocked."
+               FontSize="13"
+               TextColor="#ffcc00"
+               HorizontalOptions="Center"
+               HorizontalTextAlignment="Center"
+               IsVisible="False" />
+
+        <Button x:Name="BatterySettingsButton"
+                Text="Fix Battery Optimization"
+                Clicked="OnBatterySettingsClicked"
+                BackgroundColor="#5a4a00"
+                IsVisible="False"
+                HorizontalOptions="Fill" />
+
         <Button x:Name="DeliverNowButton"
                 Text="Deliver Now"
                 Clicked="OnDeliverNowClicked"
