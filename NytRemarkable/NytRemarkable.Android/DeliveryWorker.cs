@@ -42,7 +42,7 @@ public class DeliveryWorker : Worker
 
     public static void Schedule(Context context)
     {
-        var request = new PeriodicWorkRequest.Builder(
+        var request = (PeriodicWorkRequest) new PeriodicWorkRequest.Builder(
                 Java.Lang.Class.FromType(typeof(DeliveryWorker)),
                 24,
                 Java.Util.Concurrent.TimeUnit.Hours!)

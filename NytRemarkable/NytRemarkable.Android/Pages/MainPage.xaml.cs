@@ -32,19 +32,19 @@ public partial class MainPage : ContentPage
 
     private static bool IsBatteryOptimized()
     {
-        var pm = Android.App.Application.Context
+        var pm = global::Android.App.Application.Context
             .GetSystemService(global::Android.Content.Context.PowerService)
-            as Android.OS.PowerManager;
+            as global::Android.OS.PowerManager;
         return pm != null &&
-               !pm.IsIgnoringBatteryOptimizations(Android.App.Application.Context.PackageName);
+               !pm.IsIgnoringBatteryOptimizations(global::Android.App.Application.Context.PackageName);
     }
 
     private void OnBatterySettingsClicked(object sender, EventArgs e)
     {
-        var intent = new Android.Content.Intent(
-            Android.Provider.Settings.ActionRequestIgnoreBatteryOptimizations);
-        intent.SetData(Android.Net.Uri.Parse(
-            $"package:{Android.App.Application.Context.PackageName}"));
+        var intent = new global::Android.Content.Intent(
+            global::Android.Provider.Settings.ActionRequestIgnoreBatteryOptimizations);
+        intent.SetData(global::Android.Net.Uri.Parse(
+            $"package:{global::Android.App.Application.Context.PackageName}"));
         Platform.CurrentActivity!.StartActivity(intent);
     }
 
