@@ -41,10 +41,10 @@ public partial class MainPage : ContentPage
 
     private void OnBatterySettingsClicked(object sender, EventArgs e)
     {
+        var packageName = global::Android.App.Application.Context.PackageName;
         var intent = new global::Android.Content.Intent(
             global::Android.Provider.Settings.ActionRequestIgnoreBatteryOptimizations);
-        intent.SetData(global::Android.Net.Uri.Parse(
-            $"package:{global::Android.App.Application.Context.PackageName}"));
+        intent.SetData(global::Android.Net.Uri.Parse($"package:{packageName}"));
         Platform.CurrentActivity!.StartActivity(intent);
     }
 
