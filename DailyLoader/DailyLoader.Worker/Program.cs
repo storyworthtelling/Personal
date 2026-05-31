@@ -37,7 +37,9 @@ builder.Services.AddTransient<IPdfComposer, PdfComposer>();
 builder.Services.AddTransient<CrosswordDeliveryService>();
 
 // Calendar + checklist feature.
-builder.Services.AddSingleton<IGoogleClientFactory, GoogleClientFactory>();
+builder.Services.AddHttpClient<IGoogleAccessTokenProvider, GoogleAccessTokenProvider>();
+builder.Services.AddSingleton<IGoogleClientFactory>(sp =>
+    new GoogleClientFactory(sp.GetRequiredService<IGoogleAccessTokenProvider>()));
 builder.Services.AddTransient<IGoogleCalendarClient, GoogleCalendarClient>();
 builder.Services.AddTransient<IGoogleTasksClient, GoogleTasksClient>();
 builder.Services.AddTransient<CalendarColumnMapper>();
