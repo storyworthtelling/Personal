@@ -16,9 +16,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <ItemGroup>
-    <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#0f172a" />
-  </ItemGroup>
+  <!-- App icon is provided as native Android adaptive-icon resources under
+       Platforms/Android/Resources (mipmap-*). MAUI's SVG-based MauiIcon
+       pipeline silently failed to rasterise the icon, so it is bypassed. -->
 
   <ItemGroup>
     <ProjectReference Include="..\DailyLoader.Infrastructure\DailyLoader.Infrastructure.csproj" />
