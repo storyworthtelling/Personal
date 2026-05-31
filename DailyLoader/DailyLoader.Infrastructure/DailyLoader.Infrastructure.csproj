@@ -14,6 +14,9 @@
 
   <ItemGroup>
     <PackageReference Include="AngleSharp" Version="1.1.2" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.74.0" />
+    <PackageReference Include="Google.Apis.Calendar.v3" Version="1.74.0.4154" />
+    <PackageReference Include="Google.Apis.Tasks.v1" Version="1.74.0.3958" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
     <PackageReference Include="PDFsharp" Version="6.1.1" />
