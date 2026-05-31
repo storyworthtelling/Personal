@@ -5,6 +5,7 @@
     <UseMaui>true</UseMaui>
     <RootNamespace>DailyLoader.Android</RootNamespace>
     <ApplicationId>com.storyworthtelling.dailyloader</ApplicationId>
+    <ApplicationTitle>Daily Loader</ApplicationTitle>
     <!-- yyyyMMddHHmm overflows Android's int32 versionCode limit (2,147,483,647).
          Using last digit of year keeps the 9-digit result within range. -->
     <_VersionYearDigit>$([MSBuild]::Modulo($([System.DateTime]::UtcNow.Year), 10))</_VersionYearDigit>
