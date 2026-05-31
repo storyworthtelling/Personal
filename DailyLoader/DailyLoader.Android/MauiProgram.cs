@@ -73,9 +73,9 @@ public static class MauiProgram
         builder.Services.AddTransient<IPdfComposer, PdfComposer>();
         builder.Services.AddTransient<CrosswordDeliveryService>();
 
-        // Calendar + checklist feature. Tokens come from Play Services for the device account;
+        // Calendar + checklist feature. Tokens come from the device account via AccountManager;
         // Anthropic HTTP and the Google SDK transport go through AndroidMessageHandler for SELinux.
-        builder.Services.AddSingleton<IGoogleAccessTokenProvider, PlayServicesGoogleTokenProvider>();
+        builder.Services.AddSingleton<IGoogleAccessTokenProvider, DeviceAccountTokenProvider>();
         builder.Services.AddSingleton<IGoogleClientFactory>(sp =>
             new GoogleClientFactory(
                 sp.GetRequiredService<IGoogleAccessTokenProvider>(),

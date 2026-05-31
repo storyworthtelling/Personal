@@ -46,7 +46,7 @@ public partial class SetupPage : ContentPage
 
         try
         {
-            var email = await DailyLoader.Android.Google.GoogleSignInFlow.SignIn(activity);
+            var email = await DailyLoader.Android.Google.DeviceAccountSignIn.SignIn(activity);
             GoogleStatusLabel.Text = $"Signed in as {email} ✓";
             await DisplayAlert("Google", $"Signed in as {email}.", "OK");
         }

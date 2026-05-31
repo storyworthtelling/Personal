@@ -24,7 +24,7 @@ public class MainActivity : MauiAppCompatActivity
         int requestCode, global::Android.App.Result resultCode, global::Android.Content.Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode == DailyLoader.Android.Google.GoogleSignInFlow.RequestCode)
-            DailyLoader.Android.Google.GoogleSignInFlow.HandleResult(data);
+        if (requestCode == DailyLoader.Android.Google.DeviceAccountSignIn.RequestCode)
+            DailyLoader.Android.Google.DeviceAccountSignIn.HandleChooserResult(resultCode, data);
     }
 }
