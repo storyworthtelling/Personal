@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyLoader.Android.Pages.SetupPage"
+             Title="Settings"
+             BackgroundColor="{StaticResource PageBackground}">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+
+            <Label Text="NYT-S Cookie"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}" />
+            <Label Text="Log into nytimes.com in Chrome, open DevTools → Application → Cookies → copy the NYT-S value."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Entry x:Name="NytCookieEntry"
+                   Placeholder="Paste NYT-S cookie value here" />
+
+            <Label Text="NYT API Key"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}"
+                   Margin="0,8,0,0" />
+            <Label Text="From developer.nytimes.com — used to fetch the top stories list."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Entry x:Name="NytApiKeyEntry"
+                   Placeholder="Paste NYT API key here" />
+
+            <Label Text="reMarkable Device Token"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}"
+                   Margin="0,8,0,0" />
+            <Label Text="Visit my.remarkable.com/device/mobile/connect for a one-time code, then tap Register below."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Entry x:Name="RemarkableTokenEntry"
+                   Placeholder="Paste device token, or use Register button" />
+            <Button Text="Register reMarkable Device"
+                    Clicked="OnRegisterRemarkableClicked"
+                    BackgroundColor="#333333" />
+
+            <Button Text="Save Settings"
+                    Clicked="OnSaveClicked"
+                    Margin="0,16,0,0" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
