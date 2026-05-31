@@ -16,10 +16,11 @@ public partial class SetupPage : ContentPage
         NytCookieEntry.Text = CredentialStore.NytSessionCookie;
         NytApiKeyEntry.Text = CredentialStore.NytApiKey;
         RemarkableTokenEntry.Text = CredentialStore.RemarkableDeviceToken;
-        GoogleClientIdEntry.Text = CredentialStore.GoogleClientId;
         AnthropicKeyEntry.Text = CredentialStore.AnthropicApiKey;
         CalendarMappingEditor.Text = CredentialStore.CalendarMappingJson;
-        GoogleStatusLabel.Text = CredentialStore.IsGoogleConfigured ? "Signed in ✓" : "Not signed in";
+        GoogleStatusLabel.Text = CredentialStore.IsGoogleConfigured
+            ? $"Signed in as {CredentialStore.GoogleAccountEmail} ✓"
+            : "Not signed in";
     }
 
     private async void OnSaveClicked(object sender, EventArgs e)
@@ -27,7 +28,6 @@ public partial class SetupPage : ContentPage
         CredentialStore.NytSessionCookie = NytCookieEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.NytApiKey = NytApiKeyEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.RemarkableDeviceToken = RemarkableTokenEntry.Text?.Trim() ?? string.Empty;
-        CredentialStore.GoogleClientId = GoogleClientIdEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.AnthropicApiKey = AnthropicKeyEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.CalendarMappingJson = CalendarMappingEditor.Text?.Trim() ?? string.Empty;
 
@@ -37,21 +37,18 @@ public partial class SetupPage : ContentPage
 
     private async void OnGoogleSignInClicked(object sender, EventArgs e)
     {
-        var clientId = GoogleClientIdEntry.Text?.Trim() ?? string.Empty;
-        if (string.IsNullOrEmpty(clientId))
+        var activity = Platform.CurrentActivity;
+        if (activity is null)
         {
-            await DisplayAlert("Google", "Enter your Google client id first.", "OK");
+            await DisplayAlert("Google", "Could not start sign-in (no active window).", "OK");
             return;
         }
 
-        // Persist the client id so the token provider can use it immediately after consent.
-        CredentialStore.GoogleClientId = clientId;
-
         try
         {
-            await DailyLoader.Android.Google.GoogleOAuthFlow.SignIn(clientId);
-            GoogleStatusLabel.Text = "Signed in ✓";
-            await DisplayAlert("Google", "Signed in and refresh token saved.", "OK");
+            var email = await DailyLoader.Android.Google.GoogleSignInFlow.SignIn(activity);
+            GoogleStatusLabel.Text = $"Signed in as {email} ✓";
+            await DisplayAlert("Google", $"Signed in as {email}.", "OK");
         }
         catch (Exception ex)
         {

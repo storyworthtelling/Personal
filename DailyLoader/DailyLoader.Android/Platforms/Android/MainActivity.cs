@@ -19,4 +19,12 @@ public class MainActivity : MauiAppCompatActivity
         base.OnCreate(savedInstanceState);
         DeliveryWorker.Schedule(this);
     }
+
+    protected override void OnActivityResult(
+        int requestCode, global::Android.App.Result resultCode, global::Android.Content.Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == DailyLoader.Android.Google.GoogleSignInFlow.RequestCode)
+            DailyLoader.Android.Google.GoogleSignInFlow.HandleResult(data);
+    }
 }

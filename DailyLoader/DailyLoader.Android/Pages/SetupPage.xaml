@@ -40,10 +40,8 @@
                    FontSize="13" FontAttributes="Bold"
                    TextColor="{StaticResource TextSecondary}"
                    Margin="0,16,0,0" />
-            <Label Text="Create an OAuth client (iOS type, no secret) in Google Cloud Console with the Calendar and Tasks APIs enabled, paste its client id, then sign in. The reverse-client-id scheme must also be set in GoogleAuthCallbackActivity.cs."
+            <Label Text="Sign in with the Google account already on this phone to sync your calendars and tasks. Grant the calendar and tasks permissions when prompted."
                    FontSize="12" TextColor="{StaticResource TextSecondary}" />
-            <Entry x:Name="GoogleClientIdEntry"
-                   Placeholder="123456-abcd.apps.googleusercontent.com" />
             <Button Text="Sign in with Google"
                     Clicked="OnGoogleSignInClicked"
                     BackgroundColor="#333333" />

@@ -42,12 +42,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<IOptions<RemarkableOptions>>(
             _ => new LiveOptions<RemarkableOptions>(() => new RemarkableOptions { DeviceToken = CredentialStore.RemarkableDeviceToken }));
 
+        // Credentials come from the device account via Play Services, so GoogleOptions only
+        // carries the non-secret settings (time zone, target calendar, kid calendar names).
         builder.Services.AddSingleton<IOptions<GoogleOptions>>(
-            _ => new LiveOptions<GoogleOptions>(() => new GoogleOptions
-            {
-                ClientId = CredentialStore.GoogleClientId,
-                RefreshToken = CredentialStore.GoogleRefreshToken
-            }));
+            _ => new LiveOptions<GoogleOptions>(() => new GoogleOptions()));
         builder.Services.AddSingleton<IOptions<AnthropicOptions>>(
             _ => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions { ApiKey = CredentialStore.AnthropicApiKey }));
         builder.Services.AddSingleton<IOptions<CalendarMappingOptions>>(
@@ -75,10 +73,9 @@ public static class MauiProgram
         builder.Services.AddTransient<IPdfComposer, PdfComposer>();
         builder.Services.AddTransient<CrosswordDeliveryService>();
 
-        // Calendar + checklist feature. Google and Anthropic HTTP go through AndroidMessageHandler
-        // so they clear SELinux like the other clients.
-        builder.Services.AddHttpClient<IGoogleAccessTokenProvider, GoogleAccessTokenProvider>()
-            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // Calendar + checklist feature. Tokens come from Play Services for the device account;
+        // Anthropic HTTP and the Google SDK transport go through AndroidMessageHandler for SELinux.
+        builder.Services.AddSingleton<IGoogleAccessTokenProvider, PlayServicesGoogleTokenProvider>();
         builder.Services.AddSingleton<IGoogleClientFactory>(sp =>
             new GoogleClientFactory(
                 sp.GetRequiredService<IGoogleAccessTokenProvider>(),
