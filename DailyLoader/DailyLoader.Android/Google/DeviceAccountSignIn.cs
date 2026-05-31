@@ -24,14 +24,11 @@ public static class DeviceAccountSignIn
 
     private static Task<string> ChooseAccount(Activity activity)
     {
+        // Positional args (binding parameter names differ from the Java docs):
+        // (selectedAccount, allowableAccounts, allowableAccountTypes, descriptionOverrideText,
+        //  addAccountAuthTokenType, addAccountRequiredFeatures, addAccountOptions)
         var intent = AccountManager.NewChooseAccountIntent(
-            selectedAccount: null,
-            allowableAccounts: null,
-            allowableAccountTypes: new[] { "com.google" },
-            descriptionOverrideText: null,
-            addAccountAuthTokenType: null,
-            addAccountRequiredFeatures: null,
-            addAccountOptions: null);
+            null, null, new[] { "com.google" }, null, null, null, null);
 
         pendingChoice = new TaskCompletionSource<string>();
         activity.StartActivityForResult(intent, RequestCode);

@@ -40,7 +40,7 @@ public class DeviceAccountTokenProvider : IGoogleAccessTokenProvider
                     manager.InvalidateAuthToken("com.google", cachedToken);
             }
 
-            var token = manager.BlockingGetAuthToken(account, TokenScope, notifyAuthFailure: true)
+            var token = manager.BlockingGetAuthToken(account, TokenScope, true)
                 ?? throw new InvalidOperationException(
                     "Could not get a Google token for the device account. Open Settings and sign in again.");
 
