@@ -75,8 +75,9 @@ public static class DeviceAccountSignIn
         {
             try
             {
-                // Reading the result blocks until consent (shown via the activity) completes.
-                _ = future?.GetResult();
+                // The callback only fires once the future is done, so this returns immediately;
+                // reading the result surfaces any auth error (and the consent UI has already shown).
+                _ = future?.GetResult(60_000, Java.Util.Concurrent.TimeUnit.Milliseconds);
                 tcs.TrySetResult(true);
             }
             catch (Exception ex)
