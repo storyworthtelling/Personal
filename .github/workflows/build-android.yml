@@ -30,6 +30,18 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/dailyloader.keystore
 
+      - name: Print signing SHA-1
+        run: |
+          keytool -list -v \
+            -keystore /tmp/dailyloader.keystore \
+            -alias "${{ secrets.KEY_ALIAS }}" \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" > /tmp/cert.txt
+          echo "## App signing certificate fingerprints" >> $GITHUB_STEP_SUMMARY
+          echo "Register the SHA1 below in your Google Cloud OAuth Android client (package com.storyworthtelling.dailyloader)." >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "SHA1:|SHA256:" /tmp/cert.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
       - name: Build APK
         working-directory: DailyLoader
         run: >
