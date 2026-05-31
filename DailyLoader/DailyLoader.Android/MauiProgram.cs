@@ -1,13 +1,19 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using DailyLoader.Domain.Interfaces;
+using DailyLoader.Infrastructure.Calendar;
 using DailyLoader.Infrastructure.Delivery;
+using DailyLoader.Infrastructure.Google;
+using DailyLoader.Infrastructure.Handwriting;
 using DailyLoader.Infrastructure.Nyt;
 using DailyLoader.Infrastructure.Pdf;
 using DailyLoader.Infrastructure.Remarkable;
+using DailyLoader.Android.Google;
 using PdfSharp.Fonts;
 
 namespace DailyLoader.Android;
@@ -36,6 +42,19 @@ public static class MauiProgram
         builder.Services.AddSingleton<IOptions<RemarkableOptions>>(
             _ => new LiveOptions<RemarkableOptions>(() => new RemarkableOptions { DeviceToken = CredentialStore.RemarkableDeviceToken }));
 
+        builder.Services.AddSingleton<IOptions<GoogleOptions>>(
+            _ => new LiveOptions<GoogleOptions>(() => new GoogleOptions
+            {
+                ClientId = CredentialStore.GoogleClientId,
+                RefreshToken = CredentialStore.GoogleRefreshToken
+            }));
+        builder.Services.AddSingleton<IOptions<AnthropicOptions>>(
+            _ => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions { ApiKey = CredentialStore.AnthropicApiKey }));
+        builder.Services.AddSingleton<IOptions<CalendarMappingOptions>>(
+            _ => new LiveOptions<CalendarMappingOptions>(() => ParseMapping(CredentialStore.CalendarMappingJson)));
+        builder.Services.AddSingleton<IOptions<WorkScheduleOptions>>(
+            _ => new LiveOptions<WorkScheduleOptions>(() => new WorkScheduleOptions()));
+
         // AndroidMessageHandler routes through Android's HttpsURLConnection (Java layer),
         // which is required for SELinux to permit network access. SocketsHttpHandler
         // (the .NET default) opens raw sockets that SELinux blocks in Android app processes.
@@ -56,6 +75,25 @@ public static class MauiProgram
         builder.Services.AddTransient<IPdfComposer, PdfComposer>();
         builder.Services.AddTransient<CrosswordDeliveryService>();
 
+        // Calendar + checklist feature. Google and Anthropic HTTP go through AndroidMessageHandler
+        // so they clear SELinux like the other clients.
+        builder.Services.AddHttpClient<IGoogleAccessTokenProvider, GoogleAccessTokenProvider>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddSingleton<IGoogleClientFactory>(sp =>
+            new GoogleClientFactory(
+                sp.GetRequiredService<IGoogleAccessTokenProvider>(),
+                new AndroidGoogleHttpClientFactory()));
+        builder.Services.AddTransient<IGoogleCalendarClient, GoogleCalendarClient>();
+        builder.Services.AddTransient<IGoogleTasksClient, GoogleTasksClient>();
+        builder.Services.AddTransient<CalendarColumnMapper>();
+        builder.Services.AddTransient<WorkScheduleAugmenter>();
+        builder.Services.AddTransient<IOutlookSelector, OutlookSelector>();
+        builder.Services.AddTransient<ICalendarPdfComposer, CalendarPdfComposer>();
+        builder.Services.AddTransient<IChecklistPdfComposer, ChecklistPdfComposer>();
+        builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddTransient<DailyDeliveryService>();
+
         builder.Services.AddTransient<Pages.MainPage>();
         builder.Services.AddTransient<Pages.SetupPage>();
 
@@ -65,5 +103,28 @@ public static class MauiProgram
         builder.Logging.AddProvider(DeliveryFileLogger.Instance);
 
         return builder.Build();
+    }
+
+    private static readonly JsonSerializerOptions MappingJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    // Parses the saved calendar-mapping JSON into options, falling back to defaults when empty
+    // or malformed so a bad paste never breaks delivery.
+    private static CalendarMappingOptions ParseMapping(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new CalendarMappingOptions();
+        try
+        {
+            return JsonSerializer.Deserialize<CalendarMappingOptions>(json, MappingJsonOptions)
+                ?? new CalendarMappingOptions();
+        }
+        catch (JsonException)
+        {
+            return new CalendarMappingOptions();
+        }
     }
 }
