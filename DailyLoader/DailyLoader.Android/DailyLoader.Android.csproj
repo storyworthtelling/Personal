@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UseMaui>true</UseMaui>
+    <RootNamespace>DailyLoader.Android</RootNamespace>
+    <ApplicationId>com.storyworthtelling.dailyloader</ApplicationId>
+    <!-- yyyyMMddHHmm overflows Android's int32 versionCode limit (2,147,483,647).
+         Using last digit of year keeps the 9-digit result within range. -->
+    <_VersionYearDigit>$([MSBuild]::Modulo($([System.DateTime]::UtcNow.Year), 10))</_VersionYearDigit>
+    <ApplicationVersion>$(_VersionYearDigit)$([System.DateTime]::UtcNow.ToString('MMddHHmm'))</ApplicationVersion>
+    <ApplicationDisplayVersion>$([System.DateTime]::UtcNow.ToString('yyyy.MM.dd.HHmm'))</ApplicationDisplayVersion>
+    <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#1a1a1a" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DailyLoader.Infrastructure\DailyLoader.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.9.1.3" />
+  </ItemGroup>
+
+  <!-- Preserve PDFsharp from the Release IL trimmer — uses reflection internally -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="PdfSharp" RootMode="All" />
+  </ItemGroup>
+</Project>

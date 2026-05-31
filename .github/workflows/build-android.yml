@@ -5,9 +5,9 @@ on:
   push:
     branches: [main, 'claude/**']
     paths:
-      - 'NytRemarkable/NytRemarkable.Android/**'
-      - 'NytRemarkable/NytRemarkable.Infrastructure/**'
-      - 'NytRemarkable/NytRemarkable.Domain/**'
+      - 'DailyLoader/DailyLoader.Android/**'
+      - 'DailyLoader/DailyLoader.Infrastructure/**'
+      - 'DailyLoader/DailyLoader.Domain/**'
       - '.github/workflows/build-android.yml'
 
 jobs:
@@ -28,14 +28,14 @@ jobs:
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/nytremarkable.keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/dailyloader.keystore
 
       - name: Build APK
-        working-directory: NytRemarkable
+        working-directory: DailyLoader
         run: >
-          dotnet publish NytRemarkable.Android -f net9.0-android -c Release
+          dotnet publish DailyLoader.Android -f net9.0-android -c Release
           -p:AndroidKeyStore=true
-          -p:AndroidSigningKeyStore=/tmp/nytremarkable.keystore
+          -p:AndroidSigningKeyStore=/tmp/dailyloader.keystore
           -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }}
           -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }}
           -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
@@ -43,7 +43,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NYT-Crossword-Android
-          path: NytRemarkable/NytRemarkable.Android/bin/Release/net9.0-android/publish/*.apk
+          name: Daily-Loader-Android
+          path: DailyLoader/DailyLoader.Android/bin/Release/net9.0-android/publish/*.apk
           if-no-files-found: error
           retention-days: 90
