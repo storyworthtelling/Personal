@@ -36,6 +36,37 @@
                     Clicked="OnRegisterRemarkableClicked"
                     BackgroundColor="#333333" />
 
+            <Label Text="Google"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}"
+                   Margin="0,16,0,0" />
+            <Label Text="Sign in with the Google account already on this phone to sync your calendars and tasks. Grant the calendar and tasks permissions when prompted."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Button Text="Sign in with Google"
+                    Clicked="OnGoogleSignInClicked"
+                    BackgroundColor="#333333" />
+            <Label x:Name="GoogleStatusLabel"
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+
+            <Label Text="Anthropic API Key"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}"
+                   Margin="0,8,0,0" />
+            <Label Text="Optional — transcribes hand-written notes back into your calendar/tasks. Read-back is skipped if blank."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Entry x:Name="AnthropicKeyEntry"
+                   Placeholder="sk-ant-..." />
+
+            <Label Text="Calendar Mapping (JSON)"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}"
+                   Margin="0,8,0,0" />
+            <Label Text="Optional — maps calendar ids to columns (Matt/Ashley/Gwen/Eva/Watch) and sets the Family calendar id. Leave blank to default everything to Matt with Gwen/Eva keyword routing."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Editor x:Name="CalendarMappingEditor"
+                    AutoSize="TextChanges"
+                    HeightRequest="120" />
+
             <Button Text="Save Settings"
                     Clicked="OnSaveClicked"
                     Margin="0,16,0,0" />

@@ -75,6 +75,13 @@ public partial class MainPage : ContentPage
                 if (CrosswordDeliveryService.IsFirstSundayOfMonth(today))
                     await delivery.DeliverBonusPuzzle(today);
 
+                if (CredentialStore.IsGoogleConfigured)
+                {
+                    var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
+                    await daily.EnsureKidCalendars();
+                    await daily.DeliverDailyDocuments(today);
+                }
+
                 CredentialStore.LastDeliveryResult = $"Success — {today:MMM d, yyyy} ({newsStatus})";
             });
 

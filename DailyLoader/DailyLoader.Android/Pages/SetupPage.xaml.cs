@@ -16,6 +16,11 @@ public partial class SetupPage : ContentPage
         NytCookieEntry.Text = CredentialStore.NytSessionCookie;
         NytApiKeyEntry.Text = CredentialStore.NytApiKey;
         RemarkableTokenEntry.Text = CredentialStore.RemarkableDeviceToken;
+        AnthropicKeyEntry.Text = CredentialStore.AnthropicApiKey;
+        CalendarMappingEditor.Text = CredentialStore.CalendarMappingJson;
+        GoogleStatusLabel.Text = CredentialStore.IsGoogleConfigured
+            ? $"Signed in as {CredentialStore.GoogleAccountEmail} ✓"
+            : "Not signed in";
     }
 
     private async void OnSaveClicked(object sender, EventArgs e)
@@ -23,9 +28,35 @@ public partial class SetupPage : ContentPage
         CredentialStore.NytSessionCookie = NytCookieEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.NytApiKey = NytApiKeyEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.RemarkableDeviceToken = RemarkableTokenEntry.Text?.Trim() ?? string.Empty;
+        CredentialStore.AnthropicApiKey = AnthropicKeyEntry.Text?.Trim() ?? string.Empty;
+        CredentialStore.CalendarMappingJson = CalendarMappingEditor.Text?.Trim() ?? string.Empty;
 
         await DisplayAlert("Saved", "Settings saved.", "OK");
         await Navigation.PopAsync();
+    }
+
+    private async void OnGoogleSignInClicked(object sender, EventArgs e)
+    {
+        var activity = Platform.CurrentActivity;
+        if (activity is null)
+        {
+            await DisplayAlert("Google", "Could not start sign-in (no active window).", "OK");
+            return;
+        }
+
+        try
+        {
+            var email = await DailyLoader.Android.Google.DeviceAccountSignIn.SignIn(activity);
+            GoogleStatusLabel.Text = $"Signed in as {email} ✓";
+            await DisplayAlert("Google", $"Signed in as {email}.", "OK");
+        }
+        catch (Exception ex)
+        {
+            var fullMessage = FlattenException(ex);
+            GoogleStatusLabel.Text = "Sign-in failed";
+            await Clipboard.SetTextAsync(fullMessage);
+            await DisplayAlert("Google Sign-in Failed (copied to clipboard)", fullMessage, "OK");
+        }
     }
 
     private static string FlattenException(Exception ex)

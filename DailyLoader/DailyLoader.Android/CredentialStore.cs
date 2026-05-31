@@ -20,6 +20,28 @@ public static class CredentialStore
         set => Preferences.Set(nameof(RemarkableDeviceToken), value);
     }
 
+    // The Google account chosen via the native "Sign in with Google" picker. Access tokens are
+    // obtained from Google Play Services for this account, so no client id/secret is stored.
+    public static string GoogleAccountEmail
+    {
+        get => Preferences.Get(nameof(GoogleAccountEmail), string.Empty);
+        set => Preferences.Set(nameof(GoogleAccountEmail), value);
+    }
+
+    // Anthropic API key for handwriting transcription (optional; read-back is skipped without it).
+    public static string AnthropicApiKey
+    {
+        get => Preferences.Get(nameof(AnthropicApiKey), string.Empty);
+        set => Preferences.Set(nameof(AnthropicApiKey), value);
+    }
+
+    // JSON for the calendar-to-column mapping (CalendarMappingOptions shape). Empty = defaults.
+    public static string CalendarMappingJson
+    {
+        get => Preferences.Get(nameof(CalendarMappingJson), string.Empty);
+        set => Preferences.Set(nameof(CalendarMappingJson), value);
+    }
+
     public static string LastDeliveryResult
     {
         get => Preferences.Get(nameof(LastDeliveryResult), "Never delivered");
@@ -30,4 +52,9 @@ public static class CredentialStore
         !string.IsNullOrEmpty(NytSessionCookie) &&
         !string.IsNullOrEmpty(NytApiKey) &&
         !string.IsNullOrEmpty(RemarkableDeviceToken);
+
+    // The calendar/checklist delivery runs only once Google is connected; until then the
+    // existing crossword delivery is unaffected.
+    public static bool IsGoogleConfigured =>
+        !string.IsNullOrEmpty(GoogleAccountEmail);
 }

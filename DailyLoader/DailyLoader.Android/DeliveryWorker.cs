@@ -30,6 +30,13 @@ public class DeliveryWorker : Worker
             if (CrosswordDeliveryService.IsFirstSundayOfMonth(today))
                 delivery.DeliverBonusPuzzle(today).GetAwaiter().GetResult();
 
+            if (CredentialStore.IsGoogleConfigured)
+            {
+                var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
+                daily.EnsureKidCalendars().GetAwaiter().GetResult();
+                daily.DeliverDailyDocuments(today).GetAwaiter().GetResult();
+            }
+
             CredentialStore.LastDeliveryResult = $"Success — {today:MMM d, yyyy} ({newsStatus})";
             return Result.InvokeSuccess();
         }

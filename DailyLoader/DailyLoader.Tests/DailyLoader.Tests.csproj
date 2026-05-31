@@ -9,7 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DailyLoader.Domain\DailyLoader.Domain.csproj" />
     <ProjectReference Include="..\DailyLoader.Infrastructure\DailyLoader.Infrastructure.csproj" />
-    <ProjectReference Include="..\DailyLoader.Worker\DailyLoader.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

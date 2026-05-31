@@ -1,48 +1,54 @@
-using global::Google.Apis.Auth.OAuth2;
-using global::Google.Apis.Auth.OAuth2.Flows;
-using global::Google.Apis.Auth.OAuth2.Responses;
 using global::Google.Apis.Calendar.v3;
+using global::Google.Apis.Http;
 using global::Google.Apis.Services;
 using global::Google.Apis.Tasks.v1;
-using Microsoft.Extensions.Options;
+using GoogleHttpClientFactory = global::Google.Apis.Http.IHttpClientFactory;
 
 namespace DailyLoader.Infrastructure.Google;
 
-// Turns the stored OAuth refresh token into auto-refreshing Google API services.
+// Builds Google API services that authenticate with the access-token provider and (optionally)
+// route transport through a host-supplied handler. The Android host passes a factory backed by
+// AndroidMessageHandler so calls clear SELinux; the Worker leaves it null to use the default.
 public class GoogleClientFactory : IGoogleClientFactory
 {
     private const string ApplicationName = "DailyLoader";
 
-    private readonly GoogleOptions options;
+    private readonly IGoogleAccessTokenProvider tokenProvider;
+    private readonly GoogleHttpClientFactory? transportFactory;
 
-    public GoogleClientFactory(IOptions<GoogleOptions> options)
+    public GoogleClientFactory(
+        IGoogleAccessTokenProvider tokenProvider,
+        GoogleHttpClientFactory? transportFactory = null)
     {
-        this.options = options.Value;
+        this.tokenProvider = tokenProvider;
+        this.transportFactory = transportFactory;
     }
 
-    public CalendarService CreateCalendarService() =>
-        new(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = CreateCredential([CalendarService.Scope.Calendar]),
-            ApplicationName = ApplicationName
-        });
+    public CalendarService CreateCalendarService() => new(CreateInitializer());
 
-    public TasksService CreateTasksService() =>
-        new(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = CreateCredential([TasksService.Scope.Tasks]),
-            ApplicationName = ApplicationName
-        });
+    public TasksService CreateTasksService() => new(CreateInitializer());
 
-    private UserCredential CreateCredential(IEnumerable<string> scopes)
+    private BaseClientService.Initializer CreateInitializer()
     {
-        var flow = new GoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
+        var initializer = new BaseClientService.Initializer
         {
-            ClientSecrets = new ClientSecrets { ClientId = options.ClientId, ClientSecret = options.ClientSecret },
-            Scopes = scopes
-        });
+            HttpClientInitializer = new TokenInitializer(tokenProvider),
+            ApplicationName = ApplicationName
+        };
+        if (transportFactory is not null)
+            initializer.HttpClientFactory = transportFactory;
+        return initializer;
+    }
 
-        // The access token is left empty so the flow fetches a fresh one from the refresh token.
-        return new UserCredential(flow, "user", new TokenResponse { RefreshToken = options.RefreshToken });
+    // Injects a fresh bearer token on every request via the access-token provider.
+    private sealed class TokenInitializer(IGoogleAccessTokenProvider provider)
+        : IConfigurableHttpClientInitializer, IHttpExecuteInterceptor
+    {
+        public void Initialize(ConfigurableHttpClient httpClient) =>
+            httpClient.MessageHandler.AddExecuteInterceptor(this);
+
+        public async Task InterceptAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", await provider.GetAccessToken());
     }
 }
