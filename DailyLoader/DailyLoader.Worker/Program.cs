@@ -11,6 +11,10 @@ using DailyLoader.Infrastructure.Pdf;
 using DailyLoader.Infrastructure.Remarkable;
 using DailyLoader.Worker;
 
+// PDFsharp has no GDI/CoreText on Linux, so the host must register a font resolver before any
+// PDF is composed (the Android app registers AndroidFontResolver in the same way).
+SystemFontResolver.Register();
+
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.Configure<NytOptions>(builder.Configuration.GetSection(NytOptions.SectionName));

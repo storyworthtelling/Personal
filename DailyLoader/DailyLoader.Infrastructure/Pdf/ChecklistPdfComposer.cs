@@ -16,8 +16,6 @@ public class ChecklistPdfComposer : IChecklistPdfComposer
         DateOnly date,
         IReadOnlyList<ParsedNote> unreadableCarryovers)
     {
-        SystemFontResolver.Register();
-
         var doc = new PdfDocument();
         var layout = new PdfLayout(doc);
 

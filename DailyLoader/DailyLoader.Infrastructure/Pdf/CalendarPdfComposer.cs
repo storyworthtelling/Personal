@@ -25,8 +25,6 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         IReadOnlyList<CalendarEvent> outlook,
         IReadOnlyList<ParsedNote> unreadableCarryovers)
     {
-        SystemFontResolver.Register();
-
         var doc = new PdfDocument();
         var layout = new PdfLayout(doc, PageOrientation.Landscape);
 

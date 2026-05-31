@@ -24,8 +24,6 @@ public class PdfComposer : IPdfComposer
 
     private byte[] GenerateNewsPages(IReadOnlyList<ArticleContent> articles)
     {
-        SystemFontResolver.Register();
-
         var doc = new PdfDocument();
         var layout = new PdfLayout(doc);
 
