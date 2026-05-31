@@ -1,0 +1,30 @@
+name: Print Signing SHA-1
+
+# Run manually (Actions tab → this workflow → Run workflow) to read the app's signing
+# certificate fingerprints. Register the SHA-1 in your Google Cloud Android OAuth client
+# (package com.storyworthtelling.dailyloader) so Sign in with Google works. Fingerprints are
+# not secret; the keystore password stays masked.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  print-sha:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > dailyloader.keystore
+
+      - name: Print certificate fingerprints
+        run: |
+          keytool -list -v \
+            -keystore dailyloader.keystore \
+            -alias "${{ secrets.KEY_ALIAS }}" \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" > out.txt
+          echo "## App signing certificate fingerprints" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Register the **SHA1** value in your Google Cloud OAuth **Android** client (package \`com.storyworthtelling.dailyloader\`)." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "SHA1:|SHA256:" out.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
