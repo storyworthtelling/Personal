@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using DailyLoader.Domain.Interfaces;
 using DailyLoader.Domain.Models;
-using DailyLoader.Worker;
+using DailyLoader.Infrastructure.Delivery;
 using Xunit;
 
 namespace DailyLoader.Tests;
@@ -148,7 +148,7 @@ public class CrosswordDeliveryServiceTests
                 list.Count == 2 &&
                 list[0].Title == FakeNewsStory.Title &&
                 list[0].Body.Count == 1 &&
-                list[0].Body[0] is TextBlock tb && tb.Text == FakeNewsStory.Abstract),
+                ((TextBlock)list[0].Body[0]).Text == FakeNewsStory.Abstract),
             crosswordBytes), Times.Once);
     }
 
