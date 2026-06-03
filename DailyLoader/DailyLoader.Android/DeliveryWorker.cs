@@ -57,11 +57,14 @@ public class DeliveryWorker : Worker
             .AddTag(WorkName)
             .Build();
 
-        // Update (not Keep) so re-launches recalculate the initial delay
-        // if the schedule has drifted.
+        // Keep (not Update) so app re-launches don't reset the initial delay on a
+        // pending-but-never-run job. Update only helps after the first run (when
+        // WorkManager uses periodStartTime, not initialDelay), so it buys nothing
+        // for drift correction while breaking fresh installs where the user opens
+        // the app after the delivery window.
         WorkManager.GetInstance(context)
             .EnqueueUniquePeriodicWork(WorkName,
-                ExistingPeriodicWorkPolicy.Update,
+                ExistingPeriodicWorkPolicy.Keep,
                 request);
     }
 
