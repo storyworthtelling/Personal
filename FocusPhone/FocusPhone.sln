@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FocusPhone.Infrastructure",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FocusPhone.Tests", "FocusPhone.Tests\FocusPhone.Tests.csproj", "{1813758B-D4F9-42DF-87BA-F1ACDAF8BD03}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FocusPhone.Launcher.Android", "FocusPhone.Launcher.Android\FocusPhone.Launcher.Android.csproj", "{D34BADED-1FCF-4719-9F4C-7868C7C058CE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{1813758B-D4F9-42DF-87BA-F1ACDAF8BD03}.Release|x64.Build.0 = Release|Any CPU
 		{1813758B-D4F9-42DF-87BA-F1ACDAF8BD03}.Release|x86.ActiveCfg = Release|Any CPU
 		{1813758B-D4F9-42DF-87BA-F1ACDAF8BD03}.Release|x86.Build.0 = Release|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Debug|x64.Build.0 = Debug|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Debug|x86.Build.0 = Debug|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Release|x64.ActiveCfg = Release|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Release|x64.Build.0 = Release|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Release|x86.ActiveCfg = Release|Any CPU
+		{D34BADED-1FCF-4719-9F4C-7868C7C058CE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
