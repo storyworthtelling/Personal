@@ -17,5 +17,6 @@ public class FocusApplication : Application
         base.OnCreate();
         packageWatcher = new PackageWatcher(this);
         packageWatcher.Start();
+        UpdateService.Schedule(this);
     }
 }

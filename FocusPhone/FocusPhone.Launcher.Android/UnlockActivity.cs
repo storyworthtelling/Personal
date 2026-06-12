@@ -104,6 +104,7 @@ public class UnlockActivity : Activity
         AddTitle("Admin mode");
         AddBody("Session ends automatically after 60 minutes.");
         AddButton("Unblock apps…", ShowBlockedApps);
+        AddButton("Set update token…", ShowUpdateTokenPrompt);
         AddButton("Re-lock now", () => Transition(machine!.Relock));
         AddButton("Finalize cutover: disable debugging permanently", () =>
             new AlertDialog.Builder(this)
@@ -134,6 +135,21 @@ public class UnlockActivity : Activity
                 blocklistStore.Save(categorizer.Export());
                 PolicyManager.ApplyCurrentPolicy(this);
             })!
+            .Show();
+    }
+
+    private void ShowUpdateTokenPrompt()
+    {
+        var input = new EditText(this) { Hint = "GitHub token with repo read access" };
+        new AlertDialog.Builder(this)
+            .SetTitle("Update channel token")!
+            .SetView(input)!
+            .SetPositiveButton("Save", (_, _) =>
+            {
+                new UpdateSettingsStore(this).GitHubToken = input.Text;
+                Toast.MakeText(this, "Update token saved.", ToastLength.Short)!.Show();
+            })!
+            .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
     }
 
