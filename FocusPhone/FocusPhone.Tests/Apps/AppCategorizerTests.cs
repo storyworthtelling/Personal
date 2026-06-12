@@ -86,6 +86,17 @@ public class AppCategorizerTests
     }
 
     [Fact]
+    public void Unblock_AllowsPreviouslyBlockedPackage()
+    {
+        categorizer.Block("com.example.notes");
+
+        categorizer.Unblock("com.example.notes");
+
+        Assert.Equal(AppVerdict.Allowed, categorizer.Categorize(CleanApp(), ContentRating.Unknown));
+        Assert.DoesNotContain("com.example.notes", categorizer.Export().BlockedPackages);
+    }
+
+    [Fact]
     public void ExportedLists_RestoreInNewInstance()
     {
         categorizer.Block("com.blocked.app");

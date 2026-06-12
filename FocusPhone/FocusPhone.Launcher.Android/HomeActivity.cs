@@ -75,6 +75,7 @@ public class HomeActivity : Activity
         timeView = new TextView(this) { TextSize = 64 };
         timeView.SetTextColor(Palette.Ink);
         timeView.Gravity = GravityFlags.CenterHorizontal;
+        timeView.LongClick += (_, _) => StartActivity(new Intent(this, typeof(UnlockActivity)));
         root.AddView(timeView, MatchWrap());
 
         dateView = new TextView(this) { TextSize = 18 };

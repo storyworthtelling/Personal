@@ -58,5 +58,16 @@ public class AppCategorizer
         allowedPackages.Add(packageName);
     }
 
+    /// <summary>
+    /// Admin-mode reversal of a block: the package is removed from the
+    /// blocklist and explicitly allowlisted so a re-categorization cannot
+    /// immediately quarantine it again.
+    /// </summary>
+    public void Unblock(string packageName)
+    {
+        blockedPackages.Remove(packageName);
+        allowedPackages.Add(packageName);
+    }
+
     public CategorizerData Export() => new([.. blockedPackages], [.. allowedPackages]);
 }
