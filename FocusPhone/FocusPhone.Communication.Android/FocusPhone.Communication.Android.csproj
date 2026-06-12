@@ -7,7 +7,7 @@
     <ApplicationTitle>Communication</ApplicationTitle>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
-    <AndroidMinSdkVersion>34</AndroidMinSdkVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
