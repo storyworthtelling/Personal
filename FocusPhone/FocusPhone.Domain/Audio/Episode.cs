@@ -5,4 +5,5 @@ public record Episode(
     string FeedId,
     string Title,
     DateTimeOffset PublishedUtc,
-    TimeSpan? Duration = null);
+    TimeSpan? Duration = null,
+    string? AudioUrl = null);
