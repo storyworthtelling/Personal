@@ -14,5 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FocusPhone.Domain\FocusPhone.Domain.csproj" />
+    <ProjectReference Include="..\FocusPhone.Infrastructure\FocusPhone.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
