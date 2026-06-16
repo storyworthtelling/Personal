@@ -10,9 +10,15 @@ irreversible, so it comes absolutely last.
    *unlocked* for several days (all four apps installed normally, remote
    install from play.google.com confirmed, auto-update confirmed, messaging
    bridge stable across re-auth).
-2. **Escrow the release keystore + passwords off-device.** Losing the keystore
-   means no app can ever be updated again (signature mismatch) — the only
-   recovery would be a factory reset.
+2. **Build and escrow the signing keystore.** The four heads carry no signing
+   config, so they sign with the dev machine's default debug keystore (same as
+   DailyLoader) — `~/.local/share/Xamarin/Mono for Android/debug.keystore` on
+   Linux, `%LOCALAPPDATA%\Xamarin\Mono for Android\debug.keystore` on Windows.
+   Build all four APKs on the **same machine/user** so they share one key (the
+   device-owner silent-update channel rejects a signature change). That debug
+   keystore is generated per-machine, so back it up off-device: losing it means
+   no app can ever be updated again (signature mismatch), and recovery would be
+   a factory reset.
 3. Back up anything on the device.
 
 ## Provisioning
