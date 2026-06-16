@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Personal projects repository — primarily background automation apps, with occasional MAUI mobile apps and Angular frontends. Projects are added incrementally; update this file with project-specific build/test commands when a new one lands.
 
+## Projects
+
+### FocusPhone
+
+Distraction-free Pixel 8a: a device-owner launcher/DPC plus companion apps (see `FocusPhone/`).
+
+- Tests: `dotnet test FocusPhone/FocusPhone.sln` (Domain + Infrastructure; no device needed)
+- Android heads target `net10.0-android` and need the Android SDK. In environments without one (e.g. sandboxed CI), a minimal SDK works: `android.jar` under `platforms/android-36/` plus stub `platform-tools/adb`, then build with `-p:AndroidSdkDirectory=<sdk> -p:AndroidUseApkSigner=false` (workload bundles aapt2/r8; jarsigner signs debug builds)
+- App IDs are `com.storyworthtelling.focusphone.*` and must match `PolicyContext` constants in Domain
+- The Camera app cannot build without dl.google.com access: its ML Kit / Play services bindings download .aar payloads at build time (Xamarin.Build.Download). Build it on a normal dev machine
+
 ## Languages & Frameworks
 
 - **Primary**: C# / .NET
