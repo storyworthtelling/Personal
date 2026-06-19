@@ -60,8 +60,9 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
         {
             entity.HasKey(chunk => chunk.Id);
             entity.Property(chunk => chunk.AnalysisStatus).HasConversion<int>();
+            entity.Property(chunk => chunk.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
             entity.HasIndex(chunk => new { chunk.NovelId, chunk.Ordinal });
-            entity.HasIndex(chunk => chunk.AnalysisStatus);
+            entity.HasIndex(chunk => new { chunk.AnalysisStatus, chunk.NextAttemptAtUtc });
         });
 
         model.Entity<DesignRef>(entity =>

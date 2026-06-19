@@ -21,6 +21,7 @@ namespace Storyboarder.Infrastructure.Migrations
                     GoogleDocName = table.Column<string>(type: "TEXT", nullable: false),
                     ArtStyle = table.Column<string>(type: "TEXT", nullable: false),
                     Stage = table.Column<int>(type: "INTEGER", nullable: false),
+                    DesignBibleConsolidated = table.Column<bool>(type: "INTEGER", nullable: false),
                     StoryboardCursor = table.Column<int>(type: "INTEGER", nullable: false),
                     ContinuitySummary = table.Column<string>(type: "TEXT", nullable: false),
                     LastError = table.Column<string>(type: "TEXT", nullable: true),
@@ -43,7 +44,10 @@ namespace Storyboarder.Infrastructure.Migrations
                     EndOffset = table.Column<int>(type: "INTEGER", nullable: false),
                     Text = table.Column<string>(type: "TEXT", nullable: false),
                     AnalysisStatus = table.Column<int>(type: "INTEGER", nullable: false),
-                    PartialBibleJson = table.Column<string>(type: "TEXT", nullable: true)
+                    PartialBibleJson = table.Column<string>(type: "TEXT", nullable: true),
+                    Attempts = table.Column<int>(type: "INTEGER", nullable: false),
+                    NextAttemptAtUtc = table.Column<long>(type: "INTEGER", nullable: true),
+                    LastError = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -178,9 +182,9 @@ namespace Storyboarder.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Chunks_AnalysisStatus",
+                name: "IX_Chunks_AnalysisStatus_NextAttemptAtUtc",
                 table: "Chunks",
-                column: "AnalysisStatus");
+                columns: new[] { "AnalysisStatus", "NextAttemptAtUtc" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Chunks_NovelId_Ordinal",

@@ -26,7 +26,16 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("AnalysisStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("EndOffset")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("NextAttemptAtUtc")
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid>("NovelId")
@@ -47,7 +56,7 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AnalysisStatus");
+                    b.HasIndex("AnalysisStatus", "NextAttemptAtUtc");
 
                     b.HasIndex("NovelId", "Ordinal");
 
@@ -117,6 +126,9 @@ namespace Storyboarder.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("DesignBibleConsolidated")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("GoogleDocId")

@@ -1,8 +1,22 @@
+using System.Text.Json.Serialization;
+
 namespace Storyboarder.Domain.Analysis;
 
 // A single character or setting as observed in one chunk of the novel (the "map" output).
-public sealed record EntityMention(string Name, string Description, IReadOnlyList<string> Aliases)
+public sealed record EntityMention
 {
+    public string Name { get; init; }
+    public string Description { get; init; }
+    public IReadOnlyList<string> Aliases { get; init; }
+
+    [JsonConstructor]
+    public EntityMention(string name, string description, IReadOnlyList<string> aliases)
+    {
+        Name = name;
+        Description = description;
+        Aliases = aliases;
+    }
+
     public EntityMention(string name, string description)
         : this(name, description, Array.Empty<string>()) { }
 }

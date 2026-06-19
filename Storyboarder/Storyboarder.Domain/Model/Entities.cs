@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Storyboarder.Domain.Model;
 
 // Persistence entities (plain POCOs; EF configuration lives in the Infrastructure DbContext).
@@ -12,6 +14,10 @@ public class Novel
     public string GoogleDocName { get; set; } = string.Empty;
     public string ArtStyle { get; set; } = ArtStyles.Default;
     public ProjectStage Stage { get; set; } = ProjectStage.Created;
+
+    // Set once the per-chunk extractions have been merged into canonical DesignRefs, so the merge
+    // (which would otherwise reset reference-sheet state) runs exactly once.
+    public bool DesignBibleConsolidated { get; set; }
 
     // Chunk ordinal up to which storyboarding has already run (for resumable, windowed storyboarding).
     public int StoryboardCursor { get; set; }
@@ -35,7 +41,7 @@ public class SourceText
     public int CharacterCount { get; set; }
 }
 
-public class Chunk
+public class Chunk : IRetryable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid NovelId { get; set; }
@@ -45,10 +51,16 @@ public class Chunk
     public string Text { get; set; } = string.Empty;
     public WorkStatus AnalysisStatus { get; set; } = WorkStatus.Pending;
     public string? PartialBibleJson { get; set; }
+    public int Attempts { get; set; }
+    public DateTimeOffset? NextAttemptAtUtc { get; set; }
+    public string? LastError { get; set; }
+
+    [NotMapped]
+    public WorkStatus WorkState { get => AnalysisStatus; set => AnalysisStatus = value; }
 }
 
 // A canonical design-bible entity (character or setting), with its reference sheet render state.
-public class DesignRef
+public class DesignRef : IRetryable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid NovelId { get; set; }
@@ -61,6 +73,9 @@ public class DesignRef
     public int Attempts { get; set; }
     public DateTimeOffset? NextAttemptAtUtc { get; set; }
     public string? LastError { get; set; }
+
+    [NotMapped]
+    public WorkStatus WorkState { get => ReferenceSheetStatus; set => ReferenceSheetStatus = value; }
 }
 
 public class Volume
@@ -87,7 +102,7 @@ public class Page
     public List<Panel> Panels { get; set; } = [];
 }
 
-public class Panel
+public class Panel : IRetryable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid PageId { get; set; }
@@ -105,4 +120,7 @@ public class Panel
     public int Attempts { get; set; }
     public DateTimeOffset? NextAttemptAtUtc { get; set; }
     public string? LastError { get; set; }
+
+    [NotMapped]
+    public WorkStatus WorkState { get => Status; set => Status = value; }
 }
