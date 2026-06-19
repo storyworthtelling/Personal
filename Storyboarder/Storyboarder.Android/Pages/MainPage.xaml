@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Storyboarder.Android.Pages.MainPage"
+             Title="Storyboarder"
+             BackgroundColor="{StaticResource PageBackground}">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="16" RowSpacing="12">
+
+        <Label Grid.Row="0"
+               Text="Your graphic novels"
+               FontSize="22" FontAttributes="Bold"
+               TextColor="{StaticResource TextPrimary}" />
+
+        <Label x:Name="ConfigWarningLabel" Grid.Row="1"
+               Text="⚠ Enter your Claude and Gemini API keys in Settings to start rendering."
+               FontSize="13" TextColor="#ffcc00"
+               IsVisible="False" />
+
+        <CollectionView x:Name="ProjectsList" Grid.Row="2"
+                        SelectionMode="Single"
+                        SelectionChanged="OnProjectSelected">
+            <CollectionView.EmptyView>
+                <Label Text="No projects yet. Tap “New project” to pick a Google Doc."
+                       TextColor="{StaticResource TextSecondary}"
+                       HorizontalTextAlignment="Center" Margin="0,40" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Stroke="#333333" StrokeThickness="1" Padding="12" Margin="0,4"
+                            StrokeShape="RoundRectangle 8">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding Title}" FontSize="16" FontAttributes="Bold"
+                                   TextColor="{StaticResource TextPrimary}" />
+                            <Label Text="{Binding Summary}" FontSize="13"
+                                   TextColor="{StaticResource TextSecondary}" />
+                            <Label Text="{Binding Error}" FontSize="12" TextColor="#ff6b6b"
+                                   IsVisible="{Binding HasError}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <VerticalStackLayout Grid.Row="3" Spacing="8">
+            <Label x:Name="LastRunLabel" FontSize="12"
+                   TextColor="{StaticResource TextSecondary}"
+                   HorizontalTextAlignment="Center" />
+            <Button Text="New project" Clicked="OnNewProjectClicked" HorizontalOptions="Fill" />
+            <Button Text="Settings" Clicked="OnSettingsClicked"
+                    BackgroundColor="#333333" HorizontalOptions="Fill" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

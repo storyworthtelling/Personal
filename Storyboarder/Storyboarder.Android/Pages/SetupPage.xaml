@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Storyboarder.Android.Pages.SetupPage"
+             Title="Settings"
+             BackgroundColor="{StaticResource PageBackground}">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="14">
+
+            <Label Text="Claude (Anthropic) API key"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}" />
+            <Label Text="Builds the design bible and storyboards the book. From console.anthropic.com."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Entry x:Name="ClaudeKeyEntry" Placeholder="sk-ant-..." />
+
+            <Label Text="Gemini API key"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}" Margin="0,8,0,0" />
+            <Label Text="Renders the panel images. From aistudio.google.com."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Entry x:Name="GeminiKeyEntry" Placeholder="AIza..." />
+
+            <Label Text="Google account"
+                   FontSize="13" FontAttributes="Bold"
+                   TextColor="{StaticResource TextSecondary}" Margin="0,16,0,0" />
+            <Label Text="Sign in with the Google account on this phone to pick a Doc to convert. Grant the documents and Drive read permissions when prompted."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Button Text="Sign in with Google"
+                    Clicked="OnGoogleSignInClicked" BackgroundColor="#333333" />
+            <Label x:Name="GoogleStatusLabel"
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+
+            <Button Text="Save settings" Clicked="OnSaveClicked" Margin="0,16,0,0" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

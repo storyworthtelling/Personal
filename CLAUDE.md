@@ -19,12 +19,12 @@ Distraction-free Pixel 8a: a device-owner launcher/DPC plus companion apps (see 
 
 ### Storyboarder
 
-Turns a Google Docs novel into a multi-volume graphic novel: Claude builds a design bible and storyboards the book; Gemini renders the panels; a resumable background worker assembles one PDF per volume (see `Storyboarder/`).
+An **Android (MAUI) app** that turns a Google Docs novel into a multi-volume graphic novel: Claude builds a design bible and storyboards the book; Gemini renders the panels; a resumable pipeline assembles one PDF per volume. Modeled on DailyLoader: an AndroidX **WorkManager** periodic worker drains the pipeline on-device (no web host, no SignalR). See `Storyboarder/`.
 
-- Tests: `dotnet test Storyboarder/Storyboarder.sln` (no API keys needed — external services are faked)
-- Run: `dotnet run --project Storyboarder/Storyboarder.Api` (status page at `/`, Swagger at `/swagger`); EF migrations apply at startup
-- Secrets via user-secrets / env vars (`Claude__ApiKey`, `Gemini__ApiKey`, `Google__ClientId`, `Google__ApiKey`); see `Storyboarder/README.md` for the Google Cloud setup
-- All `net10.0`; uses EF Core + SQLite as the data layer (the data-access choice CLAUDE.md prescribes), SkiaSharp for page composition, PdfSharp for volume PDFs
+- Tests: `dotnet test Storyboarder/Storyboarder.sln -p:StoryboarderTfms=net10.0` (Domain + Infrastructure + Tests; no device, no API keys — external services are faked). The `-p:StoryboarderTfms=net10.0` switch builds Infrastructure for the desktop TFM only so the suite runs without the MAUI/Android workload.
+- Android head (`Storyboarder.Android`, `net10.0-android`, app id `com.storyworthtelling.storyboarder`): build with the MAUI/Android workload + Android SDK (same minimal-SDK note as FocusPhone — `platforms/android-34/`, `-p:AndroidSdkDirectory=<sdk> -p:AndroidUseApkSigner=false`); signs with the default debug keystore. Background work uses `Xamarin.AndroidX.Work.Runtime`.
+- Secrets are entered in-app on the Settings page (stored in MAUI `Preferences`): Claude + Gemini API keys. Google Docs access uses native device-account sign-in via Android `AccountManager` (no Play Services binding, so **no `dl.google.com` build dependency** — unlike the FocusPhone Camera app); a Drive doc picker lists the user's Google Docs.
+- `Storyboarder.Infrastructure` multi-targets `net10.0;net10.0-android`; `Storyboarder.Domain` is `net10.0`. Data layer is EF Core + SQLite (the prescribed data-access choice); SkiaSharp composes pages, PdfSharp assembles volume PDFs. On device the DB and image/PDF output live under `FileSystem.AppDataDirectory`.
 
 ## Languages & Frameworks
 

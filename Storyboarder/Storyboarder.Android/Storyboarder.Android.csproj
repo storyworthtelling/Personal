@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UseMaui>true</UseMaui>
+    <RootNamespace>Storyboarder.Android</RootNamespace>
+    <ApplicationId>com.storyworthtelling.storyboarder</ApplicationId>
+    <ApplicationTitle>Storyboarder</ApplicationTitle>
+    <!-- yyyyMMddHHmm overflows Android's int32 versionCode limit; the last year digit keeps the
+         9-digit result in range (matches DailyLoader). -->
+    <_VersionYearDigit>$([MSBuild]::Modulo($([System.DateTime]::UtcNow.Year), 10))</_VersionYearDigit>
+    <ApplicationVersion>$(_VersionYearDigit)$([System.DateTime]::UtcNow.ToString('MMddHHmm'))</ApplicationVersion>
+    <ApplicationDisplayVersion>$([System.DateTime]::UtcNow.ToString('yyyy.MM.dd.HHmm'))</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- App icon is provided as native Android adaptive-icon resources under
+       Platforms/Android/Resources (mipmap-*); MAUI's SVG MauiIcon pipeline is bypassed. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Storyboarder.Domain\Storyboarder.Domain.csproj" />
+    <ProjectReference Include="..\Storyboarder.Infrastructure\Storyboarder.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
+  </ItemGroup>
+
+  <!-- PdfSharp and SkiaSharp use reflection / native entry points; keep the Release trimmer away. -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="PdfSharp" RootMode="All" />
+    <TrimmerRootAssembly Include="SkiaSharp" RootMode="All" />
+  </ItemGroup>
+</Project>
