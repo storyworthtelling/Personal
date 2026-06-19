@@ -18,7 +18,7 @@ namespace Storyboarder.Infrastructure.Pipeline;
 // The heart of the app: advances one novel by one unit of work per call, idempotently and resumably.
 // State lives entirely in the database, so the worker resumes after pauses, rate limits, or restarts
 // simply by querying the next due unit. A single worker calls ProcessNextAsync in a loop.
-public sealed class GraphicNovelProcessor
+public sealed class GraphicNovelProcessor : IPipelineStep
 {
     private readonly IDbContextFactory<StoryboarderDbContext> dbContextFactory;
     private readonly IClaudeAnalysisClient claude;

@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -23,7 +22,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Storyboarder.Domain\Storyboarder.Domain.csproj" />
     <ProjectReference Include="..\Storyboarder.Infrastructure\Storyboarder.Infrastructure.csproj" />
-    <ProjectReference Include="..\Storyboarder.Api\Storyboarder.Api.csproj" />
   </ItemGroup>
 
 </Project>
