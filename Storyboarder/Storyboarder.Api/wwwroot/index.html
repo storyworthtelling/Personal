@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Storyboarder — novel → graphic novel</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    h1 { margin-bottom: .25rem; }
+    .sub { color: #888; margin-top: 0; }
+    .panel { border: 1px solid #8884; border-radius: 10px; padding: 1rem 1.25rem; margin: 1rem 0; }
+    button { font-size: 1rem; padding: .5rem 1rem; border-radius: 8px; border: 1px solid #8886; cursor: pointer; background: #2b6cb0; color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    label { display: block; font-size: .85rem; color: #888; margin: .5rem 0 .15rem; }
+    input { width: 100%; padding: .45rem; border-radius: 6px; border: 1px solid #8886; box-sizing: border-box; }
+    .stage { font-weight: 600; }
+    .bars { display: grid; grid-template-columns: 9rem 1fr 4rem; gap: .35rem .6rem; align-items: center; margin-top: .6rem; }
+    .track { background: #8883; border-radius: 6px; height: 12px; overflow: hidden; }
+    .fill { background: #38a169; height: 100%; width: 0; transition: width .4s; }
+    .err { color: #e53e3e; font-size: .85rem; }
+    .vol a { margin-right: .75rem; }
+    .empty { color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Storyboarder</h1>
+  <p class="sub">Turn a Google&nbsp;Docs novel into a multi-volume graphic novel. It works in the background and keeps going until it's done.</p>
+
+  <div class="panel">
+    <label for="artStyle">Art style (baked into every panel for consistency)</label>
+    <input id="artStyle" value="modern graphic-novel realism: painterly, semi-realistic Western graphic-novel illustration with cinematic lighting and a restrained, muted color palette" />
+    <p></p>
+    <button id="choose" disabled>Choose a novel from Google Drive…</button>
+    <span id="hint" class="empty"> loading…</span>
+  </div>
+
+  <h2>Projects</h2>
+  <div id="projects"><p class="empty">No projects yet.</p></div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js" async defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

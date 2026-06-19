@@ -17,6 +17,15 @@ Distraction-free Pixel 8a: a device-owner launcher/DPC plus companion apps (see 
 - App IDs are `com.storyworthtelling.focusphone.*` and must match `PolicyContext` constants in Domain
 - The Camera app cannot build without dl.google.com access: its ML Kit / Play services bindings download .aar payloads at build time (Xamarin.Build.Download). Build it on a normal dev machine
 
+### Storyboarder
+
+Turns a Google Docs novel into a multi-volume graphic novel: Claude builds a design bible and storyboards the book; Gemini renders the panels; a resumable background worker assembles one PDF per volume (see `Storyboarder/`).
+
+- Tests: `dotnet test Storyboarder/Storyboarder.sln` (no API keys needed — external services are faked)
+- Run: `dotnet run --project Storyboarder/Storyboarder.Api` (status page at `/`, Swagger at `/swagger`); EF migrations apply at startup
+- Secrets via user-secrets / env vars (`Claude__ApiKey`, `Gemini__ApiKey`, `Google__ClientId`, `Google__ApiKey`); see `Storyboarder/README.md` for the Google Cloud setup
+- All `net10.0`; uses EF Core + SQLite as the data layer (the data-access choice CLAUDE.md prescribes), SkiaSharp for page composition, PdfSharp for volume PDFs
+
 ## Languages & Frameworks
 
 - **Primary**: C# / .NET
