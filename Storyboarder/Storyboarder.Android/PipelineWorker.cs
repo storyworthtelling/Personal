@@ -2,8 +2,9 @@ using global::Android.Content;
 using AndroidX.Work;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
-using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Pipeline;
+// AndroidX.Work also defines an IClock, so alias the domain one we mean.
+using IClock = Storyboarder.Domain.Time.IClock;
 
 namespace Storyboarder.Android;
 
