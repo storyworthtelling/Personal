@@ -1,0 +1,20 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## User secrets / credentials (never commit these)
+**/appsettings.Production.json
+**/appsettings.*.local.json
+**/secrets.json
+
+## Local runtime data (SQLite DB + generated images/PDFs)
+output/
+*.db
+*.db-shm
+*.db-wal
+
+## Publish output
+publish/

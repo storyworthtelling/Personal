@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Storyboarder.Android.Pages.NewProjectPage"
+             Title="New project"
+             BackgroundColor="{StaticResource PageBackground}">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" Padding="16" RowSpacing="10">
+
+        <Button Grid.Row="0" x:Name="SignInButton"
+                Text="Sign in with Google" Clicked="OnSignInClicked"
+                BackgroundColor="#333333" />
+
+        <Label Grid.Row="1" x:Name="AccountLabel"
+               FontSize="12" TextColor="{StaticResource TextSecondary}" />
+
+        <Label Grid.Row="2" Text="Art style"
+               FontSize="13" FontAttributes="Bold"
+               TextColor="{StaticResource TextSecondary}" Margin="0,8,0,0" />
+
+        <Entry Grid.Row="3" x:Name="ArtStyleEntry" />
+
+        <CollectionView Grid.Row="4" x:Name="DocsList"
+                        SelectionMode="Single" SelectionChanged="OnDocSelected">
+            <CollectionView.EmptyView>
+                <Label Text="Sign in, then your Google Docs appear here."
+                       TextColor="{StaticResource TextSecondary}"
+                       HorizontalTextAlignment="Center" Margin="0,40" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Stroke="#333333" StrokeThickness="1" Padding="10" Margin="0,3"
+                            StrokeShape="RoundRectangle 6">
+                        <Label Text="{Binding Name}" TextColor="{StaticResource TextPrimary}" />
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <StackLayout Grid.Row="5" Orientation="Horizontal" Spacing="8">
+            <ActivityIndicator x:Name="Spinner" IsRunning="False" IsVisible="False"
+                               Color="{StaticResource Accent}" />
+            <Label x:Name="StatusLabel" FontSize="12"
+                   TextColor="{StaticResource TextSecondary}" VerticalOptions="Center" />
+        </StackLayout>
+
+        <Grid Grid.Row="6" ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Grid.Column="0" x:Name="RefreshButton" Text="Refresh docs"
+                    Clicked="OnRefreshDocsClicked" BackgroundColor="#333333" />
+            <Button Grid.Column="1" x:Name="CreateButton" Text="Create"
+                    Clicked="OnCreateClicked" IsEnabled="False" />
+        </Grid>
+    </Grid>
+</ContentPage>

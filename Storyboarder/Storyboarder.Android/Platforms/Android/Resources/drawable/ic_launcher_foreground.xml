@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Storyboarder emblem: an open book whose left page (the novel, shown as text lines) becomes a
+     2x2 grid of comic panels on the right page (the graphic novel). White on the adaptive
+     background colour; kept inside the 108dp adaptive safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Open-book silhouette -->
+    <path
+        android:pathData="M22,35 L54,41 L86,35 L86,67 L54,73 L22,67 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Centre spine -->
+    <path
+        android:pathData="M54,41 L54,73"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Left page: text lines (the novel) -->
+    <path android:fillColor="#FFFFFF" android:pathData="M27,47 H49 V49 H27 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M27,54 H46 V56 H27 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M27,61 H43 V63 H27 Z" />
+
+    <!-- Right page: 2x2 comic panels (the graphic novel) -->
+    <path android:fillColor="#FFFFFF" android:pathData="M60,46 H69 V55 H60 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M72,46 H81 V55 H72 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M60,58 H69 V67 H60 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M72,58 H81 V67 H72 Z" />
+</vector>

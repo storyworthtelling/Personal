@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- The Android head needs net10.0-android; Tests/CI without the Android workload can build
+         just the desktop TFM with -p:StoryboarderTfms=net10.0. -->
+    <StoryboarderTfms Condition="'$(StoryboarderTfms)' == ''">net10.0;net10.0-android</StoryboarderTfms>
+    <TargetFrameworks>$(StoryboarderTfms)</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <SupportedOSPlatformVersion Condition="$(TargetFramework.EndsWith('-android'))">34</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Storyboarder.Domain\Storyboarder.Domain.csproj" />
+  </ItemGroup>
+
+  <!-- Cross-target packages. -->
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageReference Include="Google.Apis.Docs.v1" Version="1.74.0.4134" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
+    <PackageReference Include="PDFsharp" Version="6.1.1" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
+
+  <!-- Desktop-only: design-time EF tooling and the Linux Skia natives used by Tests/CI.
+       The Android build packages libSkiaSharp.so per ABI from the base SkiaSharp package. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+  </ItemGroup>
+
+  <!-- The design-time factory depends on the Design package, which is desktop-only. -->
+  <ItemGroup Condition="$(TargetFramework.EndsWith('-android'))">
+    <Compile Remove="Persistence\DesignTimeDbContextFactory.cs" />
+  </ItemGroup>
+
+</Project>
