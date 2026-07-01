@@ -17,8 +17,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <!-- App icon is provided as native Android adaptive-icon resources under
-       Platforms/Android/Resources (mipmap-*); MAUI's SVG MauiIcon pipeline is bypassed. -->
+  <!-- App icon via MAUI's SVG resizetizer: generates all densities + adaptive + round and wires the
+       manifest icon at build time. Replaces the earlier hand-rolled native adaptive-icon resources,
+       which rendered as the default Android icon (an anydpi-v26-only mipmap with no bitmap fallback).
+       White emblem (appiconfg.svg) over the brand indigo background (Color). -->
+  <ItemGroup>
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#3B5BDB" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Storyboarder.Domain\Storyboarder.Domain.csproj" />
