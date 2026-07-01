@@ -24,6 +24,7 @@ public class GraphicNovelProcessorTests : IDisposable
     private readonly Mock<IClaudeAnalysisClient> claude = new();
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int panelRenderCalls;
+    private int chapterAnalysisCalls;
 
     public GraphicNovelProcessorTests()
     {
@@ -38,6 +39,27 @@ public class GraphicNovelProcessorTests : IDisposable
                 [new VolumeDraft(1, "Volume One",
                     [new PageDraft(1, [new PanelDraft("Hero stands before the Castle", "At last.", null, ["Hero", "Castle"])])])],
                 "Hero reached the castle."));
+
+        // The first chapter-analysis call is rate-limited; the worker must reschedule and succeed on retry.
+        claude.Setup(c => c.AnalyzeChapter(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                chapterAnalysisCalls++;
+                return chapterAnalysisCalls == 1
+                    ? Task.FromException<ChapterNotes>(new RateLimitException("429 from test"))
+                    : Task.FromResult(new ChapterNotes(
+                        ["Hero"], ["Hero walks to the castle"], ["Hero resolves to enter"], [], [], [], ["Vivid setting"], []));
+            });
+
+        claude.Setup(c => c.ConsolidateAnalysis(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BookAnalysisResult(
+                "A hero reaches a castle.", "The hero journeys to the castle and knocks.",
+                [new CharacterProfile("Hero", "protagonist", "Grows from timid to resolute.", ["approaches: Castle"])],
+                ["perseverance"], ["How did the gate open?"], ["Eye colour shifts"], ["Castle geography"], ["Slow open"],
+                [new Review("developmental editor", "Promising but uneven.", ["Voice"], ["Pacing"], "Tighten the opening.")],
+                [new RevisionItem("High", "Sagging middle", "Cut a subplot.")],
+                ["Comparable Title"], "Upmarket fantasy for adult readers."));
 
         gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
@@ -68,6 +90,7 @@ public class GraphicNovelProcessorTests : IDisposable
         new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
         new SkiaPageComposer(Options.Create(new PageLayoutOptions())),
         new PdfVolumeComposer(),
+        new AnalysisPdfComposer(new PdfVolumeComposer(), new AnalysisDocumentRenderer()),
         clock,
         Options.Create(new RateLimitOptions
         {
@@ -131,5 +154,12 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.NotNull(volume.PdfPath);
         Assert.True(File.Exists(volume.PdfPath));
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(volume.PdfPath!)[..4]));
+
+        Assert.True(chapterAnalysisCalls >= 2, "The rate-limited first chapter analysis should have been retried.");
+        var analysis = Assert.Single(context.BookAnalyses.Where(a => a.NovelId == novelId));
+        Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);
+        Assert.NotNull(analysis.PdfPath);
+        Assert.True(File.Exists(analysis.PdfPath));
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(analysis.PdfPath!)[..4]));
     }
 }

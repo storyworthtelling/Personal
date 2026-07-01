@@ -89,6 +89,70 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task AnalyzeChapter_ParsesNotes_ToleratingProse()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "Here you go:\n{\"charactersPresent\":[\"Alice\"],\"keyEvents\":[\"Alice leaves home\"]," +
+            "\"characterBeats\":[\"Alice resolves to go\"],\"setupsAndPayoffs\":[\"A locket is introduced\"]," +
+            "\"possibleInconsistencies\":[\"Eye color changes\"],\"factualClaims\":[\"Paris is in France\"]," +
+            "\"notableStrengths\":[\"Vivid prose\"],\"notableWeaknesses\":[\"Slow open\"]}"));
+
+        var notes = await client.AnalyzeChapter("excerpt", ["Alice"], CancellationToken.None);
+
+        Assert.Contains("Alice", notes.CharactersPresent);
+        Assert.Equal("Eye color changes", Assert.Single(notes.PossibleInconsistencies));
+        Assert.Equal("Paris is in France", Assert.Single(notes.FactualClaims));
+        Assert.Equal("Slow open", Assert.Single(notes.NotableWeaknesses));
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_MissingFields_DefaultToEmpty()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{}"));
+
+        var notes = await client.AnalyzeChapter("excerpt", [], CancellationToken.None);
+
+        Assert.Empty(notes.CharactersPresent);
+        Assert.Empty(notes.NotableStrengths);
+    }
+
+    [Fact]
+    public async Task ConsolidateAnalysis_ParsesReport_AndUsesAnalysisMaxTokens()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", MaxTokens = 256, AnalysisMaxTokens = 4096
+        });
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
+        handler.EnqueueOk(Reply(
+            "{\"logline\":\"A girl quests.\",\"synopsis\":\"She grows up.\"," +
+            "\"characters\":[{\"name\":\"Alice\",\"role\":\"protagonist\",\"arcSummary\":\"grows brave\"," +
+            "\"relationships\":[\"ally: Bob\"]}],\"themes\":[\"courage\"],\"plotHoles\":[\"Where is the key?\"]," +
+            "\"inconsistencies\":[\"Eye color\"],\"inaccuracies\":[\"Paris claim\"],\"pacingNotes\":[\"Middle sags\"]," +
+            "\"reviews\":[{\"perspective\":\"developmental editor\",\"assessment\":\"promising\"," +
+            "\"strengths\":[\"voice\"],\"weaknesses\":[\"pacing\"],\"recommendation\":\"revise middle\"}]," +
+            "\"revisionPlan\":[{\"priority\":\"High\",\"issue\":\"sagging middle\",\"suggestedFix\":\"cut subplot\"}]," +
+            "\"comparableTitles\":[\"Book X\"],\"marketPositioning\":\"YA fantasy\"}"));
+
+        var report = await client.ConsolidateAnalysis(
+            "Quest", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        Assert.Equal("A girl quests.", report.Logline);
+        var character = Assert.Single(report.Characters);
+        Assert.Equal("Alice", character.Name);
+        Assert.Equal("protagonist", character.Role);
+        Assert.Equal("developmental editor", Assert.Single(report.Reviews).Perspective);
+        Assert.Equal("High", Assert.Single(report.RevisionPlan).Priority);
+        Assert.Equal("YA fantasy", report.MarketPositioning);
+
+        // The reduce call must request the larger analysis output budget, not the default MaxTokens.
+        Assert.Contains("\"max_tokens\":4096", handler.RequestBodies[0]);
+    }
+
+    [Fact]
     public async Task RateLimit_429_ThrowsRateLimitException()
     {
         var (client, handler) = Create();

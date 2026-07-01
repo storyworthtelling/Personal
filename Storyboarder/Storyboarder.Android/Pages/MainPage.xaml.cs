@@ -72,16 +72,30 @@ public partial class MainPage : ContentPage
         if (!statuses.TryGetValue(row.Id, out var status))
             return;
 
-        var ready = status.VolumeList.Where(v => v.PdfReady).ToList();
-        if (ready.Count == 0)
+        // Openable PDFs: the finished comic volumes plus the book-analysis (revision) report.
+        var options = new List<PdfChoice>();
+        foreach (var volume in status.VolumeList.Where(v => v.PdfReady))
         {
-            await DisplayAlert(row.Title, "No finished volume PDFs yet.", "OK");
+            var number = volume.Number;
+            options.Add(new PdfChoice(
+                $"Volume {number}: {volume.Title}",
+                $"{status.Title} — Volume {number}",
+                projects => projects.GetVolumePdfPathAsync(status.Id, number, CancellationToken.None)));
+        }
+        if (status.AnalysisReady)
+            options.Add(new PdfChoice(
+                "Analysis report (revision notes)",
+                $"{status.Title} — Analysis",
+                projects => projects.GetAnalysisPdfPathAsync(status.Id, CancellationToken.None)));
+
+        if (options.Count == 0)
+        {
+            await DisplayAlert(row.Title, "No finished PDFs yet.", "OK");
             return;
         }
 
-        var labels = ready.Select(v => $"Volume {v.Number}: {v.Title}").ToArray();
-        var choice = await DisplayActionSheet("Open a finished volume", "Cancel", null, labels);
-        var picked = ready.FirstOrDefault(v => $"Volume {v.Number}: {v.Title}" == choice);
+        var choice = await DisplayActionSheet("Open a PDF", "Cancel", null, options.Select(o => o.Label).ToArray());
+        var picked = options.FirstOrDefault(o => o.Label == choice);
         if (picked is null)
             return;
 
@@ -89,21 +103,24 @@ public partial class MainPage : ContentPage
         using (var scope = IPlatformApplication.Current!.Services.CreateScope())
         {
             var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
-            path = await projects.GetVolumePdfPathAsync(status.Id, picked.Number, CancellationToken.None);
+            path = await picked.Resolve(projects);
         }
 
         if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
         {
-            await DisplayAlert("Volume", "The PDF file could not be found.", "OK");
+            await DisplayAlert("PDF", "The PDF file could not be found.", "OK");
             return;
         }
 
         await Share.RequestAsync(new ShareFileRequest
         {
-            Title = $"{status.Title} — Volume {picked.Number}",
+            Title = picked.ShareTitle,
             File = new ShareFile(path)
         });
     }
+
+    // One entry in the "open a PDF" action sheet: its label, share title, and how to resolve its path.
+    private sealed record PdfChoice(string Label, string ShareTitle, Func<ProjectService, Task<string?>> Resolve);
 
     private async void OnNewProjectClicked(object sender, EventArgs e) =>
         await Navigation.PushAsync(
@@ -120,7 +137,8 @@ public partial class MainPage : ContentPage
         {
             var summary =
                 $"{s.Stage} · panels {s.Panels.Done}/{s.Panels.Total} · " +
-                $"pages {s.Pages.Done}/{s.Pages.Total} · volumes {s.Volumes.Done}/{s.Volumes.Total}";
+                $"pages {s.Pages.Done}/{s.Pages.Total} · volumes {s.Volumes.Done}/{s.Volumes.Total} · " +
+                $"analysis {s.Analysis.Done}/{s.Analysis.Total}";
             return new ProjectRow(s.Id, s.Title, summary, s.LastError, !string.IsNullOrEmpty(s.LastError));
         }
     }

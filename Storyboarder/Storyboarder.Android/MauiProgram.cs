@@ -71,6 +71,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IImageStore, FileSystemImageStore>();
         builder.Services.AddSingleton<IPageComposer, SkiaPageComposer>();
         builder.Services.AddSingleton<IVolumePdfComposer, PdfVolumeComposer>();
+        builder.Services.AddSingleton<AnalysisDocumentRenderer>();
+        builder.Services.AddSingleton<IAnalysisPdfComposer, AnalysisPdfComposer>();
 
         // Pipeline + application services.
         builder.Services.AddSingleton<GraphicNovelProcessor>();

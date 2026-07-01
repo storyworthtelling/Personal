@@ -15,4 +15,6 @@ public sealed record NovelStatus(
     PhaseProgress Panels,
     PhaseProgress Pages,
     PhaseProgress Volumes,
-    IReadOnlyList<VolumeStatus> VolumeList);
+    IReadOnlyList<VolumeStatus> VolumeList,
+    PhaseProgress Analysis,
+    bool AnalysisReady);

@@ -74,6 +74,15 @@ public sealed class ProjectService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<string?> GetAnalysisPdfPathAsync(Guid novelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.BookAnalyses
+            .Where(a => a.NovelId == novelId && a.PdfStatus == WorkStatus.Completed)
+            .Select(a => a.PdfPath)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     private static async Task<NovelStatus?> BuildStatus(StoryboarderDbContext db, Guid id, CancellationToken cancellationToken)
     {
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
@@ -96,9 +105,13 @@ public sealed class ProjectService
             .Select(v => new VolumeStatus(v.Number, v.Title, v.PdfStatus == WorkStatus.Completed))
             .ToListAsync(cancellationToken);
 
+        var analysisReady = await db.BookAnalyses
+            .AnyAsync(a => a.NovelId == id && a.PdfStatus == WorkStatus.Completed, cancellationToken);
+        var analysis = new PhaseProgress(analysisReady ? 1 : 0, 1);
+
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
-            chunks, sheets, panels, pages, volumes, volumeList);
+            chunks, sheets, panels, pages, volumes, volumeList, analysis, analysisReady);
     }
 
     private static async Task<PhaseProgress> Counts<T>(

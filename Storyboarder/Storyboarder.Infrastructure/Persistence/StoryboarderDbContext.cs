@@ -16,6 +16,8 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
     public DbSet<Volume> Volumes => Set<Volume>();
     public DbSet<Page> Pages => Set<Page>();
     public DbSet<Panel> Panels => Set<Panel>();
+    public DbSet<ChunkAnalysis> ChunkAnalyses => Set<ChunkAnalysis>();
+    public DbSet<BookAnalysis> BookAnalyses => Set<BookAnalysis>();
 
     // SQLite has no native DateTimeOffset, and the provider cannot translate comparisons on the
     // default TEXT mapping. Storing UTC ticks as integers makes the worker's "due units" time
@@ -50,6 +52,14 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.HasMany(novel => novel.Volumes)
                 .WithOne()
                 .HasForeignKey(volume => volume.NovelId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(novel => novel.ChunkAnalyses)
+                .WithOne()
+                .HasForeignKey(analysis => analysis.NovelId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(novel => novel.Analysis)
+                .WithOne()
+                .HasForeignKey<BookAnalysis>(analysis => analysis.NovelId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(novel => novel.Stage);
         });
@@ -101,6 +111,22 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.Property(panel => panel.Status).HasConversion<int>();
             entity.Property(panel => panel.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
             entity.HasIndex(panel => new { panel.Status, panel.NextAttemptAtUtc });
+        });
+
+        model.Entity<ChunkAnalysis>(entity =>
+        {
+            entity.HasKey(analysis => analysis.Id);
+            entity.Property(analysis => analysis.Status).HasConversion<int>();
+            entity.Property(analysis => analysis.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
+            entity.HasIndex(analysis => new { analysis.NovelId, analysis.Ordinal });
+            entity.HasIndex(analysis => new { analysis.Status, analysis.NextAttemptAtUtc });
+        });
+
+        model.Entity<BookAnalysis>(entity =>
+        {
+            entity.HasKey(analysis => analysis.Id);
+            entity.Property(analysis => analysis.PdfStatus).HasConversion<int>();
+            entity.HasIndex(analysis => analysis.NovelId).IsUnique();
         });
     }
 }

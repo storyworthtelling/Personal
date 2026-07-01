@@ -13,7 +13,8 @@ public sealed record PipelineProgress(
     bool StoryboardCreated,
     bool AllPanelsRendered,
     bool AllPagesComposed,
-    bool AllVolumesAssembled);
+    bool AllVolumesAssembled,
+    bool AnalysisComplete = false);
 
 // Decides the next stage for a novel given its progress. Pure and idempotent: a stage only advances
 // when its completion predicate holds; Completed and Failed are terminal.
@@ -35,7 +36,9 @@ public static class ProjectStateMachine
         ProjectStage.ComposingPages =>
             progress.AllPagesComposed ? ProjectStage.AssemblingVolumes : ProjectStage.ComposingPages,
         ProjectStage.AssemblingVolumes =>
-            progress.AllVolumesAssembled ? ProjectStage.Completed : ProjectStage.AssemblingVolumes,
+            progress.AllVolumesAssembled ? ProjectStage.ComposingAnalysis : ProjectStage.AssemblingVolumes,
+        ProjectStage.ComposingAnalysis =>
+            progress.AnalysisComplete ? ProjectStage.Completed : ProjectStage.ComposingAnalysis,
         ProjectStage.Completed => ProjectStage.Completed,
         ProjectStage.Failed => ProjectStage.Failed,
         _ => progress.Stage

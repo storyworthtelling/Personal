@@ -81,7 +81,7 @@ public sealed class SkiaPageComposer : IPageComposer
         using var textPaint = new SKPaint { Color = SKColors.Black, IsAntialias = true };
 
         float maxTextWidth = panel.Width - 4 * Padding;
-        var lines = WrapText(text, font, maxTextWidth);
+        var lines = SkiaText.Wrap(font, text, maxTextWidth);
         float lineHeight = FontSize * 1.3f;
         float boxHeight = lines.Count * lineHeight + 2 * Padding;
         float boxWidth = panel.Width - 2 * Padding;
@@ -103,29 +103,5 @@ public sealed class SkiaPageComposer : IPageComposer
             canvas.DrawText(line, boxX + Padding, baseline, font, textPaint);
             baseline += lineHeight;
         }
-    }
-
-    private static List<string> WrapText(string text, SKFont font, float maxWidth)
-    {
-        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var lines = new List<string>();
-        var current = string.Empty;
-
-        foreach (var word in words)
-        {
-            var candidate = current.Length == 0 ? word : $"{current} {word}";
-            if (current.Length == 0 || font.MeasureText(candidate) <= maxWidth)
-                current = candidate;
-            else
-            {
-                lines.Add(current);
-                current = word;
-            }
-        }
-
-        if (current.Length > 0)
-            lines.Add(current);
-
-        return lines.Count == 0 ? [string.Empty] : lines;
     }
 }

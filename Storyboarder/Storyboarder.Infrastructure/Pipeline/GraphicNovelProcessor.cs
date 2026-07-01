@@ -26,6 +26,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private readonly IImageStore imageStore;
     private readonly IPageComposer pageComposer;
     private readonly IVolumePdfComposer pdfComposer;
+    private readonly IAnalysisPdfComposer analysisPdfComposer;
     private readonly IClock clock;
     private readonly ILogger<GraphicNovelProcessor> logger;
 
@@ -43,6 +44,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         IImageStore imageStore,
         IPageComposer pageComposer,
         IVolumePdfComposer pdfComposer,
+        IAnalysisPdfComposer analysisPdfComposer,
         IClock clock,
         IOptions<RateLimitOptions> rateLimitOptions,
         ILogger<GraphicNovelProcessor> logger)
@@ -53,6 +55,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         this.imageStore = imageStore;
         this.pageComposer = pageComposer;
         this.pdfComposer = pdfComposer;
+        this.analysisPdfComposer = analysisPdfComposer;
         this.clock = clock;
         this.logger = logger;
 
@@ -84,6 +87,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             ProjectStage.RenderingImages => await RenderPanels(db, novel, cancellationToken),
             ProjectStage.ComposingPages => await ComposePages(db, novel, cancellationToken),
             ProjectStage.AssemblingVolumes => await AssembleVolumes(db, novel, cancellationToken),
+            ProjectStage.ComposingAnalysis => await ComposeAnalysis(db, novel, cancellationToken),
             _ => ProcessResult.Idle
         };
     }
@@ -440,6 +444,133 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return ProcessResult.DidWork(novel.Id);
     }
 
+    // Builds the book-analysis (revision report) PDF: map each chunk to notes, consolidate once, then
+    // render. Structured like BuildDesignBible — one unit of work per call, fully resumable from the DB.
+    private async Task<ProcessResult> ComposeAnalysis(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+
+        // 0) Seed one analysis unit per chunk (once), plus the per-novel analysis record.
+        if (!await db.ChunkAnalyses.AnyAsync(a => a.NovelId == novel.Id, cancellationToken))
+        {
+            var ordinals = await db.Chunks
+                .Where(c => c.NovelId == novel.Id)
+                .OrderBy(c => c.Ordinal)
+                .Select(c => c.Ordinal)
+                .ToListAsync(cancellationToken);
+            foreach (var ordinal in ordinals)
+                db.ChunkAnalyses.Add(new ChunkAnalysis { NovelId = novel.Id, Ordinal = ordinal });
+
+            if (!await db.BookAnalyses.AnyAsync(a => a.NovelId == novel.Id, cancellationToken))
+                db.BookAnalyses.Add(new BookAnalysis { NovelId = novel.Id });
+
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 1) Map: analyze one pending/due chunk into notes.
+        var unit = await db.ChunkAnalyses
+            .Where(a => a.NovelId == novel.Id &&
+                        (a.Status == WorkStatus.Pending ||
+                         (a.Status == WorkStatus.NeedsRetry && a.NextAttemptAtUtc <= now)))
+            .OrderBy(a => a.Ordinal)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (unit is not null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var text = await db.Chunks
+                .Where(c => c.NovelId == novel.Id && c.Ordinal == unit.Ordinal)
+                .Select(c => c.Text)
+                .FirstAsync(cancellationToken);
+            var castNames = await db.DesignRefs
+                .Where(r => r.NovelId == novel.Id && r.Kind == ReferenceKind.Character)
+                .Select(r => r.Name)
+                .ToListAsync(cancellationToken);
+
+            try
+            {
+                var notes = await claude.AnalyzeChapter(text, castNames, cancellationToken);
+                unit.NotesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
+                unit.Status = WorkStatus.Completed;
+                unit.LastError = null;
+            }
+            catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
+            {
+                ScheduleRetry(unit, ex);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        if (await PendingWork(db.ChunkAnalyses.Where(a => a.NovelId == novel.Id), a => a.Status, a => a.NextAttemptAtUtc, now)
+                is { } mapWait)
+            return mapWait == TimeSpan.MinValue ? ProcessResult.Idle : ProcessResult.Waiting(mapWait, novel.Id);
+
+        var analysis = await db.BookAnalyses.FirstAsync(a => a.NovelId == novel.Id, cancellationToken);
+
+        // 2) Reduce: consolidate all chunk notes into the whole report (one Claude call).
+        if (analysis.ConsolidatedJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var notes = await LoadChapterNotes(db, novel.Id, cancellationToken);
+            var bible = await LoadBible(db, novel.Id, cancellationToken);
+
+            try
+            {
+                var report = await claude.ConsolidateAnalysis(novel.Title, notes, bible, novel.ContinuitySummary, cancellationToken);
+                analysis.ConsolidatedJson = JsonSerializer.Serialize(report, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
+            {
+                novel.LastError = ex.Message;
+                await db.SaveChangesAsync(cancellationToken);
+                var retryAfter = (ex as RateLimitException)?.RetryAfter;
+                return ProcessResult.Waiting(backoff.NextDelay(0, retryAfter), novel.Id);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 3) Render: compose the analysis PDF from the consolidated report.
+        if (analysis.PdfStatus != WorkStatus.Completed)
+        {
+            try
+            {
+                var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
+                             ?? BookAnalysisResult.Empty;
+                var pdf = analysisPdfComposer.Compose(report, novel.Title);
+                analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
+                analysis.PdfStatus = WorkStatus.Completed;
+            }
+            catch (Exception ex)
+            {
+                analysis.PdfStatus = WorkStatus.Failed;
+                logger.LogError(ex, "Failed to compose analysis PDF for novel {NovelId}", novel.Id);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 4) Report rendered: advance to Completed.
+        novel.Stage = ProjectStateMachine.NextStage(new PipelineProgress(
+            novel.Stage, SourceIngested: false, AllChunksAnalyzed: false, BibleConsolidated: false,
+            AllReferenceSheetsRendered: false, StoryboardCreated: false, AllPanelsRendered: false,
+            AllPagesComposed: false, AllVolumesAssembled: false, AnalysisComplete: true));
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
+    }
+
     // --- helpers ---
 
     // Returns null when the phase's units are all complete; otherwise a wait: a positive duration to
@@ -486,6 +617,20 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return new DesignBible(
             refs.Where(r => r.Kind == ReferenceKind.Character).Select(Map).ToList(),
             refs.Where(r => r.Kind == ReferenceKind.Setting).Select(Map).ToList());
+    }
+
+    private async Task<IReadOnlyList<ChapterNotes>> LoadChapterNotes(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var notesJson = await db.ChunkAnalyses
+            .Where(a => a.NovelId == novelId && a.NotesJson != null)
+            .OrderBy(a => a.Ordinal)
+            .Select(a => a.NotesJson!)
+            .ToListAsync(cancellationToken);
+
+        return notesJson
+            .Select(json => JsonSerializer.Deserialize<ChapterNotes>(json, JsonResponse.CaseInsensitive) ?? ChapterNotes.Empty)
+            .ToList();
     }
 
     private async Task<IReadOnlyList<byte[]>> LoadReferenceImages(

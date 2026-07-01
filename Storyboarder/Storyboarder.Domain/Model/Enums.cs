@@ -11,6 +11,7 @@ public enum ProjectStage
     RenderingImages,
     ComposingPages,
     AssemblingVolumes,
+    ComposingAnalysis,
     Completed,
     Failed
 }

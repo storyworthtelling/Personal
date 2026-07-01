@@ -26,6 +26,15 @@ public class StoryboarderDbContextTests : IDisposable
         page.Panels.Add(new Panel { PageId = page.Id, PanelNumber = 1, VisualPrompt = "Alice wakes." });
         volume.Pages.Add(page);
         novel.Volumes.Add(volume);
+
+        novel.ChunkAnalyses.Add(new ChunkAnalysis
+        {
+            NovelId = novel.Id, Ordinal = 0, Status = WorkStatus.Completed, NotesJson = "{}"
+        });
+        novel.Analysis = new BookAnalysis
+        {
+            NovelId = novel.Id, ConsolidatedJson = "{}", PdfStatus = WorkStatus.Completed, PdfPath = "/tmp/a.pdf"
+        };
         return novel;
     }
 
@@ -46,6 +55,8 @@ public class StoryboarderDbContextTests : IDisposable
                 .Include(n => n.Chunks)
                 .Include(n => n.DesignRefs)
                 .Include(n => n.Volumes).ThenInclude(v => v.Pages).ThenInclude(p => p.Panels)
+                .Include(n => n.ChunkAnalyses)
+                .Include(n => n.Analysis)
                 .Single();
 
             Assert.Equal("Test Novel", loaded.Title);
@@ -55,6 +66,8 @@ public class StoryboarderDbContextTests : IDisposable
             Assert.Equal(ReferenceKind.Character, Assert.Single(loaded.DesignRefs).Kind);
             var panel = Assert.Single(Assert.Single(Assert.Single(loaded.Volumes).Pages).Panels);
             Assert.Equal("Alice wakes.", panel.VisualPrompt);
+            Assert.Equal(0, Assert.Single(loaded.ChunkAnalyses).Ordinal);
+            Assert.Equal("/tmp/a.pdf", loaded.Analysis!.PdfPath);
         }
     }
 
@@ -83,6 +96,8 @@ public class StoryboarderDbContextTests : IDisposable
             Assert.Empty(context.Pages);
             Assert.Empty(context.Panels);
             Assert.Empty(context.SourceTexts);
+            Assert.Empty(context.ChunkAnalyses);
+            Assert.Empty(context.BookAnalyses);
         }
     }
 

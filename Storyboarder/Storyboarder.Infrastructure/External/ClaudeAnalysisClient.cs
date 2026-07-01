@@ -37,6 +37,34 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "[{\"chapterNumber\":int,\"panels\":[{\"visualPrompt\":string,\"dialogue\":string|null," +
         "\"caption\":string|null,\"referenceNames\":[string]}]}]}]}. No prose outside the JSON.";
 
+    private const string ChapterAnalysisInstruction =
+        "You are a developmental editor analyzing ONE excerpt of a novel manuscript to help the author " +
+        "revise toward publication. Use the KNOWN CAST names consistently when they appear. Read the " +
+        "excerpt and record concise, concrete, accurate observations. Respond with ONLY a JSON object: " +
+        "{\"charactersPresent\":[string],\"keyEvents\":[string],\"characterBeats\":[string]," +
+        "\"setupsAndPayoffs\":[string],\"possibleInconsistencies\":[string],\"factualClaims\":[string]," +
+        "\"notableStrengths\":[string],\"notableWeaknesses\":[string]}. characterBeats = decisions, " +
+        "changes, or motivation shifts; setupsAndPayoffs = planted elements or promises (note if paid " +
+        "off here); factualClaims = checkable real-world statements that may need fact-checking; " +
+        "possibleInconsistencies = anything that may contradict earlier text (names, timeline, physical " +
+        "details, world rules). Use [] when none are present. No prose outside the JSON.";
+
+    private const string ConsolidationInstruction =
+        "You are a panel of professional readers producing a REVISION REPORT for an author preparing a " +
+        "novel for publication. You are given per-chunk notes gathered across the whole manuscript in " +
+        "reading order, plus the cast. Synthesize the WHOLE book (do not merely concatenate the notes); " +
+        "be accurate, fair, specific, and constructive. Respond with ONLY a JSON object: " +
+        "{\"logline\":string,\"synopsis\":string,\"characters\":[{\"name\":string,\"role\":string," +
+        "\"arcSummary\":string,\"relationships\":[string]}],\"themes\":[string],\"plotHoles\":[string]," +
+        "\"inconsistencies\":[string],\"inaccuracies\":[string],\"pacingNotes\":[string],\"reviews\":" +
+        "[{\"perspective\":string,\"assessment\":string,\"strengths\":[string],\"weaknesses\":[string]," +
+        "\"recommendation\":string}],\"revisionPlan\":[{\"priority\":string,\"issue\":string," +
+        "\"suggestedFix\":string}],\"comparableTitles\":[string],\"marketPositioning\":string}. " +
+        "Provide AT LEAST THREE reviews from DISTINCT, fair perspectives (e.g. developmental editor, " +
+        "target-genre reader, literary critic, acquiring agent) — differing but honest, each with real " +
+        "strengths and weaknesses. Order revisionPlan HIGHEST-IMPACT FIRST and set priority to " +
+        "\"High\", \"Medium\", or \"Low\". Use [] when none. No prose outside the JSON.";
+
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
 
@@ -88,12 +116,73 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return new StoryboardSegment(volumes, dto.ContinuitySummary ?? string.Empty);
     }
 
-    private async Task<string> SendMessage(string instruction, string userText, CancellationToken cancellationToken)
+    public async Task<ChapterNotes> AnalyzeChapter(
+        string chapterText, IReadOnlyList<string> characterNames, CancellationToken cancellationToken)
+    {
+        var cast = characterNames.Count == 0 ? "(none identified yet)" : string.Join(", ", characterNames);
+        var userContent = $"KNOWN CAST: {cast}\n\nEXCERPT:\n{chapterText}";
+
+        var reply = await SendMessage(ChapterAnalysisInstruction, userContent, cancellationToken);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return ChapterNotes.Empty;
+
+        var dto = JsonResponse.Deserialize<ChapterNotesDto>(json);
+        if (dto is null)
+            return ChapterNotes.Empty;
+
+        return new ChapterNotes(
+            dto.CharactersPresent ?? [], dto.KeyEvents ?? [], dto.CharacterBeats ?? [],
+            dto.SetupsAndPayoffs ?? [], dto.PossibleInconsistencies ?? [], dto.FactualClaims ?? [],
+            dto.NotableStrengths ?? [], dto.NotableWeaknesses ?? []);
+    }
+
+    public async Task<BookAnalysisResult> ConsolidateAnalysis(
+        string title, IReadOnlyList<ChapterNotes> notes, DesignBible bible, string continuitySummary,
+        CancellationToken cancellationToken)
+    {
+        var notesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
+        var bibleJson = JsonSerializer.Serialize(bible, JsonResponse.CaseInsensitive);
+        var userContent =
+            $"TITLE: {title}\n\n" +
+            $"CAST (design bible JSON):\n{bibleJson}\n\n" +
+            $"CONTINUITY SUMMARY:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(none)" : continuitySummary)}\n\n" +
+            $"PER-CHUNK NOTES (JSON array, in reading order):\n{notesJson}";
+
+        var reply = await SendMessage(ConsolidationInstruction, userContent, cancellationToken, options.AnalysisMaxTokens);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return BookAnalysisResult.Empty;
+
+        var dto = JsonResponse.Deserialize<BookAnalysisDto>(json);
+        if (dto is null)
+            return BookAnalysisResult.Empty;
+
+        return new BookAnalysisResult(
+            dto.Logline ?? string.Empty,
+            dto.Synopsis ?? string.Empty,
+            (dto.Characters ?? []).Select(c =>
+                new CharacterProfile(c.Name ?? string.Empty, c.Role ?? string.Empty, c.ArcSummary ?? string.Empty, c.Relationships ?? [])).ToList(),
+            dto.Themes ?? [],
+            dto.PlotHoles ?? [],
+            dto.Inconsistencies ?? [],
+            dto.Inaccuracies ?? [],
+            dto.PacingNotes ?? [],
+            (dto.Reviews ?? []).Select(r =>
+                new Review(r.Perspective ?? string.Empty, r.Assessment ?? string.Empty, r.Strengths ?? [], r.Weaknesses ?? [], r.Recommendation ?? string.Empty)).ToList(),
+            (dto.RevisionPlan ?? []).Select(r =>
+                new RevisionItem(r.Priority ?? string.Empty, r.Issue ?? string.Empty, r.SuggestedFix ?? string.Empty)).ToList(),
+            dto.ComparableTitles ?? [],
+            dto.MarketPositioning ?? string.Empty);
+    }
+
+    private async Task<string> SendMessage(
+        string instruction, string userText, CancellationToken cancellationToken, int? maxTokens = null)
     {
         var payload = new
         {
             model = options.Model,
-            max_tokens = options.MaxTokens,
+            max_tokens = maxTokens ?? options.MaxTokens,
             system = new[]
             {
                 new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } }
@@ -214,5 +303,57 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Dialogue { get; set; }
         public string? Caption { get; set; }
         public List<string>? ReferenceNames { get; set; }
+    }
+
+    private sealed class ChapterNotesDto
+    {
+        public List<string>? CharactersPresent { get; set; }
+        public List<string>? KeyEvents { get; set; }
+        public List<string>? CharacterBeats { get; set; }
+        public List<string>? SetupsAndPayoffs { get; set; }
+        public List<string>? PossibleInconsistencies { get; set; }
+        public List<string>? FactualClaims { get; set; }
+        public List<string>? NotableStrengths { get; set; }
+        public List<string>? NotableWeaknesses { get; set; }
+    }
+
+    private sealed class BookAnalysisDto
+    {
+        public string? Logline { get; set; }
+        public string? Synopsis { get; set; }
+        public List<CharacterProfileDto>? Characters { get; set; }
+        public List<string>? Themes { get; set; }
+        public List<string>? PlotHoles { get; set; }
+        public List<string>? Inconsistencies { get; set; }
+        public List<string>? Inaccuracies { get; set; }
+        public List<string>? PacingNotes { get; set; }
+        public List<ReviewDto>? Reviews { get; set; }
+        public List<RevisionItemDto>? RevisionPlan { get; set; }
+        public List<string>? ComparableTitles { get; set; }
+        public string? MarketPositioning { get; set; }
+    }
+
+    private sealed class CharacterProfileDto
+    {
+        public string? Name { get; set; }
+        public string? Role { get; set; }
+        public string? ArcSummary { get; set; }
+        public List<string>? Relationships { get; set; }
+    }
+
+    private sealed class ReviewDto
+    {
+        public string? Perspective { get; set; }
+        public string? Assessment { get; set; }
+        public List<string>? Strengths { get; set; }
+        public List<string>? Weaknesses { get; set; }
+        public string? Recommendation { get; set; }
+    }
+
+    private sealed class RevisionItemDto
+    {
+        public string? Priority { get; set; }
+        public string? Issue { get; set; }
+        public string? SuggestedFix { get; set; }
     }
 }

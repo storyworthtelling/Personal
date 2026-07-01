@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using PdfSharp.Pdf.IO;
 using SkiaSharp;
+using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.Imaging;
@@ -101,5 +102,89 @@ public class PdfVolumeComposerTests
         using var stream = new MemoryStream(pdfBytes);
         using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.Equal(2, document.PageCount);
+    }
+}
+
+public class AnalysisPdfComposerTests
+{
+    private static AnalysisPdfComposer Composer() =>
+        new(new PdfVolumeComposer(), new AnalysisDocumentRenderer());
+
+    private static BookAnalysisResult Sample(int scale)
+    {
+        List<string> Many(string prefix) => Enumerable.Range(1, 3 * scale)
+            .Select(i => $"{prefix} {i}: a sentence with enough words to wrap across a line or two in the report.")
+            .ToList();
+
+        var characters = Enumerable.Range(1, 2 * scale)
+            .Select(i => new CharacterProfile(
+                $"Character {i}", "protagonist",
+                "Grows from timid to bold across the story, tested by loss and reconciliation.",
+                new[] { "ally: Character 1", "rival: Character 2" }))
+            .ToList();
+        var reviews = Enumerable.Range(1, 3)
+            .Select(i => new Review(
+                $"Perspective {i}", "A fair, specific assessment of the manuscript's merits and flaws.",
+                new[] { "Strong voice" }, new[] { "Uneven pacing" }, "Revise the middle act."))
+            .ToList();
+        var plan = Enumerable.Range(1, 3 * scale)
+            .Select(i => new RevisionItem(
+                i == 1 ? "High" : "Medium", $"Issue {i}", "A concrete suggested fix for the issue described above."))
+            .ToList();
+
+        return new BookAnalysisResult(
+            "A concise logline for the book.",
+            string.Join(" ", Enumerable.Repeat("The synopsis recounts the plot across several sentences.", 4 * scale)),
+            characters, Many("Theme"), Many("Plot hole"), Many("Inconsistency"), Many("Inaccuracy"), Many("Pacing"),
+            reviews, plan, Many("Comp"), "Positioned as upmarket literary fiction for adult readers.");
+    }
+
+    private static int PageCount(byte[] pdf)
+    {
+        using var stream = new MemoryStream(pdf);
+        using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        return document.PageCount;
+    }
+
+    [Fact]
+    public void Compose_ProducesPdf_WithAtLeastOnePage()
+    {
+        var pdf = Composer().Compose(Sample(1), "My Novel");
+
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
+        Assert.True(PageCount(pdf) >= 1);
+    }
+
+    [Fact]
+    public void Compose_LargerReport_PaginatesToMorePages()
+    {
+        var small = PageCount(Composer().Compose(Sample(1), "My Novel"));
+        var large = PageCount(Composer().Compose(Sample(8), "My Novel"));
+
+        Assert.True(large > small, $"expected more pages for a larger report (small={small}, large={large})");
+        Assert.True(large > 1);
+    }
+
+    [Fact]
+    public void Compose_EmptyReport_DoesNotThrow_AndStillProducesAPage()
+    {
+        var pdf = Composer().Compose(BookAnalysisResult.Empty, "");
+
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
+        Assert.True(PageCount(pdf) >= 1);
+    }
+
+    [Fact]
+    public void Renderer_ProducesDecodablePngPagesOfConfiguredWidth()
+    {
+        var pages = new AnalysisDocumentRenderer().Render(Sample(4), "My Novel");
+
+        Assert.NotEmpty(pages);
+        foreach (var page in pages)
+        {
+            using var bitmap = SKBitmap.Decode(page);
+            Assert.NotNull(bitmap);
+            Assert.Equal(1240, bitmap!.Width);
+        }
     }
 }
