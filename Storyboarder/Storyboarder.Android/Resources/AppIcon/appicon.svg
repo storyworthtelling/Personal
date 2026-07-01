@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- App-icon background: the brand indigo. MAUI's MauiIcon overlays appiconfg.svg on top and also
+     applies Color="#3B5BDB" for the adaptive background. -->
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+  <rect width="456" height="456" fill="#3B5BDB"/>
+</svg>

@@ -40,11 +40,34 @@ All settings are entered **in the app** (Settings page) and stored in MAUI `Pref
 - **Gemini API key** — Google **Generative Language API** key for image generation
   (`aistudio.google.com`).
 - **Google account** — tap *Sign in with Google* to pick the device account; the app requests the
-  `documents.readonly` and `drive.readonly` scopes via Android `AccountManager`. No OAuth client id,
-  API key, or Play Services binding is needed, so there is **no `dl.google.com` build dependency**.
+  `documents.readonly` and `drive.readonly` scopes via Android `AccountManager`. No Play Services
+  binding is needed, so there is **no `dl.google.com` build dependency** — but Google still
+  identifies the app by its **package name + signing-certificate SHA-1**, so that pair must be
+  registered as an **Android OAuth client** (see *Google Cloud setup* below) or sign-in fails with
+  `UnregisteredOnApiConsole`.
 
 The SQLite database and generated images/PDFs live under the app's private storage
 (`FileSystem.AppDataDirectory`).
+
+## Google Cloud setup (one-time)
+
+Sign-in uses the device's Google account via `AccountManager`, which requires the app to be a
+registered **Android OAuth client** — Google identifies it by package name + signing-certificate
+SHA-1 (no client id is sent from code). Without this, sign-in throws
+`AuthenticatorException: UnregisteredOnApiConsole`.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com) pick or create a project.
+2. **APIs & Services → Library** — enable the **Google Docs API** and **Google Drive API**.
+3. **APIs & Services → OAuth consent screen** — User type *External*; add the scopes
+   `.../auth/documents.readonly` and `.../auth/drive.readonly`; add your Google account under **Test
+   users**; keep publishing status *Testing* (the restricted Drive scope then works for test users,
+   past an "unverified app" warning).
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID → Android** — set *Package
+   name* `com.storyworthtelling.storyboarder` and the signing-certificate **SHA-1** shown on the
+   app's **Settings** page (tap *Copy package + SHA-1*). Debug and CI/release builds have different
+   SHA-1s — register whichever you install (or add both as separate clients on the same package).
+
+Wait a few minutes for the client to propagate, then sign in again.
 
 ## Build & test
 

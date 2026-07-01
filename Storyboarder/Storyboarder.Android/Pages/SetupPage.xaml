@@ -31,6 +31,13 @@
             <Label x:Name="GoogleStatusLabel"
                    FontSize="12" TextColor="{StaticResource TextSecondary}" />
 
+            <Label Text="One-time setup in Google Cloud Console: create an Android OAuth client with the package and SHA-1 below, enable the Google Docs &amp; Drive APIs, and add your account as a test user."
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,8,0,0" />
+            <Label x:Name="SigningInfoLabel"
+                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Button Text="Copy package + SHA-1"
+                    Clicked="OnCopySigningInfoClicked" BackgroundColor="#333333" />
+
             <Button Text="Save settings" Clicked="OnSaveClicked" Margin="0,16,0,0" />
 
         </VerticalStackLayout>
