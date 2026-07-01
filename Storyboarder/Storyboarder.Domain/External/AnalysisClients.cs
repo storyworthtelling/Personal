@@ -15,6 +15,23 @@ public interface IClaudeAnalysisClient
         DesignBible bible,
         string artStyle,
         CancellationToken cancellationToken);
+
+    // Literary-analysis "map": observations for one manuscript chunk (character beats, events,
+    // possible inconsistencies, checkable claims, strengths/weaknesses) anchored to the known cast.
+    Task<ChapterNotes> AnalyzeChapter(
+        string chapterText,
+        IReadOnlyList<string> characterNames,
+        CancellationToken cancellationToken);
+
+    // Literary-analysis "reduce": consolidates all chunk notes into the whole revision report
+    // (character map + arcs, plot holes, inconsistencies/inaccuracies, multi-perspective reviews,
+    // a prioritized revision plan, and publish-oriented positioning).
+    Task<BookAnalysisResult> ConsolidateAnalysis(
+        string title,
+        IReadOnlyList<ChapterNotes> notes,
+        DesignBible bible,
+        string continuitySummary,
+        CancellationToken cancellationToken);
 }
 
 // Image generation via Gemini. Reference sheets are generated once per design-bible entity, then

@@ -9,6 +9,10 @@ public sealed class ClaudeOptions
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = "claude-sonnet-4-6";
     public int MaxTokens { get; set; } = 8_000;
+
+    // The consolidated revision report is long (many sections + several reviews), so its single
+    // "reduce" call gets a larger output budget than the per-chunk/per-panel calls.
+    public int AnalysisMaxTokens { get; set; } = 16_000;
 }
 
 public sealed class GeminiOptions

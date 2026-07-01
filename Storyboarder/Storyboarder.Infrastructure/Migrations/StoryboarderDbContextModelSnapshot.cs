@@ -17,6 +17,32 @@ namespace Storyboarder.Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
 
+            modelBuilder.Entity("Storyboarder.Domain.Model.BookAnalysis", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConsolidatedJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("NovelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PdfPath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PdfStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NovelId")
+                        .IsUnique();
+
+                    b.ToTable("BookAnalyses");
+                });
+
             modelBuilder.Entity("Storyboarder.Domain.Model.Chunk", b =>
                 {
                     b.Property<Guid>("Id")
@@ -61,6 +87,42 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.HasIndex("NovelId", "Ordinal");
 
                     b.ToTable("Chunks");
+                });
+
+            modelBuilder.Entity("Storyboarder.Domain.Model.ChunkAnalysis", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("NextAttemptAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("NotesJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("NovelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NovelId", "Ordinal");
+
+                    b.HasIndex("Status", "NextAttemptAtUtc");
+
+                    b.ToTable("ChunkAnalyses");
                 });
 
             modelBuilder.Entity("Storyboarder.Domain.Model.DesignRef", b =>
@@ -301,10 +363,28 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.ToTable("Volumes");
                 });
 
+            modelBuilder.Entity("Storyboarder.Domain.Model.BookAnalysis", b =>
+                {
+                    b.HasOne("Storyboarder.Domain.Model.Novel", null)
+                        .WithOne("Analysis")
+                        .HasForeignKey("Storyboarder.Domain.Model.BookAnalysis", "NovelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Storyboarder.Domain.Model.Chunk", b =>
                 {
                     b.HasOne("Storyboarder.Domain.Model.Novel", null)
                         .WithMany("Chunks")
+                        .HasForeignKey("NovelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Storyboarder.Domain.Model.ChunkAnalysis", b =>
+                {
+                    b.HasOne("Storyboarder.Domain.Model.Novel", null)
+                        .WithMany("ChunkAnalyses")
                         .HasForeignKey("NovelId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -357,6 +437,10 @@ namespace Storyboarder.Infrastructure.Migrations
 
             modelBuilder.Entity("Storyboarder.Domain.Model.Novel", b =>
                 {
+                    b.Navigation("Analysis");
+
+                    b.Navigation("ChunkAnalyses");
+
                     b.Navigation("Chunks");
 
                     b.Navigation("DesignRefs");

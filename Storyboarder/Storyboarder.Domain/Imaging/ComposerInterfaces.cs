@@ -21,3 +21,9 @@ public interface IVolumePdfComposer
 {
     byte[] Compose(IReadOnlyList<byte[]> pageImages);
 }
+
+// Renders the consolidated book-analysis (revision report) into a single, text-heavy PDF.
+public interface IAnalysisPdfComposer
+{
+    byte[] Compose(Storyboarder.Domain.Analysis.BookAnalysisResult analysis, string title);
+}

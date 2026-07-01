@@ -31,6 +31,10 @@ public class Novel
     public List<Chunk> Chunks { get; set; } = [];
     public List<DesignRef> DesignRefs { get; set; } = [];
     public List<Volume> Volumes { get; set; } = [];
+
+    // The per-chunk literary-analysis units (map step) and the consolidated book-analysis PDF record.
+    public List<ChunkAnalysis> ChunkAnalyses { get; set; } = [];
+    public BookAnalysis? Analysis { get; set; }
 }
 
 public class SourceText
@@ -76,6 +80,34 @@ public class DesignRef : IRetryable
 
     [NotMapped]
     public WorkStatus WorkState { get => ReferenceSheetStatus; set => ReferenceSheetStatus = value; }
+}
+
+// A per-chunk literary-analysis unit (the "map" step of the revision report). Mirrors Chunk's
+// resumable retry pattern; Ordinal matches the corresponding Chunk so its text can be looked up.
+public class ChunkAnalysis : IRetryable
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid NovelId { get; set; }
+    public int Ordinal { get; set; }
+    public WorkStatus Status { get; set; } = WorkStatus.Pending;
+    public string? NotesJson { get; set; }
+    public int Attempts { get; set; }
+    public DateTimeOffset? NextAttemptAtUtc { get; set; }
+    public string? LastError { get; set; }
+
+    [NotMapped]
+    public WorkStatus WorkState { get => Status; set => Status = value; }
+}
+
+// The consolidated book-analysis (revision report) for a novel: the merged JSON from Claude and the
+// rendered PDF's assembly state/path. One per novel (mirrors Volume's PDF record).
+public class BookAnalysis
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid NovelId { get; set; }
+    public string? ConsolidatedJson { get; set; }
+    public WorkStatus PdfStatus { get; set; } = WorkStatus.Pending;
+    public string? PdfPath { get; set; }
 }
 
 public class Volume

@@ -14,9 +14,10 @@ public class ProjectStateMachineTests
         bool storyboardCreated = false,
         bool allPanelsRendered = false,
         bool allPagesComposed = false,
-        bool allVolumesAssembled = false) =>
+        bool allVolumesAssembled = false,
+        bool analysisComplete = false) =>
         new(stage, sourceIngested, allChunksAnalyzed, bibleConsolidated, allReferenceSheetsRendered,
-            storyboardCreated, allPanelsRendered, allPagesComposed, allVolumesAssembled);
+            storyboardCreated, allPanelsRendered, allPagesComposed, allVolumesAssembled, analysisComplete);
 
     [Fact]
     public void Created_Advances_ToIngesting() =>
@@ -62,9 +63,19 @@ public class ProjectStateMachineTests
             ProjectStateMachine.NextStage(At(ProjectStage.ComposingPages, allPagesComposed: true)));
 
     [Fact]
-    public void AssemblingVolumes_Advances_WhenAllVolumesAssembled() =>
-        Assert.Equal(ProjectStage.Completed,
+    public void AssemblingVolumes_Advances_ToComposingAnalysis_WhenAllVolumesAssembled() =>
+        Assert.Equal(ProjectStage.ComposingAnalysis,
             ProjectStateMachine.NextStage(At(ProjectStage.AssemblingVolumes, allVolumesAssembled: true)));
+
+    [Fact]
+    public void ComposingAnalysis_Stays_UntilAnalysisComplete() =>
+        Assert.Equal(ProjectStage.ComposingAnalysis,
+            ProjectStateMachine.NextStage(At(ProjectStage.ComposingAnalysis)));
+
+    [Fact]
+    public void ComposingAnalysis_Advances_ToCompleted_WhenAnalysisComplete() =>
+        Assert.Equal(ProjectStage.Completed,
+            ProjectStateMachine.NextStage(At(ProjectStage.ComposingAnalysis, analysisComplete: true)));
 
     [Fact]
     public void Completed_IsTerminal() =>
