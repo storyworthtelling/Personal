@@ -9,7 +9,10 @@ public partial class NewProjectPage : ContentPage
 {
     private readonly DeviceAccountTokenProvider tokens;
     private readonly DriveDocsLister lister;
-    private DriveDocsLister.DocItem? selected;
+
+    // The current folder breadcrumb (bottom = current); starts at My Drive root.
+    private readonly List<(string Id, string Name)> path = [];
+    private DriveDocsLister.DriveEntry? selected;
 
     public NewProjectPage(DeviceAccountTokenProvider tokens, DriveDocsLister lister)
     {
@@ -23,8 +26,8 @@ public partial class NewProjectPage : ContentPage
     {
         base.OnAppearing();
         UpdateAccountLabel();
-        if (SettingsStore.IsGoogleConfigured && DocsList.ItemsSource is null)
-            _ = LoadDocsAsync();
+        if (SettingsStore.IsGoogleConfigured && path.Count == 0)
+            _ = ResetToRootAsync();
     }
 
     private void UpdateAccountLabel() =>
@@ -45,7 +48,7 @@ public partial class NewProjectPage : ContentPage
         {
             await DeviceAccountSignIn.SignIn(activity);
             UpdateAccountLabel();
-            await LoadDocsAsync();
+            await ResetToRootAsync();
         }
         catch (Exception ex)
         {
@@ -54,9 +57,24 @@ public partial class NewProjectPage : ContentPage
         }
     }
 
-    private async void OnRefreshDocsClicked(object sender, EventArgs e) => await LoadDocsAsync();
+    private async void OnRefreshClicked(object sender, EventArgs e) => await LoadCurrentFolderAsync();
 
-    private async Task LoadDocsAsync()
+    private async void OnUpClicked(object sender, EventArgs e)
+    {
+        if (path.Count <= 1)
+            return;
+        path.RemoveAt(path.Count - 1);
+        await LoadCurrentFolderAsync();
+    }
+
+    private Task ResetToRootAsync()
+    {
+        path.Clear();
+        path.Add(("root", "My Drive"));
+        return LoadCurrentFolderAsync();
+    }
+
+    private async Task LoadCurrentFolderAsync()
     {
         if (!SettingsStore.IsGoogleConfigured)
         {
@@ -64,18 +82,23 @@ public partial class NewProjectPage : ContentPage
             return;
         }
 
-        Busy(true, "Loading your Google Docs…");
+        selected = null;
+        CreateButton.IsEnabled = false;
+        UpButton.IsEnabled = path.Count > 1;
+        PathLabel.Text = string.Join(" / ", path.Select(p => p.Name));
+
+        Busy(true, "Loading…");
         try
         {
             var token = await tokens.GetAccessToken();
-            var docs = await lister.ListAsync(token, CancellationToken.None);
-            DocsList.ItemsSource = docs;
-            StatusLabel.Text = docs.Count == 0 ? "No Google Docs found." : $"{docs.Count} doc(s).";
+            var entries = await lister.ListChildrenAsync(token, path[^1].Id, CancellationToken.None);
+            DocsList.ItemsSource = entries;
+            StatusLabel.Text = entries.Count == 0 ? "Empty folder." : $"{entries.Count} item(s).";
         }
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert("Could not list docs (copied to clipboard)", ex.Message, "OK");
+            await DisplayAlert("Could not list Drive (copied to clipboard)", ex.Message, "OK");
         }
         finally
         {
@@ -83,10 +106,23 @@ public partial class NewProjectPage : ContentPage
         }
     }
 
-    private void OnDocSelected(object? sender, SelectionChangedEventArgs e)
+    private async void OnEntrySelected(object? sender, SelectionChangedEventArgs e)
     {
-        selected = e.CurrentSelection.FirstOrDefault() as DriveDocsLister.DocItem;
-        CreateButton.IsEnabled = selected is not null;
+        if (e.CurrentSelection.FirstOrDefault() is not DriveDocsLister.DriveEntry entry)
+            return;
+        DocsList.SelectedItem = null; // we manage selection ourselves; clear the row highlight
+
+        if (entry.IsFolder)
+        {
+            path.Add((entry.Id, entry.Name));
+            await LoadCurrentFolderAsync();
+        }
+        else
+        {
+            selected = entry;
+            CreateButton.IsEnabled = true;
+            StatusLabel.Text = $"Selected: {entry.Name}";
+        }
     }
 
     private async void OnCreateClicked(object sender, EventArgs e)
@@ -106,7 +142,7 @@ public partial class NewProjectPage : ContentPage
             {
                 var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
                 _ = await projects.CreateFromDocAsync(
-                    selected.FileId, selected.Name, token, null, artStyle, CancellationToken.None);
+                    selected.Id, selected.Name, token, null, artStyle, CancellationToken.None);
             }
 
             // Kick off an immediate drain rather than waiting for the next periodic window.
@@ -134,6 +170,7 @@ public partial class NewProjectPage : ContentPage
         StatusLabel.Text = message ?? string.Empty;
         SignInButton.IsEnabled = !busy;
         RefreshButton.IsEnabled = !busy;
+        UpButton.IsEnabled = !busy && path.Count > 1;
         CreateButton.IsEnabled = !busy && selected is not null;
     }
 }

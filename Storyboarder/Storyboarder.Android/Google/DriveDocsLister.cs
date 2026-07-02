@@ -4,13 +4,25 @@ using global::Google.Apis.Services;
 
 namespace Storyboarder.Android.Google;
 
-// Lists the signed-in user's Google Docs via the Drive API so the New Project page can show a
-// picker. Uses the device-account access token; the transport goes through AndroidMessageHandler.
+// Browses the signed-in user's Google Drive by folder so the New Project page can navigate the folder
+// tree (rather than showing every Doc in one flat list). Uses the device-account access token; the
+// transport goes through AndroidMessageHandler.
 public sealed class DriveDocsLister
 {
-    public sealed record DocItem(string FileId, string Name);
+    private const string FolderMime = "application/vnd.google-apps.folder";
+    private const string DocMime = "application/vnd.google-apps.document";
 
-    public async Task<IReadOnlyList<DocItem>> ListAsync(string accessToken, CancellationToken cancellationToken)
+    // A child of a Drive folder: either a sub-folder (navigate into) or a Google Doc (selectable).
+    public sealed record DriveEntry(string Id, string Name, bool IsFolder)
+    {
+        // Shown in the list; the glyph distinguishes folders from docs without a custom cell template.
+        public string Display => (IsFolder ? "\U0001F4C1  " : "\U0001F4C4  ") + Name;
+    }
+
+    // Lists the folders and Google Docs directly inside the given folder ("root" = My Drive root),
+    // folders first then by name.
+    public async Task<IReadOnlyList<DriveEntry>> ListChildrenAsync(
+        string accessToken, string folderId, CancellationToken cancellationToken)
     {
         var credential = GoogleCredential.FromAccessToken(accessToken);
         using var service = new DriveService(new BaseClientService.Initializer
@@ -21,15 +33,16 @@ public sealed class DriveDocsLister
         });
 
         var request = service.Files.List();
-        request.Q = "mimeType='application/vnd.google-apps.document' and trashed=false";
-        request.Fields = "files(id,name)";
-        request.OrderBy = "modifiedTime desc";
-        request.PageSize = 100;
+        request.Q = $"'{folderId}' in parents and trashed=false and " +
+                    $"(mimeType='{FolderMime}' or mimeType='{DocMime}')";
+        request.Fields = "files(id,name,mimeType)";
+        request.OrderBy = "folder,name";
+        request.PageSize = 200;
 
         var response = await request.ExecuteAsync(cancellationToken);
         return response.Files
             .Where(f => !string.IsNullOrEmpty(f.Id))
-            .Select(f => new DocItem(f.Id, f.Name ?? "(untitled)"))
+            .Select(f => new DriveEntry(f.Id, f.Name ?? "(untitled)", f.MimeType == FolderMime))
             .ToList();
     }
 }
