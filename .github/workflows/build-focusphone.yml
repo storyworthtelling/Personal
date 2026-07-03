@@ -1,0 +1,94 @@
+name: Build FocusPhone APKs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'FocusPhone/FocusPhone.Launcher.Android/**'
+      - 'FocusPhone/FocusPhone.Communication.Android/**'
+      - 'FocusPhone/FocusPhone.Camera.Android/**'
+      - 'FocusPhone/FocusPhone.Audio.Android/**'
+      - 'FocusPhone/FocusPhone.Domain/**'
+      - 'FocusPhone/FocusPhone.Infrastructure/**'
+      - 'FocusPhone/FocusPhone.Tests/**'
+      - '.github/workflows/build-focusphone.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android heads, which would require the Android workload.
+      - name: Run tests
+        run: dotnet test FocusPhone/FocusPhone.Tests/FocusPhone.Tests.csproj
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    # actions: write lets the prune step delete artifacts from older runs.
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # The FocusPhone heads are plain .NET-for-Android (not MAUI), so the lighter
+      # 'android' workload is sufficient. Unlike the local sandbox, the runner has
+      # network access, so the Camera app's ML Kit / Play-services bindings can
+      # download their .aar payloads from dl.google.com at build time.
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      # All four heads sign with the one shared repo keystore so they carry a single
+      # signature — required for the device-owner silent-update channel to accept
+      # updates across the suite.
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/focusphone.keystore
+
+      - name: Build signed APKs
+        working-directory: FocusPhone
+        run: |
+          for proj in Launcher Communication Camera Audio; do
+            echo "::group::Publishing FocusPhone.$proj.Android"
+            dotnet publish "FocusPhone.$proj.Android" -f net10.0-android -c Release \
+              -p:AndroidPackageFormat=apk \
+              -p:AndroidKeyStore=true \
+              -p:AndroidSigningKeyStore=/tmp/focusphone.keystore \
+              -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }} \
+              -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }} \
+              -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
+            echo "::endgroup::"
+          done
+
+      # Keep only the latest run's artifacts: delete artifacts from older runs of
+      # this workflow before uploading, which also frees storage so the upload succeeds.
+      - name: Prune old artifacts
+        uses: ./.github/actions/prune-old-artifacts
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: FocusPhone-Android
+          path: |
+            FocusPhone/FocusPhone.Launcher.Android/bin/Release/net10.0-android/publish/*.apk
+            FocusPhone/FocusPhone.Communication.Android/bin/Release/net10.0-android/publish/*.apk
+            FocusPhone/FocusPhone.Camera.Android/bin/Release/net10.0-android/publish/*.apk
+            FocusPhone/FocusPhone.Audio.Android/bin/Release/net10.0-android/publish/*.apk
+          if-no-files-found: error
+          retention-days: 90

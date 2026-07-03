@@ -15,7 +15,8 @@ Distraction-free Pixel 8a: a device-owner launcher/DPC plus companion apps (see 
 - Tests: `dotnet test FocusPhone/FocusPhone.sln` (Domain + Infrastructure; no device needed)
 - Android heads target `net10.0-android` and need the Android SDK. In environments without one (e.g. sandboxed CI), a minimal SDK works: `android.jar` under `platforms/android-36/` plus stub `platform-tools/adb`, then build with `-p:AndroidSdkDirectory=<sdk> -p:AndroidUseApkSigner=false` (workload bundles aapt2/r8; jarsigner signs debug builds)
 - App IDs are `com.storyworthtelling.focusphone.*` and must match `PolicyContext` constants in Domain
-- The Camera app cannot build without dl.google.com access: its ML Kit / Play services bindings download .aar payloads at build time (Xamarin.Build.Download). Build it on a normal dev machine
+- APKs build in CI via `.github/workflows/build-focusphone.yml` (test job → signed build of all four heads → upload). Signs with the shared repo keystore secrets (`KEYSTORE_BASE64`/`KEY_ALIAS`/`KEY_PASSWORD`/`KEYSTORE_PASSWORD`, same as DailyLoader/Storyboarder) so all four heads share one signature for the device-owner update channel; download the **FocusPhone-Android** artifact from the run
+- The Camera app's ML Kit / Play-services bindings download .aar payloads from dl.google.com at build time (Xamarin.Build.Download). CI builds it fine (the runner has network); only a network-restricted sandbox can't — build Camera in CI or on a normal dev machine, not the sandbox
 
 ### Storyboarder
 
