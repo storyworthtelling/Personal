@@ -9,9 +9,10 @@ using AndroidX.Camera.Core;
 using AndroidX.Camera.Lifecycle;
 using AndroidX.Camera.View;
 using AndroidX.Core.Content;
+using Google.MLKit.Vision.Documentscanner;
+using Xamarin.Google.MLKit.Vision.BarCode;
 using Xamarin.Google.MLKit.Vision.Barcode.Common;
-using Xamarin.Google.MLKit.Vision.CodeScanner;
-using Xamarin.Google.MLKit.Vision.DocumentScanner;
+using Xamarin.Google.MLKit.Vision.Common;
 
 namespace FocusPhone.Camera;
 
@@ -135,14 +136,18 @@ public class CameraActivity : AppCompatActivity
             .AddOnFailureListener(new FailureToastListener(this, "Document scanner unavailable"));
     }
 
+    // These bindings expose the ML Kit barcode *processing* API (not the turnkey
+    // GMS code-scanner UI), so QR scanning captures a still frame and decodes it.
     private void StartQrScan()
     {
-        var options = new GmsBarcodeScannerOptions.Builder()
-            .SetBarcodeFormats(Barcode.FormatQrCode)
-            .Build();
-        GmsBarcodeScanning.GetClient(this, options).StartScan()
-            .AddOnSuccessListener(new QrResultListener(this))
-            .AddOnFailureListener(new FailureToastListener(this, "QR scanner unavailable"));
+        if (imageCapture is null)
+        {
+            return;
+        }
+        var file = new Java.IO.File(CacheDir, "qr-scan.jpg");
+        var options = new ImageCapture.OutputFileOptions.Builder(file).Build();
+        imageCapture.TakePicture(options, ContextCompat.GetMainExecutor(this),
+            new QrCaptureCallback(this, file));
     }
 
     private void OpenGooglePhotos()
@@ -158,7 +163,7 @@ public class CameraActivity : AppCompatActivity
         }
     }
 
-    private class CaptureCallback : ImageCapture.OnImageSavedCallback
+    private class CaptureCallback : Java.Lang.Object, ImageCapture.IOnImageSavedCallback
     {
         private readonly CameraActivity activity;
 
@@ -167,11 +172,38 @@ public class CameraActivity : AppCompatActivity
             this.activity = activity;
         }
 
-        public override void OnImageSaved(ImageCapture.OutputFileResults results) =>
+        public void OnImageSaved(ImageCapture.OutputFileResults results) =>
             Toast.MakeText(activity, "Saved.", ToastLength.Short)!.Show();
 
-        public override void OnError(ImageCaptureException exception) =>
+        public void OnError(ImageCaptureException exception) =>
             Toast.MakeText(activity, $"Capture failed: {exception.Message}", ToastLength.Long)!.Show();
+    }
+
+    // Captures a still frame to the cache, then decodes any QR code in it.
+    private class QrCaptureCallback : Java.Lang.Object, ImageCapture.IOnImageSavedCallback
+    {
+        private readonly CameraActivity activity;
+        private readonly Java.IO.File file;
+
+        public QrCaptureCallback(CameraActivity activity, Java.IO.File file)
+        {
+            this.activity = activity;
+            this.file = file;
+        }
+
+        public void OnImageSaved(ImageCapture.OutputFileResults results)
+        {
+            var image = InputImage.FromFilePath(activity, Android.Net.Uri.FromFile(file)!);
+            var options = new BarcodeScannerOptions.Builder()
+                .SetBarcodeFormats(Barcode.FormatQrCode)
+                .Build();
+            BarcodeScanning.GetClient(options).Process(image)
+                .AddOnSuccessListener(new QrResultListener(activity))
+                .AddOnFailureListener(new FailureToastListener(activity, "QR scan failed"));
+        }
+
+        public void OnError(ImageCaptureException exception) =>
+            Toast.MakeText(activity, $"QR capture failed: {exception.Message}", ToastLength.Long)!.Show();
     }
 
     private class QrResultListener : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
@@ -185,9 +217,21 @@ public class CameraActivity : AppCompatActivity
 
         public void OnSuccess(Java.Lang.Object? result)
         {
-            var value = (result as Barcode)?.RawValue;
+            string? value = null;
+            if (result is System.Collections.IEnumerable barcodes)
+            {
+                foreach (var item in barcodes)
+                {
+                    if (item is Barcode barcode && barcode.RawValue is not null)
+                    {
+                        value = barcode.RawValue;
+                        break;
+                    }
+                }
+            }
             if (value is null)
             {
+                Toast.MakeText(activity, "No QR code found.", ToastLength.Short)!.Show();
                 return;
             }
             if (Uri.TryCreate(value, UriKind.Absolute, out var uri)
