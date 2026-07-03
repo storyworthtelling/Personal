@@ -41,7 +41,14 @@ public class ThreadsActivity : ListActivity
             e.Handled = true;
         };
 
-        EmailSyncWorker.Schedule(this);
+        try
+        {
+            EmailSyncWorker.Schedule(this);
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("FocusPhoneComm", $"Could not schedule email sync: {e}");
+        }
     }
 
     protected override void OnResume()
@@ -61,9 +68,16 @@ public class ThreadsActivity : ListActivity
         {
             // READ_CALL_LOG not yet granted (pre-provisioning); show what we have.
         }
-        using (var database = TimelineDatabase.Open(this))
+        try
         {
+            using var database = TimelineDatabase.Open(this);
             items.AddRange(database.Cache.LoadAll());
+        }
+        catch (Exception e)
+        {
+            // The timeline cache is a convenience over the live call log; never
+            // let a database problem crash the screen on open.
+            Android.Util.Log.Warn("FocusPhoneComm", $"Timeline cache unavailable: {e}");
         }
 
         threads = new TimelineMerger().Merge(items);

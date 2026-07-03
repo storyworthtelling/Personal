@@ -34,10 +34,15 @@ public class ThreadActivity : ListActivity
 
     private void LoadItems()
     {
-        List<TimelineItem> items;
-        using (var database = TimelineDatabase.Open(this))
+        var items = new List<TimelineItem>();
+        try
         {
-            items = database.Cache.LoadAll().ToList();
+            using var database = TimelineDatabase.Open(this);
+            items.AddRange(database.Cache.LoadAll());
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("FocusPhoneComm", $"Timeline cache unavailable: {e}");
         }
         try
         {
