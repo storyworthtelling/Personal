@@ -8,9 +8,11 @@ using Android.Widget;
 namespace FocusPhone.Launcher;
 
 /// <summary>
-/// The swipe-up tray: every launchable, non-suspended app. Long-press blocks
-/// an app — the block is permanent (survives reinstall) and takes effect via
-/// an immediate policy re-apply.
+/// The swipe-up tray of launchable apps, filtered for distraction-free use:
+/// our own apps (reached from the home tiles), blocked packages, browsers, and
+/// games are excluded. Long-press blocks an app — the block is permanent
+/// (survives reinstall), removes it from the tray immediately, and, once the
+/// launcher is device owner, suspends it via a policy re-apply.
 /// </summary>
 [Activity(
     Label = "Apps",
@@ -45,17 +47,44 @@ public class AppTrayActivity : ListActivity
 
     private void LoadApps()
     {
-        var intent = new Intent(Intent.ActionMain);
-        intent.AddCategory(Intent.CategoryLauncher);
+        var launcherIntent = new Intent(Intent.ActionMain);
+        launcherIntent.AddCategory(Intent.CategoryLauncher);
+
+        var blocked = new BlocklistStore(this).Load().BlockedPackages.ToHashSet();
+        var browsers = BrowserPackages();
 
         apps = PackageManager!
-            .QueryIntentActivities(intent, (PackageInfoFlags)0)
-            .Where(resolveInfo => resolveInfo.ActivityInfo!.PackageName != PackageName)
+            .QueryIntentActivities(launcherIntent, (PackageInfoFlags)0)
+            .Where(resolveInfo => IsAllowedInTray(resolveInfo, blocked, browsers))
             .OrderBy(resolveInfo => resolveInfo.LoadLabel(PackageManager).ToString())
             .ToList();
 
         ListAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleListItem1,
             apps.Select(resolveInfo => resolveInfo.LoadLabel(PackageManager).ToString()!).ToList());
+    }
+
+    private bool IsAllowedInTray(ResolveInfo resolveInfo, HashSet<string> blocked, HashSet<string> browsers)
+    {
+        var package = resolveInfo.ActivityInfo!.PackageName!;
+        if (package == PackageName || Domain.Policy.PolicyContext.FocusPhonePackages.Contains(package))
+        {
+            return false; // Our own apps are reached from the home tiles, not the tray.
+        }
+        if (blocked.Contains(package) || browsers.Contains(package))
+        {
+            return false;
+        }
+        return resolveInfo.ActivityInfo!.ApplicationInfo?.Category != ApplicationCategories.Game;
+    }
+
+    private HashSet<string> BrowserPackages()
+    {
+        var view = new Intent(Intent.ActionView, Android.Net.Uri.Parse("https://example.com"));
+        view.AddCategory(Intent.CategoryBrowsable);
+        return PackageManager!
+            .QueryIntentActivities(view, PackageInfoFlags.MatchAll)
+            .Select(resolveInfo => resolveInfo.ActivityInfo!.PackageName!)
+            .ToHashSet();
     }
 
     private void ConfirmBlock(ResolveInfo app)

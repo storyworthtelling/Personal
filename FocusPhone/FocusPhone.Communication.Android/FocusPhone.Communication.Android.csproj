@@ -20,4 +20,14 @@
   <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
   </ItemGroup>
+
+  <!-- Preserve SQLitePCLRaw from the Release IL trimmer. Its provider is wired
+       up by a module initializer and reflection; trimming it makes the first
+       SqliteConnection.Open() fail at runtime (the app crashed on launch). -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Microsoft.Data.Sqlite" RootMode="All" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.core" RootMode="All" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.batteries_v2" RootMode="All" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.provider.e_sqlite3" RootMode="All" />
+  </ItemGroup>
 </Project>

@@ -53,8 +53,15 @@ public class MessagesNotificationListener : NotificationListenerService
 
         if (items.Count > 0)
         {
-            using var cache = TimelineDatabase.Open(this);
-            cache.Cache.Upsert(items);
+            try
+            {
+                using var cache = TimelineDatabase.Open(this);
+                cache.Cache.Upsert(items);
+            }
+            catch (Exception e)
+            {
+                Android.Util.Log.Warn("FocusPhoneComm", $"Could not cache messages: {e}");
+            }
         }
     }
 
