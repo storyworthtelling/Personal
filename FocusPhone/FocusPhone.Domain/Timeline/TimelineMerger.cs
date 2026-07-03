@@ -1,16 +1,17 @@
 namespace FocusPhone.Domain.Timeline;
 
 /// <summary>
-/// Merges call-log, message, and email items into per-contact threads:
-/// items deduplicated by (kind, source id), chronological within a thread,
-/// threads ordered by most recent activity.
+/// Merges call-log, voicemail, message, and email items into per-contact
+/// threads: items deduplicated by (kind, source id), cross-source duplicates
+/// collapsed, chronological within a thread, threads ordered by most recent
+/// activity.
 /// </summary>
 public class TimelineMerger
 {
     public IReadOnlyList<ContactThread> Merge(IEnumerable<TimelineItem> items)
     {
-        return items
-            .DistinctBy(item => (item.Kind, item.SourceId))
+        return NearDuplicateCollapser.Collapse(
+                items.DistinctBy(item => (item.Kind, item.SourceId)).ToList())
             .GroupBy(item => item.ContactKey)
             .Select(group =>
             {

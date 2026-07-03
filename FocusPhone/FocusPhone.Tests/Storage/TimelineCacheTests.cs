@@ -62,4 +62,14 @@ public class TimelineCacheTests : IDisposable
     {
         Assert.Empty(cache.LoadAll());
     }
+
+    [Fact]
+    public void Upsert_VoicemailKind_RoundTrips()
+    {
+        cache.Upsert([Item("vm:5551234567:1", TimelineItemKind.Voicemail, snippet: "Hi, it's mom")]);
+
+        var item = Assert.Single(cache.LoadAll());
+        Assert.Equal(TimelineItemKind.Voicemail, item.Kind);
+        Assert.Equal("Hi, it's mom", item.Snippet);
+    }
 }

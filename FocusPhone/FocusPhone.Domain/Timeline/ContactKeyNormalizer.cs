@@ -16,4 +16,14 @@ public static class ContactKeyNormalizer
     }
 
     public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    /// <summary>
+    /// Keys a sender that may be an email address, a phone number, or a bare
+    /// display name (notifications carry names, not addresses); names key the
+    /// thread as-is and are merged with contacts at render time.
+    /// </summary>
+    public static string NormalizeAny(string senderOrAddress) =>
+        senderOrAddress.Contains('@') ? NormalizeEmail(senderOrAddress)
+        : senderOrAddress.Any(char.IsAsciiDigit) ? NormalizePhone(senderOrAddress)
+        : senderOrAddress.Trim().ToLowerInvariant();
 }
