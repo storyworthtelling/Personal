@@ -172,11 +172,11 @@ public class CameraActivity : AppCompatActivity
             this.activity = activity;
         }
 
-        public void OnImageSaved(ImageCapture.OutputFileResults results) =>
+        public void OnImageSaved(ImageCapture.OutputFileResults? results) =>
             Toast.MakeText(activity, "Saved.", ToastLength.Short)!.Show();
 
-        public void OnError(ImageCaptureException exception) =>
-            Toast.MakeText(activity, $"Capture failed: {exception.Message}", ToastLength.Long)!.Show();
+        public void OnError(ImageCaptureException? exception) =>
+            Toast.MakeText(activity, $"Capture failed: {exception?.Message}", ToastLength.Long)!.Show();
     }
 
     // Captures a still frame to the cache, then decodes any QR code in it.
@@ -191,7 +191,7 @@ public class CameraActivity : AppCompatActivity
             this.file = file;
         }
 
-        public void OnImageSaved(ImageCapture.OutputFileResults results)
+        public void OnImageSaved(ImageCapture.OutputFileResults? results)
         {
             var image = InputImage.FromFilePath(activity, Android.Net.Uri.FromFile(file)!);
             var options = new BarcodeScannerOptions.Builder()
@@ -202,8 +202,8 @@ public class CameraActivity : AppCompatActivity
                 .AddOnFailureListener(new FailureToastListener(activity, "QR scan failed"));
         }
 
-        public void OnError(ImageCaptureException exception) =>
-            Toast.MakeText(activity, $"QR capture failed: {exception.Message}", ToastLength.Long)!.Show();
+        public void OnError(ImageCaptureException? exception) =>
+            Toast.MakeText(activity, $"QR capture failed: {exception?.Message}", ToastLength.Long)!.Show();
     }
 
     private class QrResultListener : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
@@ -243,7 +243,7 @@ public class CameraActivity : AppCompatActivity
             }
             else
             {
-                new AlertDialog.Builder(activity)
+                new Android.App.AlertDialog.Builder(activity)
                     .SetTitle("Scanned")!
                     .SetMessage(value)!
                     .SetPositiveButton("OK", (_, _) => { })!
@@ -294,7 +294,7 @@ public class CameraActivity : AppCompatActivity
         }
 
         var result = GmsDocumentScanningResult.FromActivityResultIntent(data);
-        var pdf = result?.Pdf;
+        var pdf = result?.GetPdf();
         if (pdf?.Uri is null)
         {
             return;
