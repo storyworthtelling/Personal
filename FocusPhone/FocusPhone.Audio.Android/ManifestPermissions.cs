@@ -4,3 +4,7 @@ using Android;
 [assembly: UsesPermission(Manifest.Permission.ForegroundService)]
 [assembly: UsesPermission(Manifest.Permission.ForegroundServiceMediaPlayback)]
 [assembly: UsesPermission(Manifest.Permission.PostNotifications)]
+
+// Needed to launch / hand off to the YouTube Music app under Android 11+
+// package-visibility filtering. Sideloaded app, so QUERY_ALL_PACKAGES is fine.
+[assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]

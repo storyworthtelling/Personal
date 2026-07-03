@@ -8,3 +8,7 @@ using Android;
 [assembly: UsesPermission(Manifest.Permission.ReadContacts)]
 [assembly: UsesPermission(Manifest.Permission.PostNotifications)]
 [assembly: UsesPermission(Manifest.Permission.Internet)]
+
+// Needed to resolve/deep-link the dialer, Google Messages, and email apps under
+// Android 11+ package-visibility filtering. Sideloaded, so QUERY_ALL_PACKAGES is fine.
+[assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]
