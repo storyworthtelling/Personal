@@ -10,15 +10,19 @@ irreversible, so it comes absolutely last.
    *unlocked* for several days (all four apps installed normally, remote
    install from play.google.com confirmed, auto-update confirmed, messaging
    bridge stable across re-auth).
-2. **Build and escrow the signing keystore.** The four heads carry no signing
-   config, so they sign with the dev machine's default debug keystore (same as
-   DailyLoader) — `~/.local/share/Xamarin/Mono for Android/debug.keystore` on
-   Linux, `%LOCALAPPDATA%\Xamarin\Mono for Android\debug.keystore` on Windows.
-   Build all four APKs on the **same machine/user** so they share one key (the
-   device-owner silent-update channel rejects a signature change). That debug
-   keystore is generated per-machine, so back it up off-device: losing it means
-   no app can ever be updated again (signature mismatch), and recovery would be
-   a factory reset.
+2. **Get the signed APKs from CI.** The canonical build path is the
+   `Build FocusPhone APKs` workflow (`.github/workflows/build-focusphone.yml`):
+   it builds all four heads and signs them with the shared repo release keystore
+   (the same `KEYSTORE_BASE64` / `KEY_ALIAS` / `KEY_PASSWORD` /
+   `KEYSTORE_PASSWORD` secrets DailyLoader and Storyboarder use), so all four
+   carry one signature — required for the device-owner silent-update channel to
+   accept updates across the suite. Trigger it (push to the branch or run it
+   manually), then download the **FocusPhone-Android** artifact from the Actions
+   run; it contains the four APKs. Keep an off-GitHub copy of that keystore: if
+   the secret is ever lost, no app can be updated again (signature mismatch) and
+   recovery would be a factory reset. (A local Visual Studio build works too, but
+   it signs with that machine's debug keystore — fine for functional testing, not
+   for the update channel unless you always rebuild on the same machine.)
 3. Back up anything on the device.
 
 ## Provisioning
