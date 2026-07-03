@@ -64,6 +64,22 @@ public class EmailSyncWorker : Worker
             WorkName, ExistingPeriodicWorkPolicy.Keep!, (PeriodicWorkRequest)request);
     }
 
+    /// <summary>
+    /// Runs a single sync now (e.g. right after the account is configured) so
+    /// the timeline populates promptly instead of waiting for the next period.
+    /// </summary>
+    public static void RunOnce(Context context)
+    {
+        var constraints = new Constraints.Builder()
+            .SetRequiredNetworkType(NetworkType.Connected!)!
+            .Build();
+        var request = new OneTimeWorkRequest.Builder(typeof(EmailSyncWorker))
+            .SetConstraints(constraints)!
+            .Build();
+        WorkManager.GetInstance(context).EnqueueUniqueWork(
+            "focusphone-email-sync-once", ExistingWorkPolicy.Replace!, (OneTimeWorkRequest)request);
+    }
+
     public override Result DoWork()
     {
         var account = new AccountStore(ApplicationContext);
