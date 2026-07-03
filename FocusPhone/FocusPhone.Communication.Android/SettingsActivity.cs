@@ -1,4 +1,5 @@
 using Android.App;
+using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -37,14 +38,37 @@ public class SettingsActivity : Activity
         {
             account.GmailAddress = address.Text;
             account.GmailAppPassword = password.Text;
+            if (account.IsConfigured)
+            {
+                // Sync now so conversations appear promptly instead of waiting
+                // for the next periodic run.
+                EmailSyncWorker.RunOnce(this);
+            }
             Toast.MakeText(this, "Saved.", ToastLength.Short)!.Show();
             Finish();
         };
+
+        var enableMessages = new Button(this) { Text = "Enable message sync (notification access)" };
+        enableMessages.Click += (_, _) =>
+            StartActivity(new Intent(Android.Provider.Settings.ActionNotificationListenerSettings));
+
+        var note = new TextView(this)
+        {
+            Text = "Message sync reads incoming texts from Google Messages notifications. " +
+                   "Call history requires the call-log permission, which takes effect after the " +
+                   "device is locked down (or a whitelisted install).",
+            TextSize = 13,
+        };
+        note.SetTextColor(Android.Graphics.Color.ParseColor("#8A8578"));
 
         layout.AddView(address);
         layout.AddView(password);
         layout.AddView(save, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = 48 });
+        layout.AddView(enableMessages, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = 24 });
+        layout.AddView(note, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = 32 });
         SetContentView(layout);
     }
 }

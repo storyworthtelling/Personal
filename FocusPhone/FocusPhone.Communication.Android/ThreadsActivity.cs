@@ -1,7 +1,10 @@
+using Android;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Graphics;
 using Android.OS;
+using Android.Views;
 using Android.Widget;
 using FocusPhone.Domain.Timeline;
 
@@ -9,7 +12,9 @@ namespace FocusPhone.Communication;
 
 /// <summary>
 /// The main screen: every conversation (calls, texts, email) merged into one
-/// list of per-contact threads, most recent first.
+/// list of per-contact threads, most recent first. A header exposes Settings
+/// (always reachable), and an empty-state message guides setup when there is
+/// no data yet.
 /// </summary>
 [Activity(
     Label = "Communication",
@@ -17,29 +22,29 @@ namespace FocusPhone.Communication;
     Exported = true,
     Theme = "@android:style/Theme.Material.Light.NoActionBar")]
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
-public class ThreadsActivity : ListActivity
+public class ThreadsActivity : Activity
 {
     public static readonly Color Paper = Color.ParseColor("#FAF8F2");
+    private static readonly Color Ink = Color.ParseColor("#3A3A33");
+    private static readonly Color InkMuted = Color.ParseColor("#8A8578");
 
+    private ListView? threadList;
+    private TextView? emptyView;
     private IReadOnlyList<ContactThread> threads = [];
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
-        ListView!.SetBackgroundColor(Paper);
+        SetContentView(BuildLayout());
 
-        ListView.ItemClick += (_, e) =>
+        threadList!.ItemClick += (_, e) =>
         {
             var intent = new Intent(this, typeof(ThreadActivity));
             intent.PutExtra(ThreadActivity.ExtraContactKey, threads[e.Position].ContactKey);
             StartActivity(intent);
         };
 
-        ListView.ItemLongClick += (_, e) =>
-        {
-            StartActivity(new Intent(this, typeof(SettingsActivity)));
-            e.Handled = true;
-        };
+        RequestRuntimePermissions();
 
         try
         {
@@ -57,6 +62,72 @@ public class ThreadsActivity : ListActivity
         LoadThreads();
     }
 
+    private View BuildLayout()
+    {
+        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        root.SetBackgroundColor(Paper);
+
+        var header = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        header.SetPadding(48, 72, 32, 24);
+        header.SetGravity(GravityFlags.CenterVertical);
+
+        var title = new TextView(this) { Text = "Communication", TextSize = 26 };
+        title.SetTextColor(Ink);
+        header.AddView(title,
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+
+        var settings = new Button(this) { Text = "Settings" };
+        settings.Click += (_, _) => StartActivity(new Intent(this, typeof(SettingsActivity)));
+        header.AddView(settings);
+
+        root.AddView(header, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        var frame = new FrameLayout(this);
+        threadList = new ListView(this);
+        threadList.SetBackgroundColor(Paper);
+        frame.AddView(threadList, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        emptyView = new TextView(this) { TextSize = 16 };
+        emptyView.SetTextColor(InkMuted);
+        emptyView.Gravity = GravityFlags.Center;
+        emptyView.SetPadding(64, 0, 64, 0);
+        frame.AddView(emptyView, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        threadList.EmptyView = emptyView;
+
+        root.AddView(frame, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return root;
+    }
+
+    private void RequestRuntimePermissions()
+    {
+        var wanted = new[]
+        {
+            Manifest.Permission.ReadContacts,
+            Manifest.Permission.PostNotifications,
+            // READ_CALL_LOG is hard-restricted: this request auto-denies unless the
+            // APK was installed with -g / whitelisted, but it takes effect post-cutover.
+            Manifest.Permission.ReadCallLog,
+        };
+        var toRequest = wanted
+            .Where(permission => CheckSelfPermission(permission) != Permission.Granted)
+            .ToArray();
+        if (toRequest.Length > 0)
+        {
+            RequestPermissions(toRequest, 0);
+        }
+    }
+
+    public override void OnRequestPermissionsResult(
+        int requestCode, string[] permissions, Permission[] grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+        LoadThreads();
+    }
+
     private void LoadThreads()
     {
         var items = new List<TimelineItem>();
@@ -66,7 +137,7 @@ public class ThreadsActivity : ListActivity
         }
         catch (Java.Lang.SecurityException)
         {
-            // READ_CALL_LOG not yet granted (pre-provisioning); show what we have.
+            // READ_CALL_LOG not granted yet; show what we have.
         }
         try
         {
@@ -81,7 +152,11 @@ public class ThreadsActivity : ListActivity
         }
 
         threads = new TimelineMerger().Merge(items);
-        ListAdapter = new ThreadListAdapter(this, threads);
+        threadList!.Adapter = new ThreadListAdapter(this, threads);
+
+        emptyView!.Text = new AccountStore(this).IsConfigured
+            ? "No conversations yet.\n\nCall and text history appears once permissions are granted."
+            : "No conversations yet.\n\nTap Settings to connect your Gmail account.";
     }
 
     private class ThreadListAdapter : BaseAdapter
@@ -101,8 +176,7 @@ public class ThreadsActivity : ListActivity
 
         public override long GetItemId(int position) => position;
 
-        public override Android.Views.View GetView(int position, Android.Views.View? convertView,
-            Android.Views.ViewGroup? parent)
+        public override View GetView(int position, View? convertView, ViewGroup? parent)
         {
             var view = convertView ?? activity.LayoutInflater.Inflate(
                 Android.Resource.Layout.SimpleListItem2, parent, false)!;
