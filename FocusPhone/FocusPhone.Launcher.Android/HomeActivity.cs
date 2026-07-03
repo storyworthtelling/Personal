@@ -25,6 +25,7 @@ public class HomeActivity : Activity
 {
     private TextView? timeView;
     private TextView? dateView;
+    private Button? setDefaultLauncherButton;
     private readonly Dictionary<Tile, ImageView> tileViews = [];
     private TimeTickReceiver? timeTickReceiver;
     private NotificationsChangedReceiver? notificationsReceiver;
@@ -42,6 +43,7 @@ public class HomeActivity : Activity
     {
         base.OnResume();
         UpdateClock();
+        UpdateSetDefaultLauncherButton();
         timeTickReceiver = new TimeTickReceiver(UpdateClock);
         RegisterReceiver(timeTickReceiver, new IntentFilter(Intent.ActionTimeTick));
         notificationsReceiver = new NotificationsChangedReceiver(UpdateTileTints);
@@ -83,6 +85,18 @@ public class HomeActivity : Activity
         dateView.Gravity = GravityFlags.CenterHorizontal;
         root.AddView(dateView, MatchWrap());
 
+        // Shown only until FocusPhone is the default home app (before device-owner
+        // pinning). ROLE_HOME cannot be force-granted programmatically, so this
+        // opens the system Home-app picker.
+        setDefaultLauncherButton = new Button(this)
+        {
+            Text = "Set as default launcher",
+            Visibility = ViewStates.Gone,
+        };
+        setDefaultLauncherButton.Click += (_, _) =>
+            StartActivity(new Intent(Android.Provider.Settings.ActionHomeSettings));
+        root.AddView(setDefaultLauncherButton, MatchWrap());
+
         var grid = new GridLayout(this) { ColumnCount = 2, RowCount = 3 };
         var gridParams = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1, TopMargin = 96 };
@@ -110,6 +124,10 @@ public class HomeActivity : Activity
             {
                 StartActivity(intent);
             }
+            else
+            {
+                Toast.MakeText(this, $"{tile.Name} isn't installed", ToastLength.Short)!.Show();
+            }
         };
 
         var layoutParams = new GridLayout.LayoutParams(
@@ -126,6 +144,17 @@ public class HomeActivity : Activity
 
     private static LinearLayout.LayoutParams MatchWrap() =>
         new(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+
+    private void UpdateSetDefaultLauncherButton()
+    {
+        if (setDefaultLauncherButton is null)
+        {
+            return;
+        }
+        var roleManager = GetSystemService(Context.RoleService) as Android.App.Roles.RoleManager;
+        var isDefaultLauncher = roleManager?.IsRoleHeld(Android.App.Roles.RoleManager.RoleHome) ?? false;
+        setDefaultLauncherButton.Visibility = isDefaultLauncher ? ViewStates.Gone : ViewStates.Visible;
+    }
 
     private void UpdateClock()
     {

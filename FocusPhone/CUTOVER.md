@@ -9,7 +9,11 @@ irreversible, so it comes absolutely last.
 1. Everything in the build order is done and soak-tested on the phone
    *unlocked* for several days (all four apps installed normally, remote
    install from play.google.com confirmed, auto-update confirmed, messaging
-   bridge stable across re-auth).
+   bridge stable across re-auth). During this pre-lockdown testing the DPC has
+   not pinned HOME yet, so make FocusPhone the launcher manually: open it and
+   tap **Set as default launcher** (shown until it is the default), or Settings
+   → Apps → Default apps → Home app. At provisioning (step 9) the DPC pins it
+   automatically and the button disappears.
 2. **Get the signed APKs from CI.** The canonical build path is the
    `Build FocusPhone APKs` workflow (`.github/workflows/build-focusphone.yml`):
    it builds all four heads and signs them with the shared repo release keystore
