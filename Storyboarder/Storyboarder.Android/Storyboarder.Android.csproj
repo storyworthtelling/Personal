@@ -28,6 +28,12 @@
     <ProjectReference Include="..\Storyboarder.Infrastructure\Storyboarder.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- The shared Paper & Ink fonts (aliases registered in MauiProgram). The CI
+       FONT CHECK proves they are packaged in the APK. -->
+  <ItemGroup>
+    <MauiFont Include="..\..\Fonts\*.ttf" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />

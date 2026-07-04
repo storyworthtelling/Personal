@@ -31,7 +31,16 @@ public static class MauiProgram
     public static MauiApp CreateMauiApp()
     {
         var builder = MauiApp.CreateBuilder();
-        builder.UseMauiApp<App>();
+        builder.UseMauiApp<App>()
+            .ConfigureFonts(fonts =>
+            {
+                fonts.AddFont("SourceSerif4-Regular.ttf", "Serif");
+                fonts.AddFont("SourceSerif4-Semibold.ttf", "SerifSemibold");
+                fonts.AddFont("SourceSerif4-Italic.ttf", "SerifItalic");
+                fonts.AddFont("SourceSans3-Regular.ttf", "Sans");
+                fonts.AddFont("SourceSans3-Semibold.ttf", "SansSemibold");
+                fonts.AddFont("CascadiaCode-Regular.ttf", "Mono");
+            });
 
         var dbPath = Path.Combine(FileSystem.AppDataDirectory, "storyboarder.db");
         var outputRoot = Path.Combine(FileSystem.AppDataDirectory, "output");

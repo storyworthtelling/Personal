@@ -19,7 +19,7 @@ public partial class MainPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        ConfigWarningLabel.IsVisible = !SettingsStore.IsConfigured;
+        ConfigWarningCard.IsVisible = !SettingsStore.IsConfigured;
         LastRunLabel.Text = SettingsStore.LastRunResult;
 
         _ = RefreshAsync();
@@ -135,11 +135,23 @@ public partial class MainPage : ContentPage
     {
         public static ProjectRow From(NovelStatus s)
         {
-            var summary =
-                $"{s.Stage} · panels {s.Panels.Done}/{s.Panels.Total} · " +
-                $"pages {s.Pages.Done}/{s.Pages.Total} · volumes {s.Volumes.Done}/{s.Volumes.Total} · " +
-                $"analysis {s.Analysis.Done}/{s.Analysis.Total}";
+            // One readable progress sentence: the stage plus only the phases
+            // that have work, e.g. "Storyboarding — panels 12 of 40".
+            var parts = new List<string>();
+            AddPart(parts, "panels", s.Panels);
+            AddPart(parts, "pages", s.Pages);
+            AddPart(parts, "volumes", s.Volumes);
+            AddPart(parts, "analysis", s.Analysis);
+            var summary = parts.Count > 0 ? $"{s.Stage} — {string.Join(", ", parts)}" : s.Stage;
             return new ProjectRow(s.Id, s.Title, summary, s.LastError, !string.IsNullOrEmpty(s.LastError));
+        }
+
+        private static void AddPart(List<string> parts, string name, PhaseProgress phase)
+        {
+            if (phase.Total > 0)
+            {
+                parts.Add($"{name} {phase.Done} of {phase.Total}");
+            }
         }
     }
 }

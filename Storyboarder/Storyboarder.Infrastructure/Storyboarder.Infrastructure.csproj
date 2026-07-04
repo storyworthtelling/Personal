@@ -14,6 +14,13 @@
     <ProjectReference Include="..\Storyboarder.Domain\Storyboarder.Domain.csproj" />
   </ItemGroup>
 
+  <!-- The shared Paper & Ink fonts, embedded for the Skia page/report renderers
+       (identical on the desktop test TFM and on device). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\Fonts\SourceSerif4-*.ttf;..\..\Fonts\SourceSans3-*.ttf"
+                      Link="Fonts\%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <!-- Cross-target packages. -->
   <ItemGroup>
     <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
