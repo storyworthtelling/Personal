@@ -13,6 +13,8 @@ using Google.MLKit.Vision.Documentscanner;
 using Xamarin.Google.MLKit.Vision.BarCode;
 using Xamarin.Google.MLKit.Vision.Barcode.Common;
 using Xamarin.Google.MLKit.Vision.Common;
+using FocusPhone.Domain.Design;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Camera;
 
@@ -26,12 +28,11 @@ namespace FocusPhone.Camera;
     Label = "Camera",
     MainLauncher = true,
     Exported = true,
-    Theme = "@style/Theme.AppCompat.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper.AppCompat")]
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class CameraActivity : AppCompatActivity
 {
     private const int DocumentScanRequest = 1;
-    private static readonly Color Paper = Color.ParseColor("#FAF8F2");
 
     private PreviewView? previewView;
     private ImageCapture? imageCapture;
@@ -64,30 +65,29 @@ public class CameraActivity : AppCompatActivity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetBackgroundColor(Paper);
+        root.SetBackgroundColor(PaperTheme.Paper);
 
         previewView = new PreviewView(this);
         root.AddView(previewView, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         var actions = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        actions.SetPadding(16, 16, 16, 16);
-        AddAction(actions, "Capture", TakePhoto);
-        AddAction(actions, "Scan doc", StartDocumentScan);
-        AddAction(actions, "Scan QR", StartQrScan);
-        AddAction(actions, "Photos", OpenGooglePhotos);
+        var pad = PaperTheme.Dp(this, DesignTokens.Space.X3);
+        actions.SetPadding(pad, pad, pad, pad);
+        AddAction(actions, PaperUi.PrimaryButton(this, "Capture", TakePhoto));
+        AddAction(actions, PaperUi.SecondaryButton(this, "Scan doc", StartDocumentScan));
+        AddAction(actions, PaperUi.SecondaryButton(this, "Scan QR", StartQrScan));
+        AddAction(actions, PaperUi.SecondaryButton(this, "Photos", OpenGooglePhotos));
         root.AddView(actions);
         return root;
     }
 
-    private void AddAction(LinearLayout row, string label, Action onClick)
+    private void AddAction(LinearLayout row, Button button)
     {
-        var button = new Button(this) { Text = label };
-        button.Click += (_, _) => onClick();
         row.AddView(button, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent)
         {
             Weight = 1,
-            MarginEnd = 8,
+            MarginEnd = PaperTheme.Dp(this, DesignTokens.Space.X2),
         });
     }
 

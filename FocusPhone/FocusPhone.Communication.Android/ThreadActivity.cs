@@ -3,7 +3,9 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Timeline;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Communication;
 
@@ -15,7 +17,7 @@ namespace FocusPhone.Communication;
 [Activity(
     Label = "Thread",
     Exported = false,
-    Theme = "@android:style/Theme.Material.Light.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper")]
 public class ThreadActivity : ListActivity
 {
     public const string ExtraContactKey = "contactKey";
@@ -27,8 +29,8 @@ public class ThreadActivity : ListActivity
         base.OnCreate(savedInstanceState);
         contactKey = Intent?.GetStringExtra(ExtraContactKey) ?? "";
         Title = ContactNameResolver.DisplayName(this, contactKey);
-        ListView!.SetBackgroundColor(ThreadsActivity.Paper);
-        ListView.AddFooterView(BuildActionRow());
+        PaperUi.StylePaperList(this, ListView!);
+        ListView!.AddFooterView(BuildActionRow());
         LoadItems();
     }
 
@@ -54,16 +56,19 @@ public class ThreadActivity : ListActivity
 
         var thread = new TimelineMerger().Merge(items)
             .FirstOrDefault(t => t.ContactKey == contactKey);
-        var lines = (thread?.Items ?? [])
-            .Select(item => $"{(item.Incoming ? "←" : "→")} {item.TimestampUtc.ToLocalTime():MMM d HH:mm}  {item.Snippet}")
-            .ToList();
-        ListAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleListItem1, lines);
+        ListAdapter = new PaperListAdapter(this, (thread?.Items ?? [])
+            .Select(item => new PaperListRow(
+                item.Snippet,
+                $"{(item.Incoming ? "←" : "→")} {item.TimestampUtc.ToLocalTime():MMM d HH:mm}"))
+            .ToList());
     }
 
     private View BuildActionRow()
     {
         var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        row.SetPadding(16, 24, 16, 24);
+        var horizontal = PaperTheme.Dp(this, DesignTokens.Space.X3);
+        var vertical = PaperTheme.Dp(this, DesignTokens.Space.X4);
+        row.SetPadding(horizontal, vertical, horizontal, vertical);
 
         var isPhone = contactKey.All(char.IsAsciiDigit);
         var isEmail = contactKey.Contains('@');
@@ -93,11 +98,18 @@ public class ThreadActivity : ListActivity
         }
 
         var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var subject = new EditText(this) { Hint = "Subject" };
-        var body = new EditText(this) { Hint = "Message" };
+        var pad = PaperTheme.Dp(this, DesignTokens.Space.X4);
+        layout.SetPadding(pad, pad, pad, 0);
+        var subject = PaperUi.Field(this, "Subject");
+        var body = PaperUi.Field(this, "Message");
         body.SetMinLines(4);
         layout.AddView(subject);
-        layout.AddView(body);
+        var bodyParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+        {
+            TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X3),
+        };
+        layout.AddView(body, bodyParams);
 
         new AlertDialog.Builder(this)
             .SetTitle($"Email {Title}")!
@@ -122,12 +134,11 @@ public class ThreadActivity : ListActivity
 
     private void AddAction(LinearLayout row, string label, Action onClick)
     {
-        var button = new Button(this) { Text = label };
-        button.Click += (_, _) => onClick();
+        var button = PaperUi.SecondaryButton(this, label, onClick);
         var layoutParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent)
         {
             Weight = 1,
-            MarginEnd = 16,
+            MarginEnd = PaperTheme.Dp(this, DesignTokens.Space.X3),
         };
         row.AddView(button, layoutParams);
     }

@@ -2,11 +2,12 @@ using Android;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
-using Android.Graphics;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Timeline;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Communication;
 
@@ -20,14 +21,10 @@ namespace FocusPhone.Communication;
     Label = "Communication",
     MainLauncher = true,
     Exported = true,
-    Theme = "@android:style/Theme.Material.Light.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper")]
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class ThreadsActivity : Activity
 {
-    public static readonly Color Paper = Color.ParseColor("#FAF8F2");
-    private static readonly Color Ink = Color.ParseColor("#3A3A33");
-    private static readonly Color InkMuted = Color.ParseColor("#8A8578");
-
     private ListView? threadList;
     private TextView? emptyView;
     private IReadOnlyList<ContactThread> threads = [];
@@ -65,19 +62,20 @@ public class ThreadsActivity : Activity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetBackgroundColor(Paper);
+        root.SetBackgroundColor(PaperTheme.Paper);
 
         var header = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        header.SetPadding(48, 72, 32, 24);
+        header.SetPadding(
+            PaperTheme.Dp(this, DesignTokens.Space.X4), PaperTheme.Dp(this, DesignTokens.Space.X8),
+            PaperTheme.Dp(this, DesignTokens.Space.X3), PaperTheme.Dp(this, DesignTokens.Space.X3));
         header.SetGravity(GravityFlags.CenterVertical);
 
-        var title = new TextView(this) { Text = "Communication", TextSize = 26 };
-        title.SetTextColor(Ink);
+        var title = PaperUi.Title(this, "Communication");
         header.AddView(title,
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
-        var settings = new Button(this) { Text = "Settings" };
-        settings.Click += (_, _) => StartActivity(new Intent(this, typeof(SettingsActivity)));
+        var settings = PaperUi.QuietButton(this, "Settings", () =>
+            StartActivity(new Intent(this, typeof(SettingsActivity))));
         header.AddView(settings);
 
         root.AddView(header, new LinearLayout.LayoutParams(
@@ -85,14 +83,13 @@ public class ThreadsActivity : Activity
 
         var frame = new FrameLayout(this);
         threadList = new ListView(this);
-        threadList.SetBackgroundColor(Paper);
+        PaperUi.StylePaperList(this, threadList);
         frame.AddView(threadList, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        emptyView = new TextView(this) { TextSize = 16 };
-        emptyView.SetTextColor(InkMuted);
-        emptyView.Gravity = GravityFlags.Center;
-        emptyView.SetPadding(64, 0, 64, 0);
+        emptyView = PaperUi.EmptyState(this, "");
+        var pad = PaperTheme.Dp(this, DesignTokens.Space.X6);
+        emptyView.SetPadding(pad, 0, pad, 0);
         frame.AddView(emptyView, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
         threadList.EmptyView = emptyView;
@@ -152,42 +149,18 @@ public class ThreadsActivity : Activity
         }
 
         threads = new TimelineMerger().Merge(items);
-        threadList!.Adapter = new ThreadListAdapter(this, threads);
+        threadList!.Adapter = new PaperListAdapter(this, threads
+            .Select(thread =>
+            {
+                var latest = thread.Items[^1];
+                return new PaperListRow(
+                    ContactNameResolver.DisplayName(this, thread.ContactKey),
+                    $"{latest.TimestampUtc.ToLocalTime():MMM d HH:mm} · {latest.Snippet}");
+            })
+            .ToList());
 
         emptyView!.Text = new AccountStore(this).IsConfigured
             ? "No conversations yet.\n\nCall and text history appears once permissions are granted."
             : "No conversations yet.\n\nTap Settings to connect your Gmail account.";
-    }
-
-    private class ThreadListAdapter : BaseAdapter
-    {
-        private readonly ThreadsActivity activity;
-        private readonly IReadOnlyList<ContactThread> threads;
-
-        public ThreadListAdapter(ThreadsActivity activity, IReadOnlyList<ContactThread> threads)
-        {
-            this.activity = activity;
-            this.threads = threads;
-        }
-
-        public override int Count => threads.Count;
-
-        public override Java.Lang.Object? GetItem(int position) => null;
-
-        public override long GetItemId(int position) => position;
-
-        public override View GetView(int position, View? convertView, ViewGroup? parent)
-        {
-            var view = convertView ?? activity.LayoutInflater.Inflate(
-                Android.Resource.Layout.SimpleListItem2, parent, false)!;
-            var thread = threads[position];
-            var latest = thread.Items[^1];
-
-            view.FindViewById<TextView>(Android.Resource.Id.Text1)!.Text =
-                ContactNameResolver.DisplayName(activity, thread.ContactKey);
-            view.FindViewById<TextView>(Android.Resource.Id.Text2)!.Text =
-                $"{latest.TimestampUtc.ToLocalTime():MMM d HH:mm} · {latest.Snippet}";
-            return view;
-        }
     }
 }

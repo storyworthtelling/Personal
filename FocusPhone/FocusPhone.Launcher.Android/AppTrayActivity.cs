@@ -4,6 +4,7 @@ using Android.Content.PM;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Launcher;
 
@@ -17,7 +18,7 @@ namespace FocusPhone.Launcher;
 [Activity(
     Label = "Apps",
     Exported = false,
-    Theme = "@android:style/Theme.Material.Light.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper")]
 public class AppTrayActivity : ListActivity
 {
     private List<ResolveInfo> apps = [];
@@ -25,7 +26,7 @@ public class AppTrayActivity : ListActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
-        ListView!.SetBackgroundColor(Palette.Paper);
+        PaperUi.StylePaperList(this, ListView!);
         LoadApps();
 
         ListView.ItemClick += (_, e) =>
@@ -59,8 +60,8 @@ public class AppTrayActivity : ListActivity
             .OrderBy(resolveInfo => resolveInfo.LoadLabel(PackageManager).ToString())
             .ToList();
 
-        ListAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleListItem1,
-            apps.Select(resolveInfo => resolveInfo.LoadLabel(PackageManager).ToString()!).ToList());
+        ListAdapter = new PaperListAdapter(this,
+            apps.Select(resolveInfo => new PaperListRow(resolveInfo.LoadLabel(PackageManager).ToString()!)).ToList());
     }
 
     private bool IsAllowedInTray(ResolveInfo resolveInfo, HashSet<string> blocked, HashSet<string> browsers)
@@ -94,7 +95,7 @@ public class AppTrayActivity : ListActivity
 
         new AlertDialog.Builder(this)
             .SetTitle($"Block {label}?")!
-            .SetMessage($"{label} will be unusable and stay blocked even if reinstalled. Unblocking requires admin mode (72-hour delay).")!
+            .SetMessage($"{label} stays blocked even if it's reinstalled. Unblocking needs admin mode and its 72-hour delay.")!
             .SetPositiveButton("Block", (_, _) =>
             {
                 var store = new BlocklistStore(this);

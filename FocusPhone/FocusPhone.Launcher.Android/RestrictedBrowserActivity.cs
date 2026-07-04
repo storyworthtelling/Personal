@@ -5,7 +5,9 @@ using Android.OS;
 using Android.Views;
 using Android.Webkit;
 using Android.Widget;
+using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Web;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Launcher;
 
@@ -17,7 +19,7 @@ namespace FocusPhone.Launcher;
 [Activity(
     Label = "Web",
     Exported = true,
-    Theme = "@android:style/Theme.Material.Light.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper")]
 [IntentFilter(
     [Intent.ActionView],
     Categories = [Intent.CategoryDefault, Intent.CategoryBrowsable],
@@ -41,15 +43,22 @@ public class RestrictedBrowserActivity : Activity
         }
 
         var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        layout.SetBackgroundColor(Palette.Paper);
+        layout.SetBackgroundColor(PaperTheme.Paper);
 
-        addressDisplay = new TextView(this);
-        addressDisplay.SetTextColor(Palette.InkMuted);
+        addressDisplay = PaperUi.Mono(this, "");
+        addressDisplay.SetTextColor(PaperTheme.InkMuted);
         addressDisplay.SetSingleLine(true);
         addressDisplay.Ellipsize = Android.Text.TextUtils.TruncateAt.End;
-        addressDisplay.SetPadding(32, 24, 32, 24);
+        addressDisplay.SetPadding(
+            PaperTheme.Dp(this, DesignTokens.Space.X4), PaperTheme.Dp(this, DesignTokens.Space.X3),
+            PaperTheme.Dp(this, DesignTokens.Space.X4), PaperTheme.Dp(this, DesignTokens.Space.X3));
         layout.AddView(addressDisplay, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        var rule = new View(this);
+        rule.SetBackgroundColor(PaperTheme.Hairline);
+        layout.AddView(rule, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, PaperTheme.Dp(this, DesignTokens.Shape.HairlineDp)));
 
         webView = new WebView(this);
         layout.AddView(webView, new LinearLayout.LayoutParams(
@@ -80,11 +89,24 @@ public class RestrictedBrowserActivity : Activity
     public void ShowBlockedPage(string blockedUrl)
     {
         var originHost = Intent?.Data?.Host ?? "the original site";
-        webView!.LoadDataWithBaseURL(null, $"""
-            <html><body style="background:#FAF8F2;color:#3A3A33;font-family:sans-serif;padding:2em">
+        // Styled entirely from DesignTokens; fonts come from the shared assets
+        // via the android_asset base URL, with system fallbacks.
+        webView!.LoadDataWithBaseURL("file:///android_asset/", $$"""
+            <html><head><style>
+            @font-face { font-family: 'Source Serif 4'; src: url('{{DesignTokens.FontAssets.SerifSemibold}}'); }
+            @font-face { font-family: 'Source Sans 3'; src: url('{{DesignTokens.FontAssets.SansRegular}}'); }
+            @font-face { font-family: 'Cascadia Code'; src: url('{{DesignTokens.FontAssets.Mono}}'); }
+            body { background: {{DesignTokens.Paper}}; color: {{DesignTokens.Ink}};
+                   font-family: 'Source Sans 3', sans-serif; padding: 2em 1.5em; }
+            h2 { font-family: 'Source Serif 4', serif; font-weight: 600; }
+            .card { background: {{DesignTokens.PaperDeep}}; border-left: 3px solid {{DesignTokens.Accent}};
+                    border-radius: 6px; padding: 1em 1.25em; }
+            .url { word-break: break-all; color: {{DesignTokens.InkMuted}};
+                   font-family: 'Cascadia Code', monospace; font-size: 0.85em; }
+            </style></head><body>
             <h2>Blocked</h2>
-            <p>This page stays on <b>{originHost}</b>. The link below leads elsewhere and was not opened:</p>
-            <p style="word-break:break-all;color:#8A8578">{WebUtility.HtmlEncode(blockedUrl)}</p>
+            <div class="card">This page stays on <b>{{originHost}}</b>. The link below leads elsewhere and was not opened.</div>
+            <p class="url">{{WebUtility.HtmlEncode(blockedUrl)}}</p>
             </body></html>
             """, "text/html", "utf-8", null);
     }
