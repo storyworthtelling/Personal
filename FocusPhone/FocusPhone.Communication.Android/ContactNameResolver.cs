@@ -22,6 +22,32 @@ public static class ContactNameResolver
         return contactKey;
     }
 
+    /// <summary>
+    /// Reverse lookup for notification senders: notifications carry display
+    /// names, and keying by the contact's number instead merges those items
+    /// into the same thread as calls and provider texts. Case-insensitive
+    /// because callers may pass an already-normalized (lowercased) key.
+    /// </summary>
+    public static string? PhoneForDisplayName(Context context, string displayName)
+    {
+        try
+        {
+            using var cursor = context.ContentResolver!.Query(
+                ContactsContract.CommonDataKinds.Phone.ContentUri!,
+                [ContactsContract.CommonDataKinds.Phone.Number],
+                $"{ContactsContract.CommonDataKinds.Phone.InterfaceConsts.DisplayName} = ? COLLATE NOCASE",
+                [displayName], null);
+            var number = cursor is not null && cursor.MoveToFirst() ? cursor.GetString(0) : null;
+            return string.IsNullOrWhiteSpace(number)
+                ? null
+                : Domain.Timeline.ContactKeyNormalizer.NormalizePhone(number);
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            return null; // READ_CONTACTS not granted yet; keep the name key.
+        }
+    }
+
     private static string? LookupPhone(Context context, string number)
     {
         var uri = Android.Net.Uri.WithAppendedPath(

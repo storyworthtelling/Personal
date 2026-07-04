@@ -6,10 +6,14 @@ namespace FocusPhone.Communication;
 
 /// <summary>
 /// Tier-2 messaging bridge: captures incoming texts from Google Messages
-/// notifications (MessagingStyle) into the timeline cache. Listener access is
-/// granted during provisioning. Tier 1 (the embedded Messages-for-Web bridge)
-/// replaces this as the primary source once gmbridge lands; tier 3 (deep link
-/// into Google Messages) always remains for replying.
+/// notifications (MessagingStyle) and voicemails (with transcription) from
+/// Google Phone notifications into the timeline cache. Listener access is
+/// granted during provisioning. For texts, the SMS provider is the
+/// authoritative history and near-duplicates are collapsed at merge time, so
+/// this listener's lasting job is RCS (which never reaches the provider) and
+/// voicemail transcriptions. Tier 1 (the embedded Messages-for-Web bridge)
+/// replaces the text capture as the primary source once gmbridge lands; tier
+/// 3 (deep link into Google Messages) always remains for replying.
 /// </summary>
 [Service(
     Name = "com.storyworthtelling.focusphone.communication.MessageBridgeListener",
@@ -22,13 +26,24 @@ public class MessagesNotificationListener : NotificationListenerService
 
     public override void OnNotificationPosted(StatusBarNotification? sbn)
     {
-        if (sbn?.PackageName != GoogleMessagesPackage || sbn.Notification is null)
+        if (sbn?.Notification is null)
         {
             return;
         }
+        if (sbn.PackageName == VoicemailNotificationParser.DialerPackage)
+        {
+            CaptureVoicemail(sbn);
+        }
+        else if (sbn.PackageName == GoogleMessagesPackage)
+        {
+            CaptureMessages(sbn);
+        }
+    }
 
+    private void CaptureMessages(StatusBarNotification sbn)
+    {
         var style = AndroidX.Core.App.NotificationCompat.MessagingStyle
-            .ExtractMessagingStyleFromNotification(sbn.Notification);
+            .ExtractMessagingStyleFromNotification(sbn.Notification!);
         if (style is null)
         {
             return;
@@ -42,36 +57,80 @@ public class MessagesNotificationListener : NotificationListenerService
             {
                 continue;
             }
+            var contactKey = ContactKey(sender);
             items.Add(new TimelineItem(
                 TimelineItemKind.Message,
-                ContactKey(sender),
+                contactKey,
                 DateTimeOffset.FromUnixTimeMilliseconds(message.Timestamp),
                 message.Text?.ToString(),
                 Incoming: true,
-                SourceId: $"{ContactKey(sender)}:{message.Timestamp}"));
+                SourceId: $"{contactKey}:{message.Timestamp}"));
         }
+        Cache(items);
+    }
 
-        if (items.Count > 0)
+    private void CaptureVoicemail(StatusBarNotification sbn)
+    {
+        var extras = sbn.Notification!.Extras;
+        var item = VoicemailNotificationParser.TryParse(
+            sbn.PackageName,
+            sbn.Notification.ChannelId,
+            extras?.GetCharSequence(Notification.ExtraTitle)?.ToString(),
+            extras?.GetCharSequence(Notification.ExtraText)?.ToString()
+                ?? extras?.GetCharSequence(Notification.ExtraBigText)?.ToString(),
+            sbn.Notification.When);
+        if (item is null)
         {
-            try
+            return;
+        }
+        // The parser keys by whatever the title carried; when that is a display
+        // name, re-key to the contact's number so the voicemail lands in the
+        // same thread as the calls. The SourceId keeps the original key so the
+        // id stays stable however contacts change later.
+        if (!item.ContactKey.Contains('@') && !item.ContactKey.All(char.IsAsciiDigit))
+        {
+            var number = ContactNameResolver.PhoneForDisplayName(this, item.ContactKey);
+            if (number is not null)
             {
-                using var cache = TimelineDatabase.Open(this);
-                cache.Cache.Upsert(items);
+                item = item with { ContactKey = number };
             }
-            catch (Exception e)
-            {
-                Android.Util.Log.Warn("FocusPhoneComm", $"Could not cache messages: {e}");
-            }
+        }
+        Cache([item]);
+    }
+
+    private void Cache(List<TimelineItem> items)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+        try
+        {
+            using var cache = TimelineDatabase.Open(this);
+            cache.Cache.Upsert(items);
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("FocusPhoneComm", $"Could not cache notification items: {e}");
         }
     }
 
     /// <summary>
-    /// Notifications carry display names, not addresses; when the name looks
-    /// like a phone number it is normalized, otherwise the name itself keys
-    /// the thread (merged with contacts at render time).
+    /// Notifications carry display names, not addresses; a name is first
+    /// reverse-resolved to the contact's number so the message threads with
+    /// calls and provider texts, else the name itself keys the thread
+    /// (merged with contacts at render time).
     /// </summary>
-    private static string ContactKey(string sender) =>
-        sender.Any(char.IsAsciiDigit)
-            ? ContactKeyNormalizer.NormalizePhone(sender)
-            : sender.Trim().ToLowerInvariant();
+    private string ContactKey(string sender)
+    {
+        if (!sender.Contains('@') && !sender.Any(char.IsAsciiDigit))
+        {
+            var number = ContactNameResolver.PhoneForDisplayName(this, sender);
+            if (number is not null)
+            {
+                return number;
+            }
+        }
+        return ContactKeyNormalizer.NormalizeAny(sender);
+    }
 }

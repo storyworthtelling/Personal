@@ -54,9 +54,10 @@ public class SettingsActivity : Activity
 
         var note = new TextView(this)
         {
-            Text = "Message sync reads incoming texts from Google Messages notifications. " +
-                   "Call history requires the call-log permission, which takes effect after the " +
-                   "device is locked down (or a whitelisted install).",
+            Text = "Message sync reads incoming texts from Google Messages notifications and " +
+                   "voicemails (with transcription) from Google Phone notifications. " +
+                   "Call and text history require the call-log and SMS permissions, which take " +
+                   "effect after the device is locked down (or a whitelisted install).",
             TextSize = 13,
         };
         note.SetTextColor(Android.Graphics.Color.ParseColor("#8A8578"));

@@ -77,4 +77,20 @@ public class TimelineMergerTests
     {
         Assert.Empty(new TimelineMerger().Merge([]));
     }
+
+    [Fact]
+    public void Merge_CollapsesProviderAndNotificationDuplicatesIntoOneItem()
+    {
+        var providerText = new TimelineItem(
+            TimelineItemKind.Message, "5551234567", T0, "hey", Incoming: true, SourceId: "sms:12");
+        var notificationText = new TimelineItem(
+            TimelineItemKind.Message, "5551234567", T0.AddSeconds(30), "hey", Incoming: true,
+            SourceId: "5551234567:1750000000000");
+
+        var threads = new TimelineMerger().Merge([providerText, notificationText]);
+
+        var thread = Assert.Single(threads);
+        var item = Assert.Single(thread.Items);
+        Assert.Equal("sms:12", item.SourceId);
+    }
 }

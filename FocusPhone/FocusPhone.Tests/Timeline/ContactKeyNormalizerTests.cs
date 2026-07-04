@@ -38,4 +38,26 @@ public class ContactKeyNormalizerTests
     {
         Assert.Equal(expected, ContactKeyNormalizer.NormalizeEmail(input));
     }
+
+    [Theory]
+    [InlineData("+1 (555) 123-4567", "5551234567")]
+    [InlineData("15551234567", "5551234567")]
+    public void NormalizeAny_Phoneish_UsesLastTenDigits(string input, string expected)
+    {
+        Assert.Equal(expected, ContactKeyNormalizer.NormalizeAny(input));
+    }
+
+    [Fact]
+    public void NormalizeAny_Email_Lowercases()
+    {
+        Assert.Equal("alice@example.com", ContactKeyNormalizer.NormalizeAny(" Alice@Example.COM "));
+    }
+
+    [Theory]
+    [InlineData("Mom", "mom")]
+    [InlineData("  Uncle Bob  ", "uncle bob")]
+    public void NormalizeAny_BareName_TrimsAndLowercases(string input, string expected)
+    {
+        Assert.Equal(expected, ContactKeyNormalizer.NormalizeAny(input));
+    }
 }
