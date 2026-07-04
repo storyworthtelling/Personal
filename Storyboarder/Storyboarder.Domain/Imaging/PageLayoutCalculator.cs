@@ -5,20 +5,24 @@ public sealed record PageSize(double Width, double Height);
 // A panel's placement on the page, in the same units as the PageSize.
 public sealed record PanelRect(double X, double Y, double Width, double Height);
 
-// Computes a deterministic grid layout for a page's panels given the page size, margin and gutter.
+// The page's editorial margins. The bottom margin is deeper than the sides so
+// the folio band (running title + page number) has a home (see DESIGN.md §7).
+public sealed record PageMargins(double Top, double Side, double Bottom);
+
+// Computes a deterministic grid layout for a page's panels given the page size, margins and gutter.
 // Pure math: no rendering. The composer fills these rectangles with the generated panel images.
 public sealed class PageLayoutCalculator
 {
-    private readonly double margin;
+    private readonly PageMargins margins;
     private readonly double gutter;
 
-    public PageLayoutCalculator(double margin, double gutter)
+    public PageLayoutCalculator(PageMargins margins, double gutter)
     {
-        if (margin < 0)
-            throw new ArgumentOutOfRangeException(nameof(margin), "Margin cannot be negative.");
+        if (margins.Top < 0 || margins.Side < 0 || margins.Bottom < 0)
+            throw new ArgumentOutOfRangeException(nameof(margins), "Margins cannot be negative.");
         if (gutter < 0)
             throw new ArgumentOutOfRangeException(nameof(gutter), "Gutter cannot be negative.");
-        this.margin = margin;
+        this.margins = margins;
         this.gutter = gutter;
     }
 
@@ -30,10 +34,10 @@ public sealed class PageLayoutCalculator
         int columns = ColumnsFor(panelCount);
         int rows = (int)Math.Ceiling(panelCount / (double)columns);
 
-        double usableWidth = page.Width - 2 * margin - (columns - 1) * gutter;
-        double usableHeight = page.Height - 2 * margin - (rows - 1) * gutter;
+        double usableWidth = page.Width - 2 * margins.Side - (columns - 1) * gutter;
+        double usableHeight = page.Height - margins.Top - margins.Bottom - (rows - 1) * gutter;
         if (usableWidth <= 0 || usableHeight <= 0)
-            throw new ArgumentException("Page is too small for the requested margin/gutter and panel count.", nameof(page));
+            throw new ArgumentException("Page is too small for the requested margins/gutter and panel count.", nameof(page));
 
         double cellWidth = usableWidth / columns;
         double cellHeight = usableHeight / rows;
@@ -43,8 +47,8 @@ public sealed class PageLayoutCalculator
         {
             int row = index / columns;
             int column = index % columns;
-            double x = margin + column * (cellWidth + gutter);
-            double y = margin + row * (cellHeight + gutter);
+            double x = margins.Side + column * (cellWidth + gutter);
+            double y = margins.Top + row * (cellHeight + gutter);
             rects.Add(new PanelRect(x, y, cellWidth, cellHeight));
         }
         return rects;

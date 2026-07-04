@@ -377,7 +377,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                     .OrderBy(p => p.PanelNumber)
                     .Select(p => new PanelArt(imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption))
                     .ToList();
-                var composed = pageComposer.Compose(panelArt);
+                var volume = await db.Volumes.FirstAsync(v => v.Id == page.VolumeId, cancellationToken);
+                var chrome = new PageChrome(page.PageNumber, $"{novel.Title} · Volume {volume.Number}");
+                var composed = pageComposer.Compose(panelArt, chrome);
                 page.ComposedImagePath = imageStore.Save($"{novel.Id}/pages/{page.Id}.png", composed);
                 page.CompositionStatus = WorkStatus.Completed;
                 page.LastError = null;
