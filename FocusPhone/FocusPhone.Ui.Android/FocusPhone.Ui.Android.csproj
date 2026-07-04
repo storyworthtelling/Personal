@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <RootNamespace>FocusPhone.Ui</RootNamespace>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FocusPhone.Domain\FocusPhone.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The shared Paper & Ink fonts; packaged into every consuming head's APK. -->
+    <AndroidAsset Include="..\..\Fonts\*.ttf" Link="Assets\fonts\%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

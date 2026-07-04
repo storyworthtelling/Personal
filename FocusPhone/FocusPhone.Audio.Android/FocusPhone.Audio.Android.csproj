@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FocusPhone.Domain\FocusPhone.Domain.csproj" />
     <ProjectReference Include="..\FocusPhone.Infrastructure\FocusPhone.Infrastructure.csproj" />
+    <ProjectReference Include="..\FocusPhone.Ui.Android\FocusPhone.Ui.Android.csproj" />
   </ItemGroup>
 
   <ItemGroup>
