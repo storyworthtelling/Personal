@@ -2,71 +2,65 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="DailyLoader.Android.Pages.MainPage"
-             Title="NYT Crossword Delivery"
-             BackgroundColor="{StaticResource PageBackground}">
+             Title="NYT Crossword Delivery">
     <VerticalStackLayout Padding="24" Spacing="20" VerticalOptions="Center">
 
         <Label Text="NYT Crossword Delivery"
-               FontSize="24" FontAttributes="Bold"
-               TextColor="{StaticResource TextPrimary}"
+               Style="{StaticResource TitleLabel}"
                HorizontalOptions="Center" />
 
         <Label x:Name="StatusLabel"
-               FontSize="14"
-               TextColor="{StaticResource TextSecondary}"
+               Style="{StaticResource SecondaryLabel}"
                HorizontalOptions="Center"
                HorizontalTextAlignment="Center" />
 
-        <Label x:Name="ConfigWarningLabel"
-               Text="⚠ Credentials not configured. Go to Settings."
-               FontSize="13"
-               TextColor="#ffcc00"
-               HorizontalOptions="Center"
-               HorizontalTextAlignment="Center"
-               IsVisible="False" />
+        <Border x:Name="ConfigWarningLabel"
+                Style="{StaticResource WarningCard}" IsVisible="False">
+            <Label Text="Add your credentials in Settings to start delivering."
+                   FontSize="{StaticResource SecondarySize}"
+                   HorizontalTextAlignment="Center" />
+        </Border>
 
-        <Label x:Name="BatteryWarningLabel"
-               Text="⚠ Battery optimization is on — automatic delivery may be blocked."
-               FontSize="13"
-               TextColor="#ffcc00"
-               HorizontalOptions="Center"
-               HorizontalTextAlignment="Center"
-               IsVisible="False" />
+        <Border x:Name="BatteryWarningLabel"
+                Style="{StaticResource WarningCard}" IsVisible="False">
+            <Label Text="Battery optimization is on — automatic delivery may be blocked."
+                   FontSize="{StaticResource SecondarySize}"
+                   HorizontalTextAlignment="Center" />
+        </Border>
 
         <Button x:Name="BatterySettingsButton"
-                Text="Fix Battery Optimization"
+                Text="Fix battery optimization"
                 Clicked="OnBatterySettingsClicked"
-                BackgroundColor="#5a4a00"
+                Style="{StaticResource SecondaryButton}"
                 IsVisible="False"
                 HorizontalOptions="Fill" />
 
         <Button x:Name="DeliverNowButton"
-                Text="Deliver Now"
+                Text="Deliver now"
                 Clicked="OnDeliverNowClicked"
                 HorizontalOptions="Fill" />
 
         <ActivityIndicator x:Name="Spinner"
                            IsRunning="False"
                            IsVisible="False"
-                           Color="{StaticResource Accent}"
                            HorizontalOptions="Center" />
 
         <Button Text="Settings"
                 Clicked="OnSettingsClicked"
-                BackgroundColor="#333333"
+                Style="{StaticResource SecondaryButton}"
                 HorizontalOptions="Fill" />
 
         <Button x:Name="DeliveryLogButton"
-                Text="View Delivery Log"
+                Text="View delivery log"
                 Clicked="OnDeliveryLogClicked"
-                BackgroundColor="#1a3a5a"
+                Style="{StaticResource QuietButton}"
                 IsVisible="False"
                 HorizontalOptions="Fill" />
 
         <Button x:Name="CrashLogButton"
-                Text="View Crash Log"
+                Text="View crash log"
                 Clicked="OnCrashLogClicked"
-                BackgroundColor="#5a1a1a"
+                Style="{StaticResource DestructiveButton}"
                 IsVisible="False"
                 HorizontalOptions="Fill" />
 
