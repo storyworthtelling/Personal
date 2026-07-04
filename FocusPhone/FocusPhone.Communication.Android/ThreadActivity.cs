@@ -51,11 +51,18 @@ public class ThreadActivity : ListActivity
         catch (Java.Lang.SecurityException)
         {
         }
+        try
+        {
+            items.AddRange(SmsLogReader.ReadAll(this));
+        }
+        catch (Java.Lang.SecurityException)
+        {
+        }
 
         var thread = new TimelineMerger().Merge(items)
             .FirstOrDefault(t => t.ContactKey == contactKey);
         var lines = (thread?.Items ?? [])
-            .Select(item => $"{(item.Incoming ? "←" : "→")} {item.TimestampUtc.ToLocalTime():MMM d HH:mm}  {item.Snippet}")
+            .Select(item => $"{(item.Incoming ? "←" : "→")} {item.TimestampUtc.ToLocalTime():MMM d HH:mm}  {TimelineItemFormatter.Describe(item)}")
             .ToList();
         ListAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleListItem1, lines);
     }
@@ -77,47 +84,10 @@ public class ThreadActivity : ListActivity
         }
         if (isEmail)
         {
-            AddAction(row, "Email", ShowComposeDialog);
+            AddAction(row, "Email", () =>
+                EmailComposeDialog.Show(this, contactKey, Title?.ToString() ?? contactKey));
         }
         return row;
-    }
-
-    private void ShowComposeDialog()
-    {
-        var account = new AccountStore(this);
-        if (!account.IsConfigured)
-        {
-            Toast.MakeText(this, "Set up Gmail in settings first (long-press the thread list).",
-                ToastLength.Long)!.Show();
-            return;
-        }
-
-        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var subject = new EditText(this) { Hint = "Subject" };
-        var body = new EditText(this) { Hint = "Message" };
-        body.SetMinLines(4);
-        layout.AddView(subject);
-        layout.AddView(body);
-
-        new AlertDialog.Builder(this)
-            .SetTitle($"Email {Title}")!
-            .SetView(layout)!
-            .SetPositiveButton("Send", async (_, _) =>
-            {
-                try
-                {
-                    var client = new Infrastructure.Email.GmailClient(
-                        account.GmailAddress!, account.GmailAppPassword!);
-                    await client.SendAsync(contactKey, subject.Text ?? "", body.Text ?? "");
-                    Toast.MakeText(this, "Sent.", ToastLength.Short)!.Show();
-                }
-                catch (Exception e)
-                {
-                    Toast.MakeText(this, $"Send failed: {e.Message}", ToastLength.Long)!.Show();
-                }
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
     }
 
     private void AddAction(LinearLayout row, string label, Action onClick)

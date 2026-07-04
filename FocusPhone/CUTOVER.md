@@ -36,7 +36,7 @@ irreversible, so it comes absolutely last.
    requirement for `dpm set-device-owner`). Enable Developer Options and USB
    debugging.
 6. Install the four signed release APKs — `-g` whitelists the hard-restricted
-   `READ_CALL_LOG` for the Communication app:
+   `READ_CALL_LOG` and `READ_SMS` for the Communication app:
 
    ```
    adb install -g -r FocusPhone.Launcher.apk
@@ -58,6 +58,9 @@ irreversible, so it comes absolutely last.
    adb shell cmd notification allow_listener com.storyworthtelling.focusphone.launcher/.TileNotificationListener
    ```
 
+   The Communication listener grant powers both text capture from Google
+   Messages and voicemail capture (with transcription) from Google Phone.
+
 9. Launch the launcher once — the DPC applies every policy **except**
    `DISALLOW_DEBUGGING_FEATURES`.
 
@@ -73,7 +76,10 @@ irreversible, so it comes absolutely last.
 13. Tap through the CAMERA / RECORD_AUDIO runtime dialogs (sensor permissions
     cannot be silently granted; they persist for the life of the install).
 14. In the launcher admin screen: set the GitHub token for the update channel.
-15. Verify each app end-to-end on the device.
+15. Verify each app end-to-end on the device. For Communication, check the
+    feed intermixes all four sources: place a call, receive a text (exactly
+    one feed item, not a provider/notification duplicate), and leave a
+    voicemail (it should appear with its transcription).
 16. Confirm a remote install from play.google.com lands and auto-update works.
     If this fails, all third-party apps must ship through the GitHub
     silent-install channel instead — decide before proceeding.
