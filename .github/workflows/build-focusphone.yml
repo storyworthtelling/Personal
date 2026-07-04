@@ -76,6 +76,26 @@ jobs:
             echo "::endgroup::"
           done
 
+      # Prove the Paper & Ink launcher icons and shared fonts are actually packaged
+      # (same rationale as Storyboarder's ICON CHECK: don't trust "it built").
+      # Print-only / non-fatal; grep the log for "=== ICON+FONT CHECK ===".
+      - name: ICON+FONT CHECK
+        continue-on-error: true
+        working-directory: FocusPhone
+        run: |
+          set +e
+          echo "=== ICON+FONT CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          for proj in Launcher Communication Camera Audio; do
+            APK=$(ls -1 "FocusPhone.$proj.Android"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+            [ -z "$APK" ] && APK=$(ls -1 "FocusPhone.$proj.Android"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+            echo "--- $proj: $APK"
+            "$AAPT2" dump badging "$APK" 2>/dev/null | grep -Ei 'application(-icon)?:' || echo "(no icon line)"
+            unzip -l "$APK" | grep -Ei 'mipmap.*appicon' | head -4 || echo "(no appicon entries)"
+            echo "fonts packaged: $(unzip -l "$APK" | grep -ci '\.ttf')"
+          done
+          echo "=== END ICON+FONT CHECK ==="
+
       # Keep only the latest run's artifacts: delete artifacts from older runs of
       # this workflow before uploading, which also frees storage so the upload succeeds.
       - name: Prune old artifacts

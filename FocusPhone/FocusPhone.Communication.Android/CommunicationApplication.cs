@@ -3,7 +3,7 @@ using Android.Runtime;
 
 namespace FocusPhone.Communication;
 
-[Application]
+[Application(Icon = "@mipmap/appicon", RoundIcon = "@mipmap/appicon_round")]
 public class CommunicationApplication : Application
 {
     public CommunicationApplication(IntPtr handle, JniHandleOwnership ownership)

@@ -44,6 +44,23 @@ jobs:
           -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }}
           -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
 
+      # Prove the Paper & Ink launcher icon and shared fonts are actually packaged.
+      # Print-only / non-fatal; grep the log for "=== ICON+FONT CHECK ===".
+      - name: ICON+FONT CHECK
+        continue-on-error: true
+        working-directory: DailyLoader
+        run: |
+          set +e
+          echo "=== ICON+FONT CHECK ==="
+          APK=$(ls -1 DailyLoader.Android/bin/Release/net9.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls -1 DailyLoader.Android/bin/Release/net9.0-android/publish/*.apk 2>/dev/null | head -1)
+          echo "APK: $APK"
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          "$AAPT2" dump badging "$APK" 2>/dev/null | grep -Ei 'application(-icon)?:' || echo "(no icon line)"
+          unzip -l "$APK" | grep -Ei 'mipmap.*ic_launcher' | head -4 || echo "(no ic_launcher entries)"
+          echo "fonts packaged: $(unzip -l "$APK" | grep -ci '\.ttf')"
+          echo "=== END ICON+FONT CHECK ==="
+
       # Keep only the latest run's artifacts: delete artifacts from older runs of
       # this workflow before uploading, which also frees storage so the upload succeeds.
       - name: Prune old artifacts

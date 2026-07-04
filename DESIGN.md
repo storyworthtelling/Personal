@@ -133,7 +133,7 @@ In-app glyphs are single-color `Ink` line drawings, geometric, 2dp stroke, no fi
 Android adaptive icons, generated exclusively by `Tools/IconStudio` (never hand-edited):
 
 - **Background layer:** flat `Paper`.
-- **Foreground layer:** one `Ink` line glyph (stroke ≈ 6px at 432px canvas), centered in the 66/108 safe zone, with exactly one `Accent` detail.
+- **Foreground layer:** one `Ink` line glyph (stroke ≈ 3.5% of the canvas — a 2dp-feeling mark that survives 48px legacy sizes), centered in the 66/108 safe zone, with exactly one `Accent` detail.
 - Glyphs: Launcher = clock face w/ terracotta hand · Camera = lens ring w/ terracotta aperture dot · Audio = waveform w/ one terracotta bar · Communication = speech outline w/ terracotta dot · Storyboarder = comic panel grid w/ one terracotta panel · DailyLoader = folded paper w/ terracotta fold.
 - Regenerate: `dotnet run --project Tools/IconStudio -- --repo-root .`
 
