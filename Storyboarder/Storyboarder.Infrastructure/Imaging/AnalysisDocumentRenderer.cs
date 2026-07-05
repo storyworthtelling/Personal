@@ -223,6 +223,7 @@ public sealed class AnalysisDocumentRenderer
             surface = SKSurface.Create(new SKImageInfo(DesignTokens.Pdf.PageWidth, DesignTokens.Pdf.PageHeight));
             canvas = surface.Canvas;
             canvas.Clear(Paper);
+            PaperGrain.Draw(canvas, DesignTokens.Pdf.PageWidth, DesignTokens.Pdf.PageHeight);
             y = DesignTokens.Pdf.TopMargin;
         }
 

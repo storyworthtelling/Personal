@@ -39,6 +39,7 @@ public sealed class SkiaPageComposer : IPageComposer
         using var surface = SKSurface.Create(info);
         var canvas = surface.Canvas;
         canvas.Clear(Paper);
+        PaperGrain.Draw(canvas, layout.Width, layout.Height);
 
         var rects = calculator.Layout(new PageSize(layout.Width, layout.Height), panels.Count);
         // Axis-aligned border strokes stay crisp without antialiasing.

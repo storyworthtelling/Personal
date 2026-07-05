@@ -56,6 +56,29 @@ public class SkiaPageComposerTests
 
     private static SKColor Token(string hex) => SKColor.Parse(hex);
 
+    // Grained paper: within GrainTolerance of Paper per channel (alpha-6 ink
+    // noise shifts channels by at most ~5). Real ink differs by far more.
+    internal const int GrainTolerance = 8;
+    internal const int StrongInkDelta = 24;
+
+    internal static void AssertNearPaper(SKColor pixel)
+    {
+        var paper = SKColor.Parse(DesignTokens.Paper);
+        Assert.True(
+            Math.Abs(pixel.Red - paper.Red) <= GrainTolerance &&
+            Math.Abs(pixel.Green - paper.Green) <= GrainTolerance &&
+            Math.Abs(pixel.Blue - paper.Blue) <= GrainTolerance,
+            $"expected near-paper, got {pixel}");
+    }
+
+    internal static bool IsStrongInk(SKColor pixel)
+    {
+        var paper = SKColor.Parse(DesignTokens.Paper);
+        return Math.Abs(pixel.Red - paper.Red) > StrongInkDelta ||
+               Math.Abs(pixel.Green - paper.Green) > StrongInkDelta ||
+               Math.Abs(pixel.Blue - paper.Blue) > StrongInkDelta;
+    }
+
     [Fact]
     public void Compose_ProducesPngOfConfiguredSize()
     {
@@ -86,13 +109,35 @@ public class SkiaPageComposerTests
     }
 
     [Fact]
-    public void Compose_PageBackgroundIsPaper()
+    public void Compose_PageBackgroundIsGrainedPaper()
     {
         var bytes = Composer().Compose([new PanelArt(SampleImages.Png(), null, null)], Chrome);
 
         using var decoded = SKBitmap.Decode(bytes)!;
         // The corner is outside every panel and outside the folio band.
-        Assert.Equal(Token(DesignTokens.Paper), decoded.GetPixel(5, 5));
+        AssertNearPaper(decoded.GetPixel(5, 5));
+    }
+
+    [Fact]
+    public void Compose_IsDeterministic_GrainIncluded()
+    {
+        var panels = new List<PanelArt> { new(SampleImages.Png(), "Hello.", null) };
+        Assert.Equal(Composer().Compose(panels, Chrome), Composer().Compose(panels, Chrome));
+    }
+
+    [Fact]
+    public void Compose_GrainIsSubtle()
+    {
+        var bytes = Composer().Compose([new PanelArt(SampleImages.Png(), null, null)], Chrome);
+        using var decoded = SKBitmap.Decode(bytes)!;
+        // An empty margin strip: every pixel stays within the grain tolerance.
+        for (var x = 0; x < 40; x++)
+        {
+            for (var y = 0; y < 40; y++)
+            {
+                AssertNearPaper(decoded.GetPixel(x, y));
+            }
+        }
     }
 
     [Fact]
@@ -114,16 +159,15 @@ public class SkiaPageComposerTests
         var withChrome = Composer().Compose([new PanelArt(SampleImages.Png(), null, null)], Chrome);
 
         using var decoded = SKBitmap.Decode(withChrome)!;
-        // The folio band (bottom margin) must contain non-paper pixels — the
-        // running title and the page number.
-        var paper = Token(DesignTokens.Paper);
+        // The folio band (bottom margin) must contain strong ink — the
+        // running title and the page number — not just grain noise.
         var bandTop = DesignTokens.Comic.PageHeight - DesignTokens.Comic.FolioBand;
         var inked = 0;
         for (var x = 0; x < decoded.Width; x += 2)
         {
             for (var y = bandTop; y < decoded.Height; y += 2)
             {
-                if (decoded.GetPixel(x, y) != paper)
+                if (IsStrongInk(decoded.GetPixel(x, y)))
                 {
                     inked++;
                 }
@@ -288,12 +332,12 @@ public class AnalysisPdfComposerTests
     }
 
     [Fact]
-    public void Renderer_PageBackgroundIsPaper()
+    public void Renderer_PageBackgroundIsGrainedPaper()
     {
         var pages = new AnalysisDocumentRenderer().Render(Sample(1), "My Novel");
 
         using var bitmap = SKBitmap.Decode(pages[0])!;
-        Assert.Equal(SKColor.Parse(DesignTokens.Paper), bitmap.GetPixel(5, 5));
+        SkiaPageComposerTests.AssertNearPaper(bitmap.GetPixel(5, 5));
     }
 
     [Fact]
@@ -320,7 +364,6 @@ public class AnalysisPdfComposerTests
         var pages = new AnalysisDocumentRenderer().Render(Sample(4), "My Novel");
         Assert.True(pages.Count > 1);
 
-        var paper = SKColor.Parse(DesignTokens.Paper);
         foreach (var page in pages)
         {
             using var bitmap = SKBitmap.Decode(page)!;
@@ -330,7 +373,7 @@ public class AnalysisPdfComposerTests
             {
                 for (var y = footerTop; y < bitmap.Height; y += 2)
                 {
-                    if (bitmap.GetPixel(x, y) != paper)
+                    if (SkiaPageComposerTests.IsStrongInk(bitmap.GetPixel(x, y)))
                     {
                         inked++;
                     }
