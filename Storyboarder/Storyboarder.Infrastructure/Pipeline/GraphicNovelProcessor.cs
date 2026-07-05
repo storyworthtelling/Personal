@@ -11,6 +11,7 @@ using Storyboarder.Domain.Text;
 using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
+using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Persistence;
 
 namespace Storyboarder.Infrastructure.Pipeline;
@@ -36,6 +37,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private readonly RateLimitOptions rateLimits;
     private readonly TextChunker chunker = new();
     private readonly DesignBibleMerger merger = new();
+    private readonly CoverPageRenderer coverRenderer = new();
 
     public GraphicNovelProcessor(
         IDbContextFactory<StoryboarderDbContext> dbContextFactory,
@@ -422,6 +424,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                     .OrderBy(p => p.PageNumber)
                     .Select(p => imageStore.Read(p.ComposedImagePath!))
                     .ToList();
+                pageImages.Insert(0, coverRenderer.VolumeCover(novel.Title, volume.Number, volume.Title));
                 var pdf = pdfComposer.Compose(pageImages);
                 volume.PdfPath = imageStore.Save($"{novel.Id}/volumes/volume-{volume.Number}.pdf", pdf);
                 volume.PdfStatus = WorkStatus.Completed;

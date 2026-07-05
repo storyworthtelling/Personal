@@ -10,6 +10,11 @@ namespace Storyboarder.Infrastructure.Imaging;
 // character map. Styling follows DESIGN.md §7: paper pages, Source Serif type in ink, terracotta
 // rules under section headings, and a footer with the running title and page number. The pages are
 // handed to the existing IVolumePdfComposer to assemble the final PDF.
+public sealed record AnalysisRenderResult(
+    IReadOnlyList<byte[]> Pages,
+    int FrontMatterCount,
+    IReadOnlyList<(string Title, int Page)> TocEntries);
+
 public sealed class AnalysisDocumentRenderer
 {
     private static readonly SKColor Paper = SKColor.Parse(DesignTokens.Paper);
@@ -17,7 +22,30 @@ public sealed class AnalysisDocumentRenderer
     private static readonly SKColor Accent = SKColor.Parse(DesignTokens.Accent);
     private static readonly SKColor Muted = SKColor.Parse(DesignTokens.InkMuted);
 
-    public IReadOnlyList<byte[]> Render(BookAnalysisResult analysis, string title)
+    private readonly CoverPageRenderer covers = new();
+
+    public IReadOnlyList<byte[]> Render(BookAnalysisResult analysis, string title) =>
+        RenderReport(analysis, title).Pages;
+
+    /// <summary>
+    /// Renders content pages first (recording each H2 section's page number),
+    /// then prepends unnumbered front matter: cover + table of contents.
+    /// Content folios stay 1..N, so the printed TOC needs no bookkeeping.
+    /// </summary>
+    public AnalysisRenderResult RenderReport(BookAnalysisResult analysis, string title)
+    {
+        var reportTitle = string.IsNullOrWhiteSpace(title) ? "Book Analysis" : title;
+        var content = RenderContent(analysis, reportTitle, out var tocEntries);
+
+        var pages = new List<byte[]> { covers.AnalysisCover(reportTitle) };
+        var toc = covers.AnalysisToc(tocEntries);
+        pages.AddRange(toc);
+        pages.AddRange(content);
+        return new AnalysisRenderResult(pages, 1 + toc.Count, tocEntries);
+    }
+
+    private IReadOnlyList<byte[]> RenderContent(
+        BookAnalysisResult analysis, string reportTitle, out IReadOnlyList<(string Title, int Page)> tocEntries)
     {
         using var body = new SKFont(EmbeddedTypefaces.SerifRegular, DesignTokens.Pdf.Body);
         using var bodyBold = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.Body);
@@ -26,7 +54,6 @@ public sealed class AnalysisDocumentRenderer
         using var h2 = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.H2);
         using var h3 = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.H3);
 
-        var reportTitle = string.IsNullOrWhiteSpace(title) ? "Book Analysis" : title;
         var writer = new PageWriter(reportTitle);
 
         writer.Heading(reportTitle, h1, Ink, ruled: true);
@@ -119,7 +146,9 @@ public sealed class AnalysisDocumentRenderer
             }
         }
 
-        return writer.Finish();
+        var pages = writer.Finish();
+        tocEntries = writer.TocEntries;
+        return pages;
     }
 
     private static void Section(PageWriter writer, string heading, IReadOnlyList<string> items, SKFont body, SKFont h2)
@@ -144,6 +173,7 @@ public sealed class AnalysisDocumentRenderer
 
         private readonly string runningTitle;
         private readonly List<byte[]> pages = [];
+        private readonly List<(string Title, int Page)> tocEntries = [];
         private SKSurface surface = null!;
         private SKCanvas canvas = null!;
         private float y;
@@ -154,6 +184,9 @@ public sealed class AnalysisDocumentRenderer
             StartPage();
         }
 
+        /// <summary>H2 sections and the content page (1-based) they begin on.</summary>
+        public IReadOnlyList<(string Title, int Page)> TocEntries => tocEntries;
+
         public void Gap(float height) => y += height;
 
         public void Heading(string text, SKFont font, SKColor color, bool ruled = false)
@@ -163,6 +196,8 @@ public sealed class AnalysisDocumentRenderer
             // the very bottom of the page.
             if (y + font.Size * DesignTokens.Pdf.LineSpacing * 2 > ContentBottom)
                 NewPage();
+            if (font.Size == DesignTokens.Pdf.H2)
+                tocEntries.Add((text, pages.Count + 1));
             DrawWrapped(text, font, color, ContentLeft, ContentWidth);
             if (ruled)
             {

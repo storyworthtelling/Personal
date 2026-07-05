@@ -359,9 +359,48 @@ public class AnalysisPdfComposerTests
     }
 
     [Fact]
+    public void Renderer_FrontMatter_CoverAndTocPrecedeContent()
+    {
+        var result = new AnalysisDocumentRenderer().RenderReport(Sample(1), "My Novel");
+
+        Assert.True(result.FrontMatterCount >= 2, "expected a cover and at least one TOC page");
+        Assert.Equal(result.Pages.Count - result.FrontMatterCount,
+            result.Pages.Count - result.FrontMatterCount);
+        Assert.NotEmpty(result.TocEntries);
+        // Every H2 section lands in the TOC with a plausible 1-based content page.
+        Assert.Contains(result.TocEntries, e => e.Title == "Logline");
+        Assert.All(result.TocEntries, e =>
+            Assert.InRange(e.Page, 1, result.Pages.Count - result.FrontMatterCount));
+        // Entries are in reading order.
+        var pagesInOrder = result.TocEntries.Select(e => e.Page).ToList();
+        Assert.Equal(pagesInOrder.OrderBy(p => p), pagesInOrder);
+    }
+
+    [Fact]
+    public void Renderer_TocPageListsTheSections()
+    {
+        var result = new AnalysisDocumentRenderer().RenderReport(Sample(1), "My Novel");
+
+        using var toc = SKBitmap.Decode(result.Pages[1])!; // page 0 = cover, page 1 = contents
+        var inked = 0;
+        for (var x = 0; x < toc.Width; x += 3)
+        {
+            for (var y = 0; y < toc.Height; y += 3)
+            {
+                if (SkiaPageComposerTests.IsStrongInk(toc.GetPixel(x, y)))
+                {
+                    inked++;
+                }
+            }
+        }
+        Assert.True(inked > 200, $"expected a populated contents page, found {inked} ink pixels");
+    }
+
+    [Fact]
     public void Renderer_EveryPage_HasFooterInk()
     {
-        var pages = new AnalysisDocumentRenderer().Render(Sample(4), "My Novel");
+        var result = new AnalysisDocumentRenderer().RenderReport(Sample(4), "My Novel");
+        var pages = result.Pages.Skip(result.FrontMatterCount).ToList(); // front matter is unnumbered
         Assert.True(pages.Count > 1);
 
         foreach (var page in pages)
