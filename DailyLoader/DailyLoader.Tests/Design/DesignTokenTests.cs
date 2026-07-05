@@ -54,6 +54,18 @@ public class DesignTokenTests
     }
 
     [Fact]
+    public void ButtonStylesUseTheSoftStationeryRadius()
+    {
+        var path = Path.Combine(Root(), "DailyLoader.Android", "Resources", "Styles", "DesignTokens.xaml");
+        var xaml = File.ReadAllText(path);
+        var radii = Regex.Matches(xaml, "<Setter Property=\"CornerRadius\" Value=\"(\\d+)\" />")
+            .Select(m => int.Parse(m.Groups[1].Value))
+            .ToList();
+        Assert.NotEmpty(radii);
+        Assert.All(radii, r => Assert.Equal(12, r));
+    }
+
+    [Fact]
     public void NoColorHexLiteralsOutsideTokenFiles()
     {
         var root = Root();

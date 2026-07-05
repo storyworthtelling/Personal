@@ -77,6 +77,31 @@ public class DesignTokensTests
     }
 
     [Fact]
+    public void CornerRadiiAreSoftStationery()
+    {
+        // DESIGN.md §4: soft-cornered stationery, radii 10–16, never pills.
+        var radii = new[]
+        {
+            DesignTokens.Shape.RadiusInput,
+            DesignTokens.Shape.RadiusButton,
+            DesignTokens.Shape.RadiusCard,
+        };
+        foreach (var radius in radii)
+        {
+            Assert.InRange(radius, 10, 16);
+        }
+    }
+
+    [Fact]
+    public void MotionUsesTheTwoSanctionedDurations()
+    {
+        Assert.Equal(150, DesignTokens.Motion.QuickMs);
+        Assert.Equal(200, DesignTokens.Motion.StandardMs);
+        Assert.True(DesignTokens.Motion.UndoWindowMs >= 5_000, "undo window must be long enough to read and react");
+        Assert.InRange(DesignTokens.Motion.CutoverCountdownSeconds, 8, 15);
+    }
+
+    [Fact]
     public void SpacingScaleIsMultiplesOfFourAndAscending()
     {
         var scale = new[]

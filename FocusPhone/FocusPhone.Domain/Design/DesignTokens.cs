@@ -48,13 +48,32 @@ public static class DesignTokens
 
     public static class Shape
     {
-        public const int RadiusInput = 6;
-        public const int RadiusButton = 8;
-        public const int RadiusCard = 6;
+        public const int RadiusInput = 12;
+        public const int RadiusButton = 12;
+        public const int RadiusCard = 12;
         public const int HairlineDp = 1;
         public const int WarningRuleDp = 3;
         public const int ListRowMinHeightDp = 56;
         public const int TouchTargetDp = 48;
+        public const int ScreenEdgeDp = Space.X6;
+    }
+
+    /// <summary>Calm functional motion: two durations, decelerate curves, no haptics.</summary>
+    public static class Motion
+    {
+        public const int QuickMs = 150;
+        public const int StandardMs = 200;
+        public const int UndoWindowMs = 6_000;
+        public const int CutoverCountdownSeconds = 10;
+    }
+
+    /// <summary>Paper grain: deterministic seeded ink noise (DESIGN.md §6).</summary>
+    public static class Grain
+    {
+        public const int TileSize = 256;
+        public const int Alpha = 6;          // of 255 — ~2.4% ink
+        public const int Density = 6;        // ~1 in Density pixels carries grain
+        public const uint Seed = 1913;
     }
 
     /// <summary>Font asset paths as packaged by FocusPhone.Ui.Android.</summary>

@@ -49,6 +49,21 @@ public class TokenParityTests
         }
     }
 
+    [Fact]
+    public void ButtonStylesUseTheSoftStationeryRadius()
+    {
+        // DESIGN.md §4: radii 10–16; buttons/cards sit at 12.
+        var xaml = ReadTokensXaml();
+        var radii = System.Text.RegularExpressions.Regex
+            .Matches(xaml, "<Setter Property=\"CornerRadius\" Value=\"(\\d+)\" />")
+            .Select(m => int.Parse(m.Groups[1].Value))
+            .ToList();
+        Assert.NotEmpty(radii);
+        Assert.All(radii, r => Assert.Equal(12, r));
+        Assert.DoesNotContain("RoundRectangle 6", xaml);
+        Assert.DoesNotContain("RoundRectangle 8", xaml);
+    }
+
     private static string ReadTokensXaml()
     {
         var path = Path.Combine(

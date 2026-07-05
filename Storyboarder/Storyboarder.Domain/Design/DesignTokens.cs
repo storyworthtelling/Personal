@@ -46,10 +46,12 @@ public static class DesignTokens
         public const float LetteringSize = 17f;  // dialogue, Sans
         public const float CaptionSize = 16f;    // captions, Serif Italic
         public const float FolioSize = 18f;      // page number + running title, Serif
-        public const float BalloonRadius = 8f;
-        public const float CaptionRadius = 4f;
+        public const float BalloonRadius = 14f;
+        public const float CaptionRadius = 10f;
         public const float BoxPadding = 8f;
         public const float LineSpacing = 1.35f;
+        public const float CoverTitleSize = 72f;
+        public const float CoverMedallionSize = 120f;
     }
 
     /// <summary>Analysis report pages (px at ~A4 150 DPI).</summary>
@@ -69,5 +71,24 @@ public static class DesignTokens
         public const float BulletIndent = 34f;
         public const float AccentRuleHeight = 2f;
         public const float AccentRuleGap = 24f;
+        public const float CoverTitle = 72f;
+        public const float CoverMedallionSize = 160f;
+    }
+
+    /// <summary>Calm functional motion: two durations, decelerate curves, no haptics.</summary>
+    public static class Motion
+    {
+        public const int QuickMs = 150;
+        public const int StandardMs = 200;
+        public const int UndoWindowMs = 6_000;
+    }
+
+    /// <summary>Paper grain: deterministic seeded ink noise (DESIGN.md §6).</summary>
+    public static class Grain
+    {
+        public const int TileSize = 256;
+        public const int Alpha = 6;          // of 255 — ~2.4% ink
+        public const int Density = 6;        // ~1 in Density pixels carries grain
+        public const uint Seed = 1913;
     }
 }
