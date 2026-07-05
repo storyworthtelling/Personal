@@ -11,8 +11,10 @@ public static class Tokens
     public const string PaperHex = "#FAF8F2";
     public const string InkHex = "#3A3A33";
     public const string AccentHex = "#C2542F";
+    public const string HairlineHex = "#E3DCC9";
 
     public static readonly SKColor Paper = SKColor.Parse(PaperHex);
     public static readonly SKColor Ink = SKColor.Parse(InkHex);
     public static readonly SKColor Accent = SKColor.Parse(AccentHex);
+    public static readonly SKColor Hairline = SKColor.Parse(HairlineHex);
 }

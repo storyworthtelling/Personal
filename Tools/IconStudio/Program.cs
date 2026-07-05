@@ -39,6 +39,11 @@ public static class Program
                 Console.WriteLine($"{spec.App}: preview {AdaptiveIconRenderer.WritePreview(previewDir, spec)}");
             }
         }
+        if (repoRoot is not null)
+        {
+            var branded = BrandAssets.Write(repoRoot);
+            Console.WriteLine($"branding + grain: wrote {branded.Count} files");
+        }
         return 0;
     }
 }
