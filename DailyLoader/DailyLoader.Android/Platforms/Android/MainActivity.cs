@@ -6,7 +6,7 @@ using Microsoft.Maui;
 namespace DailyLoader.Android.Platforms.Android;
 
 [Activity(
-    Theme = "@style/PaperSplashTheme",
+    Theme = "@style/Maui.SplashTheme",
     MainLauncher = true,
     LaunchMode = LaunchMode.SingleTop,
     ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation |
