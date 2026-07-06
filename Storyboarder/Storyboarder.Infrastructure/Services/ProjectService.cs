@@ -45,6 +45,16 @@ public sealed class ProjectService
         return novel.Id;
     }
 
+    // True while any novel is mid-conversion (not Completed/Failed). The Android head checks this on
+    // launch to kick the worker immediately after an app update, so a long conversion resumes at once
+    // rather than waiting for the next periodic window.
+    public async Task<bool> HasActiveWorkAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Novels.AnyAsync(
+            n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<NovelStatus>> ListAsync(CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);

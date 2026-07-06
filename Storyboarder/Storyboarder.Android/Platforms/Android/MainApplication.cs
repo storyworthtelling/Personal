@@ -37,15 +37,25 @@ public class MainApplication : MauiApplication
 
         // Apply EF Core migrations once at process start (the process is created for WorkManager
         // jobs too), so the SQLite schema always exists before the worker or UI touches it.
+        RunMigrations();
+    }
+
+    // Brings the on-device schema up to date. Records the outcome in SettingsStore so a failed update
+    // surfaces on the Settings page rather than silently stalling every worker cycle. Also re-run
+    // after a backup restore, since the restored database may predate a schema change.
+    internal static void RunMigrations()
+    {
         try
         {
             var factory = IPlatformApplication.Current!.Services
                 .GetRequiredService<IDbContextFactory<StoryboarderDbContext>>();
             using var db = factory.CreateDbContext();
             db.Database.Migrate();
+            SettingsStore.LastMigrationError = string.Empty;
         }
         catch (Exception ex)
         {
+            SettingsStore.LastMigrationError = ex.Message;
             CrashLogger.Log($"Database migration failed:\n{ex}");
         }
     }

@@ -171,4 +171,88 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.True(File.Exists(analysis.PdfPath));
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(analysis.PdfPath!)[..4]));
     }
+
+    [Fact]
+    public async Task ReRendersPanel_WhenItsImageFileVanishes_InsteadOfStalling()
+    {
+        var novelId = SeedNovel();
+        var disrupted = false;
+        var rendersBeforeDisruption = 0;
+
+        // When a rendered panel's image disappears (cache eviction, a partial restore), page
+        // composition would otherwise throw on the missing file and block the novel forever.
+        await DriveToCompletion(novelId, stage =>
+        {
+            if (stage != ProjectStage.ComposingPages || disrupted)
+                return;
+            using var context = database.NewContext();
+            var panel = context.Panels.First(p => p.Status == WorkStatus.Completed && p.ImagePath != null);
+            Assert.True(File.Exists(panel.ImagePath!));
+            File.Delete(panel.ImagePath!);
+            rendersBeforeDisruption = panelRenderCalls;
+            disrupted = true;
+        });
+
+        Assert.True(disrupted, "Expected the pipeline to reach ComposingPages so a panel image could be removed.");
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.True(panelRenderCalls > rendersBeforeDisruption, "The panel with the missing image should have been re-rendered.");
+
+        using var ctx = database.NewContext();
+        var restored = ctx.Panels.First();
+        Assert.Equal(WorkStatus.Completed, restored.Status);
+        Assert.True(File.Exists(restored.ImagePath!));
+    }
+
+    [Fact]
+    public async Task RecomposesPage_WhenComposedImageVanishes_BeforeVolumeAssembly()
+    {
+        var novelId = SeedNovel();
+        var disrupted = false;
+
+        await DriveToCompletion(novelId, stage =>
+        {
+            if (stage != ProjectStage.AssemblingVolumes || disrupted)
+                return;
+            using var context = database.NewContext();
+            var page = context.Pages.First(p => p.CompositionStatus == WorkStatus.Completed && p.ComposedImagePath != null);
+            File.Delete(page.ComposedImagePath!);
+            disrupted = true;
+        });
+
+        Assert.True(disrupted, "Expected the pipeline to reach AssemblingVolumes so a composed page could be removed.");
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var volume = ctx.Volumes.First(v => v.NovelId == novelId);
+        Assert.Equal(WorkStatus.Completed, volume.PdfStatus);
+        Assert.True(File.Exists(volume.PdfPath!));
+        var page2 = ctx.Pages.First();
+        Assert.True(File.Exists(page2.ComposedImagePath!));
+    }
+
+    // Drives the pipeline to a terminal stage, invoking inspect() with the current stage before each
+    // cycle so a test can disrupt on-disk state mid-run. Fresh processor per cycle proves resume.
+    private async Task DriveToCompletion(Guid novelId, Action<ProjectStage> inspect)
+    {
+        for (int i = 0; i < 400; i++)
+        {
+            var stage = CurrentStage(novelId);
+            if (stage is ProjectStage.Completed or ProjectStage.Failed)
+                return;
+
+            inspect(stage);
+
+            var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+            stage = CurrentStage(novelId);
+            if (stage is ProjectStage.Completed or ProjectStage.Failed)
+                return;
+
+            if (result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+            else if (result.Outcome == ProcessOutcome.Idle)
+                Assert.Fail($"Pipeline stalled in stage {stage} (last error surfaced via DB).");
+        }
+
+        Assert.Fail("Pipeline did not reach a terminal stage within the iteration budget.");
+    }
 }

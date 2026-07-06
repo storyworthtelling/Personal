@@ -81,6 +81,15 @@ public class PipelineWorker : Worker
             .EnqueueUniqueWork($"{WorkName}-now", ExistingWorkPolicy.Keep!, (OneTimeWorkRequest)request);
     }
 
+    // Stops the periodic and one-shot pipeline work. Used before a backup restore swaps the database
+    // and output files out from under a running cycle.
+    public static void CancelAll(Context context)
+    {
+        var manager = WorkManager.GetInstance(context);
+        manager.CancelUniqueWork(WorkName);
+        manager.CancelUniqueWork($"{WorkName}-now");
+    }
+
     private static Constraints NetworkConnected() =>
         new Constraints.Builder()
             .SetRequiredNetworkType(NetworkType.Connected!)!

@@ -88,6 +88,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPipelineStep>(sp => sp.GetRequiredService<GraphicNovelProcessor>());
         builder.Services.AddSingleton<PipelineRunner>();
         builder.Services.AddScoped<ProjectService>();
+        builder.Services.AddSingleton<ProjectBackupService>();
 
         // Android-side Google helpers consumed by the New Project page.
         builder.Services.AddSingleton<DeviceAccountTokenProvider>();

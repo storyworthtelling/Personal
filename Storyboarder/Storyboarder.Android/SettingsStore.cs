@@ -36,6 +36,14 @@ public static class SettingsStore
         set => Preferences.Set(nameof(LastRunAtUtc), value);
     }
 
+    // Set when applying EF migrations at process start fails, cleared on success. Surfaced on the
+    // Settings page so a broken update is visible instead of silently stalling the worker.
+    public static string LastMigrationError
+    {
+        get => Preferences.Get(nameof(LastMigrationError), string.Empty);
+        set => Preferences.Set(nameof(LastMigrationError), value);
+    }
+
     // "Delivered — 2h ago" style summary for the library footer (DESIGN.md §11).
     public static string LastRunSummary =>
         string.IsNullOrEmpty(LastRunOutcome) || LastRunAtUtc == DateTime.MinValue

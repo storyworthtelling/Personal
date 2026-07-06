@@ -13,6 +13,10 @@
                 <Label Text="Settings" Style="{StaticResource DisplayLabel}" VerticalOptions="Center" />
             </HorizontalStackLayout>
 
+            <Border x:Name="MigrationErrorCard" IsVisible="False" Style="{StaticResource WarningCard}" Margin="0,8,0,0">
+                <Label x:Name="MigrationErrorLabel" FontSize="{StaticResource SecondarySize}" />
+            </Border>
+
             <Label Text="API keys" Style="{StaticResource TitleLabel}" Margin="0,8,0,0" />
 
             <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" />
@@ -45,6 +49,17 @@
             <Button Text="Copy package + SHA-1"
                     Clicked="OnCopySigningInfoClicked" Style="{StaticResource SecondaryButton}" />
             <Label x:Name="CopyStatusLabel" Style="{StaticResource StatusLine}" />
+
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+
+            <Label Text="Progress backup" Style="{StaticResource TitleLabel}" />
+            <Label Text="Save your whole library — every conversion and rendered page — to a file you choose. If you reinstall the app or move to a new phone, restore the file to pick up a long conversion where you left off."
+                   Style="{StaticResource SecondaryLabel}" />
+            <Button x:Name="BackupButton" Text="Back up progress"
+                    Clicked="OnBackupClicked" Style="{StaticResource SecondaryButton}" />
+            <Button x:Name="RestoreButton" Text="Restore from a backup"
+                    Clicked="OnRestoreClicked" Style="{StaticResource SecondaryButton}" />
+            <Label x:Name="BackupStatusLabel" Style="{StaticResource StatusLine}" />
 
         </VerticalStackLayout>
     </ScrollView>
