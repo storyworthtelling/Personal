@@ -25,25 +25,12 @@ public static class CallLogReader
 
         while (cursor.MoveToNext())
         {
-            var id = cursor.GetString(0)!;
-            var number = cursor.GetString(1) ?? "";
-            var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(cursor.GetLong(2));
-            var type = (CallType)cursor.GetInt(3);
-            var duration = TimeSpan.FromSeconds(cursor.GetLong(4));
-
-            var incoming = type is CallType.Incoming or CallType.Missed or CallType.Rejected;
-            var snippet = type switch
-            {
-                CallType.Missed => "Missed call",
-                CallType.Rejected => "Declined call",
-                CallType.Incoming => $"Incoming call ({duration:mm\\:ss})",
-                _ => $"Outgoing call ({duration:mm\\:ss})",
-            };
-
-            items.Add(new TimelineItem(
-                TimelineItemKind.Call,
-                ContactKeyNormalizer.NormalizePhone(number),
-                timestamp, snippet, incoming, id));
+            items.Add(CallRecordMapper.Map(
+                cursor.GetString(0)!,
+                cursor.GetString(1) ?? "",
+                cursor.GetLong(2),
+                cursor.GetInt(3),
+                cursor.GetLong(4)));
         }
         return items;
     }

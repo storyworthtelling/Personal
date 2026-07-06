@@ -10,8 +10,9 @@ namespace FocusPhone.Launcher;
 /// <summary>
 /// The post-lockdown update path: a periodic worker polls this repo's GitHub
 /// Releases and device-owner-silent-installs newer signed APKs. Every install
-/// session re-whitelists the hard-restricted READ_CALL_LOG permission so the
-/// Communication app keeps call-log access across updates.
+/// session re-whitelists the hard-restricted READ_CALL_LOG and READ_SMS
+/// permissions so the Communication app keeps call-log and text-history
+/// access across updates.
 /// </summary>
 public static class UpdateService
 {
@@ -80,7 +81,7 @@ public static class UpdateService
         var installer = context.PackageManager!.PackageInstaller;
         var sessionParams = new PackageInstaller.SessionParams(PackageInstallMode.FullInstall);
         sessionParams.SetWhitelistedRestrictedPermissions(
-            [Android.Manifest.Permission.ReadCallLog]);
+            [Android.Manifest.Permission.ReadCallLog, Android.Manifest.Permission.ReadSms]);
 
         var sessionId = installer.CreateSession(sessionParams);
         using var session = installer.OpenSession(sessionId);

@@ -68,8 +68,9 @@ public class SettingsActivity : Activity
         layout.AddView(enableMessages, Spaced(DesignTokens.Space.X4, 0));
 
         var note = PaperUi.Secondary(this,
-            "Message sync reads incoming texts from Google Messages notifications. " +
-            "Call history requires the call-log permission, which takes effect after the " +
+            "Message sync reads incoming texts from Google Messages notifications and " +
+            "voicemails (with transcription) from Google Phone notifications. Call and text " +
+            "history require the call-log and SMS permissions, which take effect after the " +
             "device is locked down (or a whitelisted install).");
         layout.AddView(note, Spaced(DesignTokens.Space.X6, 0));
 

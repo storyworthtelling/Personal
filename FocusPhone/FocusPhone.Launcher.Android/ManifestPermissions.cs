@@ -8,3 +8,7 @@ using Android;
 // silent no-op. The suite is sideloaded / device-owner-installed (never on
 // Play), so QUERY_ALL_PACKAGES is unrestricted here.
 [assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]
+
+// RestrictedBrowserActivity hosts the device's only WebView; without INTERNET
+// every page load fails at the network layer with net::ERR_CACHE_MISS.
+[assembly: UsesPermission(Manifest.Permission.Internet)]
