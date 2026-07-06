@@ -53,8 +53,12 @@ public sealed class RateLimitOptions
 public sealed class PageLayoutOptions
 {
     public const string SectionName = "PageLayout";
-    public int Width { get; set; } = 1_024;
-    public int Height { get; set; } = 1_536;
-    public int Margin { get; set; } = 40;
-    public int Gutter { get; set; } = 24;
+    public int Width { get; set; } = Domain.Design.DesignTokens.Comic.PageWidth;
+    public int Height { get; set; } = Domain.Design.DesignTokens.Comic.PageHeight;
+    public int TopMargin { get; set; } = Domain.Design.DesignTokens.Comic.TopMargin;
+    public int SideMargin { get; set; } = Domain.Design.DesignTokens.Comic.SideMargin;
+
+    // Deeper than the sides: contains the folio band (see DESIGN.md §7).
+    public int BottomMargin { get; set; } = Domain.Design.DesignTokens.Comic.BottomMargin;
+    public int Gutter { get; set; } = Domain.Design.DesignTokens.Comic.Gutter;
 }

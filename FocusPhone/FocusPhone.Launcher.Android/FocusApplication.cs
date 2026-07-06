@@ -3,7 +3,7 @@ using Android.Runtime;
 
 namespace FocusPhone.Launcher;
 
-[Application]
+[Application(Icon = "@mipmap/appicon", RoundIcon = "@mipmap/appicon_round")]
 public class FocusApplication : Application
 {
     private PackageWatcher? packageWatcher;

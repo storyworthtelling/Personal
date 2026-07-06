@@ -37,12 +37,14 @@ public class DeliveryWorker : Worker
                 daily.DeliverDailyDocuments(today).GetAwaiter().GetResult();
             }
 
-            CredentialStore.LastDeliveryResult = $"Success — {today:MMM d, yyyy} ({newsStatus})";
+            CredentialStore.LastDeliveryOutcome = $"Delivered ({newsStatus})";
+            CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
             return Result.InvokeSuccess();
         }
         catch (Exception ex)
         {
-            CredentialStore.LastDeliveryResult = $"Failed — {DateTime.Today:MMM d, yyyy}: {ex.Message}";
+            CredentialStore.LastDeliveryOutcome = $"Failed: {ex.Message}";
+            CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
             return Result.InvokeRetry();
         }
     }

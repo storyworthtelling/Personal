@@ -4,21 +4,9 @@
              x:Class="DailyLoader.Android.App">
     <Application.Resources>
         <ResourceDictionary>
-            <Color x:Key="PageBackground">#1a1a1a</Color>
-            <Color x:Key="TextPrimary">#ffffff</Color>
-            <Color x:Key="TextSecondary">#aaaaaa</Color>
-            <Color x:Key="Accent">#e63946</Color>
-            <Style TargetType="Button">
-                <Setter Property="BackgroundColor" Value="{StaticResource Accent}" />
-                <Setter Property="TextColor" Value="White" />
-                <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Padding" Value="16,10" />
-            </Style>
-            <Style TargetType="Entry">
-                <Setter Property="BackgroundColor" Value="#2d2d2d" />
-                <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
-                <Setter Property="PlaceholderColor" Value="{StaticResource TextSecondary}" />
-            </Style>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/DesignTokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

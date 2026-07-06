@@ -8,7 +8,10 @@ using AndroidX.Media3.Common;
 using AndroidX.Media3.Session;
 using MediaController = AndroidX.Media3.Session.MediaController;
 using FocusPhone.Domain.Audio;
+using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
 using FocusPhone.Infrastructure.Podcasts;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Audio;
 
@@ -22,14 +25,14 @@ namespace FocusPhone.Audio;
     Label = "Audio",
     MainLauncher = true,
     Exported = true,
-    Theme = "@android:style/Theme.Material.Light.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper")]
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class AudioActivity : ListActivity
 {
     private const string YtMusicPackage = "com.google.android.apps.youtube.music";
-    private static readonly Color Paper = Color.ParseColor("#FAF8F2");
 
     private PodcastStore? store;
+    private FrameLayout? undoHost;
     private PodcastLibrary library = new([]);
     private IReadOnlyList<Episode> queue = [];
     private MediaController? controller;
@@ -37,32 +40,74 @@ public class AudioActivity : ListActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         store = new PodcastStore(this);
-        ListView!.SetBackgroundColor(Paper);
-        ListView.AddHeaderView(BuildActionRow());
+        SetContentView(BuildLayout());
+        PaperUi.StylePaperList(this, ListView!);
 
-        ListView.ItemClick += (_, e) =>
+        ListView!.ItemClick += (_, e) =>
         {
-            var index = e.Position - 1; // Header occupies position 0.
-            if (index >= 0 && index < queue.Count)
+            if (e.Position >= 0 && e.Position < queue.Count)
             {
-                Play(queue[index]);
+                Play(queue[e.Position]);
             }
         };
 
         ListView.ItemLongClick += (_, e) =>
         {
-            var index = e.Position - 1;
-            if (index >= 0 && index < queue.Count)
+            if (e.Position >= 0 && e.Position < queue.Count)
             {
-                library.MarkListened(queue[index].Id);
-                store.SaveListenedIds(library.ExportListenedIds());
-                RenderQueue();
+                MarkListenedWithUndo(queue[e.Position]);
             }
             e.Handled = true;
         };
 
         ConnectController();
+    }
+
+    // ListActivity binds to the ListView with the platform list id. The action
+    // row is a pinned bottom bar; the undo host overlays the list.
+    private View BuildLayout()
+    {
+        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
+
+        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
+        var header = PaperUi.PageHeader(this, "Audio");
+        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        root.AddView(header);
+
+        undoHost = new FrameLayout(this);
+        var list = new ListView(this) { Id = Android.Resource.Id.List };
+        PaperUi.StylePaperList(this, list);
+        undoHost.AddView(list, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        var empty = PaperUi.EmptyState(this, "Nothing new to hear.");
+        undoHost.AddView(empty, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        list.EmptyView = empty;
+
+        root.AddView(undoHost, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        root.AddView(PaperUi.BottomBar(this,
+            PaperUi.SecondaryButton(this, "Add feed", ShowAddFeedDialog),
+            PaperUi.QuietButton(this, "YT Music", ShowYtMusicSearch)));
+        return root;
+    }
+
+    // Undo-first (DESIGN.md §7): mark immediately, offer the reversal.
+    private void MarkListenedWithUndo(Episode episode)
+    {
+        library.MarkListened(episode.Id);
+        store!.SaveListenedIds(library.ExportListenedIds());
+        RenderQueue();
+        UndoBar.Show(this, undoHost!, "Marked listened.", onUndo: () =>
+        {
+            library.MarkUnlistened(episode.Id);
+            store.SaveListenedIds(library.ExportListenedIds());
+            RenderQueue();
+        });
     }
 
     protected override void OnResume()
@@ -101,7 +146,8 @@ public class AudioActivity : ListActivity
             }
             catch (Exception e) when (e is HttpRequestException or InvalidDataException)
             {
-                Toast.MakeText(this, $"Feed failed: {new Uri(feedUrl).Host} — {e.Message}",
+                // Failure may speak (DESIGN.md §7); worded per the error template.
+                Toast.MakeText(this, $"{new Uri(feedUrl).Host} didn't answer. It retries on the next refresh.",
                     ToastLength.Short)!.Show();
             }
         }
@@ -113,7 +159,12 @@ public class AudioActivity : ListActivity
     private void RenderQueue()
     {
         queue = library.GetDefaultView();
-        ListAdapter = new EpisodeAdapter(this, queue);
+        ListAdapter = new PaperListAdapter(this, queue
+            .Select(episode => new PaperListRow(
+                episode.Title,
+                RelativeTime.Format(episode.PublishedUtc.ToLocalTime(), DateTime.Now) +
+                (episode.Duration is { } d ? $" · {(int)d.TotalMinutes} min" : "")))
+            .ToList());
     }
 
     private void Play(Episode episode)
@@ -132,29 +183,9 @@ public class AudioActivity : ListActivity
         controller.Play();
     }
 
-    private View BuildActionRow()
-    {
-        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        row.SetPadding(16, 24, 16, 24);
-        AddAction(row, "Add feed", ShowAddFeedDialog);
-        AddAction(row, "YT Music", ShowYtMusicSearch);
-        return row;
-    }
-
-    private void AddAction(LinearLayout row, string label, Action onClick)
-    {
-        var button = new Button(this) { Text = label };
-        button.Click += (_, _) => onClick();
-        row.AddView(button, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent)
-        {
-            Weight = 1,
-            MarginEnd = 16,
-        });
-    }
-
     private void ShowAddFeedDialog()
     {
-        var input = new EditText(this) { Hint = "RSS feed URL" };
+        var input = PaperUi.MonoField(this, "RSS feed URL");
         new AlertDialog.Builder(this)
             .SetTitle("Subscribe to podcast")!
             .SetView(input)!
@@ -176,7 +207,7 @@ public class AudioActivity : ListActivity
 
     private void ShowYtMusicSearch()
     {
-        var input = new EditText(this) { Hint = "Search YouTube Music" };
+        var input = PaperUi.Field(this, "Search YouTube Music");
         new AlertDialog.Builder(this)
             .SetTitle("YT Music")!
             .SetView(input)!
@@ -198,33 +229,4 @@ public class AudioActivity : ListActivity
             .Show();
     }
 
-    private class EpisodeAdapter : BaseAdapter
-    {
-        private readonly AudioActivity activity;
-        private readonly IReadOnlyList<Episode> episodes;
-
-        public EpisodeAdapter(AudioActivity activity, IReadOnlyList<Episode> episodes)
-        {
-            this.activity = activity;
-            this.episodes = episodes;
-        }
-
-        public override int Count => episodes.Count;
-
-        public override Java.Lang.Object? GetItem(int position) => null;
-
-        public override long GetItemId(int position) => position;
-
-        public override View GetView(int position, View? convertView, ViewGroup? parent)
-        {
-            var view = convertView ?? activity.LayoutInflater.Inflate(
-                Android.Resource.Layout.SimpleListItem2, parent, false)!;
-            var episode = episodes[position];
-            view.FindViewById<TextView>(Android.Resource.Id.Text1)!.Text = episode.Title;
-            view.FindViewById<TextView>(Android.Resource.Id.Text2)!.Text =
-                $"{episode.PublishedUtc.ToLocalTime():MMM d}" +
-                (episode.Duration is { } d ? $" · {(int)d.TotalMinutes} min" : "");
-            return view;
-        }
-    }
 }

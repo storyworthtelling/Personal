@@ -153,6 +153,15 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.Equal(WorkStatus.Completed, volume.PdfStatus);
         Assert.NotNull(volume.PdfPath);
         Assert.True(File.Exists(volume.PdfPath));
+
+        // Every composed page also gets a pre-scaled library thumbnail.
+        var composedPages = context.Pages.Where(p => p.CompositionStatus == WorkStatus.Completed).ToList();
+        Assert.NotEmpty(composedPages);
+        Assert.All(composedPages, p =>
+        {
+            Assert.NotNull(p.ThumbImagePath);
+            Assert.True(File.Exists(p.ThumbImagePath));
+        });
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(volume.PdfPath!)[..4]));
 
         Assert.True(chapterAnalysisCalls >= 2, "The rate-limited first chapter analysis should have been retried.");

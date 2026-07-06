@@ -17,4 +17,5 @@ public sealed record NovelStatus(
     PhaseProgress Volumes,
     IReadOnlyList<VolumeStatus> VolumeList,
     PhaseProgress Analysis,
-    bool AnalysisReady);
+    bool AnalysisReady,
+    string? CoverThumbPath = null);

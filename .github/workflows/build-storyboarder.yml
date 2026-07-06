@@ -85,6 +85,8 @@ jobs:
           "$AAPT2" dump badging "$APK" 2>/dev/null | grep -Ei 'application(-icon)?:|launchable-activity' || echo "(aapt2 badging produced no icon line)"
           echo "--- packaged icon resources (unzip -l) ---"
           unzip -l "$APK" | grep -Ei 'mipmap|appicon' || echo "(no mipmap/appicon entries found in APK)"
+          echo "--- packaged fonts (unzip -l) ---"
+          echo "fonts packaged: $(unzip -l "$APK" | grep -ci '\.ttf')"
           echo "=== END ICON CHECK ==="
 
       # Keep only the latest run's artifacts: delete artifacts from older runs of

@@ -8,8 +8,8 @@ public partial class App : Application
         MainPage = new NavigationPage(
             IPlatformApplication.Current!.Services.GetRequiredService<Pages.MainPage>())
         {
-            BarBackgroundColor = Color.FromArgb("#1a1a1a"),
-            BarTextColor = Colors.White
+            BarBackgroundColor = (Color)Resources["Paper"],
+            BarTextColor = (Color)Resources["Ink"]
         };
     }
 }

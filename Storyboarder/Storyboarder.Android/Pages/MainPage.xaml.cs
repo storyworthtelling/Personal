@@ -19,8 +19,8 @@ public partial class MainPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        ConfigWarningLabel.IsVisible = !SettingsStore.IsConfigured;
-        LastRunLabel.Text = SettingsStore.LastRunResult;
+        ConfigWarningCard.IsVisible = !SettingsStore.IsConfigured;
+        LastRunLabel.Text = SettingsStore.LastRunSummary;
 
         _ = RefreshAsync();
 
@@ -49,13 +49,25 @@ public partial class MainPage : ContentPage
             }
 
             statuses.Clear();
-            rows.Clear();
             foreach (var status in list)
-            {
                 statuses[status.Id] = status;
-                rows.Add(ProjectRow.From(status));
+
+            // Diff-update so the 5-second refresh never flickers thumbnails.
+            var updated = list.Select(ProjectRow.From).ToList();
+            for (var i = rows.Count - 1; i >= 0; i--)
+            {
+                if (updated.All(row => row.Id != rows[i].Id))
+                    rows.RemoveAt(i);
             }
-            LastRunLabel.Text = SettingsStore.LastRunResult;
+            for (var i = 0; i < updated.Count; i++)
+            {
+                var existing = rows.FirstOrDefault(row => row.Id == updated[i].Id);
+                if (existing is null)
+                    rows.Insert(Math.Min(i, rows.Count), updated[i]);
+                else if (!existing.SameAs(updated[i]))
+                    rows[rows.IndexOf(existing)] = updated[i];
+            }
+            LastRunLabel.Text = SettingsStore.LastRunSummary;
         }
         catch
         {
@@ -90,7 +102,7 @@ public partial class MainPage : ContentPage
 
         if (options.Count == 0)
         {
-            await DisplayAlert(row.Title, "No finished PDFs yet.", "OK");
+            // Nothing to open yet; the card's chips already say why.
             return;
         }
 
@@ -130,16 +142,59 @@ public partial class MainPage : ContentPage
         await Navigation.PushAsync(
             IPlatformApplication.Current!.Services.GetRequiredService<SetupPage>());
 
+    // One phase chip on a project card. Public so the XAML binding can read it.
+    public sealed record PhaseChipRow(string Text, bool IsActive);
+
     // Display projection of a NovelStatus for the list. Public so the XAML binding can read it.
-    public sealed record ProjectRow(Guid Id, string Title, string Summary, string? Error, bool HasError)
+    public sealed record ProjectRow(
+        Guid Id, string Title, string Summary, string? Error, bool HasError,
+        string? CoverThumb, bool HasCover, IReadOnlyList<PhaseChipRow> Phases)
     {
+        // Record equality is referential for the Phases list; compare content
+        // so the diff-refresh can skip rows that haven't changed.
+        public bool SameAs(ProjectRow other) =>
+            Id == other.Id && Title == other.Title && Summary == other.Summary &&
+            Error == other.Error && CoverThumb == other.CoverThumb &&
+            Phases.SequenceEqual(other.Phases);
+
         public static ProjectRow From(NovelStatus s)
         {
-            var summary =
-                $"{s.Stage} · panels {s.Panels.Done}/{s.Panels.Total} · " +
-                $"pages {s.Pages.Done}/{s.Pages.Total} · volumes {s.Volumes.Done}/{s.Volumes.Total} · " +
-                $"analysis {s.Analysis.Done}/{s.Analysis.Total}";
-            return new ProjectRow(s.Id, s.Title, summary, s.LastError, !string.IsNullOrEmpty(s.LastError));
+            // Loading is words (DESIGN.md §5): one readable sentence for the
+            // active stage, with the phase chips carrying the numbers.
+            var summary = s.Stage switch
+            {
+                "Created" or "Ingesting" => "Reading the manuscript…",
+                "BuildingDesignBible" => Sentence("Building the design bible", "chunks", s.Chunks),
+                "Storyboarding" => "Storyboarding the book…",
+                "RenderingImages" => Sentence("Painting panels", "panels", s.Panels),
+                "ComposingPages" => Sentence("Composing pages", "pages", s.Pages),
+                "AssemblingVolumes" => Sentence("Binding volumes", "volumes", s.Volumes),
+                "ComposingAnalysis" => "Writing the revision report…",
+                "Completed" => "Finished.",
+                "Failed" => "Stopped.",
+                _ => s.Stage,
+            };
+
+            var chips = new List<PhaseChipRow>();
+            AddChip(chips, "panels", s.Panels, s.Stage == "RenderingImages");
+            AddChip(chips, "pages", s.Pages, s.Stage == "ComposingPages");
+            AddChip(chips, "volumes", s.Volumes, s.Stage == "AssemblingVolumes");
+            AddChip(chips, "analysis", s.Analysis, s.Stage == "ComposingAnalysis");
+
+            return new ProjectRow(
+                s.Id, s.Title, summary, s.LastError, !string.IsNullOrEmpty(s.LastError),
+                s.CoverThumbPath, !string.IsNullOrEmpty(s.CoverThumbPath), chips);
+        }
+
+        private static string Sentence(string verb, string noun, PhaseProgress phase) =>
+            phase.Total > 0 ? $"{verb} — {noun} {phase.Done} of {phase.Total}…" : $"{verb}…";
+
+        private static void AddChip(List<PhaseChipRow> chips, string name, PhaseProgress phase, bool active)
+        {
+            if (phase.Total > 0)
+            {
+                chips.Add(new PhaseChipRow($"{name} {phase.Done} of {phase.Total}", active));
+            }
         }
     }
 }

@@ -10,10 +10,15 @@ public interface IImageStore
     bool Exists(string absolutePath);
 }
 
-// Composites a page's panel images into a single page raster, typesetting dialogue/captions.
+// The page furniture outside the panels: the folio band's page number and
+// running volume title (e.g. "My Novel · Volume 2").
+public sealed record PageChrome(int PageNumber, string VolumeTitle);
+
+// Composites a page's panel images into a single page raster, typesetting dialogue/captions
+// and drawing the folio band.
 public interface IPageComposer
 {
-    byte[] Compose(IReadOnlyList<PanelArt> panels);
+    byte[] Compose(IReadOnlyList<PanelArt> panels, PageChrome chrome);
 }
 
 // Assembles ordered page images into a single volume PDF.

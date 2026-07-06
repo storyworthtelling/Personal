@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Grained-paper window background (DESIGN.md §6): a thin veneer over MAUI's
+     own themes so pages can be transparent and show the grain. Revert path if
+     pages ever flash: point MainActivity back at Maui.SplashTheme and restore
+     the ContentPage BackgroundColor in DesignTokens.xaml. -->
+<resources>
+    <style name="PaperMainTheme" parent="Maui.MainTheme">
+        <item name="android:windowBackground">@drawable/paper_background</item>
+    </style>
+    <style name="PaperSplashTheme" parent="Maui.SplashTheme">
+        <item name="postSplashScreenTheme">@style/PaperMainTheme</item>
+    </style>
+</resources>

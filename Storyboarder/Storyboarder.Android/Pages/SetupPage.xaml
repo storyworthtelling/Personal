@@ -2,44 +2,59 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Storyboarder.Android.Pages.SetupPage"
-             Title="Settings"
-             BackgroundColor="{StaticResource PageBackground}">
-    <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="14">
+             Title="Settings">
+    <Grid RowDefinitions="*,Auto">
+    <ScrollView Grid.Row="0">
+        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="14">
 
-            <Label Text="Claude (Anthropic) API key"
-                   FontSize="13" FontAttributes="Bold"
-                   TextColor="{StaticResource TextSecondary}" />
+            <HorizontalStackLayout Spacing="12">
+                <Image Source="owner_medallion.png" WidthRequest="48" HeightRequest="48"
+                       VerticalOptions="Center" />
+                <Label Text="Settings" Style="{StaticResource DisplayLabel}" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Label Text="API keys" Style="{StaticResource TitleLabel}" Margin="0,8,0,0" />
+
+            <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" />
+            <Entry x:Name="ClaudeKeyEntry" Placeholder="sk-ant-..."
+                   Style="{StaticResource MonoEntry}" />
             <Label Text="Builds the design bible and storyboards the book. From console.anthropic.com."
-                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
-            <Entry x:Name="ClaudeKeyEntry" Placeholder="sk-ant-..." />
+                   Style="{StaticResource SecondaryLabel}" />
 
-            <Label Text="Gemini API key"
-                   FontSize="13" FontAttributes="Bold"
-                   TextColor="{StaticResource TextSecondary}" Margin="0,8,0,0" />
+            <Label Text="Gemini API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+            <Entry x:Name="GeminiKeyEntry" Placeholder="AIza..."
+                   Style="{StaticResource MonoEntry}" />
             <Label Text="Renders the panel images. From aistudio.google.com."
-                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
-            <Entry x:Name="GeminiKeyEntry" Placeholder="AIza..." />
+                   Style="{StaticResource SecondaryLabel}" />
 
-            <Label Text="Google account"
-                   FontSize="13" FontAttributes="Bold"
-                   TextColor="{StaticResource TextSecondary}" Margin="0,16,0,0" />
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+
+            <Label Text="Google account" Style="{StaticResource TitleLabel}" />
             <Label Text="Sign in with the Google account on this phone to pick a Doc to convert. Grant the documents and Drive read permissions when prompted."
-                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+                   Style="{StaticResource SecondaryLabel}" />
             <Button Text="Sign in with Google"
-                    Clicked="OnGoogleSignInClicked" BackgroundColor="#333333" />
-            <Label x:Name="GoogleStatusLabel"
-                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+                    Clicked="OnGoogleSignInClicked" Style="{StaticResource SecondaryButton}" />
+            <Label x:Name="GoogleStatusLabel" Style="{StaticResource SecondaryLabel}" />
 
-            <Label Text="One-time setup in Google Cloud Console: create an Android OAuth client with the package and SHA-1 below, enable the Google Docs &amp; Drive APIs, and add your account as a test user."
-                   FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,8,0,0" />
-            <Label x:Name="SigningInfoLabel"
-                   FontSize="12" TextColor="{StaticResource TextSecondary}" />
+            <Border Style="{StaticResource WarningCard}" Margin="0,8,0,0">
+                <Label Text="One-time setup in Google Cloud Console: create an Android OAuth client with the package and SHA-1 below, enable the Google Docs &amp; Drive APIs, and add your account as a test user."
+                       FontSize="{StaticResource SecondarySize}" />
+            </Border>
+            <Label x:Name="SigningInfoLabel" Style="{StaticResource MonoLabel}"
+                   FontSize="{StaticResource LabelSize}" />
             <Button Text="Copy package + SHA-1"
-                    Clicked="OnCopySigningInfoClicked" BackgroundColor="#333333" />
-
-            <Button Text="Save settings" Clicked="OnSaveClicked" Margin="0,16,0,0" />
+                    Clicked="OnCopySigningInfoClicked" Style="{StaticResource SecondaryButton}" />
+            <Label x:Name="CopyStatusLabel" Style="{StaticResource StatusLine}" />
 
         </VerticalStackLayout>
     </ScrollView>
+
+    <!-- Pinned bottom bar (DESIGN.md §7). -->
+    <VerticalStackLayout Grid.Row="1">
+        <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+        <Grid Padding="24,12">
+            <Button Text="Save settings" Clicked="OnSaveClicked" />
+        </Grid>
+    </VerticalStackLayout>
+    </Grid>
 </ContentPage>

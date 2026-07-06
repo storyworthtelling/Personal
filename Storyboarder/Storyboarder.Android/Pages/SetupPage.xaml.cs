@@ -39,7 +39,8 @@ public partial class SetupPage : ContentPage
         {
             var email = await DeviceAccountSignIn.SignIn(activity);
             UpdateGoogleStatus();
-            await DisplayAlert("Google", $"Signed in as {email}.", "OK");
+            // The status line below the button is the state change.
+            GoogleStatusLabel.Text = $"Signed in as {email}.";
         }
         catch (Exception ex) when (ex.ToString().Contains("UnregisteredOnApiConsole", StringComparison.OrdinalIgnoreCase))
         {
@@ -63,14 +64,15 @@ public partial class SetupPage : ContentPage
     private async void OnCopySigningInfoClicked(object sender, EventArgs e)
     {
         await Clipboard.SetTextAsync(SigningInfoText());
-        await DisplayAlert("Copied", "Package name and SHA-1 copied to the clipboard.", "OK");
+        CopyStatusLabel.Text = "Copied.";
     }
 
     private async void OnSaveClicked(object sender, EventArgs e)
     {
         SettingsStore.ClaudeApiKey = ClaudeKeyEntry.Text?.Trim() ?? string.Empty;
         SettingsStore.GeminiApiKey = GeminiKeyEntry.Text?.Trim() ?? string.Empty;
-        await DisplayAlert("Saved", "Settings saved.", "OK");
+        // Success is the state change: saving returns to the library.
+        await Navigation.PopAsync();
         await Navigation.PopAsync();
     }
 }

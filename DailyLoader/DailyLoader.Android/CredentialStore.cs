@@ -42,11 +42,23 @@ public static class CredentialStore
         set => Preferences.Set(nameof(CalendarMappingJson), value);
     }
 
-    public static string LastDeliveryResult
+    public static string LastDeliveryOutcome
     {
-        get => Preferences.Get(nameof(LastDeliveryResult), "Never delivered");
-        set => Preferences.Set(nameof(LastDeliveryResult), value);
+        get => Preferences.Get(nameof(LastDeliveryOutcome), string.Empty);
+        set => Preferences.Set(nameof(LastDeliveryOutcome), value);
     }
+
+    public static DateTime LastDeliveryAtUtc
+    {
+        get => Preferences.Get(nameof(LastDeliveryAtUtc), DateTime.MinValue);
+        set => Preferences.Set(nameof(LastDeliveryAtUtc), value);
+    }
+
+    // "Delivered — 2h ago" style summary for the home screen (DESIGN.md §11).
+    public static string LastDeliverySummary =>
+        string.IsNullOrEmpty(LastDeliveryOutcome) || LastDeliveryAtUtc == DateTime.MinValue
+            ? "Never delivered"
+            : $"{LastDeliveryOutcome} — {DailyLoader.Domain.Time.RelativeTime.Format(LastDeliveryAtUtc.ToLocalTime(), DateTime.Now)}";
 
     public static bool IsConfigured =>
         !string.IsNullOrEmpty(NytSessionCookie) &&

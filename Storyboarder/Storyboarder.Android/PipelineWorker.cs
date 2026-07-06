@@ -44,12 +44,14 @@ public class PipelineWorker : Worker
             var outcome = runner.RunUntilExhaustedAsync(budget, CancellationToken.None)
                 .GetAwaiter().GetResult();
 
-            SettingsStore.LastRunResult = $"{outcome} — {DateTime.Now:MMM d, HH:mm}";
+            SettingsStore.LastRunOutcome = outcome;
+            SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return outcome == RunResult.Completed ? Result.InvokeSuccess() : Result.InvokeRetry();
         }
         catch (Exception ex)
         {
-            SettingsStore.LastRunResult = $"Failed — {DateTime.Now:MMM d, HH:mm}: {ex.Message}";
+            SettingsStore.LastRunOutcome = $"Failed: {ex.Message}";
+            SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return Result.InvokeRetry();
         }
     }

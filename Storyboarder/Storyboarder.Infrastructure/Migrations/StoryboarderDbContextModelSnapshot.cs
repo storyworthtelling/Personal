@@ -248,6 +248,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("PageNumber")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ThumbImagePath")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("VolumeId")
                         .HasColumnType("TEXT");
 

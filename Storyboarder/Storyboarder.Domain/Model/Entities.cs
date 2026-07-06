@@ -129,6 +129,10 @@ public class Page
     public int PageNumber { get; set; }
     public WorkStatus CompositionStatus { get; set; } = WorkStatus.Pending;
     public string? ComposedImagePath { get; set; }
+
+    // A ~256px-wide downscale of the composed page, pre-generated so the
+    // library list never decodes full pages on its refresh timer.
+    public string? ThumbImagePath { get; set; }
     public int Attempts { get; set; }
     public string? LastError { get; set; }
     public List<Panel> Panels { get; set; } = [];

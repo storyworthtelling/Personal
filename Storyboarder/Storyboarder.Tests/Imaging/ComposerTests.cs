@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using PdfSharp.Pdf.IO;
 using SkiaSharp;
 using Storyboarder.Domain.Analysis;
+using Storyboarder.Domain.Design;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.Imaging;
@@ -48,20 +49,47 @@ public class FileSystemImageStoreTests : IDisposable
 
 public class SkiaPageComposerTests
 {
+    private static readonly PageChrome Chrome = new(PageNumber: 7, VolumeTitle: "My Novel · Volume 2");
+
     private static SkiaPageComposer Composer() =>
-        new(Options.Create(new PageLayoutOptions { Width = 1024, Height = 1536, Margin = 40, Gutter = 24 }));
+        new(Options.Create(new PageLayoutOptions()));
+
+    private static SKColor Token(string hex) => SKColor.Parse(hex);
+
+    // Grained paper: within GrainTolerance of Paper per channel (alpha-6 ink
+    // noise shifts channels by at most ~5). Real ink differs by far more.
+    internal const int GrainTolerance = 8;
+    internal const int StrongInkDelta = 24;
+
+    internal static void AssertNearPaper(SKColor pixel)
+    {
+        var paper = SKColor.Parse(DesignTokens.Paper);
+        Assert.True(
+            Math.Abs(pixel.Red - paper.Red) <= GrainTolerance &&
+            Math.Abs(pixel.Green - paper.Green) <= GrainTolerance &&
+            Math.Abs(pixel.Blue - paper.Blue) <= GrainTolerance,
+            $"expected near-paper, got {pixel}");
+    }
+
+    internal static bool IsStrongInk(SKColor pixel)
+    {
+        var paper = SKColor.Parse(DesignTokens.Paper);
+        return Math.Abs(pixel.Red - paper.Red) > StrongInkDelta ||
+               Math.Abs(pixel.Green - paper.Green) > StrongInkDelta ||
+               Math.Abs(pixel.Blue - paper.Blue) > StrongInkDelta;
+    }
 
     [Fact]
     public void Compose_ProducesPngOfConfiguredSize()
     {
         var panels = new List<PanelArt> { new(SampleImages.Png(), null, null) };
 
-        var bytes = Composer().Compose(panels);
+        var bytes = Composer().Compose(panels, Chrome);
 
         using var decoded = SKBitmap.Decode(bytes);
         Assert.NotNull(decoded);
-        Assert.Equal(1024, decoded!.Width);
-        Assert.Equal(1536, decoded.Height);
+        Assert.Equal(DesignTokens.Comic.PageWidth, decoded!.Width);
+        Assert.Equal(DesignTokens.Comic.PageHeight, decoded.Height);
     }
 
     [Fact]
@@ -73,17 +101,131 @@ public class SkiaPageComposerTests
                 Caption: $"Meanwhile, in location {i}..."))
             .ToList();
 
-        var bytes = Composer().Compose(panels);
+        var bytes = Composer().Compose(panels, Chrome);
 
         Assert.NotEmpty(bytes);
         using var decoded = SKBitmap.Decode(bytes);
-        Assert.Equal(1024, decoded!.Width);
+        Assert.Equal(DesignTokens.Comic.PageWidth, decoded!.Width);
+    }
+
+    [Fact]
+    public void Compose_PageBackgroundIsGrainedPaper()
+    {
+        var bytes = Composer().Compose([new PanelArt(SampleImages.Png(), null, null)], Chrome);
+
+        using var decoded = SKBitmap.Decode(bytes)!;
+        // The corner is outside every panel and outside the folio band.
+        AssertNearPaper(decoded.GetPixel(5, 5));
+    }
+
+    [Fact]
+    public void Compose_IsDeterministic_GrainIncluded()
+    {
+        var panels = new List<PanelArt> { new(SampleImages.Png(), "Hello.", null) };
+        Assert.Equal(Composer().Compose(panels, Chrome), Composer().Compose(panels, Chrome));
+    }
+
+    [Fact]
+    public void Compose_GrainIsSubtle()
+    {
+        var bytes = Composer().Compose([new PanelArt(SampleImages.Png(), null, null)], Chrome);
+        using var decoded = SKBitmap.Decode(bytes)!;
+        // An empty margin strip: every pixel stays within the grain tolerance.
+        for (var x = 0; x < 40; x++)
+        {
+            for (var y = 0; y < 40; y++)
+            {
+                AssertNearPaper(decoded.GetPixel(x, y));
+            }
+        }
+    }
+
+    [Fact]
+    public void Compose_PanelBorderIsInk()
+    {
+        var bytes = Composer().Compose([new PanelArt(SampleImages.Png(), null, null)], Chrome);
+
+        using var decoded = SKBitmap.Decode(bytes)!;
+        // A single panel's top edge runs along y = TopMargin; sample the middle
+        // of the stroke (drawn without antialiasing, so the color is exact).
+        var border = decoded.GetPixel(
+            DesignTokens.Comic.PageWidth / 2, DesignTokens.Comic.TopMargin);
+        Assert.Equal(Token(DesignTokens.Ink), border);
+    }
+
+    [Fact]
+    public void Compose_FolioBand_CarriesPageNumberAndTitleInk()
+    {
+        var withChrome = Composer().Compose([new PanelArt(SampleImages.Png(), null, null)], Chrome);
+
+        using var decoded = SKBitmap.Decode(withChrome)!;
+        // The folio band (bottom margin) must contain strong ink — the
+        // running title and the page number — not just grain noise.
+        var bandTop = DesignTokens.Comic.PageHeight - DesignTokens.Comic.FolioBand;
+        var inked = 0;
+        for (var x = 0; x < decoded.Width; x += 2)
+        {
+            for (var y = bandTop; y < decoded.Height; y += 2)
+            {
+                if (IsStrongInk(decoded.GetPixel(x, y)))
+                {
+                    inked++;
+                }
+            }
+        }
+        Assert.True(inked > 20, $"expected folio text pixels in the bottom band, found {inked}");
+    }
+
+    [Fact]
+    public void Compose_CaptionBoxIsDeepPaper_NotYellow()
+    {
+        var caption = string.Join(" ", Enumerable.Repeat("caption", 12));
+        var bytes = Composer().Compose([new PanelArt(SampleImages.Png(), null, caption)], Chrome);
+
+        using var decoded = SKBitmap.Decode(bytes)!;
+        // The caption box hugs the panel bottom; its fill (away from text and
+        // stroke) must be PaperDeep. Sample a horizontal run just above the
+        // panel's bottom edge, inside the box, and require PaperDeep presence.
+        var panelBottom = DesignTokens.Comic.PageHeight - DesignTokens.Comic.BottomMargin;
+        var probeY = panelBottom - (int)DesignTokens.Comic.BoxPadding - 6;
+        var deep = Token(DesignTokens.PaperDeep);
+        var found = false;
+        for (var x = DesignTokens.Comic.SideMargin + 20; x < DesignTokens.Comic.PageWidth - DesignTokens.Comic.SideMargin - 20; x += 3)
+        {
+            if (decoded.GetPixel(x, probeY) == deep)
+            {
+                found = true;
+                break;
+            }
+        }
+        Assert.True(found, "expected a PaperDeep caption box hugging the panel bottom");
+    }
+
+    [Fact]
+    public void Compose_DialogueBalloonIsBrightPaper()
+    {
+        var dialogue = string.Join(" ", Enumerable.Repeat("words", 12));
+        var bytes = Composer().Compose([new PanelArt(SampleImages.Png(color: SKColors.CornflowerBlue), dialogue, null)], Chrome);
+
+        using var decoded = SKBitmap.Decode(bytes)!;
+        var probeY = DesignTokens.Comic.TopMargin + (int)DesignTokens.Comic.BoxPadding + 12;
+        var bright = Token(DesignTokens.PaperBright);
+        var found = false;
+        for (var x = DesignTokens.Comic.SideMargin + 20; x < DesignTokens.Comic.PageWidth - DesignTokens.Comic.SideMargin - 20; x += 3)
+        {
+            if (decoded.GetPixel(x, probeY) == bright)
+            {
+                found = true;
+                break;
+            }
+        }
+        Assert.True(found, "expected a PaperBright dialogue balloon at the panel top");
     }
 
     [Fact]
     public void Compose_NoPanels_Throws()
     {
-        Assert.Throws<ArgumentException>(() => Composer().Compose([]));
+        Assert.Throws<ArgumentException>(() => Composer().Compose([], Chrome));
     }
 }
 
@@ -184,7 +326,99 @@ public class AnalysisPdfComposerTests
         {
             using var bitmap = SKBitmap.Decode(page);
             Assert.NotNull(bitmap);
-            Assert.Equal(1240, bitmap!.Width);
+            Assert.Equal(DesignTokens.Pdf.PageWidth, bitmap!.Width);
+            Assert.Equal(DesignTokens.Pdf.PageHeight, bitmap.Height);
+        }
+    }
+
+    [Fact]
+    public void Renderer_PageBackgroundIsGrainedPaper()
+    {
+        var pages = new AnalysisDocumentRenderer().Render(Sample(1), "My Novel");
+
+        using var bitmap = SKBitmap.Decode(pages[0])!;
+        SkiaPageComposerTests.AssertNearPaper(bitmap.GetPixel(5, 5));
+    }
+
+    [Fact]
+    public void Renderer_FirstPage_HasTerracottaHeadingRule()
+    {
+        var pages = new AnalysisDocumentRenderer().Render(Sample(1), "My Novel");
+
+        using var bitmap = SKBitmap.Decode(pages[0])!;
+        var accent = SKColor.Parse(DesignTokens.Accent);
+        var found = false;
+        for (var y = 0; y < bitmap.Height && !found; y++)
+        {
+            if (bitmap.GetPixel(DesignTokens.Pdf.PageWidth / 4, y) == accent)
+            {
+                found = true;
+            }
+        }
+        Assert.True(found, "expected a terracotta rule under the title heading");
+    }
+
+    [Fact]
+    public void Renderer_FrontMatter_CoverAndTocPrecedeContent()
+    {
+        var result = new AnalysisDocumentRenderer().RenderReport(Sample(1), "My Novel");
+
+        Assert.True(result.FrontMatterCount >= 2, "expected a cover and at least one TOC page");
+        Assert.Equal(result.Pages.Count - result.FrontMatterCount,
+            result.Pages.Count - result.FrontMatterCount);
+        Assert.NotEmpty(result.TocEntries);
+        // Every H2 section lands in the TOC with a plausible 1-based content page.
+        Assert.Contains(result.TocEntries, e => e.Title == "Logline");
+        Assert.All(result.TocEntries, e =>
+            Assert.InRange(e.Page, 1, result.Pages.Count - result.FrontMatterCount));
+        // Entries are in reading order.
+        var pagesInOrder = result.TocEntries.Select(e => e.Page).ToList();
+        Assert.Equal(pagesInOrder.OrderBy(p => p), pagesInOrder);
+    }
+
+    [Fact]
+    public void Renderer_TocPageListsTheSections()
+    {
+        var result = new AnalysisDocumentRenderer().RenderReport(Sample(1), "My Novel");
+
+        using var toc = SKBitmap.Decode(result.Pages[1])!; // page 0 = cover, page 1 = contents
+        var inked = 0;
+        for (var x = 0; x < toc.Width; x += 3)
+        {
+            for (var y = 0; y < toc.Height; y += 3)
+            {
+                if (SkiaPageComposerTests.IsStrongInk(toc.GetPixel(x, y)))
+                {
+                    inked++;
+                }
+            }
+        }
+        Assert.True(inked > 200, $"expected a populated contents page, found {inked} ink pixels");
+    }
+
+    [Fact]
+    public void Renderer_EveryPage_HasFooterInk()
+    {
+        var result = new AnalysisDocumentRenderer().RenderReport(Sample(4), "My Novel");
+        var pages = result.Pages.Skip(result.FrontMatterCount).ToList(); // front matter is unnumbered
+        Assert.True(pages.Count > 1);
+
+        foreach (var page in pages)
+        {
+            using var bitmap = SKBitmap.Decode(page)!;
+            var footerTop = DesignTokens.Pdf.PageHeight - (int)DesignTokens.Pdf.BottomMargin;
+            var inked = 0;
+            for (var x = 0; x < bitmap.Width; x += 2)
+            {
+                for (var y = footerTop; y < bitmap.Height; y += 2)
+                {
+                    if (SkiaPageComposerTests.IsStrongInk(bitmap.GetPixel(x, y)))
+                    {
+                        inked++;
+                    }
+                }
+            }
+            Assert.True(inked > 20, $"expected footer text (running title + page number), found {inked} inked pixels");
         }
     }
 }

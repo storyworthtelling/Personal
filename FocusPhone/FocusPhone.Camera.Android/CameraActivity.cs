@@ -13,6 +13,9 @@ using Google.MLKit.Vision.Documentscanner;
 using Xamarin.Google.MLKit.Vision.BarCode;
 using Xamarin.Google.MLKit.Vision.Barcode.Common;
 using Xamarin.Google.MLKit.Vision.Common;
+using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Camera;
 
@@ -26,19 +29,20 @@ namespace FocusPhone.Camera;
     Label = "Camera",
     MainLauncher = true,
     Exported = true,
-    Theme = "@style/Theme.AppCompat.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper.AppCompat")]
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class CameraActivity : AppCompatActivity
 {
     private const int DocumentScanRequest = 1;
-    private static readonly Color Paper = Color.ParseColor("#FAF8F2");
 
     private PreviewView? previewView;
     private ImageCapture? imageCapture;
+    private TextView? statusLine;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         SetContentView(BuildLayout());
 
         if (CheckSelfPermission(Android.Manifest.Permission.Camera) == Android.Content.PM.Permission.Granted)
@@ -64,31 +68,30 @@ public class CameraActivity : AppCompatActivity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetBackgroundColor(Paper);
 
         previewView = new PreviewView(this);
         root.AddView(previewView, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        var actions = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        actions.SetPadding(16, 16, 16, 16);
-        AddAction(actions, "Capture", TakePhoto);
-        AddAction(actions, "Scan doc", StartDocumentScan);
-        AddAction(actions, "Scan QR", StartQrScan);
-        AddAction(actions, "Photos", OpenGooglePhotos);
-        root.AddView(actions);
+        // Quiet inline status replaces success toasts (DESIGN.md §7).
+        statusLine = PaperUi.Secondary(this, "");
+        statusLine.Gravity = GravityFlags.CenterHorizontal;
+        statusLine.Visibility = ViewStates.Gone;
+        root.AddView(statusLine, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        root.AddView(PaperUi.BottomBar(this,
+            PaperUi.PrimaryButton(this, "Capture", TakePhoto),
+            PaperUi.SecondaryButton(this, "Scan doc", StartDocumentScan),
+            PaperUi.SecondaryButton(this, "Scan QR", StartQrScan),
+            PaperUi.SecondaryButton(this, "Photos", OpenGooglePhotos)));
         return root;
     }
 
-    private void AddAction(LinearLayout row, string label, Action onClick)
+    private void ShowStatus(string message)
     {
-        var button = new Button(this) { Text = label };
-        button.Click += (_, _) => onClick();
-        row.AddView(button, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent)
-        {
-            Weight = 1,
-            MarginEnd = 8,
-        });
+        statusLine!.Text = message;
+        statusLine.Visibility = ViewStates.Visible;
     }
 
     private void StartCamera()
@@ -173,7 +176,7 @@ public class CameraActivity : AppCompatActivity
         }
 
         public void OnImageSaved(ImageCapture.OutputFileResults? results) =>
-            Toast.MakeText(activity, "Saved.", ToastLength.Short)!.Show();
+            activity.RunOnUiThread(() => activity.ShowStatus($"Photo saved · {TimeFormats.Clock12(DateTime.Now)}"));
 
         public void OnError(ImageCaptureException? exception) =>
             Toast.MakeText(activity, $"Capture failed: {exception?.Message}", ToastLength.Long)!.Show();
@@ -314,6 +317,6 @@ public class CameraActivity : AppCompatActivity
         using var input = ContentResolver.OpenInputStream(pdf.Uri)!;
         using var output = ContentResolver.OpenOutputStream(target)!;
         input.CopyTo(output);
-        Toast.MakeText(this, "Scan saved to Downloads.", ToastLength.Short)!.Show();
+        ShowStatus($"Scan saved to Downloads · {TimeFormats.Clock12(DateTime.Now)}");
     }
 }

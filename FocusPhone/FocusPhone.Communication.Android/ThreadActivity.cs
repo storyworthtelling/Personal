@@ -3,7 +3,10 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
 using FocusPhone.Domain.Timeline;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Communication;
 
@@ -15,7 +18,7 @@ namespace FocusPhone.Communication;
 [Activity(
     Label = "Thread",
     Exported = false,
-    Theme = "@android:style/Theme.Material.Light.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper")]
 public class ThreadActivity : ListActivity
 {
     public const string ExtraContactKey = "contactKey";
@@ -25,10 +28,11 @@ public class ThreadActivity : ListActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         contactKey = Intent?.GetStringExtra(ExtraContactKey) ?? "";
         Title = ContactNameResolver.DisplayName(this, contactKey);
-        ListView!.SetBackgroundColor(ThreadsActivity.Paper);
-        ListView.AddFooterView(BuildActionRow());
+        PaperUi.StylePaperList(this, ListView!);
+        ListView!.AddFooterView(BuildActionRow());
         LoadItems();
     }
 
@@ -61,16 +65,19 @@ public class ThreadActivity : ListActivity
 
         var thread = new TimelineMerger().Merge(items)
             .FirstOrDefault(t => t.ContactKey == contactKey);
-        var lines = (thread?.Items ?? [])
-            .Select(item => $"{(item.Incoming ? "←" : "→")} {item.TimestampUtc.ToLocalTime():MMM d HH:mm}  {TimelineItemFormatter.Describe(item)}")
-            .ToList();
-        ListAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleListItem1, lines);
+        ListAdapter = new PaperListAdapter(this, (thread?.Items ?? [])
+            .Select(item => new PaperListRow(
+                TimelineItemFormatter.Describe(item),
+                $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.ToLocalTime(), DateTime.Now)}"))
+            .ToList());
     }
 
     private View BuildActionRow()
     {
         var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        row.SetPadding(16, 24, 16, 24);
+        var horizontal = PaperTheme.Dp(this, DesignTokens.Space.X3);
+        var vertical = PaperTheme.Dp(this, DesignTokens.Space.X4);
+        row.SetPadding(horizontal, vertical, horizontal, vertical);
 
         var isPhone = contactKey.All(char.IsAsciiDigit);
         var isEmail = contactKey.Contains('@');
@@ -92,12 +99,11 @@ public class ThreadActivity : ListActivity
 
     private void AddAction(LinearLayout row, string label, Action onClick)
     {
-        var button = new Button(this) { Text = label };
-        button.Click += (_, _) => onClick();
+        var button = PaperUi.SecondaryButton(this, label, onClick);
         var layoutParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent)
         {
             Weight = 1,
-            MarginEnd = 16,
+            MarginEnd = PaperTheme.Dp(this, DesignTokens.Space.X3),
         };
         row.AddView(button, layoutParams);
     }

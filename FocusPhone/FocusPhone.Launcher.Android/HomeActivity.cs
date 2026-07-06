@@ -3,6 +3,9 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Launcher;
 
@@ -17,13 +20,13 @@ namespace FocusPhone.Launcher;
     Exported = true,
     LaunchMode = Android.Content.PM.LaunchMode.SingleTask,
     StateNotNeeded = true,
-    Theme = "@android:style/Theme.Material.Light.NoActionBar")]
+    Theme = "@style/Theme.FocusPhone.Paper")]
 [IntentFilter(
     [Intent.ActionMain],
     Categories = [Intent.CategoryHome, Intent.CategoryDefault])]
 public class HomeActivity : Activity
 {
-    private TextView? timeView;
+    private PaperClockView? clockView;
     private TextView? dateView;
     private Button? setDefaultLauncherButton;
     private readonly Dictionary<Tile, ImageView> tileViews = [];
@@ -34,6 +37,7 @@ public class HomeActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         SetContentView(BuildLayout());
         gestureDetector = new GestureDetector(this, new SwipeUpListener(OpenAppTray));
         PolicyManager.ApplyCurrentPolicy(this);
@@ -71,41 +75,59 @@ public class HomeActivity : Activity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetBackgroundColor(Palette.Paper);
-        root.SetPadding(48, 160, 48, 96);
+        root.SetPadding(
+            PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X16),
+            PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X8));
 
-        timeView = new TextView(this) { TextSize = 64 };
-        timeView.SetTextColor(Palette.Ink);
-        timeView.Gravity = GravityFlags.CenterHorizontal;
-        timeView.LongClick += (_, _) => StartActivity(new Intent(this, typeof(UnlockActivity)));
-        root.AddView(timeView, MatchWrap());
+        // The drawn analog face (DESIGN.md §11): no digital time on the home
+        // screen. Long-pressing the clock opens admin — its hub dot is the
+        // only mark for that gesture.
+        clockView = new PaperClockView(this);
+        clockView.LongClick += (_, _) => StartActivity(new Intent(this, typeof(UnlockActivity)));
+        var clockSize = PaperTheme.Dp(this, 176);
+        root.AddView(clockView, new LinearLayout.LayoutParams(clockSize, clockSize)
+        {
+            Gravity = GravityFlags.CenterHorizontal,
+        });
 
-        dateView = new TextView(this) { TextSize = 18 };
-        dateView.SetTextColor(Palette.InkMuted);
+        dateView = PaperUi.Heading(this, "");
+        dateView.Typeface = PaperTheme.SerifRegular(this);
         dateView.Gravity = GravityFlags.CenterHorizontal;
-        root.AddView(dateView, MatchWrap());
+        var dateParams = MatchWrap();
+        dateParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
+        root.AddView(dateView, dateParams);
 
         // Shown only until FocusPhone is the default home app (before device-owner
         // pinning). ROLE_HOME cannot be force-granted programmatically, so this
         // opens the system Home-app picker.
-        setDefaultLauncherButton = new Button(this)
-        {
-            Text = "Set as default launcher",
-            Visibility = ViewStates.Gone,
-        };
-        setDefaultLauncherButton.Click += (_, _) =>
-            StartActivity(new Intent(Android.Provider.Settings.ActionHomeSettings));
-        root.AddView(setDefaultLauncherButton, MatchWrap());
+        setDefaultLauncherButton = PaperUi.SecondaryButton(this, "Set as default launcher", () =>
+            StartActivity(new Intent(Android.Provider.Settings.ActionHomeSettings)));
+        setDefaultLauncherButton.Visibility = ViewStates.Gone;
+        var buttonParams = MatchWrap();
+        buttonParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
+        root.AddView(setDefaultLauncherButton, buttonParams);
 
         var grid = new GridLayout(this) { ColumnCount = 2, RowCount = 3 };
         var gridParams = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1, TopMargin = 96 };
+            ViewGroup.LayoutParams.MatchParent, 0)
+        {
+            Weight = 1,
+            TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X8),
+        };
         root.AddView(grid, gridParams);
 
         foreach (var tile in Tile.All)
         {
             grid.AddView(BuildTileView(tile));
         }
+
+        // Icon-only affordance for the swipe-up tray (DESIGN.md §7).
+        var hint = PaperUi.HintChevron(this, OpenAppTray);
+        var hintSize = PaperTheme.Dp(this, DesignTokens.Shape.TouchTargetDp);
+        root.AddView(hint, new LinearLayout.LayoutParams(hintSize, hintSize)
+        {
+            Gravity = GravityFlags.CenterHorizontal,
+        });
         return root;
     }
 
@@ -114,8 +136,9 @@ public class HomeActivity : Activity
         var icon = new ImageView(this) { ContentDescription = tile.Name };
         var resourceId = Resources!.GetIdentifier(tile.IconResourceName, "drawable", PackageName);
         icon.SetImageResource(resourceId);
-        icon.SetColorFilter(Palette.Ink);
-        icon.SetPadding(64, 64, 64, 64);
+        icon.SetColorFilter(PaperTheme.Ink);
+        var pad = PaperTheme.Dp(this, DesignTokens.Space.X6);
+        icon.SetPadding(pad, pad, pad, pad);
 
         icon.Click += (_, _) =>
         {
@@ -159,8 +182,8 @@ public class HomeActivity : Activity
     private void UpdateClock()
     {
         var now = DateTime.Now;
-        timeView!.Text = now.ToString("HH:mm");
-        dateView!.Text = now.ToString("dddd, MMMM d");
+        clockView!.SetTime(now.TimeOfDay);
+        dateView!.Text = TimeFormats.DateLong(now);
     }
 
     private void UpdateTileTints(IReadOnlySet<string> packagesWithNotifications)
@@ -168,7 +191,7 @@ public class HomeActivity : Activity
         foreach (var (tile, view) in tileViews)
         {
             var lit = tile.NotificationPackages.Any(packagesWithNotifications.Contains);
-            view.SetColorFilter(lit ? Palette.Accent : Palette.Ink);
+            view.SetColorFilter(lit ? PaperTheme.Accent : PaperTheme.Ink);
         }
     }
 

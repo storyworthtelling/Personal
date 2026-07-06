@@ -109,9 +109,16 @@ public sealed class ProjectService
             .AnyAsync(a => a.NovelId == id && a.PdfStatus == WorkStatus.Completed, cancellationToken);
         var analysis = new PhaseProgress(analysisReady ? 1 : 0, 1);
 
+        // The first composed page doubles as the library cover thumbnail.
+        var coverThumb = await db.Pages
+            .Where(p => volumeIds.Contains(p.VolumeId) && p.CompositionStatus == WorkStatus.Completed)
+            .OrderBy(p => p.PageNumber)
+            .Select(p => p.ThumbImagePath ?? p.ComposedImagePath)
+            .FirstOrDefaultAsync(cancellationToken);
+
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
-            chunks, sheets, panels, pages, volumes, volumeList, analysis, analysisReady);
+            chunks, sheets, panels, pages, volumes, volumeList, analysis, analysisReady, coverThumb);
     }
 
     private static async Task<PhaseProgress> Counts<T>(
