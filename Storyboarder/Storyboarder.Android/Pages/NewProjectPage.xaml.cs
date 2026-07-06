@@ -87,7 +87,7 @@ public partial class NewProjectPage : ContentPage
         UpButton.IsEnabled = path.Count > 1;
         PathLabel.Text = string.Join(" / ", path.Select(p => p.Name));
 
-        Busy(true, "Loading…");
+        Busy(true, "Loading My Drive…");
         try
         {
             var token = await tokens.GetAccessToken();
@@ -148,8 +148,8 @@ public partial class NewProjectPage : ContentPage
             // Kick off an immediate drain rather than waiting for the next periodic window.
             PipelineWorker.RunNow(global::Android.App.Application.Context);
 
-            await DisplayAlert("Project created",
-                $"“{selected.Name}” is queued. Rendering runs in the background.", "OK");
+            // Success is the state change (DESIGN.md §7): the library now
+            // shows the new card with live progress chips.
             await Navigation.PopAsync();
         }
         catch (Exception ex)
@@ -165,8 +165,6 @@ public partial class NewProjectPage : ContentPage
 
     private void Busy(bool busy, string? message = null)
     {
-        Spinner.IsVisible = busy;
-        Spinner.IsRunning = busy;
         StatusLabel.Text = message ?? string.Empty;
         SignInButton.IsEnabled = !busy;
         RefreshButton.IsEnabled = !busy;

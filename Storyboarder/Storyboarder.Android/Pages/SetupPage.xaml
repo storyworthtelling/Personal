@@ -3,10 +3,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Storyboarder.Android.Pages.SetupPage"
              Title="Settings">
-    <ScrollView>
-        <VerticalStackLayout Padding="24" Spacing="14">
+    <Grid RowDefinitions="*,Auto">
+    <ScrollView Grid.Row="0">
+        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="14">
 
-            <Label Text="API keys" Style="{StaticResource TitleLabel}" />
+            <HorizontalStackLayout Spacing="12">
+                <Image Source="owner_medallion.png" WidthRequest="48" HeightRequest="48"
+                       VerticalOptions="Center" />
+                <Label Text="Settings" Style="{StaticResource DisplayLabel}" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Label Text="API keys" Style="{StaticResource TitleLabel}" Margin="0,8,0,0" />
 
             <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" />
             <Entry x:Name="ClaudeKeyEntry" Placeholder="sk-ant-..."
@@ -37,9 +44,17 @@
                    FontSize="{StaticResource LabelSize}" />
             <Button Text="Copy package + SHA-1"
                     Clicked="OnCopySigningInfoClicked" Style="{StaticResource SecondaryButton}" />
-
-            <Button Text="Save settings" Clicked="OnSaveClicked" Margin="0,16,0,0" />
+            <Label x:Name="CopyStatusLabel" Style="{StaticResource StatusLine}" />
 
         </VerticalStackLayout>
     </ScrollView>
+
+    <!-- Pinned bottom bar (DESIGN.md §7). -->
+    <VerticalStackLayout Grid.Row="1">
+        <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+        <Grid Padding="24,12">
+            <Button Text="Save settings" Clicked="OnSaveClicked" />
+        </Grid>
+    </VerticalStackLayout>
+    </Grid>
 </ContentPage>

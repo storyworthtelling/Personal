@@ -3,11 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Storyboarder.Android.Pages.MainPage"
              Title="Storyboarder">
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="16" RowSpacing="12">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="{StaticResource ScreenPadding}" RowSpacing="12">
 
         <Label Grid.Row="0"
                Text="Your graphic novels"
-               Style="{StaticResource TitleLabel}" />
+               Style="{StaticResource DisplayLabel}" />
 
         <Border x:Name="ConfigWarningCard" Grid.Row="1"
                 Style="{StaticResource WarningCard}" IsVisible="False">
@@ -25,23 +25,58 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate>
                     <Border Style="{StaticResource HairlineCard}" Margin="0,4">
-                        <VerticalStackLayout Spacing="4">
-                            <Label Text="{Binding Title}" Style="{StaticResource HeadingLabel}" />
-                            <Label Text="{Binding Summary}" Style="{StaticResource SecondaryLabel}" />
-                            <Label Text="{Binding Error}" Style="{StaticResource ErrorLabel}"
-                                   IsVisible="{Binding HasError}" />
-                        </VerticalStackLayout>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <Border Grid.Column="0"
+                                    Stroke="{StaticResource Hairline}" StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 10" Padding="0"
+                                    WidthRequest="64" HeightRequest="96"
+                                    VerticalOptions="Start"
+                                    IsVisible="{Binding HasCover}">
+                                <Image Source="{Binding CoverThumb}" Aspect="AspectFill" />
+                            </Border>
+                            <VerticalStackLayout Grid.Column="1" Spacing="6">
+                                <Label Text="{Binding Title}" Style="{StaticResource HeadingLabel}" />
+                                <HorizontalStackLayout Spacing="6"
+                                                       BindableLayout.ItemsSource="{Binding Phases}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource PhaseChip}">
+                                                <Label Text="{Binding Text}" Style="{StaticResource ChipLabel}">
+                                                    <Label.Triggers>
+                                                        <DataTrigger TargetType="Label" Binding="{Binding IsActive}" Value="True">
+                                                            <Setter Property="TextColor" Value="{StaticResource Ink}" />
+                                                            <Setter Property="FontFamily" Value="SansSemibold" />
+                                                        </DataTrigger>
+                                                    </Label.Triggers>
+                                                </Label>
+                                            </Border>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </HorizontalStackLayout>
+                                <Label Text="{Binding Summary}" Style="{StaticResource StatusLine}" />
+                                <Border Style="{StaticResource ErrorChip}"
+                                        HorizontalOptions="Start"
+                                        IsVisible="{Binding HasError}">
+                                    <Label Text="needs attention" Style="{StaticResource ChipLabelError}" />
+                                </Border>
+                            </VerticalStackLayout>
+                        </Grid>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <VerticalStackLayout Grid.Row="3" Spacing="8">
-            <Label x:Name="LastRunLabel" Style="{StaticResource SecondaryLabel}"
-                   HorizontalTextAlignment="Center" />
-            <Button Text="New project" Clicked="OnNewProjectClicked" HorizontalOptions="Fill" />
-            <Button Text="Settings" Clicked="OnSettingsClicked"
-                    Style="{StaticResource SecondaryButton}" HorizontalOptions="Fill" />
+        <Label Grid.Row="3" x:Name="LastRunLabel" Style="{StaticResource SecondaryLabel}"
+               HorizontalTextAlignment="Center" />
+
+        <!-- Pinned bottom bar (DESIGN.md §7). -->
+        <VerticalStackLayout Grid.Row="4" Margin="-24,0,-24,-24">
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Padding="24,12">
+                <Button Grid.Column="0" Text="New project" Clicked="OnNewProjectClicked" />
+                <Button Grid.Column="1" Text="Settings" Clicked="OnSettingsClicked"
+                        Style="{StaticResource QuietButton}" />
+            </Grid>
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

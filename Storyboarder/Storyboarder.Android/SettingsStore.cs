@@ -24,11 +24,23 @@ public static class SettingsStore
         set => Preferences.Set(nameof(GoogleAccountEmail), value);
     }
 
-    public static string LastRunResult
+    public static string LastRunOutcome
     {
-        get => Preferences.Get(nameof(LastRunResult), "Never run");
-        set => Preferences.Set(nameof(LastRunResult), value);
+        get => Preferences.Get(nameof(LastRunOutcome), string.Empty);
+        set => Preferences.Set(nameof(LastRunOutcome), value);
     }
+
+    public static DateTime LastRunAtUtc
+    {
+        get => Preferences.Get(nameof(LastRunAtUtc), DateTime.MinValue);
+        set => Preferences.Set(nameof(LastRunAtUtc), value);
+    }
+
+    // "Delivered — 2h ago" style summary for the library footer (DESIGN.md §11).
+    public static string LastRunSummary =>
+        string.IsNullOrEmpty(LastRunOutcome) || LastRunAtUtc == DateTime.MinValue
+            ? "Never run"
+            : $"{LastRunOutcome} — {Storyboarder.Domain.Time.RelativeTime.Format(LastRunAtUtc.ToLocalTime(), DateTime.Now)}";
 
     // The pipeline can't do anything without both API keys, so the worker no-ops until they're set.
     public static bool IsConfigured =>

@@ -383,6 +383,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 var chrome = new PageChrome(page.PageNumber, $"{novel.Title} · Volume {volume.Number}");
                 var composed = pageComposer.Compose(panelArt, chrome);
                 page.ComposedImagePath = imageStore.Save($"{novel.Id}/pages/{page.Id}.png", composed);
+                page.ThumbImagePath = imageStore.Save(
+                    $"{novel.Id}/pages/{page.Id}.thumb.png", Thumbnailer.Downscale(composed, 256));
                 page.CompositionStatus = WorkStatus.Completed;
                 page.LastError = null;
             }
