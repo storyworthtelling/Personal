@@ -19,7 +19,7 @@ public partial class MainPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        StatusLabel.Text = CredentialStore.LastDeliveryResult;
+        StatusLabel.Text = CredentialStore.LastDeliverySummary;
         ConfigWarningLabel.IsVisible = !CredentialStore.IsConfigured;
         DeliveryLogButton.IsVisible = System.IO.File.Exists(DeliveryLogPath) &&
                                       new System.IO.FileInfo(DeliveryLogPath).Length > 0;
@@ -52,16 +52,15 @@ public partial class MainPage : ContentPage
     {
         if (!CredentialStore.IsConfigured)
         {
-            await DisplayAlert("Not Configured",
-                "Please enter your credentials in Settings first.", "OK");
+            // The warning card on screen already says what to do; keep quiet here.
+            ConfigWarningLabel.IsVisible = true;
             return;
         }
 
         DeliveryFileLogger.Clear();
         DeliverNowButton.IsEnabled = false;
-        Spinner.IsVisible = true;
-        Spinner.IsRunning = true;
-        StatusLabel.Text = "Delivering…";
+        // Loading is words (DESIGN.md §5).
+        StatusLabel.Text = "Delivering — fetching today's crossword…";
 
         try
         {
@@ -82,26 +81,26 @@ public partial class MainPage : ContentPage
                     await daily.DeliverDailyDocuments(today);
                 }
 
-                CredentialStore.LastDeliveryResult = $"Success — {today:MMM d, yyyy} ({newsStatus})";
+                CredentialStore.LastDeliveryOutcome = $"Delivered ({newsStatus})";
+                CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
             });
 
-            StatusLabel.Text = CredentialStore.LastDeliveryResult;
+            // Success is the state change: the status line is the record.
+            StatusLabel.Text = CredentialStore.LastDeliverySummary;
             DeliveryLogButton.IsVisible = true;
-            await DisplayAlert("Done", CredentialStore.LastDeliveryResult, "OK");
         }
         catch (Exception ex)
         {
             var fullMessage = FlattenException(ex);
-            CredentialStore.LastDeliveryResult = $"Failed — {DateTime.Today:MMM d}: {ex.Message}";
-            StatusLabel.Text = CredentialStore.LastDeliveryResult;
+            CredentialStore.LastDeliveryOutcome = $"Failed: {ex.Message}";
+            CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
+            StatusLabel.Text = CredentialStore.LastDeliverySummary;
             DeliveryLogButton.IsVisible = true;
             await Clipboard.SetTextAsync(fullMessage);
             await DisplayAlert("Delivery Failed (copied to clipboard)", fullMessage, "OK");
         }
         finally
         {
-            Spinner.IsRunning = false;
-            Spinner.IsVisible = false;
             DeliverNowButton.IsEnabled = true;
         }
     }

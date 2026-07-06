@@ -31,7 +31,7 @@ public partial class SetupPage : ContentPage
         CredentialStore.AnthropicApiKey = AnthropicKeyEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.CalendarMappingJson = CalendarMappingEditor.Text?.Trim() ?? string.Empty;
 
-        await DisplayAlert("Saved", "Settings saved.", "OK");
+        // Success is the state change: saving returns home (DESIGN.md §7).
         await Navigation.PopAsync();
     }
 
@@ -48,7 +48,8 @@ public partial class SetupPage : ContentPage
         {
             var email = await DailyLoader.Android.Google.DeviceAccountSignIn.SignIn(activity);
             GoogleStatusLabel.Text = $"Signed in as {email} ✓";
-            await DisplayAlert("Google", $"Signed in as {email}.", "OK");
+            // The status line below the button is the state change.
+            GoogleStatusLabel.Text = $"Signed in as {email}.";
         }
         catch (Exception ex)
         {
