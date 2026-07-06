@@ -22,16 +22,35 @@ public class SettingsActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         var account = new AccountStore(this);
 
+        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        var scroll = new ScrollView(this);
         var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        layout.SetBackgroundColor(PaperTheme.Paper);
         layout.SetPadding(
-            PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X12),
-            PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X6));
+            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X12),
+            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X6));
 
-        var heading = PaperUi.Title(this, "Gmail account");
-        layout.AddView(heading, Spaced(0, DesignTokens.Space.X6));
+        // The owner's medallion marks the settings screen (DESIGN.md §13).
+        var headerRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        headerRow.SetGravity(GravityFlags.CenterVertical);
+        var medallionId = Resources!.GetIdentifier("owner_medallion", "drawable", PackageName);
+        if (medallionId != 0)
+        {
+            var medallion = new ImageView(this);
+            medallion.SetImageResource(medallionId);
+            var size = PaperTheme.Dp(this, DesignTokens.Shape.TouchTargetDp);
+            var medallionParams = new LinearLayout.LayoutParams(size, size)
+            {
+                MarginEnd = PaperTheme.Dp(this, DesignTokens.Space.X3),
+            };
+            headerRow.AddView(medallion, medallionParams);
+        }
+        var heading = PaperUi.PageHeader(this, "Settings");
+        heading.SetPadding(0, 0, 0, 0);
+        headerRow.AddView(heading);
+        layout.AddView(headerRow, Spaced(0, DesignTokens.Space.X6));
 
         var address = PaperUi.Field(this, "name@gmail.com");
         address.Text = account.GmailAddress;
@@ -44,6 +63,21 @@ public class SettingsActivity : Activity
         AddFieldGroup(layout, "App password", password,
             "Create one at myaccount.google.com/apppasswords.");
 
+        var enableMessages = PaperUi.SecondaryButton(this, "Enable message sync (notification access)", () =>
+            StartActivity(new Intent(Android.Provider.Settings.ActionNotificationListenerSettings)));
+        layout.AddView(enableMessages, Spaced(DesignTokens.Space.X4, 0));
+
+        var note = PaperUi.Secondary(this,
+            "Message sync reads incoming texts from Google Messages notifications. " +
+            "Call history requires the call-log permission, which takes effect after the " +
+            "device is locked down (or a whitelisted install).");
+        layout.AddView(note, Spaced(DesignTokens.Space.X6, 0));
+
+        scroll.AddView(layout);
+        root.AddView(scroll, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        // Success is the state change: saving closes the screen (DESIGN.md §7).
         var save = PaperUi.PrimaryButton(this, "Save", () =>
         {
             account.GmailAddress = address.Text;
@@ -54,22 +88,11 @@ public class SettingsActivity : Activity
                 // for the next periodic run.
                 EmailSyncWorker.RunOnce(this);
             }
-            Toast.MakeText(this, "Saved.", ToastLength.Short)!.Show();
             Finish();
         });
-        layout.AddView(save, Spaced(DesignTokens.Space.X8, 0));
+        root.AddView(PaperUi.BottomBar(this, save));
 
-        var enableMessages = PaperUi.SecondaryButton(this, "Enable message sync (notification access)", () =>
-            StartActivity(new Intent(Android.Provider.Settings.ActionNotificationListenerSettings)));
-        layout.AddView(enableMessages, Spaced(DesignTokens.Space.X3, 0));
-
-        var note = PaperUi.Secondary(this,
-            "Message sync reads incoming texts from Google Messages notifications. " +
-            "Call history requires the call-log permission, which takes effect after the " +
-            "device is locked down (or a whitelisted install).");
-        layout.AddView(note, Spaced(DesignTokens.Space.X6, 0));
-
-        SetContentView(layout);
+        SetContentView(root);
     }
 
     private void AddFieldGroup(LinearLayout layout, string label, EditText field, string? helper)

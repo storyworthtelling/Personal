@@ -21,7 +21,6 @@ public static class DesignTokens
     /// <summary>Type scale in Android scaled pixels (sp).</summary>
     public static class TypeSp
     {
-        public const float Clock = 64f;
         public const float Countdown = 40f;
         public const float Display = 34f;
         public const float Title = 24f;

@@ -9,6 +9,7 @@ using AndroidX.Media3.Session;
 using MediaController = AndroidX.Media3.Session.MediaController;
 using FocusPhone.Domain.Audio;
 using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
 using FocusPhone.Infrastructure.Podcasts;
 using FocusPhone.Ui;
 
@@ -31,6 +32,7 @@ public class AudioActivity : ListActivity
     private const string YtMusicPackage = "com.google.android.apps.youtube.music";
 
     private PodcastStore? store;
+    private FrameLayout? undoHost;
     private PodcastLibrary library = new([]);
     private IReadOnlyList<Episode> queue = [];
     private MediaController? controller;
@@ -38,6 +40,7 @@ public class AudioActivity : ListActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         store = new PodcastStore(this);
         SetContentView(BuildLayout());
         PaperUi.StylePaperList(this, ListView!);
@@ -54,9 +57,7 @@ public class AudioActivity : ListActivity
         {
             if (e.Position >= 0 && e.Position < queue.Count)
             {
-                library.MarkListened(queue[e.Position].Id);
-                store.SaveListenedIds(library.ExportListenedIds());
-                RenderQueue();
+                MarkListenedWithUndo(queue[e.Position]);
             }
             e.Handled = true;
         };
@@ -64,27 +65,49 @@ public class AudioActivity : ListActivity
         ConnectController();
     }
 
-    // ListActivity binds to the ListView with the platform list id, letting the
-    // action row live outside the list (so the empty state can show).
+    // ListActivity binds to the ListView with the platform list id. The action
+    // row is a pinned bottom bar; the undo host overlays the list.
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetBackgroundColor(PaperTheme.Paper);
-        root.AddView(BuildActionRow());
 
-        var frame = new FrameLayout(this);
+        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
+        var header = PaperUi.PageHeader(this, "Audio");
+        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        root.AddView(header);
+
+        undoHost = new FrameLayout(this);
         var list = new ListView(this) { Id = Android.Resource.Id.List };
-        frame.AddView(list, new FrameLayout.LayoutParams(
+        PaperUi.StylePaperList(this, list);
+        undoHost.AddView(list, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
         var empty = PaperUi.EmptyState(this, "Nothing new to hear.");
-        frame.AddView(empty, new FrameLayout.LayoutParams(
+        undoHost.AddView(empty, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
         list.EmptyView = empty;
 
-        root.AddView(frame, new LinearLayout.LayoutParams(
+        root.AddView(undoHost, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        root.AddView(PaperUi.BottomBar(this,
+            PaperUi.SecondaryButton(this, "Add feed", ShowAddFeedDialog),
+            PaperUi.QuietButton(this, "YT Music", ShowYtMusicSearch)));
         return root;
+    }
+
+    // Undo-first (DESIGN.md §7): mark immediately, offer the reversal.
+    private void MarkListenedWithUndo(Episode episode)
+    {
+        library.MarkListened(episode.Id);
+        store!.SaveListenedIds(library.ExportListenedIds());
+        RenderQueue();
+        UndoBar.Show(this, undoHost!, "Marked listened.", onUndo: () =>
+        {
+            library.MarkUnlistened(episode.Id);
+            store.SaveListenedIds(library.ExportListenedIds());
+            RenderQueue();
+        });
     }
 
     protected override void OnResume()
@@ -123,7 +146,8 @@ public class AudioActivity : ListActivity
             }
             catch (Exception e) when (e is HttpRequestException or InvalidDataException)
             {
-                Toast.MakeText(this, $"Feed failed: {new Uri(feedUrl).Host} — {e.Message}",
+                // Failure may speak (DESIGN.md §7); worded per the error template.
+                Toast.MakeText(this, $"{new Uri(feedUrl).Host} didn't answer. It retries on the next refresh.",
                     ToastLength.Short)!.Show();
             }
         }
@@ -138,7 +162,7 @@ public class AudioActivity : ListActivity
         ListAdapter = new PaperListAdapter(this, queue
             .Select(episode => new PaperListRow(
                 episode.Title,
-                $"{episode.PublishedUtc.ToLocalTime():MMM d}" +
+                RelativeTime.Format(episode.PublishedUtc.ToLocalTime(), DateTime.Now) +
                 (episode.Duration is { } d ? $" · {(int)d.TotalMinutes} min" : "")))
             .ToList());
     }
@@ -157,26 +181,6 @@ public class AudioActivity : ListActivity
         controller.SetMediaItem(item);
         controller.Prepare();
         controller.Play();
-    }
-
-    private View BuildActionRow()
-    {
-        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        var horizontal = PaperTheme.Dp(this, DesignTokens.Space.X3);
-        var vertical = PaperTheme.Dp(this, DesignTokens.Space.X4);
-        row.SetPadding(horizontal, vertical, horizontal, vertical);
-        AddAction(row, PaperUi.SecondaryButton(this, "Add feed", ShowAddFeedDialog));
-        AddAction(row, PaperUi.QuietButton(this, "YT Music", ShowYtMusicSearch));
-        return row;
-    }
-
-    private void AddAction(LinearLayout row, Button button)
-    {
-        row.AddView(button, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent)
-        {
-            Weight = 1,
-            MarginEnd = PaperTheme.Dp(this, DesignTokens.Space.X3),
-        });
     }
 
     private void ShowAddFeedDialog()

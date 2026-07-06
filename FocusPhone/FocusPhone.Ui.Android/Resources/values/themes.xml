@@ -3,7 +3,7 @@
     <!-- The Paper & Ink activity theme: warm paper window, ink text, terracotta
          accent (dialog buttons, cursors, selection handles). Light-only by design. -->
     <style name="Theme.FocusPhone.Paper" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/paper</item>
+        <item name="android:windowBackground">@drawable/paper_background</item>
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:colorPrimary">@color/accent</item>
         <item name="android:colorPrimaryDark">@color/paper</item>

@@ -6,6 +6,7 @@ using Android.OS;
 using Android.Views;
 using Android.Widget;
 using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
 using FocusPhone.Domain.Timeline;
 using FocusPhone.Ui;
 
@@ -32,6 +33,7 @@ public class ThreadsActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         SetContentView(BuildLayout());
 
         threadList!.ItemClick += (_, e) =>
@@ -62,7 +64,6 @@ public class ThreadsActivity : Activity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetBackgroundColor(PaperTheme.Paper);
 
         var header = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         header.SetPadding(
@@ -70,7 +71,7 @@ public class ThreadsActivity : Activity
             PaperTheme.Dp(this, DesignTokens.Space.X3), PaperTheme.Dp(this, DesignTokens.Space.X3));
         header.SetGravity(GravityFlags.CenterVertical);
 
-        var title = PaperUi.Title(this, "Communication");
+        var title = PaperUi.Display(this, "Communication");
         header.AddView(title,
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
@@ -155,7 +156,7 @@ public class ThreadsActivity : Activity
                 var latest = thread.Items[^1];
                 return new PaperListRow(
                     ContactNameResolver.DisplayName(this, thread.ContactKey),
-                    $"{latest.TimestampUtc.ToLocalTime():MMM d HH:mm} · {latest.Snippet}");
+                    $"{RelativeTime.Format(latest.TimestampUtc.ToLocalTime(), DateTime.Now)} · {latest.Snippet}");
             })
             .ToList());
 

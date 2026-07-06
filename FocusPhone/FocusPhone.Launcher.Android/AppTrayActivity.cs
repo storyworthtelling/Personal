@@ -4,6 +4,7 @@ using Android.Content.PM;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using FocusPhone.Domain.Design;
 using FocusPhone.Ui;
 
 namespace FocusPhone.Launcher;
@@ -11,25 +12,28 @@ namespace FocusPhone.Launcher;
 /// <summary>
 /// The swipe-up tray of launchable apps, filtered for distraction-free use:
 /// our own apps (reached from the home tiles), blocked packages, browsers, and
-/// games are excluded. Long-press blocks an app — the block is permanent
-/// (survives reinstall), removes it from the tray immediately, and, once the
-/// launcher is device owner, suspends it via a policy re-apply.
+/// games are excluded. Long-press blocks an app immediately — undo-first per
+/// DESIGN.md §7: the block happens at once and a 6-second undo bar offers the
+/// reversal (the same unblock admin mode uses).
 /// </summary>
 [Activity(
     Label = "Apps",
     Exported = false,
     Theme = "@style/Theme.FocusPhone.Paper")]
-public class AppTrayActivity : ListActivity
+public class AppTrayActivity : Activity
 {
     private List<ResolveInfo> apps = [];
+    private ListView? listView;
+    private FrameLayout? undoHost;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
-        PaperUi.StylePaperList(this, ListView!);
+        PaperTransitions.Apply(this);
+        SetContentView(BuildLayout());
         LoadApps();
 
-        ListView.ItemClick += (_, e) =>
+        listView!.ItemClick += (_, e) =>
         {
             var info = apps[e.Position].ActivityInfo!;
             var intent = PackageManager!.GetLaunchIntentForPackage(info.PackageName!);
@@ -39,11 +43,30 @@ public class AppTrayActivity : ListActivity
             }
         };
 
-        ListView.ItemLongClick += (_, e) =>
+        listView.ItemLongClick += (_, e) =>
         {
-            ConfirmBlock(apps[e.Position]);
+            BlockWithUndo(apps[e.Position]);
             e.Handled = true;
         };
+    }
+
+    private View BuildLayout()
+    {
+        undoHost = new FrameLayout(this);
+
+        var column = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
+        column.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        column.AddView(PaperUi.PageHeader(this, "Apps"));
+
+        listView = new ListView(this);
+        PaperUi.StylePaperList(this, listView);
+        column.AddView(listView, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        undoHost.AddView(column, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        return undoHost;
     }
 
     private void LoadApps()
@@ -60,7 +83,7 @@ public class AppTrayActivity : ListActivity
             .OrderBy(resolveInfo => resolveInfo.LoadLabel(PackageManager).ToString())
             .ToList();
 
-        ListAdapter = new PaperListAdapter(this,
+        listView!.Adapter = new PaperListAdapter(this,
             apps.Select(resolveInfo => new PaperListRow(resolveInfo.LoadLabel(PackageManager).ToString()!)).ToList());
     }
 
@@ -88,24 +111,31 @@ public class AppTrayActivity : ListActivity
             .ToHashSet();
     }
 
-    private void ConfirmBlock(ResolveInfo app)
+    // Undo-first: block immediately, then offer the reversal for six seconds.
+    private void BlockWithUndo(ResolveInfo app)
     {
         var packageName = app.ActivityInfo!.PackageName!;
         var label = app.LoadLabel(PackageManager!).ToString();
 
-        new AlertDialog.Builder(this)
-            .SetTitle($"Block {label}?")!
-            .SetMessage($"{label} stays blocked even if it's reinstalled. Unblocking needs admin mode and its 72-hour delay.")!
-            .SetPositiveButton("Block", (_, _) =>
-            {
-                var store = new BlocklistStore(this);
-                var categorizer = new Domain.Apps.AppCategorizer(store.Load());
-                categorizer.Block(packageName);
-                store.Save(categorizer.Export());
-                PolicyManager.ApplyCurrentPolicy(this);
-                LoadApps();
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+        SetBlocked(packageName, blocked: true);
+        UndoBar.Show(this, undoHost!, $"Blocked {label}.", onUndo: () =>
+            SetBlocked(packageName, blocked: false));
+    }
+
+    private void SetBlocked(string packageName, bool blocked)
+    {
+        var store = new BlocklistStore(this);
+        var categorizer = new Domain.Apps.AppCategorizer(store.Load());
+        if (blocked)
+        {
+            categorizer.Block(packageName);
+        }
+        else
+        {
+            categorizer.Unblock(packageName);
+        }
+        store.Save(categorizer.Export());
+        PolicyManager.ApplyCurrentPolicy(this);
+        LoadApps();
     }
 }

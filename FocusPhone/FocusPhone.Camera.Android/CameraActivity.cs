@@ -14,6 +14,7 @@ using Xamarin.Google.MLKit.Vision.BarCode;
 using Xamarin.Google.MLKit.Vision.Barcode.Common;
 using Xamarin.Google.MLKit.Vision.Common;
 using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
 using FocusPhone.Ui;
 
 namespace FocusPhone.Camera;
@@ -36,10 +37,12 @@ public class CameraActivity : AppCompatActivity
 
     private PreviewView? previewView;
     private ImageCapture? imageCapture;
+    private TextView? statusLine;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         SetContentView(BuildLayout());
 
         if (CheckSelfPermission(Android.Manifest.Permission.Camera) == Android.Content.PM.Permission.Granted)
@@ -65,30 +68,30 @@ public class CameraActivity : AppCompatActivity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetBackgroundColor(PaperTheme.Paper);
 
         previewView = new PreviewView(this);
         root.AddView(previewView, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        var actions = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        var pad = PaperTheme.Dp(this, DesignTokens.Space.X3);
-        actions.SetPadding(pad, pad, pad, pad);
-        AddAction(actions, PaperUi.PrimaryButton(this, "Capture", TakePhoto));
-        AddAction(actions, PaperUi.SecondaryButton(this, "Scan doc", StartDocumentScan));
-        AddAction(actions, PaperUi.SecondaryButton(this, "Scan QR", StartQrScan));
-        AddAction(actions, PaperUi.SecondaryButton(this, "Photos", OpenGooglePhotos));
-        root.AddView(actions);
+        // Quiet inline status replaces success toasts (DESIGN.md §7).
+        statusLine = PaperUi.Secondary(this, "");
+        statusLine.Gravity = GravityFlags.CenterHorizontal;
+        statusLine.Visibility = ViewStates.Gone;
+        root.AddView(statusLine, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        root.AddView(PaperUi.BottomBar(this,
+            PaperUi.PrimaryButton(this, "Capture", TakePhoto),
+            PaperUi.SecondaryButton(this, "Scan doc", StartDocumentScan),
+            PaperUi.SecondaryButton(this, "Scan QR", StartQrScan),
+            PaperUi.SecondaryButton(this, "Photos", OpenGooglePhotos)));
         return root;
     }
 
-    private void AddAction(LinearLayout row, Button button)
+    private void ShowStatus(string message)
     {
-        row.AddView(button, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent)
-        {
-            Weight = 1,
-            MarginEnd = PaperTheme.Dp(this, DesignTokens.Space.X2),
-        });
+        statusLine!.Text = message;
+        statusLine.Visibility = ViewStates.Visible;
     }
 
     private void StartCamera()
@@ -173,7 +176,7 @@ public class CameraActivity : AppCompatActivity
         }
 
         public void OnImageSaved(ImageCapture.OutputFileResults? results) =>
-            Toast.MakeText(activity, "Saved.", ToastLength.Short)!.Show();
+            activity.RunOnUiThread(() => activity.ShowStatus($"Photo saved · {TimeFormats.Clock12(DateTime.Now)}"));
 
         public void OnError(ImageCaptureException? exception) =>
             Toast.MakeText(activity, $"Capture failed: {exception?.Message}", ToastLength.Long)!.Show();
@@ -314,6 +317,6 @@ public class CameraActivity : AppCompatActivity
         using var input = ContentResolver.OpenInputStream(pdf.Uri)!;
         using var output = ContentResolver.OpenOutputStream(target)!;
         input.CopyTo(output);
-        Toast.MakeText(this, "Scan saved to Downloads.", ToastLength.Short)!.Show();
+        ShowStatus($"Scan saved to Downloads · {TimeFormats.Clock12(DateTime.Now)}");
     }
 }

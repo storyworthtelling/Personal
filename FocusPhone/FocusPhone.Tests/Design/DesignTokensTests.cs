@@ -51,11 +51,10 @@ public class DesignTokensTests
     }
 
     [Fact]
-    public void TypeScaleDescendsFromClockToLabel()
+    public void TypeScaleDescendsFromCountdownToLabel()
     {
         var scale = new[]
         {
-            DesignTokens.TypeSp.Clock,
             DesignTokens.TypeSp.Countdown,
             DesignTokens.TypeSp.Display,
             DesignTokens.TypeSp.Title,

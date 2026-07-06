@@ -1,5 +1,4 @@
 using Android.App;
-using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -13,7 +12,10 @@ namespace FocusPhone.Launcher;
 /// <summary>
 /// The escape hatch. Requesting admin access starts a 72-hour countdown that
 /// is visible and cancellable; once it elapses, a 60-minute admin session can
-/// be opened to unblock apps, re-pair integrations, or finalize the cutover.
+/// be opened. Undo-first everywhere (DESIGN.md §7): even the irreversible
+/// finalize-cutover runs as a visible 10-second inline countdown with Cancel —
+/// it executes only from a live foreground countdown, and leaving the screen
+/// cancels it.
 /// </summary>
 [Activity(
     Label = "Admin",
@@ -24,22 +26,35 @@ public class UnlockActivity : Activity
     private readonly Handler handler = new(Looper.MainLooper!);
     private UnlockStore? store;
     private UnlockStateMachine? machine;
+    private InlineCountdown? cutover;
     private LinearLayout? content;
+    private LinearLayout? actionBarHost;
+    private string? inlineStatus;
     private bool refreshScheduled;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         store = new UnlockStore(this);
-        machine = store.LoadMachine(new SystemClockAdapter());
+        var clock = new SystemClockAdapter();
+        machine = store.LoadMachine(clock);
+        cutover = new InlineCountdown(clock, TimeSpan.FromSeconds(DesignTokens.Motion.CutoverCountdownSeconds));
 
-        var root = new ScrollView(this);
-        root.SetBackgroundColor(PaperTheme.Paper);
+        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
+
+        var scroll = new ScrollView(this);
         content = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        content.SetPadding(
-            PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X12),
-            PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X6));
-        root.AddView(content);
+        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
+        content.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X12), edge, edge);
+        scroll.AddView(content);
+        root.AddView(scroll, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        actionBarHost = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        root.AddView(actionBarHost, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
         SetContentView(root);
     }
 
@@ -55,6 +70,8 @@ public class UnlockActivity : Activity
         base.OnPause();
         handler.RemoveCallbacksAndMessages(null);
         refreshScheduled = false;
+        // An abandoned cutover countdown is cancelled, never resumed hidden.
+        cutover!.Cancel();
         store!.Save(machine!);
     }
 
@@ -75,32 +92,38 @@ public class UnlockActivity : Activity
 
     private void Render()
     {
+        if (cutover!.HasExpired)
+        {
+            cutover.Cancel();
+            PolicyManager.LockDownDebugging(this);
+            inlineStatus = "Debugging is now disabled for good.";
+        }
+
         content!.RemoveAllViews();
+        actionBarHost!.RemoveAllViews();
         switch (machine!.CurrentState)
         {
             case UnlockState.Locked:
-                AddTitle("Locked");
+                AddHeader("Locked");
                 AddBody("Admin access requires a 72-hour delay. The countdown is visible and can be cancelled at any time.");
-                AddButton(PaperUi.PrimaryButton(this, "Request admin unlock", () => Transition(machine.RequestUnlock)));
+                PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => Transition(machine.RequestUnlock)));
                 break;
 
             case UnlockState.Pending:
-                AddTitle("Unlock pending");
+                AddHeader("Unlock pending");
                 AddBody("Admin mode opens in");
                 var remaining = machine.RemainingDelay ?? TimeSpan.Zero;
                 var countdown = PaperUi.Countdown(this);
                 countdown.Text = $"{(int)remaining.TotalHours:D2}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
                 countdown.Gravity = GravityFlags.CenterHorizontal;
-                var countdownParams = MatchWrap();
-                countdownParams.BottomMargin = PaperTheme.Dp(this, DesignTokens.Space.X12);
-                content!.AddView(countdown, countdownParams);
-                AddButton(PaperUi.SecondaryButton(this, "Cancel request", () => Transition(machine.CancelRequest)));
+                content!.AddView(countdown, MatchWrap());
+                PinActions(PaperUi.SecondaryButton(this, "Cancel request", () => Transition(machine.CancelRequest)));
                 break;
 
             case UnlockState.Ready:
-                AddTitle("Ready");
+                AddHeader("Ready");
                 AddBody("The delay has elapsed. Admin mode lasts 60 minutes and re-locks automatically.");
-                AddButton(PaperUi.PrimaryButton(this, "Enter admin mode", () => Transition(machine.EnterAdminMode)));
+                PinActions(PaperUi.PrimaryButton(this, "Enter admin mode", () => Transition(machine.EnterAdminMode)));
                 break;
 
             case UnlockState.AdminActive:
@@ -111,18 +134,48 @@ public class UnlockActivity : Activity
 
     private void RenderAdminSession()
     {
-        AddTitle("Admin mode");
+        AddHeader("Admin mode");
         AddBody("Session ends automatically after 60 minutes.");
-        AddButton(PaperUi.SecondaryButton(this, "Unblock apps…", ShowBlockedApps));
-        AddButton(PaperUi.SecondaryButton(this, "Set update token…", ShowUpdateTokenPrompt));
-        AddButton(PaperUi.SecondaryButton(this, "Re-lock now", () => Transition(machine!.Relock)));
-        AddButton(PaperUi.DestructiveButton(this, "Finalize cutover: disable debugging permanently", () =>
-            new AlertDialog.Builder(this)
-                .SetTitle("Disable debugging?")!
-                .SetMessage("This is the final cutover step. ADB access becomes impossible; only a recovery-mode factory reset can undo the lockdown.")!
-                .SetPositiveButton("Disable forever", (_, _) => PolicyManager.LockDownDebugging(this))!
-                .SetNegativeButton("Cancel", (_, _) => { })!
-                .Show()));
+        AddContentButton(PaperUi.SecondaryButton(this, "Unblock apps…", ShowBlockedApps));
+        AddContentButton(PaperUi.SecondaryButton(this, "Set update token…", ShowUpdateTokenPrompt));
+
+        if (cutover!.IsRunning)
+        {
+            // The live cutover countdown: Cascadia seconds + Cancel beside it.
+            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            row.SetGravity(GravityFlags.CenterVertical);
+            var seconds = (int)Math.Ceiling(cutover.Remaining.TotalSeconds);
+            var timer = PaperUi.Countdown(this);
+            timer.Text = $"0:{seconds:D2}";
+            row.AddView(timer, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+            row.AddView(PaperUi.SecondaryButton(this, "Cancel", () =>
+            {
+                cutover.Cancel();
+                Render();
+            }));
+            var rowParams = MatchWrap();
+            rowParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
+            content!.AddView(row, rowParams);
+            AddBody("Disabling debugging when the countdown ends. ADB access becomes impossible; only a recovery-mode factory reset undoes the lockdown.");
+        }
+        else
+        {
+            AddContentButton(PaperUi.DestructiveButton(this, "Finalize cutover: disable debugging permanently", () =>
+            {
+                cutover.Start();
+                Render();
+            }));
+        }
+
+        if (inlineStatus is not null)
+        {
+            var status = PaperUi.Secondary(this, inlineStatus);
+            var statusParams = MatchWrap();
+            statusParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
+            content!.AddView(status, statusParams);
+        }
+
+        PinActions(PaperUi.SecondaryButton(this, "Re-lock now", () => Transition(machine!.Relock)));
     }
 
     private void ShowBlockedApps()
@@ -132,7 +185,8 @@ public class UnlockActivity : Activity
         var blocked = data.BlockedPackages.OrderBy(p => p).ToArray();
         if (blocked.Length == 0)
         {
-            Toast.MakeText(this, "No blocked apps.", ToastLength.Short)!.Show();
+            inlineStatus = "No blocked apps.";
+            Render();
             return;
         }
 
@@ -144,6 +198,8 @@ public class UnlockActivity : Activity
                 categorizer.Unblock(blocked[e.Which]);
                 blocklistStore.Save(categorizer.Export());
                 PolicyManager.ApplyCurrentPolicy(this);
+                inlineStatus = $"Unblocked {blocked[e.Which]}.";
+                Render();
             })!
             .Show();
     }
@@ -157,7 +213,8 @@ public class UnlockActivity : Activity
             .SetPositiveButton("Save", (_, _) =>
             {
                 new UpdateSettingsStore(this).GitHubToken = input.Text;
-                Toast.MakeText(this, "Update token saved.", ToastLength.Short)!.Show();
+                inlineStatus = "Update token set.";
+                Render();
             })!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
@@ -167,15 +224,11 @@ public class UnlockActivity : Activity
     {
         action();
         store!.Save(machine!);
+        inlineStatus = null;
         Render();
     }
 
-    private void AddTitle(string text)
-    {
-        var view = PaperUi.Title(this, text);
-        view.SetPadding(0, 0, 0, PaperTheme.Dp(this, DesignTokens.Space.X4));
-        content!.AddView(view);
-    }
+    private void AddHeader(string text) => content!.AddView(PaperUi.PageHeader(this, text));
 
     private void AddBody(string text)
     {
@@ -184,12 +237,15 @@ public class UnlockActivity : Activity
         content!.AddView(view);
     }
 
-    private void AddButton(Button button)
+    private void AddContentButton(Button button)
     {
         var layoutParams = MatchWrap();
         layoutParams.BottomMargin = PaperTheme.Dp(this, DesignTokens.Space.X3);
         content!.AddView(button, layoutParams);
     }
+
+    private void PinActions(params View[] actions) =>
+        actionBarHost!.AddView(PaperUi.BottomBar(this, actions));
 
     private static LinearLayout.LayoutParams MatchWrap() =>
         new(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);

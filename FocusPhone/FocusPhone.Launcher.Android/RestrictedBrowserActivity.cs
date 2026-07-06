@@ -32,6 +32,7 @@ public class RestrictedBrowserActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
 
         var origin = Intent?.Data?.ToString() is { } raw && Uri.TryCreate(raw, UriKind.Absolute, out var parsed)
             ? parsed
@@ -43,7 +44,6 @@ public class RestrictedBrowserActivity : Activity
         }
 
         var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        layout.SetBackgroundColor(PaperTheme.Paper);
 
         addressDisplay = PaperUi.Mono(this, "");
         addressDisplay.SetTextColor(PaperTheme.InkMuted);

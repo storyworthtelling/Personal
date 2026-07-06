@@ -16,12 +16,6 @@ public static class PaperUi
 {
     // ---- Text ----
 
-    public static TextView Clock(Context context)
-    {
-        var view = Text(context, "", DesignTokens.TypeSp.Clock, PaperTheme.Ink, PaperTheme.SerifRegular(context));
-        return view;
-    }
-
     public static TextView Display(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
 
@@ -182,12 +176,98 @@ public static class PaperUi
 
     // ---- Lists ----
 
-    /// <summary>Applies the paper list recipe: paper background, hairline dividers.</summary>
+    /// <summary>Applies the paper list recipe: transparent over the grained
+    /// window background, hairline dividers.</summary>
     public static void StylePaperList(Context context, ListView list)
     {
-        list.SetBackgroundColor(PaperTheme.Paper);
+        list.SetBackgroundColor(Color.Transparent);
+        list.CacheColorHint = Color.Transparent;
         list.Divider = new ColorDrawable(PaperTheme.Hairline);
         list.DividerHeight = PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp);
+    }
+
+    // ---- Structure ----
+
+    /// <summary>The in-page chapter-heading screen title (DESIGN.md §7).</summary>
+    public static TextView PageHeader(Context context, string title)
+    {
+        var view = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
+        view.SetPadding(0, 0, 0, PaperTheme.Dp(context, DesignTokens.Space.X6));
+        return view;
+    }
+
+    /// <summary>
+    /// The pinned bottom bar: a hairline rule over a horizontal action row,
+    /// fixed at the screen bottom (append after a weight-1 content view).
+    /// </summary>
+    public static LinearLayout BottomBar(Context context, params Android.Views.View[] actions)
+    {
+        var bar = new LinearLayout(context) { Orientation = Orientation.Vertical };
+
+        var rule = new Android.Views.View(context);
+        rule.SetBackgroundColor(PaperTheme.Hairline);
+        bar.AddView(rule, new LinearLayout.LayoutParams(
+            Android.Views.ViewGroup.LayoutParams.MatchParent,
+            PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp)));
+
+        var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
+        var horizontal = PaperTheme.Dp(context, DesignTokens.Space.X6);
+        var vertical = PaperTheme.Dp(context, DesignTokens.Space.X3);
+        row.SetPadding(horizontal, vertical, horizontal, vertical);
+        foreach (var action in actions)
+        {
+            row.AddView(action, new LinearLayout.LayoutParams(0,
+                Android.Views.ViewGroup.LayoutParams.WrapContent)
+            {
+                Weight = 1,
+                MarginEnd = PaperTheme.Dp(context, DesignTokens.Space.X2),
+            });
+        }
+        bar.AddView(row, new LinearLayout.LayoutParams(
+            Android.Views.ViewGroup.LayoutParams.MatchParent,
+            Android.Views.ViewGroup.LayoutParams.WrapContent));
+        return bar;
+    }
+
+    /// <summary>
+    /// The icon-only affordance for the swipe-up tray: a small ink chevron
+    /// with a 48dp touch target (DESIGN.md §7 gesture hint).
+    /// </summary>
+    public static Android.Views.View HintChevron(Context context, Action onTap)
+    {
+        var chevron = new ChevronView(context)
+        {
+            ContentDescription = "Open app tray",
+        };
+        chevron.Click += (_, _) => onTap();
+        return chevron;
+    }
+
+    private sealed class ChevronView : Android.Views.View
+    {
+        private readonly Paint paint;
+
+        public ChevronView(Context context) : base(context)
+        {
+            paint = new Paint
+            {
+                AntiAlias = true,
+                StrokeWidth = PaperTheme.Dp(context, 2),
+                Color = PaperTheme.InkMuted,
+                StrokeCap = Paint.Cap.Round,
+            };
+            paint.SetStyle(Paint.Style.Stroke);
+        }
+
+        protected override void OnDraw(Canvas canvas)
+        {
+            base.OnDraw(canvas);
+            using var path = new Path();
+            path.MoveTo(Width * 0.32f, Height * 0.58f);
+            path.LineTo(Width * 0.50f, Height * 0.42f);
+            path.LineTo(Width * 0.68f, Height * 0.58f);
+            canvas.DrawPath(path, paint);
+        }
     }
 
     // ---- Drawables ----

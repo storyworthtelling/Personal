@@ -4,6 +4,7 @@ using Android.OS;
 using Android.Views;
 using Android.Widget;
 using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
 using FocusPhone.Domain.Timeline;
 using FocusPhone.Ui;
 
@@ -27,6 +28,7 @@ public class ThreadActivity : ListActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        PaperTransitions.Apply(this);
         contactKey = Intent?.GetStringExtra(ExtraContactKey) ?? "";
         Title = ContactNameResolver.DisplayName(this, contactKey);
         PaperUi.StylePaperList(this, ListView!);
@@ -59,7 +61,7 @@ public class ThreadActivity : ListActivity
         ListAdapter = new PaperListAdapter(this, (thread?.Items ?? [])
             .Select(item => new PaperListRow(
                 item.Snippet,
-                $"{(item.Incoming ? "←" : "→")} {item.TimestampUtc.ToLocalTime():MMM d HH:mm}"))
+                $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.ToLocalTime(), DateTime.Now)}"))
             .ToList());
     }
 
@@ -121,11 +123,13 @@ public class ThreadActivity : ListActivity
                     var client = new Infrastructure.Email.GmailClient(
                         account.GmailAddress!, account.GmailAppPassword!);
                     await client.SendAsync(contactKey, subject.Text ?? "", body.Text ?? "");
-                    Toast.MakeText(this, "Sent.", ToastLength.Short)!.Show();
+                    // Success is the state change: the sent mail appears in the
+                    // thread on the next sync; nothing else to announce.
+                    LoadItems();
                 }
                 catch (Exception e)
                 {
-                    Toast.MakeText(this, $"Send failed: {e.Message}", ToastLength.Long)!.Show();
+                    Toast.MakeText(this, $"Send failed: {e.Message}. Check the app password in Settings.", ToastLength.Long)!.Show();
                 }
             })!
             .SetNegativeButton("Cancel", (_, _) => { })!
