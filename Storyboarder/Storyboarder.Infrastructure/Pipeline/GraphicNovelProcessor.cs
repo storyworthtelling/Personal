@@ -363,6 +363,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
     private async Task<ProcessResult> ComposePages(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
+        // Self-heal: a Completed panel whose image file has vanished (cache eviction, a partial
+        // restore) would make composition throw on the missing file and block the novel forever;
+        // send it back to be re-rendered instead.
+        if (await RevertPanelsWithMissingImages(db, novel, cancellationToken))
+            return ProcessResult.DidWork(novel.Id);
+
         var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);
 
         var page = await db.Pages
@@ -412,6 +418,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
     private async Task<ProcessResult> AssembleVolumes(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
+        // Self-heal: a Completed page whose composed image has vanished would make PDF assembly throw;
+        // send it back to be recomposed (which in turn re-renders any missing panels) instead.
+        if (await RevertPagesWithMissingImages(db, novel, cancellationToken))
+            return ProcessResult.DidWork(novel.Id);
+
         var volume = await db.Volumes
             .Where(v => v.NovelId == novel.Id && v.PdfStatus == WorkStatus.Pending)
             .Include(v => v.Pages)
@@ -672,6 +683,75 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         db.SaveChanges();
         logger.LogError("Novel {NovelId} failed: {Message}", novel.Id, message);
         return ProcessResult.Idle;
+    }
+
+    // Reverts any Completed panel whose rendered image is gone from disk back to Pending (and the
+    // pages that used it back to Pending too), then steps the novel back to RenderingImages so the
+    // worker regenerates the missing art rather than throwing on the missing file. Returns whether
+    // anything was healed.
+    private async Task<bool> RevertPanelsWithMissingImages(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);
+        var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
+        var completedPanels = await db.Panels
+            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.Completed)
+            .ToListAsync(cancellationToken);
+
+        var missing = completedPanels.Where(p => p.ImagePath is null || !imageStore.Exists(p.ImagePath)).ToList();
+        if (missing.Count == 0)
+            return false;
+
+        var affectedPageIds = missing.Select(p => p.PageId).ToHashSet();
+        foreach (var panel in missing)
+        {
+            panel.Status = WorkStatus.Pending;
+            panel.ImagePath = null;
+        }
+
+        var affectedPages = await db.Pages.Where(p => affectedPageIds.Contains(p.Id)).ToListAsync(cancellationToken);
+        foreach (var page in affectedPages)
+        {
+            page.CompositionStatus = WorkStatus.Pending;
+            page.ComposedImagePath = null;
+            page.ThumbImagePath = null;
+        }
+
+        SetStage(novel, ProjectStage.RenderingImages);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    // Reverts any Completed page whose composed image is gone from disk back to Pending (and the
+    // volumes that used it back to Pending too), then steps the novel back to ComposingPages.
+    private async Task<bool> RevertPagesWithMissingImages(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);
+        var completedPages = await db.Pages
+            .Where(p => volumeIds.Contains(p.VolumeId) && p.CompositionStatus == WorkStatus.Completed)
+            .ToListAsync(cancellationToken);
+
+        var missing = completedPages.Where(p => p.ComposedImagePath is null || !imageStore.Exists(p.ComposedImagePath)).ToList();
+        if (missing.Count == 0)
+            return false;
+
+        var affectedVolumeIds = missing.Select(p => p.VolumeId).ToHashSet();
+        foreach (var page in missing)
+        {
+            page.CompositionStatus = WorkStatus.Pending;
+            page.ComposedImagePath = null;
+            page.ThumbImagePath = null;
+        }
+
+        var affectedVolumes = await db.Volumes.Where(v => affectedVolumeIds.Contains(v.Id)).ToListAsync(cancellationToken);
+        foreach (var volume in affectedVolumes)
+        {
+            volume.PdfStatus = WorkStatus.Pending;
+            volume.PdfPath = null;
+        }
+
+        SetStage(novel, ProjectStage.ComposingPages);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private void SetStage(Novel novel, ProjectStage stage)

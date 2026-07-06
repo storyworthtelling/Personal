@@ -29,10 +29,9 @@
     <!-- Layout -->
     <Thickness x:Key="ScreenPadding">24</Thickness>
 
-    <!-- Pages: transparent so the grained window background shows (DESIGN.md §6).
-         Revert this single setter to {StaticResource Paper} if pages ever flash. -->
+    <!-- Pages -->
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
-        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Paper}" />
     </Style>
 
     <!-- Text: default is Sans body ink; named styles cover the rest of the scale. -->

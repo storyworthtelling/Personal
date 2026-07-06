@@ -44,7 +44,7 @@ public class PipelineWorker : Worker
             var outcome = runner.RunUntilExhaustedAsync(budget, CancellationToken.None)
                 .GetAwaiter().GetResult();
 
-            SettingsStore.LastRunOutcome = outcome;
+            SettingsStore.LastRunOutcome = outcome.ToString();
             SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return outcome == RunResult.Completed ? Result.InvokeSuccess() : Result.InvokeRetry();
         }
@@ -79,6 +79,15 @@ public class PipelineWorker : Worker
 
         WorkManager.GetInstance(context)
             .EnqueueUniqueWork($"{WorkName}-now", ExistingWorkPolicy.Keep!, (OneTimeWorkRequest)request);
+    }
+
+    // Stops the periodic and one-shot pipeline work. Used before a backup restore swaps the database
+    // and output files out from under a running cycle.
+    public static void CancelAll(Context context)
+    {
+        var manager = WorkManager.GetInstance(context);
+        manager.CancelUniqueWork(WorkName);
+        manager.CancelUniqueWork($"{WorkName}-now");
     }
 
     private static Constraints NetworkConnected() =>
