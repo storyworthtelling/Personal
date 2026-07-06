@@ -5,7 +5,7 @@ using Microsoft.Maui;
 namespace Storyboarder.Android.Platforms.Android;
 
 [Activity(
-    Theme = "@style/Maui.SplashTheme",
+    Theme = "@style/PaperSplashTheme",
     MainLauncher = true,
     LaunchMode = LaunchMode.SingleTop,
     ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation |
