@@ -44,7 +44,7 @@ public class PipelineWorker : Worker
             var outcome = runner.RunUntilExhaustedAsync(budget, CancellationToken.None)
                 .GetAwaiter().GetResult();
 
-            SettingsStore.LastRunOutcome = outcome;
+            SettingsStore.LastRunOutcome = outcome.ToString();
             SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return outcome == RunResult.Completed ? Result.InvokeSuccess() : Result.InvokeRetry();
         }
