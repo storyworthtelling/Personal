@@ -68,7 +68,7 @@ public class ThreadActivity : ListActivity
         ListAdapter = new PaperListAdapter(this, (thread?.Items ?? [])
             .Select(item => new PaperListRow(
                 TimelineItemFormatter.Describe(item),
-                $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.ToLocalTime(), DateTime.Now)}"))
+                $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.LocalDateTime, DateTime.Now)}"))
             .ToList());
     }
 

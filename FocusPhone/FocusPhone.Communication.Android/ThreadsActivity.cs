@@ -171,7 +171,7 @@ public class ThreadsActivity : Activity
                 var latest = thread.Items[^1];
                 return new PaperListRow(
                     ContactNameResolver.DisplayName(this, thread.ContactKey),
-                    $"{RelativeTime.Format(latest.TimestampUtc.ToLocalTime(), DateTime.Now)} · {latest.Snippet}");
+                    $"{RelativeTime.Format(latest.TimestampUtc.LocalDateTime, DateTime.Now)} · {latest.Snippet}");
             })
             .ToList());
 

@@ -162,7 +162,7 @@ public class AudioActivity : ListActivity
         ListAdapter = new PaperListAdapter(this, queue
             .Select(episode => new PaperListRow(
                 episode.Title,
-                RelativeTime.Format(episode.PublishedUtc.ToLocalTime(), DateTime.Now) +
+                RelativeTime.Format(episode.PublishedUtc.LocalDateTime, DateTime.Now) +
                 (episode.Duration is { } d ? $" · {(int)d.TotalMinutes} min" : "")))
             .ToList());
     }
