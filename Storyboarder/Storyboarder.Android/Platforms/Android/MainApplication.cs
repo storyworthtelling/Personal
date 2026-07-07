@@ -15,7 +15,12 @@ using Storyboarder.Infrastructure.Persistence;
 
 namespace Storyboarder.Android.Platforms.Android;
 
-[Application]
+// The launcher icon is set here, not in Platforms/Android/AndroidManifest.xml: this head does not set
+// <SingleProject>true</SingleProject>, so MAUI never wires that XML manifest into the build (the same
+// reason the permissions above are declared as assembly attributes). Setting Icon/RoundIcon on
+// [Application] bakes android:icon into the generated manifest, and the mipmap resources under
+// Resources/ (the active resource prefix) resolve it. Regenerate the icon via Tools/IconStudio.
+[Application(Icon = "@mipmap/appicon", RoundIcon = "@mipmap/appicon_round")]
 public class MainApplication : MauiApplication
 {
     public MainApplication(IntPtr handle, JniHandleOwnership ownership)
