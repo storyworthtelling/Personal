@@ -189,8 +189,13 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 reference.ReferenceSheetStatus = WorkStatus.Completed;
                 reference.LastError = null;
             }
-            catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                // Any failure — a rate limit, an HTTP error, or a response that carried no usable
+                // image (a text-only or safety-blocked reply, which surfaces as a plain exception) —
+                // is retried with backoff and, once non-transient attempts run out, marked Failed.
+                // Letting it escape here would crash the whole drain cycle and re-attempt the same
+                // sheet forever, wedging the novel at "sheets 0 of N" (and every novel queued behind it).
                 ScheduleRetry(reference, ex);
             }
 
@@ -198,9 +203,15 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        if (await PendingWork(db.DesignRefs.Where(r => r.NovelId == novel.Id), r => r.ReferenceSheetStatus, r => r.NextAttemptAtUtc, now)
-                is { } refWait)
-            return refWait == TimeSpan.MinValue ? ProcessResult.Idle : ProcessResult.Waiting(refWait, novel.Id);
+        // Reference sheets are optional consistency aids — panels render with whatever sheets exist —
+        // so a permanently-failed sheet must not block the stage. Only sheets still awaiting a retry
+        // hold us here; once none remain Pending/NeedsRetry, advance even if some ended up Failed.
+        var pendingSheetRetries = await db.DesignRefs
+            .Where(r => r.NovelId == novel.Id && r.ReferenceSheetStatus == WorkStatus.NeedsRetry)
+            .Select(r => r.NextAttemptAtUtc)
+            .ToListAsync(cancellationToken);
+        if (pendingSheetRetries.Count > 0)
+            return ProcessResult.Waiting((pendingSheetRetries.Min() ?? now) - now, novel.Id);
 
         // 4) Everything ready: advance.
         novel.Stage = ProjectStateMachine.NextStage(new PipelineProgress(
@@ -342,8 +353,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 panel.Status = WorkStatus.Completed;
                 panel.LastError = null;
             }
-            catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                // As with reference sheets: a rate limit, HTTP error, or no-image response is retried
+                // with backoff (then Failed once attempts run out) rather than escaping and crashing
+                // the cycle. A permanently-failed panel still blocks page composition below, by design.
                 ScheduleRetry(panel, ex);
             }
 
