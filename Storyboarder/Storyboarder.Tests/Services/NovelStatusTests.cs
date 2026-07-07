@@ -1,6 +1,7 @@
 using Moq;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Model;
+using Storyboarder.Infrastructure.Persistence;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
 using Xunit;
