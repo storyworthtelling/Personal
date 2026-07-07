@@ -9,6 +9,7 @@ on:
       - 'FocusPhone/FocusPhone.Communication.Android/**'
       - 'FocusPhone/FocusPhone.Camera.Android/**'
       - 'FocusPhone/FocusPhone.Audio.Android/**'
+      - 'FocusPhone/FocusPhone.Ui.Android/**'
       - 'FocusPhone/FocusPhone.Domain/**'
       - 'FocusPhone/FocusPhone.Infrastructure/**'
       - 'FocusPhone/FocusPhone.Tests/**'
