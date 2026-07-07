@@ -262,7 +262,7 @@ public static class PaperUi
         protected override void OnDraw(Canvas canvas)
         {
             base.OnDraw(canvas);
-            using var path = new Path();
+            using var path = new Android.Graphics.Path();
             path.MoveTo(Width * 0.32f, Height * 0.58f);
             path.LineTo(Width * 0.50f, Height * 0.42f);
             path.LineTo(Width * 0.68f, Height * 0.58f);
