@@ -159,32 +159,52 @@ public partial class MainPage : ContentPage
 
         public static ProjectRow From(NovelStatus s)
         {
-            // Loading is words (DESIGN.md §5): one readable sentence for the
-            // active stage, with the phase chips carrying the numbers.
+            // Loading is words (DESIGN.md §5): one readable sentence for the active stage — and,
+            // for the stages that walk a list, the running count so it's clear how much is left.
             var summary = s.Stage switch
             {
                 "Created" or "Ingesting" => "Reading the manuscript…",
-                "BuildingDesignBible" => Sentence("Building the design bible", "chunks", s.Chunks),
-                "Storyboarding" => "Storyboarding the book…",
+                "BuildingDesignBible" => DesignBibleSentence(s),
+                "Storyboarding" => Sentence("Storyboarding the book", "chunks", s.Storyboard),
                 "RenderingImages" => Sentence("Painting panels", "panels", s.Panels),
                 "ComposingPages" => Sentence("Composing pages", "pages", s.Pages),
                 "AssemblingVolumes" => Sentence("Binding volumes", "volumes", s.Volumes),
-                "ComposingAnalysis" => "Writing the revision report…",
+                "ComposingAnalysis" => AnalysisSentence(s),
                 "Completed" => "Finished.",
                 "Failed" => "Stopped.",
                 _ => s.Stage,
             };
 
+            // The whole pipeline as a wrapping chip strip: each phase that has work shows its
+            // done-of-total, and the stage in progress is highlighted (DESIGN.md §7).
             var chips = new List<PhaseChipRow>();
+            AddChip(chips, "chunks", s.Chunks, s.Stage == "BuildingDesignBible" && !Complete(s.Chunks));
+            AddChip(chips, "sheets", s.ReferenceSheets, s.Stage == "BuildingDesignBible" && Complete(s.Chunks));
+            AddChip(chips, "storyboard", s.Storyboard, s.Stage == "Storyboarding");
             AddChip(chips, "panels", s.Panels, s.Stage == "RenderingImages");
             AddChip(chips, "pages", s.Pages, s.Stage == "ComposingPages");
             AddChip(chips, "volumes", s.Volumes, s.Stage == "AssemblingVolumes");
-            AddChip(chips, "analysis", s.Analysis, s.Stage == "ComposingAnalysis");
+            AddChip(chips, "analysis", s.AnalysisNotes, s.Stage == "ComposingAnalysis");
 
             return new ProjectRow(
                 s.Id, s.Title, summary, s.LastError, !string.IsNullOrEmpty(s.LastError),
                 s.CoverThumbPath, !string.IsNullOrEmpty(s.CoverThumbPath), chips);
         }
+
+        // The design bible has two sub-steps: read every chunk for characters & settings, then draw
+        // a reference sheet for each. Report whichever is in flight so the sentence never stalls.
+        private static string DesignBibleSentence(NovelStatus s) =>
+            Complete(s.Chunks)
+                ? Sentence("Drawing reference sheets", "sheets", s.ReferenceSheets)
+                : Sentence("Building the design bible", "chunks", s.Chunks);
+
+        // The report maps every chapter into notes, then consolidates and renders it as a PDF.
+        private static string AnalysisSentence(NovelStatus s) =>
+            Complete(s.AnalysisNotes)
+                ? "Writing the revision report…"
+                : Sentence("Analysing the manuscript", "chapters", s.AnalysisNotes);
+
+        private static bool Complete(PhaseProgress phase) => phase.Total > 0 && phase.Done >= phase.Total;
 
         private static string Sentence(string verb, string noun, PhaseProgress phase) =>
             phase.Total > 0 ? $"{verb} — {noun} {phase.Done} of {phase.Total}…" : $"{verb}…";

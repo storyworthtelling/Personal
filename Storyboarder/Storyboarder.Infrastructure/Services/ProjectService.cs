@@ -102,6 +102,11 @@ public sealed class ProjectService
         var chunks = await Counts(db.Chunks.Where(c => c.NovelId == id), c => c.AnalysisStatus, cancellationToken);
         var sheets = await Counts(db.DesignRefs.Where(r => r.NovelId == id), r => r.ReferenceSheetStatus, cancellationToken);
 
+        // Storyboarding walks the chunk list one window at a time; the cursor is how far it has got.
+        // Clamp to the total so the moment it finishes (cursor == count) it reads a clean 100%.
+        var chunkCount = await db.Chunks.CountAsync(c => c.NovelId == id, cancellationToken);
+        var storyboard = new PhaseProgress(Math.Min(novel.StoryboardCursor, chunkCount), chunkCount);
+
         var volumeIds = await db.Volumes.Where(v => v.NovelId == id).Select(v => v.Id).ToListAsync(cancellationToken);
         var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
 
@@ -115,6 +120,9 @@ public sealed class ProjectService
             .Select(v => new VolumeStatus(v.Number, v.Title, v.PdfStatus == WorkStatus.Completed))
             .ToListAsync(cancellationToken);
 
+        // The analysis stage maps every chapter into notes before it consolidates and renders; the
+        // per-chapter map is the long part, so surface it as its own progress.
+        var analysisNotes = await Counts(db.ChunkAnalyses.Where(a => a.NovelId == id), a => a.Status, cancellationToken);
         var analysisReady = await db.BookAnalyses
             .AnyAsync(a => a.NovelId == id && a.PdfStatus == WorkStatus.Completed, cancellationToken);
         var analysis = new PhaseProgress(analysisReady ? 1 : 0, 1);
@@ -128,7 +136,8 @@ public sealed class ProjectService
 
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
-            chunks, sheets, panels, pages, volumes, volumeList, analysis, analysisReady, coverThumb);
+            chunks, sheets, storyboard, panels, pages, volumes, volumeList,
+            analysisNotes, analysis, analysisReady, coverThumb);
     }
 
     private static async Task<PhaseProgress> Counts<T>(
