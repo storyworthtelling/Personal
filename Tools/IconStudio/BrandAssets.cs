@@ -13,15 +13,16 @@ public static class BrandAssets
     private static readonly string[] GrainTargets =
     [
         "FocusPhone/FocusPhone.Ui.Android/Resources/drawable-nodpi/paper_grain.png",
-        "Storyboarder/Storyboarder.Android/Platforms/Android/Resources/drawable-nodpi/paper_grain.png",
-        "DailyLoader/DailyLoader.Android/Platforms/Android/Resources/drawable-nodpi/paper_grain.png",
+        // MAUI heads use the plain `Resources/` prefix, not Platforms/Android/Resources — see IconSpecs.
+        "Storyboarder/Storyboarder.Android/Resources/drawable-nodpi/paper_grain.png",
+        "DailyLoader/DailyLoader.Android/Resources/drawable-nodpi/paper_grain.png",
     ];
 
     private static readonly string[] MedallionTargets =
     [
         "Storyboarder/Storyboarder.Infrastructure/Resources/owner.png",
-        "Storyboarder/Storyboarder.Android/Platforms/Android/Resources/drawable-nodpi/owner_medallion.png",
-        "DailyLoader/DailyLoader.Android/Platforms/Android/Resources/drawable-nodpi/owner_medallion.png",
+        "Storyboarder/Storyboarder.Android/Resources/drawable-nodpi/owner_medallion.png",
+        "DailyLoader/DailyLoader.Android/Resources/drawable-nodpi/owner_medallion.png",
         "FocusPhone/FocusPhone.Communication.Android/Resources/drawable-nodpi/owner_medallion.png",
     ];
 

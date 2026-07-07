@@ -65,12 +65,11 @@ jobs:
           -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }}
           -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
 
-      # Prove the launcher icon is actually in the APK. In a multi-project MAUI head the resizetizer
-      # has silently shipped the default icon before, so we no longer trust "it built". Print-only /
-      # non-fatal: shows the packaged icon resources and the manifest's resolved android:icon, so a
-      # green build confirms the custom icon is present (grep for "=== ICON CHECK ===" in the log).
+      # Prove the launcher icon is actually in the APK and FAIL the build if it is not. This head does
+      # not set <SingleProject>true</SingleProject>, so anything under Platforms/Android/Resources is
+      # silently dropped and android:icon resolves to empty; a plain "it built" hid that for months.
+      # This gate reads the resolved android:icon back out of the APK (grep the log for "ICON CHECK").
       - name: ICON CHECK
-        continue-on-error: true
         working-directory: Storyboarder
         run: |
           set +e
@@ -81,13 +80,20 @@ jobs:
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
           [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
           echo "aapt2: $AAPT2"
+          BADGING=$("$AAPT2" dump badging "$APK" 2>/dev/null)
           echo "--- manifest application icon (aapt2 dump badging) ---"
-          "$AAPT2" dump badging "$APK" 2>/dev/null | grep -Ei 'application(-icon)?:|launchable-activity' || echo "(aapt2 badging produced no icon line)"
+          echo "$BADGING" | grep -Ei 'application(-icon)?:|launchable-activity' || echo "(aapt2 badging produced no icon line)"
           echo "--- packaged icon resources (unzip -l) ---"
           unzip -l "$APK" | grep -Ei 'mipmap|appicon' || echo "(no mipmap/appicon entries found in APK)"
           echo "--- packaged fonts (unzip -l) ---"
           echo "fonts packaged: $(unzip -l "$APK" | grep -ci '\.ttf')"
           echo "=== END ICON CHECK ==="
+          APPICON=$(echo "$BADGING" | grep -E '^application:' | sed -n "s/.*icon='\([^']*\)'.*/\1/p")
+          if [ -z "$APPICON" ]; then
+            echo "ICON CHECK FAILED: android:icon is empty — the launcher icon is not packaged/resolved."
+            exit 1
+          fi
+          echo "ICON CHECK PASSED: android:icon = $APPICON"
 
       # Keep only the latest run's artifacts: delete artifacts from older runs of
       # this workflow before uploading, which also frees storage so the upload succeeds.
