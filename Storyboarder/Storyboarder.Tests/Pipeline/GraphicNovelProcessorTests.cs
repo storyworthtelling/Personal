@@ -230,6 +230,61 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.True(File.Exists(page2.ComposedImagePath!));
     }
 
+    [Fact]
+    public async Task CompletesNovel_EvenWhenEveryReferenceSheetRenderFailsWithoutAnImage()
+    {
+        // The image model can return a response that carries no usable image (a text-only or
+        // safety-blocked reply), which surfaces as a non-HTTP InvalidOperationException. That must be
+        // retried and then tolerated — not left to escape the cycle and wedge the novel at "0 of N".
+        gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Gemini response contained no image data"));
+
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var context = database.NewContext();
+        var design = context.DesignRefs.Where(r => r.NovelId == novelId).ToList();
+        Assert.NotEmpty(design);
+        Assert.All(design, r =>
+        {
+            Assert.Equal(WorkStatus.Failed, r.ReferenceSheetStatus);
+            Assert.NotNull(r.LastError);
+            Assert.Null(r.ReferenceImagePath);
+        });
+
+        // Panels still render (with whatever reference sheets exist — here, none) and the volume binds.
+        var volume = Assert.Single(context.Volumes.Where(v => v.NovelId == novelId));
+        Assert.Equal(WorkStatus.Completed, volume.PdfStatus);
+        Assert.True(File.Exists(volume.PdfPath!));
+    }
+
+    [Fact]
+    public async Task RetriesPanelRender_WhenGeminiReturnsNoImage_InsteadOfCrashingTheCycle()
+    {
+        // A panel render that comes back without an image raises a non-HTTP exception too; it must be
+        // scheduled for retry rather than thrown out of ProcessNextAsync.
+        var panelCalls = 0;
+        gemini.Setup(g => g.GeneratePanel(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                panelCalls++;
+                return panelCalls == 1
+                    ? Task.FromException<byte[]>(new InvalidOperationException("Gemini response contained no image data"))
+                    : Task.FromResult(SampleImages.Png());
+            });
+
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.True(panelCalls >= 2, "The no-image first panel render should have been retried.");
+    }
+
     // Drives the pipeline to a terminal stage, invoking inspect() with the current stage before each
     // cycle so a test can disrupt on-disk state mid-run. Fresh processor per cycle proves resume.
     private async Task DriveToCompletion(Guid novelId, Action<ProjectStage> inspect)
