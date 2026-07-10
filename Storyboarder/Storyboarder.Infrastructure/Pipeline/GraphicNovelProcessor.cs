@@ -152,7 +152,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 chunk.LastError = null;
                 logger.LogInformation("Analysed chunk {Ordinal} for the design bible (novel {NovelId})", chunk.Ordinal, novel.Id);
             }
-            catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
+            // Any transient failure — rate limit, HTTP error, or a network-layer drop like "Socket
+            // closed" (an IOException/SocketException, not an HttpRequestException) — is retried with
+            // backoff rather than escaping and failing the whole worker cycle.
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 ScheduleRetry(chunk, ex);
             }
@@ -274,7 +277,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         {
             segment = await claude.Storyboard(window, novel.ContinuitySummary, bible, novel.ArtStyle, cancellationToken);
         }
-        catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
+        // A transient failure here (rate limit, HTTP error, or a network drop like "Socket closed")
+        // is retried with backoff; letting it escape would fail the whole worker cycle.
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             novel.LastError = ex.Message;
             await db.SaveChangesAsync(cancellationToken);
@@ -528,7 +533,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 unit.Status = WorkStatus.Completed;
                 unit.LastError = null;
             }
-            catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
+            // Retry any transient failure (rate limit, HTTP error, or a network drop like "Socket
+            // closed") with backoff instead of letting it escape and fail the whole worker cycle.
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 ScheduleRetry(unit, ex);
             }
@@ -558,7 +565,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 analysis.ConsolidatedJson = JsonSerializer.Serialize(report, JsonResponse.CaseInsensitive);
                 novel.LastError = null;
             }
-            catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
+            // Retry any transient failure (rate limit, HTTP error, or a network drop like "Socket
+            // closed") with backoff instead of letting it escape and fail the whole worker cycle.
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 novel.LastError = ex.Message;
                 await db.SaveChangesAsync(cancellationToken);

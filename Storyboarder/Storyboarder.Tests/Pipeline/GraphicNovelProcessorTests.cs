@@ -285,6 +285,33 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.True(panelCalls >= 2, "The no-image first panel render should have been retried.");
     }
 
+    [Fact]
+    public async Task RecoversFromTransientNetworkDrop_DuringStoryboarding_InsteadOfFailingTheCycle()
+    {
+        // A socket/IO drop ("Socket closed" is an IOException, not an HttpRequestException) during a
+        // Claude call must be retried with backoff — not escape ProcessNextAsync and fail the cycle.
+        var storyboardCalls = 0;
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                storyboardCalls++;
+                return storyboardCalls == 1
+                    ? Task.FromException<StoryboardSegment>(new IOException("Socket closed"))
+                    : Task.FromResult(new StoryboardSegment(
+                        [new VolumeDraft(1, "Volume One",
+                            [new PageDraft(1, [new PanelDraft("Hero stands before the Castle", "At last.", null, ["Hero", "Castle"])])])],
+                        "Hero reached the castle."));
+            });
+
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.True(storyboardCalls >= 2, "The socket-dropped first storyboard call should have been retried.");
+    }
+
     // Drives the pipeline to a terminal stage, invoking inspect() with the current stage before each
     // cycle so a test can disrupt on-disk state mid-run. Fresh processor per cycle proves resume.
     private async Task DriveToCompletion(Guid novelId, Action<ProjectStage> inspect)
