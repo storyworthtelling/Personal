@@ -32,6 +32,18 @@ public static class PolicyPlanBuilder
         // kept runnable but never surfaced in the launcher.
         suspended.Remove(PolicyContext.PlayStorePackage);
 
-        return new PolicyPlan(restrictions, suspended, EnforceAutoTime: true, FamilyDnsHost);
+        // READ_SMS and READ_CALL_LOG are hard-restricted: the installer only
+        // whitelists them (un-restricts), so they still have to be granted. A
+        // device-owner grant is the only reliable path — it needs no runtime
+        // dialog (unusable on the kiosk), survives a fresh reinstall through the
+        // silent-update channel (which arrives whitelisted but not granted), and
+        // pins the grant against Android auto-resetting unused-app permissions.
+        var permissionGrants = new List<PermissionGrant>
+        {
+            new(PolicyContext.CommunicationPackage, PolicyContext.ReadSmsPermission),
+            new(PolicyContext.CommunicationPackage, PolicyContext.ReadCallLogPermission),
+        };
+
+        return new PolicyPlan(restrictions, suspended, permissionGrants, EnforceAutoTime: true, FamilyDnsHost);
     }
 }

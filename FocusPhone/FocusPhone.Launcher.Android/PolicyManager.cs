@@ -83,9 +83,10 @@ public static class PolicyManager
             }
         }
 
+        GrantPermissions(dpm, admin, plan);
         PinHomeActivity(dpm, admin, context);
         PinRestrictedBrowser(dpm, admin, context);
-        Log.Info(Tag, $"Policy applied: {plan.UserRestrictions.Count} restrictions, {installed.Length} packages suspended.");
+        Log.Info(Tag, $"Policy applied: {plan.UserRestrictions.Count} restrictions, {installed.Length} packages suspended, {plan.PermissionGrants.Count} permission grants.");
     }
 
     /// <summary>
@@ -97,6 +98,36 @@ public static class PolicyManager
         var store = new BlocklistStore(context);
         store.DebuggingLockedDown = true;
         ApplyCurrentPolicy(context);
+    }
+
+    /// <summary>
+    /// Force-grants the hard-restricted permissions the Communication app needs
+    /// (READ_SMS, READ_CALL_LOG). The APK is whitelisted at install time, which
+    /// only un-restricts these; the device-owner grant is what actually turns
+    /// them on — with no runtime dialog, across silent reinstalls, and pinned so
+    /// Android's unused-app auto-reset can't revoke them.
+    /// </summary>
+    private static void GrantPermissions(DevicePolicyManager dpm, ComponentName admin, PolicyPlan plan)
+    {
+        foreach (var grant in plan.PermissionGrants)
+        {
+            try
+            {
+                // Returns false (or throws) if the target app isn't installed yet
+                // or the permission isn't whitelisted; the next policy pass (e.g.
+                // after the update worker installs it) retries, so a single miss
+                // must not abort the rest of the lockdown.
+                if (!dpm.SetPermissionGrantState(admin, grant.Package, grant.Permission,
+                        PermissionGrantState.Granted))
+                {
+                    Log.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet; will retry next policy pass.");
+                }
+            }
+            catch (Java.Lang.Exception e)
+            {
+                Log.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}");
+            }
+        }
     }
 
     private static void PinHomeActivity(DevicePolicyManager dpm, ComponentName admin, Context context)
