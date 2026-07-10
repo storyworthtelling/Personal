@@ -1,5 +1,6 @@
 using Moq;
 using Storyboarder.Domain.External;
+using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
 using Storyboarder.Infrastructure.Persistence;
 using Storyboarder.Infrastructure.Services;
@@ -17,10 +18,11 @@ public class NovelStatusTests : IDisposable
     private readonly TestDatabase database = new();
     private readonly FakeClock clock = new(Start);
     private readonly Mock<IGoogleDocsClient> docs = new();
+    private readonly Mock<IImageStore> imageStore = new();
 
     public void Dispose() => database.Dispose();
 
-    private ProjectService NewService() => new(database, docs.Object, clock);
+    private ProjectService NewService() => new(database, docs.Object, imageStore.Object, clock);
 
     private Guid SeedNovel(ProjectStage stage, Action<StoryboarderDbContextSeed>? seed = null)
     {
