@@ -25,12 +25,16 @@ public class PipelineWorker : Worker
 
     public override Result DoWork()
     {
-        // Nothing the worker can do until the API keys are entered on the Settings page.
-        if (!SettingsStore.IsConfigured)
-            return Result.InvokeSuccess();
-
         using var scope = IPlatformApplication.Current!.Services.CreateScope();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<PipelineWorker>>();
+
+        // Nothing the worker can do until the API keys are entered on the Settings page. Log it so a
+        // conversion that never advances because it's unconfigured leaves a trace in the pipeline log.
+        if (!SettingsStore.IsConfigured)
+        {
+            logger.LogInformation("Pipeline worker skipped: API keys are not configured yet.");
+            return Result.InvokeSuccess();
+        }
 
         try
         {
