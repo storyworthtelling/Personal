@@ -77,15 +77,15 @@ jobs:
             echo "::endgroup::"
           done
 
-      # Prove the Paper & Ink launcher icons and shared fonts are actually packaged
-      # (same rationale as Storyboarder's ICON CHECK: don't trust "it built").
-      # Print-only / non-fatal; grep the log for "=== ICON+FONT CHECK ===".
-      - name: ICON+FONT CHECK
+      # Prove the Paper & Ink launcher icons are packaged (same rationale as
+      # Storyboarder's ICON CHECK: don't trust "it built"). Print-only /
+      # non-fatal; grep the log for "=== ICON CHECK ===".
+      - name: ICON CHECK
         continue-on-error: true
         working-directory: FocusPhone
         run: |
           set +e
-          echo "=== ICON+FONT CHECK ==="
+          echo "=== ICON CHECK ==="
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
           for proj in Launcher Communication Camera Audio; do
             APK=$(ls -1 "FocusPhone.$proj.Android"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
@@ -93,9 +93,35 @@ jobs:
             echo "--- $proj: $APK"
             "$AAPT2" dump badging "$APK" 2>/dev/null | grep -Ei 'application(-icon)?:' || echo "(no icon line)"
             unzip -l "$APK" | grep -Ei 'mipmap.*appicon' | head -4 || echo "(no appicon entries)"
-            echo "fonts packaged: $(unzip -l "$APK" | grep -ci '\.ttf')"
           done
-          echo "=== END ICON+FONT CHECK ==="
+          echo "=== END ICON CHECK ==="
+
+      # Fatal: prove the six shared fonts are packaged at the exact internal
+      # path PaperTheme.Load reads them from (assets/fonts/<name>.ttf). Counting
+      # ".ttf" is not enough — a Link separator bug can pack them under a wrong
+      # literal name (e.g. "assets/Assets\fonts\Foo.ttf") so Assets.Open fails
+      # and every head crashes on launch. A misfiled font must fail the build.
+      - name: FONT CHECK
+        working-directory: FocusPhone
+        run: |
+          set -e
+          echo "=== FONT CHECK ==="
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular"
+          for proj in Launcher Communication Camera Audio; do
+            APK=$(ls -1 "FocusPhone.$proj.Android"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+            [ -z "$APK" ] && APK=$(ls -1 "FocusPhone.$proj.Android"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+            echo "--- $proj: $APK"
+            ENTRIES=$(unzip -l "$APK")
+            for font in $FONTS; do
+              if ! echo "$ENTRIES" | grep -q "assets/fonts/$font.ttf"; then
+                echo "FAIL: $proj is missing assets/fonts/$font.ttf"
+                echo "$ENTRIES" | grep -i '\.ttf' || echo "(no .ttf entries at all)"
+                exit 1
+              fi
+            done
+            echo "ok: all six fonts at assets/fonts/"
+          done
+          echo "=== END FONT CHECK ==="
 
       # Keep only the latest run's artifacts: delete artifacts from older runs of
       # this workflow before uploading, which also frees storage so the upload succeeds.
