@@ -53,6 +53,8 @@ public class ThreadsActivity : Activity
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Could not schedule email sync: {e}");
         }
+
+        CrashReporter.ShowPendingCrash(this);
     }
 
     protected override void OnResume()

@@ -63,6 +63,7 @@ public class AudioActivity : ListActivity
         };
 
         ConnectController();
+        CrashReporter.ShowPendingCrash(this);
     }
 
     // ListActivity binds to the ListView with the platform list id. The action

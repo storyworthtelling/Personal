@@ -12,7 +12,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The shared Paper & Ink fonts; packaged into every consuming head's APK. -->
-    <AndroidAsset Include="..\..\Fonts\*.ttf" Link="Assets\fonts\%(Filename)%(Extension)" />
+    <!-- The shared Paper & Ink fonts; packaged into every consuming head's APK.
+         Forward slashes in Link are mandatory: on the Linux CI runner a
+         backslash is not a path separator, so "Assets\fonts\Foo.ttf" would be
+         packaged under that literal name instead of nested at assets/fonts/,
+         and PaperTheme.Load's Assets.Open("fonts/...") would fail — crashing
+         every head on launch. Forward slashes are correct on Windows too. -->
+    <AndroidAsset Include="..\..\Fonts\*.ttf" Link="Assets/fonts/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

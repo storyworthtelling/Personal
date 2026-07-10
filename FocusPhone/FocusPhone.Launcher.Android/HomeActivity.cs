@@ -41,6 +41,7 @@ public class HomeActivity : Activity
         SetContentView(BuildLayout());
         gestureDetector = new GestureDetector(this, new SwipeUpListener(OpenAppTray));
         PolicyManager.ApplyCurrentPolicy(this);
+        CrashReporter.ShowPendingCrash(this);
     }
 
     protected override void OnResume()

@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Runtime;
+using FocusPhone.Ui;
 
 namespace FocusPhone.Launcher;
 
@@ -15,6 +16,8 @@ public class FocusApplication : Application
     public override void OnCreate()
     {
         base.OnCreate();
+        // Install first so a fault in the startup work below is captured.
+        CrashReporter.Install(this, "FocusPhone");
         packageWatcher = new PackageWatcher(this);
         packageWatcher.Start();
         UpdateService.Schedule(this);

@@ -53,6 +53,8 @@ public class CameraActivity : AppCompatActivity
         {
             RequestPermissions([Android.Manifest.Permission.Camera], 0);
         }
+
+        CrashReporter.ShowPendingCrash(this);
     }
 
     public override void OnRequestPermissionsResult(int requestCode, string[] permissions,
