@@ -8,6 +8,9 @@ namespace Storyboarder.Android.Pages;
 
 public partial class SetupPage : ContentPage
 {
+    private static string PipelineLogPath => System.IO.Path.Combine(FileSystem.AppDataDirectory, "pipeline.log");
+    private static string CrashLogPath => System.IO.Path.Combine(FileSystem.AppDataDirectory, "crash.log");
+
     public SetupPage()
     {
         InitializeComponent();
@@ -27,6 +30,9 @@ public partial class SetupPage : ContentPage
             MigrationErrorLabel.Text =
                 "The last app update couldn't finish updating your library, so work is paused. " +
                 "Restoring a recent backup usually fixes it. Details: " + migrationError;
+
+        PipelineLogButton.IsVisible = HasContent(PipelineLogPath);
+        CrashLogButton.IsVisible = HasContent(CrashLogPath);
     }
 
     private static ProjectBackupService BackupService() =>
@@ -114,6 +120,45 @@ public partial class SetupPage : ContentPage
         catch (Exception ex)
         {
             BackupStatusLabel.Text = "Restore failed: " + ex.Message;
+        }
+    }
+
+    private static bool HasContent(string path) =>
+        System.IO.File.Exists(path) && new System.IO.FileInfo(path).Length > 0;
+
+    private async void OnPipelineLogClicked(object sender, EventArgs e) =>
+        await ShowLog("Pipeline log", PipelineLogPath, PipelineFileLogger.Clear, PipelineLogButton);
+
+    private async void OnCrashLogClicked(object sender, EventArgs e) =>
+        await ShowLog("Crash log", CrashLogPath, () => System.IO.File.Delete(CrashLogPath), CrashLogButton);
+
+    // Shared View & copy / Share / Clear flow for a diagnostic log file (mirrors DailyLoader).
+    private async Task ShowLog(string title, string path, Action clear, Button button)
+    {
+        if (!HasContent(path))
+        {
+            DiagnosticsStatusLabel.Text = $"No {title.ToLowerInvariant()} yet.";
+            button.IsVisible = false;
+            return;
+        }
+
+        var log = System.IO.File.ReadAllText(path);
+        var action = await DisplayActionSheet(title, "Cancel", null, "View & copy", "Share", "Clear");
+        if (action == "View & copy")
+        {
+            var preview = log.Length > 3000 ? "(truncated — use Share for the full log)\n\n" + log[^3000..] : log;
+            await Clipboard.SetTextAsync(log);
+            await DisplayAlert($"{title} (copied to clipboard)", preview, "OK");
+        }
+        else if (action == "Share")
+        {
+            await Share.RequestAsync(new ShareFileRequest { Title = title, File = new ShareFile(path) });
+        }
+        else if (action == "Clear")
+        {
+            clear();
+            DiagnosticsStatusLabel.Text = $"{title} cleared.";
+            button.IsVisible = HasContent(path);
         }
     }
 

@@ -13,7 +13,8 @@ public enum ProjectStage
     AssemblingVolumes,
     ComposingAnalysis,
     Completed,
-    Failed
+    Failed,
+    Cancelled    // stopped by the user; terminal, and the worker leaves it alone
 }
 
 // The status of a single unit of work (a chunk analysis, a reference sheet, a panel render,

@@ -100,13 +100,25 @@ public partial class MainPage : ContentPage
                 $"{status.Title} — Analysis",
                 projects => projects.GetAnalysisPdfPathAsync(status.Id, CancellationToken.None)));
 
-        if (options.Count == 0)
+        // A project card always offers management (stop/delete); PDFs appear once they're ready.
+        var isActive = status.Stage is not ("Completed" or "Failed" or "Cancelled");
+        var buttons = options.Select(o => o.Label).ToList();
+        if (isActive)
+            buttons.Add(StopAction);
+
+        var choice = await DisplayActionSheet(status.Title, "Cancel", DeleteAction, buttons.ToArray());
+
+        if (choice == DeleteAction)
         {
-            // Nothing to open yet; the card's chips already say why.
+            await DeleteProject(status);
+            return;
+        }
+        if (choice == StopAction)
+        {
+            await StopProject(status);
             return;
         }
 
-        var choice = await DisplayActionSheet("Open a PDF", "Cancel", null, options.Select(o => o.Label).ToArray());
         var picked = options.FirstOrDefault(o => o.Label == choice);
         if (picked is null)
             return;
@@ -129,6 +141,39 @@ public partial class MainPage : ContentPage
             Title = picked.ShareTitle,
             File = new ShareFile(path)
         });
+    }
+
+    private const string StopAction = "Stop conversion";
+    private const string DeleteAction = "Delete project";
+
+    // Stops a running conversion but keeps the card and any finished PDFs.
+    private async Task StopProject(NovelStatus status)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            await projects.CancelAsync(status.Id, CancellationToken.None);
+        }
+        await RefreshAsync();
+    }
+
+    // Removes a project entirely (rows + rendered files) after a confirm. DESIGN.md §5 asks for an
+    // undo bar; MAUI has no such component, so this mirrors the Restore flow's confirm dialog.
+    private async Task DeleteProject(NovelStatus status)
+    {
+        var confirm = await DisplayAlert(
+            "Delete this project?",
+            $"“{status.Title}” and its rendered pages will be removed for good. This can’t be undone.",
+            "Delete", "Keep");
+        if (!confirm)
+            return;
+
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            await projects.DeleteAsync(status.Id, CancellationToken.None);
+        }
+        await RefreshAsync();
     }
 
     // One entry in the "open a PDF" action sheet: its label, share title, and how to resolve its path.
@@ -172,6 +217,7 @@ public partial class MainPage : ContentPage
                 "ComposingAnalysis" => AnalysisSentence(s),
                 "Completed" => "Finished.",
                 "Failed" => "Stopped.",
+                "Cancelled" => "Stopped by you.",
                 _ => s.Stage,
             };
 

@@ -8,6 +8,10 @@ public interface IImageStore
     string Save(string relativePath, byte[] content);
     byte[] Read(string absolutePath);
     bool Exists(string absolutePath);
+
+    // Recursively removes a file or directory under the output root (e.g. a whole novel's output
+    // subtree). A no-op if nothing is there, so deleting an already-clean project can't throw.
+    void Delete(string relativePath);
 }
 
 // The page furniture outside the panels: the folio band's page number and

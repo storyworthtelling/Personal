@@ -102,6 +102,8 @@ public static class MauiProgram
 #if DEBUG
         builder.Logging.AddDebug();
 #endif
+        // Persist the pipeline's log to a file so it can be viewed/shared from Settings for diagnosis.
+        builder.Logging.AddProvider(PipelineFileLogger.Instance);
 
         return builder.Build();
     }
