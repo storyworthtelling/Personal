@@ -41,6 +41,7 @@ public static class ProjectStateMachine
             progress.AnalysisComplete ? ProjectStage.Completed : ProjectStage.ComposingAnalysis,
         ProjectStage.Completed => ProjectStage.Completed,
         ProjectStage.Failed => ProjectStage.Failed,
+        ProjectStage.Cancelled => ProjectStage.Cancelled,
         _ => progress.Stage
     };
 }

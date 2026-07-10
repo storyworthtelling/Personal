@@ -28,4 +28,13 @@ public sealed class FileSystemImageStore : IImageStore
     public byte[] Read(string absolutePath) => File.ReadAllBytes(absolutePath);
 
     public bool Exists(string absolutePath) => File.Exists(absolutePath);
+
+    public void Delete(string relativePath)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(root, relativePath));
+        if (Directory.Exists(fullPath))
+            Directory.Delete(fullPath, recursive: true);
+        else if (File.Exists(fullPath))
+            File.Delete(fullPath);
+    }
 }

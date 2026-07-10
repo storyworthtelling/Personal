@@ -73,7 +73,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var novel = await db.Novels
-            .Where(n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed)
+            .Where(n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed &&
+                        n.Stage != ProjectStage.Cancelled)
             .OrderBy(n => n.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -149,6 +150,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 chunk.PartialBibleJson = JsonSerializer.Serialize(fragment, JsonResponse.CaseInsensitive);
                 chunk.AnalysisStatus = WorkStatus.Completed;
                 chunk.LastError = null;
+                logger.LogInformation("Analysed chunk {Ordinal} for the design bible (novel {NovelId})", chunk.Ordinal, novel.Id);
             }
             catch (Exception ex) when (ex is RateLimitException or HttpRequestException)
             {
@@ -188,6 +190,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 reference.ReferenceImagePath = imageStore.Save($"{novel.Id}/refs/{reference.Id}.png", image);
                 reference.ReferenceSheetStatus = WorkStatus.Completed;
                 reference.LastError = null;
+                logger.LogInformation("Rendered reference sheet for {Kind} '{Name}' (novel {NovelId})", reference.Kind, reference.Name, novel.Id);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -214,10 +217,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.Waiting((pendingSheetRetries.Min() ?? now) - now, novel.Id);
 
         // 4) Everything ready: advance.
-        novel.Stage = ProjectStateMachine.NextStage(new PipelineProgress(
+        SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, false, AllChunksAnalyzed: true, BibleConsolidated: true, AllReferenceSheetsRendered: true,
-            false, false, false, false));
-        Touch(novel);
+            false, false, false, false)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
@@ -251,9 +253,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         var chunkCount = await db.Chunks.CountAsync(c => c.NovelId == novel.Id, cancellationToken);
         if (novel.StoryboardCursor >= chunkCount)
         {
-            novel.Stage = ProjectStateMachine.NextStage(new PipelineProgress(
-                novel.Stage, false, false, false, false, StoryboardCreated: true, false, false, false));
-            Touch(novel);
+            SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
+                novel.Stage, false, false, false, false, StoryboardCreated: true, false, false, false)));
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.DidWork(novel.Id);
         }
@@ -352,6 +353,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", image);
                 panel.Status = WorkStatus.Completed;
                 panel.LastError = null;
+                logger.LogInformation("Rendered panel {PanelId} (novel {NovelId})", panel.Id, novel.Id);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -368,9 +370,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (await PendingWork(panelsForNovel, p => p.Status, p => p.NextAttemptAtUtc, now) is { } wait)
             return wait == TimeSpan.MinValue ? ProcessResult.Idle : ProcessResult.Waiting(wait, novel.Id);
 
-        novel.Stage = ProjectStateMachine.NextStage(new PipelineProgress(
-            novel.Stage, false, false, false, false, false, AllPanelsRendered: true, false, false));
-        Touch(novel);
+        SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
+            novel.Stage, false, false, false, false, false, AllPanelsRendered: true, false, false)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
@@ -423,9 +424,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (await db.Pages.AnyAsync(p => volumeIds.Contains(p.VolumeId) && p.CompositionStatus != WorkStatus.Completed, cancellationToken))
             return ProcessResult.Idle; // blocked on a failed page
 
-        novel.Stage = ProjectStateMachine.NextStage(new PipelineProgress(
-            novel.Stage, false, false, false, false, false, false, AllPagesComposed: true, false));
-        Touch(novel);
+        SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
+            novel.Stage, false, false, false, false, false, false, AllPagesComposed: true, false)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
@@ -469,9 +469,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (await db.Volumes.AnyAsync(v => v.NovelId == novel.Id && v.PdfStatus != WorkStatus.Completed, cancellationToken))
             return ProcessResult.Idle; // blocked on a failed volume
 
-        novel.Stage = ProjectStateMachine.NextStage(new PipelineProgress(
-            novel.Stage, false, false, false, false, false, false, false, AllVolumesAssembled: true));
-        Touch(novel);
+        SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
+            novel.Stage, false, false, false, false, false, false, false, AllVolumesAssembled: true)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
@@ -594,11 +593,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         }
 
         // 4) Report rendered: advance to Completed.
-        novel.Stage = ProjectStateMachine.NextStage(new PipelineProgress(
+        SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, SourceIngested: false, AllChunksAnalyzed: false, BibleConsolidated: false,
             AllReferenceSheetsRendered: false, StoryboardCreated: false, AllPanelsRendered: false,
-            AllPagesComposed: false, AllVolumesAssembled: false, AnalysisComplete: true));
-        Touch(novel);
+            AllPagesComposed: false, AllVolumesAssembled: false, AnalysisComplete: true)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
@@ -634,11 +632,16 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (!transient && unit.Attempts >= rateLimits.MaxAttempts)
         {
             unit.WorkState = WorkStatus.Failed;
+            logger.LogWarning("{Unit} failed after {Attempts} attempts and is given up on: {Error}",
+                unit.GetType().Name, unit.Attempts, exception.Message);
             return;
         }
 
         unit.WorkState = WorkStatus.NeedsRetry;
         unit.NextAttemptAtUtc = clock.UtcNow + backoff.NextDelay(unit.Attempts - 1, retryAfter);
+        logger.LogWarning("{Unit} attempt {Attempts}/{Max} failed ({Kind}); retrying after {NextAttempt:u}: {Error}",
+            unit.GetType().Name, unit.Attempts, rateLimits.MaxAttempts,
+            transient ? "rate limit" : "error", unit.NextAttemptAtUtc, exception.Message);
     }
 
     private async Task<DesignBible> LoadBible(StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
@@ -770,6 +773,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
     private void SetStage(Novel novel, ProjectStage stage)
     {
+        if (novel.Stage != stage)
+            logger.LogInformation("Novel {NovelId} ({Title}): {From} -> {To}", novel.Id, novel.Title, novel.Stage, stage);
         novel.Stage = stage;
         Touch(novel);
     }
