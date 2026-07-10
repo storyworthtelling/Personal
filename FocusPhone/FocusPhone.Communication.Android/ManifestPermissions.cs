@@ -3,7 +3,11 @@ using Android;
 // READ_CALL_LOG and READ_SMS are hard-restricted permissions: they must be
 // whitelisted by the installer (`adb install -g` at cutover;
 // SetWhitelistedRestrictedPermissions in every silent-update session) before
-// any grant works.
+// any grant works. Whitelisting only un-restricts them, so the grant itself is
+// force-applied by the device owner on every policy pass (PolicyPlanBuilder /
+// PolicyManager.GrantPermissions) — dialog-free, surviving silent reinstalls
+// and Android's unused-app auto-reset; the runtime dialog below is only a
+// pre-cutover fallback.
 [assembly: UsesPermission(Manifest.Permission.ReadCallLog)]
 [assembly: UsesPermission(Manifest.Permission.ReadSms)]
 [assembly: UsesPermission(Manifest.Permission.CallPhone)]

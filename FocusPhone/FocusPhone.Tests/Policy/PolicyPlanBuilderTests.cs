@@ -104,4 +104,36 @@ public class PolicyPlanBuilderTests
         Assert.True(plan.EnforceAutoTime);
         Assert.Equal("family.cloudflare-dns.com", plan.PrivateDnsHost);
     }
+
+    [Fact]
+    public void Plan_GrantsHardRestrictedSmsAndCallLogToCommunicationApp()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.ReadSmsPermission),
+            plan.PermissionGrants);
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.ReadCallLogPermission),
+            plan.PermissionGrants);
+    }
+
+    [Fact]
+    public void Plan_GrantsAreScopedToTheCommunicationApp()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.All(plan.PermissionGrants,
+            grant => Assert.Equal(PolicyContext.CommunicationPackage, grant.Package));
+    }
+
+    [Fact]
+    public void Plan_GrantsSurviveCutoverFinalization()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext(finalized: true));
+
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.ReadSmsPermission),
+            plan.PermissionGrants);
+    }
 }
