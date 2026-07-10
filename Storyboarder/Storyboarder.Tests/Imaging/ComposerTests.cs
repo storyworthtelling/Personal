@@ -45,6 +45,27 @@ public class FileSystemImageStoreTests : IDisposable
 
         Assert.Equal<byte[]>([9, 9, 9], store.Read(path));
     }
+
+    [Fact]
+    public void Delete_RemovesAWholeSubtree()
+    {
+        var store = Store();
+        var first = store.Save(Path.Combine("novel", "refs", "a.png"), [1, 2, 3]);
+        var second = store.Save(Path.Combine("novel", "pages", "b.png"), [4, 5, 6]);
+
+        store.Delete("novel");
+
+        Assert.False(File.Exists(first));
+        Assert.False(File.Exists(second));
+        Assert.False(Directory.Exists(Path.Combine(root, "novel")));
+    }
+
+    [Fact]
+    public void Delete_IsANoOp_WhenNothingIsThere()
+    {
+        // Deleting a path that was never written must not throw.
+        Store().Delete("never-written");
+    }
 }
 
 public class SkiaPageComposerTests
