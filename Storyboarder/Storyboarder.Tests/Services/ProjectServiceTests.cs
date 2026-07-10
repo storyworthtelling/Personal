@@ -168,4 +168,68 @@ public class ProjectServiceTests : IDisposable
         context.SaveChanges();
         return novel.Id;
     }
+
+    private static DiagnosticsContext Context(bool claudeSet = true, bool geminiSet = true) =>
+        new(ClaudeKeySet: claudeSet, GeminiKeySet: geminiSet, GoogleAccount: "me@example.com",
+            LastRunOutcome: "MoreWorkPending", LastRunAtUtc: Start, MigrationError: null);
+
+    [Fact]
+    public async Task DiagnosticsReport_SurfacesStage_FailedCounts_AndUnitErrors()
+    {
+        SeedTroubledNovel();
+
+        var report = await NewService().BuildDiagnosticsReportAsync(Context(geminiSet: false), CancellationToken.None);
+
+        Assert.Contains("Gemini key: MISSING", report);
+        Assert.Contains("me@example.com", report);
+        Assert.Contains("Stage: BuildingDesignBible", report);
+        Assert.Contains("Novel error: the whole novel is unhappy", report);
+        // 1 of 3 sheets done, 2 failed — and the failing reason is sampled with its count.
+        Assert.Contains("Reference sheets: 1/3 done, 2 failed", report);
+        Assert.Contains("no image in the Gemini response", report);
+        Assert.Contains("×2", report);
+    }
+
+    [Fact]
+    public async Task DiagnosticsReport_CleanProject_ReportsNoErrors()
+    {
+        SeedNovel(ProjectStage.Created);
+
+        var report = await NewService().BuildDiagnosticsReportAsync(Context(), CancellationToken.None);
+
+        Assert.Contains("Projects: 1", report);
+        Assert.DoesNotContain("failed", report);
+        Assert.DoesNotContain("Novel error", report);
+    }
+
+    private void SeedTroubledNovel()
+    {
+        using var context = database.NewContext();
+        var novel = new Novel
+        {
+            Title = "Quest",
+            GoogleDocId = "doc",
+            Stage = ProjectStage.BuildingDesignBible,
+            LastError = "the whole novel is unhappy",
+            CreatedAtUtc = clock.UtcNow,
+            UpdatedAtUtc = clock.UtcNow
+        };
+        novel.DesignRefs.Add(new DesignRef
+        {
+            NovelId = novel.Id, Kind = ReferenceKind.Character, Name = "Hero",
+            ReferenceSheetStatus = WorkStatus.Failed, LastError = "no image in the Gemini response"
+        });
+        novel.DesignRefs.Add(new DesignRef
+        {
+            NovelId = novel.Id, Kind = ReferenceKind.Character, Name = "Villain",
+            ReferenceSheetStatus = WorkStatus.Failed, LastError = "no image in the Gemini response"
+        });
+        novel.DesignRefs.Add(new DesignRef
+        {
+            NovelId = novel.Id, Kind = ReferenceKind.Setting, Name = "Castle",
+            ReferenceSheetStatus = WorkStatus.Completed
+        });
+        context.Novels.Add(novel);
+        context.SaveChanges();
+    }
 }

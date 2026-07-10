@@ -64,12 +64,16 @@
             <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
 
             <Label Text="Diagnostics" Style="{StaticResource TitleLabel}" />
-            <Label Text="A running record of the background conversion — each stage, every render, retries and errors. Share it if something looks stuck."
+            <Label Text="See what each project is doing and what's gone wrong. Status snapshot is the quickest read; Export bundles the snapshot and both logs into one file to share."
                    Style="{StaticResource SecondaryLabel}" />
+            <Button x:Name="StatusSnapshotButton" Text="Status snapshot"
+                    Clicked="OnStatusSnapshotClicked" Style="{StaticResource SecondaryButton}" />
             <Button x:Name="PipelineLogButton" Text="Pipeline log"
                     Clicked="OnPipelineLogClicked" Style="{StaticResource SecondaryButton}" />
             <Button x:Name="CrashLogButton" Text="Crash log"
                     Clicked="OnCrashLogClicked" Style="{StaticResource SecondaryButton}" />
+            <Button x:Name="ExportDiagnosticsButton" Text="Export diagnostics"
+                    Clicked="OnExportDiagnosticsClicked" Style="{StaticResource SecondaryButton}" />
             <Label x:Name="DiagnosticsStatusLabel" Style="{StaticResource StatusLine}" />
 
         </VerticalStackLayout>

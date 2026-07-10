@@ -30,9 +30,6 @@ public partial class SetupPage : ContentPage
             MigrationErrorLabel.Text =
                 "The last app update couldn't finish updating your library, so work is paused. " +
                 "Restoring a recent backup usually fixes it. Details: " + migrationError;
-
-        PipelineLogButton.IsVisible = HasContent(PipelineLogPath);
-        CrashLogButton.IsVisible = HasContent(CrashLogPath);
     }
 
     private static ProjectBackupService BackupService() =>
@@ -126,19 +123,94 @@ public partial class SetupPage : ContentPage
     private static bool HasContent(string path) =>
         System.IO.File.Exists(path) && new System.IO.FileInfo(path).Length > 0;
 
+    private static string ReadOrEmpty(string path) =>
+        HasContent(path) ? System.IO.File.ReadAllText(path) : "(empty)";
+
+    // A plain-text snapshot of the current pipeline state and anything troubling, built from the DB by
+    // ProjectService plus the settings that live in this head's Preferences.
+    private static async Task<string> BuildDiagnosticsReport()
+    {
+        using var scope = IPlatformApplication.Current!.Services.CreateScope();
+        var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+        var context = new DiagnosticsContext(
+            ClaudeKeySet: !string.IsNullOrEmpty(SettingsStore.ClaudeApiKey),
+            GeminiKeySet: !string.IsNullOrEmpty(SettingsStore.GeminiApiKey),
+            GoogleAccount: SettingsStore.GoogleAccountEmail,
+            LastRunOutcome: SettingsStore.LastRunOutcome,
+            LastRunAtUtc: SettingsStore.LastRunAtUtc == DateTime.MinValue
+                ? null
+                : new DateTimeOffset(DateTime.SpecifyKind(SettingsStore.LastRunAtUtc, DateTimeKind.Utc)),
+            MigrationError: string.IsNullOrEmpty(SettingsStore.LastMigrationError) ? null : SettingsStore.LastMigrationError);
+        return await projects.BuildDiagnosticsReportAsync(context, CancellationToken.None);
+    }
+
+    private async void OnStatusSnapshotClicked(object sender, EventArgs e)
+    {
+        string report;
+        try
+        {
+            report = await BuildDiagnosticsReport();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Status snapshot", "Couldn't build the snapshot: " + ex.Message, "OK");
+            return;
+        }
+
+        var action = await DisplayActionSheet("Status snapshot", "Cancel", null, "View & copy", "Share");
+        if (action == "View & copy")
+        {
+            var preview = report.Length > 3000 ? report[..3000] + "\n\n(truncated — use Share for the full snapshot)" : report;
+            await Clipboard.SetTextAsync(report);
+            await DisplayAlert("Status snapshot (copied to clipboard)", preview, "OK");
+        }
+        else if (action == "Share")
+        {
+            await ShareText("storyboarder-status.txt", report, "Storyboarder status snapshot");
+        }
+    }
+
+    // Bundles the status snapshot + both logs into one shareable file — so the crash log comes along
+    // even when there's no crash to show on its own.
+    private async void OnExportDiagnosticsClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var report = await BuildDiagnosticsReport();
+            var bundle = new System.Text.StringBuilder()
+                .AppendLine("===== STATUS SNAPSHOT =====").AppendLine().AppendLine(report).AppendLine()
+                .AppendLine("===== PIPELINE LOG =====").AppendLine().AppendLine(ReadOrEmpty(PipelineLogPath)).AppendLine()
+                .AppendLine("===== CRASH LOG =====").AppendLine().AppendLine(ReadOrEmpty(CrashLogPath))
+                .ToString();
+            await ShareText($"storyboarder-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.txt", bundle, "Storyboarder diagnostics");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Export diagnostics", "Couldn't export: " + ex.Message, "OK");
+        }
+    }
+
+    // Writes text to a cache file and opens the share sheet (Share needs a file, not a raw string).
+    private static async Task ShareText(string fileName, string content, string title)
+    {
+        var path = System.IO.Path.Combine(FileSystem.CacheDirectory, fileName);
+        await System.IO.File.WriteAllTextAsync(path, content);
+        await Share.RequestAsync(new ShareFileRequest { Title = title, File = new ShareFile(path) });
+    }
+
     private async void OnPipelineLogClicked(object sender, EventArgs e) =>
-        await ShowLog("Pipeline log", PipelineLogPath, PipelineFileLogger.Clear, PipelineLogButton);
+        await ShowLog("Pipeline log", PipelineLogPath, PipelineFileLogger.Clear);
 
     private async void OnCrashLogClicked(object sender, EventArgs e) =>
-        await ShowLog("Crash log", CrashLogPath, () => System.IO.File.Delete(CrashLogPath), CrashLogButton);
+        await ShowLog("Crash log", CrashLogPath, () => System.IO.File.Delete(CrashLogPath));
 
-    // Shared View & copy / Share / Clear flow for a diagnostic log file (mirrors DailyLoader).
-    private async Task ShowLog(string title, string path, Action clear, Button button)
+    // Shared View & copy / Share / Clear flow for a diagnostic log file (mirrors DailyLoader). The
+    // buttons stay visible even when a log is empty, so the crash log is always reachable.
+    private async Task ShowLog(string title, string path, Action clear)
     {
         if (!HasContent(path))
         {
-            DiagnosticsStatusLabel.Text = $"No {title.ToLowerInvariant()} yet.";
-            button.IsVisible = false;
+            await DisplayAlert(title, $"No {title.ToLowerInvariant()} recorded yet — nothing to show.", "OK");
             return;
         }
 
@@ -158,7 +230,6 @@ public partial class SetupPage : ContentPage
         {
             clear();
             DiagnosticsStatusLabel.Text = $"{title} cleared.";
-            button.IsVisible = HasContent(path);
         }
     }
 

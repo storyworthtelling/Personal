@@ -29,7 +29,14 @@ public sealed class PipelineFileLogger : ILoggerProvider, ILogger
         catch { }
     }
 
-    public ILogger CreateLogger(string categoryName) => new CategoryLogger(this, ShortCategory(categoryName));
+    public ILogger CreateLogger(string categoryName)
+    {
+        // The pipeline log is for the app's own diagnostics. Framework categories (EF Core's per-command
+        // SQL, MAUI) log at Information and would otherwise drown the file — the 5-second UI refresh alone
+        // emits ~20 SELECTs — so capture those only at Warning+, keeping their errors without the noise.
+        var isOwn = categoryName.StartsWith("Storyboarder", StringComparison.Ordinal);
+        return new CategoryLogger(this, ShortCategory(categoryName), isOwn ? LogLevel.Information : LogLevel.Warning);
+    }
 
     public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
 
@@ -93,13 +100,16 @@ public sealed class PipelineFileLogger : ILoggerProvider, ILogger
             : categoryName;
     }
 
-    private sealed class CategoryLogger(PipelineFileLogger owner, string category) : ILogger
+    private sealed class CategoryLogger(PipelineFileLogger owner, string category, LogLevel minLevel) : ILogger
     {
-        public bool IsEnabled(LogLevel logLevel) => owner.IsEnabled(logLevel);
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= minLevel;
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
-            Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (!IsEnabled(logLevel)) return;
             owner.Write(category, logLevel, formatter(state, exception), exception);
+        }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
     }

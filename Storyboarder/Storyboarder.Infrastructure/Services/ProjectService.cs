@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
@@ -6,6 +7,12 @@ using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Persistence;
 
 namespace Storyboarder.Infrastructure.Services;
+
+// App-level state the diagnostics report needs but that lives in the platform head (MAUI Preferences),
+// passed in so the service stays platform-free.
+public sealed record DiagnosticsContext(
+    bool ClaudeKeySet, bool GeminiKeySet, string GoogleAccount,
+    string LastRunOutcome, DateTimeOffset? LastRunAtUtc, string? MigrationError);
 
 // Application service backing the controllers: creates a novel from a picked Google Doc and reports
 // progress. Controllers go through this rather than touching the DbContext directly.
@@ -175,6 +182,106 @@ public sealed class ProjectService
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
             analysisNotes, analysis, analysisReady, coverThumb);
+    }
+
+    // A human-readable snapshot of everything that might be wrong: config, last worker run, and per
+    // project the stage plus each phase's done/failed/retry counts and a sample of the error messages
+    // on the stuck units. Surfaces "sheets 0 of 124, 124 failed: <reason>" without reading the raw log.
+    public async Task<string> BuildDiagnosticsReportAsync(DiagnosticsContext context, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var report = new StringBuilder();
+
+        report.AppendLine($"Storyboarder diagnostics — {clock.UtcNow:yyyy-MM-dd HH:mm:ss}Z");
+        report.AppendLine($"Claude key: {(context.ClaudeKeySet ? "set" : "MISSING")}    Gemini key: {(context.GeminiKeySet ? "set" : "MISSING")}");
+        report.AppendLine($"Google account: {(string.IsNullOrEmpty(context.GoogleAccount) ? "not signed in" : context.GoogleAccount)}");
+        report.Append("Last worker run: ");
+        report.AppendLine(string.IsNullOrEmpty(context.LastRunOutcome)
+            ? "never"
+            : context.LastRunOutcome + (context.LastRunAtUtc is { } at ? $" at {at:yyyy-MM-dd HH:mm:ss}Z" : string.Empty));
+        if (!string.IsNullOrEmpty(context.MigrationError))
+            report.AppendLine($"Migration error: {context.MigrationError}");
+
+        var novels = await db.Novels.OrderByDescending(n => n.CreatedAtUtc).ToListAsync(cancellationToken);
+        report.AppendLine();
+        report.AppendLine($"Projects: {novels.Count}");
+
+        foreach (var novel in novels)
+        {
+            report.AppendLine();
+            report.AppendLine($"— {novel.Title} [{novel.Id}]");
+            report.AppendLine($"  Stage: {novel.Stage}    Updated: {novel.UpdatedAtUtc:yyyy-MM-dd HH:mm:ss}Z    StoryboardCursor: {novel.StoryboardCursor}");
+            if (!string.IsNullOrEmpty(novel.LastError))
+                report.AppendLine($"  Novel error: {Truncate(novel.LastError)}");
+
+            await AppendPhase(report, "Chunks", db.Chunks.Where(c => c.NovelId == novel.Id),
+                c => c.AnalysisStatus, c => c.LastError, cancellationToken);
+            await AppendPhase(report, "Reference sheets", db.DesignRefs.Where(r => r.NovelId == novel.Id),
+                r => r.ReferenceSheetStatus, r => r.LastError, cancellationToken);
+
+            var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);
+            var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
+            await AppendPhase(report, "Panels", db.Panels.Where(p => pageIds.Contains(p.PageId)),
+                p => p.Status, p => p.LastError, cancellationToken);
+            await AppendPhase(report, "Pages", db.Pages.Where(p => volumeIds.Contains(p.VolumeId)),
+                p => p.CompositionStatus, p => p.LastError, cancellationToken);
+            // Volumes carry no LastError column, so there's no message to sample (PdfPath is null on a
+            // failed volume); the failed/retry counts on the line are what matter here.
+            await AppendPhase(report, "Volumes", db.Volumes.Where(v => v.NovelId == novel.Id),
+                v => v.PdfStatus, v => v.PdfPath, cancellationToken);
+            await AppendPhase(report, "Analysis notes", db.ChunkAnalyses.Where(a => a.NovelId == novel.Id),
+                a => a.Status, a => a.LastError, cancellationToken);
+        }
+
+        return report.ToString();
+    }
+
+    // Writes one phase line ("done/total, N failed, M retrying") plus a short sample of the distinct
+    // error messages on its failed/retrying units. Skips phases the pipeline hasn't reached yet.
+    private static async Task AppendPhase<T>(
+        StringBuilder report, string name, IQueryable<T> query,
+        System.Linq.Expressions.Expression<Func<T, WorkStatus>> status,
+        System.Linq.Expressions.Expression<Func<T, string?>> lastError,
+        CancellationToken cancellationToken)
+    {
+        var total = await query.CountAsync(cancellationToken);
+        if (total == 0)
+            return;
+
+        var done = await query.CountAsync(BuildEquals(status, WorkStatus.Completed), cancellationToken);
+        var failed = await query.CountAsync(BuildEquals(status, WorkStatus.Failed), cancellationToken);
+        var retry = await query.CountAsync(BuildEquals(status, WorkStatus.NeedsRetry), cancellationToken);
+
+        var line = $"  {name}: {done}/{total} done";
+        if (failed > 0) line += $", {failed} failed";
+        if (retry > 0) line += $", {retry} retrying";
+        report.AppendLine(line);
+
+        if (failed == 0 && retry == 0)
+            return;
+
+        var messages = await query.Where(BuildTroubling(status)).Select(lastError).ToListAsync(cancellationToken);
+        foreach (var group in messages
+                     .Where(m => !string.IsNullOrEmpty(m))
+                     .GroupBy(m => m!)
+                     .OrderByDescending(g => g.Count())
+                     .Take(3))
+            report.AppendLine($"      • {(group.Count() > 1 ? $"(×{group.Count()}) " : string.Empty)}{Truncate(group.Key)}");
+    }
+
+    private static string Truncate(string value, int max = 300) =>
+        value.Length <= max ? value : value[..max] + "…";
+
+    // status == Failed || status == NeedsRetry, for sampling the errors on stuck units.
+    private static System.Linq.Expressions.Expression<Func<T, bool>> BuildTroubling<T>(
+        System.Linq.Expressions.Expression<Func<T, WorkStatus>> selector)
+    {
+        var failed = System.Linq.Expressions.Expression.Equal(
+            selector.Body, System.Linq.Expressions.Expression.Constant(WorkStatus.Failed));
+        var retry = System.Linq.Expressions.Expression.Equal(
+            selector.Body, System.Linq.Expressions.Expression.Constant(WorkStatus.NeedsRetry));
+        return System.Linq.Expressions.Expression.Lambda<Func<T, bool>>(
+            System.Linq.Expressions.Expression.OrElse(failed, retry), selector.Parameters);
     }
 
     private static async Task<PhaseProgress> Counts<T>(
