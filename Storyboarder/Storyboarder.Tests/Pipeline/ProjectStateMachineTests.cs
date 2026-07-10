@@ -86,6 +86,10 @@ public class ProjectStateMachineTests
         Assert.Equal(ProjectStage.Failed, ProjectStateMachine.NextStage(At(ProjectStage.Failed)));
 
     [Fact]
+    public void Cancelled_IsTerminal() =>
+        Assert.Equal(ProjectStage.Cancelled, ProjectStateMachine.NextStage(At(ProjectStage.Cancelled)));
+
+    [Fact]
     public void NextStage_IsIdempotent_WhenPredicateUnmet()
     {
         var progress = At(ProjectStage.RenderingImages);

@@ -1,6 +1,7 @@
 using global::Android.Content;
 using AndroidX.Work;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Maui;
 using Storyboarder.Infrastructure.Pipeline;
 // AndroidX.Work also defines an IClock, so alias the domain one we mean.
@@ -28,11 +29,15 @@ public class PipelineWorker : Worker
         if (!SettingsStore.IsConfigured)
             return Result.InvokeSuccess();
 
+        using var scope = IPlatformApplication.Current!.Services.CreateScope();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<PipelineWorker>>();
+
         try
         {
-            using var scope = IPlatformApplication.Current!.Services.CreateScope();
             var runner = scope.ServiceProvider.GetRequiredService<PipelineRunner>();
             var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+
+            logger.LogInformation("Pipeline cycle starting.");
 
             var budget = new RunBudget(
                 clock,
@@ -44,12 +49,14 @@ public class PipelineWorker : Worker
             var outcome = runner.RunUntilExhaustedAsync(budget, CancellationToken.None)
                 .GetAwaiter().GetResult();
 
+            logger.LogInformation("Pipeline cycle finished: {Outcome}.", outcome);
             SettingsStore.LastRunOutcome = outcome.ToString();
             SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return outcome == RunResult.Completed ? Result.InvokeSuccess() : Result.InvokeRetry();
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Pipeline cycle threw and will be retried.");
             SettingsStore.LastRunOutcome = $"Failed: {ex.Message}";
             SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return Result.InvokeRetry();

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Storyboarder.Domain.External;
+using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Persistence;
@@ -12,13 +13,16 @@ public sealed class ProjectService
 {
     private readonly IDbContextFactory<StoryboarderDbContext> dbContextFactory;
     private readonly IGoogleDocsClient docs;
+    private readonly IImageStore imageStore;
     private readonly IClock clock;
 
     public ProjectService(
-        IDbContextFactory<StoryboarderDbContext> dbContextFactory, IGoogleDocsClient docs, IClock clock)
+        IDbContextFactory<StoryboarderDbContext> dbContextFactory, IGoogleDocsClient docs,
+        IImageStore imageStore, IClock clock)
     {
         this.dbContextFactory = dbContextFactory;
         this.docs = docs;
+        this.imageStore = imageStore;
         this.clock = clock;
     }
 
@@ -45,14 +49,47 @@ public sealed class ProjectService
         return novel.Id;
     }
 
-    // True while any novel is mid-conversion (not Completed/Failed). The Android head checks this on
-    // launch to kick the worker immediately after an app update, so a long conversion resumes at once
-    // rather than waiting for the next periodic window.
+    // True while any novel is mid-conversion (not Completed/Failed/Cancelled). The Android head checks
+    // this on launch to kick the worker immediately after an app update, so a long conversion resumes
+    // at once rather than waiting for the next periodic window.
     public async Task<bool> HasActiveWorkAsync(CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         return await db.Novels.AnyAsync(
-            n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed, cancellationToken);
+            n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed &&
+                 n.Stage != ProjectStage.Cancelled, cancellationToken);
+    }
+
+    // Stops a running conversion without removing it: the worker skips Cancelled novels, but the card
+    // and any finished PDFs remain in the library. A no-op if the novel is already in a terminal stage.
+    public async Task CancelAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null ||
+            novel.Stage is ProjectStage.Completed or ProjectStage.Failed or ProjectStage.Cancelled)
+            return;
+
+        novel.Stage = ProjectStage.Cancelled;
+        novel.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Removes a novel entirely: its rows (children cascade via the DbContext relationships) and every
+    // rendered image/PDF on disk. Used to clear a project out of the library for good.
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null)
+            return;
+
+        db.Novels.Remove(novel);
+        await db.SaveChangesAsync(cancellationToken);
+
+        // The DB row is gone; drop the output subtree too. Files failing to delete shouldn't resurrect
+        // the (already-removed) project, so this runs after the row is committed.
+        imageStore.Delete(id.ToString());
     }
 
     public async Task<IReadOnlyList<NovelStatus>> ListAsync(CancellationToken cancellationToken)
