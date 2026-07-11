@@ -123,11 +123,11 @@ public class RestrictedBrowserActivity : Activity
         var cookies = CookieManager.Instance?.GetCookie(url);
         if (!string.IsNullOrEmpty(cookies))
         {
-            request.SetHeader("Cookie", cookies);
+            request.AddRequestHeader("Cookie", cookies);
         }
         if (!string.IsNullOrEmpty(userAgent))
         {
-            request.SetHeader("User-Agent", userAgent);
+            request.AddRequestHeader("User-Agent", userAgent);
         }
 
         ((DownloadManager)GetSystemService(DownloadService)!).Enqueue(request);
