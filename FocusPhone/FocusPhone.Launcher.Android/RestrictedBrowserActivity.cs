@@ -14,7 +14,11 @@ namespace FocusPhone.Launcher;
 /// <summary>
 /// The only web surface on the device. Opens a single link (from a QR scan,
 /// email, or text) and confines all navigation to the originating link's
-/// registrable domain. No URL entry, no tabs, no downloads.
+/// registrable domain. No URL entry, no tabs. Downloads are the one thing
+/// allowed off-domain: a saved file does not open another site, and release/
+/// artifact links routinely redirect to a signed storage host on an unrelated
+/// domain — so a link the same-domain gate blocks is handed to the system
+/// download manager when it points at a file rather than a page.
 /// </summary>
 [Activity(
     Label = "Web",
@@ -28,6 +32,7 @@ public class RestrictedBrowserActivity : Activity
 {
     private WebView? webView;
     private TextView? addressDisplay;
+    private string originHost = "the original site";
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -42,6 +47,7 @@ public class RestrictedBrowserActivity : Activity
             Finish();
             return;
         }
+        originHost = origin.Host;
 
         var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
@@ -80,15 +86,56 @@ public class RestrictedBrowserActivity : Activity
         settings.JavaScriptCanOpenWindowsAutomatically = false;
         settings.SetGeolocationEnabled(false);
 
-        view.SetDownloadListener(new BlockedDownloadListener());
+        view.SetDownloadListener(new DownloadStartListener(this));
         view.SetWebViewClient(new SameDomainWebViewClient(this, LinkPolicy.CreateDefault(), origin));
     }
 
     public void ShowAddress(string url) => addressDisplay!.Text = url;
 
+    private void ShowStatus(string message) => addressDisplay!.Text = message;
+
+    /// <summary>
+    /// Hands a URL to the system download manager, saving it to the public
+    /// Downloads folder. Called for links the browser recognises as files —
+    /// including cross-domain ones the same-domain navigation gate rejects.
+    /// </summary>
+    public void StartDownload(string url, string? userAgent, string? contentDisposition, string? mimeType)
+    {
+        var target = Android.Net.Uri.Parse(url);
+        if (target is null)
+        {
+            return;
+        }
+
+        var fileName = URLUtil.GuessFileName(url, contentDisposition, mimeType);
+        var request = new DownloadManager.Request(target);
+        request.SetTitle(fileName);
+        request.SetDescription(originHost);
+        request.SetNotificationVisibility(DownloadVisibility.VisibleNotifyCompleted);
+        request.SetDestinationInExternalPublicDir(Android.OS.Environment.DirectoryDownloads, fileName);
+        if (!string.IsNullOrEmpty(mimeType))
+        {
+            request.SetMimeType(mimeType);
+        }
+
+        // The signed URL self-authenticates, but carry the session cookies and
+        // user agent so same-origin downloads behind a login work too.
+        var cookies = CookieManager.Instance?.GetCookie(url);
+        if (!string.IsNullOrEmpty(cookies))
+        {
+            request.SetHeader("Cookie", cookies);
+        }
+        if (!string.IsNullOrEmpty(userAgent))
+        {
+            request.SetHeader("User-Agent", userAgent);
+        }
+
+        ((DownloadManager)GetSystemService(DownloadService)!).Enqueue(request);
+        ShowStatus($"Saving {fileName} to Downloads…");
+    }
+
     public void ShowBlockedPage(string blockedUrl)
     {
-        var originHost = Intent?.Data?.Host ?? "the original site";
         // Styled entirely from DesignTokens; fonts come from the shared assets
         // via the android_asset base URL, with system fallbacks.
         webView!.LoadDataWithBaseURL("file:///android_asset/", $$"""
@@ -144,13 +191,24 @@ public class RestrictedBrowserActivity : Activity
         public override bool ShouldOverrideUrlLoading(WebView? view, IWebResourceRequest? request)
         {
             var target = request?.Url?.ToString();
-            if (target is null || !Uri.TryCreate(target, UriKind.Absolute, out var targetUri)
-                || !policy.IsNavigationAllowed(origin, targetUri))
+            if (target is not null && Uri.TryCreate(target, UriKind.Absolute, out var targetUri)
+                && policy.IsNavigationAllowed(origin, targetUri))
+            {
+                return false;
+            }
+
+            // A same-domain page loads above; anything else is off-limits — unless
+            // it is a file to save, which crosses domains without opening a site.
+            if (target is not null && Uri.TryCreate(target, UriKind.Absolute, out var downloadUri)
+                && DownloadHeuristics.IsDownloadUrl(downloadUri))
+            {
+                activity.StartDownload(target, null, DownloadHeuristics.ReadContentDisposition(downloadUri), null);
+            }
+            else
             {
                 activity.ShowBlockedPage(target ?? "(unparseable URL)");
-                return true;
             }
-            return false;
+            return true;
         }
 
         public override void OnPageFinished(WebView? view, string? url)
@@ -163,12 +221,25 @@ public class RestrictedBrowserActivity : Activity
         }
     }
 
-    private class BlockedDownloadListener : Java.Lang.Object, IDownloadListener
+    private class DownloadStartListener : Java.Lang.Object, IDownloadListener
     {
+        private readonly RestrictedBrowserActivity activity;
+
+        public DownloadStartListener(RestrictedBrowserActivity activity)
+        {
+            this.activity = activity;
+        }
+
+        // Fires when the WebView itself resolves a load to a file (an allowed
+        // same-domain link, or a redirect it followed internally). Cross-domain
+        // links the navigation gate intercepts are downloaded from there instead.
         public void OnDownloadStart(string? url, string? userAgent, string? contentDisposition,
             string? mimetype, long contentLength)
         {
-            // Downloads are not part of the restricted browsing surface.
+            if (url is not null)
+            {
+                activity.StartDownload(url, userAgent, contentDisposition, mimetype);
+            }
         }
     }
 }
