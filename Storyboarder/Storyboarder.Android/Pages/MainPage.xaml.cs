@@ -100,17 +100,25 @@ public partial class MainPage : ContentPage
                 $"{status.Title} — Analysis",
                 projects => projects.GetAnalysisPdfPathAsync(status.Id, CancellationToken.None)));
 
-        // A project card always offers management (stop/delete); PDFs appear once they're ready.
+        // A project card always offers management (retry/stop/delete); PDFs appear once they're ready.
         var isActive = status.Stage is not ("Completed" or "Failed" or "Cancelled");
         var buttons = options.Select(o => o.Label).ToList();
         if (isActive)
+        {
+            buttons.Add(RetryAction);
             buttons.Add(StopAction);
+        }
 
         var choice = await DisplayActionSheet(status.Title, "Cancel", DeleteAction, buttons.ToArray());
 
         if (choice == DeleteAction)
         {
             await DeleteProject(status);
+            return;
+        }
+        if (choice == RetryAction)
+        {
+            await RetryProject(status);
             return;
         }
         if (choice == StopAction)
@@ -143,8 +151,22 @@ public partial class MainPage : ContentPage
         });
     }
 
+    private const string RetryAction = "Retry now";
     private const string StopAction = "Stop conversion";
     private const string DeleteAction = "Delete project";
+
+    // Clears the stall and kicks the pipeline immediately, rather than waiting for the next periodic
+    // window. Resets the current stage's stuck work to due-now, then fires an off-cycle drain.
+    private async Task RetryProject(NovelStatus status)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            await projects.RetryAsync(status.Id, CancellationToken.None);
+        }
+        PipelineWorker.RunNow(global::Android.App.Application.Context);
+        await RefreshAsync();
+    }
 
     // Stops a running conversion but keeps the card and any finished PDFs.
     private async Task StopProject(NovelStatus status)

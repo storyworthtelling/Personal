@@ -94,13 +94,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         CancellationToken cancellationToken)
     {
         var bibleJson = JsonSerializer.Serialize(bible, JsonResponse.CaseInsensitive);
-        var userContent =
+        // The art style and design bible are identical for every window of a novel, so they go in a
+        // cached block: consecutive windows and any retries then bill this as a cache read (~0.1x)
+        // rather than re-sending the whole bible at full input price on every call.
+        var cachedContext =
             $"ART STYLE (apply to every visual prompt): {artStyle}\n\n" +
-            $"DESIGN BIBLE (JSON):\n{bibleJson}\n\n" +
+            $"DESIGN BIBLE (JSON):\n{bibleJson}";
+        var userContent =
             $"CONTINUITY SO FAR:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(none yet)" : continuitySummary)}\n\n" +
             $"PASSAGE TO ADAPT:\n{textWindow}";
 
-        var reply = await SendMessage(StoryboardInstruction, userContent, cancellationToken);
+        var reply = await SendMessage(
+            StoryboardInstruction, userContent, cancellationToken, cachedContext: cachedContext);
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException("Claude storyboard reply did not contain a JSON object.");
 
@@ -178,17 +183,29 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     }
 
     private async Task<string> SendMessage(
-        string instruction, string userText, CancellationToken cancellationToken, int? maxTokens = null)
+        string instruction, string userText, CancellationToken cancellationToken,
+        int? maxTokens = null, string? cachedContext = null)
     {
+        // Invariant, reused context (the design bible) is cached as its own block so repeated calls
+        // within the cache window bill it as a cache read instead of full input. Both blocks share one
+        // anonymous shape so the array stays strongly typed (no object-typed JSON serialization).
+        var system = string.IsNullOrEmpty(cachedContext)
+            ? new[]
+            {
+                new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } }
+            }
+            : new[]
+            {
+                new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } },
+                new { type = "text", text = cachedContext, cache_control = new { type = "ephemeral" } }
+            };
+
         var payload = new
         {
             model = options.Model,
             max_tokens = maxTokens ?? options.MaxTokens,
             stream = true,
-            system = new[]
-            {
-                new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } }
-            },
+            system,
             messages = new[]
             {
                 new { role = "user", content = userText }

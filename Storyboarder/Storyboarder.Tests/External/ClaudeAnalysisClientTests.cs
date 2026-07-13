@@ -243,4 +243,35 @@ public class ClaudeAnalysisClientTests
 
         await Assert.ThrowsAsync<RateLimitException>(() => client.ExtractEntities("x", CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Storyboard_CachesArtStyleAndBibleSeparatelyFromThePassage()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
+
+        await client.Storyboard(
+            "PASSAGE: the hero walks to the gate", "prior events",
+            new DesignBible([], []), "watercolour noir", CancellationToken.None);
+
+        var body = handler.RequestBodies[0];
+        // Two cached blocks: the static instruction and the per-novel art style + design bible, so
+        // repeated windows/retries bill the bible as a cache read rather than full input every call.
+        Assert.Equal(2, CountOccurrences(body, "cache_control"));
+        Assert.Contains("watercolour noir", body);
+        Assert.Contains("DESIGN BIBLE", body);
+        // The varying passage rides in the uncached user message.
+        Assert.Contains("the hero walks to the gate", body);
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        int count = 0, index = 0;
+        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+        return count;
+    }
 }

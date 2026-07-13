@@ -312,6 +312,43 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.True(storyboardCalls >= 2, "The socket-dropped first storyboard call should have been retried.");
     }
 
+    [Fact]
+    public async Task StoryboardingFailure_StopsCallingClaudeAfterMaxAttempts()
+    {
+        // A storyboard call that keeps failing must not retry — and re-bill — forever. After MaxAttempts
+        // the novel stalls (Idle) with its error, and Claude is not called again until a manual retry.
+        var storyboardCalls = 0;
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                storyboardCalls++;
+                return Task.FromException<StoryboardSegment>(new IOException("Socket closed"));
+            });
+
+        var novelId = SeedNovel();
+
+        var stalled = false;
+        for (int i = 0; i < 400 && !stalled; i++)
+        {
+            var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+            if (result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+            else if (result.Outcome == ProcessOutcome.Idle && CurrentStage(novelId) == ProjectStage.Storyboarding)
+                stalled = true;
+        }
+
+        Assert.True(stalled, "The novel should have stalled once storyboarding exhausted its attempts.");
+        Assert.Equal(6, storyboardCalls); // MaxAttempts — never re-called past the cap.
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == novelId);
+        Assert.Equal(ProjectStage.Storyboarding, novel.Stage);
+        Assert.Equal(0, novel.StoryboardCursor);
+        Assert.Equal(6, novel.StoryboardAttempts);
+        Assert.False(string.IsNullOrEmpty(novel.LastError));
+    }
+
     // Drives the pipeline to a terminal stage, invoking inspect() with the current stage before each
     // cycle so a test can disrupt on-disk state mid-run. Fresh processor per cycle proves resume.
     private async Task DriveToCompletion(Guid novelId, Action<ProjectStage> inspect)

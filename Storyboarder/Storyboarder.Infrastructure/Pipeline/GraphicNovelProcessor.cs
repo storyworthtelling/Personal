@@ -262,6 +262,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // Bounded retries: once the current window has failed MaxAttempts times, stop re-calling Claude
+        // (every attempt bills tokens) and leave the novel stalled with its error until a manual retry
+        // resets the counter. Without this a persistently-failing call retries — and re-bills — forever.
+        if (novel.StoryboardAttempts >= rateLimits.MaxAttempts)
+            return ProcessResult.Idle;
+
         var window = await db.Chunks
             .Where(c => c.NovelId == novel.Id && c.Ordinal == novel.StoryboardCursor)
             .Select(c => c.Text)
@@ -281,10 +287,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         // is retried with backoff; letting it escape would fail the whole worker cycle.
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            novel.StoryboardAttempts++;
             novel.LastError = ex.Message;
             await db.SaveChangesAsync(cancellationToken);
             var retryAfter = (ex as RateLimitException)?.RetryAfter;
-            return ProcessResult.Waiting(backoff.NextDelay(0, retryAfter), novel.Id);
+            return ProcessResult.Waiting(backoff.NextDelay(novel.StoryboardAttempts - 1, retryAfter), novel.Id);
         }
 
         var volumes = await db.Volumes
@@ -327,6 +334,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         novel.ContinuitySummary = segment.ContinuitySummary;
         novel.StoryboardCursor++;
+        novel.StoryboardAttempts = 0;
         novel.LastError = null;
         Touch(novel);
         await db.SaveChangesAsync(cancellationToken);

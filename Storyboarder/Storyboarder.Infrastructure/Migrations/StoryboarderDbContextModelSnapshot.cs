@@ -207,6 +207,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("Stage")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("StoryboardAttempts")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("StoryboardCursor")
                         .HasColumnType("INTEGER");
 

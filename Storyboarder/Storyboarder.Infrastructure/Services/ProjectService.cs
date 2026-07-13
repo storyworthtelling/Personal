@@ -82,6 +82,53 @@ public sealed class ProjectService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    // Un-sticks a stalled project on demand (the "Retry" action): clears the novel-level error, gives
+    // the current storyboard window a fresh attempt budget, and makes every failed/retrying unit due
+    // immediately so the next worker cycle resumes the work at once. The UI pairs this with a RunNow so
+    // it doesn't wait for the next periodic window. A no-op on a finished or user-cancelled project.
+    public async Task RetryAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null || novel.Stage is ProjectStage.Completed or ProjectStage.Cancelled)
+            return;
+
+        novel.LastError = null;
+        novel.StoryboardAttempts = 0;
+        novel.UpdatedAtUtc = clock.UtcNow;
+
+        Revive(await db.Chunks.Where(c => c.NovelId == id).ToListAsync(cancellationToken));
+        Revive(await db.DesignRefs.Where(d => d.NovelId == id).ToListAsync(cancellationToken));
+        Revive(await db.ChunkAnalyses.Where(a => a.NovelId == id).ToListAsync(cancellationToken));
+
+        var volumeIds = await db.Volumes.Where(v => v.NovelId == id).Select(v => v.Id).ToListAsync(cancellationToken);
+        var pages = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).ToListAsync(cancellationToken);
+        var pageIds = pages.Select(p => p.Id).ToList();
+        Revive(await db.Panels.Where(p => pageIds.Contains(p.PageId)).ToListAsync(cancellationToken));
+
+        // Pages compose locally (no backoff / IRetryable), so revive a failed composition directly.
+        foreach (var page in pages.Where(p => p.CompositionStatus is WorkStatus.Failed or WorkStatus.NeedsRetry))
+        {
+            page.CompositionStatus = WorkStatus.Pending;
+            page.Attempts = 0;
+            page.LastError = null;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Returns a failed/retrying unit to Pending, due now, with a fresh attempt budget and no error.
+    private static void Revive(IEnumerable<IRetryable> units)
+    {
+        foreach (var unit in units.Where(u => u.WorkState is WorkStatus.Failed or WorkStatus.NeedsRetry))
+        {
+            unit.WorkState = WorkStatus.Pending;
+            unit.Attempts = 0;
+            unit.NextAttemptAtUtc = null;
+            unit.LastError = null;
+        }
+    }
+
     // Removes a novel entirely: its rows (children cascade via the DbContext relationships) and every
     // rendered image/PDF on disk. Used to clear a project out of the library for good.
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
