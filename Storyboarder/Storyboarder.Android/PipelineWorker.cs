@@ -18,6 +18,12 @@ public class PipelineWorker : Worker
 {
     private const string WorkName = "storyboarder-pipeline";
 
+    // WorkManager can run the periodic worker and a RunNow one-shot at the same time (they are separate
+    // unique-work chains). Concurrent cycles double up on the same due work — and, when a call keeps
+    // failing, on its retries. This process-wide gate lets only one cycle run at a time; a second
+    // wakeup returns immediately and the already-running cycle drains the outstanding work.
+    private static readonly SemaphoreSlim CycleGate = new(1, 1);
+
     public PipelineWorker(Context context, WorkerParameters parameters)
         : base(context, parameters)
     {
@@ -33,6 +39,12 @@ public class PipelineWorker : Worker
         if (!SettingsStore.IsConfigured)
         {
             logger.LogInformation("Pipeline worker skipped: API keys are not configured yet.");
+            return Result.InvokeSuccess();
+        }
+
+        if (!CycleGate.Wait(0))
+        {
+            logger.LogInformation("Pipeline cycle skipped: another cycle is already running.");
             return Result.InvokeSuccess();
         }
 
@@ -64,6 +76,10 @@ public class PipelineWorker : Worker
             SettingsStore.LastRunOutcome = $"Failed: {ex.Message}";
             SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return Result.InvokeRetry();
+        }
+        finally
+        {
+            CycleGate.Release();
         }
     }
 

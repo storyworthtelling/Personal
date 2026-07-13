@@ -37,23 +37,25 @@ public class MigrationSafetyTests : IDisposable
         Assert.True(migrations.Count >= 2, "Need at least two migrations to exercise an upgrade.");
         var previousRelease = migrations[^2];
 
-        Guid novelId;
+        var novelId = Guid.NewGuid();
         using (var db = new StoryboarderDbContext(options))
         {
-            // Bring the schema up to the previous release, then seed a mid-flight conversion.
+            // Bring the schema up to the previous release, then seed a mid-flight conversion with raw
+            // SQL. Seeding via the EF model would include columns a later migration adds (the one under
+            // test), which don't exist at this schema yet; raw SQL matches the previous schema exactly.
             db.GetInfrastructure().GetRequiredService<IMigrator>().Migrate(previousRelease);
-            var novel = new Novel
-            {
-                Title = "Month-long book",
-                GoogleDocId = "doc",
-                Stage = ProjectStage.RenderingImages,
-                CreatedAtUtc = DateTimeOffset.UtcNow,
-                UpdatedAtUtc = DateTimeOffset.UtcNow
-            };
-            novel.Source = new SourceText { NovelId = novel.Id, FullText = "half-converted manuscript", CharacterCount = 25 };
-            db.Novels.Add(novel);
-            db.SaveChanges();
-            novelId = novel.Id;
+            var ticks = DateTimeOffset.UtcNow.UtcTicks;
+            // LastError is nullable and omitted, so it defaults to NULL — this also sidesteps having to
+            // bind a DBNull parameter, which the provider can't map.
+            db.Database.ExecuteSqlRaw(
+                "INSERT INTO Novels (Id, Title, GoogleDocId, GoogleDocName, ArtStyle, Stage, " +
+                "DesignBibleConsolidated, StoryboardCursor, ContinuitySummary, CreatedAtUtc, UpdatedAtUtc) " +
+                "VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10})",
+                novelId, "Month-long book", "doc", "", ArtStyles.Default,
+                (int)ProjectStage.RenderingImages, 0, 0, "", ticks, ticks);
+            db.Database.ExecuteSqlRaw(
+                "INSERT INTO SourceTexts (Id, NovelId, FullText, CharacterCount) VALUES ({0}, {1}, {2}, {3})",
+                Guid.NewGuid(), novelId, "half-converted manuscript", 25);
         }
         SqliteConnection.ClearAllPools();
 

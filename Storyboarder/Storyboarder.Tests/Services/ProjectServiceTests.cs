@@ -202,6 +202,67 @@ public class ProjectServiceTests : IDisposable
         Assert.DoesNotContain("Novel error", report);
     }
 
+    [Fact]
+    public async Task RetryAsync_ClearsStallAndMakesStuckWorkDueAgain()
+    {
+        Guid novelId;
+        using (var context = database.NewContext())
+        {
+            var novel = new Novel
+            {
+                Title = "Quest", GoogleDocId = "doc", Stage = ProjectStage.Storyboarding,
+                StoryboardAttempts = 6, LastError = "Socket closed",
+                CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+            };
+            novel.Chunks.Add(new Chunk
+            {
+                NovelId = novel.Id, Ordinal = 0, Text = "chunk",
+                AnalysisStatus = WorkStatus.NeedsRetry, Attempts = 3,
+                NextAttemptAtUtc = clock.UtcNow.AddHours(4), LastError = "429"
+            });
+            novel.DesignRefs.Add(new DesignRef
+            {
+                NovelId = novel.Id, Kind = ReferenceKind.Character, Name = "Hero",
+                ReferenceSheetStatus = WorkStatus.Failed, Attempts = 6,
+                NextAttemptAtUtc = clock.UtcNow.AddHours(4), LastError = "boom"
+            });
+            context.Novels.Add(novel);
+            context.SaveChanges();
+            novelId = novel.Id;
+        }
+
+        await NewService().RetryAsync(novelId, CancellationToken.None);
+
+        using (var context = database.NewContext())
+        {
+            var novel = context.Novels.Single(n => n.Id == novelId);
+            Assert.Null(novel.LastError);
+            Assert.Equal(0, novel.StoryboardAttempts);
+
+            var chunk = context.Chunks.Single(c => c.NovelId == novelId);
+            Assert.Equal(WorkStatus.Pending, chunk.AnalysisStatus);
+            Assert.Equal(0, chunk.Attempts);
+            Assert.Null(chunk.NextAttemptAtUtc);
+            Assert.Null(chunk.LastError);
+
+            var reference = context.DesignRefs.Single(d => d.NovelId == novelId);
+            Assert.Equal(WorkStatus.Pending, reference.ReferenceSheetStatus);
+            Assert.Equal(0, reference.Attempts);
+            Assert.Null(reference.NextAttemptAtUtc);
+        }
+    }
+
+    [Fact]
+    public async Task RetryAsync_LeavesCancelledProjectsAlone()
+    {
+        var id = SeedNovel(ProjectStage.Cancelled);
+
+        await NewService().RetryAsync(id, CancellationToken.None);
+
+        using var context = database.NewContext();
+        Assert.Equal(ProjectStage.Cancelled, context.Novels.Single(n => n.Id == id).Stage);
+    }
+
     private void SeedTroubledNovel()
     {
         using var context = database.NewContext();

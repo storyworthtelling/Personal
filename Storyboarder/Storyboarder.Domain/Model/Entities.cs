@@ -23,6 +23,11 @@ public class Novel
     public int StoryboardCursor { get; set; }
     public string ContinuitySummary { get; set; } = string.Empty;
 
+    // Consecutive failed storyboard attempts for the CURRENT window. Bounded by RateLimitOptions
+    // .MaxAttempts so a persistently-failing call can't retry (and re-bill) forever; reset to 0 on a
+    // successful window or a manual retry.
+    public int StoryboardAttempts { get; set; }
+
     public string? LastError { get; set; }
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }

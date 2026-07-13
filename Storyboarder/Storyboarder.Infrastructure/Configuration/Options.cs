@@ -41,7 +41,11 @@ public sealed class RateLimitOptions
 {
     public const string SectionName = "RateLimit";
     public int ClaudeRequestsPerMinute { get; set; } = 5;
-    public int ClaudeRequestsPerDay { get; set; } = 2_000;
+
+    // Safety ceiling, not an expected volume: a full novel needs well under this many Claude calls
+    // (roughly two per chunk plus a consolidation), so a day that approaches it means something is
+    // looping. Kept comfortably above real usage but low enough that a runaway can't rack up cost.
+    public int ClaudeRequestsPerDay { get; set; } = 500;
     public int GeminiRequestsPerMinute { get; set; } = 5;
     public int GeminiRequestsPerDay { get; set; } = 100;
     public int MaxAttempts { get; set; } = 6;
