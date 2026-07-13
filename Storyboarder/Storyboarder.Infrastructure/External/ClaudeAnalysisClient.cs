@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.Analysis;
@@ -183,6 +184,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         {
             model = options.Model,
             max_tokens = maxTokens ?? options.MaxTokens,
+            stream = true,
             system = new[]
             {
                 new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } }
@@ -196,16 +198,83 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
         request.Headers.Add("x-api-key", options.ApiKey);
         request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         request.Content = JsonContent.Create(payload);
 
-        var response = await httpClient.SendAsync(request, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        // Stream the response as server-sent events. A large storyboard generation runs well past the
+        // default 100s HttpClient timeout, and a non-streaming request leaves the socket idle for those
+        // minutes — mobile carriers/NATs then abort it, surfacing as "Socket closed" / "Software caused
+        // connection abort". Streaming keeps bytes flowing so the connection stays alive, and reading
+        // headers first means the long generation isn't bounded by the send timeout.
+        var response = await httpClient.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw ToException(response, body);
+        }
 
-        return ExtractText(body);
+        return await ReadStreamedText(response, cancellationToken);
+    }
+
+    // Accumulates the assistant's text from an Anthropic Messages streaming response. Only text_delta
+    // events contribute; a mid-stream error event is surfaced with the same classification as an HTTP
+    // error so the worker reschedules throttling rather than crashing the cycle.
+    private static async Task<string> ReadStreamedText(
+        HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream);
+
+        var text = new StringBuilder();
+        string? line;
+        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
+        {
+            if (!line.StartsWith("data:", StringComparison.Ordinal))
+                continue;
+
+            var data = line["data:".Length..].Trim();
+            if (data.Length == 0)
+                continue;
+
+            using var evt = JsonDocument.Parse(data);
+            var root = evt.RootElement;
+            if (!root.TryGetProperty("type", out var typeProperty))
+                continue;
+
+            switch (typeProperty.GetString())
+            {
+                case "content_block_delta"
+                    when root.TryGetProperty("delta", out var delta) &&
+                         delta.TryGetProperty("type", out var deltaType) &&
+                         deltaType.GetString() == "text_delta" &&
+                         delta.TryGetProperty("text", out var chunk):
+                    text.Append(chunk.GetString());
+                    break;
+
+                case "error":
+                    throw StreamError(root);
+
+                case "message_stop":
+                    return text.ToString();
+            }
+        }
+
+        return text.ToString();
+    }
+
+    private static Exception StreamError(JsonElement root)
+    {
+        var body = root.GetRawText();
+        var type = root.TryGetProperty("error", out var error) && error.TryGetProperty("type", out var t)
+            ? t.GetString()
+            : null;
+
+        if (type is "rate_limit_error" or "overloaded_error")
+            return new RateLimitException($"Anthropic rate limited (stream): {body}");
+
+        return new HttpRequestException($"Anthropic stream error: {body}");
     }
 
     private static Exception ToException(HttpResponseMessage response, string body)
@@ -239,17 +308,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             // Non-JSON error body: fall back to status-code classification.
         }
         return false;
-    }
-
-    private static string ExtractText(string responseJson)
-    {
-        using var document = JsonDocument.Parse(responseJson);
-        return document.RootElement
-            .GetProperty("content")
-            .EnumerateArray()
-            .FirstOrDefault(block => block.TryGetProperty("type", out var t) && t.GetString() == "text")
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
     }
 
     private static IReadOnlyList<EntityMention> MapMentions(List<EntityDto>? entities) =>
