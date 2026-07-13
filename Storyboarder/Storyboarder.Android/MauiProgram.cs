@@ -69,9 +69,14 @@ public static class MauiProgram
         // External HTTP clients route through AndroidMessageHandler — SELinux blocks the raw sockets
         // the default SocketsHttpHandler opens in an Android app process.
         static Xamarin.Android.Net.AndroidMessageHandler AndroidHandler() => new();
+        // The default 100s HttpClient timeout is shorter than a large Claude generation or a slow Gemini
+        // render; both would abort mid-flight. Claude responses are streamed so the connection stays warm,
+        // but a generous ceiling still guards against a genuinely stuck request.
         builder.Services.AddHttpClient<IClaudeAnalysisClient, ClaudeAnalysisClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(10))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddHttpClient<IGeminiImageClient, GeminiImageClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         // Infrastructure collaborators.

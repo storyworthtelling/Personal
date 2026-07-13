@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.Analysis;
@@ -19,8 +20,29 @@ public class ClaudeAnalysisClientTests
         return (new ClaudeAnalysisClient(new HttpClient(handler), options), handler);
     }
 
-    private static string Reply(string assistantText) =>
-        JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = assistantText } } });
+    // The Messages API streams responses as server-sent events; the client now consumes that format.
+    // Reply wraps a whole assistant message as a single text_delta so the existing assertions exercise
+    // the streaming path unchanged.
+    private static string Reply(string assistantText) => Sse(
+        ("message_start", "{\"type\":\"message_start\",\"message\":{\"role\":\"assistant\",\"content\":[]}}"),
+        ("content_block_start", "{\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}"),
+        ("content_block_delta", Delta(assistantText)),
+        ("content_block_stop", "{\"type\":\"content_block_stop\",\"index\":0}"),
+        ("message_delta", "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}"),
+        ("message_stop", "{\"type\":\"message_stop\"}"));
+
+    // A single content_block_delta event carrying the given text piece.
+    private static string Delta(string textPiece) =>
+        "{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":" +
+        JsonSerializer.Serialize(textPiece) + "}}";
+
+    private static string Sse(params (string Event, string Data)[] events)
+    {
+        var builder = new StringBuilder();
+        foreach (var (name, data) in events)
+            builder.Append("event: ").Append(name).Append('\n').Append("data: ").Append(data).Append("\n\n");
+        return builder.ToString();
+    }
 
     [Fact]
     public async Task ExtractEntities_ParsesCharactersAndSettings()
@@ -179,5 +201,46 @@ public class ClaudeAnalysisClientTests
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.ExtractEntities("x", CancellationToken.None));
         Assert.Equal(HttpStatusCode.InternalServerError, ex.StatusCode);
         Assert.Contains("boom", ex.Message);
+    }
+
+    [Fact]
+    public async Task SendMessage_RequestsStreaming()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
+
+        await client.ExtractEntities("excerpt", CancellationToken.None);
+
+        Assert.Contains("\"stream\":true", handler.RequestBodies[0]);
+        var request = Assert.Single(handler.Requests);
+        Assert.Contains(request.Headers.Accept, header => header.MediaType == "text/event-stream");
+    }
+
+    [Fact]
+    public async Task SendMessage_ConcatenatesTextDeltasSplitAcrossEvents()
+    {
+        var (client, handler) = Create();
+        // A real stream delivers the JSON in pieces across many text_delta events.
+        handler.Enqueue(HttpStatusCode.OK, Sse(
+            ("content_block_delta", Delta("{\"continuitySummary\":\"Ali")),
+            ("content_block_delta", Delta("ce arrived.\",\"volumes\":")),
+            ("content_block_delta", Delta("[]}")),
+            ("message_stop", "{\"type\":\"message_stop\"}")), "text/event-stream");
+
+        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+
+        Assert.Equal("Alice arrived.", segment.ContinuitySummary);
+        Assert.Empty(segment.Volumes);
+    }
+
+    [Fact]
+    public async Task StreamError_OverloadedEvent_ThrowsRateLimitException()
+    {
+        var (client, handler) = Create();
+        handler.Enqueue(HttpStatusCode.OK, Sse(
+            ("error", "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"overloaded\"}}")),
+            "text/event-stream");
+
+        await Assert.ThrowsAsync<RateLimitException>(() => client.ExtractEntities("x", CancellationToken.None));
     }
 }
