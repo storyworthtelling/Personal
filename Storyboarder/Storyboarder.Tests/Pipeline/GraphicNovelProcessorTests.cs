@@ -83,7 +83,8 @@ public class GraphicNovelProcessorTests : IDisposable
             Directory.Delete(outputRoot, recursive: true);
     }
 
-    private GraphicNovelProcessor NewProcessor() => new(
+    private GraphicNovelProcessor NewProcessor(
+        int storyboardWindowChars = 8_000, int storyboardWindowMaxChars = 10_000) => new(
         database,
         claude.Object,
         gemini.Object,
@@ -96,7 +97,8 @@ public class GraphicNovelProcessorTests : IDisposable
         {
             ClaudeRequestsPerMinute = 1000, ClaudeRequestsPerDay = 100000,
             GeminiRequestsPerMinute = 1000, GeminiRequestsPerDay = 100000,
-            BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
+            BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6,
+            StoryboardWindowChars = storyboardWindowChars, StoryboardWindowMaxChars = storyboardWindowMaxChars
         }),
         NullLogger<GraphicNovelProcessor>.Instance);
 
@@ -119,6 +121,63 @@ public class GraphicNovelProcessorTests : IDisposable
     {
         using var context = database.NewContext();
         return context.Novels.Single(n => n.Id == novelId).Stage;
+    }
+
+    private Guid SeedStoryboardingNovel(string chunkText)
+    {
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc", Stage = ProjectStage.Storyboarding,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        using var context = database.NewContext();
+        context.Novels.Add(novel);
+        context.Chunks.Add(new Chunk
+        {
+            NovelId = novel.Id, Ordinal = 0, Text = chunkText, AnalysisStatus = WorkStatus.Completed
+        });
+        context.SaveChanges();
+        return novel.Id;
+    }
+
+    private Novel ReadNovel(Guid novelId)
+    {
+        using var context = database.NewContext();
+        return context.Novels.Single(n => n.Id == novelId);
+    }
+
+    private void VerifyStoryboardCalls(Times times) =>
+        claude.Verify(c => c.Storyboard(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            times);
+
+    [Fact]
+    public async Task Storyboarding_adapts_a_chunk_one_window_at_a_time_before_advancing_the_cursor()
+    {
+        // Tiny windows so a short chunk still splits into several storyboard sub-windows. A whole chunk
+        // adapted in one call runs long enough to be killed by the background worker's time limit; slicing
+        // it keeps each call short, and the per-window index makes progress resumable across cycles.
+        var processor = NewProcessor(storyboardWindowChars: 40, storyboardWindowMaxChars: 200);
+        var chunkText = string.Join("\n\n",
+            Enumerable.Range(0, 4).Select(i => $"Paragraph {i}: the hero walks onward through the long grey hall."));
+        var novelId = SeedStoryboardingNovel(chunkText);
+
+        // First cycle adapts only window 0: the sub-window index advances, the chunk cursor stays put.
+        await processor.ProcessNextAsync(CancellationToken.None);
+        var afterOne = ReadNovel(novelId);
+        Assert.Equal(0, afterOne.StoryboardCursor);
+        Assert.Equal(1, afterOne.StoryboardWindowIndex);
+        VerifyStoryboardCalls(Times.Once());
+
+        // Adapt the remaining three windows.
+        for (var i = 0; i < 3; i++)
+            await processor.ProcessNextAsync(CancellationToken.None);
+
+        var done = ReadNovel(novelId);
+        // All four windows adapted: the chunk is finished, so the cursor advances and the index resets.
+        Assert.Equal(1, done.StoryboardCursor);
+        Assert.Equal(0, done.StoryboardWindowIndex);
+        VerifyStoryboardCalls(Times.Exactly(4));
     }
 
     [Fact]

@@ -36,6 +36,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private readonly BackoffScheduler backoff;
     private readonly RateLimitOptions rateLimits;
     private readonly TextChunker chunker = new();
+    // A finer chunker used only for storyboarding: it slices each (large) design-bible chunk into small
+    // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
+    private readonly TextChunker storyboardChunker;
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
 
@@ -62,6 +65,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         this.logger = logger;
 
         rateLimits = rateLimitOptions.Value;
+        storyboardChunker = new TextChunker(rateLimits.StoryboardWindowChars, rateLimits.StoryboardWindowMaxChars);
         claudeLimiter = new RequestRateLimiter(rateLimits.ClaudeRequestsPerMinute, rateLimits.ClaudeRequestsPerDay, clock);
         geminiLimiter = new RequestRateLimiter(rateLimits.GeminiRequestsPerMinute, rateLimits.GeminiRequestsPerDay, clock);
         backoff = new BackoffScheduler(
@@ -268,15 +272,33 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (novel.StoryboardAttempts >= rateLimits.MaxAttempts)
             return ProcessResult.Idle;
 
-        var window = await db.Chunks
+        var chunkText = await db.Chunks
             .Where(c => c.NovelId == novel.Id && c.Ordinal == novel.StoryboardCursor)
             .Select(c => c.Text)
             .FirstAsync(cancellationToken);
+
+        // Adapt the chunk one small sub-window at a time. A whole ~48K-char chunk in a single call runs
+        // for many minutes — long enough that Android's background worker is killed mid-stream. Slicing
+        // it into small, boundary-aligned windows keeps every call short, and persisting the sub-window
+        // index makes it resumable across worker cycles.
+        var windows = storyboardChunker.Chunk(chunkText);
+
+        // A blank/whitespace chunk yields no windows (or the index has already reached the end): the
+        // chunk is done, so advance the cursor without billing a Claude call.
+        if (novel.StoryboardWindowIndex >= windows.Count)
+        {
+            novel.StoryboardCursor++;
+            novel.StoryboardWindowIndex = 0;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
 
         if (!claudeLimiter.TryAcquire())
             return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
 
         var bible = await LoadBible(db, novel.Id, cancellationToken);
+        var window = windows[novel.StoryboardWindowIndex].Text;
 
         StoryboardSegment segment;
         try
@@ -333,7 +355,14 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         }
 
         novel.ContinuitySummary = segment.ContinuitySummary;
-        novel.StoryboardCursor++;
+        novel.StoryboardWindowIndex++;
+        // Chunk finished once its last window is adapted: advance to the next chunk and reset the
+        // sub-window index. The outer cursor check ends storyboarding when the last chunk is done.
+        if (novel.StoryboardWindowIndex >= windows.Count)
+        {
+            novel.StoryboardCursor++;
+            novel.StoryboardWindowIndex = 0;
+        }
         novel.StoryboardAttempts = 0;
         novel.LastError = null;
         Touch(novel);

@@ -213,6 +213,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("StoryboardCursor")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("StoryboardWindowIndex")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("TEXT");
