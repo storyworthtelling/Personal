@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Tests.Support;
 using Xunit;
@@ -22,6 +23,27 @@ public class PipelineRunnerTests
         {
             Calls++;
             return Task.FromResult(results.Count > 0 ? results.Dequeue() : ProcessResult.Idle);
+        }
+    }
+
+    // A step that throws a scripted exception on its first call, then idles.
+    private sealed class ThrowingStep : IPipelineStep
+    {
+        private readonly Exception toThrow;
+        private bool thrown;
+        public int Calls { get; private set; }
+
+        public ThrowingStep(Exception toThrow) => this.toThrow = toThrow;
+
+        public Task<ProcessResult> ProcessNextAsync(CancellationToken cancellationToken)
+        {
+            Calls++;
+            if (!thrown)
+            {
+                thrown = true;
+                throw toThrow;
+            }
+            return Task.FromResult(ProcessResult.Idle);
         }
     }
 
@@ -120,6 +142,22 @@ public class PipelineRunnerTests
 
         Assert.Equal(RunResult.MoreWorkPending, result);
         Assert.Equal(3, step.Calls);
+    }
+
+    [Fact]
+    public async Task ConcurrencyConflict_endsCycleAsMoreWorkPending_withoutCrashing()
+    {
+        var clock = new FakeClock(DateTimeOffset.UnixEpoch);
+        var delay = new RecordingDelay(clock);
+        // A concurrent writer (an overlapping cycle, or a UI Retry/Delete) changed the same rows
+        // between load and save. The idempotent, resumable pipeline must treat this as a benign
+        // "someone else advanced it" and end the cycle for a retry, not crash with a "Failed" status.
+        var step = new ThrowingStep(new DbUpdateConcurrencyException("row changed"));
+
+        var result = await new PipelineRunner(step).RunUntilExhaustedAsync(Budget(clock, delay), CancellationToken.None);
+
+        Assert.Equal(RunResult.MoreWorkPending, result);
+        Assert.Equal(1, step.Calls);
     }
 
     [Fact]

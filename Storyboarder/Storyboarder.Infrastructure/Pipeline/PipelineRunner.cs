@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Storyboarder.Domain.Time;
 
 namespace Storyboarder.Infrastructure.Pipeline;
@@ -37,7 +38,21 @@ public sealed class PipelineRunner
             if (iterations >= budget.MaxIterations || budget.Clock.UtcNow - start >= budget.MaxDuration)
                 return RunResult.MoreWorkPending;
 
-            var result = await step.ProcessNextAsync(cancellationToken);
+            ProcessResult result;
+            try
+            {
+                result = await step.ProcessNextAsync(cancellationToken);
+            }
+            // A concurrent writer — an overlapping worker cycle, or a UI action such as Retry or
+            // Delete — changed the same rows between load and SaveChanges. State lives entirely in the
+            // database and every step is idempotent and resumable, so this cycle's now-stale work is
+            // abandoned rather than crashing the run (which would surface as an alarming "Failed:
+            // database…" status). The cycle ends as MoreWorkPending; WorkManager re-runs and the next
+            // cycle re-reads fresh state.
+            catch (DbUpdateConcurrencyException)
+            {
+                return RunResult.MoreWorkPending;
+            }
             iterations++;
 
             switch (result.Outcome)
