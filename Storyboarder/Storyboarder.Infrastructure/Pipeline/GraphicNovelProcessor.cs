@@ -316,28 +316,32 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.Waiting(backoff.NextDelay(novel.StoryboardAttempts - 1, retryAfter), novel.Id);
         }
 
-        var volumes = await db.Volumes
-            .Where(v => v.NovelId == novel.Id)
-            .Include(v => v.Pages)
-            .ToListAsync(cancellationToken);
+        // Resolve the novel's existing volumes (id + current page count) WITHOUT tracking them. Once
+        // storyboarding reuses a volume across windows/chunks, loading that volume graph and appending
+        // to it while also updating the novel trips SaveChanges' concurrency check; inserting new rows
+        // against explicit foreign keys keeps the change-tracker to just the novel plus the new inserts.
+        var existing = (await db.Volumes
+                .Where(v => v.NovelId == novel.Id)
+                .Select(v => new { v.Id, v.Number, PageCount = v.Pages.Count })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(v => v.Number, v => (v.Id, PageCount: v.PageCount));
 
         foreach (var volumeDraft in segment.Volumes)
         {
-            var volume = volumes.FirstOrDefault(v => v.Number == volumeDraft.Number);
-            if (volume is null)
+            if (!existing.TryGetValue(volumeDraft.Number, out var target))
             {
-                volume = new Volume { NovelId = novel.Id, Number = volumeDraft.Number, Title = volumeDraft.Title };
+                var volume = new Volume { NovelId = novel.Id, Number = volumeDraft.Number, Title = volumeDraft.Title };
                 db.Volumes.Add(volume);
-                volumes.Add(volume);
+                target = (volume.Id, 0);
             }
 
             foreach (var pageDraft in volumeDraft.Pages)
             {
                 var page = new Page
                 {
-                    VolumeId = volume.Id,
+                    VolumeId = target.Id,
                     ChapterNumber = pageDraft.ChapterNumber,
-                    PageNumber = volume.Pages.Count + 1
+                    PageNumber = ++target.PageCount
                 };
                 int panelNumber = 1;
                 foreach (var panelDraft in pageDraft.Panels)
@@ -350,8 +354,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                         Caption = panelDraft.Caption,
                         ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
                     });
-                volume.Pages.Add(page);
+                db.Pages.Add(page);
             }
+
+            // Remember the running page count so a volume number repeated later in this segment keeps numbering.
+            existing[volumeDraft.Number] = target;
         }
 
         novel.ContinuitySummary = segment.ContinuitySummary;
