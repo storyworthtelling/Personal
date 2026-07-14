@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Options;
 using Moq;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
+using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.Persistence;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
@@ -22,7 +24,8 @@ public class NovelStatusTests : IDisposable
 
     public void Dispose() => database.Dispose();
 
-    private ProjectService NewService() => new(database, docs.Object, imageStore.Object, clock);
+    private ProjectService NewService() =>
+        new(database, docs.Object, imageStore.Object, clock, Options.Create(new RateLimitOptions()));
 
     private Guid SeedNovel(ProjectStage stage, Action<StoryboarderDbContextSeed>? seed = null)
     {
@@ -123,6 +126,47 @@ public class NovelStatusTests : IDisposable
 
         Assert.Equal(1, status!.ReferenceSheets.Done);
         Assert.Equal(2, status.ReferenceSheets.Total);
+    }
+
+    [Fact]
+    public async Task NeedsAttention_true_when_storyboard_retries_are_exhausted()
+    {
+        var id = SeedNovel(ProjectStage.Storyboarding, seed =>
+        {
+            for (var i = 0; i < 5; i++)
+                seed.Context.Chunks.Add(NewChunk(seed.NovelId, i));
+            var novel = seed.Context.Novels.Local.First();
+            novel.StoryboardCursor = 2;
+            novel.LastError = "Software caused connection abort";
+            // At the attempt cap the storyboard window has given up; the worker won't advance on its
+            // own, so this genuinely needs the user to hit Retry.
+            novel.StoryboardAttempts = new RateLimitOptions().MaxAttempts;
+        });
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.True(status!.NeedsAttention);
+        Assert.Equal("Software caused connection abort", status.LastError);
+    }
+
+    [Fact]
+    public async Task NeedsAttention_false_while_a_transient_error_is_still_retrying()
+    {
+        var id = SeedNovel(ProjectStage.Storyboarding, seed =>
+        {
+            for (var i = 0; i < 5; i++)
+                seed.Context.Chunks.Add(NewChunk(seed.NovelId, i));
+            var novel = seed.Context.Novels.Local.First();
+            novel.StoryboardCursor = 2;
+            novel.LastError = "Software caused connection abort";
+            // Below the cap: the worker will retry this transient error on its own, so it must not
+            // raise the "needs attention" alarm.
+            novel.StoryboardAttempts = 3;
+        });
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.False(status!.NeedsAttention);
     }
 
     [Fact]

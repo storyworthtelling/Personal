@@ -23,4 +23,8 @@ public sealed record NovelStatus(
     PhaseProgress AnalysisNotes,
     PhaseProgress Analysis,
     bool AnalysisReady,
-    string? CoverThumbPath = null);
+    string? CoverThumbPath = null,
+    // True only when the pipeline has genuinely stalled and needs the user (a storyboard window that
+    // exhausted its retry budget). A transient error the worker is still auto-retrying leaves this
+    // false, so the card doesn't cry wolf while it self-heals.
+    bool NeedsAttention = false);

@@ -32,7 +32,8 @@ public class ProjectServiceTests : IDisposable
             Directory.Delete(outputRoot, recursive: true);
     }
 
-    private ProjectService NewService() => new(database, docs.Object, imageStore, clock);
+    private ProjectService NewService() =>
+        new(database, docs.Object, imageStore, clock, Options.Create(new RateLimitOptions()));
 
     private Guid SeedNovel(ProjectStage stage)
     {

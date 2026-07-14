@@ -1,9 +1,11 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Time;
+using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.Persistence;
 
 namespace Storyboarder.Infrastructure.Services;
@@ -22,15 +24,17 @@ public sealed class ProjectService
     private readonly IGoogleDocsClient docs;
     private readonly IImageStore imageStore;
     private readonly IClock clock;
+    private readonly RateLimitOptions rateLimits;
 
     public ProjectService(
         IDbContextFactory<StoryboarderDbContext> dbContextFactory, IGoogleDocsClient docs,
-        IImageStore imageStore, IClock clock)
+        IImageStore imageStore, IClock clock, IOptions<RateLimitOptions> rateLimitOptions)
     {
         this.dbContextFactory = dbContextFactory;
         this.docs = docs;
         this.imageStore = imageStore;
         this.clock = clock;
+        rateLimits = rateLimitOptions.Value;
     }
 
     public async Task<Guid> CreateFromDocAsync(
@@ -153,7 +157,7 @@ public sealed class ProjectService
         var statuses = new List<NovelStatus>(ids.Count);
         foreach (var id in ids)
         {
-            var status = await BuildStatus(db, id, cancellationToken);
+            var status = await BuildStatus(db, id, rateLimits.MaxAttempts, cancellationToken);
             if (status is not null)
                 statuses.Add(status);
         }
@@ -163,7 +167,7 @@ public sealed class ProjectService
     public async Task<NovelStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await BuildStatus(db, id, cancellationToken);
+        return await BuildStatus(db, id, rateLimits.MaxAttempts, cancellationToken);
     }
 
     public async Task<string?> GetVolumePdfPathAsync(Guid novelId, int number, CancellationToken cancellationToken)
@@ -184,7 +188,8 @@ public sealed class ProjectService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    private static async Task<NovelStatus?> BuildStatus(StoryboarderDbContext db, Guid id, CancellationToken cancellationToken)
+    private static async Task<NovelStatus?> BuildStatus(
+        StoryboarderDbContext db, Guid id, int maxStoryboardAttempts, CancellationToken cancellationToken)
     {
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
         if (novel is null)
@@ -225,10 +230,19 @@ public sealed class ProjectService
             .Select(p => p.ThumbImagePath ?? p.ComposedImagePath)
             .FirstOrDefaultAsync(cancellationToken);
 
+        // The pipeline auto-retries transient failures (network drops, rate limits) with backoff, so a
+        // novel-level LastError is usually a self-healing hiccup, not a stall. The one exception is a
+        // storyboard window that has burned through its bounded retry budget: DoStoryboard then idles
+        // the novel and only a manual Retry restarts it. That — and only that — is "needs attention".
+        var needsAttention = novel.LastError is not null
+            && novel.Stage == ProjectStage.Storyboarding
+            && novel.StoryboardCursor < chunkCount
+            && novel.StoryboardAttempts >= maxStoryboardAttempts;
+
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
-            analysisNotes, analysis, analysisReady, coverThumb);
+            analysisNotes, analysis, analysisReady, coverThumb, needsAttention);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per
