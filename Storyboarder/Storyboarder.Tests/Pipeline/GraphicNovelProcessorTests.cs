@@ -83,8 +83,7 @@ public class GraphicNovelProcessorTests : IDisposable
             Directory.Delete(outputRoot, recursive: true);
     }
 
-    private GraphicNovelProcessor NewProcessor(
-        int storyboardWindowChars = 8_000, int storyboardWindowMaxChars = 10_000) => new(
+    private GraphicNovelProcessor NewProcessor() => new(
         database,
         claude.Object,
         gemini.Object,
@@ -97,19 +96,19 @@ public class GraphicNovelProcessorTests : IDisposable
         {
             ClaudeRequestsPerMinute = 1000, ClaudeRequestsPerDay = 100000,
             GeminiRequestsPerMinute = 1000, GeminiRequestsPerDay = 100000,
-            BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6,
-            StoryboardWindowChars = storyboardWindowChars, StoryboardWindowMaxChars = storyboardWindowMaxChars
+            BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
         NullLogger<GraphicNovelProcessor>.Instance);
 
-    private Guid SeedNovel()
+    private Guid SeedNovel(string? fullText = null)
     {
+        var text = fullText ?? "A short tale. The hero walked to the castle and knocked on the gate.";
         var novel = new Novel { Title = "Quest", GoogleDocId = "doc", CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow };
         novel.Source = new SourceText
         {
             NovelId = novel.Id,
-            FullText = "A short tale. The hero walked to the castle and knocked on the gate.",
-            CharacterCount = 64
+            FullText = text,
+            CharacterCount = text.Length
         };
         using var context = database.NewContext();
         context.Novels.Add(novel);
@@ -123,61 +122,31 @@ public class GraphicNovelProcessorTests : IDisposable
         return context.Novels.Single(n => n.Id == novelId).Stage;
     }
 
-    private Guid SeedStoryboardingNovel(string chunkText)
-    {
-        var novel = new Novel
-        {
-            Title = "Quest", GoogleDocId = "doc", Stage = ProjectStage.Storyboarding,
-            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
-        };
-        using var context = database.NewContext();
-        context.Novels.Add(novel);
-        context.Chunks.Add(new Chunk
-        {
-            NovelId = novel.Id, Ordinal = 0, Text = chunkText, AnalysisStatus = WorkStatus.Completed
-        });
-        context.SaveChanges();
-        return novel.Id;
-    }
-
-    private Novel ReadNovel(Guid novelId)
-    {
-        using var context = database.NewContext();
-        return context.Novels.Single(n => n.Id == novelId);
-    }
-
-    private void VerifyStoryboardCalls(Times times) =>
-        claude.Verify(c => c.Storyboard(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            times);
-
     [Fact]
-    public async Task Storyboarding_adapts_a_chunk_one_window_at_a_time_before_advancing_the_cursor()
+    public async Task Storyboarding_slices_a_long_chunk_into_several_windows()
     {
-        // Tiny windows so a short chunk still splits into several storyboard sub-windows. A whole chunk
-        // adapted in one call runs long enough to be killed by the background worker's time limit; slicing
-        // it keeps each call short, and the per-window index makes progress resumable across cycles.
-        var processor = NewProcessor(storyboardWindowChars: 40, storyboardWindowMaxChars: 200);
-        var chunkText = string.Join("\n\n",
-            Enumerable.Range(0, 4).Select(i => $"Paragraph {i}: the hero walks onward through the long grey hall."));
-        var novelId = SeedStoryboardingNovel(chunkText);
+        // A manuscript long enough to be a single design-bible chunk (well under the ~48K chunker
+        // target) but several small storyboard windows. Each window is its own short Claude call: a
+        // whole chunk adapted in one call runs long enough to be killed by the background worker's
+        // time limit, which is what stalled the pipeline; slicing keeps every call short.
+        var manuscript = string.Join("\n\n",
+            Enumerable.Range(0, 120).Select(i =>
+                $"Paragraph {i}: the hero walks onward through the long grey hall, thinking of home and the road ahead."));
+        var novelId = SeedNovel(manuscript);
 
-        // First cycle adapts only window 0: the sub-window index advances, the chunk cursor stays put.
-        await processor.ProcessNextAsync(CancellationToken.None);
-        var afterOne = ReadNovel(novelId);
-        Assert.Equal(0, afterOne.StoryboardCursor);
-        Assert.Equal(1, afterOne.StoryboardWindowIndex);
-        VerifyStoryboardCalls(Times.Once());
+        await DriveToCompletion(novelId, _ => { });
 
-        // Adapt the remaining three windows.
-        for (var i = 0; i < 3; i++)
-            await processor.ProcessNextAsync(CancellationToken.None);
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
 
-        var done = ReadNovel(novelId);
-        // All four windows adapted: the chunk is finished, so the cursor advances and the index resets.
-        Assert.Equal(1, done.StoryboardCursor);
-        Assert.Equal(0, done.StoryboardWindowIndex);
-        VerifyStoryboardCalls(Times.Exactly(4));
+        using var context = database.NewContext();
+        var chunkCount = context.Chunks.Count(c => c.NovelId == novelId);
+        var storyboardCalls = claude.Invocations
+            .Count(i => i.Method.Name == nameof(IClaudeAnalysisClient.Storyboard));
+        // The manuscript is a single design-bible chunk, yet storyboarding adapted it in more than one
+        // window — proof the chunk was sliced rather than sent to Claude whole.
+        Assert.Equal(1, chunkCount);
+        Assert.True(storyboardCalls > 1,
+            $"a single chunk should be storyboarded in several windows, but Storyboard was called {storyboardCalls} time(s)");
     }
 
     [Fact]
