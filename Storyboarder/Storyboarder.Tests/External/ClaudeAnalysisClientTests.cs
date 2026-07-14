@@ -175,6 +175,41 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task Storyboard_UsesStoryboardMaxTokens_NotDefault()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", MaxTokens = 256, StoryboardMaxTokens = 32000
+        });
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
+        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
+
+        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+
+        // A full panel breakdown of a chunk is the heaviest output the pipeline produces, so the
+        // storyboard call must request its own large budget rather than the small default MaxTokens.
+        Assert.Contains("\"max_tokens\":32000", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task MaxTokensStopReason_ThrowsTruncatedResponse_NotSilentPartialBody()
+    {
+        var (client, handler) = Create();
+        // The model hit its output ceiling mid-response: partial (unterminated) JSON plus a
+        // message_delta reporting stop_reason "max_tokens". Returning this silently would fail
+        // downstream with an opaque JSON error (e.g. "ZeroDepthAtEnd"); the client must surface it.
+        handler.Enqueue(HttpStatusCode.OK, Sse(
+            ("content_block_delta", Delta("{\"characters\":[{\"name\":\"Ali")),
+            ("message_delta", "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"}}"),
+            ("message_stop", "{\"type\":\"message_stop\"}")), "text/event-stream");
+
+        var ex = await Assert.ThrowsAsync<ResponseTruncatedException>(
+            () => client.ExtractEntities("x", CancellationToken.None));
+        Assert.Contains("max_tokens", ex.Message);
+    }
+
+    [Fact]
     public async Task RateLimit_429_ThrowsRateLimitException()
     {
         var (client, handler) = Create();

@@ -10,6 +10,13 @@ public sealed class ClaudeOptions
     public string Model { get; set; } = "claude-sonnet-4-6";
     public int MaxTokens { get; set; } = 8_000;
 
+    // A single storyboard call must emit the full panel-by-panel breakdown of an entire chunk
+    // window (many pages, each with several panels of prose visual prompts) as one JSON object —
+    // by far the heaviest output the pipeline produces. The default MaxTokens is too small: dense
+    // chunks overflow it, the response is truncated mid-object, and the JSON fails to parse, so the
+    // novel stalls in "needs attention". Give storyboarding its own generous budget.
+    public int StoryboardMaxTokens { get; set; } = 32_000;
+
     // The consolidated revision report is long (many sections + several reviews), so its single
     // "reduce" call gets a larger output budget than the per-chunk/per-panel calls.
     public int AnalysisMaxTokens { get; set; } = 16_000;

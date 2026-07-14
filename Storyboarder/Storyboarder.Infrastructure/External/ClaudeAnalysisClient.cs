@@ -105,7 +105,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             $"PASSAGE TO ADAPT:\n{textWindow}";
 
         var reply = await SendMessage(
-            StoryboardInstruction, userContent, cancellationToken, cachedContext: cachedContext);
+            StoryboardInstruction, userContent, cancellationToken,
+            maxTokens: options.StoryboardMaxTokens, cachedContext: cachedContext);
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException("Claude storyboard reply did not contain a JSON object.");
 
@@ -200,10 +201,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 new { type = "text", text = cachedContext, cache_control = new { type = "ephemeral" } }
             };
 
+        var effectiveMaxTokens = maxTokens ?? options.MaxTokens;
         var payload = new
         {
             model = options.Model,
-            max_tokens = maxTokens ?? options.MaxTokens,
+            max_tokens = effectiveMaxTokens,
             stream = true,
             system,
             messages = new[]
@@ -232,19 +234,22 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             throw ToException(response, body);
         }
 
-        return await ReadStreamedText(response, cancellationToken);
+        return await ReadStreamedText(response, effectiveMaxTokens, cancellationToken);
     }
 
     // Accumulates the assistant's text from an Anthropic Messages streaming response. Only text_delta
     // events contribute; a mid-stream error event is surfaced with the same classification as an HTTP
-    // error so the worker reschedules throttling rather than crashing the cycle.
+    // error so the worker reschedules throttling rather than crashing the cycle. The message_delta
+    // event carries the final stop_reason: if the model ran out of output budget ("max_tokens") the
+    // accumulated text is truncated, so we raise instead of returning a partial (unparseable) body.
     private static async Task<string> ReadStreamedText(
-        HttpResponseMessage response, CancellationToken cancellationToken)
+        HttpResponseMessage response, int maxTokens, CancellationToken cancellationToken)
     {
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
 
         var text = new StringBuilder();
+        string? stopReason = null;
         string? line;
         while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
         {
@@ -270,13 +275,31 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                     text.Append(chunk.GetString());
                     break;
 
+                case "message_delta"
+                    when root.TryGetProperty("delta", out var messageDelta) &&
+                         messageDelta.TryGetProperty("stop_reason", out var reason) &&
+                         reason.ValueKind == JsonValueKind.String:
+                    stopReason = reason.GetString();
+                    break;
+
                 case "error":
                     throw StreamError(root);
 
                 case "message_stop":
-                    return text.ToString();
+                    return Finish(text, stopReason, maxTokens);
             }
         }
+
+        return Finish(text, stopReason, maxTokens);
+    }
+
+    private static string Finish(StringBuilder text, string? stopReason, int maxTokens)
+    {
+        if (stopReason == "max_tokens")
+            throw new ResponseTruncatedException(
+                $"Claude response was truncated at the {maxTokens}-token output limit " +
+                "(stop_reason=max_tokens); the response is incomplete. Increase the request's " +
+                "max_tokens budget.");
 
         return text.ToString();
     }
