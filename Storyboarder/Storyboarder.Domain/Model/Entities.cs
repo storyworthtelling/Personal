@@ -21,6 +21,13 @@ public class Novel
 
     // Chunk ordinal up to which storyboarding has already run (for resumable, windowed storyboarding).
     public int StoryboardCursor { get; set; }
+
+    // How many storyboard sub-windows of the CURRENT chunk (StoryboardCursor) are already done. A whole
+    // chunk is too large to storyboard in one Claude call — the generation runs long enough that the
+    // background worker is killed mid-stream — so each chunk is sliced into small windows and this
+    // advances one window at a time, resetting to 0 when the chunk is finished and the cursor moves on.
+    public int StoryboardWindowIndex { get; set; }
+
     public string ContinuitySummary { get; set; } = string.Empty;
 
     // Consecutive failed storyboard attempts for the CURRENT window. Bounded by RateLimitOptions

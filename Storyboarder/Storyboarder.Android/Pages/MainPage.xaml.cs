@@ -254,8 +254,11 @@ public partial class MainPage : ContentPage
             AddChip(chips, "volumes", s.Volumes, s.Stage == "AssemblingVolumes");
             AddChip(chips, "analysis", s.AnalysisNotes, s.Stage == "ComposingAnalysis");
 
+            // Only surface the error (and the "needs attention" chip) when the pipeline has truly
+            // stalled — a transient failure the worker is still auto-retrying stays quiet so the card
+            // doesn't cry wolf while it self-heals.
             return new ProjectRow(
-                s.Id, s.Title, summary, s.LastError, !string.IsNullOrEmpty(s.LastError),
+                s.Id, s.Title, summary, s.NeedsAttention ? s.LastError : null, s.NeedsAttention,
                 s.CoverThumbPath, !string.IsNullOrEmpty(s.CoverThumbPath), chips);
         }
 

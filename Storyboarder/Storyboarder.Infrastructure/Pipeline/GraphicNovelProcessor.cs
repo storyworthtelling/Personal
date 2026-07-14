@@ -36,6 +36,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private readonly BackoffScheduler backoff;
     private readonly RateLimitOptions rateLimits;
     private readonly TextChunker chunker = new();
+    // A finer chunker used only for storyboarding: it slices each (large) design-bible chunk into small
+    // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
+    private readonly TextChunker storyboardChunker;
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
 
@@ -62,6 +65,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         this.logger = logger;
 
         rateLimits = rateLimitOptions.Value;
+        storyboardChunker = new TextChunker(rateLimits.StoryboardWindowChars, rateLimits.StoryboardWindowMaxChars);
         claudeLimiter = new RequestRateLimiter(rateLimits.ClaudeRequestsPerMinute, rateLimits.ClaudeRequestsPerDay, clock);
         geminiLimiter = new RequestRateLimiter(rateLimits.GeminiRequestsPerMinute, rateLimits.GeminiRequestsPerDay, clock);
         backoff = new BackoffScheduler(
@@ -268,15 +272,33 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (novel.StoryboardAttempts >= rateLimits.MaxAttempts)
             return ProcessResult.Idle;
 
-        var window = await db.Chunks
+        var chunkText = await db.Chunks
             .Where(c => c.NovelId == novel.Id && c.Ordinal == novel.StoryboardCursor)
             .Select(c => c.Text)
             .FirstAsync(cancellationToken);
+
+        // Adapt the chunk one small sub-window at a time. A whole ~48K-char chunk in a single call runs
+        // for many minutes — long enough that Android's background worker is killed mid-stream. Slicing
+        // it into small, boundary-aligned windows keeps every call short, and persisting the sub-window
+        // index makes it resumable across worker cycles.
+        var windows = storyboardChunker.Chunk(chunkText);
+
+        // A blank/whitespace chunk yields no windows (or the index has already reached the end): the
+        // chunk is done, so advance the cursor without billing a Claude call.
+        if (novel.StoryboardWindowIndex >= windows.Count)
+        {
+            novel.StoryboardCursor++;
+            novel.StoryboardWindowIndex = 0;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
 
         if (!claudeLimiter.TryAcquire())
             return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
 
         var bible = await LoadBible(db, novel.Id, cancellationToken);
+        var window = windows[novel.StoryboardWindowIndex].Text;
 
         StoryboardSegment segment;
         try
@@ -294,28 +316,32 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.Waiting(backoff.NextDelay(novel.StoryboardAttempts - 1, retryAfter), novel.Id);
         }
 
-        var volumes = await db.Volumes
-            .Where(v => v.NovelId == novel.Id)
-            .Include(v => v.Pages)
-            .ToListAsync(cancellationToken);
+        // Resolve the novel's existing volumes (id + current page count) WITHOUT tracking them. Once
+        // storyboarding reuses a volume across windows/chunks, loading that volume graph and appending
+        // to it while also updating the novel trips SaveChanges' concurrency check; inserting new rows
+        // against explicit foreign keys keeps the change-tracker to just the novel plus the new inserts.
+        var existing = (await db.Volumes
+                .Where(v => v.NovelId == novel.Id)
+                .Select(v => new { v.Id, v.Number, PageCount = v.Pages.Count })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(v => v.Number, v => (v.Id, PageCount: v.PageCount));
 
         foreach (var volumeDraft in segment.Volumes)
         {
-            var volume = volumes.FirstOrDefault(v => v.Number == volumeDraft.Number);
-            if (volume is null)
+            if (!existing.TryGetValue(volumeDraft.Number, out var target))
             {
-                volume = new Volume { NovelId = novel.Id, Number = volumeDraft.Number, Title = volumeDraft.Title };
+                var volume = new Volume { NovelId = novel.Id, Number = volumeDraft.Number, Title = volumeDraft.Title };
                 db.Volumes.Add(volume);
-                volumes.Add(volume);
+                target = (volume.Id, 0);
             }
 
             foreach (var pageDraft in volumeDraft.Pages)
             {
                 var page = new Page
                 {
-                    VolumeId = volume.Id,
+                    VolumeId = target.Id,
                     ChapterNumber = pageDraft.ChapterNumber,
-                    PageNumber = volume.Pages.Count + 1
+                    PageNumber = ++target.PageCount
                 };
                 int panelNumber = 1;
                 foreach (var panelDraft in pageDraft.Panels)
@@ -328,12 +354,22 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                         Caption = panelDraft.Caption,
                         ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
                     });
-                volume.Pages.Add(page);
+                db.Pages.Add(page);
             }
+
+            // Remember the running page count so a volume number repeated later in this segment keeps numbering.
+            existing[volumeDraft.Number] = target;
         }
 
         novel.ContinuitySummary = segment.ContinuitySummary;
-        novel.StoryboardCursor++;
+        novel.StoryboardWindowIndex++;
+        // Chunk finished once its last window is adapted: advance to the next chunk and reset the
+        // sub-window index. The outer cursor check ends storyboarding when the last chunk is done.
+        if (novel.StoryboardWindowIndex >= windows.Count)
+        {
+            novel.StoryboardCursor++;
+            novel.StoryboardWindowIndex = 0;
+        }
         novel.StoryboardAttempts = 0;
         novel.LastError = null;
         Touch(novel);

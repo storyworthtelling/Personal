@@ -100,14 +100,15 @@ public class GraphicNovelProcessorTests : IDisposable
         }),
         NullLogger<GraphicNovelProcessor>.Instance);
 
-    private Guid SeedNovel()
+    private Guid SeedNovel(string? fullText = null)
     {
+        var text = fullText ?? "A short tale. The hero walked to the castle and knocked on the gate.";
         var novel = new Novel { Title = "Quest", GoogleDocId = "doc", CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow };
         novel.Source = new SourceText
         {
             NovelId = novel.Id,
-            FullText = "A short tale. The hero walked to the castle and knocked on the gate.",
-            CharacterCount = 64
+            FullText = text,
+            CharacterCount = text.Length
         };
         using var context = database.NewContext();
         context.Novels.Add(novel);
@@ -119,6 +120,33 @@ public class GraphicNovelProcessorTests : IDisposable
     {
         using var context = database.NewContext();
         return context.Novels.Single(n => n.Id == novelId).Stage;
+    }
+
+    [Fact]
+    public async Task Storyboarding_slices_a_long_chunk_into_several_windows()
+    {
+        // A manuscript long enough to be a single design-bible chunk (well under the ~48K chunker
+        // target) but several small storyboard windows. Each window is its own short Claude call: a
+        // whole chunk adapted in one call runs long enough to be killed by the background worker's
+        // time limit, which is what stalled the pipeline; slicing keeps every call short.
+        var manuscript = string.Join("\n\n",
+            Enumerable.Range(0, 120).Select(i =>
+                $"Paragraph {i}: the hero walks onward through the long grey hall, thinking of home and the road ahead."));
+        var novelId = SeedNovel(manuscript);
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var context = database.NewContext();
+        var chunkCount = context.Chunks.Count(c => c.NovelId == novelId);
+        var storyboardCalls = claude.Invocations
+            .Count(i => i.Method.Name == nameof(IClaudeAnalysisClient.Storyboard));
+        // The manuscript is a single design-bible chunk, yet storyboarding adapted it in more than one
+        // window — proof the chunk was sliced rather than sent to Claude whole.
+        Assert.Equal(1, chunkCount);
+        Assert.True(storyboardCalls > 1,
+            $"a single chunk should be storyboarded in several windows, but Storyboard was called {storyboardCalls} time(s)");
     }
 
     [Fact]

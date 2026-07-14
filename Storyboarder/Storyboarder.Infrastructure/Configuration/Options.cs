@@ -10,12 +10,12 @@ public sealed class ClaudeOptions
     public string Model { get; set; } = "claude-sonnet-4-6";
     public int MaxTokens { get; set; } = 8_000;
 
-    // A single storyboard call must emit the full panel-by-panel breakdown of an entire chunk
-    // window (many pages, each with several panels of prose visual prompts) as one JSON object —
-    // by far the heaviest output the pipeline produces. The default MaxTokens is too small: dense
-    // chunks overflow it, the response is truncated mid-object, and the JSON fails to parse, so the
-    // novel stalls in "needs attention". Give storyboarding its own generous budget.
-    public int StoryboardMaxTokens { get; set; } = 32_000;
+    // Storyboarding is the heaviest output the pipeline produces (a panel-by-panel breakdown as one
+    // JSON object), so it gets its own budget rather than the small default MaxTokens. Storyboarding now
+    // runs on small text sub-windows (see RateLimitOptions.StoryboardWindowChars), so this doubles as a
+    // per-call duration cap: bounding the output also bounds how long one call streams, keeping it
+    // comfortably inside the background worker's time budget.
+    public int StoryboardMaxTokens { get; set; } = 16_000;
 
     // The consolidated revision report is long (many sections + several reviews), so its single
     // "reduce" call gets a larger output budget than the per-chunk/per-panel calls.
@@ -59,6 +59,14 @@ public sealed class RateLimitOptions
     public int BaseDelaySeconds { get; set; } = 4;
     public int MaxDelaySeconds { get; set; } = 600;
     public int IdlePollSeconds { get; set; } = 10;
+
+    // Storyboarding slices each design-bible chunk into smaller windows and adapts one per Claude call.
+    // A whole ~48K-char chunk in a single call generates for many minutes — long enough that Android's
+    // background worker is killed mid-stream ("Software caused connection abort"). These bound each
+    // window (packing toward Chars, splitting oversized paragraphs at Max) so every call stays short and
+    // finishes well inside the worker's time budget; progress is persisted per window so it's resumable.
+    public int StoryboardWindowChars { get; set; } = 8_000;
+    public int StoryboardWindowMaxChars { get; set; } = 10_000;
 }
 
 public sealed class PageLayoutOptions
