@@ -280,6 +280,31 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task RewritePromptToImply_ReturnsRestagedPrompt()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("The lovers embrace; the camera drifts to the rain-streaked window."));
+
+        var reworked = await client.RewritePromptToImply(
+            "an explicit love scene", CancellationToken.None);
+
+        Assert.Equal("The lovers embrace; the camera drifts to the rain-streaked window.", reworked);
+        // The restage instruction is sent as the (cached) system prompt.
+        Assert.Contains("IMPLIED", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task RewritePromptToImply_FallsBackToOriginal_WhenModelReturnsNothing()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("   "));
+
+        var reworked = await client.RewritePromptToImply("original prompt", CancellationToken.None);
+
+        Assert.Equal("original prompt", reworked);
+    }
+
+    [Fact]
     public async Task Storyboard_CachesArtStyleAndBibleSeparatelyFromThePassage()
     {
         var (client, handler) = Create();

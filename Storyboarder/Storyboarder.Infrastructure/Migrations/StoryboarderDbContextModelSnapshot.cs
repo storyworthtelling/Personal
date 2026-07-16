@@ -204,6 +204,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("LastError")
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("RateLimitedUntilUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Stage")
                         .HasColumnType("INTEGER");
 
@@ -275,8 +278,14 @@ namespace Storyboarder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("ApprovedForRelaxedRender")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Attempts")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("BlockedCategoriesJson")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Caption")
                         .HasColumnType("TEXT");
@@ -299,9 +308,15 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("PanelNumber")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("PromptRewrittenForSafety")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ReferenceNamesJson")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("Skipped")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");

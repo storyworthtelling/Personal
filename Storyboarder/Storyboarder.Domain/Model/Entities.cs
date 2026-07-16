@@ -36,6 +36,12 @@ public class Novel
     public int StoryboardAttempts { get; set; }
 
     public string? LastError { get; set; }
+
+    // When the pipeline last deferred this novel because a provider rate-limited it (HTTP 429 /
+    // quota), this is when it expects to try again — surfaced so the card can say "resumes ~3:47 pm"
+    // in local time. Auto-expires: it's only shown while still in the future.
+    public DateTimeOffset? RateLimitedUntilUtc { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
@@ -168,6 +174,23 @@ public class Panel : IRetryable
     public int Attempts { get; set; }
     public DateTimeOffset? NextAttemptAtUtc { get; set; }
     public string? LastError { get; set; }
+
+    // Set when a render is safety-blocked: the Gemini HARM_CATEGORY_* names that tripped, serialized as
+    // a JSON string array. On the user-approved re-render these are the only categories relaxed, and
+    // only for that one call — the app's default thresholds are never lowered anywhere else.
+    public string? BlockedCategoriesJson { get; set; }
+
+    // The user approved rendering this blocked panel with the flagged category relaxed. Drives the
+    // approved render path in RenderPanels; cleared once the panel finally renders (or is skipped).
+    public bool ApprovedForRelaxedRender { get; set; }
+
+    // The relaxed render still hit the model's non-adjustable floor, so Claude restaged the visual
+    // prompt to imply rather than depict the content. Guards against reworking the same panel twice.
+    public bool PromptRewrittenForSafety { get; set; }
+
+    // The user chose to leave this panel out. It counts as done for stage advancement but is excluded
+    // from page composition, so the page is drawn without it.
+    public bool Skipped { get; set; }
 
     [NotMapped]
     public WorkStatus WorkState { get => Status; set => Status = value; }

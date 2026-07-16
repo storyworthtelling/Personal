@@ -30,12 +30,17 @@ public sealed class GeminiImageClient : IGeminiImageClient
             $"Character/location reference sheet in this style: {artStyle}. " +
             $"Render a clear, well-lit, full reference view (neutral background) of: {description}. " +
             "Single subject, consistent canonical appearance, no text or lettering.";
-        return Generate(prompt, referenceImages: [], cancellationToken);
+        return Generate(prompt, referenceImages: [], relaxedCategories: [], cancellationToken);
     }
 
     public Task<byte[]> GeneratePanel(
         string visualPrompt, string artStyle, IReadOnlyList<byte[]> referenceImages,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        GeneratePanel(visualPrompt, artStyle, referenceImages, relaxedCategories: [], cancellationToken);
+
+    public Task<byte[]> GeneratePanel(
+        string visualPrompt, string artStyle, IReadOnlyList<byte[]> referenceImages,
+        IReadOnlyCollection<string> relaxedCategories, CancellationToken cancellationToken)
     {
         var prompt =
             $"Comic panel in this style: {artStyle}. {visualPrompt}. " +
@@ -43,24 +48,42 @@ public sealed class GeminiImageClient : IGeminiImageClient
                 ? "Keep the characters and settings visually consistent with the supplied reference images. "
                 : string.Empty) +
             "Do not render any text, speech bubbles, or lettering in the image.";
-        return Generate(prompt, referenceImages, cancellationToken);
+        return Generate(prompt, referenceImages, relaxedCategories, cancellationToken);
     }
 
     private async Task<byte[]> Generate(
-        string prompt, IReadOnlyList<byte[]> referenceImages, CancellationToken cancellationToken)
+        string prompt, IReadOnlyList<byte[]> referenceImages, IReadOnlyCollection<string> relaxedCategories,
+        CancellationToken cancellationToken)
     {
         var parts = new List<object> { new { text = prompt } };
-        foreach (var image in referenceImages)
-            parts.Add(new { inlineData = new { mimeType = "image/png", data = Convert.ToBase64String(image) } });
+        foreach (var referenceImage in referenceImages)
+            parts.Add(new { inlineData = new { mimeType = "image/png", data = Convert.ToBase64String(referenceImage) } });
 
-        var payload = new
-        {
-            contents = new[] { new { parts } },
-            generationConfig = new { responseModalities = new[] { "IMAGE" } }
-        };
+        // safetySettings is emitted ONLY for an approved re-render (relaxedCategories non-empty), and
+        // then only for the flagged categories. Omitting it entirely keeps the default render at
+        // Google's default thresholds — the app never lowers them on the normal path.
+        object payload = relaxedCategories.Count == 0
+            ? new
+            {
+                contents = new[] { new { parts } },
+                generationConfig = new { responseModalities = new[] { "IMAGE" } }
+            }
+            : new
+            {
+                contents = new[] { new { parts } },
+                generationConfig = new { responseModalities = new[] { "IMAGE" } },
+                safetySettings = relaxedCategories
+                    .Select(category => new { category, threshold = "BLOCK_NONE" })
+                    .ToArray()
+            };
 
         var url = $"{BaseUrl}/{options.Model}:generateContent?key={Uri.EscapeDataString(options.ApiKey)}";
-        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(payload) };
+        // Serialize by the payload's runtime (anonymous) type — the static type is object here, and
+        // System.Text.Json would otherwise emit an empty object for a declared-object value.
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(payload, payload.GetType())
+        };
 
         var response = await httpClient.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -68,7 +91,18 @@ public sealed class GeminiImageClient : IGeminiImageClient
         if (!response.IsSuccessStatusCode)
             throw ToException(response, body);
 
-        return ExtractImage(body);
+        var image = TryExtractImage(body);
+        if (image is not null)
+            return image;
+
+        // No image came back. A deliberate content block (safety or prohibited) is surfaced as a typed
+        // exception the worker can branch on; anything else (a text-only "sorry", an empty candidate)
+        // stays an InvalidOperationException as before.
+        var block = ClassifyBlock(body);
+        if (block is not null)
+            throw block;
+
+        throw new InvalidOperationException($"Gemini response contained no image data: {body}");
     }
 
     private static Exception ToException(HttpResponseMessage response, string body)
@@ -103,11 +137,11 @@ public sealed class GeminiImageClient : IGeminiImageClient
         return false;
     }
 
-    private static byte[] ExtractImage(string responseJson)
+    private static byte[]? TryExtractImage(string responseJson)
     {
         using var document = JsonDocument.Parse(responseJson);
         if (!document.RootElement.TryGetProperty("candidates", out var candidates))
-            throw new InvalidOperationException($"Gemini response contained no candidates: {responseJson}");
+            return null;
 
         foreach (var candidate in candidates.EnumerateArray())
         {
@@ -126,6 +160,85 @@ public sealed class GeminiImageClient : IGeminiImageClient
             }
         }
 
-        throw new InvalidOperationException($"Gemini response contained no image data: {responseJson}");
+        return null;
+    }
+
+    // The adjustable Gemini harm categories. When a SAFETY block names no specific category we relax
+    // all of them on the approved re-render, since only the user-approved single call is affected.
+    private static readonly string[] AdjustableCategories =
+    {
+        "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"
+    };
+
+    // Reads a no-image response for a deliberate content block and classifies it. A SAFETY block is
+    // adjustable — the flagged categories are collected so only those get relaxed on re-render. Every
+    // other block reason (prohibited/copyrighted content, recitation, blocklist) is non-adjustable.
+    // Returns null when the response carries no block signal (a plain text-only reply).
+    private static ImageContentBlockedException? ClassifyBlock(string responseJson)
+    {
+        using var document = JsonDocument.Parse(responseJson);
+        var root = document.RootElement;
+
+        // A blocked prompt returns no candidates but a promptFeedback.blockReason.
+        if (root.TryGetProperty("promptFeedback", out var feedback) &&
+            feedback.TryGetProperty("blockReason", out var blockReason) &&
+            blockReason.GetString() is { Length: > 0 } promptReason)
+        {
+            return promptReason == "SAFETY"
+                ? new ImageContentBlockedException(
+                    $"Gemini blocked the prompt on safety grounds: {responseJson}",
+                    ImageBlockReason.Safety, CollectFlaggedCategories(feedback))
+                : new ImageContentBlockedException(
+                    $"Gemini blocked the prompt as {promptReason}: {responseJson}", ImageBlockReason.Prohibited);
+        }
+
+        if (!root.TryGetProperty("candidates", out var candidates))
+            return null;
+
+        foreach (var candidate in candidates.EnumerateArray())
+        {
+            if (!candidate.TryGetProperty("finishReason", out var finishReasonProperty) ||
+                finishReasonProperty.GetString() is not { Length: > 0 } finishReason)
+                continue;
+
+            if (finishReason == "SAFETY")
+                return new ImageContentBlockedException(
+                    $"Gemini blocked the image on safety grounds: {responseJson}",
+                    ImageBlockReason.Safety, CollectFlaggedCategories(candidate));
+
+            // PROHIBITED_CONTENT, IMAGE_SAFETY, RECITATION, SPII, BLOCKLIST — none of them adjustable.
+            if (finishReason is "PROHIBITED_CONTENT" or "IMAGE_SAFETY" or "RECITATION" or "SPII" or "BLOCKLIST")
+                return new ImageContentBlockedException(
+                    $"Gemini refused the image as {finishReason}: {responseJson}", ImageBlockReason.Prohibited);
+        }
+
+        return null;
+    }
+
+    // The HARM_CATEGORY_* names a SAFETY block flagged — those marked blocked, else those above a low
+    // probability. Falls back to all adjustable categories when the ratings don't pinpoint one.
+    private static IReadOnlyList<string> CollectFlaggedCategories(JsonElement container)
+    {
+        if (!container.TryGetProperty("safetyRatings", out var ratings) || ratings.ValueKind != JsonValueKind.Array)
+            return AdjustableCategories;
+
+        var flagged = new List<string>();
+        foreach (var rating in ratings.EnumerateArray())
+        {
+            if (rating.TryGetProperty("category", out var categoryProperty) &&
+                categoryProperty.GetString() is { Length: > 0 } category)
+            {
+                var blocked = rating.TryGetProperty("blocked", out var blockedProperty) &&
+                              blockedProperty.ValueKind == JsonValueKind.True;
+                var probability = rating.TryGetProperty("probability", out var probabilityProperty)
+                    ? probabilityProperty.GetString()
+                    : null;
+                if (blocked || probability is "MEDIUM" or "HIGH")
+                    flagged.Add(category);
+            }
+        }
+
+        return flagged.Count > 0 ? flagged : AdjustableCategories;
     }
 }

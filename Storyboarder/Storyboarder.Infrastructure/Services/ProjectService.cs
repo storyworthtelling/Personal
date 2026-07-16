@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.External;
@@ -121,6 +122,64 @@ public sealed class ProjectService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    // The panels parked awaiting the user's OK after a safety block, with the flagged categories and the
+    // beat's dialogue/caption so the review screen can show what's being decided.
+    public async Task<IReadOnlyList<BlockedPanel>> GetBlockedPanelsAsync(Guid novelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
+        var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
+
+        var panels = await db.Panels
+            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval)
+            .OrderBy(p => p.PanelNumber)
+            .ToListAsync(cancellationToken);
+
+        return panels
+            .Select(p => new BlockedPanel(
+                p.Id, p.PanelNumber, p.VisualPrompt, p.Dialogue, p.Caption,
+                JsonSerializer.Deserialize<List<string>>(p.BlockedCategoriesJson ?? "[]") ?? [],
+                p.LastError))
+            .ToList();
+    }
+
+    // The user approved rendering a safety-blocked panel: relax the flagged category for its next render.
+    // The panel goes back to Pending (due now) with the approval flag set; the worker's next cycle
+    // re-renders it with only that category relaxed. Returns false if the panel isn't awaiting approval.
+    public async Task<bool> ApprovePanelRenderAsync(Guid panelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var panel = await db.Panels.FirstOrDefaultAsync(p => p.Id == panelId, cancellationToken);
+        if (panel is null || panel.Status != WorkStatus.AwaitingApproval)
+            return false;
+
+        panel.Status = WorkStatus.Pending;
+        panel.ApprovedForRelaxedRender = true;
+        panel.Attempts = 0;
+        panel.NextAttemptAtUtc = null;
+        panel.LastError = null;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    // The user chose to leave a safety-blocked panel out: mark it done-but-skipped so stage advancement
+    // proceeds and page composition draws the page without it. Returns false if it isn't awaiting approval.
+    public async Task<bool> SkipPanelRenderAsync(Guid panelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var panel = await db.Panels.FirstOrDefaultAsync(p => p.Id == panelId, cancellationToken);
+        if (panel is null || panel.Status != WorkStatus.AwaitingApproval)
+            return false;
+
+        panel.Status = WorkStatus.Completed;
+        panel.Skipped = true;
+        panel.ApprovedForRelaxedRender = false;
+        panel.ImagePath = null;
+        panel.LastError = null;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     // Returns a failed/retrying unit to Pending, due now, with a fresh attempt budget and no error.
     private static void Revive(IEnumerable<IRetryable> units)
     {
@@ -155,9 +214,10 @@ public sealed class ProjectService
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var ids = await db.Novels.OrderByDescending(n => n.CreatedAtUtc).Select(n => n.Id).ToListAsync(cancellationToken);
         var statuses = new List<NovelStatus>(ids.Count);
+        var now = clock.UtcNow;
         foreach (var id in ids)
         {
-            var status = await BuildStatus(db, id, rateLimits.MaxAttempts, cancellationToken);
+            var status = await BuildStatus(db, id, rateLimits.MaxAttempts, now, cancellationToken);
             if (status is not null)
                 statuses.Add(status);
         }
@@ -167,7 +227,7 @@ public sealed class ProjectService
     public async Task<NovelStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await BuildStatus(db, id, rateLimits.MaxAttempts, cancellationToken);
+        return await BuildStatus(db, id, rateLimits.MaxAttempts, clock.UtcNow, cancellationToken);
     }
 
     public async Task<string?> GetVolumePdfPathAsync(Guid novelId, int number, CancellationToken cancellationToken)
@@ -189,7 +249,7 @@ public sealed class ProjectService
     }
 
     private static async Task<NovelStatus?> BuildStatus(
-        StoryboarderDbContext db, Guid id, int maxStoryboardAttempts, CancellationToken cancellationToken)
+        StoryboarderDbContext db, Guid id, int maxStoryboardAttempts, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
         if (novel is null)
@@ -230,19 +290,29 @@ public sealed class ProjectService
             .Select(p => p.ThumbImagePath ?? p.ComposedImagePath)
             .FirstOrDefaultAsync(cancellationToken);
 
+        // Panels safety-blocked mid-render and parked until the user approves relaxing the flagged
+        // category (or skips them). The book can't finalize while any remain.
+        var pendingApprovals = await db.Panels
+            .CountAsync(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval, cancellationToken);
+
         // The pipeline auto-retries transient failures (network drops, rate limits) with backoff, so a
-        // novel-level LastError is usually a self-healing hiccup, not a stall. The one exception is a
-        // storyboard window that has burned through its bounded retry budget: DoStoryboard then idles
-        // the novel and only a manual Retry restarts it. That — and only that — is "needs attention".
-        var needsAttention = novel.LastError is not null
-            && novel.Stage == ProjectStage.Storyboarding
-            && novel.StoryboardCursor < chunkCount
-            && novel.StoryboardAttempts >= maxStoryboardAttempts;
+        // novel-level LastError is usually a self-healing hiccup, not a stall. Two things genuinely need
+        // the user: a storyboard window that has burned through its bounded retry budget, and any panel
+        // parked awaiting the user's OK. Everything else stays quiet while the worker self-heals.
+        var needsAttention = pendingApprovals > 0
+            || (novel.LastError is not null
+                && novel.Stage == ProjectStage.Storyboarding
+                && novel.StoryboardCursor < chunkCount
+                && novel.StoryboardAttempts >= maxStoryboardAttempts);
+
+        // Only surface the resume time while it's still in the future; once it passes it's stale, so the
+        // card stops showing it (and the worker has presumably resumed).
+        var rateLimitedUntil = novel.RateLimitedUntilUtc is { } until && until > now ? novel.RateLimitedUntilUtc : null;
 
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
-            analysisNotes, analysis, analysisReady, coverThumb, needsAttention);
+            analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals, rateLimitedUntil);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

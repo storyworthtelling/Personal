@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
+using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Services;
 
 namespace Storyboarder.Android.Pages;
@@ -103,6 +104,10 @@ public partial class MainPage : ContentPage
         // A project card always offers management (retry/stop/delete); PDFs appear once they're ready.
         var isActive = status.Stage is not ("Completed" or "Failed" or "Cancelled");
         var buttons = options.Select(o => o.Label).ToList();
+        // Panels safety-blocked mid-render wait on the user's OK before the book can finish.
+        var reviewLabel = status.PendingApprovals > 0 ? $"Review blocked panels ({status.PendingApprovals})" : null;
+        if (reviewLabel is not null)
+            buttons.Add(reviewLabel);
         if (isActive)
         {
             buttons.Add(RetryAction);
@@ -114,6 +119,11 @@ public partial class MainPage : ContentPage
         if (choice == DeleteAction)
         {
             await DeleteProject(status);
+            return;
+        }
+        if (choice == reviewLabel)
+        {
+            await ReviewBlockedPanels(status);
             return;
         }
         if (choice == RetryAction)
@@ -154,6 +164,71 @@ public partial class MainPage : ContentPage
     private const string RetryAction = "Retry now";
     private const string StopAction = "Stop conversion";
     private const string DeleteAction = "Delete project";
+    private const string ApprovePanelAction = "Render it (relax this once)";
+    private const string SkipPanelAction = "Leave it out";
+
+    // Walks the panels a safety filter blocked mid-render, one at a time. For each, the user can approve
+    // rendering it (the flagged category is relaxed for that one render — and, if it still hits the
+    // model's floor, Claude restages the prompt to imply the content) or skip it (the page is drawn
+    // without it). Either choice kicks the worker so the decision takes effect at once.
+    private async Task ReviewBlockedPanels(NovelStatus status)
+    {
+        IReadOnlyList<BlockedPanel> blocked;
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            blocked = await projects.GetBlockedPanelsAsync(status.Id, CancellationToken.None);
+        }
+
+        foreach (var panel in blocked)
+        {
+            var beat = FirstNonEmpty(panel.Dialogue, panel.Caption, panel.VisualPrompt) ?? "(no text)";
+            var categories = panel.Categories.Count > 0
+                ? string.Join(", ", panel.Categories.Select(FriendlyCategory))
+                : "content";
+            var choice = await DisplayActionSheet(
+                $"Panel {panel.PanelNumber} — blocked as {categories}: “{Shorten(beat)}”",
+                "Decide later", null, ApprovePanelAction, SkipPanelAction);
+
+            if (choice == ApprovePanelAction)
+                await ResolvePanel(panel.PanelId, approve: true);
+            else if (choice == SkipPanelAction)
+                await ResolvePanel(panel.PanelId, approve: false);
+            else
+                break; // "Decide later" (or dismissed) — leave the rest parked.
+        }
+
+        await RefreshAsync();
+    }
+
+    private async Task ResolvePanel(Guid panelId, bool approve)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            if (approve)
+                await projects.ApprovePanelRenderAsync(panelId, CancellationToken.None);
+            else
+                await projects.SkipPanelRenderAsync(panelId, CancellationToken.None);
+        }
+        PipelineWorker.RunNow(global::Android.App.Application.Context);
+    }
+
+    // Turns a Gemini HARM_CATEGORY_* name into a short phrase for the review prompt.
+    private static string FriendlyCategory(string category) => category switch
+    {
+        "HARM_CATEGORY_DANGEROUS_CONTENT" => "violence / dangerous",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT" => "sexual",
+        "HARM_CATEGORY_HARASSMENT" => "harassment",
+        "HARM_CATEGORY_HATE_SPEECH" => "hate",
+        _ => "content"
+    };
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+    private static string Shorten(string text, int max = 80) =>
+        text.Length <= max ? text : text[..max] + "…";
 
     // Clears the stall and kicks the pipeline immediately, rather than waiting for the next periodic
     // window. Resets the current stage's stuck work to due-now, then fires an off-cycle drain.
@@ -239,9 +314,20 @@ public partial class MainPage : ContentPage
                 "ComposingAnalysis" => AnalysisSentence(s),
                 "Completed" => "Finished.",
                 "Failed" => "Stopped.",
-                "Cancelled" => "Stopped by you.",
+                // A book the pipeline cancelled itself (prohibited/copyrighted image content) carries a
+                // reason; a book the user stopped by hand does not.
+                "Cancelled" => string.IsNullOrEmpty(s.LastError) ? "Stopped by you." : "Stopped — content couldn’t be rendered.",
                 _ => s.Stage,
             };
+
+            // When a provider rate-limited us, say when queries resume — in local 12-hour time, per
+            // DESIGN.md §11. Only set while still in the future (the status read model gates it).
+            if (s.RateLimitedUntilUtc is { } until)
+            {
+                var local = until.ToLocalTime().DateTime;
+                var when = local.Date == DateTime.Now.Date ? TimeFormats.Clock12(local) : TimeFormats.Stamp(local);
+                summary = $"{summary} · rate-limited, resumes ~{when}";
+            }
 
             // The whole pipeline as a wrapping chip strip: each phase that has work shows its
             // done-of-total, and the stage in progress is highlighted (DESIGN.md §7).
@@ -255,10 +341,13 @@ public partial class MainPage : ContentPage
             AddChip(chips, "analysis", s.AnalysisNotes, s.Stage == "ComposingAnalysis");
 
             // Only surface the error (and the "needs attention" chip) when the pipeline has truly
-            // stalled — a transient failure the worker is still auto-retrying stays quiet so the card
-            // doesn't cry wolf while it self-heals.
+            // stalled or is waiting on the user — a transient failure the worker is still auto-retrying
+            // stays quiet so the card doesn't cry wolf while it self-heals. A self-cancelled book (its
+            // content was blocked as prohibited) also shows its reason.
+            var cancelledWithReason = s.Stage == "Cancelled" && !string.IsNullOrEmpty(s.LastError);
+            var showError = s.NeedsAttention || cancelledWithReason;
             return new ProjectRow(
-                s.Id, s.Title, summary, s.NeedsAttention ? s.LastError : null, s.NeedsAttention,
+                s.Id, s.Title, summary, showError ? s.LastError : null, showError,
                 s.CoverThumbPath, !string.IsNullOrEmpty(s.CoverThumbPath), chips);
         }
 

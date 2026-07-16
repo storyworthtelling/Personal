@@ -2,6 +2,12 @@ namespace Storyboarder.Infrastructure.Services;
 
 public sealed record PhaseProgress(int Done, int Total);
 
+// A panel parked awaiting the user's decision after a safety block, for the review UI. Categories are
+// the flagged HARM_CATEGORY_* names that would be relaxed on an approved re-render.
+public sealed record BlockedPanel(
+    Guid PanelId, int PanelNumber, string VisualPrompt, string? Dialogue, string? Caption,
+    IReadOnlyList<string> Categories, string? Reason);
+
 public sealed record VolumeStatus(int Number, string Title, bool PdfReady);
 
 // A read model summarizing a novel's progress for the status page / API. Every long-running stage
@@ -25,6 +31,13 @@ public sealed record NovelStatus(
     bool AnalysisReady,
     string? CoverThumbPath = null,
     // True only when the pipeline has genuinely stalled and needs the user (a storyboard window that
-    // exhausted its retry budget). A transient error the worker is still auto-retrying leaves this
-    // false, so the card doesn't cry wolf while it self-heals.
-    bool NeedsAttention = false);
+    // exhausted its retry budget, or one or more panels safety-blocked and waiting on the user's OK).
+    // A transient error the worker is still auto-retrying leaves this false, so the card doesn't cry
+    // wolf while it self-heals.
+    bool NeedsAttention = false,
+    // Panels safety-blocked mid-render and parked until the user approves relaxing the flagged category
+    // (or skips them). Non-zero means the book can't finalize until the user reviews them.
+    int PendingApprovals = 0,
+    // When a provider rate limit last deferred this novel, the (future) UTC instant it expects to try
+    // again — set only when still in the future, so the card can say "resumes ~3:47 pm" in local time.
+    DateTimeOffset? RateLimitedUntilUtc = null);
