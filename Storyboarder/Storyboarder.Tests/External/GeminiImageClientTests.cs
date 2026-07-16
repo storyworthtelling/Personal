@@ -109,4 +109,76 @@ public class GeminiImageClientTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             client.GenerateReferenceSheet("x", "noir", CancellationToken.None));
     }
+
+    [Fact]
+    public async Task SafetyBlock_ThrowsAdjustableBlock_WithFlaggedCategory()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(
+            "{\"candidates\":[{\"finishReason\":\"SAFETY\",\"safetyRatings\":[" +
+            "{\"category\":\"HARM_CATEGORY_SEXUALLY_EXPLICIT\",\"probability\":\"NEGLIGIBLE\"}," +
+            "{\"category\":\"HARM_CATEGORY_DANGEROUS_CONTENT\",\"probability\":\"HIGH\",\"blocked\":true}]}]}");
+
+        var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
+            client.GeneratePanel("a brutal duel", "noir", [], CancellationToken.None));
+
+        Assert.Equal(ImageBlockReason.Safety, ex.Reason);
+        // Only the category that actually tripped is carried, so only it gets relaxed on re-render.
+        Assert.Equal(new[] { "HARM_CATEGORY_DANGEROUS_CONTENT" }, ex.Categories);
+    }
+
+    [Fact]
+    public async Task ProhibitedFinishReason_ThrowsProhibitedBlock()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"candidates\":[{\"finishReason\":\"PROHIBITED_CONTENT\"}]}");
+
+        var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
+            client.GeneratePanel("a recognizable trademarked hero", "noir", [], CancellationToken.None));
+
+        Assert.Equal(ImageBlockReason.Prohibited, ex.Reason);
+        Assert.Empty(ex.Categories);
+    }
+
+    [Fact]
+    public async Task PromptBlockReason_ThrowsProhibitedBlock()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"promptFeedback\":{\"blockReason\":\"BLOCKLIST\"}}");
+
+        var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
+            client.GeneratePanel("x", "noir", [], CancellationToken.None));
+
+        Assert.Equal(ImageBlockReason.Prohibited, ex.Reason);
+    }
+
+    [Fact]
+    public async Task RelaxedRender_EmitsSafetySettings_ForOnlyTheGivenCategories()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(ImageReply(PngBytes));
+
+        var image = await client.GeneratePanel(
+            "a brutal duel", "noir", [], ["HARM_CATEGORY_DANGEROUS_CONTENT"], CancellationToken.None);
+
+        Assert.Equal(PngBytes, image);
+        var body = handler.RequestBodies[0];
+        Assert.Contains("safetySettings", body);
+        Assert.Contains("HARM_CATEGORY_DANGEROUS_CONTENT", body);
+        Assert.Contains("BLOCK_NONE", body);
+        // The category that did not trip is not mentioned, so its default threshold is untouched.
+        Assert.DoesNotContain("HARM_CATEGORY_SEXUALLY_EXPLICIT", body);
+    }
+
+    [Fact]
+    public async Task DefaultRender_OmitsSafetySettingsEntirely()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(ImageReply(PngBytes));
+
+        await client.GeneratePanel("a quiet scene", "noir", [], CancellationToken.None);
+
+        // The normal path never lowers thresholds — no safetySettings block is sent at all.
+        Assert.DoesNotContain("safetySettings", handler.RequestBodies[0]);
+    }
 }

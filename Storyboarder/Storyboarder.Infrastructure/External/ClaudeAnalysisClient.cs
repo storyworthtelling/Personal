@@ -66,6 +66,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "strengths and weaknesses. Order revisionPlan HIGHEST-IMPACT FIRST and set priority to " +
         "\"High\", \"Medium\", or \"Low\". Use [] when none. No prose outside the JSON.";
 
+    private const string ImplyInstruction =
+        "You are a comics director revising a single panel's visual prompt. The image model refused to " +
+        "draw it because some element is too explicit to depict. Rewrite the prompt so that same beat is " +
+        "IMPLIED rather than shown: turn the camera away, cut to reaction or aftermath, obscure the " +
+        "explicit element with foreground/shadow/framing, or move it just off-panel — while keeping the " +
+        "mood, characters, and story moment intact. Keep it a single vivid panel description with no " +
+        "lettering. Respond with ONLY the rewritten visual prompt as plain text — no preamble, no quotes.";
+
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
 
@@ -181,6 +189,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 new RevisionItem(r.Priority ?? string.Empty, r.Issue ?? string.Empty, r.SuggestedFix ?? string.Empty)).ToList(),
             dto.ComparableTitles ?? [],
             dto.MarketPositioning ?? string.Empty);
+    }
+
+    public async Task<string> RewritePromptToImply(string visualPrompt, CancellationToken cancellationToken)
+    {
+        var reply = await SendMessage(ImplyInstruction, visualPrompt, cancellationToken);
+        var rewritten = reply.Trim();
+        // Fall back to the original prompt if the model returned nothing usable, so the caller always
+        // has a prompt to try rather than an empty one.
+        return string.IsNullOrWhiteSpace(rewritten) ? visualPrompt : rewritten;
     }
 
     private async Task<string> SendMessage(

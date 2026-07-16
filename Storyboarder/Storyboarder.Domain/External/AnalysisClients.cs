@@ -32,6 +32,11 @@ public interface IClaudeAnalysisClient
         DesignBible bible,
         string continuitySummary,
         CancellationToken cancellationToken);
+
+    // Restages a panel's visual prompt so objectionable content is implied — occluded, off-frame, or
+    // cut away from — rather than depicted. Used only when even a relaxed render hit the image model's
+    // non-adjustable floor, to salvage the beat without showing what the model refuses to draw.
+    Task<string> RewritePromptToImply(string visualPrompt, CancellationToken cancellationToken);
 }
 
 // Image generation via Gemini. Reference sheets are generated once per design-bible entity, then
@@ -44,6 +49,16 @@ public interface IGeminiImageClient
         string visualPrompt,
         string artStyle,
         IReadOnlyList<byte[]> referenceImages,
+        CancellationToken cancellationToken);
+
+    // The user-approved re-render of a safety-blocked panel: identical to GeneratePanel except that the
+    // given HARM_CATEGORY_* names are relaxed (BLOCK_NONE) for this one call. The app's default
+    // thresholds are untouched everywhere else. An empty list behaves like the default render.
+    Task<byte[]> GeneratePanel(
+        string visualPrompt,
+        string artStyle,
+        IReadOnlyList<byte[]> referenceImages,
+        IReadOnlyCollection<string> relaxedCategories,
         CancellationToken cancellationToken);
 }
 

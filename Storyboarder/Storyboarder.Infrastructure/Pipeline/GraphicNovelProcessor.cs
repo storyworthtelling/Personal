@@ -41,6 +41,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private readonly TextChunker storyboardChunker;
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
+    private readonly PlaceholderPanelRenderer placeholderRenderer = new();
 
     public GraphicNovelProcessor(
         IDbContextFactory<StoryboarderDbContext> dbContextFactory,
@@ -76,28 +77,39 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var novel = await db.Novels
+        // Advance the oldest active novel that actually has runnable work. A novel that returns Idle is
+        // blocked — on a failed unit, or parked awaiting the user's approval of a safety-blocked panel —
+        // so we step past it to the next novel rather than letting it hog the worker (and stall every
+        // novel behind it). Only if every active novel is Idle does the whole cycle idle.
+        var novels = await db.Novels
             .Where(n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed &&
                         n.Stage != ProjectStage.Cancelled)
             .OrderBy(n => n.CreatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        if (novel is null)
-            return ProcessResult.Idle;
-
-        return novel.Stage switch
+        foreach (var novel in novels)
         {
-            ProjectStage.Created => await Advance(db, novel, cancellationToken),
-            ProjectStage.Ingesting => await Ingest(db, novel, cancellationToken),
-            ProjectStage.BuildingDesignBible => await BuildDesignBible(db, novel, cancellationToken),
-            ProjectStage.Storyboarding => await DoStoryboard(db, novel, cancellationToken),
-            ProjectStage.RenderingImages => await RenderPanels(db, novel, cancellationToken),
-            ProjectStage.ComposingPages => await ComposePages(db, novel, cancellationToken),
-            ProjectStage.AssemblingVolumes => await AssembleVolumes(db, novel, cancellationToken),
-            ProjectStage.ComposingAnalysis => await ComposeAnalysis(db, novel, cancellationToken),
-            _ => ProcessResult.Idle
-        };
+            var result = await Dispatch(db, novel, cancellationToken);
+            if (result.Outcome != ProcessOutcome.Idle)
+                return result;
+        }
+
+        return ProcessResult.Idle;
     }
+
+    private Task<ProcessResult> Dispatch(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken) =>
+        novel.Stage switch
+        {
+            ProjectStage.Created => Advance(db, novel, cancellationToken),
+            ProjectStage.Ingesting => Ingest(db, novel, cancellationToken),
+            ProjectStage.BuildingDesignBible => BuildDesignBible(db, novel, cancellationToken),
+            ProjectStage.Storyboarding => DoStoryboard(db, novel, cancellationToken),
+            ProjectStage.RenderingImages => RenderPanels(db, novel, cancellationToken),
+            ProjectStage.ComposingPages => ComposePages(db, novel, cancellationToken),
+            ProjectStage.AssemblingVolumes => AssembleVolumes(db, novel, cancellationToken),
+            ProjectStage.ComposingAnalysis => ComposeAnalysis(db, novel, cancellationToken),
+            _ => Task.FromResult(ProcessResult.Idle)
+        };
 
     // Created -> Ingesting (the only transition with no work of its own).
     private async Task<ProcessResult> Advance(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
@@ -398,11 +410,27 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             try
             {
                 var references = await LoadReferenceImages(db, novel.Id, panel.ReferenceNamesJson, cancellationToken);
-                var image = await gemini.GeneratePanel(panel.VisualPrompt, novel.ArtStyle, references, cancellationToken);
+                // An approved panel renders with ONLY its flagged categories relaxed, for this one call;
+                // every other panel takes the default render (and the app's default thresholds) untouched.
+                var relaxed = panel.ApprovedForRelaxedRender
+                    ? JsonSerializer.Deserialize<List<string>>(panel.BlockedCategoriesJson ?? "[]") ?? []
+                    : [];
+                var image = relaxed.Count > 0
+                    ? await gemini.GeneratePanel(panel.VisualPrompt, novel.ArtStyle, references, relaxed, cancellationToken)
+                    : await gemini.GeneratePanel(panel.VisualPrompt, novel.ArtStyle, references, cancellationToken);
                 panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", image);
                 panel.Status = WorkStatus.Completed;
                 panel.LastError = null;
                 logger.LogInformation("Rendered panel {PanelId} (novel {NovelId})", panel.Id, novel.Id);
+            }
+            // A deliberate content block is handled distinctly from a transient failure: Prohibited (IP /
+            // copyrighted content) cancels the whole book; Safety parks the panel for the user's approval,
+            // then — once approved — relaxes the category, and if that still hits the model's floor, has
+            // Claude restage the prompt to imply the content before finally falling back to a placeholder.
+            catch (ImageContentBlockedException blocked)
+            {
+                if (await HandleBlockedPanel(novel, panel, blocked, cancellationToken) is { } wait)
+                    return wait;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -445,10 +473,16 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         {
             try
             {
+                // Skipped panels (the user chose to leave them out) are excluded, so the page is drawn
+                // without them. If every panel on the page was skipped, fall back to a single placeholder
+                // so the composer still has something to lay out rather than throwing on an empty page.
                 var panelArt = page.Panels
+                    .Where(p => !p.Skipped)
                     .OrderBy(p => p.PanelNumber)
                     .Select(p => new PanelArt(imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption))
                     .ToList();
+                if (panelArt.Count == 0)
+                    panelArt.Add(new PanelArt(placeholderRenderer.Render(), null, null));
                 var volume = await db.Volumes.FirstAsync(v => v.Id == page.VolumeId, cancellationToken);
                 var chrome = new PageChrome(page.PageNumber, $"{novel.Title} · Volume {volume.Number}");
                 var composed = pageComposer.Compose(panelArt, chrome);
@@ -675,6 +709,70 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return soonest - now;
     }
 
+    // Reacts to a panel render the provider blocked on content grounds. Returns a ProcessResult for the
+    // caller to return immediately (only when the restage needs a Claude slot that isn't free yet), or
+    // null to let the caller persist the mutated state and report DidWork.
+    private async Task<ProcessResult?> HandleBlockedPanel(
+        Novel novel, Panel panel, ImageContentBlockedException blocked, CancellationToken cancellationToken)
+    {
+        if (blocked.Reason == ImageBlockReason.Prohibited)
+        {
+            // IP / copyrighted / otherwise-prohibited content: no safety threshold can bypass it, so stop
+            // the whole book with a clear fallout reason rather than parking or retrying it.
+            panel.LastError = blocked.Message;
+            SetStage(novel, ProjectStage.Cancelled);
+            novel.LastError =
+                $"Cancelled: panel {panel.PanelNumber} was blocked as prohibited or copyrighted content, " +
+                "which relaxing the safety settings cannot bypass. Revise the passage or art direction and " +
+                "start a new conversion.";
+            logger.LogWarning("Novel {NovelId} cancelled: prohibited image content on panel {PanelId}: {Error}",
+                novel.Id, panel.Id, blocked.Message);
+            return null;
+        }
+
+        if (!panel.ApprovedForRelaxedRender)
+        {
+            // First safety block: park it for the user's decision and move on. The render query skips
+            // AwaitingApproval panels, so the rest of the book keeps rendering; the novel simply can't
+            // finalize until the user approves or skips this panel.
+            panel.Status = WorkStatus.AwaitingApproval;
+            panel.BlockedCategoriesJson = JsonSerializer.Serialize(blocked.Categories, JsonResponse.CaseInsensitive);
+            panel.LastError = blocked.Message;
+            logger.LogInformation("Panel {PanelId} safety-blocked ({Categories}); awaiting user approval (novel {NovelId})",
+                panel.Id, string.Join(", ", blocked.Categories), novel.Id);
+            return null;
+        }
+
+        if (!panel.PromptRewrittenForSafety)
+        {
+            // Approved and relaxed, yet still blocked: the model's non-adjustable floor. Ask Claude to
+            // restage the beat so the content is implied, then re-render the reworked prompt next cycle.
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+            try
+            {
+                panel.VisualPrompt = await claude.RewritePromptToImply(panel.VisualPrompt, cancellationToken);
+                panel.PromptRewrittenForSafety = true;
+                panel.LastError = null;
+                logger.LogInformation("Panel {PanelId} restaged to imply blocked content (novel {NovelId})", panel.Id, novel.Id);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Couldn't restage right now (rate limit / transient): retry it later with backoff.
+                ScheduleRetry(panel, ex);
+            }
+            return null;
+        }
+
+        // Approved, relaxed, and restaged to imply — still blocked. Final graceful fallback so the book
+        // finishes: a neutral placeholder tile (the panel's dialogue/caption are still typeset over it).
+        panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", placeholderRenderer.Render());
+        panel.Status = WorkStatus.Completed;
+        panel.LastError = "Rendered as a neutral placeholder: blocked even after relaxing safety and restaging to imply the content.";
+        logger.LogWarning("Panel {PanelId} fell back to a placeholder after repeated content blocks (novel {NovelId})", panel.Id, novel.Id);
+        return null;
+    }
+
     private void ScheduleRetry(IRetryable unit, Exception exception)
     {
         unit.Attempts++;
@@ -763,8 +861,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);
         var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
+        // Skipped panels are Completed with no image on purpose, so exclude them — otherwise the
+        // missing-image self-heal would keep reviving them straight back into the block loop.
         var completedPanels = await db.Panels
-            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.Completed)
+            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.Completed && !p.Skipped)
             .ToListAsync(cancellationToken);
 
         var missing = completedPanels.Where(p => p.ImagePath is null || !imageStore.Exists(p.ImagePath)).ToList();

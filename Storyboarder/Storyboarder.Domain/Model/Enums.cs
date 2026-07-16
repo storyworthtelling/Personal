@@ -24,8 +24,10 @@ public enum WorkStatus
     Pending,
     InProgress,
     Completed,
-    Failed,      // terminal after maxAttempts
-    NeedsRetry   // transient (e.g. rate-limited); retried after NextAttemptAtUtc
+    Failed,           // terminal after maxAttempts
+    NeedsRetry,       // transient (e.g. rate-limited); retried after NextAttemptAtUtc
+    AwaitingApproval  // a panel render was safety-blocked and is parked until the user approves relaxing
+                      // the flagged category for that one render (see GraphicNovelProcessor.RenderPanels)
 }
 
 public enum ReferenceKind
