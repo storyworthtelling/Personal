@@ -429,8 +429,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             // Claude restage the prompt to imply the content before finally falling back to a placeholder.
             catch (ImageContentBlockedException blocked)
             {
-                if (await HandleBlockedPanel(novel, panel, blocked, cancellationToken) is { } wait)
-                    return wait;
+                if (await HandleBlockedPanel(novel, panel, blocked, cancellationToken) is { } deferral)
+                    return deferral;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

@@ -56,8 +56,8 @@ public sealed class GeminiImageClient : IGeminiImageClient
         CancellationToken cancellationToken)
     {
         var parts = new List<object> { new { text = prompt } };
-        foreach (var image in referenceImages)
-            parts.Add(new { inlineData = new { mimeType = "image/png", data = Convert.ToBase64String(image) } });
+        foreach (var referenceImage in referenceImages)
+            parts.Add(new { inlineData = new { mimeType = "image/png", data = Convert.ToBase64String(referenceImage) } });
 
         // safetySettings is emitted ONLY for an approved re-render (relaxedCategories non-empty), and
         // then only for the flagged categories. Omitting it entirely keeps the default render at
@@ -98,8 +98,11 @@ public sealed class GeminiImageClient : IGeminiImageClient
         // No image came back. A deliberate content block (safety or prohibited) is surfaced as a typed
         // exception the worker can branch on; anything else (a text-only "sorry", an empty candidate)
         // stays an InvalidOperationException as before.
-        throw ClassifyBlock(body)
-            ?? new InvalidOperationException($"Gemini response contained no image data: {body}");
+        var block = ClassifyBlock(body);
+        if (block is not null)
+            throw block;
+
+        throw new InvalidOperationException($"Gemini response contained no image data: {body}");
     }
 
     private static Exception ToException(HttpResponseMessage response, string body)
