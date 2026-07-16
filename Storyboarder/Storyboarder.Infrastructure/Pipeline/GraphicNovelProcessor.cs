@@ -173,7 +173,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             // backoff rather than escaping and failing the whole worker cycle.
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                ScheduleRetry(chunk, ex);
+                ScheduleRetry(chunk, ex, novel);
             }
 
             await db.SaveChangesAsync(cancellationToken);
@@ -218,7 +218,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 // is retried with backoff and, once non-transient attempts run out, marked Failed.
                 // Letting it escape here would crash the whole drain cycle and re-attempt the same
                 // sheet forever, wedging the novel at "sheets 0 of N" (and every novel queued behind it).
-                ScheduleRetry(reference, ex);
+                ScheduleRetry(reference, ex, novel);
             }
 
             await db.SaveChangesAsync(cancellationToken);
@@ -323,9 +323,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         {
             novel.StoryboardAttempts++;
             novel.LastError = ex.Message;
-            await db.SaveChangesAsync(cancellationToken);
             var retryAfter = (ex as RateLimitException)?.RetryAfter;
-            return ProcessResult.Waiting(backoff.NextDelay(novel.StoryboardAttempts - 1, retryAfter), novel.Id);
+            var delay = backoff.NextDelay(novel.StoryboardAttempts - 1, retryAfter);
+            if (ex is RateLimitException)
+                novel.RateLimitedUntilUtc = clock.UtcNow + delay;
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.Waiting(delay, novel.Id);
         }
 
         // Resolve the novel's existing volumes (id + current page count) WITHOUT tracking them. Once
@@ -437,7 +440,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 // As with reference sheets: a rate limit, HTTP error, or no-image response is retried
                 // with backoff (then Failed once attempts run out) rather than escaping and crashing
                 // the cycle. A permanently-failed panel still blocks page composition below, by design.
-                ScheduleRetry(panel, ex);
+                ScheduleRetry(panel, ex, novel);
             }
 
             await db.SaveChangesAsync(cancellationToken);
@@ -615,7 +618,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             // closed") with backoff instead of letting it escape and fail the whole worker cycle.
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                ScheduleRetry(unit, ex);
+                ScheduleRetry(unit, ex, novel);
             }
 
             await db.SaveChangesAsync(cancellationToken);
@@ -648,9 +651,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 novel.LastError = ex.Message;
-                await db.SaveChangesAsync(cancellationToken);
                 var retryAfter = (ex as RateLimitException)?.RetryAfter;
-                return ProcessResult.Waiting(backoff.NextDelay(0, retryAfter), novel.Id);
+                var delay = backoff.NextDelay(0, retryAfter);
+                if (ex is RateLimitException)
+                    novel.RateLimitedUntilUtc = clock.UtcNow + delay;
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.Waiting(delay, novel.Id);
             }
 
             Touch(novel);
@@ -759,7 +765,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Couldn't restage right now (rate limit / transient): retry it later with backoff.
-                ScheduleRetry(panel, ex);
+                ScheduleRetry(panel, ex, novel);
             }
             return null;
         }
@@ -773,7 +779,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return null;
     }
 
-    private void ScheduleRetry(IRetryable unit, Exception exception)
+    private void ScheduleRetry(IRetryable unit, Exception exception, Novel novel)
     {
         unit.Attempts++;
         unit.LastError = exception.Message;
@@ -790,6 +796,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         unit.WorkState = WorkStatus.NeedsRetry;
         unit.NextAttemptAtUtc = clock.UtcNow + backoff.NextDelay(unit.Attempts - 1, retryAfter);
+        // A provider rate limit is the "when do queries resume" the user wants to see, so record the
+        // expected resume time on the novel; a plain error retry doesn't (it's not a quota wait).
+        if (transient)
+            novel.RateLimitedUntilUtc = unit.NextAttemptAtUtc;
         logger.LogWarning("{Unit} attempt {Attempts}/{Max} failed ({Kind}); retrying after {NextAttempt:u}: {Error}",
             unit.GetType().Name, unit.Attempts, rateLimits.MaxAttempts,
             transient ? "rate limit" : "error", unit.NextAttemptAtUtc, exception.Message);

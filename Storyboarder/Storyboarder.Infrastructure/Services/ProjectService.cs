@@ -214,9 +214,10 @@ public sealed class ProjectService
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var ids = await db.Novels.OrderByDescending(n => n.CreatedAtUtc).Select(n => n.Id).ToListAsync(cancellationToken);
         var statuses = new List<NovelStatus>(ids.Count);
+        var now = clock.UtcNow;
         foreach (var id in ids)
         {
-            var status = await BuildStatus(db, id, rateLimits.MaxAttempts, cancellationToken);
+            var status = await BuildStatus(db, id, rateLimits.MaxAttempts, now, cancellationToken);
             if (status is not null)
                 statuses.Add(status);
         }
@@ -226,7 +227,7 @@ public sealed class ProjectService
     public async Task<NovelStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await BuildStatus(db, id, rateLimits.MaxAttempts, cancellationToken);
+        return await BuildStatus(db, id, rateLimits.MaxAttempts, clock.UtcNow, cancellationToken);
     }
 
     public async Task<string?> GetVolumePdfPathAsync(Guid novelId, int number, CancellationToken cancellationToken)
@@ -248,7 +249,7 @@ public sealed class ProjectService
     }
 
     private static async Task<NovelStatus?> BuildStatus(
-        StoryboarderDbContext db, Guid id, int maxStoryboardAttempts, CancellationToken cancellationToken)
+        StoryboarderDbContext db, Guid id, int maxStoryboardAttempts, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
         if (novel is null)
@@ -304,10 +305,14 @@ public sealed class ProjectService
                 && novel.StoryboardCursor < chunkCount
                 && novel.StoryboardAttempts >= maxStoryboardAttempts);
 
+        // Only surface the resume time while it's still in the future; once it passes it's stale, so the
+        // card stops showing it (and the worker has presumably resumed).
+        var rateLimitedUntil = novel.RateLimitedUntilUtc is { } until && until > now ? novel.RateLimitedUntilUtc : null;
+
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
-            analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals);
+            analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals, rateLimitedUntil);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

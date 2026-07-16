@@ -36,6 +36,12 @@ public class Novel
     public int StoryboardAttempts { get; set; }
 
     public string? LastError { get; set; }
+
+    // When the pipeline last deferred this novel because a provider rate-limited it (HTTP 429 /
+    // quota), this is when it expects to try again — surfaced so the card can say "resumes ~3:47 pm"
+    // in local time. Auto-expires: it's only shown while still in the future.
+    public DateTimeOffset? RateLimitedUntilUtc { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 

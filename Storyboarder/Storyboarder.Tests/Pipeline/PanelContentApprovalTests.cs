@@ -287,6 +287,29 @@ public class PanelContentApprovalTests : IDisposable
         Assert.Equal(WorkStatus.AwaitingApproval, SinglePanel(novelA).Status);
     }
 
+    [Fact]
+    public async Task ProviderRateLimit_RecordsExpectedResumeTime_SurfacedInStatus()
+    {
+        var novelId = SeedRenderingNovel(WorkStatus.Pending, secondsOffset: 0);
+        gemini.Setup(g => g.GeneratePanel(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RateLimitException("429", TimeSpan.FromMinutes(5)));
+
+        var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
+        using (var ctx = database.NewContext())
+        {
+            var novel = ctx.Novels.Single(n => n.Id == novelId);
+            Assert.NotNull(novel.RateLimitedUntilUtc);
+            Assert.True(novel.RateLimitedUntilUtc > Start, "the resume time should be in the future");
+        }
+
+        // The status read model surfaces it (while it's still in the future) so the card can show it.
+        var status = await NewProjectService().GetStatusAsync(novelId, CancellationToken.None);
+        Assert.NotNull(status!.RateLimitedUntilUtc);
+    }
+
     // Seeds a novel already at RenderingImages with one volume/page/panel in the given state.
     private Guid SeedRenderingNovel(WorkStatus panelStatus, int secondsOffset)
     {

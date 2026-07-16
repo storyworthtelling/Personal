@@ -35,6 +35,7 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
         {
             entity.HasKey(novel => novel.Id);
             entity.Property(novel => novel.Stage).HasConversion<int>();
+            entity.Property(novel => novel.RateLimitedUntilUtc).HasConversion(NullableTicksConverter);
             entity.Property(novel => novel.CreatedAtUtc).HasConversion(TicksConverter);
             entity.Property(novel => novel.UpdatedAtUtc).HasConversion(TicksConverter);
             entity.HasOne(novel => novel.Source)

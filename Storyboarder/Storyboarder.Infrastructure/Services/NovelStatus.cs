@@ -37,4 +37,7 @@ public sealed record NovelStatus(
     bool NeedsAttention = false,
     // Panels safety-blocked mid-render and parked until the user approves relaxing the flagged category
     // (or skips them). Non-zero means the book can't finalize until the user reviews them.
-    int PendingApprovals = 0);
+    int PendingApprovals = 0,
+    // When a provider rate limit last deferred this novel, the (future) UTC instant it expects to try
+    // again — set only when still in the future, so the card can say "resumes ~3:47 pm" in local time.
+    DateTimeOffset? RateLimitedUntilUtc = null);

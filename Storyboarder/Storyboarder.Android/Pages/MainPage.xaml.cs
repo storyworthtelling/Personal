@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
+using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Services;
 
 namespace Storyboarder.Android.Pages;
@@ -318,6 +319,15 @@ public partial class MainPage : ContentPage
                 "Cancelled" => string.IsNullOrEmpty(s.LastError) ? "Stopped by you." : "Stopped — content couldn’t be rendered.",
                 _ => s.Stage,
             };
+
+            // When a provider rate-limited us, say when queries resume — in local 12-hour time, per
+            // DESIGN.md §11. Only set while still in the future (the status read model gates it).
+            if (s.RateLimitedUntilUtc is { } until)
+            {
+                var local = until.ToLocalTime().DateTime;
+                var when = local.Date == DateTime.Now.Date ? TimeFormats.Clock12(local) : TimeFormats.Stamp(local);
+                summary = $"{summary} · rate-limited, resumes ~{when}";
+            }
 
             // The whole pipeline as a wrapping chip strip: each phase that has work shows its
             // done-of-total, and the stage in progress is highlighted (DESIGN.md §7).

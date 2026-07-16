@@ -204,6 +204,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("LastError")
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("RateLimitedUntilUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Stage")
                         .HasColumnType("INTEGER");
 
