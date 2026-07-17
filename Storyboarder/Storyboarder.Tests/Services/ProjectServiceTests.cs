@@ -264,6 +264,123 @@ public class ProjectServiceTests : IDisposable
         Assert.Equal(ProjectStage.Cancelled, context.Novels.Single(n => n.Id == id).Stage);
     }
 
+    // A Cancelled novel stopped on a prohibited/IP block: its offending panel is left Pending with the
+    // provider's block message (exactly as the render loop leaves it), plus a reference and art style so
+    // the reconstructed prompt in the report is deterministic.
+    private (Guid NovelId, Guid PanelId) SeedCancelledNovelWithProhibitedPanel(int panelNumber = 4)
+    {
+        using var context = database.NewContext();
+        var novel = new Novel
+        {
+            Title = "Palxinota", GoogleDocId = "doc", ArtStyle = "noir",
+            Stage = ProjectStage.Cancelled,
+            LastError = "Cancelled: panel 4 was blocked as prohibited or copyrighted content, " +
+                        "which relaxing the safety settings cannot bypass.",
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        var volume = new Volume { NovelId = novel.Id, Number = 1, Title = "V1" };
+        var page = new Page { VolumeId = volume.Id, ChapterNumber = 1, PageNumber = 1 };
+        var panel = new Panel
+        {
+            PageId = page.Id, PanelNumber = panelNumber,
+            VisualPrompt = "a recognizable trademarked hero", ReferenceNamesJson = "[\"Hero\"]",
+            Status = WorkStatus.Pending,
+            LastError = "Gemini refused the image as IMAGE_SAFETY (PROHIBITED_CONTENT)"
+        };
+        page.Panels.Add(panel);
+        volume.Pages.Add(page);
+        novel.Volumes.Add(volume);
+        context.Novels.Add(novel);
+        context.SaveChanges();
+        return (novel.Id, panel.Id);
+    }
+
+    [Fact]
+    public async Task BlockedPanelReport_IncludesReconstructedPromptReasonAndReferences()
+    {
+        SeedCancelledNovelWithProhibitedPanel();
+
+        var report = await NewService().BuildBlockedPanelReportAsync(CancellationToken.None);
+
+        Assert.Contains("Panel 4", report);
+        // The exact prompt the panel was rendered with, reconstructed via the shared PanelImagePrompt.
+        Assert.Contains("Comic panel in this style: noir. a recognizable trademarked hero.", report);
+        Assert.Contains("Keep the characters and settings visually consistent", report);
+        Assert.Contains("PROHIBITED_CONTENT", report);
+        Assert.Contains("Hero", report);
+    }
+
+    [Fact]
+    public async Task BlockedPanelReport_ReportsNothing_WhenNoBlockedPanels()
+    {
+        SeedNovel(ProjectStage.RenderingImages);
+
+        var report = await NewService().BuildBlockedPanelReportAsync(CancellationToken.None);
+
+        Assert.Contains("No blocked panels found.", report);
+    }
+
+    [Fact]
+    public async Task ReworkBlockedPanelAndResumeAsync_RevivesCancelledNovel_AndResetsTheReworkedPanel()
+    {
+        var (novelId, panelId) = SeedCancelledNovelWithProhibitedPanel();
+
+        var reworked = await NewService().ReworkBlockedPanelAndResumeAsync(
+            novelId, "a generic armored knight, an original design", CancellationToken.None);
+
+        Assert.Equal(4, reworked);
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == novelId);
+        Assert.Equal(ProjectStage.RenderingImages, novel.Stage);
+        Assert.Null(novel.LastError);
+
+        var panel = context.Panels.Single(p => p.Id == panelId);
+        Assert.Equal("a generic armored knight, an original design", panel.VisualPrompt);
+        Assert.Equal(WorkStatus.Pending, panel.Status);
+        Assert.Null(panel.LastError);
+        Assert.Equal(0, panel.Attempts);
+        Assert.Null(panel.NextAttemptAtUtc);
+        Assert.False(panel.Skipped);
+    }
+
+    [Fact]
+    public async Task ReworkBlockedPanelAndResumeAsync_IsNoOp_WhenNovelNotCancelled()
+    {
+        var id = SeedNovel(ProjectStage.RenderingImages);
+
+        var reworked = await NewService().ReworkBlockedPanelAndResumeAsync(id, "x", CancellationToken.None);
+
+        Assert.Null(reworked);
+        using var context = database.NewContext();
+        Assert.Equal(ProjectStage.RenderingImages, context.Novels.Single(n => n.Id == id).Stage);
+    }
+
+    [Fact]
+    public async Task ReworkBlockedPanelAndResumeAsync_IsNoOp_WhenCancelledButNoOffendingPanel()
+    {
+        var id = SeedNovel(ProjectStage.Cancelled);
+
+        var reworked = await NewService().ReworkBlockedPanelAndResumeAsync(id, "x", CancellationToken.None);
+
+        Assert.Null(reworked);
+        using var context = database.NewContext();
+        Assert.Equal(ProjectStage.Cancelled, context.Novels.Single(n => n.Id == id).Stage);
+    }
+
+    [Fact]
+    public async Task GetProhibitedPanelAsync_ReturnsOffendingPanelPromptAndReason()
+    {
+        var (novelId, panelId) = SeedCancelledNovelWithProhibitedPanel();
+
+        var panel = await NewService().GetProhibitedPanelAsync(novelId, CancellationToken.None);
+
+        Assert.NotNull(panel);
+        Assert.Equal(panelId, panel!.PanelId);
+        Assert.Equal(4, panel.PanelNumber);
+        Assert.Equal("a recognizable trademarked hero", panel.VisualPrompt);
+        Assert.Contains("PROHIBITED_CONTENT", panel.Reason);
+    }
+
     private void SeedTroubledNovel()
     {
         using var context = database.NewContext();

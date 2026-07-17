@@ -10,6 +10,10 @@ public sealed record BlockedPanel(
 
 public sealed record VolumeStatus(int Number, string Title, bool PdfReady);
 
+// The prohibited/IP-blocked panel a Cancelled novel is stuck on, surfaced so the user can rework its
+// art direction and resume. Reason is the provider's block message; VisualPrompt is what gets reworked.
+public sealed record ProhibitedPanel(Guid PanelId, int PanelNumber, string VisualPrompt, string? Reason);
+
 // A read model summarizing a novel's progress for the status page / API. Every long-running stage
 // carries a Done/Total so the card can say what the worker is on and how much of it is left:
 // Chunks + ReferenceSheets cover the design-bible stage, Storyboard the storyboarding stage,

@@ -252,6 +252,32 @@ public class PanelContentApprovalTests : IDisposable
     }
 
     [Fact]
+    public async Task ProhibitedPanel_CanBeReworked_AndTheBookResumesAndFinishes()
+    {
+        BlockPanelRenders(ImageBlockReason.Prohibited, []);
+        var novelId = SeedNovel();
+        Assert.Equal(ProjectStage.Cancelled, await Drive(novelId));
+
+        // The user reworks the art direction to avoid the gated content; the reworked prompt renders clean.
+        gemini.Setup(g => g.GeneratePanel(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => SampleImages.Png());
+
+        var reworked = await NewProjectService().ReworkBlockedPanelAndResumeAsync(
+            novelId, "a generic knight, an original design", CancellationToken.None);
+        Assert.NotNull(reworked);
+
+        // The book resumes from Cancelled and runs through to the end — the panels rendered before the
+        // block are kept, and the reworked panel is rendered (not skipped).
+        Assert.Equal(ProjectStage.Completed, await Drive(novelId));
+        var panel = SinglePanel(novelId);
+        Assert.Equal(WorkStatus.Completed, panel.Status);
+        Assert.False(panel.Skipped);
+        Assert.Equal("a generic knight, an original design", panel.VisualPrompt);
+        Assert.NotNull(panel.ImagePath);
+    }
+
+    [Fact]
     public async Task SkippedPanel_IsLeftOut_AndTheBookFinishes()
     {
         BlockPanelRenders(ImageBlockReason.Safety);

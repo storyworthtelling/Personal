@@ -180,6 +180,70 @@ public sealed class ProjectService
         return true;
     }
 
+    // The prohibited/IP-blocked panel a Cancelled novel is stuck on, with its current prompt and the
+    // block reason, so the rework screen can prefill the art direction the user needs to revise. Null
+    // unless the novel is genuinely Cancelled with an offending panel to rework.
+    public async Task<ProhibitedPanel?> GetProhibitedPanelAsync(Guid novelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == novelId, cancellationToken);
+        if (novel is null || novel.Stage != ProjectStage.Cancelled)
+            return null;
+
+        var panel = await FindProhibitedPanelAsync(db, novelId, cancellationToken);
+        return panel is null ? null : new ProhibitedPanel(panel.Id, panel.PanelNumber, panel.VisualPrompt, panel.LastError);
+    }
+
+    // The user reworked a prohibited-blocked panel's art direction to avoid the gated content: swap in
+    // the new visual prompt, reset the panel for a clean render, clear the fallout, and lift the novel
+    // out of Cancelled back into RenderingImages so the next worker cycle re-renders that one panel and
+    // the book carries on — without discarding the panels already rendered. Returns the reworked panel's
+    // number, or null if the novel isn't Cancelled with an offending panel to rework. The UI pairs this
+    // with a RunNow so the decision takes effect at once.
+    public async Task<int?> ReworkBlockedPanelAndResumeAsync(
+        Guid novelId, string newVisualPrompt, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == novelId, cancellationToken);
+        if (novel is null || novel.Stage != ProjectStage.Cancelled)
+            return null;
+
+        var panel = await FindProhibitedPanelAsync(db, novelId, cancellationToken);
+        if (panel is null)
+            return null;
+
+        panel.VisualPrompt = newVisualPrompt;
+        panel.Status = WorkStatus.Pending;
+        panel.Attempts = 0;
+        panel.NextAttemptAtUtc = null;
+        panel.LastError = null;
+        panel.BlockedCategoriesJson = null;
+        panel.ApprovedForRelaxedRender = false;
+        panel.PromptRewrittenForSafety = false;
+        panel.Skipped = false;
+
+        novel.LastError = null;
+        novel.Stage = ProjectStage.RenderingImages;
+        novel.UpdatedAtUtc = clock.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return panel.PanelNumber;
+    }
+
+    // The panel a Prohibited/IP block stopped the book on: it's left Pending (the block never advances it
+    // to a terminal state) with the provider's block message on LastError. There's at most one at a time
+    // — the render loop cancels on the first one it hits — but order by number to be deterministic.
+    private static async Task<Panel?> FindProhibitedPanelAsync(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
+        var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
+        return await db.Panels
+            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.Pending && p.LastError != null)
+            .OrderBy(p => p.PanelNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     // Returns a failed/retrying unit to Pending, due now, with a fresh attempt budget and no error.
     private static void Revive(IEnumerable<IRetryable> units)
     {
@@ -363,6 +427,67 @@ public sealed class ProjectService
             await AppendPhase(report, "Analysis notes", db.ChunkAnalyses.Where(a => a.NovelId == novel.Id),
                 a => a.Status, a => a.LastError, cancellationToken);
         }
+
+        return report.ToString();
+    }
+
+    // A focused capture of every panel a content filter stopped — the actionable detail the top-level
+    // status snapshot leaves out: the exact prompt sent to the image model (reconstructed identically to
+    // the render call), the block reason and flagged categories, the reference sheets in play, and the
+    // beat's dialogue/caption. This is what a prohibited/IP block needs before its art direction can be
+    // reworked and the book resumed. Covers panels parked for approval (safety) and panels stopped
+    // Pending with a block message (prohibited) — not the transient failures the worker auto-retries.
+    public async Task<string> BuildBlockedPanelReportAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var report = new StringBuilder();
+        report.AppendLine($"Storyboarder blocked-panel report — {clock.UtcNow:yyyy-MM-dd HH:mm:ss}Z");
+
+        var novels = await db.Novels.OrderByDescending(n => n.CreatedAtUtc).ToListAsync(cancellationToken);
+        var totalBlocked = 0;
+
+        foreach (var novel in novels)
+        {
+            var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);
+            var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
+            var panels = await db.Panels
+                .Where(p => pageIds.Contains(p.PageId) &&
+                            (p.Status == WorkStatus.AwaitingApproval ||
+                             (p.Status == WorkStatus.Pending && p.LastError != null)))
+                .OrderBy(p => p.PanelNumber)
+                .ToListAsync(cancellationToken);
+            if (panels.Count == 0)
+                continue;
+
+            totalBlocked += panels.Count;
+            report.AppendLine();
+            report.AppendLine($"— {novel.Title} [{novel.Id}]");
+            report.AppendLine($"  Stage: {novel.Stage}    Art style: {novel.ArtStyle}");
+            if (!string.IsNullOrEmpty(novel.LastError))
+                report.AppendLine($"  Novel error: {novel.LastError}");
+
+            foreach (var panel in panels)
+            {
+                var references = JsonSerializer.Deserialize<List<string>>(panel.ReferenceNamesJson ?? "[]") ?? [];
+                var categories = JsonSerializer.Deserialize<List<string>>(panel.BlockedCategoriesJson ?? "[]") ?? [];
+                report.AppendLine();
+                report.AppendLine($"  Panel {panel.PanelNumber} [{panel.Id}] — {panel.Status}");
+                if (categories.Count > 0)
+                    report.AppendLine($"    Flagged categories: {string.Join(", ", categories)}");
+                if (!string.IsNullOrEmpty(panel.LastError))
+                    report.AppendLine($"    Provider reason: {panel.LastError}");
+                report.AppendLine($"    References: {(references.Count > 0 ? string.Join(", ", references) : "(none)")}");
+                if (!string.IsNullOrEmpty(panel.Dialogue))
+                    report.AppendLine($"    Dialogue: {panel.Dialogue}");
+                if (!string.IsNullOrEmpty(panel.Caption))
+                    report.AppendLine($"    Caption: {panel.Caption}");
+                report.AppendLine("    Prompt sent to Gemini:");
+                report.AppendLine($"      {PanelImagePrompt.Build(novel.ArtStyle, panel.VisualPrompt, references.Count > 0)}");
+            }
+        }
+
+        if (totalBlocked == 0)
+            report.AppendLine().AppendLine("No blocked panels found.");
 
         return report.ToString();
     }
