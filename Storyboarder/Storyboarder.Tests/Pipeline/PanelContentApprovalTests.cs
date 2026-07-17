@@ -91,7 +91,8 @@ public class PanelContentApprovalTests : IDisposable
 
     private void BlockPanelRenders(ImageBlockReason reason, IReadOnlyList<string>? categories = null) =>
         gemini.Setup(g => g.GeneratePanel(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ImageContentBlockedException("blocked", reason, categories ?? DangerousCategory));
 
     private Guid SeedNovel(string? text = null)
@@ -168,8 +169,8 @@ public class PanelContentApprovalTests : IDisposable
         IReadOnlyCollection<string>? relaxedSeen = null;
         gemini.Setup(g => g.GeneratePanel(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
-                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, string _, IReadOnlyList<byte[]> _, IReadOnlyCollection<string> relaxed, CancellationToken _) =>
+                It.IsAny<double?>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string _, IReadOnlyList<byte[]> _, double? _, IReadOnlyCollection<string> relaxed, CancellationToken _) =>
             {
                 relaxedSeen = relaxed;
                 return Task.FromResult(SampleImages.Png());
@@ -196,7 +197,7 @@ public class PanelContentApprovalTests : IDisposable
         var relaxedCalls = 0;
         gemini.Setup(g => g.GeneratePanel(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
-                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<double?>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
                 relaxedCalls++;
@@ -223,7 +224,7 @@ public class PanelContentApprovalTests : IDisposable
         // Even the relaxed, restaged render stays blocked — the book must still finish via a placeholder.
         gemini.Setup(g => g.GeneratePanel(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
-                It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<double?>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ImageContentBlockedException("still blocked", ImageBlockReason.Safety, DangerousCategory));
 
         var novelId = SeedNovel();
@@ -260,7 +261,8 @@ public class PanelContentApprovalTests : IDisposable
 
         // The user reworks the art direction to avoid the gated content; the reworked prompt renders clean.
         gemini.Setup(g => g.GeneratePanel(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
 
         var reworked = await NewProjectService().ReworkBlockedPanelAndResumeAsync(
@@ -302,7 +304,8 @@ public class PanelContentApprovalTests : IDisposable
         var novelA = SeedRenderingNovel(WorkStatus.AwaitingApproval, secondsOffset: 0);
         var novelB = SeedRenderingNovel(WorkStatus.Pending, secondsOffset: 10);
         gemini.Setup(g => g.GeneratePanel(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
 
         var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
@@ -318,7 +321,8 @@ public class PanelContentApprovalTests : IDisposable
     {
         var novelId = SeedRenderingNovel(WorkStatus.Pending, secondsOffset: 0);
         gemini.Setup(g => g.GeneratePanel(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new RateLimitException("429", TimeSpan.FromMinutes(5)));
 
         var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);

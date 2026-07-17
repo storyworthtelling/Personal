@@ -45,10 +45,14 @@ public interface IGeminiImageClient
 {
     Task<byte[]> GenerateReferenceSheet(string description, string artStyle, CancellationToken cancellationToken);
 
+    // aspectRatio (width/height of the panel's slot on the page) is snapped to the nearest ratio the
+    // image model supports and requested, so the ~1MP output fills the panel instead of being
+    // letterboxed. Null requests the model's default framing.
     Task<byte[]> GeneratePanel(
         string visualPrompt,
         string artStyle,
         IReadOnlyList<byte[]> referenceImages,
+        double? aspectRatio,
         CancellationToken cancellationToken);
 
     // The user-approved re-render of a safety-blocked panel: identical to GeneratePanel except that the
@@ -58,6 +62,7 @@ public interface IGeminiImageClient
         string visualPrompt,
         string artStyle,
         IReadOnlyList<byte[]> referenceImages,
+        double? aspectRatio,
         IReadOnlyCollection<string> relaxedCategories,
         CancellationToken cancellationToken);
 }

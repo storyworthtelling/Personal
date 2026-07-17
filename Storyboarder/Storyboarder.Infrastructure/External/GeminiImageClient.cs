@@ -1,6 +1,6 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
@@ -31,54 +31,75 @@ public sealed class GeminiImageClient : IGeminiImageClient
             $"Character/location reference sheet in this style: {artStyle}. " +
             $"Render a clear, well-lit, full reference view (neutral background) of: {description}. " +
             "Single subject, consistent canonical appearance, no text or lettering.";
-        return Generate(prompt, referenceImages: [], relaxedCategories: [], cancellationToken);
+        return Generate(prompt, referenceImages: [], aspectRatio: null, relaxedCategories: [], cancellationToken);
     }
 
     public Task<byte[]> GeneratePanel(
         string visualPrompt, string artStyle, IReadOnlyList<byte[]> referenceImages,
-        CancellationToken cancellationToken) =>
-        GeneratePanel(visualPrompt, artStyle, referenceImages, relaxedCategories: [], cancellationToken);
+        double? aspectRatio, CancellationToken cancellationToken) =>
+        GeneratePanel(visualPrompt, artStyle, referenceImages, aspectRatio, relaxedCategories: [], cancellationToken);
 
     public Task<byte[]> GeneratePanel(
         string visualPrompt, string artStyle, IReadOnlyList<byte[]> referenceImages,
-        IReadOnlyCollection<string> relaxedCategories, CancellationToken cancellationToken)
+        double? aspectRatio, IReadOnlyCollection<string> relaxedCategories, CancellationToken cancellationToken)
     {
         var prompt = PanelImagePrompt.Build(artStyle, visualPrompt, referenceImages.Count > 0);
-        return Generate(prompt, referenceImages, relaxedCategories, cancellationToken);
+        return Generate(prompt, referenceImages, aspectRatio, relaxedCategories, cancellationToken);
     }
 
-    private async Task<byte[]> Generate(
-        string prompt, IReadOnlyList<byte[]> referenceImages, IReadOnlyCollection<string> relaxedCategories,
-        CancellationToken cancellationToken)
+    // The aspect ratios gemini-2.5-flash-image accepts; the requested panel aspect is snapped to the
+    // nearest so the request never carries an unsupported value.
+    private static readonly (string Label, double Ratio)[] SupportedAspectRatios =
     {
-        var parts = new List<object> { new { text = prompt } };
+        ("21:9", 21.0 / 9), ("16:9", 16.0 / 9), ("3:2", 3.0 / 2), ("4:3", 4.0 / 3), ("5:4", 5.0 / 4),
+        ("1:1", 1.0), ("4:5", 4.0 / 5), ("3:4", 3.0 / 4), ("2:3", 2.0 / 3), ("9:16", 9.0 / 16),
+    };
+
+    private static string NearestAspectRatio(double ratio) =>
+        SupportedAspectRatios.MinBy(candidate => Math.Abs(candidate.Ratio - ratio)).Label;
+
+    private async Task<byte[]> Generate(
+        string prompt, IReadOnlyList<byte[]> referenceImages, double? aspectRatio,
+        IReadOnlyCollection<string> relaxedCategories, CancellationToken cancellationToken)
+    {
+        var parts = new JsonArray { new JsonObject { ["text"] = prompt } };
         foreach (var referenceImage in referenceImages)
-            parts.Add(new { inlineData = new { mimeType = "image/png", data = Convert.ToBase64String(referenceImage) } });
+            parts.Add(new JsonObject
+            {
+                ["inlineData"] = new JsonObject
+                {
+                    ["mimeType"] = "image/png",
+                    ["data"] = Convert.ToBase64String(referenceImage)
+                }
+            });
+
+        var generationConfig = new JsonObject { ["responseModalities"] = new JsonArray("IMAGE") };
+        // Ask the model to frame the image at the panel's aspect ratio, so it fills the slot rather than
+        // being letterboxed onto shaded paper when composed.
+        if (aspectRatio is { } ratio)
+            generationConfig["imageConfig"] = new JsonObject { ["aspectRatio"] = NearestAspectRatio(ratio) };
+
+        var payload = new JsonObject
+        {
+            ["contents"] = new JsonArray(new JsonObject { ["parts"] = parts }),
+            ["generationConfig"] = generationConfig
+        };
 
         // safetySettings is emitted ONLY for an approved re-render (relaxedCategories non-empty), and
         // then only for the flagged categories. Omitting it entirely keeps the default render at
         // Google's default thresholds — the app never lowers them on the normal path.
-        object payload = relaxedCategories.Count == 0
-            ? new
-            {
-                contents = new[] { new { parts } },
-                generationConfig = new { responseModalities = new[] { "IMAGE" } }
-            }
-            : new
-            {
-                contents = new[] { new { parts } },
-                generationConfig = new { responseModalities = new[] { "IMAGE" } },
-                safetySettings = relaxedCategories
-                    .Select(category => new { category, threshold = "BLOCK_NONE" })
-                    .ToArray()
-            };
+        if (relaxedCategories.Count > 0)
+        {
+            var safetySettings = new JsonArray();
+            foreach (var category in relaxedCategories)
+                safetySettings.Add(new JsonObject { ["category"] = category, ["threshold"] = "BLOCK_NONE" });
+            payload["safetySettings"] = safetySettings;
+        }
 
         var url = $"{BaseUrl}/{options.Model}:generateContent?key={Uri.EscapeDataString(options.ApiKey)}";
-        // Serialize by the payload's runtime (anonymous) type — the static type is object here, and
-        // System.Text.Json would otherwise emit an empty object for a declared-object value.
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            Content = JsonContent.Create(payload, payload.GetType())
+            Content = new StringContent(payload.ToJsonString(), System.Text.Encoding.UTF8, "application/json")
         };
 
         var response = await httpClient.SendAsync(request, cancellationToken);

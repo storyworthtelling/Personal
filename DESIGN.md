@@ -133,14 +133,14 @@ In-app glyphs are single-style **ink line icons**: 2dp stroke, geometric, no fil
 
 All pages (including front matter) carry the §6 grain over `Paper`.
 
-### Comic volumes (1024 × 1536 px)
+### Comic volumes (2048 × 3072 px, 2:3; declared 300 DPI ≈ 6.8 × 10.2 in for print)
 
 - **Cover page (new, page 0):** novel title in `CoverTitle` Serif, short terracotta rule, "Volume N" + volume title in Serif, the owner's medallion (§13) near the foot. No folio.
-- Content pages: margins side 64, top 64, bottom 116 (52px folio band); gutter 24; 2px `Ink` panel borders; `PaperShade` letterbox behind off-ratio art.
-- Dialogue balloons: `PaperBright`, 1.5px Ink stroke, radius 14, Sans 17. Captions: `PaperDeep`, radius 10, Serif Italic 16.
-- Folio band: running volume title bottom-left `InkMuted`, page number bottom-right `Ink`, Serif 18.
+- Content pages: margins side 128, top 128, bottom 232 (104px folio band); gutter 48; 4px `Ink` panel borders; `PaperShade` letterbox behind off-ratio art (minimized by requesting the panel's aspect ratio from the image model). Panel art is drawn with high-quality (Mitchell cubic) resampling.
+- Dialogue balloons: `PaperBright`, 3px Ink stroke, radius 28, Sans 34. Captions: `PaperDeep`, radius 20, Serif Italic 32.
+- Folio band: running volume title bottom-left `InkMuted`, page number bottom-right `Ink`, Serif 36.
 
-### Analysis reports (1240 × 1754 px)
+### Analysis reports (1240 × 1754 px; declared 150 DPI = true A4)
 
 - **Front matter (new, unnumbered):** a cover (title, "Revision report" in Serif Italic muted, terracotta rule, medallion) and a **Contents** page listing each section with its page number. Front matter carries no footer; content pages keep folios 1..N, so printed numbers match the TOC with no bookkeeping.
 - Content: margins 110/100/130; body Serif 30 `Ink`; H1 58/H2 40/H3 32 Serif SemiBold; 2px terracotta rule under H1/H2; terracotta bullets; footer = running title left (Sans 22 `InkMuted`), page number right (Serif 22 `Ink`).
