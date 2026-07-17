@@ -340,6 +340,83 @@ public class PanelContentApprovalTests : IDisposable
         Assert.NotNull(status!.RateLimitedUntilUtc);
     }
 
+    [Fact]
+    public async Task RateLimitedNovel_DoesNotStarve_AYoungerNovelThatCanFinish()
+    {
+        // Reproduces The Disc stuck at "Writing the revision report…": one novel is parked on a rate-limit
+        // wait (its panel NeedsRetry, not yet due), and a younger novel has already finished its analysis
+        // PDF and only needs the final move to Completed. The worker must step past the waiting novel and
+        // let the ready one finish — not return the older novel's wait and starve it every cycle.
+        SeedRateLimitedRenderingNovel(secondsOffset: -100);
+        var readyNovelId = SeedNovelReadyToCompleteAnalysis(secondsOffset: 0);
+
+        var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
+        Assert.Equal(ProjectStage.Completed, StageOf(readyNovelId));
+    }
+
+    private ProjectStage StageOf(Guid novelId)
+    {
+        using var context = database.NewContext();
+        return context.Novels.Single(n => n.Id == novelId).Stage;
+    }
+
+    // Seeds a novel at RenderingImages whose only panel is awaiting a retry that isn't due yet, so the
+    // render stage reports Waiting (a rate-limit / backoff window) rather than doing any work.
+    private Guid SeedRateLimitedRenderingNovel(int secondsOffset)
+    {
+        var now = clock.UtcNow.AddSeconds(secondsOffset);
+        var novel = new Novel
+        {
+            Title = "Rate limited", GoogleDocId = "doc", Stage = ProjectStage.RenderingImages,
+            CreatedAtUtc = now, UpdatedAtUtc = now
+        };
+        novel.Source = new SourceText { NovelId = novel.Id, FullText = "t", CharacterCount = 1 };
+        var volume = new Volume { NovelId = novel.Id, Number = 1, Title = "V1" };
+        var page = new Page { VolumeId = volume.Id, ChapterNumber = 1, PageNumber = 1, CompositionStatus = WorkStatus.Pending };
+        page.Panels.Add(new Panel
+        {
+            PageId = page.Id, PanelNumber = 1, VisualPrompt = "p", ReferenceNamesJson = "[]",
+            Status = WorkStatus.NeedsRetry, Attempts = 1, LastError = "429",
+            NextAttemptAtUtc = clock.UtcNow.AddMinutes(5)
+        });
+        volume.Pages.Add(page);
+        novel.Volumes.Add(volume);
+
+        using var context = database.NewContext();
+        context.Novels.Add(novel);
+        context.SaveChanges();
+        return novel.Id;
+    }
+
+    // Seeds a novel at ComposingAnalysis with every analysis unit done, the report consolidated, and the
+    // analysis PDF already rendered — so the only work left is the transition to Completed.
+    private Guid SeedNovelReadyToCompleteAnalysis(int secondsOffset)
+    {
+        var now = clock.UtcNow.AddSeconds(secondsOffset);
+        var novel = new Novel
+        {
+            Title = "Ready", GoogleDocId = "doc", Stage = ProjectStage.ComposingAnalysis,
+            CreatedAtUtc = now, UpdatedAtUtc = now
+        };
+        novel.Source = new SourceText { NovelId = novel.Id, FullText = "t", CharacterCount = 1 };
+
+        using var context = database.NewContext();
+        context.Novels.Add(novel);
+        context.ChunkAnalyses.Add(new ChunkAnalysis
+        {
+            NovelId = novel.Id, Ordinal = 0, Status = WorkStatus.Completed, NotesJson = "{}"
+        });
+        context.BookAnalyses.Add(new BookAnalysis
+        {
+            NovelId = novel.Id, ConsolidatedJson = "{}", PdfStatus = WorkStatus.Completed,
+            PdfPath = "book-analysis.pdf"
+        });
+        context.SaveChanges();
+        return novel.Id;
+    }
+
     // Seeds a novel already at RenderingImages with one volume/page/panel in the given state.
     private Guid SeedRenderingNovel(WorkStatus panelStatus, int secondsOffset)
     {

@@ -81,13 +81,34 @@ public class GeminiImageClientTests
     }
 
     [Fact]
-    public async Task ResourceExhausted_ThrowsRateLimitException()
+    public async Task ResourceExhausted_ThrowsTransientRateLimit()
     {
         var (client, handler) = Create();
         handler.Enqueue(HttpStatusCode.TooManyRequests, "{\"error\":{\"status\":\"RESOURCE_EXHAUSTED\"}}");
 
-        await Assert.ThrowsAsync<RateLimitException>(() =>
+        var ex = await Assert.ThrowsAsync<RateLimitException>(() =>
             client.GenerateReferenceSheet("x", "noir", CancellationToken.None));
+
+        // A bare per-minute throttle (no billing/credit wording) clears on its own — treat it as transient.
+        Assert.Equal(RateLimitKind.Transient, ex.Kind);
+    }
+
+    [Fact]
+    public async Task DepletedCredits_ThrowsQuotaExhaustedRateLimit()
+    {
+        var (client, handler) = Create();
+        // The real 429 body Gemini returns once an API project's prepaid credits run out.
+        handler.Enqueue(HttpStatusCode.TooManyRequests,
+            "{\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to " +
+            "AI Studio to manage your project and billing.\",\"status\":\"RESOURCE_EXHAUSTED\"}}");
+
+        var ex = await Assert.ThrowsAsync<RateLimitException>(() =>
+            client.GenerateReferenceSheet("x", "noir", CancellationToken.None));
+
+        // Depleted billing is a quota wall, not a short throttle — flagged so the worker defers it long
+        // and reports an actionable message rather than retrying every few seconds.
+        Assert.Equal(RateLimitKind.QuotaExhausted, ex.Kind);
+        Assert.Contains("quota exhausted", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

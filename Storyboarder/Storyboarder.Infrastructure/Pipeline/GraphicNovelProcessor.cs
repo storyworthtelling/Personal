@@ -78,24 +78,32 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // Advance the oldest active novel that actually has runnable work. A novel that returns Idle is
-        // blocked — on a failed unit, or parked awaiting the user's approval of a safety-blocked panel —
-        // so we step past it to the next novel rather than letting it hog the worker (and stall every
-        // novel behind it). Only if every active novel is Idle does the whole cycle idle.
+        // Advance the oldest active novel that actually has runnable work. A novel that can't make
+        // progress right now must not hog the worker (and stall every novel behind it): that's a novel
+        // returning Idle — blocked on a failed unit or parked awaiting the user's approval — but equally
+        // one returning Waiting, parked on a rate-limit or retry window. Both are stepped past so a novel
+        // with real work gets its turn. This is what keeps a finished-but-one-transition novel (e.g. its
+        // analysis PDF is done, only the move to Completed remains) from being starved behind another
+        // novel sitting on a long rate-limit wait. Only if no novel can do work do we return: the soonest
+        // Waiting if any is merely deferred, else Idle.
         var novels = await db.Novels
             .Where(n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed &&
                         n.Stage != ProjectStage.Cancelled)
             .OrderBy(n => n.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
+        ProcessResult? soonestWait = null;
         foreach (var novel in novels)
         {
             var result = await Dispatch(db, novel, cancellationToken);
-            if (result.Outcome != ProcessOutcome.Idle)
+            if (result.Outcome == ProcessOutcome.DidWork)
                 return result;
+            if (result.Outcome == ProcessOutcome.Waiting &&
+                (soonestWait is null || result.Wait < soonestWait.Value.Wait))
+                soonestWait = result;
         }
 
-        return ProcessResult.Idle;
+        return soonestWait ?? ProcessResult.Idle;
     }
 
     private Task<ProcessResult> Dispatch(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken) =>
@@ -822,8 +830,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         unit.Attempts++;
         unit.LastError = exception.Message;
-        var retryAfter = (exception as RateLimitException)?.RetryAfter;
-        var transient = exception is RateLimitException;
+        var rateLimit = exception as RateLimitException;
+        var transient = rateLimit is not null;
 
         if (!transient && unit.Attempts >= rateLimits.MaxAttempts)
         {
@@ -834,7 +842,19 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         }
 
         unit.WorkState = WorkStatus.NeedsRetry;
-        unit.NextAttemptAtUtc = clock.UtcNow + backoff.NextDelay(unit.Attempts - 1, retryAfter);
+
+        // Depleted billing credits won't come back on the normal backoff — retrying in seconds just burns
+        // calls until the user tops up. Defer a long, flat interval and don't advertise a resume time we
+        // can't predict; the error message (which names billing) is what tells the user how to unblock it.
+        if (rateLimit?.Kind == RateLimitKind.QuotaExhausted)
+        {
+            unit.NextAttemptAtUtc = clock.UtcNow + TimeSpan.FromSeconds(rateLimits.MaxDelaySeconds);
+            logger.LogWarning("{Unit} deferred: provider quota/credits exhausted; next check {NextAttempt:u} (add billing to resume): {Error}",
+                unit.GetType().Name, unit.NextAttemptAtUtc, exception.Message);
+            return;
+        }
+
+        unit.NextAttemptAtUtc = clock.UtcNow + backoff.NextDelay(unit.Attempts - 1, rateLimit?.RetryAfter);
         // A provider rate limit is the "when do queries resume" the user wants to see, so record the
         // expected resume time on the novel; a plain error retry doesn't (it's not a quota wait).
         if (transient)

@@ -316,6 +316,62 @@ public class GraphicNovelProcessorTests : IDisposable
     }
 
     [Fact]
+    public async Task QuotaExhaustedPanelRender_DefersLong_WithoutFalseResumeTime_ThenRecovers()
+    {
+        // Depleted Gemini credits surface as a QuotaExhausted rate limit. Unlike a per-minute throttle,
+        // that clears only when the user tops up billing, so the panel must be deferred a long, flat
+        // interval (not the short base backoff) and the novel must NOT advertise a resume time it can't
+        // keep. The panel stays retryable — never Failed — so it resumes once credits return.
+        var panelCalls = 0;
+        gemini.Setup(g => g.GeneratePanel(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                panelCalls++;
+                return panelCalls == 1
+                    ? Task.FromException<byte[]>(new RateLimitException(
+                        "Gemini quota exhausted: 429: your prepayment credits are depleted",
+                        retryAfter: null, RateLimitKind.QuotaExhausted))
+                    : Task.FromResult(SampleImages.Png());
+            });
+
+        var novelId = SeedNovel();
+
+        // Drive until the quota-exhausted panel has been attempted once and deferred.
+        var deferredSeen = false;
+        for (int i = 0; i < 400 && !deferredSeen; i++)
+        {
+            var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+            using (var ctx = database.NewContext())
+            {
+                var panel = ctx.Panels.FirstOrDefault(p => p.Status == WorkStatus.NeedsRetry);
+                if (panel is not null)
+                {
+                    // Deferred by ~MaxDelaySeconds (60 in the test config), not the 4s base delay.
+                    Assert.True(panel.NextAttemptAtUtc >= clock.UtcNow + TimeSpan.FromSeconds(59),
+                        $"expected a long quota deferral, got {panel.NextAttemptAtUtc - clock.UtcNow}");
+                    // No false "resumes shortly" — we can't predict when billing is topped up.
+                    var novel = ctx.Novels.Single(n => n.Id == novelId);
+                    Assert.Null(novel.RateLimitedUntilUtc);
+                    deferredSeen = true;
+                }
+            }
+
+            if (!deferredSeen && result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+        }
+
+        Assert.True(deferredSeen, "The quota-exhausted panel should have been deferred, not failed.");
+
+        // Once credits return the deferred panel retries and the book finishes.
+        await DriveToCompletion(novelId, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.True(panelCalls >= 2, "The quota-exhausted panel should have been retried after the deferral.");
+    }
+
+    [Fact]
     public async Task RecoversFromTransientNetworkDrop_DuringStoryboarding_InsteadOfFailingTheCycle()
     {
         // A socket/IO drop ("Socket closed" is an IOException, not an HttpRequestException) during a
