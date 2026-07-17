@@ -127,13 +127,51 @@ public sealed class GeminiImageClient : IGeminiImageClient
         var status = response.StatusCode;
         if (status == HttpStatusCode.TooManyRequests || IsResourceExhausted(body))
         {
+            // A 429 covers two very different conditions. A per-minute throttle clears on its own, so it
+            // retries on the normal backoff. Depleted billing credits ("prepayment credits are depleted")
+            // clear only when the user tops up, so retrying every few seconds just burns calls; it's
+            // flagged QuotaExhausted so the worker waits a long interval and reports an actionable message.
+            var quotaExhausted = IsCreditsExhausted(body);
+            var label = quotaExhausted ? "quota exhausted" : "rate limited";
             return new RateLimitException(
-                $"Gemini rate limited: {(int)status} ({status}): {body}",
-                response.Headers.RetryAfter?.Delta);
+                $"Gemini {label}: {(int)status} ({status}): {body}",
+                response.Headers.RetryAfter?.Delta,
+                quotaExhausted ? RateLimitKind.QuotaExhausted : RateLimitKind.Transient);
         }
 
         return new HttpRequestException(
             $"Gemini request failed: {(int)status} ({status}): {body}", inner: null, status);
+    }
+
+    // A 429 whose error message names billing/credits is a depleted-quota wall, not a short throttle:
+    // it needs the user to add billing before any retry can succeed. Message wording is the only reliable
+    // signal — the status is RESOURCE_EXHAUSTED for both — so match the terms Google uses for it.
+    private static bool IsCreditsExhausted(string body)
+    {
+        var message = ErrorMessage(body);
+        if (message is null)
+            return false;
+        return message.Contains("credit", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("billing", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("depleted", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ErrorMessage(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (document.RootElement.TryGetProperty("error", out var error) &&
+                error.TryGetProperty("message", out var message))
+            {
+                return message.GetString();
+            }
+        }
+        catch (JsonException)
+        {
+            // Non-JSON error body: no message to classify by.
+        }
+        return null;
     }
 
     private static bool IsResourceExhausted(string body)

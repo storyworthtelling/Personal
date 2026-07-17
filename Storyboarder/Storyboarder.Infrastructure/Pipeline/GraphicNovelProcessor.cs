@@ -822,8 +822,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         unit.Attempts++;
         unit.LastError = exception.Message;
-        var retryAfter = (exception as RateLimitException)?.RetryAfter;
-        var transient = exception is RateLimitException;
+        var rateLimit = exception as RateLimitException;
+        var transient = rateLimit is not null;
 
         if (!transient && unit.Attempts >= rateLimits.MaxAttempts)
         {
@@ -834,7 +834,19 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         }
 
         unit.WorkState = WorkStatus.NeedsRetry;
-        unit.NextAttemptAtUtc = clock.UtcNow + backoff.NextDelay(unit.Attempts - 1, retryAfter);
+
+        // Depleted billing credits won't come back on the normal backoff — retrying in seconds just burns
+        // calls until the user tops up. Defer a long, flat interval and don't advertise a resume time we
+        // can't predict; the error message (which names billing) is what tells the user how to unblock it.
+        if (rateLimit?.Kind == RateLimitKind.QuotaExhausted)
+        {
+            unit.NextAttemptAtUtc = clock.UtcNow + TimeSpan.FromSeconds(rateLimits.MaxDelaySeconds);
+            logger.LogWarning("{Unit} deferred: provider quota/credits exhausted; next check {NextAttempt:u} (add billing to resume): {Error}",
+                unit.GetType().Name, unit.NextAttemptAtUtc, exception.Message);
+            return;
+        }
+
+        unit.NextAttemptAtUtc = clock.UtcNow + backoff.NextDelay(unit.Attempts - 1, rateLimit?.RetryAfter);
         // A provider rate limit is the "when do queries resume" the user wants to see, so record the
         // expected resume time on the novel; a plain error retry doesn't (it's not a quota wait).
         if (transient)
