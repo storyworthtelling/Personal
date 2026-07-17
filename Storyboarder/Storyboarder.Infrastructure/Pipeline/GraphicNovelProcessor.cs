@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.Analysis;
+using Storyboarder.Domain.Design;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
@@ -413,14 +414,17 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             try
             {
                 var references = await LoadReferenceImages(db, novel.Id, panel.ReferenceNamesJson, cancellationToken);
+                // Request the image at the aspect ratio of the slot this panel will occupy on the page,
+                // so it fills the panel rather than being letterboxed onto shaded paper when composed.
+                var aspectRatio = await PanelSlotAspectRatio(db, panel.PageId, cancellationToken);
                 // An approved panel renders with ONLY its flagged categories relaxed, for this one call;
                 // every other panel takes the default render (and the app's default thresholds) untouched.
                 var relaxed = panel.ApprovedForRelaxedRender
                     ? JsonSerializer.Deserialize<List<string>>(panel.BlockedCategoriesJson ?? "[]") ?? []
                     : [];
                 var image = relaxed.Count > 0
-                    ? await gemini.GeneratePanel(panel.VisualPrompt, novel.ArtStyle, references, relaxed, cancellationToken)
-                    : await gemini.GeneratePanel(panel.VisualPrompt, novel.ArtStyle, references, cancellationToken);
+                    ? await gemini.GeneratePanel(panel.VisualPrompt, novel.ArtStyle, references, aspectRatio, relaxed, cancellationToken)
+                    : await gemini.GeneratePanel(panel.VisualPrompt, novel.ArtStyle, references, aspectRatio, cancellationToken);
                 panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", image);
                 panel.Status = WorkStatus.Completed;
                 panel.LastError = null;
@@ -538,7 +542,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                     .Select(p => imageStore.Read(p.ComposedImagePath!))
                     .ToList();
                 pageImages.Insert(0, coverRenderer.VolumeCover(novel.Title, volume.Number, volume.Title));
-                var pdf = pdfComposer.Compose(pageImages);
+                var pdf = pdfComposer.Compose(pageImages, DesignTokens.Comic.PrintDpi);
                 volume.PdfPath = imageStore.Save($"{novel.Id}/volumes/volume-{volume.Number}.pdf", pdf);
                 volume.PdfStatus = WorkStatus.Completed;
             }
@@ -784,6 +788,25 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         panel.LastError = "Rendered as a neutral placeholder: blocked even after relaxing safety and restaging to imply the content.";
         logger.LogWarning("Panel {PanelId} fell back to a placeholder after repeated content blocks (novel {NovelId})", panel.Id, novel.Id);
         return null;
+    }
+
+    // The width/height of the slot this panel will occupy on the composed page, so the image model can be
+    // asked to frame the art at that ratio. Every cell in a page's grid is the same size, so this depends
+    // only on how many panels share the page (see PageLayoutCalculator). Uses the design page geometry the
+    // composer lays out against.
+    private static async Task<double?> PanelSlotAspectRatio(
+        StoryboarderDbContext db, Guid pageId, CancellationToken cancellationToken)
+    {
+        var panelCount = await db.Panels.CountAsync(p => p.PageId == pageId, cancellationToken);
+        if (panelCount <= 0)
+            return null;
+
+        var calculator = new PageLayoutCalculator(
+            new PageMargins(DesignTokens.Comic.TopMargin, DesignTokens.Comic.SideMargin, DesignTokens.Comic.BottomMargin),
+            DesignTokens.Comic.Gutter);
+        var cell = calculator.Layout(
+            new PageSize(DesignTokens.Comic.PageWidth, DesignTokens.Comic.PageHeight), panelCount)[0];
+        return cell.Width / cell.Height;
     }
 
     // Rebuilds the exact text prompt a panel was rendered with, so a content block can be logged and

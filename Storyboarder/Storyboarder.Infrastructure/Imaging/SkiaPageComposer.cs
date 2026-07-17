@@ -20,6 +20,10 @@ public sealed class SkiaPageComposer : IPageComposer
     private static readonly SKColor Ink = SKColor.Parse(DesignTokens.Ink);
     private static readonly SKColor InkMuted = SKColor.Parse(DesignTokens.InkMuted);
 
+    // Mitchell cubic resampling: high quality for both the up- and down-scaling a panel needs to fit its
+    // slot, avoiding the blockiness/aliasing of the default nearest-neighbour sampling.
+    private static readonly SKSamplingOptions HighQualitySampling = new(SKCubicResampler.Mitchell);
+
     private readonly PageLayoutOptions layout;
     private readonly PageLayoutCalculator calculator;
 
@@ -88,7 +92,8 @@ public sealed class SkiaPageComposer : IPageComposer
         float height = bitmap.Height * scale;
         float x = dest.Left + (dest.Width - width) / 2;
         float y = dest.Top + (dest.Height - height) / 2;
-        canvas.DrawBitmap(bitmap, new SKRect(x, y, x + width, y + height));
+        using var image = SKImage.FromBitmap(bitmap);
+        canvas.DrawImage(image, new SKRect(x, y, x + width, y + height), HighQualitySampling, paint: null);
     }
 
     // Dialogue: bright-paper balloon, Sans lettering, anchored top.

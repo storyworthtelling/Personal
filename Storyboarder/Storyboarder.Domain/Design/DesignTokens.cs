@@ -31,34 +31,47 @@ public static class DesignTokens
         public const double Mono = 14;
     }
 
-    /// <summary>Comic volume pages (px at the composed page size).</summary>
+    /// <summary>
+    /// Comic volume pages (px at the composed page size). Rendered at 2048×3072 (2:3) so the pages
+    /// carry enough resolution for print: at <see cref="PrintDpi"/> that is ~6.8×10.2in, and each
+    /// panel occupies enough pixels that the ~1MP image-model output fills it without visible softening.
+    /// Every length here scales together, so the page keeps the same proportions at any size.
+    /// </summary>
     public static class Comic
     {
-        public const int PageWidth = 1_024;
-        public const int PageHeight = 1_536;
-        public const int TopMargin = 64;
-        public const int SideMargin = 64;
-        public const int BottomMargin = 116; // contains the folio band
-        public const int FolioBand = 52;
-        public const int Gutter = 24;
-        public const float PanelStroke = 2f;
-        public const float BoxStroke = 1.5f;
-        public const float LetteringSize = 17f;  // dialogue, Sans
-        public const float CaptionSize = 16f;    // captions, Serif Italic
-        public const float FolioSize = 18f;      // page number + running title, Serif
-        public const float BalloonRadius = 14f;
-        public const float CaptionRadius = 10f;
-        public const float BoxPadding = 8f;
+        public const int PageWidth = 2_048;
+        public const int PageHeight = 3_072;
+        public const int TopMargin = 128;
+        public const int SideMargin = 128;
+        public const int BottomMargin = 232; // contains the folio band
+        public const int FolioBand = 104;
+        public const int Gutter = 48;
+        public const float PanelStroke = 4f;
+        public const float BoxStroke = 3f;
+        public const float LetteringSize = 34f;  // dialogue, Sans
+        public const float CaptionSize = 32f;    // captions, Serif Italic
+        public const float FolioSize = 36f;      // page number + running title, Serif
+        public const float BalloonRadius = 28f;
+        public const float CaptionRadius = 20f;
+        public const float BoxPadding = 16f;
         public const float LineSpacing = 1.35f;
-        public const float CoverTitleSize = 72f;
-        public const float CoverMedallionSize = 120f;
+        public const float CoverTitleSize = 144f;
+        public const float CoverMedallionSize = 240f;
+
+        // The physical resolution the volume PDF declares for its full-page rasters, so print output
+        // is sized for print (≈300 DPI) rather than PdfSharp's default 96 DPI screen assumption.
+        public const int PrintDpi = 300;
     }
 
-    /// <summary>Analysis report pages (px at ~A4 150 DPI).</summary>
+    /// <summary>Analysis report pages (px at A4 150 DPI).</summary>
     public static class Pdf
     {
         public const int PageWidth = 1_240;
         public const int PageHeight = 1_754;
+
+        // A4 at this resolution is exactly 1240×1754 px, so the report PDF declares 150 DPI and prints
+        // at true A4 rather than PdfSharp's default 96 DPI (which would oversize the page).
+        public const int PrintDpi = 150;
         public const float SideMargin = 110f;
         public const float TopMargin = 100f;
         public const float BottomMargin = 130f; // contains the footer band

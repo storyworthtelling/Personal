@@ -66,7 +66,8 @@ public class GraphicNovelProcessorTests : IDisposable
 
         // The first panel render is rate-limited; the worker must reschedule and succeed on retry.
         gemini.Setup(g => g.GeneratePanel(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
                 panelRenderCalls++;
@@ -296,7 +297,8 @@ public class GraphicNovelProcessorTests : IDisposable
         // scheduled for retry rather than thrown out of ProcessNextAsync.
         var panelCalls = 0;
         gemini.Setup(g => g.GeneratePanel(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
                 panelCalls++;

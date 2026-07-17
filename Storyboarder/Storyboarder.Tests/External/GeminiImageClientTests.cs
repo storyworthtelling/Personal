@@ -60,7 +60,7 @@ public class GeminiImageClientTests
         byte[] refA = [1, 1, 1];
         byte[] refB = [2, 2, 2];
 
-        await client.GeneratePanel("knight fights dragon", "noir", [refA, refB], CancellationToken.None);
+        await client.GeneratePanel("knight fights dragon", "noir", [refA, refB], aspectRatio: null, CancellationToken.None);
 
         Assert.Equal(2, Count(handler.RequestBodies[0], "inlineData"));
         Assert.Contains(Convert.ToBase64String(refA), handler.RequestBodies[0]);
@@ -120,7 +120,7 @@ public class GeminiImageClientTests
             "{\"category\":\"HARM_CATEGORY_DANGEROUS_CONTENT\",\"probability\":\"HIGH\",\"blocked\":true}]}]}");
 
         var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
-            client.GeneratePanel("a brutal duel", "noir", [], CancellationToken.None));
+            client.GeneratePanel("a brutal duel", "noir", [], aspectRatio: null, CancellationToken.None));
 
         Assert.Equal(ImageBlockReason.Safety, ex.Reason);
         // Only the category that actually tripped is carried, so only it gets relaxed on re-render.
@@ -134,7 +134,7 @@ public class GeminiImageClientTests
         handler.EnqueueOk("{\"candidates\":[{\"finishReason\":\"PROHIBITED_CONTENT\"}]}");
 
         var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
-            client.GeneratePanel("a recognizable trademarked hero", "noir", [], CancellationToken.None));
+            client.GeneratePanel("a recognizable trademarked hero", "noir", [], aspectRatio: null, CancellationToken.None));
 
         Assert.Equal(ImageBlockReason.Prohibited, ex.Reason);
         Assert.Empty(ex.Categories);
@@ -147,7 +147,7 @@ public class GeminiImageClientTests
         handler.EnqueueOk("{\"promptFeedback\":{\"blockReason\":\"BLOCKLIST\"}}");
 
         var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
-            client.GeneratePanel("x", "noir", [], CancellationToken.None));
+            client.GeneratePanel("x", "noir", [], aspectRatio: null, CancellationToken.None));
 
         Assert.Equal(ImageBlockReason.Prohibited, ex.Reason);
     }
@@ -159,7 +159,7 @@ public class GeminiImageClientTests
         handler.EnqueueOk(ImageReply(PngBytes));
 
         var image = await client.GeneratePanel(
-            "a brutal duel", "noir", [], ["HARM_CATEGORY_DANGEROUS_CONTENT"], CancellationToken.None);
+            "a brutal duel", "noir", [], aspectRatio: null, ["HARM_CATEGORY_DANGEROUS_CONTENT"], CancellationToken.None);
 
         Assert.Equal(PngBytes, image);
         var body = handler.RequestBodies[0];
@@ -176,9 +176,34 @@ public class GeminiImageClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(ImageReply(PngBytes));
 
-        await client.GeneratePanel("a quiet scene", "noir", [], CancellationToken.None);
+        await client.GeneratePanel("a quiet scene", "noir", [], aspectRatio: null, CancellationToken.None);
 
         // The normal path never lowers thresholds — no safetySettings block is sent at all.
         Assert.DoesNotContain("safetySettings", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task Panel_WithAspectRatio_RequestsNearestSupportedRatio()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(ImageReply(PngBytes));
+
+        // 1.3 is closest to 4:3 (1.333) among the supported ratios.
+        await client.GeneratePanel("a wide vista", "noir", [], aspectRatio: 1.3, CancellationToken.None);
+
+        var body = handler.RequestBodies[0];
+        Assert.Contains("imageConfig", body);
+        Assert.Contains("\"aspectRatio\":\"4:3\"", body);
+    }
+
+    [Fact]
+    public async Task Panel_WithoutAspectRatio_OmitsImageConfig()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(ImageReply(PngBytes));
+
+        await client.GeneratePanel("a scene", "noir", [], aspectRatio: null, CancellationToken.None);
+
+        Assert.DoesNotContain("imageConfig", handler.RequestBodies[0]);
     }
 }

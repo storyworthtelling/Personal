@@ -257,7 +257,7 @@ public class PdfVolumeComposerTests
     {
         var pages = new List<byte[]> { SampleImages.Png(200, 300), SampleImages.Png(200, 300) };
 
-        var pdfBytes = new PdfVolumeComposer().Compose(pages);
+        var pdfBytes = new PdfVolumeComposer().Compose(pages, 300);
 
         Assert.True(pdfBytes.Length > 4);
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdfBytes, 0, 4));
@@ -265,6 +265,18 @@ public class PdfVolumeComposerTests
         using var stream = new MemoryStream(pdfBytes);
         using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.Equal(2, document.PageCount);
+    }
+
+    [Fact]
+    public void Compose_SizesPagesForTheGivenDpi()
+    {
+        // 600×900 px at 300 DPI is 2×3 inches — 144×216 points — regardless of the PNG's own metadata.
+        var pdfBytes = new PdfVolumeComposer().Compose([SampleImages.Png(600, 900)], dpi: 300);
+
+        using var stream = new MemoryStream(pdfBytes);
+        using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.Equal(144, document.Pages[0].Width.Point, 0);
+        Assert.Equal(216, document.Pages[0].Height.Point, 0);
     }
 }
 

@@ -1,4 +1,5 @@
 using Storyboarder.Domain.Analysis;
+using Storyboarder.Domain.Design;
 using Storyboarder.Domain.Imaging;
 
 namespace Storyboarder.Infrastructure.Imaging;
@@ -20,6 +21,6 @@ public sealed class AnalysisPdfComposer : IAnalysisPdfComposer
     public byte[] Compose(BookAnalysisResult analysis, string title)
     {
         var pages = renderer.Render(analysis, title);
-        return pdfComposer.Compose(pages);
+        return pdfComposer.Compose(pages, DesignTokens.Pdf.PrintDpi);
     }
 }

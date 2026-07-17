@@ -25,10 +25,11 @@ public interface IPageComposer
     byte[] Compose(IReadOnlyList<PanelArt> panels, PageChrome chrome);
 }
 
-// Assembles ordered page images into a single volume PDF.
+// Assembles ordered page images into a single volume PDF. dpi is the physical resolution each full-page
+// raster is declared at, so the PDF prints at the intended size rather than PdfSharp's default 96 DPI.
 public interface IVolumePdfComposer
 {
-    byte[] Compose(IReadOnlyList<byte[]> pageImages);
+    byte[] Compose(IReadOnlyList<byte[]> pageImages, int dpi);
 }
 
 // Renders the consolidated book-analysis (revision report) into a single, text-heavy PDF.
