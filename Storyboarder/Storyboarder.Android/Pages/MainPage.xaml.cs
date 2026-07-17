@@ -108,6 +108,12 @@ public partial class MainPage : ContentPage
         var reviewLabel = status.PendingApprovals > 0 ? $"Review blocked panels ({status.PendingApprovals})" : null;
         if (reviewLabel is not null)
             buttons.Add(reviewLabel);
+        // A book the pipeline cancelled on a prohibited/IP block carries a reason (a user-stopped one
+        // doesn't): offer to rework that panel's art direction and resume, rather than restart the whole
+        // conversion and discard the panels already rendered.
+        var reworkable = status.Stage == "Cancelled" && !string.IsNullOrEmpty(status.LastError);
+        if (reworkable)
+            buttons.Add(ReworkPanelAction);
         if (isActive)
         {
             buttons.Add(RetryAction);
@@ -124,6 +130,11 @@ public partial class MainPage : ContentPage
         if (choice == reviewLabel)
         {
             await ReviewBlockedPanels(status);
+            return;
+        }
+        if (choice == ReworkPanelAction)
+        {
+            await ReworkBlockedPanel(status);
             return;
         }
         if (choice == RetryAction)
@@ -166,6 +177,7 @@ public partial class MainPage : ContentPage
     private const string DeleteAction = "Delete project";
     private const string ApprovePanelAction = "Render it (relax this once)";
     private const string SkipPanelAction = "Leave it out";
+    private const string ReworkPanelAction = "Rework blocked panel & resume";
 
     // Walks the panels a safety filter blocked mid-render, one at a time. For each, the user can approve
     // rendering it (the flagged category is relaxed for that one render — and, if it still hits the
@@ -212,6 +224,44 @@ public partial class MainPage : ContentPage
                 await projects.SkipPanelRenderAsync(panelId, CancellationToken.None);
         }
         PipelineWorker.RunNow(global::Android.App.Application.Context);
+    }
+
+    // The pipeline cancelled this book on a panel Gemini blocked as prohibited/copyrighted content — no
+    // safety threshold can bypass that. Rather than restart, let the user revise that panel's art
+    // direction (prefilled with what was sent) and resume: the panel re-renders with the new prompt and
+    // the book carries on from where it stopped, keeping every panel already rendered. The card moving
+    // Cancelled → "Painting panels" is the confirmation (DESIGN.md §5 — no success toast).
+    private async Task ReworkBlockedPanel(NovelStatus status)
+    {
+        ProhibitedPanel? panel;
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            panel = await projects.GetProhibitedPanelAsync(status.Id, CancellationToken.None);
+        }
+        if (panel is null)
+        {
+            // Nothing left to rework (already resumed elsewhere, or state moved on) — just refresh.
+            await RefreshAsync();
+            return;
+        }
+
+        var newPrompt = await DisplayPromptAsync(
+            $"Rework panel {panel.PanelNumber}",
+            "Gemini blocked this panel as prohibited or copyrighted content. Revise the art direction to " +
+            "avoid it, then resume — the rest of the book is kept.",
+            accept: "Resume", cancel: "Cancel",
+            initialValue: panel.VisualPrompt, maxLength: 2000, keyboard: Keyboard.Text);
+        if (string.IsNullOrWhiteSpace(newPrompt))
+            return;
+
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            await projects.ReworkBlockedPanelAndResumeAsync(status.Id, newPrompt.Trim(), CancellationToken.None);
+        }
+        PipelineWorker.RunNow(global::Android.App.Application.Context);
+        await RefreshAsync();
     }
 
     // Turns a Gemini HARM_CATEGORY_* name into a short phrase for the review prompt.

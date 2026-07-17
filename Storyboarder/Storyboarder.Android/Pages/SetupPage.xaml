@@ -72,6 +72,8 @@
                     Clicked="OnPipelineLogClicked" Style="{StaticResource SecondaryButton}" />
             <Button x:Name="CrashLogButton" Text="Crash log"
                     Clicked="OnCrashLogClicked" Style="{StaticResource SecondaryButton}" />
+            <Button x:Name="BlockedPanelReportButton" Text="Blocked panel report"
+                    Clicked="OnBlockedPanelReportClicked" Style="{StaticResource SecondaryButton}" />
             <Button x:Name="ExportDiagnosticsButton" Text="Export diagnostics"
                     Clicked="OnExportDiagnosticsClicked" Style="{StaticResource SecondaryButton}" />
             <Label x:Name="DiagnosticsStatusLabel" Style="{StaticResource StatusLine}" />

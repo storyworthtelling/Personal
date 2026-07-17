@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.External;
+using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
 
@@ -42,12 +43,7 @@ public sealed class GeminiImageClient : IGeminiImageClient
         string visualPrompt, string artStyle, IReadOnlyList<byte[]> referenceImages,
         IReadOnlyCollection<string> relaxedCategories, CancellationToken cancellationToken)
     {
-        var prompt =
-            $"Comic panel in this style: {artStyle}. {visualPrompt}. " +
-            (referenceImages.Count > 0
-                ? "Keep the characters and settings visually consistent with the supplied reference images. "
-                : string.Empty) +
-            "Do not render any text, speech bubbles, or lettering in the image.";
+        var prompt = PanelImagePrompt.Build(artStyle, visualPrompt, referenceImages.Count > 0);
         return Generate(prompt, referenceImages, relaxedCategories, cancellationToken);
     }
 

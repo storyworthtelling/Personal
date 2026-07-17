@@ -729,10 +729,14 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             SetStage(novel, ProjectStage.Cancelled);
             novel.LastError =
                 $"Cancelled: panel {panel.PanelNumber} was blocked as prohibited or copyrighted content, " +
-                "which relaxing the safety settings cannot bypass. Revise the passage or art direction and " +
-                "start a new conversion.";
-            logger.LogWarning("Novel {NovelId} cancelled: prohibited image content on panel {PanelId}: {Error}",
-                novel.Id, panel.Id, blocked.Message);
+                "which relaxing the safety settings cannot bypass. Rework the panel's art direction and resume, " +
+                "or start a new conversion.";
+            // Capture the exact prompt that tripped the filter alongside the block, so the blocked-panel
+            // diagnostic (and the log) carry what's needed to rework the art direction — not just the refusal.
+            logger.LogWarning(
+                "Novel {NovelId} cancelled: prohibited image content on panel {PanelId} (#{PanelNumber}). " +
+                "Prompt sent to Gemini: {Prompt}. Provider reason: {Error}",
+                novel.Id, panel.Id, panel.PanelNumber, ReconstructPanelPrompt(novel, panel), blocked.Message);
             return null;
         }
 
@@ -744,8 +748,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             panel.Status = WorkStatus.AwaitingApproval;
             panel.BlockedCategoriesJson = JsonSerializer.Serialize(blocked.Categories, JsonResponse.CaseInsensitive);
             panel.LastError = blocked.Message;
-            logger.LogInformation("Panel {PanelId} safety-blocked ({Categories}); awaiting user approval (novel {NovelId})",
-                panel.Id, string.Join(", ", blocked.Categories), novel.Id);
+            logger.LogInformation(
+                "Panel {PanelId} (#{PanelNumber}) safety-blocked ({Categories}); awaiting user approval (novel {NovelId}). " +
+                "Prompt sent to Gemini: {Prompt}",
+                panel.Id, panel.PanelNumber, string.Join(", ", blocked.Categories), novel.Id,
+                ReconstructPanelPrompt(novel, panel));
             return null;
         }
 
@@ -777,6 +784,15 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         panel.LastError = "Rendered as a neutral placeholder: blocked even after relaxing safety and restaging to imply the content.";
         logger.LogWarning("Panel {PanelId} fell back to a placeholder after repeated content blocks (novel {NovelId})", panel.Id, novel.Id);
         return null;
+    }
+
+    // Rebuilds the exact text prompt a panel was rendered with, so a content block can be logged and
+    // reported with the art direction that tripped it. Uses the same builder the Gemini client does, and
+    // infers whether reference sheets were attached from the panel's stored reference names.
+    private static string ReconstructPanelPrompt(Novel novel, Panel panel)
+    {
+        var references = JsonSerializer.Deserialize<List<string>>(panel.ReferenceNamesJson ?? "[]") ?? [];
+        return PanelImagePrompt.Build(novel.ArtStyle, panel.VisualPrompt, references.Count > 0);
     }
 
     private void ScheduleRetry(IRetryable unit, Exception exception, Novel novel)
