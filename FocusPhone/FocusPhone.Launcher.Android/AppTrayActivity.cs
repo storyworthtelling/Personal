@@ -12,9 +12,10 @@ namespace FocusPhone.Launcher;
 /// <summary>
 /// The swipe-up tray of launchable apps, filtered for distraction-free use:
 /// our own apps (reached from the home tiles), blocked packages, browsers, and
-/// games are excluded. Long-press blocks an app immediately — undo-first per
-/// DESIGN.md §7: the block happens at once and a 6-second undo bar offers the
-/// reversal (the same unblock admin mode uses).
+/// games are excluded. Apps are shown as a grid of icons — no names, matching
+/// the textless home tiles. Long-press blocks an app immediately — undo-first
+/// per DESIGN.md §7: the block happens at once and a 6-second undo bar offers
+/// the reversal (the same unblock admin mode uses).
 /// </summary>
 [Activity(
     Label = "Apps",
@@ -22,8 +23,10 @@ namespace FocusPhone.Launcher;
     Theme = "@style/Theme.FocusPhone.Paper")]
 public class AppTrayActivity : Activity
 {
+    private const int GridColumns = 4;
+
     private List<ResolveInfo> apps = [];
-    private ListView? listView;
+    private GridView? gridView;
     private FrameLayout? undoHost;
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -33,7 +36,7 @@ public class AppTrayActivity : Activity
         SetContentView(BuildLayout());
         LoadApps();
 
-        listView!.ItemClick += (_, e) =>
+        gridView!.ItemClick += (_, e) =>
         {
             var info = apps[e.Position].ActivityInfo!;
             var intent = PackageManager!.GetLaunchIntentForPackage(info.PackageName!);
@@ -43,7 +46,7 @@ public class AppTrayActivity : Activity
             }
         };
 
-        listView.ItemLongClick += (_, e) =>
+        gridView.ItemLongClick += (_, e) =>
         {
             BlockWithUndo(apps[e.Position]);
             e.Handled = true;
@@ -59,9 +62,17 @@ public class AppTrayActivity : Activity
         column.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
         column.AddView(PaperUi.PageHeader(this, "Apps"));
 
-        listView = new ListView(this);
-        PaperUi.StylePaperList(this, listView);
-        column.AddView(listView, new LinearLayout.LayoutParams(
+        gridView = new GridView(this)
+        {
+            NumColumns = GridColumns,
+            VerticalSpacing = PaperTheme.Dp(this, DesignTokens.Space.X4),
+            HorizontalSpacing = PaperTheme.Dp(this, DesignTokens.Space.X4),
+            StretchMode = StretchMode.StretchColumnWidth,
+        };
+        gridView.SetBackgroundColor(Android.Graphics.Color.Transparent);
+        gridView.CacheColorHint = Android.Graphics.Color.Transparent;
+        gridView.SetSelector(new Android.Graphics.Drawables.ColorDrawable(Android.Graphics.Color.Transparent));
+        column.AddView(gridView, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         undoHost.AddView(column, new FrameLayout.LayoutParams(
@@ -83,8 +94,7 @@ public class AppTrayActivity : Activity
             .OrderBy(resolveInfo => resolveInfo.LoadLabel(PackageManager).ToString())
             .ToList();
 
-        listView!.Adapter = new PaperListAdapter(this,
-            apps.Select(resolveInfo => new PaperListRow(resolveInfo.LoadLabel(PackageManager).ToString()!)).ToList());
+        gridView!.Adapter = new AppIconAdapter(this, apps);
     }
 
     private bool IsAllowedInTray(ResolveInfo resolveInfo, HashSet<string> blocked, HashSet<string> browsers)

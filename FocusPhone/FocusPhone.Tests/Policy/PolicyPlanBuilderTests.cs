@@ -106,6 +106,22 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
+    public void Plan_DisablesStatusBar_ToBlockTheSwipeDownShade()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.True(plan.DisableStatusBar);
+    }
+
+    [Fact]
+    public void StatusBarDisable_SurvivesCutoverFinalization()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext(finalized: true));
+
+        Assert.True(plan.DisableStatusBar);
+    }
+
+    [Fact]
     public void Plan_GrantsHardRestrictedSmsAndCallLogToCommunicationApp()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext());
