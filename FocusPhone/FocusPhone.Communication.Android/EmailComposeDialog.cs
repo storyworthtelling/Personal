@@ -5,11 +5,16 @@ namespace FocusPhone.Communication;
 
 /// <summary>
 /// In-app email composer: subject + body sent directly via Gmail (no external
-/// mail app). Shared by the thread action row and the new-conversation flow.
+/// mail app), with an optional Cc line for full compose and reply threading via
+/// In-Reply-To. Shared by the thread action row, the reply action, and the
+/// new-conversation flow. (Attachment picking is a separate follow-up — it needs
+/// the host activity to route the file-picker result.)
 /// </summary>
 public static class EmailComposeDialog
 {
-    public static void Show(Activity activity, string toAddress, string displayName)
+    public static void Show(
+        Activity activity, string toAddress, string displayName,
+        string? prefillSubject = null, string? inReplyTo = null)
     {
         var account = new AccountStore(activity);
         if (!account.IsConfigured)
@@ -19,10 +24,12 @@ public static class EmailComposeDialog
         }
 
         var layout = new LinearLayout(activity) { Orientation = Orientation.Vertical };
-        var subject = new EditText(activity) { Hint = "Subject" };
+        var subject = new EditText(activity) { Hint = "Subject", Text = prefillSubject ?? "" };
+        var cc = new EditText(activity) { Hint = "Cc (optional)" };
         var body = new EditText(activity) { Hint = "Message" };
         body.SetMinLines(4);
         layout.AddView(subject);
+        layout.AddView(cc);
         layout.AddView(body);
 
         new AlertDialog.Builder(activity)
@@ -34,7 +41,8 @@ public static class EmailComposeDialog
                 {
                     var client = new Infrastructure.Email.GmailClient(
                         account.GmailAddress!, account.GmailAppPassword!);
-                    await client.SendAsync(toAddress, subject.Text ?? "", body.Text ?? "");
+                    await client.SendAsync(toAddress, subject.Text ?? "", body.Text ?? "",
+                        cc: ParseAddresses(cc.Text), inReplyTo: inReplyTo);
                     Toast.MakeText(activity, "Sent.", ToastLength.Short)!.Show();
                 }
                 catch (Exception e)
@@ -45,4 +53,9 @@ public static class EmailComposeDialog
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
     }
+
+    private static IReadOnlyList<string> ParseAddresses(string? raw) =>
+        string.IsNullOrWhiteSpace(raw)
+            ? []
+            : raw.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }

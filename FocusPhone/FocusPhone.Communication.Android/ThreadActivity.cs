@@ -205,6 +205,15 @@ public class ThreadActivity : Activity
             labels.Add("Text back");
             actions.Add(() => SendText(phone));
         }
+
+        var email = memberKeys.FirstOrDefault(IsEmail) ?? (IsEmail(contactKey) ? contactKey : null);
+        if (item.Kind == TimelineItemKind.Email && email is not null)
+        {
+            labels.Add("Reply");
+            actions.Add(() => EmailComposeDialog.Show(
+                this, email, titleView!.Text!.ToString()!, ReplySubject(item.Subject), item.MessageId));
+        }
+
         labels.Add("Delete");
         actions.Add(() => DeleteWithUndo(item));
 
@@ -304,6 +313,16 @@ public class ThreadActivity : Activity
     // Deep-link to Google Messages until the in-app bridge lands (documented fallback).
     private void SendText(string number) =>
         StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{number}")));
+
+    private static string ReplySubject(string? subject)
+    {
+        var trimmed = (subject ?? "").Trim();
+        if (trimmed.Length == 0)
+        {
+            return "Re:";
+        }
+        return trimmed.StartsWith("Re:", StringComparison.OrdinalIgnoreCase) ? trimmed : $"Re: {trimmed}";
+    }
 
     private static string ChannelWord(TimelineItem item) => item.Kind switch
     {
