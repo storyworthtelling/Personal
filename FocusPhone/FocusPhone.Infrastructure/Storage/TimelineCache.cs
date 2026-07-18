@@ -146,6 +146,15 @@ public class TimelineCache
         transaction.Commit();
     }
 
+    public void Delete(TimelineItemKind kind, string sourceId)
+    {
+        using var delete = connection.CreateCommand();
+        delete.CommandText = "DELETE FROM timelineItems WHERE kind = $kind AND sourceId = $sourceId";
+        delete.Parameters.AddWithValue("$kind", (int)kind);
+        delete.Parameters.AddWithValue("$sourceId", sourceId);
+        delete.ExecuteNonQuery();
+    }
+
     public IReadOnlyList<TimelineItem> LoadAll()
     {
         using var select = connection.CreateCommand();
