@@ -18,14 +18,16 @@ public static class ContactAssociations
         var byContact = new Dictionary<long, HashSet<string>>();
         try
         {
+            // "contact_id" (ContactsContract.Data.CONTACT_ID) is the stable column
+            // name shared by phone and email data rows.
             ReadInto(context, byContact,
                 ContactsContract.CommonDataKinds.Phone.ContentUri!,
-                ContactsContract.CommonDataKinds.Phone.InterfaceConsts.ContactId!,
+                "contact_id",
                 ContactsContract.CommonDataKinds.Phone.Number!,
                 ContactKeyNormalizer.NormalizePhone);
             ReadInto(context, byContact,
                 ContactsContract.CommonDataKinds.Email.ContentUri!,
-                ContactsContract.CommonDataKinds.Email.InterfaceConsts.ContactId!,
+                "contact_id",
                 ContactsContract.CommonDataKinds.Email.Address!,
                 ContactKeyNormalizer.NormalizeEmail);
         }

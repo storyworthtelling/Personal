@@ -283,8 +283,9 @@ public class ThreadActivity : Activity
         if (item.SourceId.All(char.IsAsciiDigit))
         {
             // A live call-log row: remove it at the source (needs WRITE_CALL_LOG).
+            // "_id" is the stable BaseColumns row-id name for the call-log provider.
             ContentResolver!.Delete(Android.Provider.CallLog.Calls.ContentUri!,
-                $"{Android.Provider.CallLog.Calls.Id} = ?", [item.SourceId]);
+                "_id = ?", [item.SourceId]);
         }
         using var database = TimelineDatabase.Open(this);
         database.Cache.Delete(item.Kind, item.SourceId);

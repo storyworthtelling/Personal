@@ -65,13 +65,14 @@ public class AppTrayActivity : Activity
         gridView = new GridView(this)
         {
             NumColumns = GridColumns,
-            VerticalSpacing = PaperTheme.Dp(this, DesignTokens.Space.X4),
-            HorizontalSpacing = PaperTheme.Dp(this, DesignTokens.Space.X4),
             StretchMode = StretchMode.StretchColumnWidth,
         };
+        gridView.SetVerticalSpacing(PaperTheme.Dp(this, DesignTokens.Space.X4));
+        gridView.SetHorizontalSpacing(PaperTheme.Dp(this, DesignTokens.Space.X4));
         gridView.SetBackgroundColor(Android.Graphics.Color.Transparent);
         gridView.CacheColorHint = Android.Graphics.Color.Transparent;
-        gridView.SetSelector(new Android.Graphics.Drawables.ColorDrawable(Android.Graphics.Color.Transparent));
+        // Transparent selector (keep the paper background flat under a tap).
+        gridView.SetSelector(Android.Resource.Color.Transparent);
         column.AddView(gridView, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
