@@ -57,19 +57,64 @@ public class GmailClient
         return items;
     }
 
+    /// <summary>
+    /// Sends an email. Quick reply passes just to/subject/body; full compose adds
+    /// cc, file attachments, and the In-Reply-To header so the reply threads with
+    /// the message it answers.
+    /// </summary>
     public async Task SendAsync(string to, string subject, string body,
-        CancellationToken cancellation = default)
+        IReadOnlyList<string>? cc = null, IReadOnlyList<string>? attachmentPaths = null,
+        string? inReplyTo = null, CancellationToken cancellation = default)
     {
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(accountAddress));
         message.To.Add(MailboxAddress.Parse(to));
+        foreach (var address in cc ?? [])
+        {
+            message.Cc.Add(MailboxAddress.Parse(address));
+        }
         message.Subject = subject;
-        message.Body = new TextPart("plain") { Text = body };
+        if (!string.IsNullOrEmpty(inReplyTo))
+        {
+            message.InReplyTo = inReplyTo;
+            message.References.Add(inReplyTo);
+        }
+
+        var builder = new BodyBuilder { TextBody = body };
+        foreach (var path in attachmentPaths ?? [])
+        {
+            await builder.Attachments.AddAsync(path, cancellation);
+        }
+        message.Body = builder.ToMessageBody();
 
         using var smtp = new SmtpClient();
         await smtp.ConnectAsync(SmtpHost, 465, useSsl: true, cancellation);
         await smtp.AuthenticateAsync(accountAddress, appPassword, cancellation);
         await smtp.SendAsync(message, cancellation);
         await smtp.DisconnectAsync(quit: true, cancellation);
+    }
+
+    /// <summary>
+    /// Deletes an email by moving every copy carrying the given RFC Message-Id
+    /// from the inbox to Gmail's Trash — the closest thing IMAP offers to a real
+    /// delete. Called only after the undo window elapses.
+    /// </summary>
+    public async Task DeleteAsync(string messageId, CancellationToken cancellation = default)
+    {
+        using var imap = new ImapClient();
+        await imap.ConnectAsync(ImapHost, 993, useSsl: true, cancellation);
+        await imap.AuthenticateAsync(accountAddress, appPassword, cancellation);
+
+        var inbox = imap.Inbox;
+        await inbox.OpenAsync(FolderAccess.ReadWrite, cancellation);
+        var matches = await inbox.SearchAsync(
+            SearchQuery.HeaderContains("Message-Id", messageId), cancellation);
+        if (matches.Count > 0)
+        {
+            var trash = await imap.GetFolderAsync("[Gmail]/Trash", cancellation);
+            await inbox.MoveToAsync(matches, trash, cancellation);
+        }
+
+        await imap.DisconnectAsync(quit: true, cancellation);
     }
 }
