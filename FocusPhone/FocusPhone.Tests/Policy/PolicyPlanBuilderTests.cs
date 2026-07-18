@@ -135,6 +135,19 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
+    public void Plan_GrantsWriteCallLogAndWriteContactsForDestructiveInboxWrites()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.WriteCallLogPermission),
+            plan.PermissionGrants);
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.WriteContactsPermission),
+            plan.PermissionGrants);
+    }
+
+    [Fact]
     public void Plan_GrantsAreScopedToTheCommunicationApp()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext());

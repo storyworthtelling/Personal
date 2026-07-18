@@ -15,6 +15,12 @@ using Android;
 [assembly: UsesPermission(Manifest.Permission.PostNotifications)]
 [assembly: UsesPermission(Manifest.Permission.Internet)]
 
+// The unified inbox's destructive writes: WRITE_CALL_LOG deletes a call/voicemail
+// from the log (hard-restricted, so whitelisted alongside READ_CALL_LOG at install
+// and in every silent update); WRITE_CONTACTS saves/links an unknown sender.
+[assembly: UsesPermission(Manifest.Permission.WriteCallLog)]
+[assembly: UsesPermission(Manifest.Permission.WriteContacts)]
+
 // Needed to resolve/deep-link the dialer, Google Messages, and email apps under
 // Android 11+ package-visibility filtering. Sideloaded, so QUERY_ALL_PACKAGES is fine.
 [assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]

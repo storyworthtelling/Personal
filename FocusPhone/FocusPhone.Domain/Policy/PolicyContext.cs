@@ -26,6 +26,13 @@ public record PolicyContext(
     public const string ReadSmsPermission = "android.permission.READ_SMS";
     public const string ReadCallLogPermission = "android.permission.READ_CALL_LOG";
 
+    // Write permissions the unified inbox needs to delete a call/voicemail from
+    // the call log and to save/link an unknown sender into Contacts. WRITE_CALL_LOG
+    // is hard-restricted (whitelisted like READ_CALL_LOG); WRITE_CONTACTS is a
+    // normal dangerous permission the device owner can grant outright.
+    public const string WriteCallLogPermission = "android.permission.WRITE_CALL_LOG";
+    public const string WriteContactsPermission = "android.permission.WRITE_CONTACTS";
+
     public static readonly IReadOnlySet<string> FocusPhonePackages = new HashSet<string>
     {
         LauncherPackage,

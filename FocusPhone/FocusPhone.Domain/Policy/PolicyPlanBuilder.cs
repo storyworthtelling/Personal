@@ -42,6 +42,10 @@ public static class PolicyPlanBuilder
         {
             new(PolicyContext.CommunicationPackage, PolicyContext.ReadSmsPermission),
             new(PolicyContext.CommunicationPackage, PolicyContext.ReadCallLogPermission),
+            // Deleting a call/voicemail from the log, and saving/linking a sender
+            // into Contacts, are the unified inbox's destructive-CRUD writes.
+            new(PolicyContext.CommunicationPackage, PolicyContext.WriteCallLogPermission),
+            new(PolicyContext.CommunicationPackage, PolicyContext.WriteContactsPermission),
         };
 
         // Disable the status bar so its swipe-down shade — notifications, quick

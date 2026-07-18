@@ -81,7 +81,11 @@ public static class UpdateService
         var installer = context.PackageManager!.PackageInstaller;
         var sessionParams = new PackageInstaller.SessionParams(PackageInstallMode.FullInstall);
         sessionParams.SetWhitelistedRestrictedPermissions(
-            [Android.Manifest.Permission.ReadCallLog, Android.Manifest.Permission.ReadSms]);
+            [
+                Android.Manifest.Permission.ReadCallLog,
+                Android.Manifest.Permission.ReadSms,
+                Android.Manifest.Permission.WriteCallLog,
+            ]);
 
         var sessionId = installer.CreateSession(sessionParams);
         using var session = installer.OpenSession(sessionId);
