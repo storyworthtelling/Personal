@@ -1,3 +1,5 @@
+using FocusPhone.Domain.Policy;
+
 namespace FocusPhone.Domain.Apps;
 
 public record CategorizerData(
@@ -31,6 +33,13 @@ public class AppCategorizer
         if (blockedPackages.Contains(app.PackageName))
         {
             return AppVerdict.Blocked;
+        }
+        // First-party apps are known-good by namespace: cleared before the
+        // web/game/rating checks so a sideloaded reinstall (always Unknown-rated)
+        // can never re-quarantine them. An explicit block above still wins.
+        if (app.PackageName.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal))
+        {
+            return AppVerdict.Allowed;
         }
         if (allowedPackages.Contains(app.PackageName))
         {
