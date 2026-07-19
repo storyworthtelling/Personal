@@ -264,10 +264,12 @@ public class ProjectServiceTests : IDisposable
         Assert.Equal(ProjectStage.Cancelled, context.Novels.Single(n => n.Id == id).Stage);
     }
 
-    // A Cancelled novel stopped on a prohibited/IP block: its offending panel is left Pending with the
-    // provider's block message (exactly as the render loop leaves it), plus a reference and art style so
-    // the reconstructed prompt in the report is deterministic.
-    private (Guid NovelId, Guid PanelId) SeedCancelledNovelWithProhibitedPanel(int panelNumber = 4)
+    // A Cancelled novel stopped on a prohibited/IP block: its offending panel carries the provider's
+    // block message (exactly as the render loop leaves it), plus a reference and art style so the
+    // reconstructed prompt in the report is deterministic. The panel status defaults to Pending, but the
+    // render loop can also cancel on a panel that was mid-retry — pass NeedsRetry to seed that case.
+    private (Guid NovelId, Guid PanelId) SeedCancelledNovelWithProhibitedPanel(
+        int panelNumber = 4, WorkStatus panelStatus = WorkStatus.Pending)
     {
         using var context = database.NewContext();
         var novel = new Novel
@@ -284,7 +286,9 @@ public class ProjectServiceTests : IDisposable
         {
             PageId = page.Id, PanelNumber = panelNumber,
             VisualPrompt = "a recognizable trademarked hero", ReferenceNamesJson = "[\"Hero\"]",
-            Status = WorkStatus.Pending,
+            Status = panelStatus,
+            Attempts = panelStatus == WorkStatus.NeedsRetry ? 2 : 0,
+            NextAttemptAtUtc = panelStatus == WorkStatus.NeedsRetry ? clock.UtcNow.AddMinutes(1) : null,
             LastError = "Gemini refused the image as IMAGE_SAFETY (PROHIBITED_CONTENT)"
         };
         page.Panels.Add(panel);
@@ -379,6 +383,67 @@ public class ProjectServiceTests : IDisposable
         Assert.Equal(4, panel.PanelNumber);
         Assert.Equal("a recognizable trademarked hero", panel.VisualPrompt);
         Assert.Contains("PROHIBITED_CONTENT", panel.Reason);
+    }
+
+    // The render loop cancels on the first block it hits — including on a panel that was mid-retry, which
+    // leaves the offending panel in NeedsRetry rather than Pending. The rework lookup must still find it,
+    // or the Rework button silently does nothing (no prompt to edit, no fix).
+    [Fact]
+    public async Task GetProhibitedPanelAsync_FindsOffendingPanel_LeftRetrying()
+    {
+        var (novelId, panelId) = SeedCancelledNovelWithProhibitedPanel(panelStatus: WorkStatus.NeedsRetry);
+
+        var panel = await NewService().GetProhibitedPanelAsync(novelId, CancellationToken.None);
+
+        Assert.NotNull(panel);
+        Assert.Equal(panelId, panel!.PanelId);
+        Assert.Equal("a recognizable trademarked hero", panel.VisualPrompt);
+    }
+
+    // A lower-numbered panel parked on a transient failure (NeedsRetry) must not be mistaken for the
+    // prohibited panel the loop settled into Pending as it cancelled — reworking the wrong panel would
+    // leave the real block in place and re-cancel the book.
+    [Fact]
+    public async Task GetProhibitedPanelAsync_PrefersTheSettledPanel_OverALowerRetryingStraggler()
+    {
+        var (novelId, prohibitedPanelId) = SeedCancelledNovelWithProhibitedPanel(panelNumber: 7);
+        using (var context = database.NewContext())
+        {
+            var pageId = context.Panels.Single(p => p.Id == prohibitedPanelId).PageId;
+            context.Panels.Add(new Panel
+            {
+                PageId = pageId, PanelNumber = 3, VisualPrompt = "a transient straggler",
+                ReferenceNamesJson = "[]", Status = WorkStatus.NeedsRetry, Attempts = 1,
+                NextAttemptAtUtc = clock.UtcNow.AddMinutes(1), LastError = "429"
+            });
+            context.SaveChanges();
+        }
+
+        var panel = await NewService().GetProhibitedPanelAsync(novelId, CancellationToken.None);
+
+        Assert.NotNull(panel);
+        Assert.Equal(prohibitedPanelId, panel!.PanelId);
+        Assert.Equal(7, panel.PanelNumber);
+    }
+
+    [Fact]
+    public async Task ReworkBlockedPanelAndResumeAsync_RevivesNovel_WhenOffendingPanelWasRetrying()
+    {
+        var (novelId, panelId) = SeedCancelledNovelWithProhibitedPanel(panelStatus: WorkStatus.NeedsRetry);
+
+        var reworked = await NewService().ReworkBlockedPanelAndResumeAsync(
+            novelId, "a generic armored knight, an original design", CancellationToken.None);
+
+        Assert.Equal(4, reworked);
+        using var context = database.NewContext();
+        Assert.Equal(ProjectStage.RenderingImages, context.Novels.Single(n => n.Id == novelId).Stage);
+
+        var panel = context.Panels.Single(p => p.Id == panelId);
+        Assert.Equal("a generic armored knight, an original design", panel.VisualPrompt);
+        Assert.Equal(WorkStatus.Pending, panel.Status);
+        Assert.Null(panel.LastError);
+        Assert.Equal(0, panel.Attempts);
+        Assert.Null(panel.NextAttemptAtUtc);
     }
 
     private void SeedTroubledNovel()
