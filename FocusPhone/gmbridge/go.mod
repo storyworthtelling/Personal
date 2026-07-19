@@ -1,6 +1,6 @@
 module github.com/storyworthtelling/focusphone/gmbridge
 
-go 1.23
+go 1.25
 
 // libgm lives inside the mautrix-gmessages module (it is not a module of its
 // own), so require the parent module; `go mod tidy` fills in the transitive
