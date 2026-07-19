@@ -28,7 +28,7 @@ import (
 
 // EventHandler receives every bridge event as a JSON document:
 //
-//	{"type":"message","conversationId":"...","sender":"...","text":"...","timestampMs":123}
+//	{"type":"message","messageId":"...","conversationId":"...","sender":"...","text":"...","timestampMs":123}
 //	{"type":"paired"} {"type":"authError","error":"..."} {"type":"log","message":"..."}
 type EventHandler interface {
 	OnEvent(eventJson string)
@@ -132,6 +132,42 @@ func (b *Bridge) SendText(conversationID string, text string) error {
 	return nil
 }
 
+// SendMedia sends an image (or other file) to a conversation: it uploads the
+// bytes, then sends a message carrying the uploaded media.
+func (b *Bridge) SendMedia(conversationID string, data []byte, fileName string, mime string) error {
+	media, err := b.client.UploadMedia(data, fileName, mime)
+	if err != nil {
+		return fmt.Errorf("uploading media: %w", err)
+	}
+	_, err = b.client.SendMessage(&gmproto.SendMessageRequest{
+		ConversationID: conversationID,
+		MessagePayload: &gmproto.MessagePayload{
+			TmpID: uuid.NewString(),
+			MessageInfo: []*gmproto.MessageInfo{{
+				Data: &gmproto.MessageInfo_MediaContent{MediaContent: media},
+			}},
+		},
+		TmpID: uuid.NewString(),
+	})
+	if err != nil {
+		return fmt.Errorf("sending media to conversation %s: %w", conversationID, err)
+	}
+	return nil
+}
+
+// DeleteMessage deletes a message for everyone (the bridge remote-delete path
+// the C# side tries before falling back to a local hide).
+func (b *Bridge) DeleteMessage(messageID string) error {
+	resp, err := b.client.DeleteMessage(messageID)
+	if err != nil {
+		return fmt.Errorf("deleting message %s: %w", messageID, err)
+	}
+	if !resp.GetSuccess() {
+		return fmt.Errorf("deleting message %s: server reported failure", messageID)
+	}
+	return nil
+}
+
 // ListConversations returns the most recent conversations as a JSON array of
 // {"id":"...","title":"...","lastMessage":"...","timestampMs":123}.
 func (b *Bridge) ListConversations(count int) (string, error) {
@@ -178,6 +214,7 @@ func (b *Bridge) handleEvent(evt any) {
 	case *libgm.WrappedMessage:
 		b.emit(map[string]any{
 			"type":           "message",
+			"messageId":      e.GetMessageID(),
 			"conversationId": e.GetConversationID(),
 			"sender":         e.GetParticipantID(),
 			"text":           messageText(e),

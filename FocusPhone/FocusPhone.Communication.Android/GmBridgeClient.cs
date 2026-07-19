@@ -85,6 +85,44 @@ public sealed class GmBridgeClient
         }
     }
 
+    /// <summary>Sends an image/file to a conversation. Returns false if the bridge isn't ready.</summary>
+    public bool TrySendMedia(string conversationId, byte[] data, string fileName, string mime)
+    {
+        if (!connected || bridge is null)
+        {
+            return false;
+        }
+        try
+        {
+            bridge.SendMedia(conversationId, data, fileName, mime);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("FocusPhoneComm", $"Bridge media send failed: {e}");
+            return false;
+        }
+    }
+
+    /// <summary>Remote-deletes a message for everyone. Returns false if unsupported/unavailable.</summary>
+    public bool TryDelete(string messageId)
+    {
+        if (!connected || bridge is null)
+        {
+            return false;
+        }
+        try
+        {
+            bridge.DeleteMessage(messageId);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("FocusPhoneComm", $"Bridge delete failed: {e}");
+            return false;
+        }
+    }
+
     private void OnEvent(string json)
     {
         try
@@ -109,6 +147,7 @@ public sealed class GmBridgeClient
 
     private void CaptureIncoming(JsonElement element)
     {
+        var messageId = element.TryGetProperty("messageId", out var m) ? m.GetString() : null;
         var conversationId = element.TryGetProperty("conversationId", out var c) ? c.GetString() : null;
         var sender = element.TryGetProperty("sender", out var s) ? s.GetString() : null;
         var text = element.TryGetProperty("text", out var t) ? t.GetString() : null;
@@ -118,13 +157,16 @@ public sealed class GmBridgeClient
             return;
         }
 
+        // Key on the message id (a pure "gm:{id}") when present so it dedups and so
+        // the delete path can recover the id to remote-delete; fall back otherwise.
+        var sourceId = string.IsNullOrEmpty(messageId) ? $"gm:{conversationId}:{timestampMs}" : $"gm:{messageId}";
         var item = new TimelineItem(
             TimelineItemKind.Message,
             ContactKeyNormalizer.NormalizeAny(sender),
             DateTimeOffset.FromUnixTimeMilliseconds(timestampMs),
             text,
             Incoming: true,
-            SourceId: $"gm:{conversationId}:{timestampMs}")
+            SourceId: sourceId)
         {
             ExternalConversationId = conversationId,
             Unread = true,
@@ -185,5 +227,9 @@ public sealed class GmBridgeClient
     public string StartPairing(string cookiesJson) => "";
 
     public bool TrySend(string conversationId, string text) => false;
+
+    public bool TrySendMedia(string conversationId, byte[] data, string fileName, string mime) => false;
+
+    public bool TryDelete(string messageId) => false;
 #endif
 }

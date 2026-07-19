@@ -39,6 +39,9 @@ public class ThreadActivity : Activity
     private IReadOnlyList<string> memberKeys = [];
     private bool isGroup;
     private string? bridgeConversationId;
+    private const int PickBridgePhoto = 71;
+    private string? pendingPhotoConversationId;
+    private string? pendingPhotoNumber;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -266,9 +269,7 @@ public class ThreadActivity : Activity
                         DeleteCallOrVoicemail(item);
                         break;
                     default:
-                        // Text: the SMS provider only lets the default SMS app delete, and
-                        // bridge remote-delete isn't wired yet — hide it locally for now.
-                        HideLocally(item);
+                        DeleteText(item);
                         break;
                 }
             }
@@ -289,6 +290,23 @@ public class ThreadActivity : Activity
         }
         using var database = TimelineDatabase.Open(this);
         database.Cache.Delete(item.Kind, item.SourceId);
+    }
+
+    // The owner chose: try the bridge's remote-delete, else hide locally (the SMS
+    // provider only lets the default SMS app delete).
+    private void DeleteText(TimelineItem item)
+    {
+        if (item.SourceId.StartsWith("gm:", StringComparison.Ordinal))
+        {
+            var messageId = item.SourceId["gm:".Length..];
+            if (!messageId.Contains(':') && GmBridgeClient.Shared(this).TryDelete(messageId))
+            {
+                using var database = TimelineDatabase.Open(this);
+                database.Cache.Delete(item.Kind, item.SourceId);
+                return;
+            }
+        }
+        HideLocally(item);
     }
 
     private void DeleteCallOrVoicemail(TimelineItem item)
@@ -350,8 +368,78 @@ public class ThreadActivity : Activity
                     StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{number}")));
                 }
             })!
+            .SetNeutralButton("Photo", (_, _) => PickPhotoForBridge(conversationId, number))!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
+    }
+
+    // Picture text: pick an image and send it through the bridge; the result
+    // arrives in OnActivityResult (the dialog is already gone by then).
+    private void PickPhotoForBridge(string conversationId, string number)
+    {
+        pendingPhotoConversationId = conversationId;
+        pendingPhotoNumber = number;
+        var intent = new Intent(Intent.ActionGetContent);
+        intent.SetType("image/*");
+        intent.AddCategory(Intent.CategoryOpenable);
+        StartActivityForResult(Intent.CreateChooser(intent, "Photo"), PickBridgePhoto);
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode != PickBridgePhoto || resultCode != Result.Ok || data?.Data is null
+            || pendingPhotoConversationId is null)
+        {
+            return;
+        }
+
+        var conversationId = pendingPhotoConversationId;
+        var number = pendingPhotoNumber ?? "";
+        var mime = ContentResolver!.GetType(data.Data) ?? "image/jpeg";
+        var bytes = ReadBytes(data.Data);
+        pendingPhotoConversationId = null;
+        pendingPhotoNumber = null;
+        if (bytes is null)
+        {
+            return;
+        }
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            if (GmBridgeClient.Shared(this).TrySendMedia(conversationId, bytes, "photo", mime))
+            {
+                RunOnUiThread(() =>
+                {
+                    EchoOutgoing(conversationId, number, "📷 Photo");
+                    LoadItems();
+                });
+            }
+            else
+            {
+                RunOnUiThread(() => Toast.MakeText(this, "Couldn't send photo.", ToastLength.Short)!.Show());
+            }
+        });
+    }
+
+    private byte[]? ReadBytes(Android.Net.Uri uri)
+    {
+        try
+        {
+            using var input = ContentResolver!.OpenInputStream(uri);
+            if (input is null)
+            {
+                return null;
+            }
+            using var memory = new System.IO.MemoryStream();
+            input.CopyTo(memory);
+            return memory.ToArray();
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("FocusPhoneComm", $"Reading photo failed: {e}");
+            return null;
+        }
     }
 
     // The bridge only reports incoming messages, so record the sent one locally
