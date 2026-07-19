@@ -118,6 +118,24 @@ public static class Glyphs
         canvas.DrawRoundRect(rightBottom, radius, radius, ink);
     }
 
+    /// <summary>Tally: four ink tally strokes struck through by the terracotta fifth mark.</summary>
+    public static void Tally(SKCanvas canvas, float s)
+    {
+        using var ink = InkStroke(s);
+        using var accent = AccentStroke(s);
+        var c = s / 2;
+        var half = s * 0.16f;
+        var spacing = s * 0.10f;
+        var startX = c - 1.5f * spacing;
+        for (var i = 0; i < 4; i++)
+        {
+            var x = startX + i * spacing;
+            canvas.DrawLine(x, c - half, x, c + half, ink);
+        }
+        // The fifth mark: a terracotta diagonal striking through the group.
+        canvas.DrawLine(startX - spacing * 0.4f, c + half, startX + 3 * spacing + spacing * 0.4f, c - half, accent);
+    }
+
     /// <summary>DailyLoader: folded sheet, terracotta dog-ear.</summary>
     public static void FoldedPaper(SKCanvas canvas, float s)
     {

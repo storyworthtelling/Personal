@@ -24,12 +24,13 @@ public class AdaptiveIconRendererTests : IDisposable
     }
 
     [Fact]
-    public void SpecsCoverAllSixApps()
+    public void SpecsCoverAllApps()
     {
-        Assert.Equal(6, IconSpecs.All.Count);
+        Assert.Equal(7, IconSpecs.All.Count);
         Assert.Equal(4, IconSpecs.All.Count(s => s.App.StartsWith("FocusPhone.")));
         Assert.Contains(IconSpecs.All, s => s.App == "Storyboarder" && s.Name == "appicon");
         Assert.Contains(IconSpecs.All, s => s.App == "DailyLoader" && s.Name == "ic_launcher");
+        Assert.Contains(IconSpecs.All, s => s.App == "Tally" && s.Name == "appicon");
     }
 
     [Fact]
