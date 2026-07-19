@@ -13,6 +13,7 @@ public class AccountStore
     private const string PreferencesName = "account";
     private const string AddressKey = "gmailAddress";
     private const string AppPasswordKey = "gmailAppPassword";
+    private const string GmBridgeSessionKey = "gmBridgeSession";
 
     private readonly ISharedPreferences preferences;
 
@@ -31,6 +32,13 @@ public class AccountStore
     {
         get => preferences.GetString(AppPasswordKey, null);
         set => preferences.Edit()!.PutString(AppPasswordKey, value)!.Apply();
+    }
+
+    /// <summary>The gmbridge (Messages-for-Web) session blob; present once paired.</summary>
+    public string? GmBridgeSession
+    {
+        get => preferences.GetString(GmBridgeSessionKey, null);
+        set => preferences.Edit()!.PutString(GmBridgeSessionKey, value)!.Apply();
     }
 
     public bool IsConfigured =>

@@ -28,6 +28,8 @@ public class ThreadsActivity : Activity
 {
     private ListView? threadList;
     private TextView? emptyView;
+    private EditText? filterField;
+    private IReadOnlyList<ContactThread> allThreads = [];
     private IReadOnlyList<ContactThread> threads = [];
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -86,6 +88,15 @@ public class ThreadsActivity : Activity
 
         root.AddView(header, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        // Lightweight find-a-person filter (names only, no full-text search).
+        filterField = PaperUi.Field(this, "Find a person");
+        filterField.TextChanged += (_, _) => BindThreads(filterField.Text ?? "");
+        var filterParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+        var edge = PaperTheme.Dp(this, DesignTokens.Space.X4);
+        filterParams.SetMargins(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X2));
+        root.AddView(filterField, filterParams);
 
         var frame = new FrameLayout(this);
         threadList = new ListView(this);
@@ -154,117 +165,167 @@ public class ThreadsActivity : Activity
         {
             // READ_SMS not granted yet; show what we have.
         }
+
+        IReadOnlyList<ContactThread> merged;
         try
         {
             using var database = TimelineDatabase.Open(this);
             items.AddRange(database.Cache.LoadAll());
+
+            // Drop items the owner deleted (text-delete fallback), merge by resolved
+            // person identity, then stamp unread from the per-thread read record.
+            var visible = database.Hidden.Filter(items);
+            var resolver = ContactAssociations.BuildResolver(this, database.IdentityLinks);
+            var readState = new ReadState(database.ReadState.LoadAll());
+            merged = new TimelineMerger().Merge(visible, resolver)
+                .Select(readState.Apply)
+                .ToList();
         }
         catch (Exception e)
         {
-            // The timeline cache is a convenience over the live call log; never
-            // let a database problem crash the screen on open.
-            Android.Util.Log.Warn("FocusPhoneComm", $"Timeline cache unavailable: {e}");
+            // The timeline cache is a convenience over the live call log; never let
+            // a database problem crash the screen — fall back to a plain merge.
+            Android.Util.Log.Warn("FocusPhoneComm", $"Timeline stores unavailable: {e}");
+            merged = new TimelineMerger().Merge(items);
         }
 
-        threads = new TimelineMerger().Merge(items);
-        threadList!.Adapter = new PaperListAdapter(this, threads
-            .Select(thread =>
-            {
-                var latest = thread.Items[^1];
-                return new PaperListRow(
-                    ContactNameResolver.DisplayName(this, thread.ContactKey),
-                    $"{RelativeTime.Format(latest.TimestampUtc.LocalDateTime, DateTime.Now)} · {latest.Snippet}");
-            })
-            .ToList());
+        allThreads = InboxOrdering.UnreadFirstThenRecent(merged);
+        BindThreads(filterField?.Text ?? "");
 
         emptyView!.Text = new AccountStore(this).IsConfigured
             ? "No conversations yet.\n\nCall and text history appears once permissions are granted."
             : "No conversations yet.\n\nTap Settings to connect your Gmail account.";
     }
 
+    private void BindThreads(string query)
+    {
+        var trimmed = query.Trim();
+        threads = trimmed.Length == 0
+            ? allThreads
+            : allThreads.Where(thread =>
+                ThreadTitle(thread).Contains(trimmed, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        threadList!.Adapter = new PaperListAdapter(this, threads
+            .Select(thread =>
+            {
+                var latest = thread.Items[^1];
+                // A subtle leading dot marks unread (DESIGN.md: a mark, not a badge).
+                var name = (thread.HasUnread ? "• " : "") + ThreadTitle(thread);
+                return new PaperListRow(
+                    name,
+                    $"{RelativeTime.Format(latest.TimestampUtc.LocalDateTime, DateTime.Now)} · {TimelineItemFormatter.Describe(latest)}");
+            })
+            .ToList());
+    }
+
+    private string ThreadTitle(ContactThread thread)
+    {
+        if (thread.IsGroup)
+        {
+            var names = thread.Participants.Take(3)
+                .Select(key => ContactNameResolver.DisplayName(this, key));
+            var joined = string.Join(", ", names);
+            if (joined.Length == 0)
+            {
+                return "Group";
+            }
+            return thread.Participants.Count > 3 ? $"{joined} +{thread.Participants.Count - 3}" : joined;
+        }
+        return ContactNameResolver.DisplayName(this, thread.ContactKey);
+    }
+
     private enum NewConversationKind { Call, Text, Email }
 
+    // Person-first (DESIGN: pick who, then how to reach them). Contacts are
+    // offered as people; the last option types an unknown number/address.
     private void ShowNewConversationDialog()
     {
-        string[] options = ["Call", "Text", "Email"];
+        IReadOnlyList<ContactPicker.Person> people;
+        try
+        {
+            people = ContactPicker.People(this);
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            people = []; // READ_CONTACTS not granted yet; manual entry still works.
+        }
+
+        var labels = people.Select(person => person.Name).ToList();
+        labels.Add("Type a number or address…");
+
         new AlertDialog.Builder(this)
             .SetTitle("New")!
-            .SetItems(options, (_, e) => ShowRecipientPicker((NewConversationKind)e.Which))!
+            .SetItems(labels.ToArray(), (_, e) =>
+            {
+                if (e.Which < people.Count)
+                {
+                    ShowChannelChooser(people[e.Which]);
+                }
+                else
+                {
+                    ShowManualEntry();
+                }
+            })!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
     }
 
-    private void ShowRecipientPicker(NewConversationKind kind)
+    private void ShowChannelChooser(ContactPicker.Person person)
     {
-        var entries = LoadPickerEntries(kind);
-        var isEmail = kind == NewConversationKind.Email;
-
-        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        layout.SetPadding(32, 16, 32, 0);
-        var manual = PaperUi.MonoField(this, isEmail ? "Email address" : "Phone number");
-        manual.InputType = isEmail
-            ? Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationEmailAddress
-            : Android.Text.InputTypes.ClassPhone;
-        manual.Typeface = PaperTheme.Mono(this); // setting InputType resets the typeface
-        layout.AddView(manual);
-
-        var contactList = new ListView(this)
+        var options = new List<(string Label, NewConversationKind Kind, string Address)>();
+        if (person.Phones.Count > 0)
         {
-            Adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleListItem1,
-                entries.Select(entry => $"{entry.Name} — {entry.Address}").ToList()),
-        };
-        layout.AddView(contactList, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            options.Add(("Call", NewConversationKind.Call, person.Phones[0]));
+            options.Add(("Text", NewConversationKind.Text, person.Phones[0]));
+        }
+        if (person.Emails.Count > 0)
+        {
+            options.Add(("Email", NewConversationKind.Email, person.Emails[0]));
+        }
+        if (options.Count == 0)
+        {
+            return;
+        }
 
+        new AlertDialog.Builder(this)
+            .SetTitle(person.Name)!
+            .SetItems(options.Select(option => option.Label).ToArray(),
+                (_, e) => Dispatch(options[e.Which].Kind, options[e.Which].Address))!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    private void ShowManualEntry()
+    {
+        var input = PaperUi.MonoField(this, "Number or email");
         var dialog = new AlertDialog.Builder(this)
-            .SetTitle($"New {kind.ToString().ToLowerInvariant()}")!
-            .SetView(layout)!
+            .SetTitle("New")!
+            .SetView(input)!
             .SetPositiveButton("Go", (IDialogInterfaceOnClickListener?)null)!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Create()!;
 
-        contactList.ItemClick += (_, e) =>
-        {
-            dialog.Dismiss();
-            Dispatch(kind, entries[e.Position].Address);
-        };
-
         dialog.Show();
-        // Wired after Show so invalid manual input keeps the dialog open.
+        // Wired after Show so invalid input keeps the dialog open.
         dialog.GetButton((int)DialogButtonType.Positive)!.Click += (_, _) =>
         {
-            if (TryValidateManualEntry(kind, manual.Text ?? "", out var address))
+            var raw = input.Text ?? "";
+            if (raw.Contains('@') && RecipientInput.TryCreateEmail(raw, out var email))
             {
                 dialog.Dismiss();
-                Dispatch(kind, address);
+                Dispatch(NewConversationKind.Email, email);
+            }
+            else if (RecipientInput.TryCreatePhone(raw, out var phone))
+            {
+                dialog.Dismiss();
+                ShowChannelChooser(new ContactPicker.Person(phone, [phone], []));
             }
             else
             {
-                Toast.MakeText(this,
-                    isEmail ? "Enter a valid email address." : "Enter a phone number.",
-                    ToastLength.Short)!.Show();
+                Toast.MakeText(this, "Enter a phone number or email.", ToastLength.Short)!.Show();
             }
         };
     }
-
-    private IReadOnlyList<ContactPicker.Entry> LoadPickerEntries(NewConversationKind kind)
-    {
-        try
-        {
-            return kind == NewConversationKind.Email
-                ? ContactPicker.EmailContacts(this)
-                : ContactPicker.PhoneContacts(this);
-        }
-        catch (Java.Lang.SecurityException)
-        {
-            return []; // READ_CONTACTS not granted yet; manual entry still works.
-        }
-    }
-
-    private static bool TryValidateManualEntry(NewConversationKind kind, string raw, out string address) =>
-        kind == NewConversationKind.Email
-            ? RecipientInput.TryCreateEmail(raw, out address)
-            : RecipientInput.TryCreatePhone(raw, out address);
 
     private void Dispatch(NewConversationKind kind, string address)
     {

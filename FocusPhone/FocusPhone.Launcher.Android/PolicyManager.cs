@@ -59,6 +59,15 @@ public static class PolicyManager
             dpm.SetAutoTimeZoneEnabled(admin, true);
         }
 
+        // Blocks the swipe-down notification shade and quick settings (and the
+        // Settings shortcut inside them). Only the device owner may do this, so
+        // it is a no-op until provisioning; the launcher re-applies it every
+        // OnCreate so it re-asserts after any transient re-enable.
+        if (!dpm.SetStatusBarDisabled(admin, plan.DisableStatusBar))
+        {
+            Log.Warn(Tag, "Could not disable the status bar; not permitted in the current state.");
+        }
+
         try
         {
             dpm.SetGlobalPrivateDnsModeSpecifiedHost(admin, plan.PrivateDnsHost);

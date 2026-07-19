@@ -56,6 +56,54 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
+      # In-app texting: build the gomobile shim over libgm (gmbridge/bridge.go)
+      # into gmbridge.aar, which FocusPhone.GmBridge.Binding turns into a C#
+      # binding the Communication head calls. Needs Go + the runner's Android NDK.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Build gmbridge.aar (gomobile)
+        working-directory: FocusPhone/gmbridge
+        run: |
+          set -e
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
+          echo "Using Android NDK at $ANDROID_NDK_HOME"
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          gomobile init || true
+          ./build.sh
+
+      # Prove the .aar binds to C# (isolated from the four heads while the bridge
+      # integration lands) — grep the log for "=== GMBRIDGE BINDING ===".
+      - name: GmBridge binding check
+        working-directory: FocusPhone
+        run: |
+          echo "=== GMBRIDGE BINDING ==="
+          dotnet build FocusPhone.GmBridge.Binding -c Release
+          echo "=== END GMBRIDGE BINDING ==="
+
+      # Print the generated binding's public API so GmBridgeClient can be written
+      # against the real C# names — grep the log for "=== GMBRIDGE API ===".
+      - name: Dump GmBridge binding API
+        continue-on-error: true
+        working-directory: FocusPhone
+        run: |
+          echo "=== GMBRIDGE API ==="
+          echo "--- Java classes in gmbridge.aar ---"
+          if [ -f gmbridge/gmbridge.aar ]; then
+            mkdir -p /tmp/aar && unzip -o gmbridge/gmbridge.aar classes.jar -d /tmp/aar >/dev/null 2>&1 || true
+            [ -f /tmp/aar/classes.jar ] && unzip -l /tmp/aar/classes.jar | grep -iE 'gmbridge.*\.class' || echo "(no classes.jar)"
+          fi
+          echo "--- Generated C# binding ---"
+          find FocusPhone.GmBridge.Binding/obj -path '*generated*' -name '*.cs' 2>/dev/null | while read -r f; do
+            echo "----- $f"
+            grep -nE 'namespace |public (sealed |partial |abstract )*(class|interface)|public .*\(.*\)' "$f" | head -80
+          done
+          echo "=== END GMBRIDGE API ==="
+
       # All four heads sign with the one shared repo keystore so they carry a single
       # signature — required for the device-owner silent-update channel to accept
       # updates across the suite.

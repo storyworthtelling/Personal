@@ -22,5 +22,17 @@ public class CommunicationApplication : Application
         // the Release trimmer, which would make the first SqliteConnection.Open()
         // throw and crash the app the moment it launches.
         SQLitePCL.Batteries_V2.Init();
+
+        // Bring the Messages-for-Web bridge online if a Google account is already
+        // paired, so incoming texts stream into the cache. No-op (stub) when the
+        // gmbridge binding isn't built in.
+        try
+        {
+            GmBridgeClient.Shared(this).ConnectIfPaired();
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("FocusPhoneComm", $"Bridge startup failed: {e}");
+        }
     }
 }

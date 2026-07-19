@@ -1,48 +1,31 @@
 using Android.App;
-using Android.Widget;
+using Android.Content;
 
 namespace FocusPhone.Communication;
 
 /// <summary>
-/// In-app email composer: subject + body sent directly via Gmail (no external
-/// mail app). Shared by the thread action row and the new-conversation flow.
+/// Launches the in-app email composer (EmailComposeActivity). Kept as a small
+/// helper so the thread action row, the reply action, and the new-conversation
+/// flow all open compose the same way. Optional reply prefill (subject +
+/// In-Reply-To) threads the reply.
 /// </summary>
 public static class EmailComposeDialog
 {
-    public static void Show(Activity activity, string toAddress, string displayName)
+    public static void Show(
+        Activity activity, string toAddress, string displayName,
+        string? prefillSubject = null, string? inReplyTo = null)
     {
-        var account = new AccountStore(activity);
-        if (!account.IsConfigured)
+        var intent = new Intent(activity, typeof(EmailComposeActivity));
+        intent.PutExtra(EmailComposeActivity.ExtraTo, toAddress);
+        intent.PutExtra(EmailComposeActivity.ExtraName, displayName);
+        if (prefillSubject is not null)
         {
-            Toast.MakeText(activity, "Set up Gmail in Settings first.", ToastLength.Long)!.Show();
-            return;
+            intent.PutExtra(EmailComposeActivity.ExtraSubject, prefillSubject);
         }
-
-        var layout = new LinearLayout(activity) { Orientation = Orientation.Vertical };
-        var subject = new EditText(activity) { Hint = "Subject" };
-        var body = new EditText(activity) { Hint = "Message" };
-        body.SetMinLines(4);
-        layout.AddView(subject);
-        layout.AddView(body);
-
-        new AlertDialog.Builder(activity)
-            .SetTitle($"Email {displayName}")!
-            .SetView(layout)!
-            .SetPositiveButton("Send", async (_, _) =>
-            {
-                try
-                {
-                    var client = new Infrastructure.Email.GmailClient(
-                        account.GmailAddress!, account.GmailAppPassword!);
-                    await client.SendAsync(toAddress, subject.Text ?? "", body.Text ?? "");
-                    Toast.MakeText(activity, "Sent.", ToastLength.Short)!.Show();
-                }
-                catch (Exception e)
-                {
-                    Toast.MakeText(activity, $"Send failed: {e.Message}", ToastLength.Long)!.Show();
-                }
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+        if (inReplyTo is not null)
+        {
+            intent.PutExtra(EmailComposeActivity.ExtraInReplyTo, inReplyTo);
+        }
+        activity.StartActivity(intent);
     }
 }

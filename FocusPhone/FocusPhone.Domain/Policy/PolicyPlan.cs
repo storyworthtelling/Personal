@@ -5,4 +5,5 @@ public record PolicyPlan(
     IReadOnlySet<string> SuspendedPackages,
     IReadOnlyList<PermissionGrant> PermissionGrants,
     bool EnforceAutoTime,
-    string PrivateDnsHost);
+    string PrivateDnsHost,
+    bool DisableStatusBar);

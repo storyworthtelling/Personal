@@ -14,11 +14,17 @@ public sealed class TimelineDatabase : IDisposable
     private readonly SqliteConnection connection;
 
     public TimelineCache Cache { get; }
+    public HiddenItemStore Hidden { get; }
+    public IdentityLinkStore IdentityLinks { get; }
+    public ReadStateStore ReadState { get; }
 
     private TimelineDatabase(SqliteConnection connection)
     {
         this.connection = connection;
         Cache = new TimelineCache(connection);
+        Hidden = new HiddenItemStore(connection);
+        IdentityLinks = new IdentityLinkStore(connection);
+        ReadState = new ReadStateStore(connection);
     }
 
     public static TimelineDatabase Open(Context context)

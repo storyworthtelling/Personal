@@ -86,4 +86,22 @@ public class GmailMessageMapperTests
 
         Assert.Equal(first.SourceId, second.SourceId);
     }
+
+    [Fact]
+    public void Map_PopulatesEmailHeaderFieldsForThreadingAndReply()
+    {
+        var message = Message("alice@example.com", AccountAddress, subject: "Lunch?", body: "Body text");
+        message.Cc.Add(MailboxAddress.Parse("carol@example.com"));
+        message.InReplyTo = "prev@mail.gmail.com";
+
+        var item = Mapper.Map(message);
+
+        Assert.Equal("Lunch?", item.Subject);
+        Assert.Equal("Body text", item.Body);
+        Assert.Equal("alice@example.com", item.FromAddress);
+        Assert.Equal([AccountAddress], item.Recipients);
+        Assert.Equal(["carol@example.com"], item.CarbonCopy);
+        Assert.Equal("abc@mail.gmail.com", item.MessageId);
+        Assert.Equal("prev@mail.gmail.com", item.InReplyTo);
+    }
 }

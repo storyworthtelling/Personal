@@ -72,4 +72,92 @@ public class TimelineCacheTests : IDisposable
         Assert.Equal(TimelineItemKind.Voicemail, item.Kind);
         Assert.Equal("Hi, it's mom", item.Snippet);
     }
+
+    [Fact]
+    public void Upsert_EmailWithHeadersAndAttachments_RoundTrips()
+    {
+        var email = new TimelineItem(
+            TimelineItemKind.Email, "bob@example.com",
+            new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero), "Subject line", Incoming: false, "e1")
+        {
+            Subject = "Subject line",
+            Body = "Body text",
+            FromAddress = "me@gmail.com",
+            Recipients = ["bob@example.com", "carol@example.com"],
+            CarbonCopy = ["dave@example.com"],
+            MessageId = "abc@mail",
+            InReplyTo = "prev@mail",
+            Attachments = [new AttachmentRef("a1", "photo.jpg", "image/jpeg", 0)],
+        };
+
+        cache.Upsert([email]);
+        var loaded = Assert.Single(cache.LoadAll());
+
+        Assert.Equal("Subject line", loaded.Subject);
+        Assert.Equal("Body text", loaded.Body);
+        Assert.Equal("me@gmail.com", loaded.FromAddress);
+        Assert.Equal(["bob@example.com", "carol@example.com"], loaded.Recipients);
+        Assert.Equal(["dave@example.com"], loaded.CarbonCopy);
+        Assert.Equal("abc@mail", loaded.MessageId);
+        Assert.Equal("prev@mail", loaded.InReplyTo);
+        var attachment = Assert.Single(loaded.Attachments);
+        Assert.Equal("photo.jpg", attachment.FileName);
+        Assert.True(attachment.IsImage);
+    }
+
+    [Fact]
+    public void Upsert_GroupMessageWithUnread_RoundTrips()
+    {
+        var group = new TimelineItem(
+            TimelineItemKind.Message, "5551110000",
+            new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero), "hi all", Incoming: true, "g1")
+        {
+            GroupId = "conv-42",
+            Participants = ["5551110000", "5552220000"],
+            ExternalConversationId = "conv-42",
+            Unread = true,
+        };
+
+        cache.Upsert([group]);
+        var loaded = Assert.Single(cache.LoadAll());
+
+        Assert.Equal("conv-42", loaded.GroupId);
+        Assert.True(loaded.IsGroup);
+        Assert.Equal(["5551110000", "5552220000"], loaded.Participants);
+        Assert.Equal("conv-42", loaded.ExternalConversationId);
+        Assert.True(loaded.Unread);
+    }
+
+    [Fact]
+    public void Constructor_MigratesLegacySixColumnTableAndDefaultsNewFields()
+    {
+        using var legacy = new SqliteConnection("Data Source=:memory:");
+        legacy.Open();
+        using (var create = legacy.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE timelineItems (
+                    kind INTEGER NOT NULL, sourceId TEXT NOT NULL, contactKey TEXT NOT NULL,
+                    timestampUtc TEXT NOT NULL, snippet TEXT, incoming INTEGER NOT NULL,
+                    PRIMARY KEY (kind, sourceId))
+                """;
+            create.ExecuteNonQuery();
+        }
+        using (var insert = legacy.CreateCommand())
+        {
+            insert.CommandText = """
+                INSERT INTO timelineItems (kind, sourceId, contactKey, timestampUtc, snippet, incoming)
+                VALUES (1, 'm1', 'alice', '2026-06-10T09:00:00.0000000+00:00', 'hi', 1)
+                """;
+            insert.ExecuteNonQuery();
+        }
+
+        var item = Assert.Single(new TimelineCache(legacy).LoadAll());
+
+        Assert.Equal("alice", item.ContactKey);
+        Assert.Null(item.Subject);
+        Assert.Empty(item.Recipients);
+        Assert.Empty(item.Attachments);
+        Assert.False(item.Unread);
+    }
 }

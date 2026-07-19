@@ -106,6 +106,22 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
+    public void Plan_DisablesStatusBar_ToBlockTheSwipeDownShade()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.True(plan.DisableStatusBar);
+    }
+
+    [Fact]
+    public void StatusBarDisable_SurvivesCutoverFinalization()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext(finalized: true));
+
+        Assert.True(plan.DisableStatusBar);
+    }
+
+    [Fact]
     public void Plan_GrantsHardRestrictedSmsAndCallLogToCommunicationApp()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext());
@@ -115,6 +131,19 @@ public class PolicyPlanBuilderTests
             plan.PermissionGrants);
         Assert.Contains(
             new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.ReadCallLogPermission),
+            plan.PermissionGrants);
+    }
+
+    [Fact]
+    public void Plan_GrantsWriteCallLogAndWriteContactsForDestructiveInboxWrites()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.WriteCallLogPermission),
+            plan.PermissionGrants);
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.WriteContactsPermission),
             plan.PermissionGrants);
     }
 

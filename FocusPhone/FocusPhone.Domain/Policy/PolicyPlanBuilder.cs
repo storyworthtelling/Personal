@@ -42,8 +42,19 @@ public static class PolicyPlanBuilder
         {
             new(PolicyContext.CommunicationPackage, PolicyContext.ReadSmsPermission),
             new(PolicyContext.CommunicationPackage, PolicyContext.ReadCallLogPermission),
+            // Deleting a call/voicemail from the log, and saving/linking a sender
+            // into Contacts, are the unified inbox's destructive-CRUD writes.
+            new(PolicyContext.CommunicationPackage, PolicyContext.WriteCallLogPermission),
+            new(PolicyContext.CommunicationPackage, PolicyContext.WriteContactsPermission),
         };
 
-        return new PolicyPlan(restrictions, suspended, permissionGrants, EnforceAutoTime: true, FamilyDnsHost);
+        // Disable the status bar so its swipe-down shade — notifications, quick
+        // settings, and the shortcut into system Settings — can't be pulled onto
+        // the kiosk. NotificationListenerService still receives notifications
+        // (tile tints and message capture are unaffected); only the overlay UI is
+        // blocked. Device-owner only, so this takes effect at provisioning.
+        return new PolicyPlan(
+            restrictions, suspended, permissionGrants,
+            EnforceAutoTime: true, FamilyDnsHost, DisableStatusBar: true);
     }
 }

@@ -18,6 +18,17 @@
     <ProjectReference Include="..\FocusPhone.Ui.Android\FocusPhone.Ui.Android.csproj" />
   </ItemGroup>
 
+  <!-- In-app texting: reference the gmbridge binding only when its .aar has been
+       built (CI builds it before the heads). When absent, GMBRIDGE is undefined
+       and GmBridgeClient compiles to a stub, so the head still builds and texting
+       falls back to the Google Messages deep link. -->
+  <PropertyGroup Condition="Exists('..\gmbridge\gmbridge.aar')">
+    <DefineConstants>$(DefineConstants);GMBRIDGE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('..\gmbridge\gmbridge.aar')">
+    <ProjectReference Include="..\FocusPhone.GmBridge.Binding\FocusPhone.GmBridge.Binding.csproj" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
   </ItemGroup>

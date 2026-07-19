@@ -93,4 +93,63 @@ public class TimelineMergerTests
         var item = Assert.Single(thread.Items);
         Assert.Equal("sms:12", item.SourceId);
     }
+
+    [Fact]
+    public void Merge_WithIdentityResolver_MergesAPersonsPhoneAndEmailIntoOneThread()
+    {
+        var phone = "5551234567";
+        var email = "alice@example.com";
+        var resolver = new IdentityMap([[phone, email]], [], []);
+
+        var threads = new TimelineMerger().Merge(
+            [
+                Item(TimelineItemKind.Message, phone, 0, "m1"),
+                Item(TimelineItemKind.Email, email, 10, "e1"),
+            ],
+            resolver);
+
+        var thread = Assert.Single(threads);
+        Assert.Equal(2, thread.Items.Count);
+        Assert.Contains(phone, thread.MemberKeys);
+        Assert.Contains(email, thread.MemberKeys);
+        Assert.False(thread.IsGroup);
+    }
+
+    [Fact]
+    public void Merge_GroupItems_ThreadByGroupIdRatherThanPerson()
+    {
+        var groupItemA = new TimelineItem(
+            TimelineItemKind.Message, "5551110000", T0, "hi all", Incoming: true, SourceId: "g1")
+        {
+            GroupId = "conv-42",
+            Participants = ["5551110000", "5552220000"],
+        };
+        var groupItemB = groupItemA with
+        {
+            ContactKey = "5552220000",
+            TimestampUtc = T0.AddMinutes(5),
+            SourceId = "g2",
+        };
+
+        var thread = Assert.Single(new TimelineMerger().Merge([groupItemA, groupItemB]));
+
+        Assert.True(thread.IsGroup);
+        Assert.Equal(2, thread.Items.Count);
+        Assert.Equal(["5551110000", "5552220000"], thread.Participants);
+    }
+
+    [Fact]
+    public void Merge_MarksThreadUnread_WhenAnyItemIsUnread()
+    {
+        var read = new TimelineItem(TimelineItemKind.Message, "alice", T0, "read", Incoming: true, SourceId: "m1");
+        var unread = new TimelineItem(
+            TimelineItemKind.Message, "alice", T0.AddMinutes(1), "new", Incoming: true, SourceId: "m2")
+        {
+            Unread = true,
+        };
+
+        var thread = Assert.Single(new TimelineMerger().Merge([read, unread]));
+
+        Assert.True(thread.HasUnread);
+    }
 }
