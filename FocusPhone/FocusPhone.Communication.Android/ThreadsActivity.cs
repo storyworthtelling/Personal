@@ -236,87 +236,96 @@ public class ThreadsActivity : Activity
 
     private enum NewConversationKind { Call, Text, Email }
 
+    // Person-first (DESIGN: pick who, then how to reach them). Contacts are
+    // offered as people; the last option types an unknown number/address.
     private void ShowNewConversationDialog()
     {
-        string[] options = ["Call", "Text", "Email"];
+        IReadOnlyList<ContactPicker.Person> people;
+        try
+        {
+            people = ContactPicker.People(this);
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            people = []; // READ_CONTACTS not granted yet; manual entry still works.
+        }
+
+        var labels = people.Select(person => person.Name).ToList();
+        labels.Add("Type a number or address…");
+
         new AlertDialog.Builder(this)
             .SetTitle("New")!
-            .SetItems(options, (_, e) => ShowRecipientPicker((NewConversationKind)e.Which))!
+            .SetItems(labels.ToArray(), (_, e) =>
+            {
+                if (e.Which < people.Count)
+                {
+                    ShowChannelChooser(people[e.Which]);
+                }
+                else
+                {
+                    ShowManualEntry();
+                }
+            })!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
     }
 
-    private void ShowRecipientPicker(NewConversationKind kind)
+    private void ShowChannelChooser(ContactPicker.Person person)
     {
-        var entries = LoadPickerEntries(kind);
-        var isEmail = kind == NewConversationKind.Email;
-
-        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        layout.SetPadding(32, 16, 32, 0);
-        var manual = PaperUi.MonoField(this, isEmail ? "Email address" : "Phone number");
-        manual.InputType = isEmail
-            ? Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationEmailAddress
-            : Android.Text.InputTypes.ClassPhone;
-        manual.Typeface = PaperTheme.Mono(this); // setting InputType resets the typeface
-        layout.AddView(manual);
-
-        var contactList = new ListView(this)
+        var options = new List<(string Label, NewConversationKind Kind, string Address)>();
+        if (person.Phones.Count > 0)
         {
-            Adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleListItem1,
-                entries.Select(entry => $"{entry.Name} — {entry.Address}").ToList()),
-        };
-        layout.AddView(contactList, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            options.Add(("Call", NewConversationKind.Call, person.Phones[0]));
+            options.Add(("Text", NewConversationKind.Text, person.Phones[0]));
+        }
+        if (person.Emails.Count > 0)
+        {
+            options.Add(("Email", NewConversationKind.Email, person.Emails[0]));
+        }
+        if (options.Count == 0)
+        {
+            return;
+        }
 
+        new AlertDialog.Builder(this)
+            .SetTitle(person.Name)!
+            .SetItems(options.Select(option => option.Label).ToArray(),
+                (_, e) => Dispatch(options[e.Which].Kind, options[e.Which].Address))!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    private void ShowManualEntry()
+    {
+        var input = PaperUi.MonoField(this, "Number or email");
         var dialog = new AlertDialog.Builder(this)
-            .SetTitle($"New {kind.ToString().ToLowerInvariant()}")!
-            .SetView(layout)!
+            .SetTitle("New")!
+            .SetView(input)!
             .SetPositiveButton("Go", (IDialogInterfaceOnClickListener?)null)!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Create()!;
 
-        contactList.ItemClick += (_, e) =>
-        {
-            dialog.Dismiss();
-            Dispatch(kind, entries[e.Position].Address);
-        };
-
         dialog.Show();
-        // Wired after Show so invalid manual input keeps the dialog open.
+        // Wired after Show so invalid input keeps the dialog open.
         dialog.GetButton((int)DialogButtonType.Positive)!.Click += (_, _) =>
         {
-            if (TryValidateManualEntry(kind, manual.Text ?? "", out var address))
+            var raw = input.Text ?? "";
+            if (raw.Contains('@') && RecipientInput.TryCreateEmail(raw, out var email))
             {
                 dialog.Dismiss();
-                Dispatch(kind, address);
+                Dispatch(NewConversationKind.Email, email);
+            }
+            else if (RecipientInput.TryCreatePhone(raw, out var phone))
+            {
+                dialog.Dismiss();
+                ShowChannelChooser(new ContactPicker.Person(phone, [phone], []));
             }
             else
             {
-                Toast.MakeText(this,
-                    isEmail ? "Enter a valid email address." : "Enter a phone number.",
-                    ToastLength.Short)!.Show();
+                Toast.MakeText(this, "Enter a phone number or email.", ToastLength.Short)!.Show();
             }
         };
     }
-
-    private IReadOnlyList<ContactPicker.Entry> LoadPickerEntries(NewConversationKind kind)
-    {
-        try
-        {
-            return kind == NewConversationKind.Email
-                ? ContactPicker.EmailContacts(this)
-                : ContactPicker.PhoneContacts(this);
-        }
-        catch (Java.Lang.SecurityException)
-        {
-            return []; // READ_CONTACTS not granted yet; manual entry still works.
-        }
-    }
-
-    private static bool TryValidateManualEntry(NewConversationKind kind, string raw, out string address) =>
-        kind == NewConversationKind.Email
-            ? RecipientInput.TryCreateEmail(raw, out address)
-            : RecipientInput.TryCreatePhone(raw, out address);
 
     private void Dispatch(NewConversationKind kind, string address)
     {
