@@ -327,6 +327,30 @@ public class PanelContentApprovalTests : IDisposable
     }
 
     [Fact]
+    public async Task ProhibitedBlock_OnARetryingPanel_CancelsButLeavesItReworkable()
+    {
+        // A panel that already had a transient failure (NeedsRetry, now due) hits a prohibited block on
+        // its retry render. The book cancels — but the offending panel must be left in a state the rework
+        // flow can find and reset, not stranded in NeedsRetry where GetProhibitedPanel can't see it (which
+        // is what made the Rework button silently do nothing).
+        BlockPanelRenders(ImageBlockReason.Prohibited, []);
+        var novelId = SeedRetryingRenderingNovel();
+
+        var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
+        Assert.Equal(ProjectStage.Cancelled, StageOf(novelId));
+        // Deterministically reset to Pending (retry schedule cleared) so the rework lookup finds it.
+        var panel = SinglePanel(novelId);
+        Assert.Equal(WorkStatus.Pending, panel.Status);
+        Assert.Null(panel.NextAttemptAtUtc);
+        Assert.NotNull(panel.LastError);
+
+        var prohibited = await NewProjectService().GetProhibitedPanelAsync(novelId, CancellationToken.None);
+        Assert.NotNull(prohibited);
+    }
+
+    [Fact]
     public async Task SkippedPanel_IsLeftOut_AndTheBookFinishes()
     {
         BlockPanelRenders(ImageBlockReason.Safety);
@@ -460,6 +484,35 @@ public class PanelContentApprovalTests : IDisposable
             NovelId = novel.Id, ConsolidatedJson = "{}", PdfStatus = WorkStatus.Completed,
             PdfPath = "book-analysis.pdf"
         });
+        context.SaveChanges();
+        return novel.Id;
+    }
+
+    // Seeds a novel at RenderingImages whose only panel is a due retry (NeedsRetry with its next-attempt
+    // time already past), so the render loop picks it up this cycle — the setup for a block that lands on
+    // a mid-retry panel.
+    private Guid SeedRetryingRenderingNovel()
+    {
+        var now = clock.UtcNow;
+        var novel = new Novel
+        {
+            Title = "Retrying", GoogleDocId = "doc", Stage = ProjectStage.RenderingImages,
+            CreatedAtUtc = now, UpdatedAtUtc = now
+        };
+        novel.Source = new SourceText { NovelId = novel.Id, FullText = "t", CharacterCount = 1 };
+        var volume = new Volume { NovelId = novel.Id, Number = 1, Title = "V1" };
+        var page = new Page { VolumeId = volume.Id, ChapterNumber = 1, PageNumber = 1, CompositionStatus = WorkStatus.Pending };
+        page.Panels.Add(new Panel
+        {
+            PageId = page.Id, PanelNumber = 1, VisualPrompt = "p", ReferenceNamesJson = "[]",
+            Status = WorkStatus.NeedsRetry, Attempts = 1, LastError = "429",
+            NextAttemptAtUtc = now.AddMinutes(-1)
+        });
+        volume.Pages.Add(page);
+        novel.Volumes.Add(volume);
+
+        using var context = database.NewContext();
+        context.Novels.Add(novel);
         context.SaveChanges();
         return novel.Id;
     }

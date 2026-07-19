@@ -230,16 +230,26 @@ public sealed class ProjectService
         return panel.PanelNumber;
     }
 
-    // The panel a Prohibited/IP block stopped the book on: it's left Pending (the block never advances it
-    // to a terminal state) with the provider's block message on LastError. There's at most one at a time
-    // — the render loop cancels on the first one it hits — but order by number to be deterministic.
+    // The panel a Prohibited/IP block stopped the book on, carrying the provider's block message on
+    // LastError. The render loop settles that panel into Pending as it cancels, so a Pending panel with an
+    // error is the primary match (lowest number wins, though there's normally just one). A NeedsRetry
+    // panel is the fallback: a block that landed mid-retry — or an older cancel from before the loop
+    // settled it to Pending — can leave the offending panel there, and it must still be reworkable rather
+    // than the Rework button silently doing nothing. Pending is preferred so a fresh cancel picks the real
+    // offender, not a lower-numbered panel merely parked mid-retry on a transient error.
     private static async Task<Panel?> FindProhibitedPanelAsync(
         StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
     {
         var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
         var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
-        return await db.Panels
-            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.Pending && p.LastError != null)
+        var blocked = db.Panels.Where(p => pageIds.Contains(p.PageId) && p.LastError != null);
+
+        var pending = await blocked
+            .Where(p => p.Status == WorkStatus.Pending)
+            .OrderBy(p => p.PanelNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+        return pending ?? await blocked
+            .Where(p => p.Status == WorkStatus.NeedsRetry)
             .OrderBy(p => p.PanelNumber)
             .FirstOrDefaultAsync(cancellationToken);
     }

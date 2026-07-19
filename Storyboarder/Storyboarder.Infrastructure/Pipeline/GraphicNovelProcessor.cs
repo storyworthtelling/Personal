@@ -738,7 +738,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (blocked.Reason == ImageBlockReason.Prohibited)
         {
             // IP / copyrighted / otherwise-prohibited content: no safety threshold can bypass it, so stop
-            // the whole book with a clear fallout reason rather than parking or retrying it.
+            // the whole book with a clear fallout reason rather than parking or retrying it. Settle the
+            // offending panel into a deterministic Pending state (clearing any retry schedule left over
+            // from a block that landed mid-retry) so the rework flow can reliably find and reset it — a
+            // panel stranded in NeedsRetry is invisible to the Rework button.
+            panel.Status = WorkStatus.Pending;
+            panel.NextAttemptAtUtc = null;
             panel.LastError = blocked.Message;
             SetStage(novel, ProjectStage.Cancelled);
             novel.LastError =
