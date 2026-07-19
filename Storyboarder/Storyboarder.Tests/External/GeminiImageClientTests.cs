@@ -149,6 +149,21 @@ public class GeminiImageClientTests
     }
 
     [Fact]
+    public async Task ImageSafetyFinishReason_ThrowsFilteredBlock()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"candidates\":[{\"finishReason\":\"IMAGE_SAFETY\"}]}");
+
+        var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
+            client.GeneratePanel("a brutal beat", "noir", [], aspectRatio: null, CancellationToken.None));
+
+        // IMAGE_SAFETY is Gemini's non-configurable image-output filter, not an IP/recitation block — it's
+        // recoverable by rephrasing, so it's Filtered (degrade the panel) rather than Prohibited (cancel).
+        Assert.Equal(ImageBlockReason.Filtered, ex.Reason);
+        Assert.Empty(ex.Categories);
+    }
+
+    [Fact]
     public async Task ProhibitedFinishReason_ThrowsProhibitedBlock()
     {
         var (client, handler) = Create();

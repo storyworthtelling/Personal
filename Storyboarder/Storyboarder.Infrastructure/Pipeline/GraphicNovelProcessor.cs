@@ -441,7 +441,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             // A deliberate content block is handled distinctly from a transient failure: Prohibited (IP /
             // copyrighted content) cancels the whole book; Safety parks the panel for the user's approval,
             // then — once approved — relaxes the category, and if that still hits the model's floor, has
-            // Claude restage the prompt to imply the content before finally falling back to a placeholder.
+            // Claude restage the prompt to imply the content before finally falling back to a placeholder;
+            // Filtered (Gemini's IMAGE_SAFETY image filter) takes that same restage-then-placeholder path
+            // straight away, since it can't be relaxed and shouldn't cancel the book.
             catch (ImageContentBlockedException blocked)
             {
                 if (await HandleBlockedPanel(novel, panel, blocked, cancellationToken) is { } deferral)
@@ -752,11 +754,13 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return null;
         }
 
-        if (!panel.ApprovedForRelaxedRender)
+        if (blocked.Reason == ImageBlockReason.Safety && !panel.ApprovedForRelaxedRender)
         {
             // First safety block: park it for the user's decision and move on. The render query skips
             // AwaitingApproval panels, so the rest of the book keeps rendering; the novel simply can't
-            // finalize until the user approves or skips this panel.
+            // finalize until the user approves or skips this panel. (A Filtered block skips this gate —
+            // relaxing can't lift Gemini's image filter and there's nothing to usefully approve — and
+            // goes straight to restaging below.)
             panel.Status = WorkStatus.AwaitingApproval;
             panel.BlockedCategoriesJson = JsonSerializer.Serialize(blocked.Categories, JsonResponse.CaseInsensitive);
             panel.LastError = blocked.Message;
@@ -770,8 +774,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         if (!panel.PromptRewrittenForSafety)
         {
-            // Approved and relaxed, yet still blocked: the model's non-adjustable floor. Ask Claude to
-            // restage the beat so the content is implied, then re-render the reworked prompt next cycle.
+            // Still blocked past what relaxing can reach — an approved Safety render at the model's floor,
+            // or a Filtered (IMAGE_SAFETY) block, which can't be relaxed at all. Ask Claude to restage the
+            // beat so the content is implied, then re-render the reworked prompt next cycle.
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
             try
@@ -789,8 +794,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return null;
         }
 
-        // Approved, relaxed, and restaged to imply — still blocked. Final graceful fallback so the book
-        // finishes: a neutral placeholder tile (the panel's dialogue/caption are still typeset over it).
+        // Restaged to imply — and still blocked (a Safety render past relax, or an unshakable Filtered
+        // one). Final graceful fallback so the book finishes: a neutral placeholder tile (the panel's
+        // dialogue/caption are still typeset over it).
         panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", placeholderRenderer.Render());
         panel.Status = WorkStatus.Completed;
         panel.LastError = "Rendered as a neutral placeholder: blocked even after relaxing safety and restaging to imply the content.";
