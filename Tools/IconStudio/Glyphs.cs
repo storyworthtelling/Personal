@@ -118,8 +118,8 @@ public static class Glyphs
         canvas.DrawRoundRect(rightBottom, radius, radius, ink);
     }
 
-    /// <summary>Tally: four ink tally strokes struck through by the terracotta fifth mark.</summary>
-    public static void Tally(SKCanvas canvas, float s)
+    /// <summary>Ledger: four ink ledger strokes struck through by the terracotta fifth mark.</summary>
+    public static void Ledger(SKCanvas canvas, float s)
     {
         using var ink = InkStroke(s);
         using var accent = AccentStroke(s);

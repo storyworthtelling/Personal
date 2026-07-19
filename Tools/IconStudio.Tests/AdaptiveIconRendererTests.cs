@@ -30,7 +30,7 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal(4, IconSpecs.All.Count(s => s.App.StartsWith("FocusPhone.")));
         Assert.Contains(IconSpecs.All, s => s.App == "Storyboarder" && s.Name == "appicon");
         Assert.Contains(IconSpecs.All, s => s.App == "DailyLoader" && s.Name == "ic_launcher");
-        Assert.Contains(IconSpecs.All, s => s.App == "Tally" && s.Name == "appicon");
+        Assert.Contains(IconSpecs.All, s => s.App == "Ledger" && s.Name == "appicon");
     }
 
     [Fact]

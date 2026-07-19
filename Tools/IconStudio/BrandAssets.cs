@@ -16,7 +16,7 @@ public static class BrandAssets
         // MAUI heads use the plain `Resources/` prefix, not Platforms/Android/Resources — see IconSpecs.
         "Storyboarder/Storyboarder.Android/Resources/drawable-nodpi/paper_grain.png",
         "DailyLoader/DailyLoader.Android/Resources/drawable-nodpi/paper_grain.png",
-        "Tally/Tally.Android/Resources/drawable-nodpi/paper_grain.png",
+        "Ledger/Ledger.Android/Resources/drawable-nodpi/paper_grain.png",
     ];
 
     private static readonly string[] MedallionTargets =
@@ -25,7 +25,7 @@ public static class BrandAssets
         "Storyboarder/Storyboarder.Android/Resources/drawable-nodpi/owner_medallion.png",
         "DailyLoader/DailyLoader.Android/Resources/drawable-nodpi/owner_medallion.png",
         "FocusPhone/FocusPhone.Communication.Android/Resources/drawable-nodpi/owner_medallion.png",
-        "Tally/Tally.Android/Resources/drawable-nodpi/owner_medallion.png",
+        "Ledger/Ledger.Android/Resources/drawable-nodpi/owner_medallion.png",
     ];
 
     public static IReadOnlyList<string> Write(string repoRoot)

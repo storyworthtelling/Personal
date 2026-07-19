@@ -209,7 +209,7 @@ Only these files may contain color hex or type-size literals:
 | FocusPhone | `FocusPhone.Domain/Design/DesignTokens.cs`; `FocusPhone.Ui.Android/Resources/values/colors.xml`, `themes.xml`; generated icon/grain/medallion resources; tile drawables; anim XMLs (durations only) |
 | Storyboarder | `Storyboarder.Domain/Design/DesignTokens.cs`; `Storyboarder.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
 | DailyLoader | `DailyLoader.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
-| Tally | `Tally.Domain/Design/DesignTokens.cs`; `Tally.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
+| Ledger | `Ledger.Domain/Design/DesignTokens.cs`; `Ledger.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
 | Branding | `/Branding/owner.png` (image, owner-supplied) |
 
