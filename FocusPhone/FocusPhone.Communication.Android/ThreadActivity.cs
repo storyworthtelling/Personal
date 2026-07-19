@@ -38,6 +38,7 @@ public class ThreadActivity : Activity
     private List<TimelineItem> items = [];
     private IReadOnlyList<string> memberKeys = [];
     private bool isGroup;
+    private string? bridgeConversationId;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -134,6 +135,9 @@ public class ThreadActivity : Activity
 
         // Hide anything the owner just deleted (still inside its undo window).
         items = deleteBuffer.Filter(thread?.Items ?? []).ToList();
+        // The conversation id to reply through the bridge (learned from the most
+        // recent bridge-captured message in this thread).
+        bridgeConversationId = items.LastOrDefault(item => item.ExternalConversationId is not null)?.ExternalConversationId;
         listView!.Adapter = new PaperListAdapter(this, items
             .Select(item => new PaperListRow(
                 TimelineItemFormatter.Describe(item),
@@ -310,9 +314,67 @@ public class ThreadActivity : Activity
     private void PlaceCall(string number) =>
         StartActivity(new Intent(Intent.ActionCall, Android.Net.Uri.Parse($"tel:{number}")));
 
-    // Deep-link to Google Messages until the in-app bridge lands (documented fallback).
-    private void SendText(string number) =>
+    // In-app via the bridge when it's connected and this thread has a known
+    // conversation; otherwise deep-link to Google Messages (documented fallback).
+    private void SendText(string number)
+    {
+        if (GmBridgeClient.Shared(this).IsConnected && bridgeConversationId is not null)
+        {
+            ShowBridgeCompose(bridgeConversationId, number);
+            return;
+        }
         StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{number}")));
+    }
+
+    private void ShowBridgeCompose(string conversationId, string number)
+    {
+        var input = new EditText(this) { Hint = "Message" };
+        new AlertDialog.Builder(this)
+            .SetTitle("Text")!
+            .SetView(input)!
+            .SetPositiveButton("Send", (_, _) =>
+            {
+                var text = input.Text ?? "";
+                if (text.Length == 0)
+                {
+                    return;
+                }
+                if (GmBridgeClient.Shared(this).TrySend(conversationId, text))
+                {
+                    EchoOutgoing(conversationId, number, text);
+                    LoadItems();
+                }
+                else
+                {
+                    Toast.MakeText(this, "Couldn't send — opening Messages.", ToastLength.Short)!.Show();
+                    StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{number}")));
+                }
+            })!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    // The bridge only reports incoming messages, so record the sent one locally
+    // (keyed to the person) to reflect it in the thread immediately.
+    private void EchoOutgoing(string conversationId, string number, string text)
+    {
+        try
+        {
+            using var database = TimelineDatabase.Open(this);
+            database.Cache.Upsert([new TimelineItem(
+                TimelineItemKind.Message,
+                ContactKeyNormalizer.NormalizePhone(number),
+                DateTimeOffset.UtcNow, text, Incoming: false,
+                SourceId: $"gmout:{conversationId}:{DateTimeOffset.UtcNow.Ticks}")
+            {
+                ExternalConversationId = conversationId,
+            }]);
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("FocusPhoneComm", $"Outgoing echo failed: {e}");
+        }
+    }
 
     private static string ReplySubject(string? subject)
     {
