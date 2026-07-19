@@ -12,6 +12,13 @@ public record PolicyContext(
     IReadOnlySet<string> BlockedPackages,
     bool DebuggingLockedDown)
 {
+    // Every first-party app the owner ships lives under this namespace. Anything
+    // matching it is known-good: the categorizer clears it outright so a
+    // sideloaded reinstall — which always reports an Unknown Play rating — can
+    // never re-quarantine it. An explicit block still wins and stays reversible
+    // from admin mode. The trailing dot keeps look-alike namespaces out.
+    public const string OwnerPackagePrefix = "com.storyworthtelling.";
+
     public const string LauncherPackage = "com.storyworthtelling.focusphone.launcher";
     public const string CommunicationPackage = "com.storyworthtelling.focusphone.communication";
     public const string CameraPackage = "com.storyworthtelling.focusphone.camera";

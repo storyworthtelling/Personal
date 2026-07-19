@@ -97,6 +97,45 @@ public class AppCategorizerTests
     }
 
     [Fact]
+    public void OwnerPrefixApp_IsAllowed_DespiteUnknownRating()
+    {
+        // Sideloaded first-party apps (Storyboarder, Ledger, …) are never on the
+        // Play Store, so their rating always resolves Unknown; the owner prefix
+        // clears them so a reinstall can't re-quarantine them.
+        var storyboarder = CleanApp("com.storyworthtelling.storyboarder");
+
+        Assert.Equal(AppVerdict.Allowed, categorizer.Categorize(storyboarder, ContentRating.Unknown));
+    }
+
+    [Fact]
+    public void OwnerPrefixApp_IsAllowed_EvenIfHandlesWebIntents()
+    {
+        var ownApp = new AppInfo(
+            "com.storyworthtelling.ledger", HandlesHttpViewIntents: true, IsCategoryGame: false);
+
+        Assert.Equal(AppVerdict.Allowed, categorizer.Categorize(ownApp, ContentRating.Unknown));
+    }
+
+    [Fact]
+    public void OwnerPrefixApp_CanStillBeExplicitlyBlocked()
+    {
+        categorizer.Block("com.storyworthtelling.storyboarder");
+
+        Assert.Equal(AppVerdict.Blocked,
+            categorizer.Categorize(CleanApp("com.storyworthtelling.storyboarder"), ContentRating.Everyone));
+    }
+
+    [Fact]
+    public void LookalikePackageOutsideOwnerPrefix_IsStillQuarantined()
+    {
+        // The prefix ends in a dot, so a namespace that merely starts with the
+        // same letters is not treated as first-party.
+        var lookalike = CleanApp("com.storyworthtellingfake.app");
+
+        Assert.Equal(AppVerdict.Quarantined, categorizer.Categorize(lookalike, ContentRating.Unknown));
+    }
+
+    [Fact]
     public void ExportedLists_RestoreInNewInstance()
     {
         categorizer.Block("com.blocked.app");
