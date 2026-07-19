@@ -8,17 +8,21 @@
 //
 //	./build.sh
 //
-// NOTE: first compiled on a machine with the NDK. libgm's API tracks Google's
-// protocol changes; pin bumps in go.mod may require small adjustments here —
-// that is the point of this shim: churn stays inside this file.
+// NOTE: written against libgm as vendored by go.mau.fi/mautrix-gmessages v0.6.4.
+// libgm's API tracks Google's protocol changes; pin bumps in go.mod may require
+// small adjustments here — that is the point of this shim: churn stays here.
 package gmbridge
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm"
+	"go.mau.fi/mautrix-gmessages/pkg/libgm/events"
 	"go.mau.fi/mautrix-gmessages/pkg/libgm/gmproto"
 )
 
@@ -48,26 +52,39 @@ func NewBridge(sessionJson string, handler EventHandler) (*Bridge, error) {
 	}
 
 	b := &Bridge{handler: handler}
-	b.client = libgm.NewClient(authData, nil, b.handleEvent)
+	// libgm v0.6.4: NewClient takes (authData, pushKeys, logger); the event
+	// handler is registered separately.
+	b.client = libgm.NewClient(authData, nil, zerolog.Nop())
+	b.client.SetEventHandler(b.handleEvent)
 	return b, nil
 }
 
 // StartGoogleAccountPairing begins Google-account pairing (the only mode that
 // works when the client runs on the same phone as Google Messages; QR pairing
 // requires a second screen). Returns the emoji the user must confirm in the
-// Messages app.
+// Messages app; pairing then finishes asynchronously and emits {"type":"paired"}
+// (or {"type":"authError"}).
 func (b *Bridge) StartGoogleAccountPairing(oauthCookiesJson string) (string, error) {
 	var cookies map[string]string
 	if err := json.Unmarshal([]byte(oauthCookiesJson), &cookies); err != nil {
 		return "", fmt.Errorf("parsing pairing cookies: %w", err)
 	}
-	for name, value := range cookies {
-		b.client.AuthData.SetCookie(name, value)
-	}
-	emoji, err := b.client.StartGaiaPairing(context.Background())
+	b.client.AuthData.SetCookies(cookies)
+
+	emoji, pairingSession, err := b.client.StartGaiaPairing(context.Background())
 	if err != nil {
 		return "", fmt.Errorf("starting Google-account pairing: %w", err)
 	}
+
+	// FinishGaiaPairing blocks until the user confirms the emoji in Google
+	// Messages, so run it off the calling thread and report the outcome as an event.
+	go func() {
+		if _, err := b.client.FinishGaiaPairing(context.Background(), pairingSession); err != nil {
+			b.emit(map[string]any{"type": "authError", "error": err.Error()})
+			return
+		}
+		b.emit(map[string]any{"type": "paired"})
+	}()
 	return emoji, nil
 }
 
@@ -98,17 +115,19 @@ func (b *Bridge) ExportSession() (string, error) {
 }
 
 // SendText sends a plain text message to a conversation.
-func (b *Bridge) SendText(conversationId string, text string) error {
-	_, err := b.client.SendMessage(context.Background(), &gmproto.SendMessageRequest{
-		ConversationID: conversationId,
+func (b *Bridge) SendText(conversationID string, text string) error {
+	_, err := b.client.SendMessage(&gmproto.SendMessageRequest{
+		ConversationID: conversationID,
 		MessagePayload: &gmproto.MessagePayload{
+			TmpID: uuid.NewString(),
 			MessagePayloadContent: &gmproto.MessagePayloadContent{
 				MessageContent: &gmproto.MessageContent{Content: text},
 			},
 		},
+		TmpID: uuid.NewString(),
 	})
 	if err != nil {
-		return fmt.Errorf("sending to conversation %s: %w", conversationId, err)
+		return fmt.Errorf("sending to conversation %s: %w", conversationID, err)
 	}
 	return nil
 }
@@ -116,7 +135,7 @@ func (b *Bridge) SendText(conversationId string, text string) error {
 // ListConversations returns the most recent conversations as a JSON array of
 // {"id":"...","title":"...","lastMessage":"...","timestampMs":123}.
 func (b *Bridge) ListConversations(count int) (string, error) {
-	resp, err := b.client.ListConversations(context.Background(), int64(count), gmproto.ListConversationsRequest_INBOX)
+	resp, err := b.client.ListConversations(count, gmproto.ListConversationsRequest_INBOX)
 	if err != nil {
 		return "", fmt.Errorf("listing conversations: %w", err)
 	}
@@ -151,6 +170,9 @@ func (b *Bridge) emit(event map[string]any) {
 	b.handler.OnEvent(string(blob))
 }
 
+// handleEvent maps the libgm event stream onto the JSON documents the C# side
+// consumes. Only incoming messages and pairing success are surfaced; everything
+// else is logged.
 func (b *Bridge) handleEvent(evt any) {
 	switch e := evt.(type) {
 	case *libgm.WrappedMessage:
@@ -158,12 +180,22 @@ func (b *Bridge) handleEvent(evt any) {
 			"type":           "message",
 			"conversationId": e.GetConversationID(),
 			"sender":         e.GetParticipantID(),
-			"text":           e.GetMessageContent().GetContent(),
+			"text":           messageText(e),
 			"timestampMs":    e.GetTimestamp(),
 		})
-	case *libgm.PairSuccessful:
+	case *events.PairSuccessful:
 		b.emit(map[string]any{"type": "paired"})
 	default:
 		b.emit(map[string]any{"type": "log", "message": fmt.Sprintf("%T", evt)})
 	}
+}
+
+// messageText concatenates the text parts of a message (v0.6.4 splits a message
+// body across MessageInfo entries).
+func messageText(msg *libgm.WrappedMessage) string {
+	var builder strings.Builder
+	for _, info := range msg.GetMessageInfo() {
+		builder.WriteString(info.GetMessageContent().GetContent())
+	}
+	return builder.String()
 }
