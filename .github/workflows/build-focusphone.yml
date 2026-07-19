@@ -85,6 +85,25 @@ jobs:
           dotnet build FocusPhone.GmBridge.Binding -c Release
           echo "=== END GMBRIDGE BINDING ==="
 
+      # Print the generated binding's public API so GmBridgeClient can be written
+      # against the real C# names — grep the log for "=== GMBRIDGE API ===".
+      - name: Dump GmBridge binding API
+        continue-on-error: true
+        working-directory: FocusPhone
+        run: |
+          echo "=== GMBRIDGE API ==="
+          echo "--- Java classes in gmbridge.aar ---"
+          if [ -f gmbridge/gmbridge.aar ]; then
+            mkdir -p /tmp/aar && unzip -o gmbridge/gmbridge.aar classes.jar -d /tmp/aar >/dev/null 2>&1 || true
+            [ -f /tmp/aar/classes.jar ] && unzip -l /tmp/aar/classes.jar | grep -iE 'gmbridge.*\.class' || echo "(no classes.jar)"
+          fi
+          echo "--- Generated C# binding ---"
+          find FocusPhone.GmBridge.Binding/obj -path '*generated*' -name '*.cs' 2>/dev/null | while read -r f; do
+            echo "----- $f"
+            grep -nE 'namespace |public (sealed |partial |abstract )*(class|interface)|public .*\(.*\)' "$f" | head -80
+          done
+          echo "=== END GMBRIDGE API ==="
+
       # All four heads sign with the one shared repo keystore so they carry a single
       # signature — required for the device-owner silent-update channel to accept
       # updates across the suite.
