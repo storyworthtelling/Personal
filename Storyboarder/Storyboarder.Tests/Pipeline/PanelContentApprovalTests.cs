@@ -16,7 +16,8 @@ namespace Storyboarder.Tests.Pipeline;
 
 // Behavioural spec for content-blocked panel rendering: a safety block parks the panel for the user's
 // OK (without wedging the book), an approval relaxes only the flagged category, the model's floor is
-// handled by restaging via Claude and then a placeholder, and a prohibited/IP block cancels the book.
+// handled by restaging via Claude and then a placeholder, a Filtered (IMAGE_SAFETY) block restages and
+// degrades to a placeholder without approval or cancelling, and a prohibited/IP block cancels the book.
 public class PanelContentApprovalTests : IDisposable
 {
     private static readonly DateTimeOffset Start = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -230,6 +231,52 @@ public class PanelContentApprovalTests : IDisposable
         var novelId = SeedNovel();
         Assert.Equal(ProjectStage.RenderingImages, await Drive(novelId));
         await NewProjectService().ApprovePanelRenderAsync(SinglePanel(novelId).Id, CancellationToken.None);
+
+        Assert.Equal(ProjectStage.Completed, await Drive(novelId));
+        var panel = SinglePanel(novelId);
+        Assert.Equal(WorkStatus.Completed, panel.Status);
+        Assert.NotNull(panel.ImagePath);
+        Assert.True(File.Exists(panel.ImagePath));
+        Assert.Contains("placeholder", panel.LastError);
+    }
+
+    [Fact]
+    public async Task FilteredPanel_IsRestagedByClaude_ThenRenders_WithoutApprovalOrCancelling()
+    {
+        // Gemini's non-configurable image-safety filter (IMAGE_SAFETY) blocks the first render. It can't
+        // be relaxed and there's nothing to approve, so the panel is restaged to imply the content and
+        // re-rendered automatically — never parked for approval, never cancelling the book.
+        var calls = 0;
+        gemini.Setup(g => g.GeneratePanel(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                calls++;
+                return calls == 1
+                    ? Task.FromException<byte[]>(new ImageContentBlockedException("filtered", ImageBlockReason.Filtered))
+                    : Task.FromResult(SampleImages.Png());
+            });
+
+        var novelId = SeedNovel();
+
+        Assert.Equal(ProjectStage.Completed, await Drive(novelId));
+        claude.Verify(c => c.RewritePromptToImply(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        var panel = SinglePanel(novelId);
+        Assert.Equal(WorkStatus.Completed, panel.Status);
+        Assert.True(panel.PromptRewrittenForSafety);
+        // No approval was involved — the relaxed-render path is never entered for a Filtered block.
+        Assert.False(panel.ApprovedForRelaxedRender);
+        Assert.Equal("The blow lands off-frame; the crowd recoils.", panel.VisualPrompt);
+    }
+
+    [Fact]
+    public async Task FilteredPanel_StillBlockedAfterRestage_FallsBackToPlaceholder_WithoutCancelling()
+    {
+        // Even the restaged prompt stays filtered — the single panel degrades to a placeholder so the
+        // book still finishes, rather than the whole conversion being cancelled.
+        BlockPanelRenders(ImageBlockReason.Filtered, []);
+        var novelId = SeedNovel();
 
         Assert.Equal(ProjectStage.Completed, await Drive(novelId));
         var panel = SinglePanel(novelId);

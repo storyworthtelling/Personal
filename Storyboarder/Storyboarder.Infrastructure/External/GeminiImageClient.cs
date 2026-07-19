@@ -227,8 +227,10 @@ public sealed class GeminiImageClient : IGeminiImageClient
     };
 
     // Reads a no-image response for a deliberate content block and classifies it. A SAFETY block is
-    // adjustable — the flagged categories are collected so only those get relaxed on re-render. Every
-    // other block reason (prohibited/copyrighted content, recitation, blocklist) is non-adjustable.
+    // adjustable — the flagged categories are collected so only those get relaxed on re-render. An
+    // IMAGE_SAFETY block is Gemini's non-configurable image-output filter: not adjustable, but recoverable
+    // by rephrasing, so it's Filtered (degrade the panel, keep the book). Every other reason
+    // (prohibited/copyrighted content, recitation, blocklist, PII) is a hard, book-cancelling block.
     // Returns null when the response carries no block signal (a plain text-only reply).
     private static ImageContentBlockedException? ClassifyBlock(string responseJson)
     {
@@ -262,8 +264,14 @@ public sealed class GeminiImageClient : IGeminiImageClient
                     $"Gemini blocked the image on safety grounds: {responseJson}",
                     ImageBlockReason.Safety, CollectFlaggedCategories(candidate));
 
-            // PROHIBITED_CONTENT, IMAGE_SAFETY, RECITATION, SPII, BLOCKLIST — none of them adjustable.
-            if (finishReason is "PROHIBITED_CONTENT" or "IMAGE_SAFETY" or "RECITATION" or "SPII" or "BLOCKLIST")
+            // IMAGE_SAFETY is Gemini's non-configurable image-output filter — recoverable by rephrasing,
+            // so it degrades the panel rather than cancelling the book.
+            if (finishReason == "IMAGE_SAFETY")
+                return new ImageContentBlockedException(
+                    $"Gemini refused the image as {finishReason}: {responseJson}", ImageBlockReason.Filtered);
+
+            // PROHIBITED_CONTENT, RECITATION, SPII, BLOCKLIST — hard content blocks, not adjustable.
+            if (finishReason is "PROHIBITED_CONTENT" or "RECITATION" or "SPII" or "BLOCKLIST")
                 return new ImageContentBlockedException(
                     $"Gemini refused the image as {finishReason}: {responseJson}", ImageBlockReason.Prohibited);
         }
