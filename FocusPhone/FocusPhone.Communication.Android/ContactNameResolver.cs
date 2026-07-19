@@ -64,7 +64,17 @@ public static class ContactNameResolver
 
     private static string? QuerySingle(Context context, Android.Net.Uri uri, string column)
     {
-        using var cursor = context.ContentResolver!.Query(uri, [column], null, null, null);
-        return cursor is not null && cursor.MoveToFirst() ? cursor.GetString(0) : null;
+        try
+        {
+            using var cursor = context.ContentResolver!.Query(uri, [column], null, null, null);
+            return cursor is not null && cursor.MoveToFirst() ? cursor.GetString(0) : null;
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            // READ_CONTACTS not granted yet; fall back to the raw key. Otherwise
+            // this uncaught throw crashes the inbox, opening a thread, and the
+            // new-email compose flow — all of which name a contact from its key.
+            return null;
+        }
     }
 }
