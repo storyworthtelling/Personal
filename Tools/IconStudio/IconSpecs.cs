@@ -28,5 +28,6 @@ public static class IconSpecs
         // csproj comments and CLAUDE.md); the launcher icon is then wired via [Application(Icon=...)].
         new("Storyboarder", "Storyboarder/Storyboarder.Android/Resources", "appicon", true, Glyphs.PanelGrid),
         new("DailyLoader", "DailyLoader/DailyLoader.Android/Resources", "ic_launcher", true, Glyphs.FoldedPaper),
+        new("Ledger", "Ledger/Ledger.Android/Resources", "appicon", true, Glyphs.Ledger),
     ];
 }

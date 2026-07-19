@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- The Android head needs net10.0-android; Tests/CI without the Android workload can build
+         just the desktop TFM with -p:LedgerTfms=net10.0. -->
+    <LedgerTfms Condition="'$(LedgerTfms)' == ''">net10.0;net10.0-android</LedgerTfms>
+    <TargetFrameworks>$(LedgerTfms)</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <SupportedOSPlatformVersion Condition="$(TargetFramework.EndsWith('-android'))">34</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ledger.Domain\Ledger.Domain.csproj" />
+  </ItemGroup>
+
+  <!-- Cross-target packages. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
+  </ItemGroup>
+
+  <!-- Desktop-only: design-time EF tooling used by Tests/CI and `dotnet ef`. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- The design-time factory depends on the Design package, which is desktop-only. -->
+  <ItemGroup Condition="$(TargetFramework.EndsWith('-android'))">
+    <Compile Remove="Persistence\DesignTimeDbContextFactory.cs" />
+  </ItemGroup>
+
+</Project>
