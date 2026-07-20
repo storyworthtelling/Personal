@@ -89,50 +89,62 @@ public class ThreadActivity : Activity
         return undoHost;
     }
 
+    // Gathering the live logs and merging the cache is I/O-heavy, so it runs off
+    // the UI thread; only the bind touches views. Refreshes (send, delete, undo)
+    // call this and let the list update a moment later.
     private void LoadItems()
     {
-        var gathered = new List<TimelineItem>();
-        try
+        System.Threading.Tasks.Task.Run(() =>
         {
-            gathered.AddRange(CallLogReader.ReadAll(this));
-        }
-        catch (Java.Lang.SecurityException)
-        {
-        }
-        try
-        {
-            gathered.AddRange(SmsLogReader.ReadAll(this));
-        }
-        catch (Java.Lang.SecurityException)
-        {
-        }
-
-        ContactThread? thread = null;
-        try
-        {
-            using var database = TimelineDatabase.Open(this);
-            gathered.AddRange(database.Cache.LoadAll());
-
-            var visible = database.Hidden.Filter(gathered);
-            var resolver = ContactAssociations.BuildResolver(this, database.IdentityLinks);
-            thread = new TimelineMerger().Merge(visible, resolver)
-                .FirstOrDefault(candidate => candidate.ContactKey == contactKey);
-
-            if (thread is not null)
+            var gathered = new List<TimelineItem>();
+            try
             {
-                // Opening a thread is seeing it: stamp read so it drops out of the
-                // inbox's unread section on return.
-                database.ReadState.MarkRead(thread.ContactKey, DateTimeOffset.Now);
+                gathered.AddRange(CallLogReader.ReadAll(this));
             }
-        }
-        catch (Exception e)
-        {
-            Android.Util.Log.Warn("FocusPhoneComm", $"Timeline stores unavailable: {e}");
-            CommunicationDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
-            thread = new TimelineMerger().Merge(gathered)
-                .FirstOrDefault(candidate => candidate.ContactKey == contactKey);
-        }
+            catch (Java.Lang.SecurityException)
+            {
+            }
+            try
+            {
+                gathered.AddRange(SmsLogReader.ReadAll(this));
+            }
+            catch (Java.Lang.SecurityException)
+            {
+            }
 
+            ContactThread? thread = null;
+            try
+            {
+                using var database = TimelineDatabase.Open(this);
+                gathered.AddRange(database.Cache.LoadAll());
+
+                var visible = database.Hidden.Filter(gathered);
+                var resolver = ContactAssociations.BuildResolver(this, database.IdentityLinks);
+                thread = new TimelineMerger().Merge(visible, resolver)
+                    .FirstOrDefault(candidate => candidate.ContactKey == contactKey);
+
+                if (thread is not null)
+                {
+                    // Opening a thread is seeing it: stamp read so it drops out of the
+                    // inbox's unread section on return.
+                    database.ReadState.MarkRead(thread.ContactKey, DateTimeOffset.Now);
+                }
+            }
+            catch (Exception e)
+            {
+                Android.Util.Log.Warn("FocusPhoneComm", $"Timeline stores unavailable: {e}");
+                CommunicationDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
+                thread = new TimelineMerger().Merge(gathered)
+                    .FirstOrDefault(candidate => candidate.ContactKey == contactKey);
+            }
+
+            var loaded = thread;
+            RunOnUiThread(() => BindThread(loaded));
+        });
+    }
+
+    private void BindThread(ContactThread? thread)
+    {
         memberKeys = thread?.MemberKeys ?? [];
         isGroup = thread?.IsGroup ?? false;
         titleView!.Text = Title(thread);

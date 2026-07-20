@@ -52,14 +52,14 @@ public class AccountStore
 
 /// <summary>
 /// Periodic Gmail sync into the timeline cache (last 30 days on first run,
-/// then incremental). IMAP IDLE push can replace polling later; the worker is
-/// the reliable baseline.
+/// then incremental). The one-shot run after configuring the account
+/// reconciles the full window so deletions land immediately; the actual sync
+/// work lives in <see cref="CommunicationSync"/>, shared with the Sync button.
 /// </summary>
 public class EmailSyncWorker : Worker
 {
     private const string WorkName = "focusphone-email-sync";
-    private const string SyncPreferences = "emailSync";
-    private const string LastSyncKey = "lastSyncUtc";
+    private const string ReconcileKey = "reconcile";
 
     public EmailSyncWorker(Context context, WorkerParameters workerParams) : base(context, workerParams)
     {
@@ -78,8 +78,9 @@ public class EmailSyncWorker : Worker
     }
 
     /// <summary>
-    /// Runs a single sync now (e.g. right after the account is configured) so
-    /// the timeline populates promptly instead of waiting for the next period.
+    /// Runs a single reconciling sync now (e.g. right after the account is
+    /// configured) so the timeline populates promptly — and drops anything
+    /// already deleted server-side — instead of waiting for the next period.
     /// </summary>
     public static void RunOnce(Context context)
     {
@@ -88,6 +89,7 @@ public class EmailSyncWorker : Worker
             .Build();
         var request = new OneTimeWorkRequest.Builder(typeof(EmailSyncWorker))
             .SetConstraints(constraints)!
+            .SetInputData(new Data.Builder().PutBoolean(ReconcileKey, true)!.Build()!)!
             .Build();
         WorkManager.GetInstance(context).EnqueueUniqueWork(
             "focusphone-email-sync-once", ExistingWorkPolicy.Replace!, (OneTimeWorkRequest)request);
@@ -95,25 +97,16 @@ public class EmailSyncWorker : Worker
 
     public override Result DoWork()
     {
-        var account = new AccountStore(ApplicationContext);
-        if (!account.IsConfigured)
-        {
-            return Result.InvokeSuccess();
-        }
-
-        var preferences = ApplicationContext.GetSharedPreferences(SyncPreferences, FileCreationMode.Private)!;
-        var since = DateTimeOffset.TryParse(preferences.GetString(LastSyncKey, null), out var parsed)
-            ? parsed
-            : DateTimeOffset.UtcNow.AddDays(-30);
-
         try
         {
-            var client = new Infrastructure.Email.GmailClient(
-                account.GmailAddress!, account.GmailAppPassword!);
-            var items = client.FetchRecentAsync(since).GetAwaiter().GetResult();
-            using var database = TimelineDatabase.Open(ApplicationContext);
-            database.Cache.Upsert(items);
-            preferences.Edit()!.PutString(LastSyncKey, DateTimeOffset.UtcNow.ToString("O"))!.Apply();
+            if (InputData.GetBoolean(ReconcileKey, false))
+            {
+                CommunicationSync.RunReconcile(ApplicationContext);
+            }
+            else
+            {
+                CommunicationSync.RunIncremental(ApplicationContext);
+            }
             return Result.InvokeSuccess();
         }
         catch (Exception e)
