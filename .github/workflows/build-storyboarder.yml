@@ -104,6 +104,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Storyboarder-Android
-          path: Storyboarder/Storyboarder.Android/bin/Release/net10.0-android/publish/*.apk
+          path: Storyboarder/Storyboarder.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
