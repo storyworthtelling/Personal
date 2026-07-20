@@ -129,6 +129,123 @@ public class TimelineCacheTests : IDisposable
     }
 
     [Fact]
+    public void LoadRecent_ReturnsNewestFirst_AndHonorsLimit()
+    {
+        cache.Upsert(
+        [
+            Item("m1", minute: 1),
+            Item("m2", minute: 2),
+            Item("m3", minute: 3),
+            Item("m4", minute: 4),
+        ]);
+
+        var page = cache.LoadRecent(2);
+
+        Assert.Equal(["m4", "m3"], page.Select(i => i.SourceId));
+    }
+
+    [Fact]
+    public void LoadRecent_WithOffset_PagesThroughOlderItems()
+    {
+        cache.Upsert(
+        [
+            Item("m1", minute: 1),
+            Item("m2", minute: 2),
+            Item("m3", minute: 3),
+            Item("m4", minute: 4),
+        ]);
+
+        var first = cache.LoadRecent(2, offset: 0);
+        var second = cache.LoadRecent(2, offset: 2);
+
+        Assert.Equal(["m4", "m3"], first.Select(i => i.SourceId));
+        Assert.Equal(["m2", "m1"], second.Select(i => i.SourceId));
+    }
+
+    [Fact]
+    public void LoadRecent_OffsetPastEnd_ReturnsEmpty()
+    {
+        cache.Upsert([Item("m1"), Item("m2", minute: 1)]);
+
+        Assert.Empty(cache.LoadRecent(10, offset: 2));
+    }
+
+    [Fact]
+    public void ReconcileWindow_RemovesInWindowItemsAbsentFromAuthoritative()
+    {
+        // "kept" and "stale" are both cached; only "kept" is still on the server.
+        cache.Upsert(
+        [
+            Item("kept", TimelineItemKind.Email, minute: 10),
+            Item("stale", TimelineItemKind.Email, minute: 11),
+        ]);
+
+        cache.ReconcileWindow(TimelineItemKind.Email,
+            new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero),
+            [Item("kept", TimelineItemKind.Email, minute: 10)]);
+
+        var item = Assert.Single(cache.LoadAll());
+        Assert.Equal("kept", item.SourceId);
+    }
+
+    [Fact]
+    public void ReconcileWindow_UpsertsNewAuthoritativeItems()
+    {
+        cache.ReconcileWindow(TimelineItemKind.Email,
+            new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero),
+            [Item("fresh", TimelineItemKind.Email, minute: 30, snippet: "new mail")]);
+
+        var item = Assert.Single(cache.LoadAll());
+        Assert.Equal("fresh", item.SourceId);
+        Assert.Equal("new mail", item.Snippet);
+    }
+
+    [Fact]
+    public void ReconcileWindow_KeepsItemsOlderThanTheWindow()
+    {
+        // An item from before "since" must survive even though the authoritative
+        // fetch (which only covers the window) does not include it.
+        cache.Upsert([Item("old", TimelineItemKind.Email, minute: 0)]);
+
+        cache.ReconcileWindow(TimelineItemKind.Email,
+            new DateTimeOffset(2026, 6, 10, 9, 30, 0, TimeSpan.Zero),
+            []);
+
+        Assert.Single(cache.LoadAll(), i => i.SourceId == "old");
+    }
+
+    [Fact]
+    public void ReconcileWindow_LeavesOtherKindsUntouched()
+    {
+        cache.Upsert(
+        [
+            Item("call", TimelineItemKind.Call, minute: 40),
+            Item("text", TimelineItemKind.Message, minute: 41),
+        ]);
+
+        cache.ReconcileWindow(TimelineItemKind.Email,
+            new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero),
+            []);
+
+        Assert.Equal(2, cache.LoadAll().Count);
+    }
+
+    [Fact]
+    public void ReconcileWindow_EmptyAuthoritative_ClearsWholeWindow()
+    {
+        cache.Upsert(
+        [
+            Item("a", TimelineItemKind.Email, minute: 10),
+            Item("b", TimelineItemKind.Email, minute: 11),
+        ]);
+
+        cache.ReconcileWindow(TimelineItemKind.Email,
+            new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero), []);
+
+        Assert.Empty(cache.LoadAll());
+    }
+
+    [Fact]
     public void Constructor_MigratesLegacySixColumnTableAndDefaultsNewFields()
     {
         using var legacy = new SqliteConnection("Data Source=:memory:");

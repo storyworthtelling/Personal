@@ -26,11 +26,37 @@ namespace FocusPhone.Communication;
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class ThreadsActivity : Activity
 {
+    // The timeline cache is read a page at a time (newest first) so a large
+    // history never has to be pulled into memory at once; more pages load as the
+    // owner scrolls. Live call/SMS rows are the small recent tail and come in
+    // whole on each reload.
+    private const int CachePageSize = 300;
+    private const int LoadMoreThreshold = 30;
+
     private ListView? threadList;
     private TextView? emptyView;
+    private TextView? statusLine;
     private EditText? filterField;
-    private IReadOnlyList<ContactThread> allThreads = [];
-    private IReadOnlyList<ContactThread> threads = [];
+    private Button? syncButton;
+
+    // Accumulated inputs, only ever mutated on the UI thread once a background
+    // load returns; the merge/title work itself runs off the UI thread.
+    private readonly List<TimelineItem> liveItems = [];
+    private readonly List<TimelineItem> cachedItems = [];
+    private int cacheOffset;
+    private bool cacheExhausted;
+    private bool loading;
+    private bool syncing;
+    // Bumped on every full reload so a superseded background load discards itself.
+    private int loadGeneration;
+
+    private IReadOnlyList<ThreadRow> allRows = [];
+    private IReadOnlyList<ThreadRow> shownRows = [];
+
+    // A prepared list row: identity to open, plus the strings the list renders.
+    // Titles are resolved off the UI thread (a Contacts query each), so binding
+    // and filtering stay cheap.
+    private sealed record ThreadRow(string ContactKey, string Title, string Subtitle, bool HasUnread);
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -40,9 +66,23 @@ public class ThreadsActivity : Activity
 
         threadList!.ItemClick += (_, e) =>
         {
+            if (e.Position < 0 || e.Position >= shownRows.Count)
+            {
+                return;
+            }
             var intent = new Intent(this, typeof(ThreadActivity));
-            intent.PutExtra(ThreadActivity.ExtraContactKey, threads[e.Position].ContactKey);
+            intent.PutExtra(ThreadActivity.ExtraContactKey, shownRows[e.Position].ContactKey);
             StartActivity(intent);
+        };
+
+        // Pull the next page as the list nears its end (only while more remains).
+        threadList.Scroll += (_, e) =>
+        {
+            if (!loading && !cacheExhausted && e.TotalItemCount > 0
+                && e.FirstVisibleItem + e.VisibleItemCount >= e.TotalItemCount - LoadMoreThreshold)
+            {
+                LoadMore();
+            }
         };
 
         RequestRuntimePermissions();
@@ -63,7 +103,7 @@ public class ThreadsActivity : Activity
     protected override void OnResume()
     {
         base.OnResume();
-        LoadThreads();
+        ReloadThreads();
     }
 
     private View BuildLayout()
@@ -83,6 +123,11 @@ public class ThreadsActivity : Activity
         var newConversation = PaperUi.SecondaryButton(this, "New", ShowNewConversationDialog);
         header.AddView(newConversation);
 
+        // Bring the cache up to date with Gmail (and drain the bridge), dropping
+        // messages deleted at the source so they stop cluttering the list.
+        syncButton = PaperUi.QuietButton(this, "Sync", SyncNow);
+        header.AddView(syncButton);
+
         var settings = PaperUi.QuietButton(this, "Settings", () =>
             StartActivity(new Intent(this, typeof(SettingsActivity))));
         header.AddView(settings);
@@ -92,12 +137,21 @@ public class ThreadsActivity : Activity
 
         // Lightweight find-a-person filter (names only, no full-text search).
         filterField = PaperUi.Field(this, "Find a person");
-        filterField.TextChanged += (_, _) => BindThreads(filterField.Text ?? "");
+        filterField.TextChanged += (_, _) => BindRows(filterField.Text ?? "");
         var filterParams = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
         var edge = PaperTheme.Dp(this, DesignTokens.Space.X4);
         filterParams.SetMargins(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X2));
         root.AddView(filterField, filterParams);
+
+        // A quiet status sentence for loading/sync (DESIGN.md §8: a sentence, not
+        // a spinner). Hidden when idle so it takes no space.
+        statusLine = PaperUi.Secondary(this, "");
+        statusLine.Visibility = ViewStates.Gone;
+        var statusParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+        statusParams.SetMargins(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X2));
+        root.AddView(statusLine, statusParams);
 
         var frame = new FrameLayout(this);
         threadList = new ListView(this);
@@ -144,15 +198,86 @@ public class ThreadsActivity : Activity
         int requestCode, string[] permissions, Permission[] grantResults)
     {
         base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-        LoadThreads();
+        ReloadThreads();
     }
 
-    private void LoadThreads()
+    // Full reload: re-read the live call/SMS tail and the first cache page, then
+    // rebuild the list. All I/O and merging happen off the UI thread so the
+    // screen never blocks (the ANR the owner was hitting); only the final bind
+    // touches views.
+    private void ReloadThreads()
     {
-        var items = new List<TimelineItem>();
+        var generation = ++loadGeneration;
+        loading = true;
+        SetStatus("Loading…");
+        emptyView!.Text = ""; // Suppress the empty message until the load resolves.
+        var titleSeed = allRows.ToDictionary(row => row.ContactKey, row => row.Title);
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var live = ReadLiveTail();
+            var (page, rows) = ReadPageAndBuild(live, [], 0, titleSeed);
+            RunOnUiThread(() =>
+            {
+                if (generation != loadGeneration)
+                {
+                    return; // A newer reload has taken over.
+                }
+                liveItems.Clear();
+                liveItems.AddRange(live);
+                cachedItems.Clear();
+                cachedItems.AddRange(page);
+                cacheOffset = page.Count;
+                cacheExhausted = page.Count < CachePageSize;
+                allRows = rows;
+                loading = false;
+                BindRows(filterField?.Text ?? "");
+                UpdateEmptyState();
+                ClearStatus();
+            });
+        });
+    }
+
+    // Appends the next cache page to what is already shown. Kept in the same
+    // generation as the reload it extends, so a concurrent reload discards it.
+    private void LoadMore()
+    {
+        if (loading || cacheExhausted)
+        {
+            return;
+        }
+        loading = true;
+        var generation = loadGeneration;
+        var live = liveItems.ToList();
+        var prior = cachedItems.ToList();
+        var offset = cacheOffset;
+        var titleSeed = allRows.ToDictionary(row => row.ContactKey, row => row.Title);
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var (page, rows) = ReadPageAndBuild(live, prior, offset, titleSeed);
+            RunOnUiThread(() =>
+            {
+                if (generation != loadGeneration)
+                {
+                    return;
+                }
+                cachedItems.AddRange(page);
+                cacheOffset += page.Count;
+                cacheExhausted = page.Count < CachePageSize;
+                allRows = rows;
+                loading = false;
+                BindRows(filterField?.Text ?? "");
+            });
+        });
+    }
+
+    private List<TimelineItem> ReadLiveTail()
+    {
+        var live = new List<TimelineItem>();
         try
         {
-            items.AddRange(CallLogReader.ReadAll(this));
+            live.AddRange(CallLogReader.ReadAll(this));
         }
         catch (Java.Lang.SecurityException)
         {
@@ -160,22 +285,38 @@ public class ThreadsActivity : Activity
         }
         try
         {
-            items.AddRange(SmsLogReader.ReadAll(this));
+            live.AddRange(SmsLogReader.ReadAll(this));
         }
         catch (Java.Lang.SecurityException)
         {
             // READ_SMS not granted yet; show what we have.
         }
+        return live;
+    }
 
+    // Reads one cache page at the given offset and merges it with the live tail
+    // and the pages already loaded into an ordered set of list rows. Runs on a
+    // background thread. Returns the page (so the caller can advance its offset)
+    // alongside the rebuilt rows.
+    private (List<TimelineItem> Page, List<ThreadRow> Rows) ReadPageAndBuild(
+        List<TimelineItem> live, List<TimelineItem> priorCache, int offset,
+        Dictionary<string, string> titleSeed)
+    {
+        var page = new List<TimelineItem>();
         IReadOnlyList<ContactThread> merged;
         try
         {
             using var database = TimelineDatabase.Open(this);
-            items.AddRange(database.Cache.LoadAll());
+            page.AddRange(database.Cache.LoadRecent(CachePageSize, offset));
+
+            var all = new List<TimelineItem>(live.Count + priorCache.Count + page.Count);
+            all.AddRange(live);
+            all.AddRange(priorCache);
+            all.AddRange(page);
 
             // Drop items the owner deleted (text-delete fallback), merge by resolved
             // person identity, then stamp unread from the per-thread read record.
-            var visible = database.Hidden.Filter(items);
+            var visible = database.Hidden.Filter(all);
             var resolver = ContactAssociations.BuildResolver(this, database.IdentityLinks);
             var readState = new ReadState(database.ReadState.LoadAll());
             merged = new TimelineMerger().Merge(visible, resolver)
@@ -188,36 +329,113 @@ public class ThreadsActivity : Activity
             // a database problem crash the screen — fall back to a plain merge.
             Android.Util.Log.Warn("FocusPhoneComm", $"Timeline stores unavailable: {e}");
             CommunicationDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
-            merged = new TimelineMerger().Merge(items);
+            merged = new TimelineMerger().Merge(live.Concat(priorCache).Concat(page));
         }
 
-        allThreads = InboxOrdering.UnreadFirstThenRecent(merged);
-        BindThreads(filterField?.Text ?? "");
+        var rows = InboxOrdering.UnreadFirstThenRecent(merged)
+            .Select(thread => BuildRow(thread, titleSeed))
+            .ToList();
+        return (page, rows);
+    }
 
+    private ThreadRow BuildRow(ContactThread thread, Dictionary<string, string> titleSeed)
+    {
+        if (!titleSeed.TryGetValue(thread.ContactKey, out var title))
+        {
+            title = ThreadTitle(thread);
+            titleSeed[thread.ContactKey] = title;
+        }
+        var latest = thread.Items[^1];
+        var subtitle =
+            $"{RelativeTime.Format(latest.TimestampUtc.LocalDateTime, DateTime.Now)} · {TimelineItemFormatter.Describe(latest)}";
+        return new ThreadRow(thread.ContactKey, title, subtitle, thread.HasUnread);
+    }
+
+    private void BindRows(string query)
+    {
+        var trimmed = query.Trim();
+        shownRows = trimmed.Length == 0
+            ? allRows
+            : allRows.Where(row =>
+                row.Title.Contains(trimmed, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        threadList!.Adapter = new PaperListAdapter(this, shownRows
+            // A subtle leading dot marks unread (DESIGN.md: a mark, not a badge).
+            .Select(row => new PaperListRow((row.HasUnread ? "• " : "") + row.Title, row.Subtitle))
+            .ToList());
+    }
+
+    private void UpdateEmptyState() =>
         emptyView!.Text = new AccountStore(this).IsConfigured
             ? "No conversations yet.\n\nCall and text history appears once permissions are granted."
             : "No conversations yet.\n\nTap Settings to connect your Gmail account.";
+
+    // Reconcile the cache with Gmail (and drain the bridge) on demand. Runs off
+    // the UI thread; success is the refreshed list (DESIGN.md §7: no success
+    // toast), failure a quiet status sentence.
+    private void SyncNow()
+    {
+        if (syncing)
+        {
+            return;
+        }
+        if (!new AccountStore(this).IsConfigured && !GmBridgeClient.Shared(this).IsPaired)
+        {
+            SetStatus("Connect your Gmail account in Settings to sync.");
+            return;
+        }
+
+        syncing = true;
+        syncButton!.Enabled = false;
+        SetStatus("Syncing…");
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var ok = true;
+            try
+            {
+                CommunicationSync.RunReconcile(this);
+            }
+            catch (Exception e)
+            {
+                ok = false;
+                Android.Util.Log.Warn("FocusPhoneComm", $"Manual sync failed: {e}");
+                CommunicationDiagnostics.LogWarning("EmailSync", "Manual sync failed", e);
+            }
+            RunOnUiThread(() =>
+            {
+                syncing = false;
+                syncButton!.Enabled = true;
+                if (ok)
+                {
+                    ReloadThreads(); // Reflect the freshly reconciled cache; clears status.
+                }
+                else
+                {
+                    SetStatus("Sync failed. Check your connection and try again.");
+                }
+            });
+        });
     }
 
-    private void BindThreads(string query)
+    private void SetStatus(string text)
     {
-        var trimmed = query.Trim();
-        threads = trimmed.Length == 0
-            ? allThreads
-            : allThreads.Where(thread =>
-                ThreadTitle(thread).Contains(trimmed, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (statusLine is null)
+        {
+            return;
+        }
+        statusLine.Text = text;
+        statusLine.Visibility = ViewStates.Visible;
+    }
 
-        threadList!.Adapter = new PaperListAdapter(this, threads
-            .Select(thread =>
-            {
-                var latest = thread.Items[^1];
-                // A subtle leading dot marks unread (DESIGN.md: a mark, not a badge).
-                var name = (thread.HasUnread ? "• " : "") + ThreadTitle(thread);
-                return new PaperListRow(
-                    name,
-                    $"{RelativeTime.Format(latest.TimestampUtc.LocalDateTime, DateTime.Now)} · {TimelineItemFormatter.Describe(latest)}");
-            })
-            .ToList());
+    private void ClearStatus()
+    {
+        if (statusLine is null)
+        {
+            return;
+        }
+        statusLine.Text = "";
+        statusLine.Visibility = ViewStates.Gone;
     }
 
     private string ThreadTitle(ContactThread thread)

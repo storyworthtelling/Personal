@@ -155,17 +155,104 @@ public class TimelineCache
         delete.ExecuteNonQuery();
     }
 
+    // The columns every read selects, in the order Read expects them.
+    private const string SelectColumns = """
+        kind, sourceId, contactKey, timestampUtc, snippet, incoming,
+        subject, body, fromAddress, recipients, carbonCopy, messageId, inReplyTo,
+        groupId, participants, externalConversationId, unread, attachments
+        """;
+
     public IReadOnlyList<TimelineItem> LoadAll()
     {
         using var select = connection.CreateCommand();
-        select.CommandText = """
-            SELECT kind, sourceId, contactKey, timestampUtc, snippet, incoming,
-                   subject, body, fromAddress, recipients, carbonCopy, messageId, inReplyTo,
-                   groupId, participants, externalConversationId, unread, attachments
-            FROM timelineItems
-            """;
-        using var reader = select.ExecuteReader();
+        select.CommandText = $"SELECT {SelectColumns} FROM timelineItems";
+        return Read(select);
+    }
 
+    /// <summary>
+    /// Loads a page of items most-recent first, so the timeline screen can render
+    /// the newest conversations without materializing the whole table. Every
+    /// cached writer stamps UTC timestamps, so ordering the ISO-8601 text
+    /// descending is the same as ordering by instant.
+    /// </summary>
+    public IReadOnlyList<TimelineItem> LoadRecent(int limit, int offset = 0)
+    {
+        using var select = connection.CreateCommand();
+        select.CommandText = $"""
+            SELECT {SelectColumns} FROM timelineItems
+            ORDER BY timestampUtc DESC
+            LIMIT $limit OFFSET $offset
+            """;
+        select.Parameters.AddWithValue("$limit", limit);
+        select.Parameters.AddWithValue("$offset", offset);
+        return Read(select);
+    }
+
+    /// <summary>
+    /// Brings a slice of the cache into line with an authoritative snapshot from
+    /// the source (e.g. the current Gmail inbox+sent for the last N days): upserts
+    /// everything in the snapshot, then removes any cached item of the same kind
+    /// within [since, now] that the snapshot no longer contains — i.e. messages
+    /// deleted at the source. Items older than <paramref name="since"/> are left
+    /// alone, since the snapshot does not cover them. The caller must fetch the
+    /// snapshot with the same (or an earlier) cutoff so the window is fully
+    /// represented. Assumes UTC timestamps, matching the cache's writers.
+    /// </summary>
+    public void ReconcileWindow(
+        TimelineItemKind kind, DateTimeOffset since, IReadOnlyCollection<TimelineItem> authoritative)
+    {
+        Upsert(authoritative);
+
+        var sinceText = since.ToUniversalTime().ToString("O");
+        using var transaction = connection.BeginTransaction();
+
+        // Stage the surviving source ids in a temp table rather than a NOT IN
+        // parameter list, which a full-window fetch could overflow.
+        using (var create = connection.CreateCommand())
+        {
+            create.Transaction = transaction;
+            create.CommandText =
+                "CREATE TEMP TABLE IF NOT EXISTS reconcileKeep (sourceId TEXT PRIMARY KEY)";
+            create.ExecuteNonQuery();
+        }
+        using (var clear = connection.CreateCommand())
+        {
+            clear.Transaction = transaction;
+            clear.CommandText = "DELETE FROM reconcileKeep";
+            clear.ExecuteNonQuery();
+        }
+        using (var insert = connection.CreateCommand())
+        {
+            insert.Transaction = transaction;
+            insert.CommandText = "INSERT OR IGNORE INTO reconcileKeep (sourceId) VALUES ($sourceId)";
+            var parameter = insert.CreateParameter();
+            parameter.ParameterName = "$sourceId";
+            insert.Parameters.Add(parameter);
+            foreach (var item in authoritative)
+            {
+                parameter.Value = item.SourceId;
+                insert.ExecuteNonQuery();
+            }
+        }
+        using (var delete = connection.CreateCommand())
+        {
+            delete.Transaction = transaction;
+            delete.CommandText = """
+                DELETE FROM timelineItems
+                WHERE kind = $kind
+                  AND timestampUtc >= $since
+                  AND sourceId NOT IN (SELECT sourceId FROM reconcileKeep)
+                """;
+            delete.Parameters.AddWithValue("$kind", (int)kind);
+            delete.Parameters.AddWithValue("$since", sinceText);
+            delete.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
+    private static List<TimelineItem> Read(SqliteCommand select)
+    {
+        using var reader = select.ExecuteReader();
         var items = new List<TimelineItem>();
         while (reader.Read())
         {
