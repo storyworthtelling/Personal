@@ -19,11 +19,6 @@ public record DriveAudioFile(
 /// </summary>
 public static class DriveAudioFileMapper
 {
-    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".mp3", ".m4a", ".m4b", ".aac", ".flac", ".ogg", ".oga", ".opus", ".wav", ".alac", ".wma",
-    };
-
     public static IReadOnlyList<DriveAudioFile> MapAudioFiles(string filesListJson)
     {
         using var document = JsonDocument.Parse(filesListJson);
@@ -44,7 +39,7 @@ public static class DriveAudioFileMapper
             }
 
             var mimeType = Text(file, "mimeType") ?? "application/octet-stream";
-            if (!IsAudio(mimeType, name))
+            if (!AudioFileTypes.IsAudio(name, mimeType))
             {
                 continue;
             }
@@ -60,10 +55,6 @@ public static class DriveAudioFileMapper
 
         return result;
     }
-
-    private static bool IsAudio(string mimeType, string name) =>
-        mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase)
-        || AudioExtensions.Contains(Path.GetExtension(name));
 
     private static string? Text(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
