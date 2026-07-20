@@ -266,7 +266,7 @@ public class AudioActivity : Activity
 
         var title = PaperUi.Body(this, episode.Title);
         title.Clickable = true;
-        title.Click += (_, _) => PlayQueueFrom(index);
+        title.Click += (_, _) => PlayQueue(episode.Id);
         row.AddView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
         if (index > 0)
