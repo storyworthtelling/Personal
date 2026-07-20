@@ -254,6 +254,7 @@ public class AudioActivity : Activity
         head.SetGravity(GravityFlags.CenterVertical);
         head.AddView(PaperUi.Heading(this, musicView.ToString()),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        head.AddView(PaperUi.QuietButton(this, "Shuffle", () => PlayShuffled((musicCatalog ?? new MusicCatalog([])).Songs())));
         head.AddView(PaperUi.QuietButton(this, "Rescan", () => _ = ScanAsync()));
         container.AddView(head);
 
@@ -277,27 +278,32 @@ public class AudioActivity : Activity
                 return artists.Count == 0
                     ? PaperUi.EmptyState(this, "No music yet — scan your library.")
                     : BuildList([.. artists.Select(artist => new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"))],
-                        _ => PlaybackComingToast());
+                        position => PlayTracks(catalog.TracksByArtist(artists[position].Name), 0),
+                        position => PlayShuffled(catalog.TracksByArtist(artists[position].Name)));
 
             case MusicView.Albums:
                 var albums = catalog.Albums();
                 return albums.Count == 0
                     ? PaperUi.EmptyState(this, "No music yet — scan your library.")
                     : BuildList([.. albums.Select(album => new PaperListRow(album.Name, album.AlbumArtist))],
-                        _ => PlaybackComingToast());
+                        position => PlayTracks(catalog.TracksInAlbum(albums[position].AlbumArtist, albums[position].Name), 0),
+                        position => PlayShuffled(catalog.TracksInAlbum(albums[position].AlbumArtist, albums[position].Name)));
 
             case MusicView.Songs:
                 var songs = catalog.Songs();
                 return songs.Count == 0
                     ? PaperUi.EmptyState(this, "No music yet — scan your library.")
                     : BuildList([.. songs.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist))],
-                        _ => PlaybackComingToast());
+                        position => PlayTracks(songs, position),
+                        position => PlaySmartMix(songs[position], catalog));
 
             case MusicView.Genres:
                 var genres = catalog.Genres();
                 return genres.Count == 0
                     ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : BuildList([.. genres.Select(genre => new PaperListRow(genre))], _ => PlaybackComingToast());
+                    : BuildList([.. genres.Select(genre => new PaperListRow(genre))],
+                        position => PlayTracks(catalog.TracksInGenre(genres[position]), 0),
+                        position => PlayShuffled(catalog.TracksInGenre(genres[position])));
 
             case MusicView.Playlists:
                 return PaperUi.EmptyState(this, "No playlists yet.");
@@ -312,8 +318,41 @@ public class AudioActivity : Activity
         }
     }
 
-    private void PlaybackComingToast() =>
-        Toast.MakeText(this, "Playback arrives in the next update.", ToastLength.Short)!.Show();
+    private void PlayTracks(IReadOnlyList<Track> tracks, int index)
+    {
+        if (controller is null || tracks.Count == 0)
+        {
+            return;
+        }
+
+        nowPlaying = null; // music, not a podcast episode
+        var items = tracks.Select(BuildTrackItem).ToList();
+        controller.SetMediaItems(items, index, 0L);
+        controller.SetPlaybackSpeed(1.0f);
+        controller.Prepare();
+        controller.Play();
+        SendSkipSilence(false); // skip-silence is a podcast setting; off for music
+    }
+
+    private void PlayShuffled(IReadOnlyList<Track> tracks) =>
+        PlayTracks(new ShufflePlanner().Shuffle(tracks), 0);
+
+    private void PlaySmartMix(Track seed, MusicCatalog catalog) =>
+        PlayTracks(new SmartMixBuilder(new ShufflePlanner()).Build(seed, catalog), 0);
+
+    private static MediaItem BuildTrackItem(Track track)
+    {
+        var metadata = new MediaMetadata.Builder()
+            .SetTitle(track.DisplayTitle)!
+            .SetArtist(track.DisplayArtist)!
+            .SetAlbumTitle(track.DisplayAlbum)!
+            .Build()!;
+        return new MediaItem.Builder()
+            .SetMediaId(track.Id)!
+            .SetUri($"drive://{track.Id}")!
+            .SetMediaMetadata(metadata)!
+            .Build()!;
+    }
 
     private View WrapScroll(View inner)
     {

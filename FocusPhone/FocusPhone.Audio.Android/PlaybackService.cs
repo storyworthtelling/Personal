@@ -2,8 +2,11 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using AndroidX.Media3.DataSource;
 using AndroidX.Media3.ExoPlayer;
+using AndroidX.Media3.ExoPlayer.Source;
 using AndroidX.Media3.Session;
+using FocusPhone.Audio.Google;
 using FocusPhone.Domain.Audio;
 
 namespace FocusPhone.Audio;
@@ -39,7 +42,14 @@ public class PlaybackService : MediaSessionService
         progressStore = new PlaybackProgressStore(this);
         book = new PlaybackProgressBook(progressStore.Load());
 
-        player = new ExoPlayerBuilder(this).Build()!;
+        // Drive-backed music (drive://{fileId}) resolves to an authed download URL per
+        // open; podcast http(s) URIs pass through. One factory serves both sides.
+        var resolvingFactory = new ResolvingDataSource.Factory(
+            new DefaultHttpDataSource.Factory(),
+            new DriveMediaResolver(new DeviceAccountTokenProvider()));
+        player = new ExoPlayerBuilder(this)
+            .SetMediaSourceFactory(new DefaultMediaSourceFactory(resolvingFactory))
+            .Build()!;
         mediaSession = new MediaSession.Builder(this, player).Build();
 
         handler = new Handler(Looper.MainLooper!);
