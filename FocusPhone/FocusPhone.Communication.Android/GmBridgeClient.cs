@@ -56,6 +56,7 @@ public sealed class GmBridgeClient
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Bridge connect failed: {e}");
+            CommunicationDiagnostics.LogWarning("Bridge", "Bridge connect failed", e);
         }
     }
 
@@ -81,6 +82,7 @@ public sealed class GmBridgeClient
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Bridge send failed: {e}");
+            CommunicationDiagnostics.LogWarning("Bridge", "Bridge text send failed", e);
             return false;
         }
     }
@@ -100,6 +102,7 @@ public sealed class GmBridgeClient
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Bridge media send failed: {e}");
+            CommunicationDiagnostics.LogWarning("Bridge", "Bridge media send failed", e);
             return false;
         }
     }

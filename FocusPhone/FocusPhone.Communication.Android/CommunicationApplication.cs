@@ -17,6 +17,9 @@ public class CommunicationApplication : Application
         base.OnCreate();
         // Install first so the SQLite init below (and anything after) is captured.
         CrashReporter.Install(this, "Communication");
+        // Layer the rolling, reviewable/shareable diagnostics log on top of the
+        // one-shot crash popup (Settings → Diagnostics).
+        CommunicationDiagnostics.Install(this);
         // Explicitly initialize the SQLitePCL provider before any database is
         // opened. The bundle's automatic module-initializer can be removed by
         // the Release trimmer, which would make the first SqliteConnection.Open()
@@ -33,6 +36,7 @@ public class CommunicationApplication : Application
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Bridge startup failed: {e}");
+            CommunicationDiagnostics.LogWarning("Bridge", "Bridge startup failed", e);
         }
     }
 }

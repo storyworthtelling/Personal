@@ -128,6 +128,7 @@ public class ThreadActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Timeline stores unavailable: {e}");
+            CommunicationDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
             thread = new TimelineMerger().Merge(gathered)
                 .FirstOrDefault(candidate => candidate.ContactKey == contactKey);
         }
@@ -276,6 +277,7 @@ public class ThreadActivity : Activity
             catch (Exception e)
             {
                 Android.Util.Log.Warn("FocusPhoneComm", $"Delete of {item.Kind}:{item.SourceId} failed: {e}");
+                CommunicationDiagnostics.LogWarning("Delete", $"Delete of {item.Kind}:{item.SourceId} failed", e);
             }
         });
     }
@@ -438,6 +440,7 @@ public class ThreadActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Reading photo failed: {e}");
+            CommunicationDiagnostics.LogWarning("Photo", "Reading photo attachment failed", e);
             return null;
         }
     }
@@ -461,6 +464,7 @@ public class ThreadActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Outgoing echo failed: {e}");
+            CommunicationDiagnostics.LogWarning("Bridge", "Recording sent message locally failed", e);
         }
     }
 

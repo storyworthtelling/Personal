@@ -114,6 +114,9 @@ public class EmailSyncWorker : Worker
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneEmail", $"Email sync failed; will retry: {e}");
+            // This runs invisibly in the background worker; without a durable record
+            // a failing sync would silently stop conversations updating.
+            CommunicationDiagnostics.LogWarning("EmailSync", "Email sync failed; will retry", e);
             return Result.InvokeRetry();
         }
     }

@@ -74,6 +74,12 @@ public class SettingsActivity : Activity
             "device is locked down (or a whitelisted install).");
         layout.AddView(note, Spaced(DesignTokens.Space.X6, 0));
 
+        // On a locked-down phone there is no logcat, so surface captured crashes
+        // and background failures here where the owner can review and share them.
+        var diagnostics = PaperUi.QuietButton(this, "Diagnostics", () =>
+            StartActivity(new Intent(this, typeof(DiagnosticsActivity))));
+        layout.AddView(diagnostics, Spaced(DesignTokens.Space.X4, 0));
+
         scroll.AddView(layout);
         root.AddView(scroll, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });

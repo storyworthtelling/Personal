@@ -54,6 +54,7 @@ public class ThreadsActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Could not schedule email sync: {e}");
+            CommunicationDiagnostics.LogWarning("EmailSync", "Could not schedule email sync", e);
         }
 
         CrashReporter.ShowPendingCrash(this);
@@ -186,6 +187,7 @@ public class ThreadsActivity : Activity
             // The timeline cache is a convenience over the live call log; never let
             // a database problem crash the screen — fall back to a plain merge.
             Android.Util.Log.Warn("FocusPhoneComm", $"Timeline stores unavailable: {e}");
+            CommunicationDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
             merged = new TimelineMerger().Merge(items);
         }
 
