@@ -32,16 +32,23 @@ public class AudioActivity : ListActivity
     private const string YtMusicPackage = "com.google.android.apps.youtube.music";
 
     private PodcastStore? store;
+    private PlaybackProgressStore? progressStore;
+    private PlaybackSettingsStore? settingsStore;
+    private PlaybackSettingsSnapshot settings = PlaybackSettingsSnapshot.Empty();
     private FrameLayout? undoHost;
     private PodcastLibrary library = new([]);
     private IReadOnlyList<Episode> queue = [];
     private MediaController? controller;
+    private Episode? nowPlaying;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
         store = new PodcastStore(this);
+        progressStore = new PlaybackProgressStore(this);
+        settingsStore = new PlaybackSettingsStore(this);
+        settings = settingsStore.Load();
         SetContentView(BuildLayout());
         PaperUi.StylePaperList(this, ListView!);
 
@@ -93,6 +100,7 @@ public class AudioActivity : ListActivity
 
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Add feed", ShowAddFeedDialog),
+            PaperUi.QuietButton(this, "Speed", ShowSpeedDialog),
             PaperUi.QuietButton(this, "YT Music", ShowYtMusicSearch)));
         return root;
     }
@@ -160,12 +168,32 @@ public class AudioActivity : ListActivity
     private void RenderQueue()
     {
         queue = library.GetDefaultView();
+        var progress = new PlaybackProgressBook(progressStore!.Load());
         ListAdapter = new PaperListAdapter(this, queue
             .Select(episode => new PaperListRow(
                 episode.Title,
                 RelativeTime.Format(episode.PublishedUtc.LocalDateTime, DateTime.Now) +
-                (episode.Duration is { } d ? $" · {(int)d.TotalMinutes} min" : "")))
+                    DurationSuffix(episode, progress)))
             .ToList());
+    }
+
+    // Episode length shown as true time-left at the show's speed, minus any
+    // resume position — so a half-heard episode reads how long is actually left.
+    private string DurationSuffix(Episode episode, PlaybackProgressBook progress)
+    {
+        if (episode.Duration is not { } duration)
+        {
+            return "";
+        }
+
+        var position = progress.Resume(episode.Id) ?? TimeSpan.Zero;
+        var remaining = duration - position;
+        if (remaining < TimeSpan.Zero)
+        {
+            remaining = TimeSpan.Zero;
+        }
+
+        return " · " + PlaybackFormatting.TimeLeftAtSpeed(remaining, settings.For(episode.FeedId).Speed);
     }
 
     private void Play(Episode episode)
@@ -174,15 +202,98 @@ public class AudioActivity : ListActivity
         {
             return;
         }
+
+        nowPlaying = episode;
+        var showSettings = settings.For(episode.FeedId);
         var metadata = new MediaMetadata.Builder().SetTitle(episode.Title)!.Build()!;
         var item = new MediaItem.Builder()
+            .SetMediaId(episode.Id)!
             .SetUri(episode.AudioUrl)!
             .SetMediaMetadata(metadata)!
             .Build()!;
-        controller.SetMediaItem(item);
+
+        var resume = new PlaybackProgressBook(progressStore!.Load())
+            .ResumeWithRewind(episode.Id, DateTimeOffset.Now);
+        var startMs = resume is { } point ? (long)point.TotalMilliseconds : 0L;
+
+        controller.SetMediaItem(item, startMs);
+        controller.SetPlaybackSpeed(showSettings.Speed);
         controller.Prepare();
         controller.Play();
+        SendSkipSilence(showSettings.SkipSilence);
     }
+
+    private void SendSkipSilence(bool enabled)
+    {
+        var intent = new Intent(this, typeof(PlaybackService));
+        intent.SetAction(AudioPlaybackCommands.ActionSetSkipSilence);
+        intent.PutExtra(AudioPlaybackCommands.ExtraEnabled, enabled);
+        StartService(intent);
+    }
+
+    // Per-show playback speed + skip-silence in a plain Paper dialog (no new
+    // tokens). Edits the currently-playing show's settings, or the global default
+    // when nothing is playing; applies live and persists.
+    private void ShowSpeedDialog()
+    {
+        var feedId = nowPlaying?.FeedId;
+        var current = feedId is null ? settings.Default : settings.For(feedId);
+
+        var edge = PaperTheme.Dp(this, DesignTokens.Space.X4);
+        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        layout.SetPadding(edge, edge, edge, edge);
+
+        var label = PaperUi.Title(this, SpeedLabel(current.Speed));
+        layout.AddView(label);
+
+        Button? trim = null;
+
+        void Apply(PlaybackSettings updated)
+        {
+            current = updated;
+            label.Text = SpeedLabel(current.Speed);
+            if (trim is not null)
+            {
+                trim.Text = TrimLabel(current.SkipSilence);
+            }
+
+            PersistAndApply(feedId, current);
+        }
+
+        var presetRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        presetRow.AddView(PaperUi.SecondaryButton(this, "−", () => Apply(current.Slower())));
+        foreach (var preset in PlaybackSettings.Presets)
+        {
+            var value = preset;
+            presetRow.AddView(PaperUi.QuietButton(this, $"{value:0.0}×", () => Apply(current.WithSpeed(value))));
+        }
+        presetRow.AddView(PaperUi.SecondaryButton(this, "+", () => Apply(current.Faster())));
+        layout.AddView(presetRow);
+
+        trim = PaperUi.SecondaryButton(this, TrimLabel(current.SkipSilence),
+            () => Apply(current with { SkipSilence = !current.SkipSilence }));
+        layout.AddView(trim);
+
+        new AlertDialog.Builder(this)
+            .SetTitle("Playback speed")!
+            .SetView(layout)!
+            .SetPositiveButton("Done", (_, _) => { })!
+            .Show();
+    }
+
+    private void PersistAndApply(string? feedId, PlaybackSettings updated)
+    {
+        settings = feedId is null
+            ? settings with { Default = updated }
+            : settings.With(feedId, updated);
+        settingsStore!.Save(settings);
+        controller?.SetPlaybackSpeed(updated.Speed);
+        SendSkipSilence(updated.SkipSilence);
+    }
+
+    private static string SpeedLabel(float speed) => $"Speed {speed:0.0}×";
+
+    private static string TrimLabel(bool on) => on ? "Trim silence: on" : "Trim silence: off";
 
     private void ShowAddFeedDialog()
     {
