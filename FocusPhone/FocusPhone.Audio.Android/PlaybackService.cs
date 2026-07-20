@@ -8,6 +8,7 @@ using AndroidX.Media3.ExoPlayer.Source;
 using AndroidX.Media3.Session;
 using FocusPhone.Audio.Google;
 using FocusPhone.Domain.Audio;
+using FocusPhone.Domain.Music;
 
 namespace FocusPhone.Audio;
 
@@ -24,12 +25,12 @@ namespace FocusPhone.Audio;
     Name = "com.storyworthtelling.focusphone.audio.PlaybackService",
     Exported = true,
     ForegroundServiceType = ForegroundService.TypeMediaPlayback)]
-[IntentFilter(["androidx.media3.session.MediaSessionService"])]
-public class PlaybackService : MediaSessionService
+[IntentFilter(["androidx.media3.session.MediaLibraryService"])]
+public class PlaybackService : MediaLibraryService
 {
     private const long RecordIntervalMs = 10_000;
 
-    private MediaSession? mediaSession;
+    private MediaLibrarySession? mediaSession;
     private IExoPlayer? player;
     private PlaybackProgressStore? progressStore;
     private PlaybackProgressBook book = new();
@@ -50,14 +51,21 @@ public class PlaybackService : MediaSessionService
         player = new ExoPlayerBuilder(this)
             .SetMediaSourceFactory(new DefaultMediaSourceFactory(resolvingFactory))
             .Build()!;
-        mediaSession = new MediaSession.Builder(this, player).Build();
+        var tree = new MediaBrowseTree(LoadCatalog());
+        mediaSession = new MediaLibrarySession.Builder(this, player, new LibraryCallback(tree)).Build();
 
         handler = new Handler(Looper.MainLooper!);
         recorder = new Java.Lang.Runnable(RecordTick);
         handler.PostDelayed(recorder, RecordIntervalMs);
     }
 
-    public override MediaSession? OnGetSession(MediaSession.ControllerInfo controllerInfo) => mediaSession;
+    public override MediaLibrarySession? OnGetSession(MediaSession.ControllerInfo controllerInfo) => mediaSession;
+
+    private MusicCatalog LoadCatalog()
+    {
+        using var database = MusicDatabase.Open(this);
+        return new MusicCatalog(database.Catalog.LoadAll());
+    }
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
     {
@@ -108,5 +116,27 @@ public class PlaybackService : MediaSessionService
         mediaSession = null;
         player = null;
         base.OnDestroy();
+    }
+
+    // Serves the browsable content tree to Android Auto / Assistant. Each request is
+    // answered immediately from the in-memory tree (built from the cached catalog).
+    private sealed class LibraryCallback(MediaBrowseTree tree)
+        : Java.Lang.Object, MediaLibrarySession.ICallback
+    {
+        public Com.Google.Common.Util.Concurrent.IListenableFuture OnGetLibraryRoot(
+            MediaLibrarySession session, MediaSession.ControllerInfo browser, MediaLibraryService.LibraryParams? libraryParams) =>
+            Com.Google.Common.Util.Concurrent.Futures.ImmediateFuture(
+                LibraryResult.OfItem(tree.Root(), libraryParams));
+
+        public Com.Google.Common.Util.Concurrent.IListenableFuture OnGetChildren(
+            MediaLibrarySession session, MediaSession.ControllerInfo browser, string parentId,
+            int page, int pageSize, MediaLibraryService.LibraryParams? libraryParams) =>
+            Com.Google.Common.Util.Concurrent.Futures.ImmediateFuture(
+                LibraryResult.OfItemList(tree.Children(parentId), libraryParams));
+
+        public Com.Google.Common.Util.Concurrent.IListenableFuture OnGetItem(
+            MediaLibrarySession session, MediaSession.ControllerInfo browser, string mediaId) =>
+            Com.Google.Common.Util.Concurrent.Futures.ImmediateFuture(
+                LibraryResult.OfItem(tree.Root(), (MediaLibraryService.LibraryParams?)null));
     }
 }
