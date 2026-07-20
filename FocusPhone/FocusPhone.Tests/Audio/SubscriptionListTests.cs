@@ -80,6 +80,28 @@ public class SubscriptionListTests
     }
 
     [Fact]
+    public void UpdateTitle_ReplacesTheShowsTitle()
+    {
+        var list = new SubscriptionList();
+        list.Add("https://a.com/feed", "https://a.com/feed", Now);
+
+        list.UpdateTitle("https://a.com/feed", "The Real Show");
+
+        Assert.Equal("The Real Show", Assert.Single(list.Ordered).Title);
+    }
+
+    [Fact]
+    public void UpdateTitle_IsNoOpForUnknownFeed()
+    {
+        var list = new SubscriptionList();
+        list.Add("https://a.com/feed", "A", Now);
+
+        list.UpdateTitle("https://missing.com/feed", "Nope");
+
+        Assert.Equal("A", Assert.Single(list.Ordered).Title);
+    }
+
+    [Fact]
     public void Order_SurvivesExportAndRestore()
     {
         var list = new SubscriptionList();

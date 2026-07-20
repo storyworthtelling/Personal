@@ -197,6 +197,39 @@ public static class PaperUi
     }
 
     /// <summary>
+    /// A two-state segmented selector (e.g. Podcasts | Music). Built from the
+    /// button recipes so no new tokens are needed: the active side is inked in
+    /// Accent, the inactive side muted. Calls back with the selected index.
+    /// </summary>
+    public static LinearLayout SegmentedToggle(Context context, string leftLabel, string rightLabel, Action<int> onSelect)
+    {
+        var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
+        Button left = null!;
+        Button right = null!;
+
+        void Paint(int index)
+        {
+            left.SetTextColor(index == 0 ? PaperTheme.Accent : PaperTheme.InkMuted);
+            right.SetTextColor(index == 1 ? PaperTheme.Accent : PaperTheme.InkMuted);
+        }
+
+        left = SecondaryButton(context, leftLabel, () => { Paint(0); onSelect(0); });
+        right = SecondaryButton(context, rightLabel, () => { Paint(1); onSelect(1); });
+
+        row.AddView(left, new LinearLayout.LayoutParams(0,
+            Android.Views.ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        row.AddView(right, new LinearLayout.LayoutParams(0,
+            Android.Views.ViewGroup.LayoutParams.WrapContent)
+        {
+            Weight = 1,
+            MarginStart = PaperTheme.Dp(context, DesignTokens.Space.X2),
+        });
+
+        Paint(0);
+        return row;
+    }
+
+    /// <summary>
     /// The pinned bottom bar: a hairline rule over a horizontal action row,
     /// fixed at the screen bottom (append after a weight-1 content view).
     /// </summary>

@@ -29,6 +29,16 @@ public class SubscriptionList
     public void Remove(string feedUrl) =>
         subscriptions.RemoveAll(subscription => subscription.FeedUrl == feedUrl);
 
+    /// <summary>Updates a show's display title (e.g. once its feed has been fetched). No-op if absent.</summary>
+    public void UpdateTitle(string feedUrl, string title)
+    {
+        var index = subscriptions.FindIndex(subscription => subscription.FeedUrl == feedUrl);
+        if (index >= 0)
+        {
+            subscriptions[index] = subscriptions[index] with { Title = title };
+        }
+    }
+
     public void Move(int fromIndex, int toIndex)
     {
         if (subscriptions.Count == 0)
