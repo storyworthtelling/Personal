@@ -137,6 +137,7 @@ public class EmailComposeActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Attachment copy failed: {e}");
+            CommunicationDiagnostics.LogWarning("Email", "Attachment copy failed", e);
             return null;
         }
     }

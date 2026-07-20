@@ -112,6 +112,7 @@ public class MessagesNotificationListener : NotificationListenerService
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Could not cache notification items: {e}");
+            CommunicationDiagnostics.LogWarning("Notifications", "Could not cache notification items", e);
         }
     }
 
