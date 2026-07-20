@@ -37,6 +37,7 @@ public class GmailClient
         DateTimeOffset since, CancellationToken cancellation = default)
     {
         using var imap = new ImapClient();
+        ConfigureTransport(imap);
         await imap.ConnectAsync(ImapHost, 993, useSsl: true, cancellation);
         await imap.AuthenticateAsync(accountAddress, appPassword, cancellation);
 
@@ -88,6 +89,7 @@ public class GmailClient
         message.Body = builder.ToMessageBody();
 
         using var smtp = new SmtpClient();
+        ConfigureTransport(smtp);
         await smtp.ConnectAsync(SmtpHost, 465, useSsl: true, cancellation);
         await smtp.AuthenticateAsync(accountAddress, appPassword, cancellation);
         await smtp.SendAsync(message, cancellation);
@@ -102,6 +104,7 @@ public class GmailClient
     public async Task DeleteAsync(string messageId, CancellationToken cancellation = default)
     {
         using var imap = new ImapClient();
+        ConfigureTransport(imap);
         await imap.ConnectAsync(ImapHost, 993, useSsl: true, cancellation);
         await imap.AuthenticateAsync(accountAddress, appPassword, cancellation);
 
@@ -116,5 +119,17 @@ public class GmailClient
         }
 
         await imap.DisconnectAsync(quit: true, cancellation);
+    }
+
+    /// <summary>
+    /// Applies the TLS settings needed to reach Gmail from Android. The device
+    /// cannot complete OCSP/CRL revocation checks for Gmail's chain (the
+    /// intermediate certificate publishes no OCSP responder), so MailKit's default
+    /// revocation check fails the handshake with Chain_RevocationStatusUnknown.
+    /// Gmail's chain is otherwise valid, so revocation checking is turned off.
+    /// </summary>
+    internal static void ConfigureTransport(IMailService client)
+    {
+        client.CheckCertificateRevocation = false;
     }
 }
