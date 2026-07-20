@@ -6,8 +6,10 @@ using Android.Widget;
 using AndroidX.Media3.Common;
 using AndroidX.Media3.Session;
 using MediaController = AndroidX.Media3.Session.MediaController;
+using FocusPhone.Audio.Google;
 using FocusPhone.Domain.Audio;
 using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Music;
 using FocusPhone.Domain.Time;
 using FocusPhone.Infrastructure.Podcasts;
 using FocusPhone.Ui;
@@ -48,6 +50,15 @@ public class AudioActivity : Activity
     private string? openFeedId;
     private bool showingQueue;
 
+    // Music side (Phase 3: sign-in + scan + browse; playback lands in Phase 4).
+    private readonly DeviceAccountTokenProvider musicTokens = new();
+    private DriveMusicClient? driveClient;
+    private MusicTagReader? tagReader;
+    private MusicCatalog? musicCatalog;
+    private IReadOnlyList<DriveMusicClient.DriveFolder>? driveFolders;
+    private string? musicStatus;
+    private MusicView musicView = MusicView.Menu;
+
     private FrameLayout content = null!;
     private NowPlayingBar nowPlayingBar = null!;
     private Handler? uiHandler;
@@ -65,10 +76,20 @@ public class AudioActivity : Activity
         subscriptions = new SubscriptionList(subscriptionStore.Load());
         MigrateLegacyFeedsIfNeeded();
 
+        driveClient = new DriveMusicClient(musicTokens);
+        tagReader = new MusicTagReader(Path.Combine(CacheDir!.AbsolutePath, "art"));
+        LoadMusicCatalog();
+
         SetContentView(BuildLayout());
         ConnectController();
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
+    }
+
+    private void LoadMusicCatalog()
+    {
+        using var database = MusicDatabase.Open(this);
+        musicCatalog = new MusicCatalog(database.Catalog.LoadAll());
     }
 
     // The old store persisted a bare feed-URL set; seed the ordered subscription
@@ -154,6 +175,11 @@ public class AudioActivity : Activity
             openFeedId = null;
             RenderContent();
         }
+        else if (side == 1 && musicView != MusicView.Menu)
+        {
+            musicView = MusicView.Menu;
+            RenderContent();
+        }
         else
         {
             base.OnBackPressed();
@@ -170,7 +196,205 @@ public class AudioActivity : Activity
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
     }
 
-    private View BuildMusicPane() => PaperUi.EmptyState(this, "Music is coming.");
+    private View BuildMusicPane()
+    {
+        if (string.IsNullOrEmpty(MusicSettingsStore.GoogleAccountEmail))
+        {
+            return BuildDriveSetup();
+        }
+
+        return string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId)
+            ? BuildFolderPicker()
+            : BuildMusicBrowse();
+    }
+
+    private View BuildDriveSetup()
+    {
+        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        layout.AddView(PaperUi.Body(this, "Stream your own music from Google Drive."));
+        layout.AddView(PaperUi.Secondary(this,
+            "First register this app as an Android OAuth client (Drive API enabled), then sign in:\n\n" +
+            $"Package: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
+        layout.AddView(PaperUi.PrimaryButton(this, "Sign in with Google", () => _ = SignInAsync()));
+        return WrapScroll(layout);
+    }
+
+    private View BuildFolderPicker()
+    {
+        if (driveFolders is null)
+        {
+            _ = LoadFoldersAsync();
+            return PaperUi.EmptyState(this, "Finding your Drive folders…");
+        }
+
+        var container = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        container.AddView(PaperUi.Body(this, "Pick the folder your music lives in."));
+        container.AddView(PaperUi.SecondaryButton(this, "Use all of My Drive", () => ChooseFolder("root")));
+
+        var rows = driveFolders.Select(folder => new PaperListRow(folder.Name)).ToList();
+        var list = BuildList(rows, position => ChooseFolder(driveFolders![position].Id));
+        container.AddView(list, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return container;
+    }
+
+    private void ChooseFolder(string folderId)
+    {
+        MusicSettingsStore.MusicFolderId = folderId;
+        driveFolders = null;
+        RenderContent();
+        _ = ScanAsync();
+    }
+
+    private View BuildMusicBrowse()
+    {
+        var container = new LinearLayout(this) { Orientation = Orientation.Vertical };
+
+        var head = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        head.SetGravity(GravityFlags.CenterVertical);
+        head.AddView(PaperUi.Heading(this, musicView.ToString()),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        head.AddView(PaperUi.QuietButton(this, "Rescan", () => _ = ScanAsync()));
+        container.AddView(head);
+
+        if (!string.IsNullOrEmpty(musicStatus))
+        {
+            container.AddView(PaperUi.Secondary(this, musicStatus));
+        }
+
+        container.AddView(BuildMusicBody(), new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return container;
+    }
+
+    private View BuildMusicBody()
+    {
+        var catalog = musicCatalog ?? new MusicCatalog([]);
+        switch (musicView)
+        {
+            case MusicView.Artists:
+                var artists = catalog.Artists();
+                return artists.Count == 0
+                    ? PaperUi.EmptyState(this, "No music yet — scan your library.")
+                    : BuildList([.. artists.Select(artist => new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"))],
+                        _ => PlaybackComingToast());
+
+            case MusicView.Albums:
+                var albums = catalog.Albums();
+                return albums.Count == 0
+                    ? PaperUi.EmptyState(this, "No music yet — scan your library.")
+                    : BuildList([.. albums.Select(album => new PaperListRow(album.Name, album.AlbumArtist))],
+                        _ => PlaybackComingToast());
+
+            case MusicView.Songs:
+                var songs = catalog.Songs();
+                return songs.Count == 0
+                    ? PaperUi.EmptyState(this, "No music yet — scan your library.")
+                    : BuildList([.. songs.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist))],
+                        _ => PlaybackComingToast());
+
+            case MusicView.Genres:
+                var genres = catalog.Genres();
+                return genres.Count == 0
+                    ? PaperUi.EmptyState(this, "No music yet — scan your library.")
+                    : BuildList([.. genres.Select(genre => new PaperListRow(genre))], _ => PlaybackComingToast());
+
+            case MusicView.Playlists:
+                return PaperUi.EmptyState(this, "No playlists yet.");
+
+            default:
+                var items = new[] { "Playlists", "Artists", "Albums", "Songs", "Genres" };
+                return BuildList([.. items.Select(item => new PaperListRow(item))], position =>
+                {
+                    musicView = Enum.Parse<MusicView>(items[position]);
+                    RenderContent();
+                });
+        }
+    }
+
+    private void PlaybackComingToast() =>
+        Toast.MakeText(this, "Playback arrives in the next update.", ToastLength.Short)!.Show();
+
+    private View WrapScroll(View inner)
+    {
+        var scroll = new ScrollView(this);
+        scroll.AddView(inner);
+        return scroll;
+    }
+
+    private async Task SignInAsync()
+    {
+        try
+        {
+            await DeviceAccountSignIn.SignIn(this);
+            RenderContent();
+        }
+        catch (Exception e)
+        {
+            Toast.MakeText(this, e.Message, ToastLength.Long)!.Show();
+        }
+    }
+
+    private async Task LoadFoldersAsync()
+    {
+        try
+        {
+            driveFolders = await driveClient!.ListFoldersAsync("root", CancellationToken.None);
+            RenderContent();
+        }
+        catch (Exception e)
+        {
+            Toast.MakeText(this, e.Message, ToastLength.Long)!.Show();
+        }
+    }
+
+    private async Task ScanAsync()
+    {
+        var folderId = MusicSettingsStore.MusicFolderId;
+        if (folderId is null || driveClient is null || tagReader is null)
+        {
+            return;
+        }
+
+        var scanner = new MusicScanner(driveClient, musicTokens, tagReader);
+        musicStatus = "Scanning your library…";
+        RenderContent();
+        try
+        {
+            using var database = MusicDatabase.Open(this);
+            await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
+            {
+                if (done == total || done % 25 == 0)
+                {
+                    RunOnUiThread(() =>
+                    {
+                        musicStatus = done >= total ? null : $"Scanning… {done} of {total}";
+                        if (side == 1)
+                        {
+                            RenderContent();
+                        }
+                    });
+                }
+            }, CancellationToken.None);
+            LoadMusicCatalog();
+            musicStatus = null;
+        }
+        catch (Exception e)
+        {
+            musicStatus = $"Scan couldn't finish: {e.Message}";
+        }
+
+        RenderContent();
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == DeviceAccountSignIn.RequestCode)
+        {
+            DeviceAccountSignIn.HandleChooserResult(resultCode, data);
+        }
+    }
 
     private View BuildPodcastsPane()
     {
@@ -605,4 +829,15 @@ public class AudioActivity : Activity
     private static string SpeedLabel(float speed) => $"Speed {speed:0.0}×";
 
     private static string TrimLabel(bool on) => on ? "Trim silence: on" : "Trim silence: off";
+}
+
+/// <summary>The music side's browse levels — the iPod top menu and its lists.</summary>
+internal enum MusicView
+{
+    Menu,
+    Playlists,
+    Artists,
+    Albums,
+    Songs,
+    Genres,
 }
