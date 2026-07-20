@@ -181,9 +181,9 @@ jobs:
         with:
           name: FocusPhone-Android
           path: |
-            FocusPhone/FocusPhone.Launcher.Android/bin/Release/net10.0-android/publish/*.apk
-            FocusPhone/FocusPhone.Communication.Android/bin/Release/net10.0-android/publish/*.apk
-            FocusPhone/FocusPhone.Camera.Android/bin/Release/net10.0-android/publish/*.apk
-            FocusPhone/FocusPhone.Audio.Android/bin/Release/net10.0-android/publish/*.apk
+            FocusPhone/FocusPhone.Launcher.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/FocusPhone.Communication.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/FocusPhone.Camera.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/FocusPhone.Audio.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90

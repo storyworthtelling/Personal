@@ -112,6 +112,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Ledger-Android
-          path: Ledger/Ledger.Android/bin/Release/net10.0-android/publish/*.apk
+          path: Ledger/Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
