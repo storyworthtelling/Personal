@@ -1,5 +1,6 @@
 using Android.Content;
 using AndroidX.Work;
+using FocusPhone.Infrastructure.Email;
 
 namespace FocusPhone.Communication;
 
@@ -25,13 +26,17 @@ public class AccountStore
     public string? GmailAddress
     {
         get => preferences.GetString(AddressKey, null);
-        set => preferences.Edit()!.PutString(AddressKey, value)!.Apply();
+        // Store the normalised address so the value the screen shows back and the
+        // value the sync worker authenticates with are the same clean string.
+        set => preferences.Edit()!.PutString(AddressKey, GmailCredentials.NormalizeAddress(value))!.Apply();
     }
 
     public string? GmailAppPassword
     {
         get => preferences.GetString(AppPasswordKey, null);
-        set => preferences.Edit()!.PutString(AppPasswordKey, value)!.Apply();
+        // Strip Google's display spaces before persisting, otherwise a
+        // pasted-verbatim app password fails auth every sync.
+        set => preferences.Edit()!.PutString(AppPasswordKey, GmailCredentials.NormalizeAppPassword(value))!.Apply();
     }
 
     /// <summary>The gmbridge (Messages-for-Web) session blob; present once paired.</summary>

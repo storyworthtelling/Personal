@@ -24,10 +24,20 @@ public class GmailClient
 
     public GmailClient(string accountAddress, string appPassword)
     {
-        this.accountAddress = accountAddress;
-        this.appPassword = appPassword;
-        mapper = new GmailMessageMapper(accountAddress);
+        // A pasted app password arrives with Google's display spaces and the
+        // address may carry stray whitespace/case; normalise before either
+        // reaches the server, otherwise auth fails with
+        // "Application-specific password required".
+        this.accountAddress = GmailCredentials.NormalizeAddress(accountAddress);
+        this.appPassword = GmailCredentials.NormalizeAppPassword(appPassword);
+        mapper = new GmailMessageMapper(this.accountAddress);
     }
+
+    /// <summary>The normalised Gmail address the client authenticates with.</summary>
+    public string AccountAddress => accountAddress;
+
+    /// <summary>The normalised app password the client authenticates with.</summary>
+    public string AppPassword => appPassword;
 
     /// <summary>
     /// Fetches recent inbox and sent messages (both directions of the
