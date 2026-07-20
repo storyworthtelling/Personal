@@ -226,7 +226,33 @@ public static class PaperUi
         bar.AddView(row, new LinearLayout.LayoutParams(
             Android.Views.ViewGroup.LayoutParams.MatchParent,
             Android.Views.ViewGroup.LayoutParams.WrapContent));
+
+        // Under the edge-to-edge layout that Android enforces at target SDK 35+
+        // the window draws behind the system navigation bar, so this pinned bar
+        // would sit beneath the gesture pill and its actions look like they
+        // overlap it. Pad the bar down by the navigation-bar inset so the
+        // buttons always clear the system bar. The freed strip below shows the
+        // paper window background, matching the paper navigationBarColor.
+        bar.SetOnApplyWindowInsetsListener(new NavigationBarInsetListener(bar.PaddingBottom));
         return bar;
+    }
+
+    /// <summary>
+    /// Pads a view down by the system navigation-bar inset so a bottom-pinned
+    /// bar clears the gesture pill under enforced edge-to-edge.
+    /// </summary>
+    private sealed class NavigationBarInsetListener : Java.Lang.Object, Android.Views.View.IOnApplyWindowInsetsListener
+    {
+        private readonly int basePaddingBottom;
+
+        public NavigationBarInsetListener(int basePaddingBottom) => this.basePaddingBottom = basePaddingBottom;
+
+        public Android.Views.WindowInsets OnApplyWindowInsets(Android.Views.View view, Android.Views.WindowInsets insets)
+        {
+            var bottom = insets.GetInsets(Android.Views.WindowInsets.Type.SystemBars()).Bottom;
+            view.SetPadding(view.PaddingLeft, view.PaddingTop, view.PaddingRight, basePaddingBottom + bottom);
+            return insets;
+        }
     }
 
     /// <summary>
