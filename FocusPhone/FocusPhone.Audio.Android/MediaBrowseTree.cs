@@ -64,8 +64,8 @@ public sealed class MediaBrowseTree
     {
         var metadata = new MediaMetadata.Builder()
             .SetTitle(title)!
-            .SetIsBrowsable(true)!
-            .SetIsPlayable(false)!
+            .SetIsBrowsable(Java.Lang.Boolean.True)!
+            .SetIsPlayable(Java.Lang.Boolean.False)!
             .Build()!;
         return new MediaItem.Builder().SetMediaId(id)!.SetMediaMetadata(metadata)!.Build()!;
     }
@@ -76,8 +76,8 @@ public sealed class MediaBrowseTree
             .SetTitle(track.DisplayTitle)!
             .SetArtist(track.DisplayArtist)!
             .SetAlbumTitle(track.DisplayAlbum)!
-            .SetIsBrowsable(false)!
-            .SetIsPlayable(true)!
+            .SetIsBrowsable(Java.Lang.Boolean.False)!
+            .SetIsPlayable(Java.Lang.Boolean.True)!
             .Build()!;
         return new MediaItem.Builder()
             .SetMediaId(track.Id)!
