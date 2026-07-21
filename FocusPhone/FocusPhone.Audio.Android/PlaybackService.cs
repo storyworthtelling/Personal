@@ -59,6 +59,8 @@ public class PlaybackService : MediaLibraryService
         handler.PostDelayed(recorder, RecordIntervalMs);
     }
 
+    public override MediaSession? OnGetSession(MediaSession.ControllerInfo? controllerInfo) => mediaSession;
+
     public override MediaLibrarySession? OnGetSessionFromMediaLibraryService(MediaSession.ControllerInfo? controllerInfo) =>
         mediaSession;
 
