@@ -59,7 +59,10 @@ public class PlaybackService : MediaLibraryService
         handler.PostDelayed(recorder, RecordIntervalMs);
     }
 
-    public override MediaSession? OnGetSession(MediaSession.ControllerInfo? controllerInfo) => mediaSession;
+    // Covariant return (MediaLibrarySession, not MediaSession): Java's
+    // MediaLibraryService.onGetSession returns MediaLibrarySession, so the generated
+    // wrapper must too, or javac rejects it.
+    public override MediaLibrarySession? OnGetSession(MediaSession.ControllerInfo? controllerInfo) => mediaSession;
 
     public override MediaLibrarySession? OnGetSessionFromMediaLibraryService(MediaSession.ControllerInfo? controllerInfo) =>
         mediaSession;
