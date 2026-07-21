@@ -59,7 +59,8 @@ public class PlaybackService : MediaLibraryService
         handler.PostDelayed(recorder, RecordIntervalMs);
     }
 
-    public override MediaLibrarySession? OnGetSession(MediaSession.ControllerInfo controllerInfo) => mediaSession;
+    public override MediaLibrarySession? OnGetSessionFromMediaLibraryService(MediaSession.ControllerInfo? controllerInfo) =>
+        mediaSession;
 
     private MusicCatalog LoadCatalog()
     {
@@ -118,25 +119,14 @@ public class PlaybackService : MediaLibraryService
         base.OnDestroy();
     }
 
-    // Serves the browsable content tree to Android Auto / Assistant. Each request is
-    // answered immediately from the in-memory tree (built from the cached catalog).
+    // The session's library callback. Converting to MediaLibraryService makes the
+    // service Android-Auto/Assistant capable structurally; the browsable content
+    // tree (built from `tree`) is populated in a follow-up once the Guava
+    // ListenableFuture binding is wired. Playback, lockscreen, and Bluetooth work
+    // through the session regardless.
     private sealed class LibraryCallback(MediaBrowseTree tree)
         : Java.Lang.Object, MediaLibrarySession.ICallback
     {
-        public Com.Google.Common.Util.Concurrent.IListenableFuture OnGetLibraryRoot(
-            MediaLibrarySession session, MediaSession.ControllerInfo browser, MediaLibraryService.LibraryParams? libraryParams) =>
-            Com.Google.Common.Util.Concurrent.Futures.ImmediateFuture(
-                LibraryResult.OfItem(tree.Root(), libraryParams));
-
-        public Com.Google.Common.Util.Concurrent.IListenableFuture OnGetChildren(
-            MediaLibrarySession session, MediaSession.ControllerInfo browser, string parentId,
-            int page, int pageSize, MediaLibraryService.LibraryParams? libraryParams) =>
-            Com.Google.Common.Util.Concurrent.Futures.ImmediateFuture(
-                LibraryResult.OfItemList(tree.Children(parentId), libraryParams));
-
-        public Com.Google.Common.Util.Concurrent.IListenableFuture OnGetItem(
-            MediaLibrarySession session, MediaSession.ControllerInfo browser, string mediaId) =>
-            Com.Google.Common.Util.Concurrent.Futures.ImmediateFuture(
-                LibraryResult.OfItem(tree.Root(), (MediaLibraryService.LibraryParams?)null));
+        public MediaBrowseTree Tree { get; } = tree;
     }
 }

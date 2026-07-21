@@ -15,9 +15,9 @@ public sealed class DriveMediaResolver : Java.Lang.Object, ResolvingDataSource.I
 
     public DriveMediaResolver(DeviceAccountTokenProvider tokens) => this.tokens = tokens;
 
-    public DataSpec ResolveDataSpec(DataSpec dataSpec)
+    public DataSpec? ResolveDataSpec(DataSpec? dataSpec)
     {
-        if (dataSpec.Uri?.Scheme != "drive")
+        if (dataSpec?.Uri?.Scheme != "drive")
         {
             return dataSpec;
         }
@@ -29,5 +29,5 @@ public sealed class DriveMediaResolver : Java.Lang.Object, ResolvingDataSource.I
         return dataSpec.WithUri(resolved).WithAdditionalHeaders(headers);
     }
 
-    public Android.Net.Uri? ResolveReportedUri(Android.Net.Uri uri) => uri;
+    public Android.Net.Uri? ResolveReportedUri(Android.Net.Uri? uri) => uri;
 }
