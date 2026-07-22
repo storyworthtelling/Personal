@@ -278,6 +278,39 @@ public class PdfVolumeComposerTests
         Assert.Equal(144, document.Pages[0].Width.Point, 0);
         Assert.Equal(216, document.Pages[0].Height.Point, 0);
     }
+
+    [Fact]
+    public void AppendPage_BuildsMultiPagePdf_AcrossSeparateCalls()
+    {
+        // Assembling a volume one page per call must yield the same multi-page PDF that a single
+        // Compose would — this is what lets the pipeline resume mid-volume instead of holding every
+        // page in memory at once.
+        var composer = new PdfVolumeComposer();
+
+        var pdf = composer.AppendPage(null, SampleImages.Png(200, 300), 300);
+        pdf = composer.AppendPage(pdf, SampleImages.Png(200, 300), 300);
+        pdf = composer.AppendPage(pdf, SampleImages.Png(200, 300), 300);
+
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
+
+        using var stream = new MemoryStream(pdf);
+        using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.Equal(3, document.PageCount);
+    }
+
+    [Fact]
+    public void AppendPage_SizesEachPageForTheGivenDpi()
+    {
+        // Each appended page is sized from its raster's pixels at the requested DPI, exactly as Compose:
+        // 600×900 px at 300 DPI is 2×3 inches — 144×216 points.
+        var composer = new PdfVolumeComposer();
+        var pdf = composer.AppendPage(null, SampleImages.Png(600, 900), dpi: 300);
+
+        using var stream = new MemoryStream(pdf);
+        using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.Equal(144, document.Pages[0].Width.Point, 0);
+        Assert.Equal(216, document.Pages[0].Height.Point, 0);
+    }
 }
 
 public class AnalysisPdfComposerTests

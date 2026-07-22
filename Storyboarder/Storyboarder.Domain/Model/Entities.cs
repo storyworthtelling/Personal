@@ -136,6 +136,11 @@ public class Volume
     public string Title { get; set; } = string.Empty;
     public WorkStatus PdfStatus { get; set; } = WorkStatus.Pending;
     public string? PdfPath { get; set; }
+
+    // How many of this volume's pages have already been appended to the growing on-disk PDF. Volume
+    // assembly appends one page per worker call (plus the cover on the first), so a hang or restart
+    // resumes mid-volume from this cursor instead of rebuilding every page in one memory-heavy pass.
+    public int PdfPageCursor { get; set; }
     public List<Page> Pages { get; set; } = [];
 }
 

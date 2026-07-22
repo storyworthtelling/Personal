@@ -370,6 +370,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("Number")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("PdfPageCursor")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("PdfPath")
                         .HasColumnType("TEXT");
 

@@ -547,16 +547,40 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         {
             try
             {
-                var pageImages = volume.Pages
-                    .OrderBy(p => p.PageNumber)
-                    .Select(p => imageStore.Read(p.ComposedImagePath!))
-                    .ToList();
-                pageImages.Insert(0, coverRenderer.VolumeCover(novel.Title, volume.Number, volume.Title));
-                var pdf = pdfComposer.Compose(pageImages, DesignTokens.Comic.PrintDpi);
+                var pages = volume.Pages.OrderBy(p => p.PageNumber).ToList();
+
+                // Assemble one page per call so only a single page raster is ever held in memory, and so
+                // a hang or restart resumes from PdfPageCursor instead of rebuilding the whole volume in
+                // one memory-heavy pass. PdfPageCursor counts the volume pages already appended; the
+                // cover is written once, as the first page, when the cursor is still 0.
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var pdf = volume.PdfPageCursor == 0
+                    ? pdfComposer.AppendPage(null, coverRenderer.VolumeCover(novel.Title, volume.Number, volume.Title), DesignTokens.Comic.PrintDpi)
+                    : imageStore.Read(volume.PdfPath!);
+
+                if (volume.PdfPageCursor < pages.Count)
+                {
+                    var pageImage = imageStore.Read(pages[volume.PdfPageCursor].ComposedImagePath!);
+                    pdf = pdfComposer.AppendPage(pdf, pageImage, DesignTokens.Comic.PrintDpi);
+                    volume.PdfPageCursor++;
+                }
+
                 volume.PdfPath = imageStore.Save($"{novel.Id}/volumes/volume-{volume.Number}.pdf", pdf);
-                volume.PdfStatus = WorkStatus.Completed;
+
+                if (volume.PdfPageCursor >= pages.Count)
+                {
+                    volume.PdfStatus = WorkStatus.Completed;
+                    logger.LogInformation("Assembled volume {Number} of novel {NovelId} ({Pages} pages)",
+                        volume.Number, novel.Id, pages.Count);
+                }
+                else
+                {
+                    logger.LogInformation("Assembling volume {Number} of novel {NovelId}: page {Cursor}/{Total}",
+                        volume.Number, novel.Id, volume.PdfPageCursor, pages.Count);
+                }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 volume.PdfStatus = WorkStatus.Failed;
                 logger.LogError(ex, "Failed to assemble volume {VolumeId}", volume.Id);
@@ -997,6 +1021,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         {
             volume.PdfStatus = WorkStatus.Pending;
             volume.PdfPath = null;
+            // Rebuild from the first page: the partial PDF (and its cursor) referenced a page that has
+            // since been re-composed, so resuming it would splice in a stale/duplicate page.
+            volume.PdfPageCursor = 0;
         }
 
         SetStage(novel, ProjectStage.ComposingPages);

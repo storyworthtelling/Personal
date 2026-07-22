@@ -30,6 +30,12 @@ public interface IPageComposer
 public interface IVolumePdfComposer
 {
     byte[] Compose(IReadOnlyList<byte[]> pageImages, int dpi);
+
+    // Appends a single page image to an existing volume PDF (or starts a new one when existingPdf is
+    // null) and returns the saved bytes. Assembling a large volume one page per call keeps only one
+    // page raster in memory at a time, so it never has to hold every page open at once the way Compose
+    // does. dpi sizes the appended page exactly as in Compose.
+    byte[] AppendPage(byte[]? existingPdf, byte[] pageImage, int dpi);
 }
 
 // Renders the consolidated book-analysis (revision report) into a single, text-heavy PDF.

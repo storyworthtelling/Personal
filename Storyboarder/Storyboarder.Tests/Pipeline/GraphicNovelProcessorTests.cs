@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using PdfSharp.Pdf.IO;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Model;
@@ -433,6 +434,52 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.Equal(0, novel.StoryboardCursor);
         Assert.Equal(6, novel.StoryboardAttempts);
         Assert.False(string.IsNullOrEmpty(novel.LastError));
+    }
+
+    [Fact]
+    public async Task AssemblesMultiPageVolume_OnePagePerCycle_ResumingFromTheCursor()
+    {
+        // A larger volume must not be assembled in one monolithic, memory-heavy pass (which stalled the
+        // worker on big books). It is built one page per cycle, resuming from PdfPageCursor — proven here
+        // by a fresh processor each cycle and by the cursor advancing exactly one page at a time.
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoryboardSegment(
+                [new VolumeDraft(1, "Volume One",
+                    [
+                        new PageDraft(1, [new PanelDraft("Hero approaches", "One.", null, ["Hero", "Castle"])]),
+                        new PageDraft(2, [new PanelDraft("Hero knocks", "Two.", null, ["Hero", "Castle"])]),
+                        new PageDraft(3, [new PanelDraft("The gate opens", "Three.", null, ["Hero", "Castle"])]),
+                    ])],
+                "Hero reached the castle."));
+
+        var novelId = SeedNovel();
+
+        var observedCursors = new List<int>();
+        await DriveToCompletion(novelId, stage =>
+        {
+            if (stage != ProjectStage.AssemblingVolumes)
+                return;
+            using var context = database.NewContext();
+            var pending = context.Volumes.FirstOrDefault(v => v.NovelId == novelId && v.PdfStatus == WorkStatus.Pending);
+            if (pending is not null)
+                observedCursors.Add(pending.PdfPageCursor);
+        });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        // One append per cycle: the cursor was seen at 0, 1, then 2 before the final page completed it.
+        Assert.Equal([0, 1, 2], observedCursors);
+
+        using var ctx = database.NewContext();
+        var volume = Assert.Single(ctx.Volumes.Where(v => v.NovelId == novelId));
+        Assert.Equal(WorkStatus.Completed, volume.PdfStatus);
+        Assert.Equal(3, volume.PdfPageCursor);
+        Assert.True(File.Exists(volume.PdfPath!));
+
+        using var stream = new MemoryStream(File.ReadAllBytes(volume.PdfPath!));
+        using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.Equal(4, pdf.PageCount); // cover + 3 pages
     }
 
     // Drives the pipeline to a terminal stage, invoking inspect() with the current stage before each
