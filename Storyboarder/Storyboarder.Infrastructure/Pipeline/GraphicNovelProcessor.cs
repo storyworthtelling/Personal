@@ -36,6 +36,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private readonly RequestRateLimiter geminiLimiter;
     private readonly BackoffScheduler backoff;
     private readonly RateLimitOptions rateLimits;
+    private readonly PageLayoutOptions pageLayout;
     private readonly TextChunker chunker = new();
     // A finer chunker used only for storyboarding: it slices each (large) design-bible chunk into small
     // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
@@ -54,6 +55,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         IAnalysisPdfComposer analysisPdfComposer,
         IClock clock,
         IOptions<RateLimitOptions> rateLimitOptions,
+        IOptions<PageLayoutOptions> pageLayoutOptions,
         ILogger<GraphicNovelProcessor> logger)
     {
         this.dbContextFactory = dbContextFactory;
@@ -67,6 +69,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         this.logger = logger;
 
         rateLimits = rateLimitOptions.Value;
+        pageLayout = pageLayoutOptions.Value;
         storyboardChunker = new TextChunker(rateLimits.StoryboardWindowChars, rateLimits.StoryboardWindowMaxChars);
         claudeLimiter = new RequestRateLimiter(rateLimits.ClaudeRequestsPerMinute, rateLimits.ClaudeRequestsPerDay, clock);
         geminiLimiter = new RequestRateLimiter(rateLimits.GeminiRequestsPerMinute, rateLimits.GeminiRequestsPerDay, clock);
@@ -214,7 +217,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
             try
             {
-                var image = await gemini.GenerateReferenceSheet(reference.CanonicalDescription, novel.ArtStyle, cancellationToken);
+                // Fold the entity's approximate scale into the description so the sheet's scale reference
+                // is drawn to the right size (the sheet prompt always asks for a scale reference).
+                var described = string.IsNullOrWhiteSpace(reference.Scale)
+                    ? reference.CanonicalDescription
+                    : $"{reference.CanonicalDescription} Approximate scale: {reference.Scale}.";
+                var image = await gemini.GenerateReferenceSheet(described, novel.ArtStyle, cancellationToken);
                 reference.ReferenceImagePath = imageStore.Save($"{novel.Id}/refs/{reference.Id}.png", image);
                 reference.ReferenceSheetStatus = WorkStatus.Completed;
                 reference.LastError = null;
@@ -361,24 +369,30 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
             foreach (var pageDraft in volumeDraft.Pages)
             {
-                var page = new Page
+                // The model is steered toward 3-6 panels per page, but a page it returns with more than
+                // the cap is split across several physical pages (panels distributed as evenly as
+                // possible) so panels are never squished into a dense grid.
+                foreach (var panelGroup in SplitForPages(pageDraft.Panels, pageLayout.MaxPanelsPerPage))
                 {
-                    VolumeId = target.Id,
-                    ChapterNumber = pageDraft.ChapterNumber,
-                    PageNumber = ++target.PageCount
-                };
-                int panelNumber = 1;
-                foreach (var panelDraft in pageDraft.Panels)
-                    page.Panels.Add(new Panel
+                    var page = new Page
                     {
-                        PageId = page.Id,
-                        PanelNumber = panelNumber++,
-                        VisualPrompt = panelDraft.VisualPrompt,
-                        Dialogue = panelDraft.Dialogue,
-                        Caption = panelDraft.Caption,
-                        ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
-                    });
-                db.Pages.Add(page);
+                        VolumeId = target.Id,
+                        ChapterNumber = pageDraft.ChapterNumber,
+                        PageNumber = ++target.PageCount
+                    };
+                    int panelNumber = 1;
+                    foreach (var panelDraft in panelGroup)
+                        page.Panels.Add(new Panel
+                        {
+                            PageId = page.Id,
+                            PanelNumber = panelNumber++,
+                            VisualPrompt = panelDraft.VisualPrompt,
+                            Dialogue = panelDraft.Dialogue,
+                            Caption = panelDraft.Caption,
+                            ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
+                        });
+                    db.Pages.Add(page);
+                }
             }
 
             // Remember the running page count so a volume number repeated later in this segment keeps numbering.
@@ -424,7 +438,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 var references = await LoadReferenceImages(db, novel.Id, panel.ReferenceNamesJson, cancellationToken);
                 // Request the image at the aspect ratio of the slot this panel will occupy on the page,
                 // so it fills the panel rather than being letterboxed onto shaded paper when composed.
-                var aspectRatio = await PanelSlotAspectRatio(db, panel.PageId, cancellationToken);
+                var aspectRatio = await PanelSlotAspectRatio(db, panel, cancellationToken);
                 // An approved panel renders with ONLY its flagged categories relaxed, for this one call;
                 // every other panel takes the default render (and the app's default thresholds) untouched.
                 var relaxed = panel.ApprovedForRelaxedRender
@@ -537,8 +551,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (await RevertPagesWithMissingImages(db, novel, cancellationToken))
             return ProcessResult.DidWork(novel.Id);
 
+        var now = clock.UtcNow;
         var volume = await db.Volumes
-            .Where(v => v.NovelId == novel.Id && v.PdfStatus == WorkStatus.Pending)
+            .Where(v => v.NovelId == novel.Id &&
+                        (v.PdfStatus == WorkStatus.Pending ||
+                         (v.PdfStatus == WorkStatus.NeedsRetry && v.NextAttemptAtUtc <= now)))
             .Include(v => v.Pages)
             .OrderBy(v => v.Number)
             .FirstOrDefaultAsync(cancellationToken);
@@ -568,6 +585,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
                 volume.PdfPath = imageStore.Save($"{novel.Id}/volumes/volume-{volume.Number}.pdf", pdf);
 
+                // A page appended cleanly: clear any earlier transient-failure state so a hiccup partway
+                // through a long volume doesn't count against the whole binding.
+                volume.Attempts = 0;
+                volume.LastError = null;
+                volume.NextAttemptAtUtc = null;
+
                 if (volume.PdfPageCursor >= pages.Count)
                 {
                     volume.PdfStatus = WorkStatus.Completed;
@@ -582,16 +605,24 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                volume.PdfStatus = WorkStatus.Failed;
-                logger.LogError(ex, "Failed to assemble volume {VolumeId}", volume.Id);
+                // A partial PDF may be corrupt, so restart this volume's assembly from scratch rather
+                // than resuming a bad file, and retry with backoff (Failed only after MaxAttempts) so a
+                // single throw no longer pins the novel at AssemblingVolumes forever.
+                volume.PdfPageCursor = 0;
+                volume.PdfPath = null;
+                ScheduleRetry(volume, ex, novel);
             }
 
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.DidWork(novel.Id);
         }
 
-        if (await db.Volumes.AnyAsync(v => v.NovelId == novel.Id && v.PdfStatus != WorkStatus.Completed, cancellationToken))
-            return ProcessResult.Idle; // blocked on a failed volume
+        // Volumes still pending a retry hold the stage (and report when they resume); once only Completed
+        // (or permanently-Failed) volumes remain, PendingWork stops waiting. A Failed volume blocks the
+        // stage until a manual retry revives it — surfaced to the user, who can redo the binding.
+        if (await PendingWork(db.Volumes.Where(v => v.NovelId == novel.Id), v => v.PdfStatus, v => v.NextAttemptAtUtc, now)
+                is { } volumeWait)
+            return volumeWait == TimeSpan.MinValue ? ProcessResult.Idle : ProcessResult.Waiting(volumeWait, novel.Id);
 
         SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, false, false, false, false, false, false, false, AllVolumesAssembled: true)));
@@ -833,14 +864,15 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return null;
     }
 
-    // The width/height of the slot this panel will occupy on the composed page, so the image model can be
-    // asked to frame the art at that ratio. Every cell in a page's grid is the same size, so this depends
-    // only on how many panels share the page (see PageLayoutCalculator). Uses the design page geometry the
-    // composer lays out against.
+    // The width/height of the ART region this panel will occupy on the composed page, so the image model
+    // can be asked to frame the art at that ratio and fill it (with the dialogue/caption bands reserved).
+    // Every cell in a page's grid is the same size, so the cell depends only on how many panels share the
+    // page (see PageLayoutCalculator); the art region within it depends on this panel's own text bands
+    // (see PanelSlotLayout). Uses the design page geometry the composer lays out against.
     private static async Task<double?> PanelSlotAspectRatio(
-        StoryboarderDbContext db, Guid pageId, CancellationToken cancellationToken)
+        StoryboarderDbContext db, Panel panel, CancellationToken cancellationToken)
     {
-        var panelCount = await db.Panels.CountAsync(p => p.PageId == pageId, cancellationToken);
+        var panelCount = await db.Panels.CountAsync(p => p.PageId == panel.PageId, cancellationToken);
         if (panelCount <= 0)
             return null;
 
@@ -849,7 +881,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             DesignTokens.Comic.Gutter);
         var cell = calculator.Layout(
             new PageSize(DesignTokens.Comic.PageWidth, DesignTokens.Comic.PageHeight), panelCount)[0];
-        return cell.Width / cell.Height;
+        var art = PanelSlotLayout.Compute(cell, panel.Dialogue, panel.Caption).Art;
+        return art.Width / art.Height;
     }
 
     // Rebuilds the exact text prompt a panel was rendered with, so a content block can be logged and
@@ -903,7 +936,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         var refs = await db.DesignRefs.Where(r => r.NovelId == novelId).ToListAsync(cancellationToken);
         EntityProfile Map(DesignRef r) =>
-            new(r.Name, r.CanonicalDescription, JsonSerializer.Deserialize<List<string>>(r.AliasesJson) ?? []);
+            new(r.Name, r.CanonicalDescription, r.Scale, JsonSerializer.Deserialize<List<string>>(r.AliasesJson) ?? []);
         return new DesignBible(
             refs.Where(r => r.Kind == ReferenceKind.Character).Select(Map).ToList(),
             refs.Where(r => r.Kind == ReferenceKind.Setting).Select(Map).ToList());
@@ -938,12 +971,35 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return paths.Where(imageStore.Exists).Select(imageStore.Read).ToList();
     }
 
+    // Splits a page's panels into consecutive groups of at most maxPerPage, balanced so the groups
+    // differ in size by at most one (8 panels at a cap of 6 become 4+4, not 6+2). Each group becomes a
+    // physical page. An empty page yields no groups.
+    private static IEnumerable<IReadOnlyList<PanelDraft>> SplitForPages(IReadOnlyList<PanelDraft> panels, int maxPerPage)
+    {
+        if (panels.Count == 0)
+            yield break;
+
+        var cap = Math.Max(1, maxPerPage);
+        var pageCount = (int)Math.Ceiling(panels.Count / (double)cap);
+        var baseSize = panels.Count / pageCount;
+        var remainder = panels.Count % pageCount; // the first `remainder` pages carry one extra panel
+
+        var index = 0;
+        for (var page = 0; page < pageCount; page++)
+        {
+            var size = baseSize + (page < remainder ? 1 : 0);
+            yield return panels.Skip(index).Take(size).ToList();
+            index += size;
+        }
+    }
+
     private static DesignRef NewDesignRef(Guid novelId, ReferenceKind kind, EntityProfile profile) => new()
     {
         NovelId = novelId,
         Kind = kind,
         Name = profile.Name,
         CanonicalDescription = profile.CanonicalDescription,
+        Scale = profile.Scale,
         AliasesJson = JsonSerializer.Serialize(profile.Aliases)
     };
 

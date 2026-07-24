@@ -53,6 +53,19 @@ public class GeminiImageClientTests
     }
 
     [Fact]
+    public async Task GenerateReferenceSheet_PromptRequestsAVisibleScaleReference()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(ImageReply(PngBytes));
+
+        await client.GenerateReferenceSheet("a tall knight. Approximate scale: 1.9m.", "noir", CancellationToken.None);
+
+        var body = handler.RequestBodies[0];
+        Assert.Contains("scale reference", body);
+        Assert.Contains("human figure", body);
+    }
+
+    [Fact]
     public async Task GeneratePanel_AttachesReferenceImagesAsInlineData()
     {
         var (client, handler) = Create();

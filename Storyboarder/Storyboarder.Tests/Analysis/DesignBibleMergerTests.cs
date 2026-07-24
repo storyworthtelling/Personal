@@ -76,6 +76,22 @@ public class DesignBibleMergerTests
     }
 
     [Fact]
+    public void Merges_Scale_FirstNonEmptyWins()
+    {
+        // A later chunk usually re-mentions a character without restating their size, so the first
+        // concrete scale seen is the one carried into the canonical profile.
+        var bible = merger.Merge(
+        [
+            Characters(new EntityMention("Tom", "tall", "", [])),
+            Characters(new EntityMention("Tom", "red coat", "about 1.8m tall", [])),
+            Characters(new EntityMention("Tom", "green eyes", "roughly 2m", []))
+        ]);
+
+        var tom = Assert.Single(bible.Characters);
+        Assert.Equal("about 1.8m tall", tom.Scale);
+    }
+
+    [Fact]
     public void Characters_And_Settings_AreMergedIndependently()
     {
         var bible = merger.Merge(

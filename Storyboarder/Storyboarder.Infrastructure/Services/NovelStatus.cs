@@ -8,7 +8,7 @@ public sealed record BlockedPanel(
     Guid PanelId, int PanelNumber, string VisualPrompt, string? Dialogue, string? Caption,
     IReadOnlyList<string> Categories, string? Reason);
 
-public sealed record VolumeStatus(int Number, string Title, bool PdfReady);
+public sealed record VolumeStatus(int Number, string Title, bool PdfReady, bool Failed = false);
 
 // The prohibited/IP-blocked panel a Cancelled novel is stuck on, surfaced so the user can rework its
 // art direction and resume. Reason is the provider's block message; VisualPrompt is what gets reworked.

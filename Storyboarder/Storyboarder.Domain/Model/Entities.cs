@@ -89,6 +89,11 @@ public class DesignRef : IRetryable
     public ReferenceKind Kind { get; set; }
     public string Name { get; set; } = string.Empty;
     public string CanonicalDescription { get; set; } = string.Empty;
+
+    // Approximate physical size (a character's height/build, a setting's extent), carried from the
+    // design bible so the reference sheet and panels keep the entity in proportion. "" when unknown.
+    public string Scale { get; set; } = string.Empty;
+
     public string AliasesJson { get; set; } = "[]";
     public WorkStatus ReferenceSheetStatus { get; set; } = WorkStatus.Pending;
     public string? ReferenceImagePath { get; set; }
@@ -128,7 +133,7 @@ public class BookAnalysis
     public string? PdfPath { get; set; }
 }
 
-public class Volume
+public class Volume : IRetryable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid NovelId { get; set; }
@@ -141,7 +146,18 @@ public class Volume
     // assembly appends one page per worker call (plus the cover on the first), so a hang or restart
     // resumes mid-volume from this cursor instead of rebuilding every page in one memory-heavy pass.
     public int PdfPageCursor { get; set; }
+
+    // Binding a volume can throw (a corrupt partial PDF, a vanished page image): rather than failing
+    // permanently on the first error, assembly retries with backoff (bounded by MaxAttempts) before it
+    // gives up, and a manual retry can revive a Failed volume. Mirrors Panel's resumable retry state.
+    public int Attempts { get; set; }
+    public DateTimeOffset? NextAttemptAtUtc { get; set; }
+    public string? LastError { get; set; }
+
     public List<Page> Pages { get; set; } = [];
+
+    [NotMapped]
+    public WorkStatus WorkState { get => PdfStatus; set => PdfStatus = value; }
 }
 
 public class Page

@@ -164,6 +164,10 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("ReferenceSheetStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Scale")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NovelId");
@@ -364,6 +368,15 @@ namespace Storyboarder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("NextAttemptAtUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("NovelId")
                         .HasColumnType("TEXT");
 
@@ -386,6 +399,8 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("NovelId");
+
+                    b.HasIndex("PdfStatus", "NextAttemptAtUtc");
 
                     b.ToTable("Volumes");
                 });

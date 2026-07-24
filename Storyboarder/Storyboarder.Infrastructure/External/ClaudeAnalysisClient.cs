@@ -23,17 +23,26 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "You are a visual-development analyst preparing a graphic-novel design bible. Read the novel " +
         "excerpt and list every distinct CHARACTER and every distinct SETTING/LOCATION that appears, " +
         "with concrete visual details useful for an illustrator (appearance, clothing, age, build for " +
-        "characters; architecture, era, mood, palette for settings). Respond with ONLY a JSON object: " +
-        "{\"characters\":[{\"name\":string,\"description\":string,\"aliases\":[string]}]," +
-        "\"settings\":[{\"name\":string,\"description\":string,\"aliases\":[string]}]}. " +
-        "Use [] when none are present. No prose outside the JSON.";
+        "characters; architecture, era, mood, palette for settings). For each entity also give its " +
+        "approximate physical SCALE so the illustrations stay proportionate: for a character an " +
+        "approximate height and build relative to an average adult; for a setting its approximate size " +
+        "and any notable scale cues. Respond with ONLY a JSON object: " +
+        "{\"characters\":[{\"name\":string,\"description\":string,\"scale\":string,\"aliases\":[string]}]," +
+        "\"settings\":[{\"name\":string,\"description\":string,\"scale\":string,\"aliases\":[string]}]}. " +
+        "Use [] when none are present, and \"\" for an unknown scale. No prose outside the JSON.";
 
     private const string StoryboardInstruction =
         "You are a comics writer adapting a novel into a graphic novel. Using the supplied design bible " +
         "for consistency, break the provided passage into as many volumes, pages, and panels as the " +
-        "story needs. For each panel give a vivid visual prompt (no lettering in the art), plus any " +
-        "dialogue and caption to be typeset separately, and the names of design-bible entities present. " +
-        "Maintain continuity with the running summary. Respond with ONLY a JSON object: " +
+        "story needs. Aim for roughly 3 to 6 panels per page (never more than 6), and give a pivotal " +
+        "beat its own page. For each panel give a vivid visual prompt that captures a SPECIFIC MOMENT " +
+        "OF ONGOING ACTION — the characters caught mid-gesture or mid-movement, interacting with each " +
+        "other and the setting — with an explicit shot type or camera angle (e.g. wide establishing " +
+        "shot, low-angle close-up, over-the-shoulder); avoid static, posed, portrait, or " +
+        "looking-at-camera framing. Respect the relative scale of the entities given in the design " +
+        "bible. Put no lettering in the art; give any dialogue and caption to be typeset separately, " +
+        "and the names of design-bible entities present. Maintain continuity with the running summary. " +
+        "Respond with ONLY a JSON object: " +
         "{\"continuitySummary\":string,\"volumes\":[{\"number\":int,\"title\":string,\"pages\":" +
         "[{\"chapterNumber\":int,\"panels\":[{\"visualPrompt\":string,\"dialogue\":string|null," +
         "\"caption\":string|null,\"referenceNames\":[string]}]}]}]}. No prose outside the JSON.";
@@ -370,7 +379,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private static IReadOnlyList<EntityMention> MapMentions(List<EntityDto>? entities) =>
         (entities ?? [])
             .Where(e => !string.IsNullOrWhiteSpace(e.Name))
-            .Select(e => new EntityMention(e.Name!, e.Description ?? string.Empty, e.Aliases ?? []))
+            .Select(e => new EntityMention(e.Name!, e.Description ?? string.Empty, e.Scale ?? string.Empty, e.Aliases ?? []))
             .ToList();
 
     private static PageDraft MapPage(PageDto page) =>
@@ -390,6 +399,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     {
         public string? Name { get; set; }
         public string? Description { get; set; }
+        public string? Scale { get; set; }
         public List<string>? Aliases { get; set; }
     }
 

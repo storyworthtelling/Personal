@@ -4,6 +4,7 @@ using Moq;
 using PdfSharp.Pdf.IO;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
+using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
@@ -26,6 +27,11 @@ public class GraphicNovelProcessorTests : IDisposable
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int panelRenderCalls;
     private int chapterAnalysisCalls;
+
+    // When set, NewProcessor binds volumes through this composer instead of a plain one, so a test can
+    // make PDF assembly throw. It's a field (not a NewProcessor arg) so the fresh processor DriveToCompletion
+    // builds each cycle keeps using it.
+    private IVolumePdfComposer? volumeComposerOverride;
 
     public GraphicNovelProcessorTests()
     {
@@ -85,13 +91,13 @@ public class GraphicNovelProcessorTests : IDisposable
             Directory.Delete(outputRoot, recursive: true);
     }
 
-    private GraphicNovelProcessor NewProcessor() => new(
+    private GraphicNovelProcessor NewProcessor(int maxPanelsPerPage = 6) => new(
         database,
         claude.Object,
         gemini.Object,
         new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
         new SkiaPageComposer(Options.Create(new PageLayoutOptions())),
-        new PdfVolumeComposer(),
+        volumeComposerOverride ?? new PdfVolumeComposer(),
         new AnalysisPdfComposer(new PdfVolumeComposer(), new AnalysisDocumentRenderer()),
         clock,
         Options.Create(new RateLimitOptions
@@ -100,6 +106,7 @@ public class GraphicNovelProcessorTests : IDisposable
             GeminiRequestsPerMinute = 1000, GeminiRequestsPerDay = 100000,
             BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
+        Options.Create(new PageLayoutOptions { MaxPanelsPerPage = maxPanelsPerPage }),
         NullLogger<GraphicNovelProcessor>.Instance);
 
     private Guid SeedNovel(string? fullText = null)
@@ -480,6 +487,109 @@ public class GraphicNovelProcessorTests : IDisposable
         using var stream = new MemoryStream(File.ReadAllBytes(volume.PdfPath!));
         using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.Equal(4, pdf.PageCount); // cover + 3 pages
+    }
+
+    [Fact]
+    public async Task Storyboard_splits_a_page_over_the_cap_into_several_balanced_pages()
+    {
+        // Claude returns a single page of 8 panels; with the cap at 6 it must become two physical pages
+        // of 4 panels each (balanced, not 6+2) so panels are never squished into a dense grid.
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoryboardSegment(
+                [new VolumeDraft(1, "Volume One",
+                    [new PageDraft(1, Enumerable.Range(1, 8)
+                        .Select(i => new PanelDraft($"Beat {i} in action", null, null, ["Hero"]))
+                        .ToList())])],
+                "Hero acted."));
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var volumeIds = ctx.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToList();
+        var pages = ctx.Pages.Where(p => volumeIds.Contains(p.VolumeId)).OrderBy(p => p.PageNumber).ToList();
+
+        // Eight panels at a cap of six became two pages, split 4 + 4, numbered consecutively.
+        Assert.Equal(2, pages.Count);
+        Assert.Equal([1, 2], pages.Select(p => p.PageNumber).ToList());
+        Assert.All(pages, p => Assert.Equal(4, ctx.Panels.Count(pn => pn.PageId == p.Id)));
+    }
+
+    [Fact]
+    public async Task VolumeBinding_ThatThrowsOnce_RetriesWithBackoff_ThenCompletes()
+    {
+        // A throw during PDF assembly used to mark the volume Failed permanently, pinning the novel at
+        // AssemblingVolumes forever. It must instead retry with backoff and bind on recovery.
+        volumeComposerOverride = new FlakyPdfComposer(failTimes: 1);
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var volume = Assert.Single(ctx.Volumes.Where(v => v.NovelId == novelId));
+        Assert.Equal(WorkStatus.Completed, volume.PdfStatus);
+        Assert.True(File.Exists(volume.PdfPath!));
+        // The one failure was recorded then cleared on the clean bind.
+        Assert.Equal(0, volume.Attempts);
+        Assert.Null(volume.LastError);
+    }
+
+    [Fact]
+    public async Task VolumeBinding_ThatKeepsThrowing_FailsAfterMaxAttempts_BlockingAnalysis()
+    {
+        // A binding that never succeeds exhausts its retry budget and stops (Failed), leaving the novel
+        // at AssemblingVolumes with the review report not yet produced — the state a manual retry fixes.
+        volumeComposerOverride = new FlakyPdfComposer(failTimes: int.MaxValue);
+
+        var novelId = SeedNovel();
+
+        var failed = false;
+        for (int i = 0; i < 400 && !failed; i++)
+        {
+            var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+            if (result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+
+            using var ctx = database.NewContext();
+            if (ctx.Volumes.Any(v => v.NovelId == novelId && v.PdfStatus == WorkStatus.Failed))
+                failed = true;
+        }
+
+        Assert.True(failed, "The binding should have exhausted its retries and been marked Failed.");
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == novelId);
+        Assert.Equal(ProjectStage.AssemblingVolumes, novel.Stage);
+        var volume = Assert.Single(context.Volumes.Where(v => v.NovelId == novelId));
+        Assert.Equal(WorkStatus.Failed, volume.PdfStatus);
+        Assert.False(string.IsNullOrEmpty(volume.LastError));
+        // The gate held: the analysis report was never seeded, let alone rendered.
+        Assert.Empty(context.BookAnalyses.Where(a => a.NovelId == novelId));
+    }
+
+    // A volume PDF composer that throws on its first `failTimes` AppendPage calls, then delegates to a
+    // real composer — so a test can exercise binding retry/failure and still get a valid PDF on recovery.
+    private sealed class FlakyPdfComposer(int failTimes) : IVolumePdfComposer
+    {
+        private readonly PdfVolumeComposer inner = new();
+        private int failures;
+
+        public byte[] Compose(IReadOnlyList<byte[]> pageImages, int dpi) => inner.Compose(pageImages, dpi);
+
+        public byte[] AppendPage(byte[]? existingPdf, byte[] pageImage, int dpi)
+        {
+            if (failures < failTimes)
+            {
+                failures++;
+                throw new InvalidOperationException("simulated binding failure");
+            }
+            return inner.AppendPage(existingPdf, pageImage, dpi);
+        }
     }
 
     // Drives the pipeline to a terminal stage, invoking inspect() with the current stage before each

@@ -30,6 +30,9 @@ public sealed class GeminiImageClient : IGeminiImageClient
         var prompt =
             $"Character/location reference sheet in this style: {artStyle}. " +
             $"Render a clear, well-lit, full reference view (neutral background) of: {description}. " +
+            "Include a visible scale reference so the subject's size reads correctly: for a figure, a " +
+            "subtle height scale of evenly-spaced tick marks behind them; for a place, an average-height " +
+            "human figure standing in it for scale. " +
             "Single subject, consistent canonical appearance, no text or lettering.";
         return Generate(prompt, referenceImages: [], aspectRatio: null, relaxedCategories: [], cancellationToken);
     }

@@ -119,6 +119,25 @@ public sealed class ProjectService
             page.LastError = null;
         }
 
+        // Failed/retrying volumes: revive AND restart the PDF from scratch (a partial file may be
+        // corrupt). This is what lets "Retry now" redo a failed binding so the book can finish — and its
+        // review report finally render, since ComposingAnalysis only runs once every volume is bound.
+        var volumes = await db.Volumes.Where(v => v.NovelId == id).ToListAsync(cancellationToken);
+        foreach (var volume in volumes.Where(v => v.PdfStatus is WorkStatus.Failed or WorkStatus.NeedsRetry))
+        {
+            volume.PdfStatus = WorkStatus.Pending;
+            volume.Attempts = 0;
+            volume.NextAttemptAtUtc = null;
+            volume.LastError = null;
+            volume.PdfPageCursor = 0;
+            volume.PdfPath = null;
+        }
+
+        // A failed analysis-report render resets too, so the revision report can rebuild.
+        var analysis = await db.BookAnalyses.FirstOrDefaultAsync(a => a.NovelId == id, cancellationToken);
+        if (analysis is not null && analysis.PdfStatus is WorkStatus.Failed or WorkStatus.NeedsRetry)
+            analysis.PdfStatus = WorkStatus.Pending;
+
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -347,8 +366,17 @@ public sealed class ProjectService
         var volumeList = await db.Volumes
             .Where(v => v.NovelId == id)
             .OrderBy(v => v.Number)
-            .Select(v => new VolumeStatus(v.Number, v.Title, v.PdfStatus == WorkStatus.Completed))
+            .Select(v => new VolumeStatus(
+                v.Number, v.Title, v.PdfStatus == WorkStatus.Completed, v.PdfStatus == WorkStatus.Failed))
             .ToListAsync(cancellationToken);
+
+        // A volume whose binding exhausted its retry budget: it blocks the book (and the review report)
+        // until the user redoes it, so surface it (with its error) so the card can prompt a retry.
+        var failedVolume = await db.Volumes
+            .Where(v => v.NovelId == id && v.PdfStatus == WorkStatus.Failed)
+            .OrderBy(v => v.Number)
+            .Select(v => new { v.LastError })
+            .FirstOrDefaultAsync(cancellationToken);
 
         // The analysis stage maps every chapter into notes before it consolidates and renders; the
         // per-chapter map is the long part, so surface it as its own progress.
@@ -374,17 +402,22 @@ public sealed class ProjectService
         // the user: a storyboard window that has burned through its bounded retry budget, and any panel
         // parked awaiting the user's OK. Everything else stays quiet while the worker self-heals.
         var needsAttention = pendingApprovals > 0
+            || failedVolume is not null
             || (novel.LastError is not null
                 && novel.Stage == ProjectStage.Storyboarding
                 && novel.StoryboardCursor < chunkCount
                 && novel.StoryboardAttempts >= maxStoryboardAttempts);
+
+        // A failed binding sets no novel-level error (the failure is recorded on the Volume), so surface
+        // it here as the card's message when nothing more specific is set.
+        var lastError = novel.LastError ?? failedVolume?.LastError;
 
         // Only surface the resume time while it's still in the future; once it passes it's stale, so the
         // card stops showing it (and the worker has presumably resumed).
         var rateLimitedUntil = novel.RateLimitedUntilUtc is { } until && until > now ? novel.RateLimitedUntilUtc : null;
 
         return new NovelStatus(
-            novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
+            novel.Id, novel.Title, novel.Stage.ToString(), lastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
             analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals, rateLimitedUntil);
     }
@@ -430,10 +463,10 @@ public sealed class ProjectService
                 p => p.Status, p => p.LastError, cancellationToken);
             await AppendPhase(report, "Pages", db.Pages.Where(p => volumeIds.Contains(p.VolumeId)),
                 p => p.CompositionStatus, p => p.LastError, cancellationToken);
-            // Volumes carry no LastError column, so there's no message to sample (PdfPath is null on a
-            // failed volume); the failed/retry counts on the line are what matter here.
+            // Volumes now carry a LastError (binding retries with backoff), so a failed/retrying volume
+            // samples why it failed, exactly like the other phases.
             await AppendPhase(report, "Volumes", db.Volumes.Where(v => v.NovelId == novel.Id),
-                v => v.PdfStatus, v => v.PdfPath, cancellationToken);
+                v => v.PdfStatus, v => v.LastError, cancellationToken);
             await AppendPhase(report, "Analysis notes", db.ChunkAnalyses.Where(a => a.NovelId == novel.Id),
                 a => a.Status, a => a.LastError, cancellationToken);
         }

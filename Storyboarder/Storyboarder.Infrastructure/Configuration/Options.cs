@@ -80,4 +80,9 @@ public sealed class PageLayoutOptions
     // Deeper than the sides: contains the folio band (see DESIGN.md §7).
     public int BottomMargin { get; set; } = Domain.Design.DesignTokens.Comic.BottomMargin;
     public int Gutter { get; set; } = Domain.Design.DesignTokens.Comic.Gutter;
+
+    // The hard ceiling on panels drawn on one physical page. The storyboard model is steered toward
+    // this, but a page it returns with more panels is split across several pages at storyboard time so
+    // panels never get squished into a dense grid.
+    public int MaxPanelsPerPage { get; set; } = 6;
 }

@@ -42,7 +42,7 @@ public sealed class DesignBibleMerger
         }
 
         return profiles
-            .Select(p => new EntityProfile(p.Name, string.Join(" ", p.Descriptions), p.Aliases.ToList()))
+            .Select(p => new EntityProfile(p.Name, string.Join(" ", p.Descriptions), p.Scale, p.Aliases.ToList()))
             .ToList();
     }
 
@@ -63,6 +63,11 @@ public sealed class DesignBibleMerger
             if (!profile.Descriptions.Contains(description))
                 profile.Descriptions.Add(description);
         }
+
+        // First non-empty scale seen for the entity wins: a later chunk usually just re-mentions the
+        // character without re-stating their size, so we keep the first concrete measurement.
+        if (string.IsNullOrWhiteSpace(profile.Scale) && !string.IsNullOrWhiteSpace(mention.Scale))
+            profile.Scale = mention.Scale.Trim();
 
         AddAlias(profile, mention.Name);
         foreach (var alias in mention.Aliases ?? [])
@@ -87,6 +92,7 @@ public sealed class DesignBibleMerger
     private sealed class MutableProfile(string name)
     {
         public string Name { get; } = name;
+        public string Scale { get; set; } = string.Empty;
         public List<string> Descriptions { get; } = [];
         public List<string> Aliases { get; } = [];
     }

@@ -54,16 +54,17 @@ public sealed class SkiaPageComposer : IPageComposer
 
         for (int i = 0; i < panels.Count; i++)
         {
-            var rect = rects[i];
-            var dest = new SKRect((float)rect.X, (float)rect.Y, (float)(rect.X + rect.Width), (float)(rect.Y + rect.Height));
+            // Split the cell so dialogue and caption get their own bands and never sit on the art.
+            var slot = PanelSlotLayout.Compute(rects[i], panels[i].Dialogue, panels[i].Caption);
+            var art = ToRect(slot.Art);
 
-            DrawPanelImage(canvas, panels[i].Image, dest);
-            canvas.DrawRect(dest, border);
+            DrawPanelImage(canvas, panels[i].Image, art);
+            canvas.DrawRect(art, border);
 
-            if (!string.IsNullOrWhiteSpace(panels[i].Dialogue))
-                DrawTextBox(canvas, panels[i].Dialogue!, dest, anchorTop: true);
-            if (!string.IsNullOrWhiteSpace(panels[i].Caption))
-                DrawTextBox(canvas, panels[i].Caption!, dest, anchorTop: false);
+            if (slot.Dialogue is { } dialogueBand)
+                DrawTextBox(canvas, panels[i].Dialogue!, ToRect(dialogueBand), anchorTop: true);
+            if (slot.Caption is { } captionBand)
+                DrawTextBox(canvas, panels[i].Caption!, ToRect(captionBand), anchorTop: false);
         }
 
         DrawFolio(canvas, chrome);
@@ -72,6 +73,9 @@ public sealed class SkiaPageComposer : IPageComposer
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         return data.ToArray();
     }
+
+    private static SKRect ToRect(Storyboarder.Domain.Imaging.PanelRect r) =>
+        new((float)r.X, (float)r.Y, (float)(r.X + r.Width), (float)(r.Y + r.Height));
 
     private static void DrawPanelImage(SKCanvas canvas, byte[] imageBytes, SKRect dest)
     {
@@ -96,9 +100,11 @@ public sealed class SkiaPageComposer : IPageComposer
         canvas.DrawImage(image, new SKRect(x, y, x + width, y + height), HighQualitySampling, paint: null);
     }
 
-    // Dialogue: bright-paper balloon, Sans lettering, anchored top.
-    // Caption: deep-paper box, Serif Italic, anchored bottom.
-    private static void DrawTextBox(SKCanvas canvas, string text, SKRect panel, bool anchorTop)
+    // Draws the typeset box that fills a reserved text band (so it sits in its own space, never on the
+    // art). Dialogue: bright-paper balloon, Sans lettering, in the band above the art. Caption:
+    // deep-paper box, Serif Italic, in the band below it. PanelSlotLayout sized the band to the wrapped
+    // text, so the box fills the band; a band the layout had to clamp simply clips any overflow line.
+    private static void DrawTextBox(SKCanvas canvas, string text, SKRect band, bool anchorTop)
     {
         var typeface = anchorTop ? EmbeddedTypefaces.SansRegular : EmbeddedTypefaces.SerifItalic;
         var fontSize = anchorTop ? DesignTokens.Comic.LetteringSize : DesignTokens.Comic.CaptionSize;
@@ -109,14 +115,13 @@ public sealed class SkiaPageComposer : IPageComposer
         using var font = new SKFont(typeface, fontSize);
         using var textPaint = new SKPaint { Color = Ink, IsAntialias = true };
 
-        float maxTextWidth = panel.Width - 4 * padding;
+        float maxTextWidth = band.Width - 4 * padding;
         var lines = SkiaText.Wrap(font, text, maxTextWidth);
         float lineHeight = fontSize * DesignTokens.Comic.LineSpacing;
-        float boxHeight = lines.Count * lineHeight + 2 * padding;
-        float boxWidth = panel.Width - 2 * padding;
-        float boxX = panel.Left + padding;
-        float boxY = anchorTop ? panel.Top + padding : panel.Bottom - padding - boxHeight;
-        var boxRect = new SKRect(boxX, boxY, boxX + boxWidth, boxY + boxHeight);
+
+        float boxX = band.Left + padding;
+        float boxWidth = band.Width - 2 * padding;
+        var boxRect = new SKRect(boxX, band.Top, boxX + boxWidth, band.Bottom);
 
         using var fill = new SKPaint { Color = fillColor, IsAntialias = true };
         using var stroke = new SKPaint
@@ -126,9 +131,11 @@ public sealed class SkiaPageComposer : IPageComposer
         canvas.DrawRoundRect(boxRect, radius, radius, fill);
         canvas.DrawRoundRect(boxRect, radius, radius, stroke);
 
-        float baseline = boxY + padding + fontSize;
+        float baseline = band.Top + padding + fontSize;
         foreach (var line in lines)
         {
+            if (baseline > boxRect.Bottom)
+                break; // a clamped band can't fit every line; stop before drawing past the box
             canvas.DrawText(line, boxX + padding, baseline, font, textPaint);
             baseline += lineHeight;
         }

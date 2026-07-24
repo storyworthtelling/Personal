@@ -81,6 +81,7 @@ public class PanelContentApprovalTests : IDisposable
             GeminiRequestsPerMinute = 1000, GeminiRequestsPerDay = 100000,
             BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
+        Options.Create(new PageLayoutOptions()),
         NullLogger<GraphicNovelProcessor>.Instance);
 
     private ProjectService NewProjectService() => new(

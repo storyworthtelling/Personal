@@ -89,10 +89,12 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
         {
             entity.HasKey(volume => volume.Id);
             entity.Property(volume => volume.PdfStatus).HasConversion<int>();
+            entity.Property(volume => volume.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
             entity.HasMany(volume => volume.Pages)
                 .WithOne()
                 .HasForeignKey(page => page.VolumeId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(volume => new { volume.PdfStatus, volume.NextAttemptAtUtc });
         });
 
         model.Entity<Page>(entity =>

@@ -62,6 +62,34 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task ExtractEntities_ParsesScale_AndPromptRequestsIt()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"characters\":[{\"name\":\"Alice\",\"description\":\"tall\",\"scale\":\"about 1.7m\",\"aliases\":[]}]," +
+            "\"settings\":[]}"));
+
+        var fragment = await client.ExtractEntities("excerpt", CancellationToken.None);
+
+        Assert.Equal("about 1.7m", Assert.Single(fragment.Characters).Scale);
+        // The extraction prompt must ask for scale so illustrations stay proportionate.
+        Assert.Contains("scale", handler.RequestBodies[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Storyboard_PromptSteersPanelDensityAndAction()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
+
+        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+
+        var body = handler.RequestBodies[0];
+        Assert.Contains("panels per page", body);
+        Assert.Contains("ONGOING ACTION", body);
+    }
+
+    [Fact]
     public async Task ExtractEntities_SendsApiKeyVersionAndCachedSystemPrompt()
     {
         var (client, handler) = Create();
