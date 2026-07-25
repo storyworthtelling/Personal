@@ -43,7 +43,12 @@ public sealed record EntityProfile(
     string Name,
     string CanonicalDescription,
     string Scale,
-    IReadOnlyList<string> Aliases);
+    IReadOnlyList<string> Aliases,
+    // How many distinct chunks mentioned this entity. A novel names a great many one-off entities (a
+    // barman in one scene, a road crossed once), and drawing a reference sheet for each of them cost the
+    // owner's last book 126 image calls for an ensemble of maybe a dozen. Only entities seen in more than
+    // one chunk earn a sheet; the rest stay in the bible so their descriptions still reach the prompts.
+    int ChunkMentions = 0);
 
 // The whole design bible: canonical characters and settings for the novel.
 public sealed record DesignBible(

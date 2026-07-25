@@ -215,8 +215,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         // no art at all. Reference sheets exist solely to keep the panels consistent, and they are the
         // expensive half of this stage (one image call per bible entity), so a report-only run skips
         // them outright rather than paying to illustrate a book that will never be illustrated.
+        // NeedsSheet excludes the one-off entities: they are part of the bible but were never going to be
+        // drawn, so they are not part of this phase at all — not queued, not counted, and crucially not
+        // waited on, since a ref left Pending forever would pin the stage.
         var reference = novel.ReportOnly ? null : await db.DesignRefs
-            .Where(r => r.NovelId == novel.Id &&
+            .Where(r => r.NovelId == novel.Id && r.NeedsSheet &&
                         (r.ReferenceSheetStatus == WorkStatus.Pending ||
                          (r.ReferenceSheetStatus == WorkStatus.NeedsRetry && r.NextAttemptAtUtc <= now)))
             .FirstOrDefaultAsync(cancellationToken);
@@ -259,7 +262,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (!novel.ReportOnly)
         {
             var pendingSheetRetries = await db.DesignRefs
-                .Where(r => r.NovelId == novel.Id && r.ReferenceSheetStatus == WorkStatus.NeedsRetry)
+                .Where(r => r.NovelId == novel.Id && r.NeedsSheet && r.ReferenceSheetStatus == WorkStatus.NeedsRetry)
                 .Select(r => r.NextAttemptAtUtc)
                 .ToListAsync(cancellationToken);
             if (pendingSheetRetries.Count > 0)
@@ -289,10 +292,16 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         var bible = merger.Merge(fragments);
 
+        // "Recurring" is measured in chunks, so it only means anything once there are at least two of
+        // them: in a manuscript short enough to be a single chunk, every entity appears in exactly one
+        // chunk and a strict rule would draw no sheets at all, losing consistency across the whole book.
+        // With no recurrence signal to go on, draw everything.
+        var chunkCount = fragments.Count;
+
         foreach (var character in bible.Characters)
-            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Character, character));
+            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Character, character, chunkCount));
         foreach (var setting in bible.Settings)
-            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Setting, setting));
+            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Setting, setting, chunkCount));
 
         novel.DesignBibleConsolidated = true;
         Touch(novel);
@@ -1087,7 +1096,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         var refs = await db.DesignRefs.Where(r => r.NovelId == novelId).ToListAsync(cancellationToken);
         EntityProfile Map(DesignRef r) =>
-            new(r.Name, r.CanonicalDescription, r.Scale, JsonSerializer.Deserialize<List<string>>(r.AliasesJson) ?? []);
+            new(r.Name, r.CanonicalDescription, r.Scale,
+                JsonSerializer.Deserialize<List<string>>(r.AliasesJson) ?? [], r.ChunkMentions);
         return new DesignBible(
             refs.Where(r => r.Kind == ReferenceKind.Character).Select(Map).ToList(),
             refs.Where(r => r.Kind == ReferenceKind.Setting).Select(Map).ToList());
@@ -1144,14 +1154,21 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         }
     }
 
-    private static DesignRef NewDesignRef(Guid novelId, ReferenceKind kind, EntityProfile profile) => new()
+    private static DesignRef NewDesignRef(
+        Guid novelId, ReferenceKind kind, EntityProfile profile, int chunkCount) => new()
     {
         NovelId = novelId,
         Kind = kind,
         Name = profile.Name,
         CanonicalDescription = profile.CanonicalDescription,
         Scale = profile.Scale,
-        AliasesJson = JsonSerializer.Serialize(profile.Aliases)
+        AliasesJson = JsonSerializer.Serialize(profile.Aliases),
+        ChunkMentions = profile.ChunkMentions,
+        // Only recurring entities earn a rendered sheet. A one-off entity still reaches the storyboard and
+        // panel prompts through the design bible — it just isn't drawn on its own, which is where the bulk
+        // of the image spend was going (126 sheets for an ensemble of about a dozen on the last book).
+        // A single-chunk manuscript carries no recurrence signal at all, so everything is drawn there.
+        NeedsSheet = profile.ChunkMentions > 1 || chunkCount <= 1
     };
 
     private ProcessResult Fail(StoryboarderDbContext db, Novel novel, string message, CancellationToken cancellationToken)

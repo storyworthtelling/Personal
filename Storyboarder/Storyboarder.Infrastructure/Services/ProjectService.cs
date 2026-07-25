@@ -367,7 +367,10 @@ public sealed class ProjectService
             return null;
 
         var chunks = await Counts(db.Chunks.Where(c => c.NovelId == id), c => c.AnalysisStatus, cancellationToken);
-        var sheets = await Counts(db.DesignRefs.Where(r => r.NovelId == id), r => r.ReferenceSheetStatus, cancellationToken);
+        // Only entities that earn a sheet count toward this phase. Including the one-off entities would
+        // report "sheets 12 of 126" for a book where 114 of those were never going to be drawn.
+        var sheets = await Counts(
+            db.DesignRefs.Where(r => r.NovelId == id && r.NeedsSheet), r => r.ReferenceSheetStatus, cancellationToken);
 
         // Storyboarding walks the chunk list one window at a time; the cursor is how far it has got.
         // Clamp to the total so the moment it finishes (cursor == count) it reads a clean 100%.
@@ -480,7 +483,9 @@ public sealed class ProjectService
 
             await AppendPhase(report, "Chunks", db.Chunks.Where(c => c.NovelId == novel.Id),
                 c => c.AnalysisStatus, c => c.LastError, cancellationToken);
-            await AppendPhase(report, "Reference sheets", db.DesignRefs.Where(r => r.NovelId == novel.Id),
+            // Scoped to the entities that earn a sheet, matching the live status counts — the one-off
+            // entities are in the bible but were never queued to be drawn.
+            await AppendPhase(report, "Reference sheets", db.DesignRefs.Where(r => r.NovelId == novel.Id && r.NeedsSheet),
                 r => r.ReferenceSheetStatus, r => r.LastError, cancellationToken);
 
             var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);

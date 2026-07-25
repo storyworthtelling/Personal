@@ -92,6 +92,37 @@ public class DesignBibleMergerTests
     }
 
     [Fact]
+    public void Counts_DistinctChunksAnEntityAppearsIn()
+    {
+        var bible = merger.Merge(
+        [
+            Characters(new EntityMention("Alice", "short"), new EntityMention("Barman", "balding")),
+            Characters(new EntityMention("Alice", "red coat")),
+            Characters(new EntityMention("Alice", "green eyes"))
+        ]);
+
+        // Alice is named in three chunks; the barman in one. That difference is what decides who gets
+        // drawn a reference sheet.
+        Assert.Equal(3, bible.Characters.Single(c => c.Name == "Alice").ChunkMentions);
+        Assert.Equal(1, bible.Characters.Single(c => c.Name == "Barman").ChunkMentions);
+    }
+
+    [Fact]
+    public void AliasesWithinOneChunk_CountAsASingleSighting()
+    {
+        // Two names for the same person inside one chunk is one sighting, not two — otherwise a single
+        // chatty chunk could promote a walk-on into the recurring cast and buy it a sheet.
+        var bible = merger.Merge(
+        [
+            new DesignBibleFragment(
+                [new EntityMention("Thomas Reed", "detective", ["Tom"]), new EntityMention("Tom", "smokes")],
+                Array.Empty<EntityMention>())
+        ]);
+
+        Assert.Equal(1, Assert.Single(bible.Characters).ChunkMentions);
+    }
+
+    [Fact]
     public void Characters_And_Settings_AreMergedIndependently()
     {
         var bible = merger.Merge(

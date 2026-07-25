@@ -11,6 +11,7 @@ using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
+using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
 using Xunit;
 
@@ -129,6 +130,13 @@ public class GraphicNovelProcessorTests : IDisposable
         }),
         Options.Create(new PageLayoutOptions { MaxPanelsPerPage = maxPanelsPerPage }),
         NullLogger<GraphicNovelProcessor>.Instance);
+
+    private ProjectService NewProjectService() => new(
+        database,
+        Mock.Of<IGoogleDocsClient>(),
+        new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
+        clock,
+        Options.Create(new RateLimitOptions { MaxAttempts = 6 }));
 
     private Guid SeedNovel(string? fullText = null, bool reportOnly = false)
     {
@@ -673,6 +681,60 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.Equal(2, pages.Count);
         Assert.Equal([1, 2], pages.Select(p => p.PageNumber).ToList());
         Assert.All(pages, p => Assert.Equal(4, ctx.Panels.Count(pn => pn.PageId == p.Id)));
+    }
+
+    [Fact]
+    public async Task OneOffEntities_GetNoReferenceSheet_ButStayInTheBible()
+    {
+        // The owner's last book spent 126 image calls drawing a sheet for every named entity, including
+        // walk-ons seen once. Only entities recurring across chunks should be drawn; the rest must remain
+        // in the bible so their descriptions still reach the storyboard and panel prompts.
+        var manuscript = string.Join("\n\n",
+            Enumerable.Range(0, 2000).Select(i =>
+                $"Paragraph {i}: the hero walks the long grey hall of the castle, thinking of the road ahead " +
+                "and of everything that was left behind in the valley below."));
+
+        // A recurring pair in every chunk, plus a walk-on unique to each chunk.
+        var call = 0;
+        claude.Setup(c => c.ExtractEntities(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                var n = call++;
+                return new DesignBibleFragment(
+                    [new EntityMention("Hero", "a brave knight"), new EntityMention($"Barman {n}", "balding, aproned")],
+                    [new EntityMention("Castle", "a grey stone fortress")]);
+            });
+
+        var novelId = SeedNovel(manuscript);
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var refs = ctx.DesignRefs.Where(r => r.NovelId == novelId).ToList();
+        var chunkCount = ctx.Chunks.Count(c => c.NovelId == novelId);
+        Assert.True(chunkCount > 1, $"needed a multi-chunk manuscript to have a recurrence signal, got {chunkCount}");
+
+        var hero = refs.Single(r => r.Name == "Hero");
+        var walkOns = refs.Where(r => r.Name.StartsWith("Barman", StringComparison.Ordinal)).ToList();
+        Assert.NotEmpty(walkOns);
+
+        // The recurring cast is drawn; the walk-ons are not queued at all.
+        Assert.True(hero.NeedsSheet);
+        Assert.Equal(WorkStatus.Completed, hero.ReferenceSheetStatus);
+        Assert.All(walkOns, r =>
+        {
+            Assert.False(r.NeedsSheet);
+            Assert.Null(r.ReferenceImagePath);
+        });
+
+        // But they are still in the bible, so the storyboard and panel prompts can still describe them.
+        Assert.All(walkOns, r => Assert.False(string.IsNullOrWhiteSpace(r.CanonicalDescription)));
+
+        // And the undrawn entities didn't inflate the progress the card reports.
+        var status = await NewProjectService().GetStatusAsync(novelId, CancellationToken.None);
+        Assert.Equal(refs.Count(r => r.NeedsSheet), status!.ReferenceSheets.Total);
+        Assert.True(status.ReferenceSheets.Total < refs.Count);
     }
 
     [Fact]
