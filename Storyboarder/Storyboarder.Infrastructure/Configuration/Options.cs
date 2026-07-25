@@ -51,6 +51,16 @@ public sealed class GeminiOptions
     public const string SectionName = "Gemini";
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = "gemini-2.5-flash-image";
+
+    // Render the first pass of panels through the Gemini Batch API (~50% cheaper, separate quota pool,
+    // up-to-24h turnaround, work runs server-side rather than grinding on the phone). Off by default: the
+    // synchronous path is the verified one, and batching is only worth enabling once measured on a real
+    // device (see BATCHING.md). Anything a batch fails or blocks falls back to the synchronous render.
+    public bool UseBatchRendering { get; set; }
+
+    // How long to wait between polls of an in-flight batch job. The job can take hours, so polling every
+    // few minutes is plenty and keeps the worker cheap.
+    public int BatchPollSeconds { get; set; } = 300;
 }
 
 // Browser-side Google credentials surfaced to the status page for the Drive Picker.
