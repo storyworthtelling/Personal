@@ -434,6 +434,27 @@ public class PanelContentApprovalTests : IDisposable
         Assert.Equal(ProjectStage.Completed, StageOf(readyNovelId));
     }
 
+    [Fact]
+    public async Task ReportAlreadyRendered_Completes_WithoutBuyingACraftConsolidation()
+    {
+        // The upgrade path: a novel whose report PDF was rendered before the craft half of the reduce
+        // existed carries CraftJson = null. Gating the craft call on that alone would bill a Claude
+        // consolidation whose output could never reach the PDF already on disk, so the stage must read
+        // "the report is rendered, therefore this stage is done" and simply advance.
+        var novelId = SeedNovelReadyToCompleteAnalysis(secondsOffset: 0);
+
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(ProjectStage.Completed, StageOf(novelId));
+        claude.Verify(c => c.ConsolidateCraft(
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        claude.Verify(c => c.ConsolidateAnalysis(
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private ProjectStage StageOf(Guid novelId)
     {
         using var context = database.NewContext();

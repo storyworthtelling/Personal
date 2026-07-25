@@ -722,8 +722,15 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         var analysis = await db.BookAnalyses.FirstAsync(a => a.NovelId == novel.Id, cancellationToken);
 
+        // Reduce work is pointless once the report PDF is on disk, and both halves are gated on it: a
+        // novel whose report was rendered before the craft half existed carries CraftJson = null, so
+        // gating the craft call on that alone would buy a consolidation whose output could never reach
+        // the PDF already written — a billed call with nothing to show for it. Such a novel falls
+        // through to the tail of this method and advances to Completed.
+        var reportRendered = analysis.PdfStatus == WorkStatus.Completed;
+
         // 2) Reduce, story half: consolidate all chunk notes into the story report (one Claude call).
-        if (analysis.ConsolidatedJson is null)
+        if (analysis.ConsolidatedJson is null && !reportRendered)
         {
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
@@ -753,7 +760,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         // map. Its own call with its own output budget, and persisted separately: asking for both
         // halves at once needs more output than one reply can carry, and a failure in either half
         // must not re-bill the one that already succeeded.
-        if (analysis.CraftJson is null)
+        if (analysis.CraftJson is null && !reportRendered)
         {
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
