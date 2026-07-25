@@ -17,6 +17,23 @@ public static class SettingsStore
         set => Preferences.Set(nameof(GeminiApiKey), value);
     }
 
+    // Copy each finished book's PDFs to a Drive folder beside its manuscript. Off until the drive.file
+    // write scope is registered on the OAuth client and consented to on the device — turning it on before
+    // then just sends every finished book through a stage that can only fail.
+    public static bool ArchiveToDrive
+    {
+        get => Preferences.Get(nameof(ArchiveToDrive), false);
+        set => Preferences.Set(nameof(ArchiveToDrive), value);
+    }
+
+    // After a confirmed upload, delete the intermediate panel and page images (hundreds of megabytes for a
+    // full book). The PDFs themselves are always kept — they are what gets read.
+    public static bool FreeLocalCopiesAfterArchive
+    {
+        get => Preferences.Get(nameof(FreeLocalCopiesAfterArchive), false);
+        set => Preferences.Set(nameof(FreeLocalCopiesAfterArchive), value);
+    }
+
     // The Google account chosen via the native picker; tokens are minted for it via AccountManager.
     public static string GoogleAccountEmail
     {

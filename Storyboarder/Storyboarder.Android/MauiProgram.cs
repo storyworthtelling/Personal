@@ -55,6 +55,14 @@ public static class MauiProgram
             _ => new LiveOptions<RateLimitOptions>(() => new RateLimitOptions()));
         builder.Services.AddSingleton<IOptions<PageLayoutOptions>>(
             _ => new LiveOptions<PageLayoutOptions>(() => new PageLayoutOptions()));
+        // Read live from Preferences like the keys are, so switching archiving on takes effect on the
+        // next worker cycle without a restart.
+        builder.Services.AddSingleton<IOptions<ArchiveOptions>>(
+            _ => new LiveOptions<ArchiveOptions>(() => new ArchiveOptions
+            {
+                Enabled = SettingsStore.ArchiveToDrive,
+                FreeLocalCopies = SettingsStore.FreeLocalCopiesAfterArchive
+            }));
         builder.Services.AddSingleton<IOptions<StorageOptions>>(
             _ => new LiveOptions<StorageOptions>(() => new StorageOptions
             {
@@ -98,6 +106,7 @@ public static class MauiProgram
         // Android-side Google helpers consumed by the New Project page.
         builder.Services.AddSingleton<DeviceAccountTokenProvider>();
         builder.Services.AddSingleton<DriveDocsLister>();
+        builder.Services.AddSingleton<IDriveArchive, DeviceAccountDriveArchive>();
 
         // Pages.
         builder.Services.AddTransient<Pages.MainPage>();

@@ -8,8 +8,18 @@ namespace Storyboarder.Android.Google;
 public class DeviceAccountTokenProvider
 {
     // AccountManager auth-token type: "oauth2:" followed by the space-separated scopes.
+    //
+    // drive.file is a WRITE scope, needed to archive finished books beside their manuscript. It is the
+    // narrowest write scope Drive offers — it grants access only to files this app itself creates, not to
+    // the rest of the user's Drive — so reading the manuscript still relies on drive.readonly.
+    //
+    // Adding a scope changes what the consent screen asks for: it must also be registered on the OAuth
+    // client in the Google Cloud project, and the user has to re-consent on the device. Until both happen,
+    // token requests including this scope fail, which is why archiving defaults to off (ArchiveOptions).
     internal const string TokenScope =
-        "oauth2:https://www.googleapis.com/auth/documents.readonly https://www.googleapis.com/auth/drive.readonly";
+        "oauth2:https://www.googleapis.com/auth/documents.readonly " +
+        "https://www.googleapis.com/auth/drive.readonly " +
+        "https://www.googleapis.com/auth/drive.file";
 
     private readonly object gate = new();
     private string? cachedToken;

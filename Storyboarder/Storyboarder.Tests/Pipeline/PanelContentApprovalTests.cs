@@ -30,6 +30,11 @@ public class PanelContentApprovalTests : IDisposable
     private readonly Mock<IClaudeAnalysisClient> claude = new();
     private readonly Mock<IGeminiImageClient> gemini = new();
 
+    // Archive settings and a fake Drive for the archive stage; null/off by default so every
+    // existing test drives the unarchived path.
+    private ArchiveOptions? archiveOptions;
+    private IDriveArchive? driveArchive;
+
     public PanelContentApprovalTests()
     {
         claude.Setup(c => c.ExtractEntities(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -92,7 +97,9 @@ public class PanelContentApprovalTests : IDisposable
             BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
         Options.Create(new PageLayoutOptions()),
-        NullLogger<GraphicNovelProcessor>.Instance);
+        Options.Create(archiveOptions ?? new ArchiveOptions()),
+        NullLogger<GraphicNovelProcessor>.Instance,
+        driveArchive);
 
     private ProjectService NewProjectService() => new(
         database,
@@ -454,9 +461,11 @@ public class PanelContentApprovalTests : IDisposable
         var readyNovelId = SeedNovelReadyToCompleteAnalysis(secondsOffset: 0);
 
         var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
-
         Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
-        Assert.Equal(ProjectStage.Completed, StageOf(readyNovelId));
+
+        // The worker stepped past the waiting novel and did the ready one's work; a couple more cycles
+        // carry it through the archive stage to the end.
+        Assert.Equal(ProjectStage.Completed, await Drive(readyNovelId));
     }
 
     [Fact]
@@ -468,9 +477,9 @@ public class PanelContentApprovalTests : IDisposable
         // "the report is rendered, therefore this stage is done" and simply advance.
         var novelId = SeedNovelReadyToCompleteAnalysis(secondsOffset: 0);
 
-        await NewProcessor().ProcessNextAsync(CancellationToken.None);
-
-        Assert.Equal(ProjectStage.Completed, StageOf(novelId));
+        // Drives rather than taking a single cycle: the book still has the archive stage to pass through,
+        // which with archiving off is a straight-through transition.
+        Assert.Equal(ProjectStage.Completed, await Drive(novelId));
         claude.Verify(c => c.ConsolidateCraft(
             It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()),
             Times.Never);

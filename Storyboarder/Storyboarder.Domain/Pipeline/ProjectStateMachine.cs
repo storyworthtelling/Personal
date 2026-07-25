@@ -18,7 +18,10 @@ public sealed record PipelineProgress(
     // The novel is a report-only draft: the art stages are skipped entirely and the design bible hands
     // straight over to the revision report. Defaulted false — the illustration is the comprehension
     // probe, so a conversion still wants it unless the owner explicitly asked for the report alone.
-    bool ReportOnly = false);
+    bool ReportOnly = false,
+    // Whether the finished outputs have been dealt with by the archive step — either uploaded, skipped
+    // because archiving is off, or given up on. Any of those three lets the book finish.
+    bool ArchiveComplete = false);
 
 // Decides the next stage for a novel given its progress. Pure and idempotent: a stage only advances
 // when its completion predicate holds; Completed and Failed are terminal.
@@ -44,8 +47,14 @@ public static class ProjectStateMachine
             progress.AllPagesComposed ? ProjectStage.AssemblingVolumes : ProjectStage.ComposingPages,
         ProjectStage.AssemblingVolumes =>
             progress.AllVolumesAssembled ? ProjectStage.ComposingAnalysis : ProjectStage.AssemblingVolumes,
+        // The report is the last thing produced, so archiving comes after it. Archiving is a convenience,
+        // not correctness — every output is already on disk — so the Archiving handler advances straight
+        // through when archiving is switched off or has given up. A book must never be left unfinished
+        // because a copy could not be uploaded.
         ProjectStage.ComposingAnalysis =>
-            progress.AnalysisComplete ? ProjectStage.Completed : ProjectStage.ComposingAnalysis,
+            progress.AnalysisComplete ? ProjectStage.Archiving : ProjectStage.ComposingAnalysis,
+        ProjectStage.Archiving =>
+            progress.ArchiveComplete ? ProjectStage.Completed : ProjectStage.Archiving,
         ProjectStage.Completed => ProjectStage.Completed,
         ProjectStage.Failed => ProjectStage.Failed,
         ProjectStage.Cancelled => ProjectStage.Cancelled,

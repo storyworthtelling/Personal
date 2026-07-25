@@ -36,6 +36,11 @@ public class GraphicNovelProcessorTests : IDisposable
     // builds each cycle keeps using it.
     private IVolumePdfComposer? volumeComposerOverride;
 
+    // Archive settings and a fake Drive for the archive stage; null/off by default so every
+    // existing test drives the unarchived path.
+    private ArchiveOptions? archiveOptions;
+    private IDriveArchive? driveArchive;
+
     public GraphicNovelProcessorTests()
     {
         claude.Setup(c => c.ExtractEntities(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -133,7 +138,9 @@ public class GraphicNovelProcessorTests : IDisposable
             BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
         Options.Create(new PageLayoutOptions { MaxPanelsPerPage = maxPanelsPerPage }),
-        NullLogger<GraphicNovelProcessor>.Instance);
+        Options.Create(archiveOptions ?? new ArchiveOptions()),
+        NullLogger<GraphicNovelProcessor>.Instance,
+        driveArchive);
 
     private ProjectService NewProjectService() => new(
         database,
@@ -739,6 +746,125 @@ public class GraphicNovelProcessorTests : IDisposable
         var status = await NewProjectService().GetStatusAsync(novelId, CancellationToken.None);
         Assert.Equal(refs.Count(r => r.NeedsSheet), status!.ReferenceSheets.Total);
         Assert.True(status.ReferenceSheets.Total < refs.Count);
+    }
+
+    // A Drive stand-in that records what was uploaded, and can be told to fail every upload.
+    private sealed class FakeDrive(bool fail = false, string? parent = "parent-folder") : IDriveArchive
+    {
+        public List<string> Uploaded { get; } = [];
+        public string? CreatedFolderUnder { get; private set; }
+
+        public Task<string?> FindParentFolder(string fileId, CancellationToken cancellationToken) =>
+            Task.FromResult(parent);
+
+        public Task<string> EnsureFolder(string parentFolderId, string name, CancellationToken cancellationToken)
+        {
+            CreatedFolderUnder = parentFolderId;
+            return Task.FromResult($"folder-for-{name}");
+        }
+
+        public Task<string> UploadFile(
+            string folderId, string name, string mimeType, byte[] content, CancellationToken cancellationToken)
+        {
+            if (fail)
+                throw new InvalidOperationException("drive is unreachable");
+            Uploaded.Add(name);
+            return Task.FromResult($"file-{Uploaded.Count}");
+        }
+    }
+
+    [Fact]
+    public async Task ArchivingOff_FinishesTheBook_WithoutTouchingDrive()
+    {
+        // The default. Archiving must be opt-in, because the Drive write scope isn't granted yet and a
+        // mandatory archive step would strand every finished book on a permission error.
+        var drive = new FakeDrive();
+        driveArchive = drive;
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.Empty(drive.Uploaded);
+        using var ctx = database.NewContext();
+        Assert.Null(ctx.Novels.Single(n => n.Id == novelId).ArchivedAtUtc);
+    }
+
+    [Fact]
+    public async Task ArchivingOn_UploadsVolumesAndReport_BesideTheManuscript()
+    {
+        var drive = new FakeDrive();
+        driveArchive = drive;
+        archiveOptions = new ArchiveOptions { Enabled = true };
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        // The folder is created under the manuscript's own parent, not somewhere app-specific.
+        Assert.Equal("parent-folder", drive.CreatedFolderUnder);
+        Assert.Contains(drive.Uploaded, n => n.Contains("Volume 1", StringComparison.Ordinal));
+        Assert.Contains(drive.Uploaded, n => n.Contains("revision report", StringComparison.Ordinal));
+
+        using var ctx = database.NewContext();
+        var novel = ctx.Novels.Single(n => n.Id == novelId);
+        Assert.NotNull(novel.ArchivedAtUtc);
+        Assert.NotNull(novel.ArchiveFolderId);
+        Assert.All(ctx.Volumes.Where(v => v.NovelId == novelId), v => Assert.NotNull(v.ArchivedDriveFileId));
+        Assert.NotNull(ctx.BookAnalyses.Single(a => a.NovelId == novelId).ArchivedDriveFileId);
+    }
+
+    [Fact]
+    public async Task ArchivingThatKeepsFailing_StillFinishesTheBook()
+    {
+        // The outputs are already on disk, so a Drive failure is an inconvenience, not a lost book. It must
+        // exhaust its retries and then finish anyway, with the reason recorded.
+        driveArchive = new FakeDrive(fail: true);
+        archiveOptions = new ArchiveOptions { Enabled = true };
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        using var ctx = database.NewContext();
+        var novel = ctx.Novels.Single(n => n.Id == novelId);
+        Assert.Null(novel.ArchivedAtUtc);
+        Assert.Contains("archive", novel.LastError!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task NoResolvableDriveFolder_FinishesWithoutArchiving()
+    {
+        // A manuscript with no resolvable parent (a shared file, or one at the root of a shared drive) has
+        // nowhere sensible to archive to. That is a reason to skip, not to fail.
+        var drive = new FakeDrive(parent: null);
+        driveArchive = drive;
+        archiveOptions = new ArchiveOptions { Enabled = true };
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.Empty(drive.Uploaded);
+    }
+
+    [Fact]
+    public async Task FreeLocalCopies_ReclaimsIntermediates_ButKeepsTheDeliverables()
+    {
+        // Panel and page rasters are the bulk of the storage and are reproducible from the PDFs; the PDFs
+        // themselves must survive, since they are what the owner actually reads.
+        driveArchive = new FakeDrive();
+        archiveOptions = new ArchiveOptions { Enabled = true, FreeLocalCopies = true };
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        using var ctx = database.NewContext();
+        var volume = ctx.Volumes.Single(v => v.NovelId == novelId);
+        Assert.True(File.Exists(volume.PdfPath!), "the volume PDF must survive being archived");
+        Assert.False(Directory.Exists(Path.Combine(outputRoot, novelId.ToString(), "panels")),
+            "intermediate panel images should have been reclaimed");
     }
 
     [Fact]

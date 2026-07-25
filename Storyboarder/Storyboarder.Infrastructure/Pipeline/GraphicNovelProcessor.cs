@@ -37,6 +37,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private readonly BackoffScheduler backoff;
     private readonly RateLimitOptions rateLimits;
     private readonly PageLayoutOptions pageLayout;
+    private readonly ArchiveOptions archive;
+
+    // Null when the platform head supplies no Drive archive (and on any non-Android host). The archive
+    // stage treats that exactly like archiving being switched off.
+    private readonly IDriveArchive? driveArchive;
     private readonly TextChunker chunker = new();
     // A finer chunker used only for storyboarding: it slices each (large) design-bible chunk into small
     // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
@@ -57,7 +62,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         IClock clock,
         IOptions<RateLimitOptions> rateLimitOptions,
         IOptions<PageLayoutOptions> pageLayoutOptions,
-        ILogger<GraphicNovelProcessor> logger)
+        IOptions<ArchiveOptions> archiveOptions,
+        ILogger<GraphicNovelProcessor> logger,
+        IDriveArchive? driveArchive = null)
     {
         this.dbContextFactory = dbContextFactory;
         this.claude = claude;
@@ -71,6 +78,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         rateLimits = rateLimitOptions.Value;
         pageLayout = pageLayoutOptions.Value;
+        archive = archiveOptions.Value;
+        this.driveArchive = driveArchive;
         storyboardChunker = new TextChunker(rateLimits.StoryboardWindowChars, rateLimits.StoryboardWindowMaxChars);
         claudeLimiter = new RequestRateLimiter(rateLimits.ClaudeRequestsPerMinute, rateLimits.ClaudeRequestsPerDay, clock);
         geminiLimiter = new RequestRateLimiter(rateLimits.GeminiRequestsPerMinute, rateLimits.GeminiRequestsPerDay, clock);
@@ -121,6 +130,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             ProjectStage.ComposingPages => ComposePages(db, novel, cancellationToken),
             ProjectStage.AssemblingVolumes => AssembleVolumes(db, novel, cancellationToken),
             ProjectStage.ComposingAnalysis => ComposeAnalysis(db, novel, cancellationToken),
+            ProjectStage.Archiving => ArchiveOutputs(db, novel, cancellationToken),
             _ => Task.FromResult(ProcessResult.Idle)
         };
 
@@ -855,6 +865,128 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         // 4) The report is rendered — either just now or on an earlier cycle — so the book is finished.
         return await AdvancePastAnalysis(db, novel, cancellationToken);
+    }
+
+    // Copies the finished outputs to a Drive folder beside the source manuscript, then optionally frees the
+    // local copies. One file per call, like every other stage, so a large book's upload is resumable and
+    // never held entirely in memory.
+    //
+    // The governing rule is that this stage cannot stop a book from finishing: every output is already on
+    // disk and the archive is a convenience. So it advances straight through when archiving is off, when
+    // Drive has nowhere sensible to put the files, and when uploads have exhausted their retries — the last
+    // recorded as an error the user can see, not as a failed book.
+    private async Task<ProcessResult> ArchiveOutputs(
+        StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        if (!archive.Enabled || driveArchive is null)
+            return await FinishArchiving(db, novel, cancellationToken);
+
+        // Volume PDFs first, then the report: the same order a reader would want them in.
+        var volumes = await db.Volumes
+            .Where(v => v.NovelId == novel.Id && v.PdfStatus == WorkStatus.Completed
+                        && v.PdfPath != null && v.ArchivedDriveFileId == null)
+            .OrderBy(v => v.Number)
+            .ToListAsync(cancellationToken);
+        var analysis = await db.BookAnalyses
+            .FirstOrDefaultAsync(a => a.NovelId == novel.Id, cancellationToken);
+        var reportPending = analysis is { PdfStatus: WorkStatus.Completed, PdfPath: not null, ArchivedDriveFileId: null };
+
+        if (volumes.Count == 0 && !reportPending)
+            return await FinishArchiving(db, novel, cancellationToken);
+
+        try
+        {
+            // Resolve (and remember) the destination once. A novel whose manuscript has no resolvable
+            // parent — a shared file, or one at the root of a shared drive — has nowhere sensible to
+            // archive to, which is a reason to skip rather than to fail.
+            if (novel.ArchiveFolderId is null)
+            {
+                var parent = await driveArchive.FindParentFolder(novel.GoogleDocId, cancellationToken);
+                if (parent is null)
+                {
+                    logger.LogInformation(
+                        "Novel {NovelId}: the source document has no resolvable Drive folder, so there is " +
+                        "nowhere to archive to; finishing without archiving", novel.Id);
+                    return await FinishArchiving(db, novel, cancellationToken);
+                }
+
+                novel.ArchiveFolderId = await driveArchive.EnsureFolder(parent, novel.Title, cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+            }
+
+            if (volumes.Count > 0)
+            {
+                var volume = volumes[0];
+                var name = $"{novel.Title} — Volume {volume.Number}.pdf";
+                volume.ArchivedDriveFileId = await driveArchive.UploadFile(
+                    novel.ArchiveFolderId, name, "application/pdf",
+                    imageStore.Read(volume.PdfPath!), cancellationToken);
+                logger.LogInformation("Archived volume {Number} of novel {NovelId} to Drive", volume.Number, novel.Id);
+            }
+            else
+            {
+                analysis!.ArchivedDriveFileId = await driveArchive.UploadFile(
+                    novel.ArchiveFolderId, $"{novel.Title} — revision report.pdf", "application/pdf",
+                    imageStore.Read(analysis.PdfPath!), cancellationToken);
+                logger.LogInformation("Archived the revision report of novel {NovelId} to Drive", novel.Id);
+            }
+
+            novel.StoryboardAttempts = 0;
+            novel.LastError = null;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Reuses the novel-level attempt counter, as the report consolidations do, since archiving is
+            // also a once-per-novel step with no per-unit row to hang a budget off. Past the budget the
+            // book finishes anyway with the reason recorded — the outputs are safe on disk regardless.
+            novel.StoryboardAttempts++;
+            novel.LastError = $"Could not archive to Drive: {ex.Message}";
+            if (novel.StoryboardAttempts >= rateLimits.MaxAttempts)
+            {
+                logger.LogWarning(ex,
+                    "Novel {NovelId}: giving up on archiving after {Attempts} attempts; finishing anyway " +
+                    "(the outputs remain on the device)", novel.Id, novel.StoryboardAttempts);
+                return await FinishArchiving(db, novel, cancellationToken);
+            }
+
+            var delay = backoff.NextDelay(novel.StoryboardAttempts - 1, (ex as RateLimitException)?.RetryAfter);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.Waiting(delay, novel.Id);
+        }
+    }
+
+    // Leaves the archive stage: stamps when it happened (only when something was actually uploaded),
+    // optionally reclaims the local copies, and advances. Freeing files is gated on the upload having
+    // succeeded, so a skipped or failed archive never deletes the only copy.
+    private async Task<ProcessResult> FinishArchiving(
+        StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var uploaded = novel.ArchiveFolderId is not null && await db.Volumes
+            .AnyAsync(v => v.NovelId == novel.Id && v.ArchivedDriveFileId != null, cancellationToken);
+        if (uploaded)
+        {
+            novel.ArchivedAtUtc = clock.UtcNow;
+            if (archive.FreeLocalCopies)
+            {
+                imageStore.Delete($"{novel.Id}/panels");
+                imageStore.Delete($"{novel.Id}/pages");
+                logger.LogInformation(
+                    "Freed the intermediate panel and page images of novel {NovelId} after archiving", novel.Id);
+            }
+        }
+
+        novel.StoryboardAttempts = 0;
+        SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
+            novel.Stage, SourceIngested: false, AllChunksAnalyzed: false, BibleConsolidated: false,
+            AllReferenceSheetsRendered: false, StoryboardCreated: false, AllPanelsRendered: false,
+            AllPagesComposed: false, AllVolumesAssembled: false, AnalysisComplete: false,
+            ArchiveComplete: true)));
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
     }
 
     // Moves a novel off ComposingAnalysis now that its revision report exists. Shared by the two paths

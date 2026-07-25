@@ -61,6 +61,21 @@ public sealed class GoogleOptions
     public string ApiKey { get; set; } = string.Empty;
 }
 
+public sealed class ArchiveOptions
+{
+    public const string SectionName = "Archive";
+
+    // Off by default, and it must stay that way until the Drive WRITE scope (drive.file) is registered on
+    // the OAuth consent screen and granted on the device. Defaulting this on would send every finished
+    // book into a stage whose only possible outcome is a permission error.
+    public bool Enabled { get; set; }
+
+    // Delete the local copies once the upload is confirmed. Separate from Enabled because archiving for
+    // safekeeping and reclaiming phone storage are different decisions: a book's rasters and PDFs run to
+    // hundreds of megabytes, but a user may still want them on the device.
+    public bool FreeLocalCopies { get; set; }
+}
+
 public sealed class StorageOptions
 {
     public const string SectionName = "Storage";

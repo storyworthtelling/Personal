@@ -16,10 +16,11 @@ public class ProjectStateMachineTests
         bool allPagesComposed = false,
         bool allVolumesAssembled = false,
         bool analysisComplete = false,
-        bool reportOnly = false) =>
+        bool reportOnly = false,
+        bool archiveComplete = false) =>
         new(stage, sourceIngested, allChunksAnalyzed, bibleConsolidated, allReferenceSheetsRendered,
             storyboardCreated, allPanelsRendered, allPagesComposed, allVolumesAssembled, analysisComplete,
-            reportOnly);
+            reportOnly, archiveComplete);
 
     [Fact]
     public void Created_Advances_ToIngesting() =>
@@ -101,10 +102,23 @@ public class ProjectStateMachineTests
         Assert.Equal(ProjectStage.ComposingAnalysis,
             ProjectStateMachine.NextStage(At(ProjectStage.ComposingAnalysis)));
 
+    // The report is the last thing produced, so archiving follows it rather than preceding it.
     [Fact]
-    public void ComposingAnalysis_Advances_ToCompleted_WhenAnalysisComplete() =>
-        Assert.Equal(ProjectStage.Completed,
+    public void ComposingAnalysis_Advances_ToArchiving_WhenAnalysisComplete() =>
+        Assert.Equal(ProjectStage.Archiving,
             ProjectStateMachine.NextStage(At(ProjectStage.ComposingAnalysis, analysisComplete: true)));
+
+    [Fact]
+    public void Archiving_Waits_UntilTheArchiveStepIsDone() =>
+        Assert.Equal(ProjectStage.Archiving,
+            ProjectStateMachine.NextStage(At(ProjectStage.Archiving)));
+
+    // "Done" covers uploaded, skipped because archiving is off, and given up on — a book must never be
+    // left unfinished because a copy could not be uploaded.
+    [Fact]
+    public void Archiving_Advances_ToCompleted_WhenTheArchiveStepIsDone() =>
+        Assert.Equal(ProjectStage.Completed,
+            ProjectStateMachine.NextStage(At(ProjectStage.Archiving, archiveComplete: true)));
 
     [Fact]
     public void Completed_IsTerminal() =>

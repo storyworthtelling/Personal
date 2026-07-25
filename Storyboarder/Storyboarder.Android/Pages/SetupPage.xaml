@@ -52,6 +52,22 @@
 
             <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
 
+            <Label Text="Archive to Drive" Style="{StaticResource TitleLabel}" />
+            <Label Text="When a book finishes, copy its volume PDFs and revision report into a folder beside the manuscript in your Google Drive. Needs the Drive permission — sign in again after turning this on, and if Google doesn't ask for it, the app's OAuth client still needs the drive.file scope added."
+                   Style="{StaticResource SecondaryLabel}" />
+            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                <Label Grid.Column="0" Text="Archive finished books" VerticalOptions="Center" />
+                <Switch Grid.Column="1" x:Name="ArchiveSwitch" Toggled="OnArchiveToggled" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="Free up space after archiving" VerticalOptions="Center" />
+                <Switch Grid.Column="1" x:Name="FreeSpaceSwitch" Toggled="OnFreeSpaceToggled" />
+            </Grid>
+            <Label Text="Freeing space deletes the panel and page images once the upload is confirmed. The PDFs are always kept."
+                   Style="{StaticResource SecondaryLabel}" />
+
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+
             <Label Text="Progress backup" Style="{StaticResource TitleLabel}" />
             <Label Text="Save your whole library — every conversion and rendered page — to a file you choose. If you reinstall the app or move to a new phone, restore the file to pick up a long conversion where you left off."
                    Style="{StaticResource SecondaryLabel}" />
