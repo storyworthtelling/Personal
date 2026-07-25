@@ -33,8 +33,13 @@ public enum WorkStatus
     Completed,
     Failed,           // terminal after maxAttempts
     NeedsRetry,       // transient (e.g. rate-limited); retried after NextAttemptAtUtc
-    AwaitingApproval  // a panel render was safety-blocked and is parked until the user approves relaxing
+    AwaitingApproval, // a panel render was safety-blocked and is parked until the user approves relaxing
                       // the flagged category for that one render (see GraphicNovelProcessor.RenderPanels)
+
+    // A panel render is in flight in a Gemini batch job (opt-in batch mode). Not yet done and not
+    // retryable on its own — the worker polls the job and reconciles the result. Appended deliberately:
+    // WorkStatus is persisted as its integer value, so new values go at the end.
+    SubmittedToBatch
 }
 
 public enum ReferenceKind

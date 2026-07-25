@@ -68,6 +68,12 @@ public class Novel
     public string? ArchiveFolderId { get; set; }
     public DateTimeOffset? ArchivedAtUtc { get; set; }
 
+    // The in-flight Gemini batch job rendering this novel's panels (opt-in batch mode), and when it was
+    // submitted. Null when no batch is outstanding; the worker polls this job and reconciles its results,
+    // then clears it. Only one batch per novel is in flight at a time.
+    public string? BatchJobId { get; set; }
+    public DateTimeOffset? BatchSubmittedAtUtc { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
@@ -274,6 +280,11 @@ public class Panel : IRetryable
     // The camera framing this panel was storyboarded as, which sizes it on the page. Defaults to
     // Standard (0), so panels from before shot types existed lay out exactly as they did before.
     public ShotType ShotType { get; set; } = ShotType.Standard;
+
+    // Set once this panel has been through a batch render (opt-in batch mode), so it is never re-batched:
+    // a panel the batch failed or blocked returns to Pending and is re-rendered SYNCHRONOUSLY from then on
+    // (the escalation ladder and its retries stay fast, not one batch turnaround per attempt).
+    public bool BatchAttempted { get; set; }
 
     // The half-open span [SourceStartOffset, SourceEndOffset) of the novel's source text this panel was
     // storyboarded from — the absolute offsets of the storyboard window that produced it, not just the

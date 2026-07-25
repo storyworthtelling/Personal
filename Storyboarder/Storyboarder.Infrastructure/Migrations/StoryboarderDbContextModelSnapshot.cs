@@ -244,6 +244,12 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("BatchJobId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("BatchSubmittedAtUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("ChaptersDetected")
                         .HasColumnType("INTEGER");
 
@@ -360,6 +366,9 @@ namespace Storyboarder.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("BatchAttempted")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("BlockedCategoriesJson")
