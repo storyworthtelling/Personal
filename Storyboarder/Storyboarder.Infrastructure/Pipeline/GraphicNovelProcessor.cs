@@ -358,10 +358,6 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        if (!claudeLimiter.TryAcquire())
-            return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
-
-        var bible = await LoadBible(db, novel.Id, cancellationToken);
         var windowSpan = windows[novel.StoryboardWindowIndex];
         var window = windowSpan.Text;
 
@@ -370,6 +366,26 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         // panels sit on text that moved.
         int windowStart = chunkInfo.StartOffset + windowSpan.StartOffset;
         int windowEnd = chunkInfo.StartOffset + windowSpan.EndOffset;
+
+        // Incremental re-render: if this is a later draft and the previous draft already storyboarded a
+        // window with this exact text, copy those panels — prompts AND renders — forward instead of
+        // re-storyboarding and re-illustrating unchanged material. This spends no Claude storyboard call
+        // and no Gemini render, so it runs before the Claude limiter is even acquired.
+        if (novel.PreviousDraftId is Guid previousDraftId &&
+            await TryReuseWindowAsync(db, novel, previousDraftId, window, windowStart, windowEnd, cancellationToken))
+        {
+            AdvanceStoryboardWindow(novel, windows.Count);
+            novel.StoryboardAttempts = 0;
+            novel.LastError = null;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        if (!claudeLimiter.TryAcquire())
+            return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+        var bible = await LoadBible(db, novel.Id, cancellationToken);
 
         StoryboardSegment segment;
         try
@@ -444,20 +460,130 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         }
 
         novel.ContinuitySummary = segment.ContinuitySummary;
-        novel.StoryboardWindowIndex++;
-        // Chunk finished once its last window is adapted: advance to the next chunk and reset the
-        // sub-window index. The outer cursor check ends storyboarding when the last chunk is done.
-        if (novel.StoryboardWindowIndex >= windows.Count)
-        {
-            novel.StoryboardCursor++;
-            novel.StoryboardWindowIndex = 0;
-        }
+        AdvanceStoryboardWindow(novel, windows.Count);
         novel.StoryboardAttempts = 0;
         novel.LastError = null;
         Touch(novel);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
+
+    // Advances one storyboard sub-window; a finished chunk (last window adapted) rolls the cursor to the
+    // next chunk and resets the sub-window index. The DoStoryboard cursor check ends storyboarding once
+    // the last chunk is done.
+    private static void AdvanceStoryboardWindow(Novel novel, int windowCount)
+    {
+        novel.StoryboardWindowIndex++;
+        if (novel.StoryboardWindowIndex >= windowCount)
+        {
+            novel.StoryboardCursor++;
+            novel.StoryboardWindowIndex = 0;
+        }
+    }
+
+    // Copies a previous draft's panels for an unchanged window into this draft, renders and all, so an
+    // edit re-illustrates only the windows whose text actually moved. Returns false — and the caller
+    // storyboards the window normally — when there is no previous draft window with this exact text, or
+    // any of its renders have gone (e.g. archived away), since a partial reuse would leave the page with
+    // holes. Whole panels are copied (prompt, dialogue, references, and the image bytes into this draft's
+    // own files) so the new draft is self-contained and every reused render still matches its prompt.
+    private async Task<bool> TryReuseWindowAsync(
+        StoryboarderDbContext db, Novel novel, Guid previousDraftId,
+        string window, int windowStart, int windowEnd, CancellationToken cancellationToken)
+    {
+        var previousFull = await db.SourceTexts
+            .Where(s => s.NovelId == previousDraftId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrEmpty(previousFull))
+            return false;
+
+        var previousPanels = await (
+            from v in db.Volumes
+            where v.NovelId == previousDraftId
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            join pn in db.Panels on pg.Id equals pn.PageId
+            orderby v.Number, pg.PageNumber, pn.PanelNumber
+            select new ReusablePanel(
+                v.Number, v.Title, pg.ChapterNumber, pg.PageNumber, pn.PanelNumber,
+                pn.SourceStartOffset, pn.SourceEndOffset, pn.VisualPrompt, pn.Dialogue, pn.Caption,
+                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped))
+            .ToListAsync(cancellationToken);
+
+        // Only the previous panels drawn from a window whose text is byte-identical to this one.
+        var matching = previousPanels
+            .Where(p => PanelSourceMatching.SourceText(previousFull, p.SourceStartOffset, p.SourceEndOffset) == window)
+            .ToList();
+        if (matching.Count == 0)
+            return false;
+
+        // Every rendered match must still have its image on disk; a skipped panel legitimately has none.
+        if (matching.Any(p => !p.Skipped && (p.ImagePath is null || !imageStore.Exists(p.ImagePath))))
+            return false;
+
+        var existing = (await db.Volumes
+                .Where(v => v.NovelId == novel.Id)
+                .Select(v => new { v.Id, v.Number, PageCount = v.Pages.Count })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(v => v.Number, v => (v.Id, PageCount: v.PageCount));
+
+        foreach (var volumeGroup in matching.GroupBy(p => (p.VolumeNumber, p.VolumeTitle)))
+        {
+            if (!existing.TryGetValue(volumeGroup.Key.VolumeNumber, out var target))
+            {
+                var volume = new Volume { NovelId = novel.Id, Number = volumeGroup.Key.VolumeNumber, Title = volumeGroup.Key.VolumeTitle };
+                db.Volumes.Add(volume);
+                target = (volume.Id, 0);
+            }
+
+            foreach (var pageGroup in volumeGroup.GroupBy(p => (p.PageNumber, p.ChapterNumber)))
+            {
+                var page = new Page
+                {
+                    VolumeId = target.Id,
+                    ChapterNumber = pageGroup.Key.ChapterNumber,
+                    PageNumber = ++target.PageCount
+                };
+                int panelNumber = 1;
+                foreach (var source in pageGroup.OrderBy(p => p.PanelNumber))
+                {
+                    var panel = new Panel
+                    {
+                        PageId = page.Id,
+                        PanelNumber = panelNumber++,
+                        VisualPrompt = source.VisualPrompt,
+                        Dialogue = source.Dialogue,
+                        Caption = source.Caption,
+                        SourceStartOffset = windowStart,
+                        SourceEndOffset = windowEnd,
+                        ReferenceNamesJson = source.ReferenceNamesJson,
+                        Status = WorkStatus.Completed
+                    };
+                    if (source.Skipped)
+                        panel.Skipped = true;
+                    else
+                    {
+                        var bytes = imageStore.Read(source.ImagePath!);
+                        panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", bytes);
+                    }
+                    page.Panels.Add(panel);
+                }
+                db.Pages.Add(page);
+            }
+
+            existing[volumeGroup.Key.VolumeNumber] = target;
+        }
+
+        logger.LogInformation(
+            "Reused {Count} panel(s) from a prior draft for an unchanged window (novel {NovelId})",
+            matching.Count, novel.Id);
+        return true;
+    }
+
+    private sealed record ReusablePanel(
+        int VolumeNumber, string VolumeTitle, int ChapterNumber, int PageNumber, int PanelNumber,
+        int SourceStartOffset, int SourceEndOffset, string VisualPrompt, string? Dialogue, string? Caption,
+        string ReferenceNamesJson, string? ImagePath, bool Skipped);
 
     private async Task<ProcessResult> RenderPanels(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {

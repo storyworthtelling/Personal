@@ -159,6 +159,7 @@ public class GraphicNovelProcessorTests : IDisposable
             Title = "Quest", GoogleDocId = "doc", ReportOnly = reportOnly,
             CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
         };
+        novel.ProjectId = novel.Id;
         novel.Source = new SourceText
         {
             NovelId = novel.Id,
@@ -169,6 +170,25 @@ public class GraphicNovelProcessorTests : IDisposable
         context.Novels.Add(novel);
         context.SaveChanges();
         return novel.Id;
+    }
+
+    // A follow-up draft in the same project as previousId, with either identical source text (the reuse
+    // case) or a supplied revision (the re-render case).
+    private Guid SeedNextDraft(Guid previousId, string? fullText = null)
+    {
+        using var context = database.NewContext();
+        var previous = context.Novels.Single(n => n.Id == previousId);
+        var text = fullText ?? context.SourceTexts.Single(s => s.NovelId == previousId).FullText;
+        var draft = new Novel
+        {
+            Title = previous.Title, GoogleDocId = "doc", ReportOnly = previous.ReportOnly,
+            ProjectId = previous.ProjectId, DraftNumber = previous.DraftNumber + 1, PreviousDraftId = previousId,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
+        context.Novels.Add(draft);
+        context.SaveChanges();
+        return draft.Id;
     }
 
     private ProjectStage CurrentStage(Guid novelId)
@@ -369,6 +389,58 @@ public class GraphicNovelProcessorTests : IDisposable
             var span = fullText.Substring(p.SourceStartOffset, p.SourceEndOffset - p.SourceStartOffset);
             Assert.Contains(span, windows);
         });
+    }
+
+    [Fact]
+    public async Task ALaterDraft_ReusesTheRenders_OfUnchangedWindows()
+    {
+        // First draft, illustrated end to end.
+        var first = SeedNovel();
+        await DriveToCompletion(first, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(first));
+
+        var rendersAfterFirst = panelRenderCalls;
+        var storyboardsAfterFirst = storyboardWindowsSeen.Count;
+
+        // Second draft of the SAME manuscript (byte-identical source). Nothing moved, so every window's
+        // panels should carry forward from the first draft — no storyboard call, no panel render.
+        var second = SeedNextDraft(first);
+        await DriveToCompletion(second, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(second));
+
+        Assert.Equal(rendersAfterFirst, panelRenderCalls);
+        Assert.Equal(storyboardsAfterFirst, storyboardWindowsSeen.Count);
+
+        // The second draft nonetheless has its own completed, on-disk panels (copied, not shared).
+        using var context = database.NewContext();
+        var secondVolumeIds = context.Volumes.Where(v => v.NovelId == second).Select(v => v.Id).ToList();
+        var secondPageIds = context.Pages.Where(p => secondVolumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToList();
+        var secondPanels = context.Panels.Where(p => secondPageIds.Contains(p.PageId)).ToList();
+        Assert.NotEmpty(secondPanels);
+        Assert.All(secondPanels, p =>
+        {
+            Assert.Equal(WorkStatus.Completed, p.Status);
+            Assert.NotNull(p.ImagePath);
+            Assert.True(File.Exists(p.ImagePath));
+            Assert.Contains(second.ToString(), p.ImagePath!);
+        });
+    }
+
+    [Fact]
+    public async Task ALaterDraft_ReRendersWindows_WhoseTextChanged()
+    {
+        var first = SeedNovel("The hero walked to the castle and knocked on the gate.");
+        await DriveToCompletion(first, _ => { });
+        var rendersAfterFirst = panelRenderCalls;
+
+        // The manuscript was revised, so no window matches the first draft: the panels must be
+        // storyboarded and rendered afresh rather than silently reusing stale art.
+        var second = SeedNextDraft(first, "The villain fled the tower and slammed the heavy door.");
+        await DriveToCompletion(second, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(second));
+
+        Assert.True(panelRenderCalls > rendersAfterFirst,
+            "a revised manuscript should re-render its panels rather than reuse the previous draft's");
     }
 
     [Fact]
