@@ -240,6 +240,28 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task DeriveArtStyle_ParsesTheStyle()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"artStyle\":\"gritty noir ink-wash with high-contrast lighting\"}"));
+
+        var style = await client.DeriveArtStyle("sample prose", new DesignBible([], []), CancellationToken.None);
+
+        Assert.Equal("gritty noir ink-wash with high-contrast lighting", style);
+    }
+
+    [Fact]
+    public async Task DeriveArtStyle_ReturnsEmpty_OnAReplyWithoutJson()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("I couldn't decide on a style."));
+
+        var style = await client.DeriveArtStyle("sample", new DesignBible([], []), CancellationToken.None);
+
+        Assert.Equal(string.Empty, style);
+    }
+
+    [Fact]
     public async Task Storyboard_ParsesShotType_AndDefaultsUnknownToStandard()
     {
         var (client, handler) = Create();

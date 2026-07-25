@@ -57,6 +57,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "\"caption\":string|null,\"referenceNames\":[string],\"shotType\":\"standard\"|\"wide\"|\"splash\"}]}]}]}." +
         " No prose outside the JSON.";
 
+    private const string ArtStyleInstruction =
+        "You are an art director choosing the visual style for a graphic-novel adaptation. From the prose " +
+        "sample and the cast below, infer the book's genre, tone, period and setting, then describe ONE " +
+        "cohesive illustration style for the WHOLE book — medium, rendering, linework, colour palette, " +
+        "lighting and mood — in a single vivid sentence a comics illustrator could follow consistently. " +
+        "Respond with ONLY a JSON object: {\"artStyle\":string}. No prose outside the JSON.";
+
     private const string ChapterAnalysisInstruction =
         "You are a developmental editor analyzing ONE excerpt of a novel manuscript to help the author " +
         "revise toward publication. Use the KNOWN CAST names consistently when they appear. LOCATION IN " +
@@ -180,6 +187,21 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             return DesignBibleFragment.Empty;
 
         return new DesignBibleFragment(MapMentions(dto.Characters), MapMentions(dto.Settings));
+    }
+
+    public async Task<string> DeriveArtStyle(string sampleText, DesignBible bible, CancellationToken cancellationToken)
+    {
+        var bibleJson = JsonSerializer.Serialize(bible, JsonResponse.CaseInsensitive);
+        var userContent = $"CAST & SETTINGS (JSON):\n{bibleJson}\n\nPROSE SAMPLE:\n{sampleText}";
+
+        // Best-effort: a malformed or empty reply yields an empty style and the caller keeps the default,
+        // so a bad derivation never blocks the book.
+        var reply = await SendMessage(ArtStyleInstruction, userContent, cancellationToken);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return string.Empty;
+        var dto = JsonResponse.Deserialize<ArtStyleDto>(json);
+        return dto?.ArtStyle?.Trim() ?? string.Empty;
     }
 
     public async Task<StoryboardSegment> Storyboard(
@@ -588,6 +610,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Description { get; set; }
         public string? Scale { get; set; }
         public List<string>? Aliases { get; set; }
+    }
+
+    private sealed class ArtStyleDto
+    {
+        public string? ArtStyle { get; set; }
     }
 
     private sealed class StoryboardDto

@@ -837,6 +837,40 @@ public class GraphicNovelProcessorTests : IDisposable
     }
 
     [Fact]
+    public async Task DesignBible_DerivesTheArtStyleFromTheManuscript_WhenTheUserDidntPickOne()
+    {
+        claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("stark ink-wash noir with high-contrast chiaroscuro");
+
+        var novelId = SeedNovel(); // no art style chosen → defaults to ArtStyles.Default
+        await DriveToCompletion(novelId, _ => { });
+
+        using var ctx = database.NewContext();
+        Assert.Equal("stark ink-wash noir with high-contrast chiaroscuro", ctx.Novels.Single(n => n.Id == novelId).ArtStyle);
+    }
+
+    [Fact]
+    public async Task DesignBible_KeepsAUserChosenArtStyle_AndDoesNotDerive()
+    {
+        claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("SHOULD NOT BE USED");
+
+        var novelId = SeedNovel();
+        using (var ctx = database.NewContext())
+        {
+            var novel = ctx.Novels.Single(n => n.Id == novelId);
+            novel.ArtStyle = "watercolour whimsy";
+            ctx.SaveChanges();
+        }
+
+        await DriveToCompletion(novelId, _ => { });
+
+        using var check = database.NewContext();
+        Assert.Equal("watercolour whimsy", check.Novels.Single(n => n.Id == novelId).ArtStyle);
+        claude.Verify(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task OneOffEntities_GetNoReferenceSheet_ButStayInTheBible()
     {
         // The owner's last book spent 126 image calls drawing a sheet for every named entity, including

@@ -16,6 +16,15 @@ public interface IClaudeAnalysisClient
         string artStyle,
         CancellationToken cancellationToken);
 
+    // Derives one cohesive illustration style for the whole book from a sample of its prose and its
+    // cast, so the art matches the manuscript's genre and tone instead of a generic default. Returns a
+    // short descriptor to prepend to every panel prompt (empty if it can't be derived, in which case the
+    // caller keeps the default style — art direction must never stall the conversion).
+    Task<string> DeriveArtStyle(
+        string sampleText,
+        DesignBible bible,
+        CancellationToken cancellationToken);
+
     // Literary-analysis "map": observations for one manuscript chunk (character beats, events,
     // possible inconsistencies, checkable claims, strengths/weaknesses) anchored to the known cast.
     // chapterLabel names the chapter(s) the chunk covers ("Chapter 7", "Chapters 7–8"); it is given to

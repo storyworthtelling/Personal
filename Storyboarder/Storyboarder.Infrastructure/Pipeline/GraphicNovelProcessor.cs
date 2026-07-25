@@ -47,6 +47,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
     private readonly TextChunker storyboardChunker;
     private readonly ChapterDetector chapterDetector = new();
+
+    // How much opening prose the art-style derivation sees — enough to read the genre, voice and setting
+    // without paying for the whole book on a one-off, best-effort call.
+    private const int ArtStyleSampleChars = 6000;
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
     private readonly PlaceholderPanelRenderer placeholderRenderer = new();
@@ -312,6 +316,31 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Character, character, chunkCount));
         foreach (var setting in bible.Settings)
             db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Setting, setting, chunkCount));
+
+        // Derive the art style from the manuscript (owner's decision: Claude derives it from prose +
+        // genre), but only when the user didn't pick one — a custom style always wins. Best-effort and
+        // never fatal: any failure keeps the default, since art direction must not stall the book.
+        if (novel.ArtStyle == ArtStyles.Default)
+        {
+            try
+            {
+                var sample = await db.Chunks
+                    .Where(c => c.NovelId == novel.Id)
+                    .OrderBy(c => c.Ordinal)
+                    .Select(c => c.Text)
+                    .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+                if (sample.Length > ArtStyleSampleChars)
+                    sample = sample[..ArtStyleSampleChars];
+
+                var derived = await claude.DeriveArtStyle(sample, bible, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(derived))
+                    novel.ArtStyle = derived.Trim();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Art-style derivation failed; keeping the default style (novel {NovelId})", novel.Id);
+            }
+        }
 
         novel.DesignBibleConsolidated = true;
         Touch(novel);
