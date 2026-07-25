@@ -335,10 +335,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (novel.StoryboardAttempts >= rateLimits.MaxAttempts)
             return ProcessResult.Idle;
 
-        var chunkText = await db.Chunks
+        var chunkInfo = await db.Chunks
             .Where(c => c.NovelId == novel.Id && c.Ordinal == novel.StoryboardCursor)
-            .Select(c => c.Text)
+            .Select(c => new { c.Text, c.StartOffset })
             .FirstAsync(cancellationToken);
+        var chunkText = chunkInfo.Text;
 
         // Adapt the chunk one small sub-window at a time. A whole ~48K-char chunk in a single call runs
         // for many minutes — long enough that Android's background worker is killed mid-stream. Slicing
@@ -361,7 +362,14 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
 
         var bible = await LoadBible(db, novel.Id, cancellationToken);
-        var window = windows[novel.StoryboardWindowIndex].Text;
+        var windowSpan = windows[novel.StoryboardWindowIndex];
+        var window = windowSpan.Text;
+
+        // Absolute source span of this window: the chunk's own offset plus the window's offset within
+        // the chunk. Every panel this window yields is anchored here, so a later draft can tell which
+        // panels sit on text that moved.
+        int windowStart = chunkInfo.StartOffset + windowSpan.StartOffset;
+        int windowEnd = chunkInfo.StartOffset + windowSpan.EndOffset;
 
         StoryboardSegment segment;
         try
@@ -423,6 +431,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                             VisualPrompt = panelDraft.VisualPrompt,
                             Dialogue = panelDraft.Dialogue,
                             Caption = panelDraft.Caption,
+                            SourceStartOffset = windowStart,
+                            SourceEndOffset = windowEnd,
                             ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
                         });
                     db.Pages.Add(page);

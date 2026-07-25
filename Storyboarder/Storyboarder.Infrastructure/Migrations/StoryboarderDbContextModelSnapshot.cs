@@ -385,6 +385,12 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<bool>("Skipped")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("SourceEndOffset")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SourceStartOffset")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 

@@ -30,6 +30,7 @@ public class GraphicNovelProcessorTests : IDisposable
     private int panelRenderCalls;
     private int chapterAnalysisCalls;
     private readonly List<string> chapterLabelsSeen = [];
+    private readonly List<string> storyboardWindowsSeen = [];
 
     // When set, NewProcessor binds volumes through this composer instead of a plain one, so a test can
     // make PDF assembly throw. It's a field (not a NewProcessor arg) so the fresh processor DriveToCompletion
@@ -50,6 +51,7 @@ public class GraphicNovelProcessorTests : IDisposable
 
         claude.Setup(c => c.Storyboard(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string window, string _, DesignBible _, string _, CancellationToken _) => storyboardWindowsSeen.Add(window))
             .ReturnsAsync(new StoryboardSegment(
                 [new VolumeDraft(1, "Volume One",
                     [new PageDraft(1, [new PanelDraft("Hero stands before the Castle", "At last.", null, ["Hero", "Castle"])])])],
@@ -332,6 +334,41 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.Equal(1, chunkCount);
         Assert.True(storyboardCalls > 1,
             $"a single chunk should be storyboarded in several windows, but Storyboard was called {storyboardCalls} time(s)");
+    }
+
+    [Fact]
+    public async Task Storyboarding_records_each_panels_source_span()
+    {
+        // "What changed between two drafts" is uncomputable unless a panel remembers which stretch of the
+        // manuscript it was drawn from. Storyboarding adapts one text window at a time, so every panel a
+        // window produces is anchored to that window's absolute span in the source. This asserts the
+        // anchor survives to storage and delimits exactly the text the window carried.
+        var manuscript = string.Join("\n\n",
+            Enumerable.Range(0, 120).Select(i =>
+                $"Paragraph {i}: the hero walks onward through the long grey hall, thinking of home and the road ahead."));
+        var novelId = SeedNovel(manuscript);
+
+        await DriveToCompletion(novelId, _ => { });
+
+        using var context = database.NewContext();
+        var fullText = context.SourceTexts.Single(s => s.NovelId == novelId).FullText;
+        var windows = storyboardWindowsSeen.ToHashSet();
+        Assert.True(windows.Count > 1, "the manuscript should have been storyboarded in several windows");
+
+        var panels = context.Panels
+            .Where(p => context.Pages
+                .Where(pg => context.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).Contains(pg.VolumeId))
+                .Select(pg => pg.Id).Contains(p.PageId))
+            .ToList();
+        Assert.NotEmpty(panels);
+        Assert.All(panels, p =>
+        {
+            Assert.True(p.SourceEndOffset > p.SourceStartOffset,
+                $"panel {p.PanelNumber} carries no source span ({p.SourceStartOffset}..{p.SourceEndOffset})");
+            Assert.True(p.SourceEndOffset <= fullText.Length);
+            var span = fullText.Substring(p.SourceStartOffset, p.SourceEndOffset - p.SourceStartOffset);
+            Assert.Contains(span, windows);
+        });
     }
 
     [Fact]

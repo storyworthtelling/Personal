@@ -260,6 +260,16 @@ public class Panel : IRetryable
     public string? Dialogue { get; set; }
     public string? Caption { get; set; }
 
+    // The half-open span [SourceStartOffset, SourceEndOffset) of the novel's source text this panel was
+    // storyboarded from — the absolute offsets of the storyboard window that produced it, not just the
+    // chunk. Every panel from one window shares that window's span; the model doesn't sub-divide a
+    // window per panel, so the window is the honest granularity. This is what makes "which panels does a
+    // re-drafted manuscript actually change" computable: a panel whose source span still reads the same
+    // in the new draft can be reused, only moved panels re-render. Zero-width on legacy rows the offsets
+    // predate.
+    public int SourceStartOffset { get; set; }
+    public int SourceEndOffset { get; set; }
+
     // Names of the design-bible entities present in this panel; their reference sheets are
     // attached to the Gemini call to keep appearance consistent.
     public string ReferenceNamesJson { get; set; } = "[]";
