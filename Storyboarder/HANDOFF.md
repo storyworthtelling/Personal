@@ -1,8 +1,9 @@
 # Storyboarder — session handoff
 
-**Phase 1 and Phase 2 are complete; Phases 3–6 remain.** Phase 1 merged in PR #111. Phase 2's backend
-landed on branch `claude/storyboarder-handoff-phases-nbhko0` (commits `bfa44bc`→`38574ad`). Read this top
-to bottom before starting work — several of the traps below cost a full CI round each to discover.
+**Phases 1–3 are complete; Phases 4–6 remain.** Phase 1 merged in PR #111. Phases 2 and 3 landed on branch
+`claude/storyboarder-handoff-phases-nbhko0` (Phase 2 backend `bfa44bc`→`38574ad` + UI `a186b76`; Phase 3
+`000fe63`→ the reader/report/diff pages). Read this top to bottom before starting work — several of the
+traps below cost a full CI round each to discover.
 
 **Phase 2 is complete end to end.** The draft loop is built and tested in Domain/Infrastructure —
 `ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings resolved/new + changed
@@ -190,9 +191,21 @@ an edit early in a chunk shifts later window boundaries and those windows re-ren
 unchanged. Finer (per-paragraph) anchoring would need the model to map panels to sub-spans, which it doesn't
 provide. The diff is honest about this — it reports what actually carried forward.
 
-### Phase 3 — in-app reader
-Page reader with chapter jump and panel zoom; browsable report alongside the PDF. Mostly MAUI pages, the
-most isolated phase — a good candidate to run in parallel with Phase 2 if using worktrees.
+### Phase 3 — in-app reader ✅ done
+Built and compiling (via `scripts/setup-android-build.sh`). Backend read models are unit-tested; the MAUI
+pages are compile-verified (there's no emulator here to run them):
+
+- **ReaderPage** — a book's composed pages in reading order with a chapter-jump picker; tap a page for
+  **PageZoomPage** (pinch-zoom, pan, double-tap reset). Fed by `ProjectService.GetReaderPagesAsync`.
+- **ReportPage** — the folded revision report as browsable scrollable sections. Fed by `GetReportAsync`.
+- **DraftDiffPage** — the Phase 2 "What changed" action now opens a real view: findings resolved/new and
+  each changed panel paired **before/after**, the side-by-side old-vs-new art the owner asked for.
+- Reachable from the project card action sheet: "Read in app", "Read report in app", "What changed since
+  last draft".
+
+Not yet done (deferred UI polish, all runtime-only concerns): the reader loads full-page rasters eagerly in
+its `CollectionView` — fine for a phone-sized book, but if a volume is long, switch the list to `ThumbPath`
+and load the full image only in `PageZoomPage`. Worth checking on a real device.
 
 ### Phase 4 — art fidelity + layout
 Claude-derived art style; literal-to-text panel prompts; **weighted layout** (varied panel sizes, splashes,

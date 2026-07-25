@@ -267,8 +267,9 @@ public partial class MainPage : ContentPage
         await Navigation.PushAsync(page);
     }
 
-    // Shows what the last revision moved: the report findings it resolved and newly raised, and how many
-    // panels changed versus carried forward untouched (ProjectService.GetDraftDiffAsync).
+    // Shows what the last revision moved: the report findings it resolved and newly raised, and the
+    // panels whose source text changed — each paired old-vs-new so the shift in the illustration is
+    // visible (ProjectService.GetDraftDiffAsync).
     private async Task ShowDraftDiff(NovelStatus status)
     {
         Storyboarder.Domain.Analysis.DraftDiff diff;
@@ -284,18 +285,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        var report = new System.Text.StringBuilder();
-        report.AppendLine($"Panels: {diff.ChangedPanels.Count} re-illustrated, {diff.ReusablePanelCount} carried forward.");
-        report.AppendLine();
-        report.AppendLine($"Findings resolved: {diff.ResolvedFindings.Count}");
-        foreach (var f in diff.ResolvedFindings.Take(5))
-            report.AppendLine($"  ✓ [{f.Category}] {Shorten(f.Detail, 100)}");
-        report.AppendLine();
-        report.AppendLine($"New findings: {diff.NewFindings.Count}");
-        foreach (var f in diff.NewFindings.Take(5))
-            report.AppendLine($"  • [{f.Category}] {Shorten(f.Detail, 100)}");
-
-        await DisplayAlert($"{status.Title} — draft {status.DraftNumber} vs {status.DraftNumber - 1}", report.ToString().TrimEnd(), "Close");
+        await Navigation.PushAsync(new DraftDiffPage(status.Title, status.DraftNumber, diff));
     }
 
     // Walks the panels a safety filter blocked mid-render, one at a time. For each, the user can approve
