@@ -105,6 +105,13 @@ public partial class MainPage : ContentPage
         var isActive = status.Stage is not ("Completed" or "Failed" or "Cancelled");
         var buttons = options.Select(o => o.Label).ToList();
 
+        // Read in-app rather than only opening the shared PDF: the page reader once any page is composed,
+        // and the browsable revision report once it's ready.
+        if (!string.IsNullOrEmpty(status.CoverThumbPath))
+            buttons.Add(ReadAction);
+        if (status.AnalysisReady)
+            buttons.Add(ReadReportAction);
+
         // Drafts: start the next draft of this book from a re-picked doc, and — once there is a
         // predecessor — see what the last revision changed. Offered on any card; a new draft re-renders
         // only the windows whose text moved.
@@ -147,6 +154,16 @@ public partial class MainPage : ContentPage
         if (choice == ReworkPanelAction)
         {
             await ReworkBlockedPanel(status);
+            return;
+        }
+        if (choice == ReadAction)
+        {
+            await OpenReader(status);
+            return;
+        }
+        if (choice == ReadReportAction)
+        {
+            await OpenReport(status);
             return;
         }
         if (choice == NewDraftAction)
@@ -202,6 +219,42 @@ public partial class MainPage : ContentPage
     private const string ReworkPanelAction = "Rework blocked panel & resume";
     private const string NewDraftAction = "New draft (re-pick doc)";
     private const string DiffAction = "What changed since last draft";
+    private const string ReadAction = "Read in app";
+    private const string ReadReportAction = "Read report in app";
+
+    // Opens the in-app page reader for a book with composed pages.
+    private async Task OpenReader(NovelStatus status)
+    {
+        ReaderBook? book;
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            book = await projects.GetReaderPagesAsync(status.Id, CancellationToken.None);
+        }
+        if (book is null || book.Pages.Count == 0)
+        {
+            await DisplayAlert("Read", "No pages have been composed yet.", "OK");
+            return;
+        }
+        await Navigation.PushAsync(new ReaderPage(book));
+    }
+
+    // Opens the browsable revision report.
+    private async Task OpenReport(NovelStatus status)
+    {
+        Storyboarder.Domain.Analysis.BookAnalysisResult? report;
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            report = await projects.GetReportAsync(status.Id, CancellationToken.None);
+        }
+        if (report is null)
+        {
+            await DisplayAlert("Report", "The revision report isn't ready yet.", "OK");
+            return;
+        }
+        await Navigation.PushAsync(new ReportPage(status.Title, report));
+    }
 
     // Starts the next draft of this book: opens the Drive picker in "new draft" mode, so the doc the user
     // picks becomes draft N+1 of the same project. The pipeline then re-renders only the windows whose
