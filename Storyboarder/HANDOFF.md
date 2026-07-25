@@ -1,9 +1,11 @@
 # Storyboarder — session handoff
 
-**Phases 1–3 are complete; Phases 4–6 remain.** Phase 1 merged in PR #111. Phases 2 and 3 landed on branch
-`claude/storyboarder-handoff-phases-nbhko0` (Phase 2 backend `bfa44bc`→`38574ad` + UI `a186b76`; Phase 3
-`000fe63`→ the reader/report/diff pages). Read this top to bottom before starting work — several of the
-traps below cost a full CI round each to discover.
+**Phases 1–3 are complete; Phase 4 is partly done; Phases 5–6 remain.** Phase 1 merged in PR #111. Phases 2,
+3, and the safe half of 4 landed on branch `claude/storyboarder-handoff-phases-nbhko0` (Phase 2 backend
+`bfa44bc`→`38574ad` + UI `a186b76`; Phase 3 `000fe63`→ reader/report/diff pages; Phase 4 `bf30279`→`8a9803c`
+— shot types, weighted layout, dialogue trim, derived art style). The rest of Phase 4 needs a live vision
+model or on-device visual iteration (see its section). Read this top to bottom before starting work —
+several of the traps below cost a full CI round each to discover.
 
 **Phase 2 is complete end to end.** The draft loop is built and tested in Domain/Infrastructure —
 `ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings resolved/new + changed
@@ -207,15 +209,37 @@ Not yet done (deferred UI polish, all runtime-only concerns): the reader loads f
 its `CollectionView` — fine for a phone-sized book, but if a volume is long, switch the list to `ThumbPath`
 and load the full image only in `PageZoomPage`. Worth checking on a real device.
 
-### Phase 4 — art fidelity + layout
-Claude-derived art style; literal-to-text panel prompts; **weighted layout** (varied panel sizes, splashes,
-camera progression) which is a real rewrite of `PageLayoutCalculator` plus per-panel weight/shot-type in the
-storyboard schema; balloon tails, thought-vs-speech, SFX; dialogue trimmed to fit; off-model auto-detection.
+### Phase 4 — art fidelity + layout ⏳ partially done
+The testable, safe-to-ship-blind half is built and on the branch; the parts that need a live vision model
+or on-device visual iteration are deferred (this environment can compile the head but not run it).
 
-Also the **prose-divergence report section**: since the owner won't hand-flag mismatches, the mechanism is a
-vision pass — feed each rendered panel plus its source passage back to the model and ask what is missing,
-added, or wrong. It is a heuristic and will have false positives; it is advisory, and it is the only design
-that satisfies "flag the prose" *and* "fully automatic" at once.
+**Done (tested):**
+- **Shot types** (`bf30279`): `Panel.ShotType` (Standard/Wide/Splash), asked of Claude in the storyboard
+  prompt, parsed case-insensitively (unknown/absent → Standard). Migration defaults existing panels to
+  Standard.
+- **Weighted layout** (`cf8be4b`): `PageLayoutCalculator` gains a shot-aware `Layout`. A page of all
+  Standard shots lays out *identically* to the old uniform grid (unit-tested), so untagged pages are
+  unchanged; a Wide shot is a full-width cinematic band and a Splash gets a page to itself (SplitForPages
+  isolates it). The composer, `PanelArt`, and the render-time aspect-ratio calc all thread the shot through.
+- **Dialogue trimmed to fit** (`cf8be4b`): `DialogueFit` abridges dialogue to a balloon budget at a word
+  boundary when panels are created.
+- **Claude-derived art style** (`8a9803c`): `DeriveArtStyle` picks one cohesive style from the opening prose
+  + cast at design-bible time, unless the user chose one. Best-effort — failure keeps the default.
+
+**Deferred (need a live model or eyes on a device — don't ship blind):**
+- **Lettering: balloon tails, thought-vs-speech, SFX.** A Skia-composer change; correctness is visual, so it
+  needs the app running to iterate. The bands/typesetting are in `SkiaPageComposer` + `PanelSlotLayout`.
+- **Off-model auto-detection + re-render.** Needs a vision compare of each rendered panel against the
+  character's reference sheet; heuristic, unverifiable without the image models.
+- **Prose-divergence report section.** The owner won't hand-flag mismatches, so the only automatic design is
+  a **vision pass**: feed each rendered panel + its source passage (the `[SourceStartOffset,SourceEndOffset)`
+  span Phase 2 added makes this exact) back to the model and ask what's missing/added/wrong. Advisory, false
+  positives expected; render it as its own report section. Needs Claude vision — plumb + verify with the real
+  API, not blind.
+- **Literal-to-text panel prompts** is largely the existing prompt already; further tuning is visual.
+
+The weighted layout is verified as *math* (no overlap, fills the page, all-Standard == old grid) but its
+*look* wasn't — worth a glance on a device once a Wide/Splash-tagged book renders.
 
 ### Phase 5 — odds
 `.docx` import · verify-after-reboot · **owner's voice propagated repo-wide** (DESIGN.md §11 plus FocusPhone,
