@@ -405,6 +405,78 @@ public sealed class ProjectService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    // The composed pages of a book, in reading order across every volume, for the in-app reader. Only
+    // finished pages with a raster on disk are returned; the chapter label is joined in so the reader's
+    // chapter-jump control can name each chapter (empty when the book was converted before chapter
+    // detection). Null if the novel doesn't exist; an empty page list if nothing is composed yet.
+    public async Task<ReaderBook?> GetReaderPagesAsync(Guid novelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var title = await db.Novels
+            .Where(n => n.Id == novelId)
+            .Select(n => n.Title)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (title is null)
+            return null;
+
+        var chapterLabels = await db.Chapters
+            .Where(c => c.NovelId == novelId)
+            .ToDictionaryAsync(c => c.Number, c => c.Label, cancellationToken);
+
+        var rows = await (
+            from v in db.Volumes
+            where v.NovelId == novelId
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            where pg.CompositionStatus == WorkStatus.Completed && pg.ComposedImagePath != null
+            orderby v.Number, pg.PageNumber
+            select new
+            {
+                v.Number,
+                VolumeTitle = v.Title,
+                pg.PageNumber,
+                pg.ChapterNumber,
+                pg.ComposedImagePath,
+                pg.ThumbImagePath
+            })
+            .ToListAsync(cancellationToken);
+
+        var pages = rows
+            .Select(r => new ReaderPage(
+                r.Number, r.VolumeTitle, r.PageNumber, r.ChapterNumber,
+                chapterLabels.GetValueOrDefault(r.ChapterNumber, string.Empty),
+                r.ComposedImagePath!, r.ThumbImagePath))
+            .ToList();
+
+        return new ReaderBook(title, pages);
+    }
+
+    // The consolidated revision report for the in-app reader, folded together exactly as the PDF composer
+    // sees it: the story half plus the separately-persisted craft half and fact-checks. Null until the
+    // report has been consolidated (the story half is what the reader needs; craft/fact-checks fold in as
+    // they arrive).
+    public async Task<Domain.Analysis.BookAnalysisResult?> GetReportAsync(Guid novelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var stored = await db.BookAnalyses
+            .Where(a => a.NovelId == novelId)
+            .Select(a => new { a.ConsolidatedJson, a.CraftJson, a.FactChecksJson })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (stored?.ConsolidatedJson is null)
+            return null;
+
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(stored.ConsolidatedJson, JsonResponse.CaseInsensitive)
+                     ?? BookAnalysisResult.Empty;
+        var craft = stored.CraftJson is null
+            ? CraftReport.Empty
+            : JsonSerializer.Deserialize<CraftReport>(stored.CraftJson, JsonResponse.CaseInsensitive) ?? CraftReport.Empty;
+        var checks = stored.FactChecksJson is null
+            ? Array.Empty<FactCheck>()
+            : JsonSerializer.Deserialize<List<FactCheck>>(stored.FactChecksJson, JsonResponse.CaseInsensitive)
+              ?? (IReadOnlyList<FactCheck>)Array.Empty<FactCheck>();
+
+        return report.WithCraft(craft).WithFactChecks(checks);
+    }
+
     // What a draft changed against the one it was made from: the revision-report findings it resolved
     // and newly raised, and the panels whose source text moved (everything else the pipeline reuses).
     // A first draft — or an unknown id — diffs to None, since there is nothing to compare against.

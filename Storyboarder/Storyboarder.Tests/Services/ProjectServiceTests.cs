@@ -151,6 +151,105 @@ public class ProjectServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetReaderPages_ReturnsComposedPagesInReadingOrder_WithChapterLabelsAndSkipsUncomposed()
+    {
+        Guid novelId;
+        using (var context = database.NewContext())
+        {
+            var novel = new Novel
+            {
+                Title = "Quest", GoogleDocId = "doc",
+                CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+            };
+            novel.ProjectId = novel.Id;
+            novel.Chapters.Add(new Chapter { NovelId = novel.Id, Number = 1, Label = "Chapter One", StartOffset = 0, EndOffset = 10 });
+            novel.Chapters.Add(new Chapter { NovelId = novel.Id, Number = 2, Label = "Chapter Two", StartOffset = 10, EndOffset = 20 });
+
+            var v1 = new Volume { NovelId = novel.Id, Number = 1, Title = "Volume One" };
+            v1.Pages.Add(ComposedPage(1, 1, "v1p1.png"));
+            v1.Pages.Add(ComposedPage(2, 2, "v1p2.png"));
+            // An uncomposed page must be excluded from the reader.
+            v1.Pages.Add(new Page { PageNumber = 3, ChapterNumber = 2, CompositionStatus = WorkStatus.Pending });
+
+            var v2 = new Volume { NovelId = novel.Id, Number = 2, Title = "Volume Two" };
+            v2.Pages.Add(ComposedPage(1, 2, "v2p1.png"));
+
+            context.Novels.Add(novel);
+            context.Volumes.AddRange(v1, v2);
+            context.SaveChanges();
+            novelId = novel.Id;
+        }
+
+        var book = await NewService().GetReaderPagesAsync(novelId, CancellationToken.None);
+
+        Assert.NotNull(book);
+        Assert.Equal("Quest", book!.Title);
+        // Three composed pages, volume 1 before volume 2, uncomposed page dropped.
+        Assert.Equal(3, book.Pages.Count);
+        Assert.Equal([1, 1, 2], book.Pages.Select(p => p.VolumeNumber).ToArray());
+        Assert.Equal("Chapter One", book.Pages[0].ChapterLabel);
+        Assert.Equal("Chapter Two", book.Pages[1].ChapterLabel);
+        Assert.Equal("v2p1.png", book.Pages[2].ImagePath);
+    }
+
+    [Fact]
+    public async Task GetReport_FoldsStoryHalfWithCraftAndFactChecks()
+    {
+        var story = BookAnalysisResult.Empty with
+        {
+            Logline = "A hero's tale",
+            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")]
+        };
+        var craft = new CraftReport([new LineEdit("Chapter 1", "He felt cold.", "The cold came.", "Filtered.")], [], [], []);
+        var checks = new List<FactCheck> { new("Paris is in France", "Correct", "Confirmed.", "Chapter 1") };
+
+        Guid novelId;
+        using (var context = database.NewContext())
+        {
+            var novel = new Novel { Title = "Quest", GoogleDocId = "doc", CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow };
+            novel.ProjectId = novel.Id;
+            novel.Analysis = new BookAnalysis
+            {
+                NovelId = novel.Id,
+                ConsolidatedJson = JsonSerializer.Serialize(story),
+                CraftJson = JsonSerializer.Serialize(craft),
+                FactChecksJson = JsonSerializer.Serialize(checks),
+                PdfStatus = WorkStatus.Completed
+            };
+            context.Novels.Add(novel);
+            context.SaveChanges();
+            novelId = novel.Id;
+        }
+
+        var report = await NewService().GetReportAsync(novelId, CancellationToken.None);
+
+        Assert.NotNull(report);
+        Assert.Equal("A hero's tale", report!.Logline);
+        Assert.Single(report.PlotHoles);
+        Assert.Single(report.LineEdits);   // craft half folded in
+        Assert.Single(report.FactChecks);  // fact-checks folded in
+    }
+
+    [Fact]
+    public async Task GetReport_IsNull_BeforeTheReportIsConsolidated()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+        var id = await NewService().CreateFromDocAsync("doc", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        Assert.Null(await NewService().GetReportAsync(id, CancellationToken.None));
+    }
+
+    private Page ComposedPage(int pageNumber, int chapterNumber, string image) => new()
+    {
+        PageNumber = pageNumber,
+        ChapterNumber = chapterNumber,
+        CompositionStatus = WorkStatus.Completed,
+        ComposedImagePath = image,
+        ThumbImagePath = "thumb-" + image
+    };
+
+    [Fact]
     public async Task GetDraftDiff_ReportsResolvedAndNewFindings_AndTheChangedPanels()
     {
         // Two drafts of one book. The middle scene's text was rewritten between them; the outer scenes
