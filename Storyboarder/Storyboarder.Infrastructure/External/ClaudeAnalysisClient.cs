@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
+using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
 
@@ -47,11 +48,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "shot, low-angle close-up, over-the-shoulder); avoid static, posed, portrait, or " +
         "looking-at-camera framing. Respect the relative scale of the entities given in the design " +
         "bible. Put no lettering in the art; give any dialogue and caption to be typeset separately, " +
-        "and the names of design-bible entities present. Maintain continuity with the running summary. " +
+        "and the names of design-bible entities present. Give each panel a shotType of \"standard\", " +
+        "\"wide\" (a full-width establishing/landscape shot), or \"splash\" (a full-page moment reserved " +
+        "for a genuinely pivotal beat — use sparingly). Maintain continuity with the running summary. " +
         "Respond with ONLY a JSON object: " +
         "{\"continuitySummary\":string,\"volumes\":[{\"number\":int,\"title\":string,\"pages\":" +
         "[{\"chapterNumber\":int,\"panels\":[{\"visualPrompt\":string,\"dialogue\":string|null," +
-        "\"caption\":string|null,\"referenceNames\":[string]}]}]}]}. No prose outside the JSON.";
+        "\"caption\":string|null,\"referenceNames\":[string],\"shotType\":\"standard\"|\"wide\"|\"splash\"}]}]}]}." +
+        " No prose outside the JSON.";
 
     private const string ChapterAnalysisInstruction =
         "You are a developmental editor analyzing ONE excerpt of a novel manuscript to help the author " +
@@ -559,8 +563,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         new(page.ChapterNumber,
             (page.Panels ?? [])
                 .Select(p => new PanelDraft(
-                    p.VisualPrompt ?? string.Empty, p.Dialogue, p.Caption, p.ReferenceNames ?? []))
+                    p.VisualPrompt ?? string.Empty, p.Dialogue, p.Caption, p.ReferenceNames ?? [], ParseShot(p.ShotType)))
                 .ToList());
+
+    // Maps the model's shotType string to the enum, defaulting to Standard for anything unrecognized or
+    // absent (an older reply, a typo, or a shot vocabulary we don't lay out specially) — so a missing or
+    // odd value simply lays the panel out normally rather than failing the parse.
+    private static ShotType ParseShot(string? shot) => shot?.Trim().ToLowerInvariant() switch
+    {
+        "wide" => ShotType.Wide,
+        "splash" => ShotType.Splash,
+        _ => ShotType.Standard
+    };
 
     private sealed class FragmentDto
     {
@@ -601,6 +615,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Dialogue { get; set; }
         public string? Caption { get; set; }
         public List<string>? ReferenceNames { get; set; }
+        public string? ShotType { get; set; }
     }
 
     private sealed class ChapterNotesDto

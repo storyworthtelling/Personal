@@ -393,6 +393,9 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ShotType")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("Skipped")
                         .HasColumnType("INTEGER");
 

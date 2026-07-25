@@ -271,6 +271,10 @@ public class Panel : IRetryable
     public string? Dialogue { get; set; }
     public string? Caption { get; set; }
 
+    // The camera framing this panel was storyboarded as, which sizes it on the page. Defaults to
+    // Standard (0), so panels from before shot types existed lay out exactly as they did before.
+    public ShotType ShotType { get; set; } = ShotType.Standard;
+
     // The half-open span [SourceStartOffset, SourceEndOffset) of the novel's source text this panel was
     // storyboarded from — the absolute offsets of the storyboard window that produced it, not just the
     // chunk. Every panel from one window shares that window's span; the model doesn't sub-divide a

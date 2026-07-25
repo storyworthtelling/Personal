@@ -447,6 +447,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                             VisualPrompt = panelDraft.VisualPrompt,
                             Dialogue = panelDraft.Dialogue,
                             Caption = panelDraft.Caption,
+                            ShotType = panelDraft.Shot,
                             SourceStartOffset = windowStart,
                             SourceEndOffset = windowEnd,
                             ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
@@ -507,7 +508,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             select new ReusablePanel(
                 v.Number, v.Title, pg.ChapterNumber, pg.PageNumber, pn.PanelNumber,
                 pn.SourceStartOffset, pn.SourceEndOffset, pn.VisualPrompt, pn.Dialogue, pn.Caption,
-                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped))
+                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped, pn.ShotType))
             .ToListAsync(cancellationToken);
 
         // Only the previous panels drawn from a window whose text is byte-identical to this one.
@@ -554,6 +555,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                         VisualPrompt = source.VisualPrompt,
                         Dialogue = source.Dialogue,
                         Caption = source.Caption,
+                        ShotType = source.ShotType,
                         SourceStartOffset = windowStart,
                         SourceEndOffset = windowEnd,
                         ReferenceNamesJson = source.ReferenceNamesJson,
@@ -583,7 +585,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private sealed record ReusablePanel(
         int VolumeNumber, string VolumeTitle, int ChapterNumber, int PageNumber, int PanelNumber,
         int SourceStartOffset, int SourceEndOffset, string VisualPrompt, string? Dialogue, string? Caption,
-        string ReferenceNamesJson, string? ImagePath, bool Skipped);
+        string ReferenceNamesJson, string? ImagePath, bool Skipped, ShotType ShotType);
 
     private async Task<ProcessResult> RenderPanels(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {

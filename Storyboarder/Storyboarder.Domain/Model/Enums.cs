@@ -42,3 +42,16 @@ public enum ReferenceKind
     Character,
     Setting
 }
+
+// The camera framing of a panel, which drives its size on the page (weighted layout). Standard is the
+// default and lays out exactly like the old uniform grid, so a page with no tagged shots is unchanged;
+// the others introduce deliberate variety. Persisted as an integer, so append new values — never insert.
+public enum ShotType
+{
+    Standard,
+    // A full-width cinematic band (a wide establishing shot): spans the page across, drawn shorter than
+    // a standard tier so it reads as a landscape.
+    Wide,
+    // A full-page splash for a pivotal beat: the panel gets a page to itself (page splitting isolates it).
+    Splash
+}

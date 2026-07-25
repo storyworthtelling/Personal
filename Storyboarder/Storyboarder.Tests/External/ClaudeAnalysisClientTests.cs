@@ -235,6 +235,27 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("Alice at the gate", panel.VisualPrompt);
         Assert.Equal("Hello?", panel.Dialogue);
         Assert.Contains("Alice", panel.ReferenceNames);
+        // No shotType in the reply → Standard, so an older model reply lays out exactly as before.
+        Assert.Equal(Storyboarder.Domain.Model.ShotType.Standard, panel.Shot);
+    }
+
+    [Fact]
+    public async Task Storyboard_ParsesShotType_AndDefaultsUnknownToStandard()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"continuitySummary\":\"x\",\"volumes\":[{\"number\":1,\"title\":\"V\",\"pages\":[{\"chapterNumber\":1,\"panels\":[" +
+            "{\"visualPrompt\":\"a\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"shotType\":\"splash\"}," +
+            "{\"visualPrompt\":\"b\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"shotType\":\"WIDE\"}," +
+            "{\"visualPrompt\":\"c\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"shotType\":\"telephoto\"}" +
+            "]}]}]}"));
+
+        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+
+        var panels = Assert.Single(Assert.Single(segment.Volumes).Pages).Panels;
+        Assert.Equal(Storyboarder.Domain.Model.ShotType.Splash, panels[0].Shot);
+        Assert.Equal(Storyboarder.Domain.Model.ShotType.Wide, panels[1].Shot);   // case-insensitive
+        Assert.Equal(Storyboarder.Domain.Model.ShotType.Standard, panels[2].Shot); // unknown → Standard
     }
 
     [Fact]

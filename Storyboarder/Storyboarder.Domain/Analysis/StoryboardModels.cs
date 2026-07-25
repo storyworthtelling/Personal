@@ -1,12 +1,16 @@
+using Storyboarder.Domain.Model;
+
 namespace Storyboarder.Domain.Analysis;
 
-// One panel in a storyboard: what to draw, what text to typeset over it, and which design-bible
-// entities appear (so their reference sheets can be supplied to the image model).
+// One panel in a storyboard: what to draw, what text to typeset over it, which design-bible entities
+// appear (so their reference sheets can be supplied to the image model), and how the panel is framed
+// (which sizes it on the page). Shot defaults to Standard when the model doesn't tag one.
 public sealed record PanelDraft(
     string VisualPrompt,
     string? Dialogue,
     string? Caption,
-    IReadOnlyList<string> ReferenceNames);
+    IReadOnlyList<string> ReferenceNames,
+    ShotType Shot = ShotType.Standard);
 
 public sealed record PageDraft(int ChapterNumber, IReadOnlyList<PanelDraft> Panels);
 
