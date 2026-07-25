@@ -142,7 +142,13 @@ public class GraphicNovelProcessorTests : IDisposable
         Options.Create(new PageLayoutOptions { MaxPanelsPerPage = maxPanelsPerPage }),
         Options.Create(archiveOptions ?? new ArchiveOptions()),
         NullLogger<GraphicNovelProcessor>.Instance,
-        driveArchive);
+        driveArchive,
+        batchClient,
+        Options.Create(new GeminiOptions { UseBatchRendering = useBatchRendering, BatchPollSeconds = 1 }));
+
+    // Batch rendering is off unless a test opts in (sets both a fake client and the flag).
+    private IGeminiBatchClient? batchClient;
+    private bool useBatchRendering;
 
     private ProjectService NewProjectService() => new(
         database,
@@ -868,6 +874,95 @@ public class GraphicNovelProcessorTests : IDisposable
         using var check = database.NewContext();
         Assert.Equal("watercolour whimsy", check.Novels.Single(n => n.Id == novelId).ArtStyle);
         claude.Verify(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task BatchMode_RendersTheBulkThroughTheBatch_NotTheSynchronousApi()
+    {
+        var manuscript = string.Join("\n\n",
+            Enumerable.Range(0, 120).Select(i => $"Paragraph {i}: the hero walks onward through the long grey hall, thinking of home and the road ahead."));
+        var fake = new FakeBatchClient(() => SampleImages.Png(), runningPolls: 1);
+        batchClient = fake;
+        useBatchRendering = true;
+
+        var novelId = SeedNovel(manuscript);
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.True(fake.SubmitCalls >= 1, "panels should have been submitted as a batch");
+        Assert.True(fake.Submitted.Count > 1, "the whole bulk should go in the batch");
+        // The bulk rendered through the batch, so the synchronous panel API was never called.
+        Assert.Equal(0, panelRenderCalls);
+
+        using var ctx = database.NewContext();
+        var volumeIds = ctx.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToList();
+        var pageIds = ctx.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToList();
+        var panels = ctx.Panels.Where(p => pageIds.Contains(p.PageId)).ToList();
+        Assert.NotEmpty(panels);
+        Assert.All(panels, p =>
+        {
+            Assert.Equal(WorkStatus.Completed, p.Status);
+            Assert.NotNull(p.ImagePath);
+            Assert.True(p.BatchAttempted);
+        });
+        // No batch job is left dangling on the finished novel.
+        Assert.Null(ctx.Novels.Single(n => n.Id == novelId).BatchJobId);
+    }
+
+    [Fact]
+    public async Task BatchMode_FallsBackToSynchronousRender_ForAPanelTheBatchFailed()
+    {
+        var manuscript = string.Join("\n\n",
+            Enumerable.Range(0, 120).Select(i => $"Paragraph {i}: the hero walks onward through the long grey hall, thinking of home and the road ahead."));
+        // The first panel in the batch comes back failed; it must re-render synchronously and the book
+        // must still finish.
+        var fake = new FakeBatchClient(() => SampleImages.Png(), failFirst: 1);
+        batchClient = fake;
+        useBatchRendering = true;
+
+        var novelId = SeedNovel(manuscript);
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.True(panelRenderCalls >= 1, "the batch-failed panel should have re-rendered through the synchronous API");
+
+        using var ctx = database.NewContext();
+        var volumeIds = ctx.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToList();
+        var pageIds = ctx.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToList();
+        Assert.All(ctx.Panels.Where(p => pageIds.Contains(p.PageId)),
+            p => Assert.Equal(WorkStatus.Completed, p.Status));
+    }
+
+    // A fake Gemini batch client: records what it was asked to render and hands back images on poll, with
+    // a configurable number of "still running" polls and a count of leading requests to fail (so the
+    // synchronous fallback can be exercised).
+    private sealed class FakeBatchClient(Func<byte[]> image, int runningPolls = 0, int failFirst = 0) : IGeminiBatchClient
+    {
+        private readonly List<BatchPanelRequest> submitted = [];
+
+        public int SubmitCalls { get; private set; }
+        public int PollCalls { get; private set; }
+        public IReadOnlyList<BatchPanelRequest> Submitted => submitted;
+
+        public Task<string> SubmitAsync(IReadOnlyList<BatchPanelRequest> requests, CancellationToken cancellationToken)
+        {
+            SubmitCalls++;
+            submitted.AddRange(requests);
+            return Task.FromResult($"job-{SubmitCalls}");
+        }
+
+        public Task<BatchJobStatus> PollAsync(string jobId, CancellationToken cancellationToken)
+        {
+            PollCalls++;
+            if (PollCalls <= runningPolls)
+                return Task.FromResult(BatchJobStatus.StillRunning);
+            var results = submitted
+                .Select((r, i) => i < failFirst
+                    ? new BatchPanelOutcome(r.PanelId, null, "blocked in batch")
+                    : new BatchPanelOutcome(r.PanelId, image(), null))
+                .ToList();
+            return Task.FromResult(new BatchJobStatus(BatchJobState.Succeeded, results));
+        }
     }
 
     [Fact]
