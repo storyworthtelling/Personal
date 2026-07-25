@@ -22,15 +22,18 @@ public class MainActivity : MauiAppCompatActivity
         ResumeActiveWork();
     }
 
-    // On first launch after an app update, kick the worker immediately if a conversion is mid-flight,
-    // so a days- or weeks-long job resumes at once instead of waiting for the next 15-minute window.
-    // Best-effort: the periodic worker still drains the pipeline if this fails.
+    // On launch (which, after a reboot, is the first time the app runs again) verify the outputs on disk
+    // against the database and heal anything a reboot or interrupted write left dangling, then — if a
+    // conversion is mid-flight, or healing regressed a finished book back into the pipeline — kick the
+    // worker at once instead of waiting for the next 15-minute window. Best-effort: the periodic worker
+    // still drains the pipeline if this fails.
     private void ResumeActiveWork() => Task.Run(() =>
     {
         try
         {
             using var scope = IPlatformApplication.Current!.Services.CreateScope();
             var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            projects.VerifyAndHealOutputsAsync(CancellationToken.None).GetAwaiter().GetResult();
             if (projects.HasActiveWorkAsync(CancellationToken.None).GetAwaiter().GetResult())
                 PipelineWorker.RunNow(this);
         }

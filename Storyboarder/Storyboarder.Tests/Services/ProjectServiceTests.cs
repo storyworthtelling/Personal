@@ -370,6 +370,137 @@ public class ProjectServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyAndHeal_LeavesAHealthyFinishedBookUntouched()
+    {
+        var book = SeedCompletedBookWithFiles();
+
+        var healed = await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        Assert.Equal(0, healed);
+        using var ctx = database.NewContext();
+        Assert.Equal(ProjectStage.Completed, ctx.Novels.Single(n => n.Id == book.NovelId).Stage);
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_RebindsAVolumeWhosePdfIsMissing_AndRegressesTheStage()
+    {
+        var book = SeedCompletedBookWithFiles();
+        System.IO.File.Delete(book.VolumePdf); // a reboot or storage hiccup lost the bound PDF
+
+        var healed = await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        Assert.True(healed >= 1);
+        using var ctx = database.NewContext();
+        var volume = ctx.Volumes.Single(v => v.NovelId == book.NovelId);
+        Assert.Equal(WorkStatus.Pending, volume.PdfStatus);
+        Assert.Null(volume.PdfPath);
+        Assert.Equal(0, volume.PdfPageCursor);
+        Assert.Equal(ProjectStage.AssemblingVolumes, ctx.Novels.Single(n => n.Id == book.NovelId).Stage);
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_ReRendersAPanelWhoseImageIsGone_CascadingToPageAndVolume()
+    {
+        var book = SeedCompletedBookWithFiles();
+        System.IO.File.Delete(book.PanelImage);
+
+        await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        using var ctx = database.NewContext();
+        var volumeIds = ctx.Volumes.Where(v => v.NovelId == book.NovelId).Select(v => v.Id).ToList();
+        var pageIds = ctx.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToList();
+        Assert.Equal(WorkStatus.Pending, ctx.Panels.Single(p => pageIds.Contains(p.PageId)).Status);
+        Assert.Equal(WorkStatus.Pending, ctx.Pages.Single(p => pageIds.Contains(p.Id)).CompositionStatus);
+        Assert.Equal(WorkStatus.Pending, ctx.Volumes.Single(v => v.NovelId == book.NovelId).PdfStatus);
+        // Back to the earliest healed stage so the worker re-renders, recomposes, and rebinds forward.
+        Assert.Equal(ProjectStage.RenderingImages, ctx.Novels.Single(n => n.Id == book.NovelId).Stage);
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_ReRendersAMissingAnalysisReport()
+    {
+        var book = SeedCompletedBookWithFiles();
+        System.IO.File.Delete(book.AnalysisPdf);
+
+        await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        using var ctx = database.NewContext();
+        Assert.Equal(WorkStatus.Pending, ctx.BookAnalyses.Single(a => a.NovelId == book.NovelId).PdfStatus);
+        Assert.Equal(ProjectStage.ComposingAnalysis, ctx.Novels.Single(n => n.Id == book.NovelId).Stage);
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_IgnoresAnArchivedVolume_WhoseLocalCopyIsIntentionallyGone()
+    {
+        Guid novelId;
+        using (var ctx = database.NewContext())
+        {
+            var novel = new Novel
+            {
+                Title = "Q", GoogleDocId = "d", Stage = ProjectStage.Completed,
+                CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+            };
+            novel.ProjectId = novel.Id;
+            // Archived: the PDF lives on Drive, the local path is cleared — absence here is expected.
+            ctx.Volumes.Add(new Volume
+            {
+                NovelId = novel.Id, Number = 1, Title = "V",
+                PdfStatus = WorkStatus.Completed, PdfPath = null, ArchivedDriveFileId = "drive-file-123"
+            });
+            ctx.Novels.Add(novel);
+            ctx.SaveChanges();
+            novelId = novel.Id;
+        }
+
+        var healed = await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        Assert.Equal(0, healed);
+        using var check = database.NewContext();
+        Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == novelId).Stage);
+    }
+
+    // Seeds a finished book whose panel/page/volume/analysis outputs all exist on disk.
+    private (Guid NovelId, string PanelImage, string PageImage, string VolumePdf, string AnalysisPdf)
+        SeedCompletedBookWithFiles()
+    {
+        using var ctx = database.NewContext();
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc", Stage = ProjectStage.Completed,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        novel.ProjectId = novel.Id;
+
+        var panelImg = imageStore.Save($"{novel.Id}/panels/panel.png", SampleImages.Png());
+        var pageImg = imageStore.Save($"{novel.Id}/pages/page.png", SampleImages.Png());
+        var thumbImg = imageStore.Save($"{novel.Id}/pages/page.thumb.png", SampleImages.Png());
+        var volumePdf = imageStore.Save($"{novel.Id}/volumes/volume-1.pdf", [0x25, 0x50, 0x44, 0x46]);
+        var analysisPdf = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", [0x25, 0x50, 0x44, 0x46]);
+
+        var volume = new Volume
+        {
+            NovelId = novel.Id, Number = 1, Title = "Volume One",
+            PdfStatus = WorkStatus.Completed, PdfPath = volumePdf
+        };
+        var page = new Page
+        {
+            VolumeId = volume.Id, PageNumber = 1, ChapterNumber = 1,
+            CompositionStatus = WorkStatus.Completed, ComposedImagePath = pageImg, ThumbImagePath = thumbImg
+        };
+        page.Panels.Add(new Panel { PageId = page.Id, PanelNumber = 1, Status = WorkStatus.Completed, ImagePath = panelImg });
+        volume.Pages.Add(page);
+        novel.Analysis = new BookAnalysis
+        {
+            NovelId = novel.Id, PdfStatus = WorkStatus.Completed, PdfPath = analysisPdf, ConsolidatedJson = "{}"
+        };
+
+        ctx.Novels.Add(novel);
+        ctx.Volumes.Add(volume);
+        ctx.SaveChanges();
+        return (novel.Id, panelImg, pageImg, volumePdf, analysisPdf);
+    }
+
+    [Fact]
     public async Task CancelAsync_MarksNovelCancelled_SoItNoLongerCountsAsActiveWork()
     {
         var id = SeedNovel(ProjectStage.BuildingDesignBible);

@@ -187,6 +187,125 @@ public sealed class ProjectService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    // Data-safety pass run at app start (which covers a device reboot): reconciles the database against
+    // what's actually on disk. A unit the DB calls "done" whose file has vanished — an interrupted write,
+    // a storage hiccup, a reboot mid-flush — is reset to Pending and the novel is regressed to the stage
+    // that rebuilds it, so the pipeline heals the book forward instead of shipping a broken page or PDF.
+    // Archived outputs (PdfPath cleared, ArchivedDriveFileId set) are expected to be absent locally and
+    // left alone. Returns the number of units healed. Idempotent: a clean project heals nothing.
+    public async Task<int> VerifyAndHealOutputsAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        // Cancelled and Failed are left to the user (Retry/rework); healing files under them would quietly
+        // resurrect work they deliberately stopped.
+        var novelIds = await db.Novels
+            .Where(n => n.Stage != ProjectStage.Cancelled && n.Stage != ProjectStage.Failed)
+            .Select(n => n.Id)
+            .ToListAsync(cancellationToken);
+
+        var healed = 0;
+        foreach (var id in novelIds)
+            healed += await VerifyNovelOutputs(db, id, cancellationToken);
+
+        if (healed > 0)
+            await db.SaveChangesAsync(cancellationToken);
+        return healed;
+    }
+
+    private async Task<int> VerifyNovelOutputs(StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var novel = await db.Novels.FirstAsync(n => n.Id == novelId, cancellationToken);
+        var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
+        var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
+
+        var healed = 0;
+        var affectedPages = new HashSet<Guid>();
+        var affectedVolumes = new HashSet<Guid>();
+        ProjectStage? regressTo = null;
+        void Regress(ProjectStage stage)
+        {
+            if (regressTo is null || stage < regressTo)
+                regressTo = stage;
+        }
+
+        // Panels: a completed, non-skipped render whose image file is gone must re-render.
+        var panels = await db.Panels
+            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.Completed && !p.Skipped && p.ImagePath != null)
+            .ToListAsync(cancellationToken);
+        foreach (var panel in panels.Where(p => !imageStore.Exists(p.ImagePath!)))
+        {
+            panel.Status = WorkStatus.Pending;
+            panel.ImagePath = null;
+            panel.Attempts = 0;
+            panel.NextAttemptAtUtc = null;
+            panel.LastError = null;
+            affectedPages.Add(panel.PageId);
+            healed++;
+            Regress(ProjectStage.RenderingImages);
+        }
+
+        // Pages: a composed page whose raster (or thumbnail) is gone, or one whose panel was just reset,
+        // must recompose so it picks up the re-rendered panel.
+        var pages = await db.Pages.Where(p => pageIds.Contains(p.Id)).ToListAsync(cancellationToken);
+        foreach (var page in pages)
+        {
+            var fileGone = page.CompositionStatus == WorkStatus.Completed &&
+                ((page.ComposedImagePath != null && !imageStore.Exists(page.ComposedImagePath)) ||
+                 (page.ThumbImagePath != null && !imageStore.Exists(page.ThumbImagePath)));
+            if (!fileGone && !affectedPages.Contains(page.Id))
+                continue;
+
+            page.CompositionStatus = WorkStatus.Pending;
+            page.ComposedImagePath = null;
+            page.ThumbImagePath = null;
+            page.Attempts = 0;
+            page.LastError = null;
+            affectedVolumes.Add(page.VolumeId);
+            healed++;
+            Regress(ProjectStage.ComposingPages);
+        }
+
+        // Volumes: a bound PDF that's gone (and not archived to Drive), or one whose page was reset, rebinds.
+        var volumes = await db.Volumes.Where(v => v.NovelId == novelId).ToListAsync(cancellationToken);
+        foreach (var volume in volumes)
+        {
+            var pdfGone = volume.PdfStatus == WorkStatus.Completed && volume.PdfPath != null
+                && volume.ArchivedDriveFileId == null && !imageStore.Exists(volume.PdfPath);
+            if (!pdfGone && !affectedVolumes.Contains(volume.Id))
+                continue;
+
+            volume.PdfStatus = WorkStatus.Pending;
+            volume.PdfPath = null;
+            volume.PdfPageCursor = 0;
+            volume.Attempts = 0;
+            volume.NextAttemptAtUtc = null;
+            volume.LastError = null;
+            healed++;
+            Regress(ProjectStage.AssemblingVolumes);
+        }
+
+        // Analysis report: a rendered PDF that's gone (and not archived) re-renders — its content lives in
+        // the database, so only the PDF is rebuilt.
+        var analysis = await db.BookAnalyses.FirstOrDefaultAsync(a => a.NovelId == novelId, cancellationToken);
+        if (analysis is not null && analysis.PdfStatus == WorkStatus.Completed && analysis.PdfPath != null
+            && analysis.ArchivedDriveFileId == null && !imageStore.Exists(analysis.PdfPath))
+        {
+            analysis.PdfStatus = WorkStatus.Pending;
+            analysis.PdfPath = null;
+            healed++;
+            Regress(ProjectStage.ComposingAnalysis);
+        }
+
+        // Regress a finished or later-stage novel so the worker re-runs the healed stages; never advance.
+        if (regressTo is { } target && (int)novel.Stage > (int)target)
+        {
+            novel.Stage = target;
+            novel.UpdatedAtUtc = clock.UtcNow;
+        }
+
+        return healed;
+    }
+
     // The panels parked awaiting the user's OK after a safety block, with the flagged categories and the
     // beat's dialogue/caption so the review screen can show what's being decided.
     public async Task<IReadOnlyList<BlockedPanel>> GetBlockedPanelsAsync(Guid novelId, CancellationToken cancellationToken)
