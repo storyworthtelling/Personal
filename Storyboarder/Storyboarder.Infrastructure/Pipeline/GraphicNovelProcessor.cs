@@ -651,6 +651,16 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         var now = clock.UtcNow;
 
+        // 0) The report PDF is already on disk, so this stage is finished: advance and do nothing else.
+        // This has to come FIRST, ahead of the labelling and seeding below, because none of that
+        // preparatory work can change a report that is already written: an existing PDF cannot gain
+        // chapter citations, and a report rendered before the craft half of the reduce existed carries
+        // CraftJson = null, which would otherwise buy a consolidation whose output could never reach it.
+        var rendered = await db.BookAnalyses
+            .AnyAsync(a => a.NovelId == novel.Id && a.PdfStatus == WorkStatus.Completed, cancellationToken);
+        if (rendered)
+            return await AdvancePastAnalysis(db, novel, cancellationToken);
+
         // 0a) Every finding in the report cites a chapter, which the map step reads off its chunk. A
         // conversion chunked before chapter detection existed still has unlabelled chunks, so label
         // them here rather than producing a report with no citations. A no-op once settled.
@@ -722,15 +732,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         var analysis = await db.BookAnalyses.FirstAsync(a => a.NovelId == novel.Id, cancellationToken);
 
-        // Reduce work is pointless once the report PDF is on disk, and both halves are gated on it: a
-        // novel whose report was rendered before the craft half existed carries CraftJson = null, so
-        // gating the craft call on that alone would buy a consolidation whose output could never reach
-        // the PDF already written — a billed call with nothing to show for it. Such a novel falls
-        // through to the tail of this method and advances to Completed.
-        var reportRendered = analysis.PdfStatus == WorkStatus.Completed;
-
         // 2) Reduce, story half: consolidate all chunk notes into the story report (one Claude call).
-        if (analysis.ConsolidatedJson is null && !reportRendered)
+        // Step 0 already returned for an already-rendered report, so reaching here means the PDF is
+        // still outstanding and both reduce halves are worth paying for.
+        if (analysis.ConsolidatedJson is null)
         {
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
@@ -760,7 +765,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         // map. Its own call with its own output budget, and persisted separately: asking for both
         // halves at once needs more output than one reply can carry, and a failure in either half
         // must not re-bill the one that already succeeded.
-        if (analysis.CraftJson is null && !reportRendered)
+        if (analysis.CraftJson is null)
         {
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
@@ -797,17 +802,26 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
+            // A failed render is left for the next cycle to retry; don't advance on it.
             catch (Exception ex)
             {
                 analysis.PdfStatus = WorkStatus.Failed;
                 logger.LogError(ex, "Failed to compose analysis PDF for novel {NovelId}", novel.Id);
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
             }
-
-            await db.SaveChangesAsync(cancellationToken);
-            return ProcessResult.DidWork(novel.Id);
         }
 
-        // 4) Report rendered: advance to Completed.
+        // 4) The report is rendered — either just now or on an earlier cycle — so the book is finished.
+        return await AdvancePastAnalysis(db, novel, cancellationToken);
+    }
+
+    // Moves a novel off ComposingAnalysis now that its revision report exists. Shared by the two paths
+    // that get there: a report rendered on this cycle, and one that was already on disk when the stage
+    // was entered (step 0).
+    private async Task<ProcessResult> AdvancePastAnalysis(
+        StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
         SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, SourceIngested: false, AllChunksAnalyzed: false, BibleConsolidated: false,
             AllReferenceSheetsRendered: false, StoryboardCreated: false, AllPanelsRendered: false,
