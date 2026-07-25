@@ -8,9 +8,23 @@ to bottom before starting work — several of the traps below cost a full CI rou
 Domain/Infrastructure — `ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings
 resolved/new + changed panels), and the storyboard-stage reuse that carries an unchanged window's renders
 forward. **None of it is wired into the Android head yet** (a "New draft" action on a project card, and a
-diff view). That UI belongs with the Phase 3 reader and needs the MAUI/Android workload to build — it was
-not attempted in the backend session because the head can't be compiled or run there. Wire it in an
-environment that can build the head, and mind the handoff's "check the feature is reachable" trap.
+diff view). That UI belongs with the Phase 3 reader and mind the handoff's "check the feature is reachable"
+trap.
+
+**The Android head now COMPILES in a web/CI container.** Run `Storyboarder/scripts/setup-android-build.sh`
+once (a few minutes: it installs the maui-android workload from nuget, pulls android.jar for API 36 from a
+GitHub mirror since `dl.google.com` is blocked, and stitches together a minimal SDK at `/opt/android-sdk-min`
+with the workload's bundled aapt2/r8 plus apt's zipalign). Then UI edits are no longer written blind:
+
+```
+Storyboarder/scripts/setup-android-build.sh
+dotnet build Storyboarder/Storyboarder.Android/Storyboarder.Android.csproj \
+  -p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false
+```
+
+This gets `dotnet build` green through XAML + C# + resource linking; it does **not** run the app (no
+emulator/display). The setup is ephemeral — the container is reclaimed — so re-run the script each session
+you need to build the head. Everything it does is documented in the script's header.
 
 ---
 
