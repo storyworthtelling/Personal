@@ -256,12 +256,18 @@ The weighted layout is verified as *math* (no overlap, fills the page, all-Stand
   Until then copy stays quiet-neutral across DESIGN.md, FocusPhone, Ledger, and Storyboarder. Its own PR
   when unblocked.
 
-### Phase 6 — Gemini batching
-See `Storyboarder/BATCHING.md` for the full investigation. **Do the cheap thing first:**
-`RateLimitOptions.GeminiRequestsPerDay` defaults to **100**, which is *this app's own safety ceiling, not
-Google's limit*. Raising it to match the account's real tier may deliver most of the wall-clock win for one
-line. Only then batch panel renders (50% discount and a separate quota pool). The owner has asked to be
-walked through finding their real Gemini limit when we get there.
+### Phase 6 — Gemini batching ⏳ cheap step done
+See `Storyboarder/BATCHING.md` for the full investigation.
+- **Cap raise** ✅ (`ad3bf4b`): the owner's real tier is 2,000/min · 50,000/day for `gemini-2.5-flash-image`.
+  `GeminiRequestsPerDay` was a self-imposed **100/day** floor (weeks per book); raised to **60/min, 5,000/day**
+  — a deliberate safety ceiling an order of magnitude under the account's 50,000/day (images are billed each,
+  so a runaway can't drain the whole quota), while removing the bottleneck (a full book's projection drops
+  from weeks to ~10 hours). A single sequential worker is latency-bound and can't approach these anyway. If
+  the owner wants to trade the runaway guardrail for maximum headroom, bump `GeminiRequestsPerDay` toward
+  50,000.
+- **Batch API** ⬜ still open: batching panel renders gives a ~50% discount and a separate quota pool, but
+  it's asynchronous (submit-then-poll) and a real rework of the render stage. Only worth it if the cap raise
+  above doesn't already deliver acceptable wall-clock time — measure first.
 
 ---
 
@@ -269,6 +275,7 @@ walked through finding their real Gemini limit when we get there.
 
 - **Register the `drive.file` scope** on the OAuth client in the Google Cloud project, then sign in again on
   the device. Until then archiving stays off (which is the default, so nothing breaks).
-- **Check the real Gemini tier limit** and raise `GeminiRequestsPerDay` — do this before any batching work.
+- ~~**Check the real Gemini tier limit** and raise `GeminiRequestsPerDay`~~ — done (`ad3bf4b`): tier is
+  2,000/min · 50,000/day; caps raised to 60/min · 5,000/day (see Phase 6).
 - **The stuck "Heart and Mind" project recovers on its own** once this ships: tap **Retry now** and volume 1
   re-binds, which unblocks the revision report. No manual data fix needed.
