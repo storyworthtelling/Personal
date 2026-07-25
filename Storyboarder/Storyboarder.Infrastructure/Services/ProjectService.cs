@@ -2,11 +2,13 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Configuration;
+using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Persistence;
 
 namespace Storyboarder.Infrastructure.Services;
@@ -402,6 +404,125 @@ public sealed class ProjectService
             .Select(a => a.PdfPath)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    // What a draft changed against the one it was made from: the revision-report findings it resolved
+    // and newly raised, and the panels whose source text moved (everything else the pipeline reuses).
+    // A first draft — or an unknown id — diffs to None, since there is nothing to compare against.
+    public async Task<DraftDiff> GetDraftDiffAsync(Guid draftId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var draft = await db.Novels.FirstOrDefaultAsync(n => n.Id == draftId, cancellationToken);
+        if (draft?.PreviousDraftId is not Guid previousId)
+            return DraftDiff.None(draftId);
+
+        var currentFindings = await LoadFindingsAsync(db, draftId, cancellationToken);
+        var previousFindings = await LoadFindingsAsync(db, previousId, cancellationToken);
+
+        // Findings match on their detail text alone (whitespace/case-normalized). Resolved = the
+        // previous draft raised it and this one doesn't; New = the reverse.
+        var currentKeys = currentFindings.Select(FindingKey).ToHashSet();
+        var previousKeys = previousFindings.Select(FindingKey).ToHashSet();
+        var resolved = previousFindings
+            .Where(f => !currentKeys.Contains(FindingKey(f)))
+            .Select(f => new DiffFinding(FindingChange.Resolved, f.Category, f.Chapter, f.Detail))
+            .ToList();
+        var added = currentFindings
+            .Where(f => !previousKeys.Contains(FindingKey(f)))
+            .Select(f => new DiffFinding(FindingChange.New, f.Category, f.Chapter, f.Detail))
+            .ToList();
+
+        var currentFull = await SourceTextAsync(db, draftId, cancellationToken);
+        var previousFull = await SourceTextAsync(db, previousId, cancellationToken);
+        var currentPanels = await LoadPanelsAsync(db, draftId, cancellationToken);
+        var previousPanels = await LoadPanelsAsync(db, previousId, cancellationToken);
+
+        // The stretches of manuscript the previous draft already illustrated. A current panel whose
+        // source text is in this set didn't move, so its render carries forward untouched.
+        var previousSpans = previousPanels
+            .Select(p => PanelSourceMatching.SourceText(previousFull, p.SourceStartOffset, p.SourceEndOffset))
+            .Where(text => text is not null)
+            .ToHashSet();
+
+        // The previous render at each reading position, for the "before" side of a side-by-side on a
+        // changed panel.
+        var previousByPosition = previousPanels
+            .GroupBy(p => (p.VolumeNumber, p.PageNumber, p.PanelNumber))
+            .ToDictionary(g => g.Key, g => g.First().ImagePath);
+
+        var changed = new List<PanelChange>();
+        var reusable = 0;
+        foreach (var panel in currentPanels)
+        {
+            var text = PanelSourceMatching.SourceText(currentFull, panel.SourceStartOffset, panel.SourceEndOffset);
+            if (text is not null && previousSpans.Contains(text))
+            {
+                reusable++;
+                continue;
+            }
+
+            previousByPosition.TryGetValue((panel.VolumeNumber, panel.PageNumber, panel.PanelNumber), out var previousImage);
+            changed.Add(new PanelChange(
+                panel.VolumeNumber, panel.PageNumber, panel.PanelNumber, panel.ImagePath, previousImage));
+        }
+
+        return new DraftDiff(draftId, previousId, resolved, added, changed, reusable);
+    }
+
+    // detail text, normalized so trivial whitespace/case differences don't read as a resolved-plus-new
+    // pair. The category is part of the key so the same sentence filed under two sections stays distinct.
+    private static string FindingKey((string Category, string Chapter, string Detail) f) =>
+        f.Category + " " + string.Join(' ', f.Detail.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+
+    // Flattens a draft's consolidated report into (section, chapter, detail) triples across the four
+    // finding sections. Empty when the report hasn't been consolidated yet (an in-flight or art-only draft).
+    private static async Task<IReadOnlyList<(string Category, string Chapter, string Detail)>> LoadFindingsAsync(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var json = await db.BookAnalyses
+            .Where(a => a.NovelId == novelId)
+            .Select(a => a.ConsolidatedJson)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrEmpty(json))
+            return [];
+
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(json, JsonResponse.CaseInsensitive)
+                     ?? BookAnalysisResult.Empty;
+        var findings = new List<(string, string, string)>();
+        void Add(string category, IReadOnlyList<Finding> items)
+        {
+            foreach (var f in items)
+                findings.Add((category, f.Chapter, f.Detail));
+        }
+        Add("Plot holes", report.PlotHoles);
+        Add("Inconsistencies", report.Inconsistencies);
+        Add("Inaccuracies", report.Inaccuracies);
+        Add("Pacing", report.PacingNotes);
+        return findings;
+    }
+
+    private static async Task<string> SourceTextAsync(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken) =>
+        await db.SourceTexts
+            .Where(s => s.NovelId == novelId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+
+    private static async Task<IReadOnlyList<PanelRow>> LoadPanelsAsync(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        return await (
+            from v in db.Volumes
+            where v.NovelId == novelId
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            join pn in db.Panels on pg.Id equals pn.PageId
+            orderby v.Number, pg.PageNumber, pn.PanelNumber
+            select new PanelRow(
+                v.Number, pg.PageNumber, pn.PanelNumber, pn.SourceStartOffset, pn.SourceEndOffset, pn.ImagePath))
+            .ToListAsync(cancellationToken);
+    }
+
+    private sealed record PanelRow(
+        int VolumeNumber, int PageNumber, int PanelNumber, int SourceStartOffset, int SourceEndOffset, string? ImagePath);
 
     private static async Task<NovelStatus?> BuildStatus(
         StoryboarderDbContext db, Guid id, RateLimitOptions limits, DateTimeOffset now, CancellationToken cancellationToken)

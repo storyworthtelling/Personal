@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Moq;
+using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Model;
 using Storyboarder.Infrastructure.Configuration;
@@ -146,6 +148,108 @@ public class ProjectServiceTests : IDisposable
         var result = await NewService().CreateNextDraftAsync(
             Guid.NewGuid(), "doc", "Book.gdoc", "token", null, null, CancellationToken.None);
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetDraftDiff_ReportsResolvedAndNewFindings_AndTheChangedPanels()
+    {
+        // Two drafts of one book. The middle scene's text was rewritten between them; the outer scenes
+        // are untouched. The report resolved one finding and raised a new one.
+        const string firstText = "AAAAA BBBBB CCCCC";
+        const string secondText = "AAAAA XXXXX CCCCC";
+        var projectId = Guid.NewGuid();
+
+        var firstReport = BookAnalysisResult.Empty with
+        {
+            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")],
+            Inconsistencies = [new Finding("Chapter 2", "The hero's eye colour shifts")]
+        };
+        var secondReport = BookAnalysisResult.Empty with
+        {
+            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")],
+            Inaccuracies = [new Finding("Chapter 3", "Paris is placed in Germany")]
+        };
+
+        var firstId = SeedDraft(projectId, 1, null, firstText, firstReport,
+            (1, 0, 5, "first-1.png"), (2, 6, 11, "first-2.png"), (3, 12, 17, "first-3.png"));
+        var secondId = SeedDraft(projectId, 2, firstId, secondText, secondReport,
+            (1, 0, 5, "second-1.png"), (2, 6, 11, "second-2.png"), (3, 12, 17, "second-3.png"));
+
+        var diff = await NewService().GetDraftDiffAsync(secondId, CancellationToken.None);
+
+        Assert.Equal(secondId, diff.DraftId);
+        Assert.Equal(firstId, diff.PreviousDraftId);
+
+        // The eye-colour inconsistency is gone; the Paris inaccuracy is new. The unchanged plot hole
+        // shows in neither list.
+        var resolved = Assert.Single(diff.ResolvedFindings);
+        Assert.Equal("Inconsistencies", resolved.Category);
+        Assert.Contains("eye colour", resolved.Detail);
+        var added = Assert.Single(diff.NewFindings);
+        Assert.Equal("Inaccuracies", added.Category);
+        Assert.Contains("Paris", added.Detail);
+
+        // Only the middle panel sits on rewritten text, so only it re-renders; the other two carry forward.
+        Assert.Equal(2, diff.ReusablePanelCount);
+        var change = Assert.Single(diff.ChangedPanels);
+        Assert.Equal(2, change.PanelNumber);
+        Assert.Equal("second-2.png", change.NewImagePath);
+        Assert.Equal("first-2.png", change.PreviousImagePath);
+    }
+
+    [Fact]
+    public async Task GetDraftDiff_OfAFirstDraft_IsEmpty()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+        var id = await NewService().CreateFromDocAsync("doc", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        var diff = await NewService().GetDraftDiffAsync(id, CancellationToken.None);
+
+        Assert.Null(diff.PreviousDraftId);
+        Assert.Empty(diff.ResolvedFindings);
+        Assert.Empty(diff.NewFindings);
+        Assert.Empty(diff.ChangedPanels);
+        Assert.Equal(0, diff.ReusablePanelCount);
+    }
+
+    // Seeds one draft: the novel row, its source text, a single volume/page carrying the given panels
+    // (panelNumber, source start, source end, image path), and a consolidated report.
+    private Guid SeedDraft(
+        Guid projectId, int draftNumber, Guid? previousDraftId, string fullText,
+        BookAnalysisResult report, params (int PanelNumber, int Start, int End, string Image)[] panels)
+    {
+        using var context = database.NewContext();
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc",
+            ProjectId = projectId, DraftNumber = draftNumber, PreviousDraftId = previousDraftId,
+            Stage = ProjectStage.Completed, CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        novel.Source = new SourceText { NovelId = novel.Id, FullText = fullText, CharacterCount = fullText.Length };
+
+        var volume = new Volume { NovelId = novel.Id, Number = 1, Title = "Volume One" };
+        var page = new Page { VolumeId = volume.Id, ChapterNumber = 1, PageNumber = 1 };
+        foreach (var (panelNumber, start, end, image) in panels)
+            page.Panels.Add(new Panel
+            {
+                PageId = page.Id, PanelNumber = panelNumber,
+                SourceStartOffset = start, SourceEndOffset = end,
+                Status = WorkStatus.Completed, ImagePath = image
+            });
+        volume.Pages.Add(page);
+
+        novel.Analysis = new BookAnalysis
+        {
+            NovelId = novel.Id,
+            ConsolidatedJson = JsonSerializer.Serialize(report),
+            PdfStatus = WorkStatus.Completed
+        };
+
+        context.Novels.Add(novel);
+        context.Volumes.Add(volume);
+        context.SaveChanges();
+        return novel.Id;
     }
 
     [Fact]
