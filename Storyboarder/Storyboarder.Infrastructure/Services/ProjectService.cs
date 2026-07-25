@@ -637,7 +637,8 @@ public sealed class ProjectService
             novel.Id, novel.Title, novel.Stage.ToString(), lastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
             analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals,
-            prohibitedPanels, estimate, rateLimitedUntil);
+            prohibitedPanels, estimate, rateLimitedUntil,
+            novel.DraftNumber, novel.PreviousDraftId is not null);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

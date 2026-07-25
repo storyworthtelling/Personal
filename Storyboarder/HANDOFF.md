@@ -4,12 +4,14 @@
 landed on branch `claude/storyboarder-handoff-phases-nbhko0` (commits `bfa44bc`→`38574ad`). Read this top
 to bottom before starting work — several of the traps below cost a full CI round each to discover.
 
-**What Phase 2 still needs (backend done, UI not):** the draft loop is fully built and tested in
-Domain/Infrastructure — `ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings
-resolved/new + changed panels), and the storyboard-stage reuse that carries an unchanged window's renders
-forward. **None of it is wired into the Android head yet** (a "New draft" action on a project card, and a
-diff view). That UI belongs with the Phase 3 reader and mind the handoff's "check the feature is reachable"
-trap.
+**Phase 2 is complete end to end.** The draft loop is built and tested in Domain/Infrastructure —
+`ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings resolved/new + changed
+panels), and the storyboard-stage reuse that carries an unchanged window's renders forward — **and now
+wired into the Android head**: each project card offers "New draft (re-pick doc)" (opens the Drive picker
+in draft mode) and, once a draft has a predecessor, "What changed since last draft" (a diff summary). The
+head compiles clean (see the build note below). The diff surface is a text summary today; the richer
+side-by-side old-vs-new **art** view the owner asked for is a Phase 3 reader job — `GetDraftDiffAsync`
+already returns the paired image paths for it.
 
 **The Android head now COMPILES in a web/CI container.** Run `Storyboarder/scripts/setup-android-build.sh`
 once (a few minutes: it installs the maui-android workload from nuget, pulls android.jar for API 36 from a

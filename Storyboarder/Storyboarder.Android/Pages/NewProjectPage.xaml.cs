@@ -14,6 +14,12 @@ public partial class NewProjectPage : ContentPage
     private readonly List<(string Id, string Name)> path = [];
     private DriveDocsLister.DriveEntry? selected;
 
+    // Set by the caller before pushing this page to run it in "new draft" mode: the picked doc becomes
+    // the next draft of this existing draft's project (ProjectService.CreateNextDraftAsync) rather than a
+    // brand-new project. Null = new project.
+    public Guid? PreviousDraftId { get; set; }
+    public string? PreviousTitle { get; set; }
+
     public NewProjectPage(DeviceAccountTokenProvider tokens, DriveDocsLister lister)
     {
         InitializeComponent();
@@ -25,6 +31,17 @@ public partial class NewProjectPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        if (PreviousDraftId is not null)
+        {
+            var label = string.IsNullOrWhiteSpace(PreviousTitle) ? "New draft" : $"New draft of “{PreviousTitle}”";
+            HeaderLabel.Text = label;
+            Title = "New draft";
+            CreateButton.Text = "Add draft";
+            // Blank inherits the previous draft's art style in the service; prefilling the default would
+            // override it. The user can still type a new style to change it for this draft.
+            ArtStyleEntry.Text = string.Empty;
+            ArtStyleEntry.Placeholder = "Leave blank to keep the previous draft's style";
+        }
         UpdateAccountLabel();
         if (SettingsStore.IsGoogleConfigured && path.Count == 0)
             _ = ResetToRootAsync();
@@ -130,19 +147,35 @@ public partial class NewProjectPage : ContentPage
         if (selected is null)
             return;
 
+        var draftMode = PreviousDraftId is not null;
+        // A new project defaults the style to the house default; a new draft leaves it blank so the
+        // service inherits the previous draft's style unless the user typed a replacement.
         var artStyle = string.IsNullOrWhiteSpace(ArtStyleEntry.Text)
-            ? ArtStyles.Default
+            ? (draftMode ? null : ArtStyles.Default)
             : ArtStyleEntry.Text.Trim();
 
-        Busy(true, "Creating project…");
+        Busy(true, draftMode ? "Adding draft…" : "Creating project…");
         try
         {
             var token = await tokens.GetAccessToken();
             using (var scope = IPlatformApplication.Current!.Services.CreateScope())
             {
                 var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
-                _ = await projects.CreateFromDocAsync(
-                    selected.Id, selected.Name, token, null, artStyle, CancellationToken.None);
+                if (draftMode)
+                {
+                    var draftId = await projects.CreateNextDraftAsync(
+                        PreviousDraftId!.Value, selected.Id, selected.Name, token, null, artStyle, CancellationToken.None);
+                    if (draftId is null)
+                    {
+                        await DisplayAlert("New draft", "The previous draft could no longer be found.", "OK");
+                        return;
+                    }
+                }
+                else
+                {
+                    _ = await projects.CreateFromDocAsync(
+                        selected.Id, selected.Name, token, null, artStyle, CancellationToken.None);
+                }
             }
 
             // Kick off an immediate drain rather than waiting for the next periodic window.
@@ -155,7 +188,9 @@ public partial class NewProjectPage : ContentPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert("Could not create project (copied to clipboard)", ex.Message, "OK");
+            await DisplayAlert(
+                draftMode ? "Could not add draft (copied to clipboard)" : "Could not create project (copied to clipboard)",
+                ex.Message, "OK");
         }
         finally
         {

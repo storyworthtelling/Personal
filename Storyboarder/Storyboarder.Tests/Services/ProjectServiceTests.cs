@@ -198,6 +198,24 @@ public class ProjectServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetStatus_SurfacesDraftNumberAndWhetherThereIsAPreviousDraft()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+        var service = NewService();
+        var first = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+        var second = await service.CreateNextDraftAsync(first, "doc-2", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        var firstStatus = await service.GetStatusAsync(first, CancellationToken.None);
+        var secondStatus = await service.GetStatusAsync(second!.Value, CancellationToken.None);
+
+        Assert.Equal(1, firstStatus!.DraftNumber);
+        Assert.False(firstStatus.HasPreviousDraft);
+        Assert.Equal(2, secondStatus!.DraftNumber);
+        Assert.True(secondStatus.HasPreviousDraft);
+    }
+
+    [Fact]
     public async Task GetDraftDiff_OfAFirstDraft_IsEmpty()
     {
         docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))

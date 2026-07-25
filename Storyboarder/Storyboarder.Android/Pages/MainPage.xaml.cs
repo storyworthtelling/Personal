@@ -104,6 +104,13 @@ public partial class MainPage : ContentPage
         // A project card always offers management (retry/stop/delete); PDFs appear once they're ready.
         var isActive = status.Stage is not ("Completed" or "Failed" or "Cancelled");
         var buttons = options.Select(o => o.Label).ToList();
+
+        // Drafts: start the next draft of this book from a re-picked doc, and — once there is a
+        // predecessor — see what the last revision changed. Offered on any card; a new draft re-renders
+        // only the windows whose text moved.
+        buttons.Add(NewDraftAction);
+        if (status.HasPreviousDraft)
+            buttons.Add(DiffAction);
         // Panels safety-blocked mid-render wait on the user's OK before the book can finish.
         var reviewLabel = status.PendingApprovals > 0 ? $"Review blocked panels ({status.PendingApprovals})" : null;
         if (reviewLabel is not null)
@@ -140,6 +147,16 @@ public partial class MainPage : ContentPage
         if (choice == ReworkPanelAction)
         {
             await ReworkBlockedPanel(status);
+            return;
+        }
+        if (choice == NewDraftAction)
+        {
+            await StartNewDraft(status);
+            return;
+        }
+        if (choice == DiffAction)
+        {
+            await ShowDraftDiff(status);
             return;
         }
         if (choice == RetryAction)
@@ -183,6 +200,50 @@ public partial class MainPage : ContentPage
     private const string ApprovePanelAction = "Render it (relax this once)";
     private const string SkipPanelAction = "Leave it out";
     private const string ReworkPanelAction = "Rework blocked panel & resume";
+    private const string NewDraftAction = "New draft (re-pick doc)";
+    private const string DiffAction = "What changed since last draft";
+
+    // Starts the next draft of this book: opens the Drive picker in "new draft" mode, so the doc the user
+    // picks becomes draft N+1 of the same project. The pipeline then re-renders only the windows whose
+    // text moved and carries the rest forward (ProjectService.CreateNextDraftAsync + storyboard reuse).
+    private async Task StartNewDraft(NovelStatus status)
+    {
+        var page = IPlatformApplication.Current!.Services.GetRequiredService<NewProjectPage>();
+        page.PreviousDraftId = status.Id;
+        page.PreviousTitle = status.Title;
+        await Navigation.PushAsync(page);
+    }
+
+    // Shows what the last revision moved: the report findings it resolved and newly raised, and how many
+    // panels changed versus carried forward untouched (ProjectService.GetDraftDiffAsync).
+    private async Task ShowDraftDiff(NovelStatus status)
+    {
+        Storyboarder.Domain.Analysis.DraftDiff diff;
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            diff = await projects.GetDraftDiffAsync(status.Id, CancellationToken.None);
+        }
+
+        if (diff.PreviousDraftId is null)
+        {
+            await DisplayAlert("What changed", "This is the first draft — there's nothing to compare against yet.", "OK");
+            return;
+        }
+
+        var report = new System.Text.StringBuilder();
+        report.AppendLine($"Panels: {diff.ChangedPanels.Count} re-illustrated, {diff.ReusablePanelCount} carried forward.");
+        report.AppendLine();
+        report.AppendLine($"Findings resolved: {diff.ResolvedFindings.Count}");
+        foreach (var f in diff.ResolvedFindings.Take(5))
+            report.AppendLine($"  ✓ [{f.Category}] {Shorten(f.Detail, 100)}");
+        report.AppendLine();
+        report.AppendLine($"New findings: {diff.NewFindings.Count}");
+        foreach (var f in diff.NewFindings.Take(5))
+            report.AppendLine($"  • [{f.Category}] {Shorten(f.Detail, 100)}");
+
+        await DisplayAlert($"{status.Title} — draft {status.DraftNumber} vs {status.DraftNumber - 1}", report.ToString().TrimEnd(), "Close");
+    }
 
     // Walks the panels a safety filter blocked mid-render, one at a time. For each, the user can approve
     // rendering it (the flagged category is relaxed for that one render — and, if it still hits the
