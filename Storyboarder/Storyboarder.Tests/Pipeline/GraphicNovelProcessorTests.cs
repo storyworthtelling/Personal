@@ -27,6 +27,7 @@ public class GraphicNovelProcessorTests : IDisposable
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int panelRenderCalls;
     private int chapterAnalysisCalls;
+    private readonly List<string> chapterLabelsSeen = [];
 
     // When set, NewProcessor binds volumes through this composer instead of a plain one, so a test can
     // make PDF assembly throw. It's a field (not a NewProcessor arg) so the fresh processor DriveToCompletion
@@ -48,13 +49,16 @@ public class GraphicNovelProcessorTests : IDisposable
                 "Hero reached the castle."));
 
         // The first chapter-analysis call is rate-limited; the worker must reschedule and succeed on retry.
-        claude.Setup(c => c.AnalyzeChapter(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Returns(() =>
+        claude.Setup(c => c.AnalyzeChapter(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string chapterLabel, IReadOnlyList<string> _, CancellationToken _) =>
             {
                 chapterAnalysisCalls++;
+                chapterLabelsSeen.Add(chapterLabel);
                 return chapterAnalysisCalls == 1
                     ? Task.FromException<ChapterNotes>(new RateLimitException("429 from test"))
                     : Task.FromResult(new ChapterNotes(
+                        chapterLabel,
                         ["Hero"], ["Hero walks to the castle"], ["Hero resolves to enter"], [], [], [], ["Vivid setting"], []));
             });
 
@@ -129,6 +133,72 @@ public class GraphicNovelProcessorTests : IDisposable
     {
         using var context = database.NewContext();
         return context.Novels.Single(n => n.Id == novelId).Stage;
+    }
+
+    [Fact]
+    public async Task Ingestion_DetectsChapters_AndLabelsEveryChunk()
+    {
+        // Three headed chapters. Chunks are sized for the model, not the book, so this whole
+        // manuscript is a single chunk — which therefore straddles both breaks and must cite the whole
+        // span it covers rather than one chapter.
+        var paragraph = string.Join(" ", Enumerable.Repeat(
+            "The hero walked on through the long grey hall toward the gate, thinking of home.", 40));
+        var manuscript = string.Join("\n\n",
+            "Chapter 1", paragraph, paragraph,
+            "Chapter 2", paragraph, paragraph,
+            "Chapter 3", paragraph, paragraph);
+        var novelId = SeedNovel(manuscript);
+
+        // Created -> Ingesting -> chunks + chapters.
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == novelId);
+        Assert.True(novel.ChaptersDetected);
+
+        var chapters = context.Chapters.Where(c => c.NovelId == novelId).OrderBy(c => c.Number).ToList();
+        Assert.Equal(["Chapter 1", "Chapter 2", "Chapter 3"], chapters.Select(c => c.Label));
+        Assert.Equal(0, chapters[0].StartOffset);
+        Assert.Equal(manuscript.Length, chapters[^1].EndOffset);
+
+        var chunk = Assert.Single(context.Chunks.Where(c => c.NovelId == novelId));
+        Assert.Equal(1, chunk.ChapterNumber);
+        Assert.Equal("Chapters 1–3", chunk.ChapterLabel);
+    }
+
+    [Fact]
+    public async Task Ingestion_WithoutHeadings_StillLabelsChunks_WithASynthesizedChapter()
+    {
+        var novelId = SeedNovel();
+
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        using var context = database.NewContext();
+        var chapter = Assert.Single(context.Chapters.Where(c => c.NovelId == novelId));
+        Assert.Equal(1, chapter.Number);
+        var chunk = Assert.Single(context.Chunks.Where(c => c.NovelId == novelId));
+        Assert.Equal(chapter.Label, chunk.ChapterLabel);
+        Assert.Equal(1, chunk.ChapterNumber);
+    }
+
+    [Fact]
+    public async Task AnalysisMapStep_CarriesEachChunksChapterIntoItsNotes()
+    {
+        var novelId = SeedNovel("Chapter 1\n\nThe hero walked to the castle and knocked on the gate.");
+
+        await DriveToCompletion(novelId, _ => { });
+
+        // Every map call was told which chapter it was reading, and the stored notes carry it through
+        // to the consolidation — that is what lets a finding in the report cite a chapter.
+        Assert.NotEmpty(chapterLabelsSeen);
+        Assert.All(chapterLabelsSeen, label => Assert.Equal("Chapter 1", label));
+
+        using var context = database.NewContext();
+        var notes = context.ChunkAnalyses.Where(a => a.NovelId == novelId).ToList();
+        Assert.NotEmpty(notes);
+        Assert.All(notes, unit => Assert.Contains("Chapter 1", unit.NotesJson));
     }
 
     [Fact]

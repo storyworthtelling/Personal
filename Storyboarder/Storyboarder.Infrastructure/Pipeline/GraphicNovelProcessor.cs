@@ -41,6 +41,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     // A finer chunker used only for storyboarding: it slices each (large) design-bible chunk into small
     // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
     private readonly TextChunker storyboardChunker;
+    private readonly ChapterDetector chapterDetector = new();
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
     private readonly PlaceholderPanelRenderer placeholderRenderer = new();
@@ -148,7 +149,14 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                     EndOffset = span.EndOffset,
                     Text = span.Text
                 });
+
+            // Persist the chunks before labelling them: the labeller reads the stored rows (which is
+            // what also lets it heal a conversion chunked before chapter detection existed), and an EF
+            // query doesn't see inserts still sitting in the change tracker.
+            await db.SaveChangesAsync(cancellationToken);
         }
+
+        await EnsureChaptersLabelled(db, novel, source.FullText, cancellationToken);
 
         SetStage(novel, ProjectStage.BuildingDesignBible);
         await db.SaveChangesAsync(cancellationToken);
@@ -636,7 +644,13 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         var now = clock.UtcNow;
 
-        // 0) Seed one analysis unit per chunk (once), plus the per-novel analysis record.
+        // 0a) Every finding in the report cites a chapter, which the map step reads off its chunk. A
+        // conversion chunked before chapter detection existed still has unlabelled chunks, so label
+        // them here rather than producing a report with no citations. A no-op once settled.
+        if (await EnsureChaptersLabelled(db, novel, fullText: null, cancellationToken))
+            return ProcessResult.DidWork(novel.Id);
+
+        // 0b) Seed one analysis unit per chunk (once), plus the per-novel analysis record.
         if (!await db.ChunkAnalyses.AnyAsync(a => a.NovelId == novel.Id, cancellationToken))
         {
             var ordinals = await db.Chunks
@@ -667,9 +681,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
 
-            var text = await db.Chunks
+            var chunk = await db.Chunks
                 .Where(c => c.NovelId == novel.Id && c.Ordinal == unit.Ordinal)
-                .Select(c => c.Text)
+                .Select(c => new { c.Text, c.ChapterLabel })
                 .FirstAsync(cancellationToken);
             var castNames = await db.DesignRefs
                 .Where(r => r.NovelId == novel.Id && r.Kind == ReferenceKind.Character)
@@ -678,7 +692,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
             try
             {
-                var notes = await claude.AnalyzeChapter(text, castNames, cancellationToken);
+                var notes = await claude.AnalyzeChapter(
+                    chunk.Text, chunk.ChapterLabel, castNames, cancellationToken);
                 unit.NotesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
                 unit.Status = WorkStatus.Completed;
                 unit.LastError = null;
@@ -764,6 +779,73 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     }
 
     // --- helpers ---
+
+    // Detects the manuscript's chapters exactly once (guarded by Novel.ChaptersDetected) and stamps
+    // every not-yet-labelled chunk with the chapters its [StartOffset, EndOffset) overlaps, so a
+    // finding drawn from that chunk can cite where in the book it came from. Idempotent and cheap
+    // once settled: a single indexed query. Also heals conversions that were chunked before chapter
+    // detection existed — they reach the report with unlabelled chunks otherwise. Detection itself is
+    // deterministic (ChapterDetector), so re-running it on the same text would give the same spans.
+    // Returns whether anything changed (the caller treats that as one unit of work).
+    private async Task<bool> EnsureChaptersLabelled(
+        StoryboarderDbContext db, Novel novel, string? fullText, CancellationToken cancellationToken)
+    {
+        var unlabelled = await db.Chunks
+            .Where(c => c.NovelId == novel.Id && c.ChapterLabel == "")
+            .ToListAsync(cancellationToken);
+        if (novel.ChaptersDetected && unlabelled.Count == 0)
+            return false;
+
+        fullText ??= await db.SourceTexts
+            .Where(s => s.NovelId == novel.Id)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (fullText is null)
+            return false;
+
+        IReadOnlyList<ChapterSpan> spans;
+        if (novel.ChaptersDetected)
+        {
+            spans = (await db.Chapters
+                    .Where(c => c.NovelId == novel.Id)
+                    .OrderBy(c => c.Number)
+                    .ToListAsync(cancellationToken))
+                .Select(c => new ChapterSpan(c.Number, c.Label, c.StartOffset, c.EndOffset))
+                .ToList();
+        }
+        else
+        {
+            spans = chapterDetector.Detect(fullText);
+            foreach (var span in spans)
+                db.Chapters.Add(new Chapter
+                {
+                    NovelId = novel.Id,
+                    Number = span.Number,
+                    Label = span.Label,
+                    StartOffset = span.StartOffset,
+                    EndOffset = span.EndOffset
+                });
+            novel.ChaptersDetected = true;
+            logger.LogInformation(
+                "Detected {Count} chapter(s) in novel {NovelId}", spans.Count, novel.Id);
+        }
+
+        // No spans means the chapter rows are gone under a novel already marked as detected — nothing
+        // to attribute to, and re-detecting would contradict the stored (already cited) chapters.
+        if (spans.Count == 0)
+            return false;
+
+        foreach (var chunk in unlabelled)
+        {
+            var (number, label) = ChapterDetector.Locate(spans, chunk.StartOffset, chunk.EndOffset);
+            chunk.ChapterNumber = number;
+            chunk.ChapterLabel = label;
+        }
+
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 
     // Returns null when the phase's units are all complete; otherwise a wait: a positive duration to
     // wait for the soonest retry, or TimeSpan.MinValue meaning "blocked" (only failed units remain).

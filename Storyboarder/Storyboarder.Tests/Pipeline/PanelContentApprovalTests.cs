@@ -43,8 +43,9 @@ public class PanelContentApprovalTests : IDisposable
                     [new PageDraft(1, [new PanelDraft("Hero fights the duel", "At last.", null, ["Hero"])])])],
                 "Hero fought."));
 
-        claude.Setup(c => c.AnalyzeChapter(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ChapterNotes(["Hero"], ["fights"], [], [], [], [], ["Vivid"], []));
+        claude.Setup(c => c.AnalyzeChapter(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChapterNotes("Chapter 1", ["Hero"], ["fights"], [], [], [], [], ["Vivid"], []));
 
         claude.Setup(c => c.ConsolidateAnalysis(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))

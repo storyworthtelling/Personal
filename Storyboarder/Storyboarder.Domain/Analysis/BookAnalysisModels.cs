@@ -3,7 +3,13 @@ namespace Storyboarder.Domain.Analysis;
 // The per-chunk literary observations (the "map" output for the revision report). Everything is a
 // flat list of short strings so one chunk's notes stay compact enough to fold many together in the
 // reduce step. The client maps missing fields to empty lists, so a partial reply degrades gracefully.
+//
+// Chapter is the label of the chapter(s) the chunk covers ("Chapter 7", "Chapters 7–8"), stamped on
+// by the client rather than asked of the model: it is known exactly from the chunk's offsets, and it
+// is what lets every finding in the consolidated report cite a place in the book. Empty for a
+// conversion chunked before chapter detection existed.
 public sealed record ChapterNotes(
+    string Chapter,
     IReadOnlyList<string> CharactersPresent,
     IReadOnlyList<string> KeyEvents,
     IReadOnlyList<string> CharacterBeats,
@@ -14,6 +20,7 @@ public sealed record ChapterNotes(
     IReadOnlyList<string> NotableWeaknesses)
 {
     public static ChapterNotes Empty { get; } = new(
+        string.Empty,
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
 }

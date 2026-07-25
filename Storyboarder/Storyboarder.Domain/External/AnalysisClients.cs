@@ -18,8 +18,12 @@ public interface IClaudeAnalysisClient
 
     // Literary-analysis "map": observations for one manuscript chunk (character beats, events,
     // possible inconsistencies, checkable claims, strengths/weaknesses) anchored to the known cast.
+    // chapterLabel names the chapter(s) the chunk covers ("Chapter 7", "Chapters 7–8"); it is given to
+    // the model as context AND stamped onto the returned notes, so the consolidated report can cite a
+    // chapter for every finding. Pass an empty label when the chapters aren't known.
     Task<ChapterNotes> AnalyzeChapter(
         string chapterText,
+        string chapterLabel,
         IReadOnlyList<string> characterNames,
         CancellationToken cancellationToken);
 

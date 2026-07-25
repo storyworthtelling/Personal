@@ -148,7 +148,7 @@ public class ClaudeAnalysisClientTests
             "\"possibleInconsistencies\":[\"Eye color changes\"],\"factualClaims\":[\"Paris is in France\"]," +
             "\"notableStrengths\":[\"Vivid prose\"],\"notableWeaknesses\":[\"Slow open\"]}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", ["Alice"], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 3", ["Alice"], CancellationToken.None);
 
         Assert.Contains("Alice", notes.CharactersPresent);
         Assert.Equal("Eye color changes", Assert.Single(notes.PossibleInconsistencies));
@@ -162,10 +162,36 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
 
         Assert.Empty(notes.CharactersPresent);
         Assert.Empty(notes.NotableStrengths);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_StampsTheChapterOnTheNotes_AndSendsItAsContext()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"keyEvents\":[\"The gate opens\"]}"));
+
+        var notes = await client.AnalyzeChapter("excerpt", "Chapters 7–8", [], CancellationToken.None);
+
+        // The chapter is known exactly from the chunk's offsets, so it is stamped on by the client —
+        // never left to the model — and it also rides along as context for the observations.
+        Assert.Equal("Chapters 7–8", notes.Chapter);
+        Assert.Contains("LOCATION IN THE BOOK", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_UnparseableReply_StillCarriesItsChapter()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("I'm afraid I can't help with that."));
+
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 4", [], CancellationToken.None);
+
+        Assert.Equal("Chapter 4", notes.Chapter);
+        Assert.Empty(notes.KeyEvents);
     }
 
     [Fact]

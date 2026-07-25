@@ -49,7 +49,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private const string ChapterAnalysisInstruction =
         "You are a developmental editor analyzing ONE excerpt of a novel manuscript to help the author " +
-        "revise toward publication. Use the KNOWN CAST names consistently when they appear. Read the " +
+        "revise toward publication. Use the KNOWN CAST names consistently when they appear. LOCATION IN " +
+        "THE BOOK names the chapter(s) this excerpt covers — every observation you make is about that " +
+        "part of the book, so keep each one specific enough to be found there again. Read the " +
         "excerpt and record concise, concrete, accurate observations. Respond with ONLY a JSON object: " +
         "{\"charactersPresent\":[string],\"keyEvents\":[string],\"characterBeats\":[string]," +
         "\"setupsAndPayoffs\":[string],\"possibleInconsistencies\":[string],\"factualClaims\":[string]," +
@@ -141,21 +143,28 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     }
 
     public async Task<ChapterNotes> AnalyzeChapter(
-        string chapterText, IReadOnlyList<string> characterNames, CancellationToken cancellationToken)
+        string chapterText, string chapterLabel, IReadOnlyList<string> characterNames,
+        CancellationToken cancellationToken)
     {
         var cast = characterNames.Count == 0 ? "(none identified yet)" : string.Join(", ", characterNames);
-        var userContent = $"KNOWN CAST: {cast}\n\nEXCERPT:\n{chapterText}";
+        var location = string.IsNullOrWhiteSpace(chapterLabel) ? "(unknown)" : chapterLabel;
+        var userContent = $"LOCATION IN THE BOOK: {location}\n\nKNOWN CAST: {cast}\n\nEXCERPT:\n{chapterText}";
 
-        var reply = await SendMessage(ChapterAnalysisInstruction, userContent, cancellationToken);
+        var reply = await SendMessage(
+            ChapterAnalysisInstruction, userContent, cancellationToken, options.ChapterNotesMaxTokens);
         var json = JsonResponse.ExtractObject(reply);
+        // The chapter is known exactly from the chunk's offsets, so it is stamped on here rather than
+        // trusted to the model — even a reply that failed to parse still carries where it came from.
+        var located = ChapterNotes.Empty with { Chapter = chapterLabel };
         if (json is null)
-            return ChapterNotes.Empty;
+            return located;
 
         var dto = JsonResponse.Deserialize<ChapterNotesDto>(json);
         if (dto is null)
-            return ChapterNotes.Empty;
+            return located;
 
         return new ChapterNotes(
+            chapterLabel,
             dto.CharactersPresent ?? [], dto.KeyEvents ?? [], dto.CharacterBeats ?? [],
             dto.SetupsAndPayoffs ?? [], dto.PossibleInconsistencies ?? [], dto.FactualClaims ?? [],
             dto.NotableStrengths ?? [], dto.NotableWeaknesses ?? []);

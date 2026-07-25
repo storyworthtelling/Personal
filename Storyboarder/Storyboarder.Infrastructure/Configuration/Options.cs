@@ -17,6 +17,12 @@ public sealed class ClaudeOptions
     // comfortably inside the background worker's time budget.
     public int StoryboardMaxTokens { get; set; } = 16_000;
 
+    // The per-chunk analysis "map" call. Its notes now cover craft as well as story (line-edit
+    // candidates, prose/voice patterns, dialogue, a scene list) for a chunk of up to ~48K characters,
+    // which is more than the small default MaxTokens comfortably holds — and a reply that runs out of
+    // budget is thrown away wholesale (ResponseTruncatedException), not merely trimmed.
+    public int ChapterNotesMaxTokens { get; set; } = 12_000;
+
     // The consolidated revision report is long (many sections + several reviews), so its single
     // "reduce" call gets a larger output budget than the per-chunk/per-panel calls.
     public int AnalysisMaxTokens { get; set; } = 16_000;
