@@ -8,6 +8,14 @@ public sealed class ClaudeOptions
     public const string SectionName = "Claude";
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = "claude-sonnet-4-6";
+
+    // The cheap tier, used for the two high-volume mechanical calls: pulling entities out of a chunk and
+    // taking per-chunk analysis notes. Both run once per chunk — by far the most calls a novel makes —
+    // and both are extraction against an explicit JSON contract rather than judgement, which is what the
+    // small model is good at. The work that actually needs the strong model (adapting prose into panels,
+    // and synthesising the whole manuscript into a report) stays on Model.
+    public string FastModel { get; set; } = "claude-haiku-4-5-20251001";
+
     public int MaxTokens { get; set; } = 8_000;
 
     // Storyboarding is the heaviest output the pipeline produces (a panel-by-panel breakdown as one
@@ -17,9 +25,25 @@ public sealed class ClaudeOptions
     // comfortably inside the background worker's time budget.
     public int StoryboardMaxTokens { get; set; } = 16_000;
 
-    // The consolidated revision report is long (many sections + several reviews), so its single
-    // "reduce" call gets a larger output budget than the per-chunk/per-panel calls.
+    // The per-chunk analysis "map" call. Its notes now cover craft as well as story (line-edit
+    // candidates, prose/voice patterns, dialogue, a scene list) for a chunk of up to ~48K characters,
+    // which is more than the small default MaxTokens comfortably holds — and a reply that runs out of
+    // budget is thrown away wholesale (ResponseTruncatedException), not merely trimmed.
+    public int ChapterNotesMaxTokens { get; set; } = 12_000;
+
+    // The consolidated revision report is long (many sections + several reviews), so its "reduce"
+    // call gets a larger output budget than the per-chunk/per-panel calls. This covers the STORY half
+    // only — synopsis, character map, plot holes, inconsistencies, pacing, reviews, revision plan.
     public int AnalysisMaxTokens { get; set; } = 16_000;
+
+    // The CRAFT half of the report (line edits, prose/voice, dialogue, the scene-by-scene map) is
+    // consolidated by its own call with its own budget. The scene map alone is one entry per scene
+    // across a whole novel, so it is the larger of the two halves. Splitting the reduce in two is
+    // deliberate: one call producing both halves would need ~40K output tokens, which both risks
+    // truncation (the client throws on stop_reason=max_tokens rather than returning a partial report)
+    // and streams for long enough that Android's background worker can be killed mid-response. Two
+    // calls of this size each stream for about as long as the storyboard calls that already work.
+    public int CraftMaxTokens { get; set; } = 20_000;
 }
 
 public sealed class GeminiOptions
@@ -35,6 +59,21 @@ public sealed class GoogleOptions
     public const string SectionName = "Google";
     public string ClientId { get; set; } = string.Empty;
     public string ApiKey { get; set; } = string.Empty;
+}
+
+public sealed class ArchiveOptions
+{
+    public const string SectionName = "Archive";
+
+    // Off by default, and it must stay that way until the Drive WRITE scope (drive.file) is registered on
+    // the OAuth consent screen and granted on the device. Defaulting this on would send every finished
+    // book into a stage whose only possible outcome is a permission error.
+    public bool Enabled { get; set; }
+
+    // Delete the local copies once the upload is confirmed. Separate from Enabled because archiving for
+    // safekeeping and reclaiming phone storage are different decisions: a book's rasters and PDFs run to
+    // hundreds of megabytes, but a user may still want them on the device.
+    public bool FreeLocalCopies { get; set; }
 }
 
 public sealed class StorageOptions
@@ -80,4 +119,9 @@ public sealed class PageLayoutOptions
     // Deeper than the sides: contains the folio band (see DESIGN.md §7).
     public int BottomMargin { get; set; } = Domain.Design.DesignTokens.Comic.BottomMargin;
     public int Gutter { get; set; } = Domain.Design.DesignTokens.Comic.Gutter;
+
+    // The hard ceiling on panels drawn on one physical page. The storyboard model is steered toward
+    // this, but a page it returns with more panels is split across several pages at storyboard time so
+    // panels never get squished into a dense grid.
+    public int MaxPanelsPerPage { get; set; } = 6;
 }

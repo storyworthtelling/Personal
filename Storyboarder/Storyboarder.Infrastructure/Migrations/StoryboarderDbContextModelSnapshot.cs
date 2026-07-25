@@ -23,7 +23,16 @@ namespace Storyboarder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ArchivedDriveFileId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ConsolidatedJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CraftJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FactChecksJson")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("NovelId")
@@ -43,6 +52,35 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.ToTable("BookAnalyses");
                 });
 
+            modelBuilder.Entity("Storyboarder.Domain.Model.Chapter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EndOffset")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("NovelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StartOffset")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NovelId", "Number");
+
+                    b.ToTable("Chapters");
+                });
+
             modelBuilder.Entity("Storyboarder.Domain.Model.Chunk", b =>
                 {
                     b.Property<Guid>("Id")
@@ -53,6 +91,13 @@ namespace Storyboarder.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ChapterLabel")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ChapterNumber")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("EndOffset")
@@ -142,6 +187,9 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ChunkMentions")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Kind")
                         .HasColumnType("INTEGER");
 
@@ -151,6 +199,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("NeedsSheet")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("NextAttemptAtUtc")
                         .HasColumnType("INTEGER");
@@ -163,6 +214,10 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.Property<int>("ReferenceSheetStatus")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Scale")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -179,9 +234,18 @@ namespace Storyboarder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ArchiveFolderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ArchivedAtUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ArtStyle")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("ChaptersDetected")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ContinuitySummary")
                         .IsRequired()
@@ -205,6 +269,9 @@ namespace Storyboarder.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<long?>("RateLimitedUntilUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ReportOnly")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Stage")
@@ -364,6 +431,18 @@ namespace Storyboarder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ArchivedDriveFileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("NextAttemptAtUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("NovelId")
                         .HasColumnType("TEXT");
 
@@ -387,6 +466,8 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.HasIndex("NovelId");
 
+                    b.HasIndex("PdfStatus", "NextAttemptAtUtc");
+
                     b.ToTable("Volumes");
                 });
 
@@ -395,6 +476,15 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.HasOne("Storyboarder.Domain.Model.Novel", null)
                         .WithOne("Analysis")
                         .HasForeignKey("Storyboarder.Domain.Model.BookAnalysis", "NovelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Storyboarder.Domain.Model.Chapter", b =>
+                {
+                    b.HasOne("Storyboarder.Domain.Model.Novel", null)
+                        .WithMany("Chapters")
+                        .HasForeignKey("NovelId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -465,6 +555,8 @@ namespace Storyboarder.Infrastructure.Migrations
             modelBuilder.Entity("Storyboarder.Domain.Model.Novel", b =>
                 {
                     b.Navigation("Analysis");
+
+                    b.Navigation("Chapters");
 
                     b.Navigation("ChunkAnalyses");
 

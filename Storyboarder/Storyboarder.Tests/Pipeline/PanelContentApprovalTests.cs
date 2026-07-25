@@ -30,6 +30,11 @@ public class PanelContentApprovalTests : IDisposable
     private readonly Mock<IClaudeAnalysisClient> claude = new();
     private readonly Mock<IGeminiImageClient> gemini = new();
 
+    // Archive settings and a fake Drive for the archive stage; null/off by default so every
+    // existing test drives the unarchived path.
+    private ArchiveOptions? archiveOptions;
+    private IDriveArchive? driveArchive;
+
     public PanelContentApprovalTests()
     {
         claude.Setup(c => c.ExtractEntities(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -43,17 +48,27 @@ public class PanelContentApprovalTests : IDisposable
                     [new PageDraft(1, [new PanelDraft("Hero fights the duel", "At last.", null, ["Hero"])])])],
                 "Hero fought."));
 
-        claude.Setup(c => c.AnalyzeChapter(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ChapterNotes(["Hero"], ["fights"], [], [], [], [], ["Vivid"], []));
+        claude.Setup(c => c.AnalyzeChapter(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChapterNotes(
+                "Chapter 1", ["Hero"], ["fights"], [], [], [], [], ["Vivid"], [], [], [], [], []));
 
         claude.Setup(c => c.ConsolidateAnalysis(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BookAnalysisResult(
                 "A duel.", "A hero duels.", [], [], [], [], [], [],
-                [new Review("editor", "ok", [], [], "revise")], [], [], "positioning"));
+                [new Review("editor", "ok", [], [], "revise")], [], [], "positioning", [], [], [], []));
+
+        claude.Setup(c => c.ConsolidateCraft(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CraftReport.Empty);
 
         claude.Setup(c => c.RewritePromptToImply(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("The blow lands off-frame; the crowd recoils.");
+
+        claude.Setup(c => c.CheckFacts(
+                It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new FactCheck("Paris is in France", "Correct", "Confirmed.", "Chapter 1")]);
 
         gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
@@ -81,7 +96,10 @@ public class PanelContentApprovalTests : IDisposable
             GeminiRequestsPerMinute = 1000, GeminiRequestsPerDay = 100000,
             BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
-        NullLogger<GraphicNovelProcessor>.Instance);
+        Options.Create(new PageLayoutOptions()),
+        Options.Create(archiveOptions ?? new ArchiveOptions()),
+        NullLogger<GraphicNovelProcessor>.Instance,
+        driveArchive);
 
     private ProjectService NewProjectService() => new(
         database,
@@ -287,16 +305,37 @@ public class PanelContentApprovalTests : IDisposable
     }
 
     [Fact]
-    public async Task ProhibitedPanel_CancelsTheBook_WithAFalloutReason()
+    public async Task ProhibitedPanel_ParksThePanel_WithoutCancellingTheBook()
     {
+        // A prohibited block used to cancel the whole conversion, which lost the owner two books after
+        // hours of rendering. It must now restage the prompt first and, if that is still refused, park
+        // only the offending panel — the novel stays alive with every other panel intact.
         BlockPanelRenders(ImageBlockReason.Prohibited, []);
         var novelId = SeedNovel();
 
-        Assert.Equal(ProjectStage.Cancelled, await Drive(novelId));
+        var stage = await Drive(novelId);
+
+        Assert.NotEqual(ProjectStage.Cancelled, stage);
+        Assert.NotEqual(ProjectStage.Failed, stage);
         using var context = database.NewContext();
         var novel = context.Novels.Single(n => n.Id == novelId);
-        Assert.Equal(ProjectStage.Cancelled, novel.Stage);
-        Assert.Contains("prohibited", novel.LastError);
+        Assert.NotEqual(ProjectStage.Cancelled, novel.Stage);
+
+        var panel = SinglePanel(novelId);
+        Assert.Equal(WorkStatus.AwaitingApproval, panel.Status);
+        // Rewording was tried before giving up, and there are no harm categories to relax — prohibited
+        // content is not adjustable, which is what tells the rework flow this panel is its business.
+        Assert.True(panel.PromptRewrittenForSafety);
+        Assert.Null(panel.BlockedCategoriesJson);
+
+        // Surfaced to the user so the book doesn't look silently stalled — as a panel to REWORK, not one
+        // to approve: there is no adjustable category here, so the approve-and-relax sheet would have
+        // nothing to offer and must not claim it has something to review.
+        var status = await NewProjectService().GetStatusAsync(novelId, CancellationToken.None);
+        Assert.Equal(1, status!.ProhibitedPanels);
+        Assert.Equal(0, status.PendingApprovals);
+        Assert.True(status.NeedsAttention);
+        Assert.Empty(await NewProjectService().GetBlockedPanelsAsync(novelId, CancellationToken.None));
     }
 
     [Fact]
@@ -304,7 +343,8 @@ public class PanelContentApprovalTests : IDisposable
     {
         BlockPanelRenders(ImageBlockReason.Prohibited, []);
         var novelId = SeedNovel();
-        Assert.Equal(ProjectStage.Cancelled, await Drive(novelId));
+        // The panel parks awaiting the user; the book is not cancelled.
+        Assert.NotEqual(ProjectStage.Cancelled, await Drive(novelId));
 
         // The user reworks the art direction to avoid the gated content; the reworked prompt renders clean.
         gemini.Setup(g => g.GeneratePanel(
@@ -316,8 +356,8 @@ public class PanelContentApprovalTests : IDisposable
             novelId, "a generic knight, an original design", CancellationToken.None);
         Assert.NotNull(reworked);
 
-        // The book resumes from Cancelled and runs through to the end — the panels rendered before the
-        // block are kept, and the reworked panel is rendered (not skipped).
+        // The book runs through to the end — the panels rendered before the block are kept, and the
+        // reworked panel is rendered (not skipped).
         Assert.Equal(ProjectStage.Completed, await Drive(novelId));
         var panel = SinglePanel(novelId);
         Assert.Equal(WorkStatus.Completed, panel.Status);
@@ -327,22 +367,21 @@ public class PanelContentApprovalTests : IDisposable
     }
 
     [Fact]
-    public async Task ProhibitedBlock_OnARetryingPanel_CancelsButLeavesItReworkable()
+    public async Task ProhibitedBlock_OnARetryingPanel_ParksItReworkable_WithoutCancelling()
     {
         // A panel that already had a transient failure (NeedsRetry, now due) hits a prohibited block on
-        // its retry render. The book cancels — but the offending panel must be left in a state the rework
-        // flow can find and reset, not stranded in NeedsRetry where GetProhibitedPanel can't see it (which
-        // is what made the Rework button silently do nothing).
+        // its retry render. The book must not cancel, and once rewording has been tried and refused the
+        // panel must be left in a state the rework flow can find and reset — not stranded in NeedsRetry
+        // where GetProhibitedPanel can't see it, which is what made the Rework button silently do nothing.
         BlockPanelRenders(ImageBlockReason.Prohibited, []);
         var novelId = SeedRetryingRenderingNovel();
 
-        var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        var stage = await Drive(novelId);
 
-        Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
-        Assert.Equal(ProjectStage.Cancelled, StageOf(novelId));
-        // Deterministically reset to Pending (retry schedule cleared) so the rework lookup finds it.
+        Assert.NotEqual(ProjectStage.Cancelled, stage);
         var panel = SinglePanel(novelId);
-        Assert.Equal(WorkStatus.Pending, panel.Status);
+        Assert.Equal(WorkStatus.AwaitingApproval, panel.Status);
+        // No retry schedule left dangling, so the rework lookup finds it deterministically.
         Assert.Null(panel.NextAttemptAtUtc);
         Assert.NotNull(panel.LastError);
 
@@ -422,9 +461,32 @@ public class PanelContentApprovalTests : IDisposable
         var readyNovelId = SeedNovelReadyToCompleteAnalysis(secondsOffset: 0);
 
         var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
-
         Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
-        Assert.Equal(ProjectStage.Completed, StageOf(readyNovelId));
+
+        // The worker stepped past the waiting novel and did the ready one's work; a couple more cycles
+        // carry it through the archive stage to the end.
+        Assert.Equal(ProjectStage.Completed, await Drive(readyNovelId));
+    }
+
+    [Fact]
+    public async Task ReportAlreadyRendered_Completes_WithoutBuyingACraftConsolidation()
+    {
+        // The upgrade path: a novel whose report PDF was rendered before the craft half of the reduce
+        // existed carries CraftJson = null. Gating the craft call on that alone would bill a Claude
+        // consolidation whose output could never reach the PDF already on disk, so the stage must read
+        // "the report is rendered, therefore this stage is done" and simply advance.
+        var novelId = SeedNovelReadyToCompleteAnalysis(secondsOffset: 0);
+
+        // Drives rather than taking a single cycle: the book still has the archive stage to pass through,
+        // which with archiving off is a straight-through transition.
+        Assert.Equal(ProjectStage.Completed, await Drive(novelId));
+        claude.Verify(c => c.ConsolidateCraft(
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        claude.Verify(c => c.ConsolidateAnalysis(
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     private ProjectStage StageOf(Guid novelId)

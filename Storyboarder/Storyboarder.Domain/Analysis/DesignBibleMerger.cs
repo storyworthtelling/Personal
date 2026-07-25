@@ -9,17 +9,21 @@ public sealed class DesignBibleMerger
     {
         ArgumentNullException.ThrowIfNull(fragments);
         var materialized = fragments.ToList();
-        var characters = MergeMentions(materialized.SelectMany(f => f.Characters));
-        var settings = MergeMentions(materialized.SelectMany(f => f.Settings));
+        // One fragment per chunk, so the fragment's index is the chunk it came from. That index is
+        // carried alongside each mention because how many DISTINCT chunks name an entity is what decides
+        // whether it earns a reference sheet — a count of mentions alone would let one chatty chunk
+        // promote a walk-on to recurring cast.
+        var characters = MergeMentions(materialized.SelectMany((f, chunk) => f.Characters.Select(m => (Mention: m, Chunk: chunk))));
+        var settings = MergeMentions(materialized.SelectMany((f, chunk) => f.Settings.Select(m => (Mention: m, Chunk: chunk))));
         return new DesignBible(characters, settings);
     }
 
-    private static IReadOnlyList<EntityProfile> MergeMentions(IEnumerable<EntityMention> mentions)
+    private static IReadOnlyList<EntityProfile> MergeMentions(IEnumerable<(EntityMention Mention, int Chunk)> mentions)
     {
         var profiles = new List<MutableProfile>();
         var byKey = new Dictionary<string, MutableProfile>(StringComparer.Ordinal);
 
-        foreach (var mention in mentions)
+        foreach (var (mention, chunk) in mentions)
         {
             if (string.IsNullOrWhiteSpace(mention.Name))
                 continue;
@@ -38,11 +42,13 @@ public sealed class DesignBibleMerger
             foreach (var key in keys)
                 byKey[key] = profile;
 
+            profile.Chunks.Add(chunk);
             MergeInto(profile, mention);
         }
 
         return profiles
-            .Select(p => new EntityProfile(p.Name, string.Join(" ", p.Descriptions), p.Aliases.ToList()))
+            .Select(p => new EntityProfile(
+                p.Name, string.Join(" ", p.Descriptions), p.Scale, p.Aliases.ToList(), p.Chunks.Count))
             .ToList();
     }
 
@@ -63,6 +69,11 @@ public sealed class DesignBibleMerger
             if (!profile.Descriptions.Contains(description))
                 profile.Descriptions.Add(description);
         }
+
+        // First non-empty scale seen for the entity wins: a later chunk usually just re-mentions the
+        // character without re-stating their size, so we keep the first concrete measurement.
+        if (string.IsNullOrWhiteSpace(profile.Scale) && !string.IsNullOrWhiteSpace(mention.Scale))
+            profile.Scale = mention.Scale.Trim();
 
         AddAlias(profile, mention.Name);
         foreach (var alias in mention.Aliases ?? [])
@@ -87,7 +98,12 @@ public sealed class DesignBibleMerger
     private sealed class MutableProfile(string name)
     {
         public string Name { get; } = name;
+        public string Scale { get; set; } = string.Empty;
         public List<string> Descriptions { get; } = [];
         public List<string> Aliases { get; } = [];
+
+        // Distinct chunk indices this entity was named in. A set, not a counter: an alias resolving to
+        // the same profile within one chunk must not count as a second sighting.
+        public HashSet<int> Chunks { get; } = [];
     }
 }

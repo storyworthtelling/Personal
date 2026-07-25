@@ -111,7 +111,12 @@ public partial class MainPage : ContentPage
         // A book the pipeline cancelled on a prohibited/IP block carries a reason (a user-stopped one
         // doesn't): offer to rework that panel's art direction and resume, rather than restart the whole
         // conversion and discard the panels already rendered.
-        var reworkable = status.Stage == "Cancelled" && !string.IsNullOrEmpty(status.LastError);
+        // A panel refused as prohibited/IP content is parked for rework: relaxing thresholds can't lift
+        // that block, so the only way forward is revising its art direction. The book keeps rendering
+        // around it, so this is an active novel, not a cancelled one — the Cancelled case is still
+        // honoured for books stopped by the older behaviour of cancelling the whole conversion.
+        var reworkable = status.ProhibitedPanels > 0
+            || (status.Stage == "Cancelled" && !string.IsNullOrEmpty(status.LastError));
         if (reworkable)
             buttons.Add(ReworkPanelAction);
         if (isActive)
@@ -370,6 +375,15 @@ public partial class MainPage : ContentPage
                 _ => s.Stage,
             };
 
+            // Before any panel is rendered, say what the run is projected to cost. The daily provider cap
+            // is what governs on a full-length book, so the sentence names it — a three-week conversion is
+            // worth knowing about while stopping still costs nothing.
+            if (s.Estimate is { } estimate && estimate.Panels > 0)
+                summary = $"{summary} · ~{estimate.Panels:N0} panels, about {Approximately(estimate.Duration)} " +
+                          $"at your {estimate.LimitingFactor} cap";
+            else if (s.Estimate is { } textOnly)
+                summary = $"{summary} · about {Approximately(textOnly.Duration)} of model calls";
+
             // When a provider rate-limited us, say when queries resume — in local 12-hour time, per
             // DESIGN.md §11. Only set while still in the future (the status read model gates it).
             if (s.RateLimitedUntilUtc is { } until)
@@ -413,6 +427,17 @@ public partial class MainPage : ContentPage
             Complete(s.AnalysisNotes)
                 ? "Writing the revision report…"
                 : Sentence("Analysing the manuscript", "chapters", s.AnalysisNotes);
+
+        // A rounded, readable duration for a projection. Precision would be false confidence — the panel
+        // count itself is extrapolated — so this deliberately says "3 weeks", not "22.4 days".
+        private static string Approximately(TimeSpan duration) => duration.TotalDays switch
+        {
+            >= 14 => $"{Math.Round(duration.TotalDays / 7)} weeks",
+            >= 2 => $"{Math.Round(duration.TotalDays)} days",
+            >= 1 => "a day",
+            >= 0.08 => $"{Math.Max(1, Math.Round(duration.TotalHours))} hours",
+            _ => "a few minutes",
+        };
 
         private static bool Complete(PhaseProgress phase) => phase.Total > 0 && phase.Done >= phase.Total;
 

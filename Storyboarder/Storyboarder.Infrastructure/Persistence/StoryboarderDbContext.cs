@@ -12,6 +12,7 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
     public DbSet<Novel> Novels => Set<Novel>();
     public DbSet<SourceText> SourceTexts => Set<SourceText>();
     public DbSet<Chunk> Chunks => Set<Chunk>();
+    public DbSet<Chapter> Chapters => Set<Chapter>();
     public DbSet<DesignRef> DesignRefs => Set<DesignRef>();
     public DbSet<Volume> Volumes => Set<Volume>();
     public DbSet<Page> Pages => Set<Page>();
@@ -36,6 +37,7 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.HasKey(novel => novel.Id);
             entity.Property(novel => novel.Stage).HasConversion<int>();
             entity.Property(novel => novel.RateLimitedUntilUtc).HasConversion(NullableTicksConverter);
+            entity.Property(novel => novel.ArchivedAtUtc).HasConversion(NullableTicksConverter);
             entity.Property(novel => novel.CreatedAtUtc).HasConversion(TicksConverter);
             entity.Property(novel => novel.UpdatedAtUtc).HasConversion(TicksConverter);
             entity.HasOne(novel => novel.Source)
@@ -45,6 +47,10 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.HasMany(novel => novel.Chunks)
                 .WithOne()
                 .HasForeignKey(chunk => chunk.NovelId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(novel => novel.Chapters)
+                .WithOne()
+                .HasForeignKey(chapter => chapter.NovelId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(novel => novel.DesignRefs)
                 .WithOne()
@@ -76,6 +82,12 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.HasIndex(chunk => new { chunk.AnalysisStatus, chunk.NextAttemptAtUtc });
         });
 
+        model.Entity<Chapter>(entity =>
+        {
+            entity.HasKey(chapter => chapter.Id);
+            entity.HasIndex(chapter => new { chapter.NovelId, chapter.Number });
+        });
+
         model.Entity<DesignRef>(entity =>
         {
             entity.HasKey(reference => reference.Id);
@@ -89,10 +101,12 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
         {
             entity.HasKey(volume => volume.Id);
             entity.Property(volume => volume.PdfStatus).HasConversion<int>();
+            entity.Property(volume => volume.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
             entity.HasMany(volume => volume.Pages)
                 .WithOne()
                 .HasForeignKey(page => page.VolumeId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(volume => new { volume.PdfStatus, volume.NextAttemptAtUtc });
         });
 
         model.Entity<Page>(entity =>

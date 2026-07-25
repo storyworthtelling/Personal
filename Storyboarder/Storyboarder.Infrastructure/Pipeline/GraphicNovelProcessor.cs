@@ -36,10 +36,17 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private readonly RequestRateLimiter geminiLimiter;
     private readonly BackoffScheduler backoff;
     private readonly RateLimitOptions rateLimits;
+    private readonly PageLayoutOptions pageLayout;
+    private readonly ArchiveOptions archive;
+
+    // Null when the platform head supplies no Drive archive (and on any non-Android host). The archive
+    // stage treats that exactly like archiving being switched off.
+    private readonly IDriveArchive? driveArchive;
     private readonly TextChunker chunker = new();
     // A finer chunker used only for storyboarding: it slices each (large) design-bible chunk into small
     // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
     private readonly TextChunker storyboardChunker;
+    private readonly ChapterDetector chapterDetector = new();
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
     private readonly PlaceholderPanelRenderer placeholderRenderer = new();
@@ -54,7 +61,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         IAnalysisPdfComposer analysisPdfComposer,
         IClock clock,
         IOptions<RateLimitOptions> rateLimitOptions,
-        ILogger<GraphicNovelProcessor> logger)
+        IOptions<PageLayoutOptions> pageLayoutOptions,
+        IOptions<ArchiveOptions> archiveOptions,
+        ILogger<GraphicNovelProcessor> logger,
+        IDriveArchive? driveArchive = null)
     {
         this.dbContextFactory = dbContextFactory;
         this.claude = claude;
@@ -67,6 +77,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         this.logger = logger;
 
         rateLimits = rateLimitOptions.Value;
+        pageLayout = pageLayoutOptions.Value;
+        archive = archiveOptions.Value;
+        this.driveArchive = driveArchive;
         storyboardChunker = new TextChunker(rateLimits.StoryboardWindowChars, rateLimits.StoryboardWindowMaxChars);
         claudeLimiter = new RequestRateLimiter(rateLimits.ClaudeRequestsPerMinute, rateLimits.ClaudeRequestsPerDay, clock);
         geminiLimiter = new RequestRateLimiter(rateLimits.GeminiRequestsPerMinute, rateLimits.GeminiRequestsPerDay, clock);
@@ -117,6 +130,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             ProjectStage.ComposingPages => ComposePages(db, novel, cancellationToken),
             ProjectStage.AssemblingVolumes => AssembleVolumes(db, novel, cancellationToken),
             ProjectStage.ComposingAnalysis => ComposeAnalysis(db, novel, cancellationToken),
+            ProjectStage.Archiving => ArchiveOutputs(db, novel, cancellationToken),
             _ => Task.FromResult(ProcessResult.Idle)
         };
 
@@ -145,7 +159,14 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                     EndOffset = span.EndOffset,
                     Text = span.Text
                 });
+
+            // Persist the chunks before labelling them: the labeller reads the stored rows (which is
+            // what also lets it heal a conversion chunked before chapter detection existed), and an EF
+            // query doesn't see inserts still sitting in the change tracker.
+            await db.SaveChangesAsync(cancellationToken);
         }
+
+        await EnsureChaptersLabelled(db, novel, source.FullText, cancellationToken);
 
         SetStage(novel, ProjectStage.BuildingDesignBible);
         await db.SaveChangesAsync(cancellationToken);
@@ -200,9 +221,15 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 3) Render one pending/due reference sheet.
-        var reference = await db.DesignRefs
-            .Where(r => r.NovelId == novel.Id &&
+        // 3) Render one pending/due reference sheet — unless this is a report-only draft, which draws
+        // no art at all. Reference sheets exist solely to keep the panels consistent, and they are the
+        // expensive half of this stage (one image call per bible entity), so a report-only run skips
+        // them outright rather than paying to illustrate a book that will never be illustrated.
+        // NeedsSheet excludes the one-off entities: they are part of the bible but were never going to be
+        // drawn, so they are not part of this phase at all — not queued, not counted, and crucially not
+        // waited on, since a ref left Pending forever would pin the stage.
+        var reference = novel.ReportOnly ? null : await db.DesignRefs
+            .Where(r => r.NovelId == novel.Id && r.NeedsSheet &&
                         (r.ReferenceSheetStatus == WorkStatus.Pending ||
                          (r.ReferenceSheetStatus == WorkStatus.NeedsRetry && r.NextAttemptAtUtc <= now)))
             .FirstOrDefaultAsync(cancellationToken);
@@ -214,7 +241,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
             try
             {
-                var image = await gemini.GenerateReferenceSheet(reference.CanonicalDescription, novel.ArtStyle, cancellationToken);
+                // Fold the entity's approximate scale into the description so the sheet's scale reference
+                // is drawn to the right size (the sheet prompt always asks for a scale reference).
+                var described = string.IsNullOrWhiteSpace(reference.Scale)
+                    ? reference.CanonicalDescription
+                    : $"{reference.CanonicalDescription} Approximate scale: {reference.Scale}.";
+                var image = await gemini.GenerateReferenceSheet(described, novel.ArtStyle, cancellationToken);
                 reference.ReferenceImagePath = imageStore.Save($"{novel.Id}/refs/{reference.Id}.png", image);
                 reference.ReferenceSheetStatus = WorkStatus.Completed;
                 reference.LastError = null;
@@ -237,17 +269,21 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         // Reference sheets are optional consistency aids — panels render with whatever sheets exist —
         // so a permanently-failed sheet must not block the stage. Only sheets still awaiting a retry
         // hold us here; once none remain Pending/NeedsRetry, advance even if some ended up Failed.
-        var pendingSheetRetries = await db.DesignRefs
-            .Where(r => r.NovelId == novel.Id && r.ReferenceSheetStatus == WorkStatus.NeedsRetry)
-            .Select(r => r.NextAttemptAtUtc)
-            .ToListAsync(cancellationToken);
-        if (pendingSheetRetries.Count > 0)
-            return ProcessResult.Waiting((pendingSheetRetries.Min() ?? now) - now, novel.Id);
+        if (!novel.ReportOnly)
+        {
+            var pendingSheetRetries = await db.DesignRefs
+                .Where(r => r.NovelId == novel.Id && r.NeedsSheet && r.ReferenceSheetStatus == WorkStatus.NeedsRetry)
+                .Select(r => r.NextAttemptAtUtc)
+                .ToListAsync(cancellationToken);
+            if (pendingSheetRetries.Count > 0)
+                return ProcessResult.Waiting((pendingSheetRetries.Min() ?? now) - now, novel.Id);
+        }
 
-        // 4) Everything ready: advance.
+        // 4) Everything ready: advance. A report-only draft goes straight to the revision report from
+        // here; every other novel goes on to storyboarding (see ProjectStateMachine).
         SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, false, AllChunksAnalyzed: true, BibleConsolidated: true, AllReferenceSheetsRendered: true,
-            false, false, false, false)));
+            false, false, false, false, ReportOnly: novel.ReportOnly)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
@@ -266,10 +302,16 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         var bible = merger.Merge(fragments);
 
+        // "Recurring" is measured in chunks, so it only means anything once there are at least two of
+        // them: in a manuscript short enough to be a single chunk, every entity appears in exactly one
+        // chunk and a strict rule would draw no sheets at all, losing consistency across the whole book.
+        // With no recurrence signal to go on, draw everything.
+        var chunkCount = fragments.Count;
+
         foreach (var character in bible.Characters)
-            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Character, character));
+            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Character, character, chunkCount));
         foreach (var setting in bible.Settings)
-            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Setting, setting));
+            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Setting, setting, chunkCount));
 
         novel.DesignBibleConsolidated = true;
         Touch(novel);
@@ -361,24 +403,30 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
             foreach (var pageDraft in volumeDraft.Pages)
             {
-                var page = new Page
+                // The model is steered toward 3-6 panels per page, but a page it returns with more than
+                // the cap is split across several physical pages (panels distributed as evenly as
+                // possible) so panels are never squished into a dense grid.
+                foreach (var panelGroup in SplitForPages(pageDraft.Panels, pageLayout.MaxPanelsPerPage))
                 {
-                    VolumeId = target.Id,
-                    ChapterNumber = pageDraft.ChapterNumber,
-                    PageNumber = ++target.PageCount
-                };
-                int panelNumber = 1;
-                foreach (var panelDraft in pageDraft.Panels)
-                    page.Panels.Add(new Panel
+                    var page = new Page
                     {
-                        PageId = page.Id,
-                        PanelNumber = panelNumber++,
-                        VisualPrompt = panelDraft.VisualPrompt,
-                        Dialogue = panelDraft.Dialogue,
-                        Caption = panelDraft.Caption,
-                        ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
-                    });
-                db.Pages.Add(page);
+                        VolumeId = target.Id,
+                        ChapterNumber = pageDraft.ChapterNumber,
+                        PageNumber = ++target.PageCount
+                    };
+                    int panelNumber = 1;
+                    foreach (var panelDraft in panelGroup)
+                        page.Panels.Add(new Panel
+                        {
+                            PageId = page.Id,
+                            PanelNumber = panelNumber++,
+                            VisualPrompt = panelDraft.VisualPrompt,
+                            Dialogue = panelDraft.Dialogue,
+                            Caption = panelDraft.Caption,
+                            ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
+                        });
+                    db.Pages.Add(page);
+                }
             }
 
             // Remember the running page count so a volume number repeated later in this segment keeps numbering.
@@ -424,7 +472,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 var references = await LoadReferenceImages(db, novel.Id, panel.ReferenceNamesJson, cancellationToken);
                 // Request the image at the aspect ratio of the slot this panel will occupy on the page,
                 // so it fills the panel rather than being letterboxed onto shaded paper when composed.
-                var aspectRatio = await PanelSlotAspectRatio(db, panel.PageId, cancellationToken);
+                var aspectRatio = await PanelSlotAspectRatio(db, panel, cancellationToken);
                 // An approved panel renders with ONLY its flagged categories relaxed, for this one call;
                 // every other panel takes the default render (and the app's default thresholds) untouched.
                 var relaxed = panel.ApprovedForRelaxedRender
@@ -537,8 +585,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (await RevertPagesWithMissingImages(db, novel, cancellationToken))
             return ProcessResult.DidWork(novel.Id);
 
+        var now = clock.UtcNow;
         var volume = await db.Volumes
-            .Where(v => v.NovelId == novel.Id && v.PdfStatus == WorkStatus.Pending)
+            .Where(v => v.NovelId == novel.Id &&
+                        (v.PdfStatus == WorkStatus.Pending ||
+                         (v.PdfStatus == WorkStatus.NeedsRetry && v.NextAttemptAtUtc <= now)))
             .Include(v => v.Pages)
             .OrderBy(v => v.Number)
             .FirstOrDefaultAsync(cancellationToken);
@@ -568,6 +619,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
                 volume.PdfPath = imageStore.Save($"{novel.Id}/volumes/volume-{volume.Number}.pdf", pdf);
 
+                // A page appended cleanly: clear any earlier transient-failure state so a hiccup partway
+                // through a long volume doesn't count against the whole binding.
+                volume.Attempts = 0;
+                volume.LastError = null;
+                volume.NextAttemptAtUtc = null;
+
                 if (volume.PdfPageCursor >= pages.Count)
                 {
                     volume.PdfStatus = WorkStatus.Completed;
@@ -582,16 +639,24 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                volume.PdfStatus = WorkStatus.Failed;
-                logger.LogError(ex, "Failed to assemble volume {VolumeId}", volume.Id);
+                // A partial PDF may be corrupt, so restart this volume's assembly from scratch rather
+                // than resuming a bad file, and retry with backoff (Failed only after MaxAttempts) so a
+                // single throw no longer pins the novel at AssemblingVolumes forever.
+                volume.PdfPageCursor = 0;
+                volume.PdfPath = null;
+                ScheduleRetry(volume, ex, novel);
             }
 
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.DidWork(novel.Id);
         }
 
-        if (await db.Volumes.AnyAsync(v => v.NovelId == novel.Id && v.PdfStatus != WorkStatus.Completed, cancellationToken))
-            return ProcessResult.Idle; // blocked on a failed volume
+        // Volumes still pending a retry hold the stage (and report when they resume); once only Completed
+        // (or permanently-Failed) volumes remain, PendingWork stops waiting. A Failed volume blocks the
+        // stage until a manual retry revives it — surfaced to the user, who can redo the binding.
+        if (await PendingWork(db.Volumes.Where(v => v.NovelId == novel.Id), v => v.PdfStatus, v => v.NextAttemptAtUtc, now)
+                is { } volumeWait)
+            return volumeWait == TimeSpan.MinValue ? ProcessResult.Idle : ProcessResult.Waiting(volumeWait, novel.Id);
 
         SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, false, false, false, false, false, false, false, AllVolumesAssembled: true)));
@@ -605,7 +670,23 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         var now = clock.UtcNow;
 
-        // 0) Seed one analysis unit per chunk (once), plus the per-novel analysis record.
+        // 0) The report PDF is already on disk, so this stage is finished: advance and do nothing else.
+        // This has to come FIRST, ahead of the labelling and seeding below, because none of that
+        // preparatory work can change a report that is already written: an existing PDF cannot gain
+        // chapter citations, and a report rendered before the craft half of the reduce existed carries
+        // CraftJson = null, which would otherwise buy a consolidation whose output could never reach it.
+        var rendered = await db.BookAnalyses
+            .AnyAsync(a => a.NovelId == novel.Id && a.PdfStatus == WorkStatus.Completed, cancellationToken);
+        if (rendered)
+            return await AdvancePastAnalysis(db, novel, cancellationToken);
+
+        // 0a) Every finding in the report cites a chapter, which the map step reads off its chunk. A
+        // conversion chunked before chapter detection existed still has unlabelled chunks, so label
+        // them here rather than producing a report with no citations. A no-op once settled.
+        if (await EnsureChaptersLabelled(db, novel, fullText: null, cancellationToken))
+            return ProcessResult.DidWork(novel.Id);
+
+        // 0b) Seed one analysis unit per chunk (once), plus the per-novel analysis record.
         if (!await db.ChunkAnalyses.AnyAsync(a => a.NovelId == novel.Id, cancellationToken))
         {
             var ordinals = await db.Chunks
@@ -636,9 +717,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
 
-            var text = await db.Chunks
+            var chunk = await db.Chunks
                 .Where(c => c.NovelId == novel.Id && c.Ordinal == unit.Ordinal)
-                .Select(c => c.Text)
+                .Select(c => new { c.Text, c.ChapterLabel })
                 .FirstAsync(cancellationToken);
             var castNames = await db.DesignRefs
                 .Where(r => r.NovelId == novel.Id && r.Kind == ReferenceKind.Character)
@@ -647,7 +728,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
             try
             {
-                var notes = await claude.AnalyzeChapter(text, castNames, cancellationToken);
+                var notes = await claude.AnalyzeChapter(
+                    chunk.Text, chunk.ChapterLabel, castNames, cancellationToken);
                 unit.NotesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
                 unit.Status = WorkStatus.Completed;
                 unit.LastError = null;
@@ -669,7 +751,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         var analysis = await db.BookAnalyses.FirstAsync(a => a.NovelId == novel.Id, cancellationToken);
 
-        // 2) Reduce: consolidate all chunk notes into the whole report (one Claude call).
+        // 2) Reduce, story half: consolidate all chunk notes into the story report (one Claude call).
+        // Step 0 already returned for an already-rendered report, so reaching here means the PDF is
+        // still outstanding and both reduce halves are worth paying for.
         if (analysis.ConsolidatedJson is null)
         {
             if (!claudeLimiter.TryAcquire())
@@ -688,13 +772,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             // closed") with backoff instead of letting it escape and fail the whole worker cycle.
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                novel.LastError = ex.Message;
-                var retryAfter = (ex as RateLimitException)?.RetryAfter;
-                var delay = backoff.NextDelay(0, retryAfter);
-                if (ex is RateLimitException)
-                    novel.RateLimitedUntilUtc = clock.UtcNow + delay;
-                await db.SaveChangesAsync(cancellationToken);
-                return ProcessResult.Waiting(delay, novel.Id);
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
             }
 
             Touch(novel);
@@ -702,28 +780,221 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 3) Render: compose the analysis PDF from the consolidated report.
+        // 2b) Reduce, craft half: line edits, prose style & voice, dialogue, and the scene-by-scene
+        // map. Its own call with its own output budget, and persisted separately: asking for both
+        // halves at once needs more output than one reply can carry, and a failure in either half
+        // must not re-bill the one that already succeeded.
+        if (analysis.CraftJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var notes = await LoadChapterNotes(db, novel.Id, cancellationToken);
+
+            try
+            {
+                var craft = await claude.ConsolidateCraft(novel.Title, notes, cancellationToken);
+                analysis.CraftJson = JsonSerializer.Serialize(craft, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 2c) Fact-check the manuscript's checkable real-world statements against a web search. Its own
+        // resumable step for the same reason the craft half is: it is the only call granted a search tool,
+        // it bills separately, and a failure here must not re-run the two consolidations that succeeded.
+        // Reaching here means the report PDF is still outstanding (step 0 returned otherwise), so the
+        // results can still make it into the rendered document.
+        if (analysis.FactChecksJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var notes = await LoadChapterNotes(db, novel.Id, cancellationToken);
+
+            try
+            {
+                var checks = await claude.CheckFacts(notes, cancellationToken);
+                analysis.FactChecksJson = JsonSerializer.Serialize(checks, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 3) Render: compose the analysis PDF from the consolidated report (both halves folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
             try
             {
                 var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
                              ?? BookAnalysisResult.Empty;
-                var pdf = analysisPdfComposer.Compose(report, novel.Title);
+                var craft = analysis.CraftJson is null
+                    ? CraftReport.Empty
+                    : JsonSerializer.Deserialize<CraftReport>(analysis.CraftJson, JsonResponse.CaseInsensitive) ?? CraftReport.Empty;
+                var checks = analysis.FactChecksJson is null
+                    ? Array.Empty<FactCheck>()
+                    : JsonSerializer.Deserialize<List<FactCheck>>(analysis.FactChecksJson, JsonResponse.CaseInsensitive)
+                      ?? (IReadOnlyList<FactCheck>)Array.Empty<FactCheck>();
+                var pdf = analysisPdfComposer.Compose(report.WithCraft(craft).WithFactChecks(checks), novel.Title);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
+            // A failed render is left for the next cycle to retry; don't advance on it.
             catch (Exception ex)
             {
                 analysis.PdfStatus = WorkStatus.Failed;
                 logger.LogError(ex, "Failed to compose analysis PDF for novel {NovelId}", novel.Id);
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+            }
+        }
+
+        // 4) The report is rendered — either just now or on an earlier cycle — so the book is finished.
+        return await AdvancePastAnalysis(db, novel, cancellationToken);
+    }
+
+    // Copies the finished outputs to a Drive folder beside the source manuscript, then optionally frees the
+    // local copies. One file per call, like every other stage, so a large book's upload is resumable and
+    // never held entirely in memory.
+    //
+    // The governing rule is that this stage cannot stop a book from finishing: every output is already on
+    // disk and the archive is a convenience. So it advances straight through when archiving is off, when
+    // Drive has nowhere sensible to put the files, and when uploads have exhausted their retries — the last
+    // recorded as an error the user can see, not as a failed book.
+    private async Task<ProcessResult> ArchiveOutputs(
+        StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        if (!archive.Enabled || driveArchive is null)
+            return await FinishArchiving(db, novel, cancellationToken);
+
+        // Volume PDFs first, then the report: the same order a reader would want them in.
+        var volumes = await db.Volumes
+            .Where(v => v.NovelId == novel.Id && v.PdfStatus == WorkStatus.Completed
+                        && v.PdfPath != null && v.ArchivedDriveFileId == null)
+            .OrderBy(v => v.Number)
+            .ToListAsync(cancellationToken);
+        var analysis = await db.BookAnalyses
+            .FirstOrDefaultAsync(a => a.NovelId == novel.Id, cancellationToken);
+        var reportPending = analysis is { PdfStatus: WorkStatus.Completed, PdfPath: not null, ArchivedDriveFileId: null };
+
+        if (volumes.Count == 0 && !reportPending)
+            return await FinishArchiving(db, novel, cancellationToken);
+
+        try
+        {
+            // Resolve (and remember) the destination once. A novel whose manuscript has no resolvable
+            // parent — a shared file, or one at the root of a shared drive — has nowhere sensible to
+            // archive to, which is a reason to skip rather than to fail.
+            if (novel.ArchiveFolderId is null)
+            {
+                var parent = await driveArchive.FindParentFolder(novel.GoogleDocId, cancellationToken);
+                if (parent is null)
+                {
+                    logger.LogInformation(
+                        "Novel {NovelId}: the source document has no resolvable Drive folder, so there is " +
+                        "nowhere to archive to; finishing without archiving", novel.Id);
+                    return await FinishArchiving(db, novel, cancellationToken);
+                }
+
+                novel.ArchiveFolderId = await driveArchive.EnsureFolder(parent, novel.Title, cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
             }
 
+            if (volumes.Count > 0)
+            {
+                var volume = volumes[0];
+                var name = $"{novel.Title} — Volume {volume.Number}.pdf";
+                volume.ArchivedDriveFileId = await driveArchive.UploadFile(
+                    novel.ArchiveFolderId, name, "application/pdf",
+                    imageStore.Read(volume.PdfPath!), cancellationToken);
+                logger.LogInformation("Archived volume {Number} of novel {NovelId} to Drive", volume.Number, novel.Id);
+            }
+            else
+            {
+                analysis!.ArchivedDriveFileId = await driveArchive.UploadFile(
+                    novel.ArchiveFolderId, $"{novel.Title} — revision report.pdf", "application/pdf",
+                    imageStore.Read(analysis.PdfPath!), cancellationToken);
+                logger.LogInformation("Archived the revision report of novel {NovelId} to Drive", novel.Id);
+            }
+
+            novel.StoryboardAttempts = 0;
+            novel.LastError = null;
+            Touch(novel);
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.DidWork(novel.Id);
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Reuses the novel-level attempt counter, as the report consolidations do, since archiving is
+            // also a once-per-novel step with no per-unit row to hang a budget off. Past the budget the
+            // book finishes anyway with the reason recorded — the outputs are safe on disk regardless.
+            novel.StoryboardAttempts++;
+            novel.LastError = $"Could not archive to Drive: {ex.Message}";
+            if (novel.StoryboardAttempts >= rateLimits.MaxAttempts)
+            {
+                logger.LogWarning(ex,
+                    "Novel {NovelId}: giving up on archiving after {Attempts} attempts; finishing anyway " +
+                    "(the outputs remain on the device)", novel.Id, novel.StoryboardAttempts);
+                return await FinishArchiving(db, novel, cancellationToken);
+            }
 
-        // 4) Report rendered: advance to Completed.
+            var delay = backoff.NextDelay(novel.StoryboardAttempts - 1, (ex as RateLimitException)?.RetryAfter);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.Waiting(delay, novel.Id);
+        }
+    }
+
+    // Leaves the archive stage: stamps when it happened (only when something was actually uploaded),
+    // optionally reclaims the local copies, and advances. Freeing files is gated on the upload having
+    // succeeded, so a skipped or failed archive never deletes the only copy.
+    private async Task<ProcessResult> FinishArchiving(
+        StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var uploaded = novel.ArchiveFolderId is not null && await db.Volumes
+            .AnyAsync(v => v.NovelId == novel.Id && v.ArchivedDriveFileId != null, cancellationToken);
+        if (uploaded)
+        {
+            novel.ArchivedAtUtc = clock.UtcNow;
+            if (archive.FreeLocalCopies)
+            {
+                imageStore.Delete($"{novel.Id}/panels");
+                imageStore.Delete($"{novel.Id}/pages");
+                logger.LogInformation(
+                    "Freed the intermediate panel and page images of novel {NovelId} after archiving", novel.Id);
+            }
+        }
+
+        novel.StoryboardAttempts = 0;
+        SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
+            novel.Stage, SourceIngested: false, AllChunksAnalyzed: false, BibleConsolidated: false,
+            AllReferenceSheetsRendered: false, StoryboardCreated: false, AllPanelsRendered: false,
+            AllPagesComposed: false, AllVolumesAssembled: false, AnalysisComplete: false,
+            ArchiveComplete: true)));
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
+    }
+
+    // Moves a novel off ComposingAnalysis now that its revision report exists. Shared by the two paths
+    // that get there: a report rendered on this cycle, and one that was already on disk when the stage
+    // was entered (step 0).
+    private async Task<ProcessResult> AdvancePastAnalysis(
+        StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
         SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, SourceIngested: false, AllChunksAnalyzed: false, BibleConsolidated: false,
             AllReferenceSheetsRendered: false, StoryboardCreated: false, AllPanelsRendered: false,
@@ -733,6 +1004,89 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     }
 
     // --- helpers ---
+
+    // Records a failed once-per-novel Claude call (a report consolidation) and parks the novel for a
+    // backoff window instead of letting the failure escape and fail the whole worker cycle. There is
+    // no per-unit attempt counter to hang the schedule off here — the unit IS the novel — so the delay
+    // is the base one, or whatever the provider asked us to wait.
+    private async Task<ProcessResult> DeferAfterFailedCall(
+        StoryboarderDbContext db, Novel novel, Exception exception, CancellationToken cancellationToken)
+    {
+        novel.LastError = exception.Message;
+        var retryAfter = (exception as RateLimitException)?.RetryAfter;
+        var delay = backoff.NextDelay(0, retryAfter);
+        if (exception is RateLimitException)
+            novel.RateLimitedUntilUtc = clock.UtcNow + delay;
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.Waiting(delay, novel.Id);
+    }
+
+    // Detects the manuscript's chapters exactly once (guarded by Novel.ChaptersDetected) and stamps
+    // every not-yet-labelled chunk with the chapters its [StartOffset, EndOffset) overlaps, so a
+    // finding drawn from that chunk can cite where in the book it came from. Idempotent and cheap
+    // once settled: a single indexed query. Also heals conversions that were chunked before chapter
+    // detection existed — they reach the report with unlabelled chunks otherwise. Detection itself is
+    // deterministic (ChapterDetector), so re-running it on the same text would give the same spans.
+    // Returns whether anything changed (the caller treats that as one unit of work).
+    private async Task<bool> EnsureChaptersLabelled(
+        StoryboarderDbContext db, Novel novel, string? fullText, CancellationToken cancellationToken)
+    {
+        var unlabelled = await db.Chunks
+            .Where(c => c.NovelId == novel.Id && c.ChapterLabel == "")
+            .ToListAsync(cancellationToken);
+        if (novel.ChaptersDetected && unlabelled.Count == 0)
+            return false;
+
+        fullText ??= await db.SourceTexts
+            .Where(s => s.NovelId == novel.Id)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (fullText is null)
+            return false;
+
+        IReadOnlyList<ChapterSpan> spans;
+        if (novel.ChaptersDetected)
+        {
+            spans = (await db.Chapters
+                    .Where(c => c.NovelId == novel.Id)
+                    .OrderBy(c => c.Number)
+                    .ToListAsync(cancellationToken))
+                .Select(c => new ChapterSpan(c.Number, c.Label, c.StartOffset, c.EndOffset))
+                .ToList();
+        }
+        else
+        {
+            spans = chapterDetector.Detect(fullText);
+            foreach (var span in spans)
+                db.Chapters.Add(new Chapter
+                {
+                    NovelId = novel.Id,
+                    Number = span.Number,
+                    Label = span.Label,
+                    StartOffset = span.StartOffset,
+                    EndOffset = span.EndOffset
+                });
+            novel.ChaptersDetected = true;
+            logger.LogInformation(
+                "Detected {Count} chapter(s) in novel {NovelId}", spans.Count, novel.Id);
+        }
+
+        // No spans means the chapter rows are gone under a novel already marked as detected — nothing
+        // to attribute to, and re-detecting would contradict the stored (already cited) chapters.
+        if (spans.Count == 0)
+            return false;
+
+        foreach (var chunk in unlabelled)
+        {
+            var (number, label) = ChapterDetector.Locate(spans, chunk.StartOffset, chunk.EndOffset);
+            chunk.ChapterNumber = number;
+            chunk.ChapterLabel = label;
+        }
+
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 
     // Returns null when the phase's units are all complete; otherwise a wait: a positive duration to
     // wait for the soonest retry, or TimeSpan.MinValue meaning "blocked" (only failed units remain).
@@ -759,27 +1113,27 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private async Task<ProcessResult?> HandleBlockedPanel(
         Novel novel, Panel panel, ImageContentBlockedException blocked, CancellationToken cancellationToken)
     {
-        if (blocked.Reason == ImageBlockReason.Prohibited)
+        if (blocked.Reason == ImageBlockReason.Prohibited && panel.PromptRewrittenForSafety)
         {
-            // IP / copyrighted / otherwise-prohibited content: no safety threshold can bypass it, so stop
-            // the whole book with a clear fallout reason rather than parking or retrying it. Settle the
-            // offending panel into a deterministic Pending state (clearing any retry schedule left over
-            // from a block that landed mid-retry) so the rework flow can reliably find and reset it — a
-            // panel stranded in NeedsRetry is invisible to the Rework button.
-            panel.Status = WorkStatus.Pending;
+            // Restaged to imply the beat and STILL refused as prohibited/IP content: rewording could not
+            // get around it, so this panel needs the owner. Park the PANEL, never the book — cancelling
+            // the whole conversion over one panel is what killed two of the owner's novels after hours of
+            // rendering. The render query skips AwaitingApproval, so every other panel keeps rendering;
+            // the book simply can't finalize until this one is reworked or left out.
+            //
+            // No BlockedCategoriesJson: prohibited content is not an adjustable harm category, so there is
+            // nothing for an "approve and relax" to act on. The review UI offers rework-or-skip instead.
+            // Settle it with no retry schedule so the rework lookup finds it deterministically.
+            panel.Status = WorkStatus.AwaitingApproval;
             panel.NextAttemptAtUtc = null;
+            panel.BlockedCategoriesJson = null;
             panel.LastError = blocked.Message;
-            SetStage(novel, ProjectStage.Cancelled);
-            novel.LastError =
-                $"Cancelled: panel {panel.PanelNumber} was blocked as prohibited or copyrighted content, " +
-                "which relaxing the safety settings cannot bypass. Rework the panel's art direction and resume, " +
-                "or start a new conversion.";
             // Capture the exact prompt that tripped the filter alongside the block, so the blocked-panel
             // diagnostic (and the log) carry what's needed to rework the art direction — not just the refusal.
             logger.LogWarning(
-                "Novel {NovelId} cancelled: prohibited image content on panel {PanelId} (#{PanelNumber}). " +
-                "Prompt sent to Gemini: {Prompt}. Provider reason: {Error}",
-                novel.Id, panel.Id, panel.PanelNumber, ReconstructPanelPrompt(novel, panel), blocked.Message);
+                "Panel {PanelId} (#{PanelNumber}) still refused as prohibited content after restaging; " +
+                "awaiting the user (novel {NovelId} continues). Prompt sent to Gemini: {Prompt}. Provider reason: {Error}",
+                panel.Id, panel.PanelNumber, novel.Id, ReconstructPanelPrompt(novel, panel), blocked.Message);
             return null;
         }
 
@@ -804,8 +1158,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (!panel.PromptRewrittenForSafety)
         {
             // Still blocked past what relaxing can reach — an approved Safety render at the model's floor,
-            // or a Filtered (IMAGE_SAFETY) block, which can't be relaxed at all. Ask Claude to restage the
-            // beat so the content is implied, then re-render the reworked prompt next cycle.
+            // a Filtered (IMAGE_SAFETY) block, which can't be relaxed at all, or a first Prohibited block,
+            // where rewording is the only lever that can help. Ask Claude to restage the beat so the
+            // content is implied, then re-render the reworked prompt next cycle.
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
             try
@@ -833,14 +1188,15 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return null;
     }
 
-    // The width/height of the slot this panel will occupy on the composed page, so the image model can be
-    // asked to frame the art at that ratio. Every cell in a page's grid is the same size, so this depends
-    // only on how many panels share the page (see PageLayoutCalculator). Uses the design page geometry the
-    // composer lays out against.
+    // The width/height of the ART region this panel will occupy on the composed page, so the image model
+    // can be asked to frame the art at that ratio and fill it (with the dialogue/caption bands reserved).
+    // Every cell in a page's grid is the same size, so the cell depends only on how many panels share the
+    // page (see PageLayoutCalculator); the art region within it depends on this panel's own text bands
+    // (see PanelSlotLayout). Uses the design page geometry the composer lays out against.
     private static async Task<double?> PanelSlotAspectRatio(
-        StoryboarderDbContext db, Guid pageId, CancellationToken cancellationToken)
+        StoryboarderDbContext db, Panel panel, CancellationToken cancellationToken)
     {
-        var panelCount = await db.Panels.CountAsync(p => p.PageId == pageId, cancellationToken);
+        var panelCount = await db.Panels.CountAsync(p => p.PageId == panel.PageId, cancellationToken);
         if (panelCount <= 0)
             return null;
 
@@ -849,7 +1205,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             DesignTokens.Comic.Gutter);
         var cell = calculator.Layout(
             new PageSize(DesignTokens.Comic.PageWidth, DesignTokens.Comic.PageHeight), panelCount)[0];
-        return cell.Width / cell.Height;
+        var art = PanelSlotLayout.Compute(cell, panel.Dialogue, panel.Caption).Art;
+        return art.Width / art.Height;
     }
 
     // Rebuilds the exact text prompt a panel was rendered with, so a content block can be logged and
@@ -903,7 +1260,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     {
         var refs = await db.DesignRefs.Where(r => r.NovelId == novelId).ToListAsync(cancellationToken);
         EntityProfile Map(DesignRef r) =>
-            new(r.Name, r.CanonicalDescription, JsonSerializer.Deserialize<List<string>>(r.AliasesJson) ?? []);
+            new(r.Name, r.CanonicalDescription, r.Scale,
+                JsonSerializer.Deserialize<List<string>>(r.AliasesJson) ?? [], r.ChunkMentions);
         return new DesignBible(
             refs.Where(r => r.Kind == ReferenceKind.Character).Select(Map).ToList(),
             refs.Where(r => r.Kind == ReferenceKind.Setting).Select(Map).ToList());
@@ -938,13 +1296,43 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return paths.Where(imageStore.Exists).Select(imageStore.Read).ToList();
     }
 
-    private static DesignRef NewDesignRef(Guid novelId, ReferenceKind kind, EntityProfile profile) => new()
+    // Splits a page's panels into consecutive groups of at most maxPerPage, balanced so the groups
+    // differ in size by at most one (8 panels at a cap of 6 become 4+4, not 6+2). Each group becomes a
+    // physical page. An empty page yields no groups.
+    private static IEnumerable<IReadOnlyList<PanelDraft>> SplitForPages(IReadOnlyList<PanelDraft> panels, int maxPerPage)
+    {
+        if (panels.Count == 0)
+            yield break;
+
+        var cap = Math.Max(1, maxPerPage);
+        var pageCount = (int)Math.Ceiling(panels.Count / (double)cap);
+        var baseSize = panels.Count / pageCount;
+        var remainder = panels.Count % pageCount; // the first `remainder` pages carry one extra panel
+
+        var index = 0;
+        for (var page = 0; page < pageCount; page++)
+        {
+            var size = baseSize + (page < remainder ? 1 : 0);
+            yield return panels.Skip(index).Take(size).ToList();
+            index += size;
+        }
+    }
+
+    private static DesignRef NewDesignRef(
+        Guid novelId, ReferenceKind kind, EntityProfile profile, int chunkCount) => new()
     {
         NovelId = novelId,
         Kind = kind,
         Name = profile.Name,
         CanonicalDescription = profile.CanonicalDescription,
-        AliasesJson = JsonSerializer.Serialize(profile.Aliases)
+        Scale = profile.Scale,
+        AliasesJson = JsonSerializer.Serialize(profile.Aliases),
+        ChunkMentions = profile.ChunkMentions,
+        // Only recurring entities earn a rendered sheet. A one-off entity still reaches the storyboard and
+        // panel prompts through the design bible — it just isn't drawn on its own, which is where the bulk
+        // of the image spend was going (126 sheets for an ensemble of about a dozen on the last book).
+        // A single-chunk manuscript carries no recurrence signal at all, so everything is drawn there.
+        NeedsSheet = profile.ChunkMentions > 1 || chunkCount <= 1
     };
 
     private ProcessResult Fail(StoryboarderDbContext db, Novel novel, string message, CancellationToken cancellationToken)

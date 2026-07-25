@@ -7,8 +7,11 @@ public static class PanelImagePrompt
 {
     public static string Build(string artStyle, string visualPrompt, bool hasReferenceImages) =>
         $"Comic panel in this style: {artStyle}. {visualPrompt}. " +
+        "Show the characters actively in this moment — caught mid-action and engaged with the scene, " +
+        "not posing or facing the camera. " +
         (hasReferenceImages
-            ? "Keep the characters and settings visually consistent with the supplied reference images. "
+            ? "Match each character's and setting's appearance from the supplied reference images, but " +
+              "not their pose — stage them in the action described, at a consistent relative scale. "
             : string.Empty) +
         "Do not render any text, speech bubbles, or lettering in the image.";
 }

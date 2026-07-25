@@ -16,7 +16,10 @@ public class ClaudeAnalysisClientTests
     private static (ClaudeAnalysisClient Client, FakeHttpMessageHandler Handler) Create()
     {
         var handler = new FakeHttpMessageHandler();
-        var options = Options.Create(new ClaudeOptions { ApiKey = "test-key", Model = "test-model", MaxTokens = 256 });
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", FastModel = "test-fast-model", MaxTokens = 256
+        });
         return (new ClaudeAnalysisClient(new HttpClient(handler), options), handler);
     }
 
@@ -62,6 +65,34 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task ExtractEntities_ParsesScale_AndPromptRequestsIt()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"characters\":[{\"name\":\"Alice\",\"description\":\"tall\",\"scale\":\"about 1.7m\",\"aliases\":[]}]," +
+            "\"settings\":[]}"));
+
+        var fragment = await client.ExtractEntities("excerpt", CancellationToken.None);
+
+        Assert.Equal("about 1.7m", Assert.Single(fragment.Characters).Scale);
+        // The extraction prompt must ask for scale so illustrations stay proportionate.
+        Assert.Contains("scale", handler.RequestBodies[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Storyboard_PromptSteersPanelDensityAndAction()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
+
+        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+
+        var body = handler.RequestBodies[0];
+        Assert.Contains("panels per page", body);
+        Assert.Contains("ONGOING ACTION", body);
+    }
+
+    [Fact]
     public async Task ExtractEntities_SendsApiKeyVersionAndCachedSystemPrompt()
     {
         var (client, handler) = Create();
@@ -74,7 +105,103 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("2023-06-01", Assert.Single(request.Headers.GetValues("anthropic-version")));
         Assert.Contains("cache_control", handler.RequestBodies[0]);
         Assert.Contains("ephemeral", handler.RequestBodies[0]);
-        Assert.Contains("test-model", handler.RequestBodies[0]);
+    }
+
+    private static ChapterNotes NotesWithClaims(string chapter, params string[] claims) =>
+        ChapterNotes.Empty with { Chapter = chapter, FactualClaims = claims };
+
+    [Fact]
+    public async Task CheckFacts_GrantsWebSearch_AndSendsOnlyTheClaims()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"checks\":[{\"claim\":\"Paris is the capital of Spain\",\"verdict\":\"Incorrect\"," +
+            "\"note\":\"Paris is the capital of France; Madrid is Spain's.\",\"chapter\":\"Chapter 3\"}]}"));
+
+        var checks = await client.CheckFacts(
+            [NotesWithClaims("Chapter 3", "Paris is the capital of Spain")], CancellationToken.None);
+
+        var check = Assert.Single(checks);
+        Assert.Equal("Incorrect", check.Verdict);
+        Assert.Equal("Chapter 3", check.Chapter);
+
+        var body = handler.RequestBodies[0];
+        // The hosted search tool is granted for this call — it is the only one that gets it.
+        Assert.Contains("web_search", body);
+        Assert.Contains("tools", body);
+        Assert.Contains("Paris is the capital of Spain", body);
+    }
+
+    [Fact]
+    public async Task OtherCalls_AreNotGivenASearchTool()
+    {
+        // The rest of the report must reason from the manuscript alone, not from what the web says a book
+        // like this should contain.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
+
+        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+
+        Assert.DoesNotContain("web_search", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task CheckFacts_WithNoClaims_MakesNoCallAtAll()
+    {
+        // Fiction that asserts nothing checkable is a normal outcome; confirming an empty list isn't worth
+        // a billed request, let alone a web search.
+        var (client, handler) = Create();
+
+        var checks = await client.CheckFacts([ChapterNotes.Empty], CancellationToken.None);
+
+        Assert.Empty(checks);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task CheckFacts_MissingVerdict_DefaultsToUnverified()
+    {
+        // Never present an unchecked claim as settled — that would send the author after a non-problem.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"checks\":[{\"claim\":\"The tower is 90m tall\",\"chapter\":\"Chapter 2\"}]}"));
+
+        var checks = await client.CheckFacts(
+            [NotesWithClaims("Chapter 2", "The tower is 90m tall")], CancellationToken.None);
+
+        Assert.Equal("Unverified", Assert.Single(checks).Verdict);
+    }
+
+    [Fact]
+    public async Task MechanicalPerChunkCalls_UseTheFastModel()
+    {
+        // Entity extraction and chapter notes run once per chunk — by far the most calls a novel makes —
+        // and both are extraction against a fixed JSON contract rather than judgement, so they go to the
+        // cheap tier.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
+        handler.EnqueueOk(Reply("{}"));
+
+        await client.ExtractEntities("excerpt", CancellationToken.None);
+        await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
+
+        Assert.Contains("\"model\":\"test-fast-model\"", handler.RequestBodies[0]);
+        Assert.Contains("\"model\":\"test-fast-model\"", handler.RequestBodies[1]);
+    }
+
+    [Fact]
+    public async Task JudgementCalls_StayOnTheStrongModel()
+    {
+        // Adapting prose into panels and synthesising the whole manuscript are the calls whose quality the
+        // owner actually sees, so they must not be downgraded to save pennies.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
+        handler.EnqueueOk(Reply("{}"));
+
+        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+        await client.ConsolidateAnalysis("Title", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[0]);
+        Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[1]);
     }
 
     [Fact]
@@ -120,7 +247,7 @@ public class ClaudeAnalysisClientTests
             "\"possibleInconsistencies\":[\"Eye color changes\"],\"factualClaims\":[\"Paris is in France\"]," +
             "\"notableStrengths\":[\"Vivid prose\"],\"notableWeaknesses\":[\"Slow open\"]}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", ["Alice"], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 3", ["Alice"], CancellationToken.None);
 
         Assert.Contains("Alice", notes.CharactersPresent);
         Assert.Equal("Eye color changes", Assert.Single(notes.PossibleInconsistencies));
@@ -134,10 +261,36 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
 
         Assert.Empty(notes.CharactersPresent);
         Assert.Empty(notes.NotableStrengths);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_StampsTheChapterOnTheNotes_AndSendsItAsContext()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"keyEvents\":[\"The gate opens\"]}"));
+
+        var notes = await client.AnalyzeChapter("excerpt", "Chapters 7–8", [], CancellationToken.None);
+
+        // The chapter is known exactly from the chunk's offsets, so it is stamped on by the client —
+        // never left to the model — and it also rides along as context for the observations.
+        Assert.Equal("Chapters 7–8", notes.Chapter);
+        Assert.Contains("LOCATION IN THE BOOK", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_UnparseableReply_StillCarriesItsChapter()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("I'm afraid I can't help with that."));
+
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 4", [], CancellationToken.None);
+
+        Assert.Equal("Chapter 4", notes.Chapter);
+        Assert.Empty(notes.KeyEvents);
     }
 
     [Fact]
@@ -169,9 +322,114 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("developmental editor", Assert.Single(report.Reviews).Perspective);
         Assert.Equal("High", Assert.Single(report.RevisionPlan).Priority);
         Assert.Equal("YA fantasy", report.MarketPositioning);
+        // A model that answered with bare strings instead of {chapter, detail} still parses; the
+        // finding simply has nothing to cite.
+        Assert.Equal("Where is the key?", Assert.Single(report.PlotHoles).Detail);
+        Assert.Equal(string.Empty, Assert.Single(report.PlotHoles).Chapter);
 
         // The reduce call must request the larger analysis output budget, not the default MaxTokens.
         Assert.Contains("\"max_tokens\":4096", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task ConsolidateAnalysis_CarriesChapterCitationsOntoFindingsAndThePlan()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"logline\":\"A girl quests.\",\"plotHoles\":[{\"chapter\":\"Chapter 4\",\"detail\":\"The key is never found.\"}]," +
+            "\"pacingNotes\":[{\"chapter\":\"Chapters 7–8\",\"detail\":\"The middle sags.\"}]," +
+            "\"revisionPlan\":[{\"priority\":\"High\",\"chapter\":\"Chapter 4\",\"issue\":\"Sagging middle\"," +
+            "\"suggestedFix\":\"Cut a subplot.\"}]}"));
+
+        var report = await client.ConsolidateAnalysis(
+            "Quest", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        Assert.Equal("Chapter 4", Assert.Single(report.PlotHoles).Chapter);
+        Assert.Equal("The key is never found.", Assert.Single(report.PlotHoles).Detail);
+        Assert.Equal("Chapters 7–8", Assert.Single(report.PacingNotes).Chapter);
+        Assert.Equal("Chapter 4", Assert.Single(report.RevisionPlan).Chapter);
+        // The prompt has to ask for the citation, or the model has no reason to carry it through.
+        Assert.Contains("chapter", handler.RequestBodies[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConsolidateAnalysis_LeavesTheCraftSectionsToTheirOwnCall()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"logline\":\"A girl quests.\"}"));
+
+        var report = await client.ConsolidateAnalysis(
+            "Quest", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        Assert.Empty(report.LineEdits);
+        Assert.Empty(report.ProseNotes);
+        Assert.Empty(report.DialogueNotes);
+        Assert.Empty(report.SceneBreakdown);
+    }
+
+    [Fact]
+    public async Task ConsolidateCraft_ParsesAllFourSections_AndUsesTheCraftBudget()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", MaxTokens = 256, CraftMaxTokens = 9001
+        });
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
+        handler.EnqueueOk(Reply(
+            "{\"lineEdits\":[{\"chapter\":\"Chapter 2\",\"excerpt\":\"He felt the cold.\"," +
+            "\"suggestion\":\"The cold came.\",\"reason\":\"Filtered.\"}]," +
+            "\"proseNotes\":[{\"chapter\":\"Chapter 3\",\"pattern\":\"Filter words\"," +
+            "\"evidence\":\"she felt\",\"fix\":\"Cut the filter.\"}]," +
+            "\"dialogueNotes\":[{\"chapter\":\"Chapter 4\",\"speakers\":\"Alice, Bob\"," +
+            "\"observation\":\"They sound identical.\",\"fix\":\"Give Bob a shorter line.\"}]," +
+            "\"sceneBreakdown\":[{\"chapter\":\"Chapter 5\",\"scene\":\"Alice waits.\"," +
+            "\"purpose\":\"Stalls the confrontation.\",\"verdict\":\"Does no work.\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        Assert.Equal("Chapter 2", Assert.Single(craft.LineEdits).Chapter);
+        Assert.Equal("The cold came.", Assert.Single(craft.LineEdits).Suggestion);
+        Assert.Equal("Filter words", Assert.Single(craft.ProseNotes).Pattern);
+        Assert.Equal("Alice, Bob", Assert.Single(craft.DialogueNotes).Speakers);
+        Assert.Equal("Does no work.", Assert.Single(craft.SceneBreakdown).Verdict);
+
+        // The craft half is the larger of the two reduce calls and must request its own budget.
+        Assert.Contains("\"max_tokens\":9001", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task ConsolidateCraft_MissingOrUnparseableSections_DegradeToEmpty()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"lineEdits\":[{\"chapter\":\"Chapter 2\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        var edit = Assert.Single(craft.LineEdits);
+        Assert.Equal("Chapter 2", edit.Chapter);
+        Assert.Equal(string.Empty, edit.Excerpt);
+        Assert.Empty(craft.SceneBreakdown);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_GathersTheCraftObservations_WhileTheSentencesAreStillAvailable()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"lineEditCandidates\":[\"\\\"He felt the cold.\\\" — cut the filter\"]," +
+            "\"proseObservations\":[\"Filter words recur\"],\"dialogueObservations\":[\"Alice and Bob sound alike\"]," +
+            "\"sceneBeats\":[\"Alice waits | stalls the confrontation | does no work\"]}"));
+
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 2", [], CancellationToken.None);
+
+        Assert.Single(notes.LineEditCandidates);
+        Assert.Single(notes.ProseObservations);
+        Assert.Single(notes.DialogueObservations);
+        Assert.Single(notes.SceneBeats);
+        // By consolidation time only the notes survive, so the prompt must gather these per chunk.
+        Assert.Contains("lineEditCandidates", handler.RequestBodies[0]);
+        Assert.Contains("sceneBeats", handler.RequestBodies[0]);
     }
 
     [Fact]

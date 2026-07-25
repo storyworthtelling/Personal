@@ -1,0 +1,189 @@
+# Storyboarder — session handoff
+
+State as of commit `bb61137` on branch `claude/storyboarder-panel-layout-p5qwah`. **Phase 1 is complete;
+Phases 2–6 remain.** Read this top to bottom before starting work — several of the traps below cost a full
+CI round each to discover.
+
+---
+
+## 1. Start here: environment
+
+**There is no .NET SDK in a fresh container**, and the official installer cannot fetch one — the network
+policy blocks `builds.dotnet.microsoft.com` and `dotnetcli.azureedge.net`. Ubuntu's archive has it.
+
+A SessionStart hook already handles this: `.claude/hooks/session-start.sh` installs `dotnet-sdk-10.0` via
+apt (running `apt-get update` first, because the image's package index is stale and installing without it
+404s on every `.deb`). It is remote-only and idempotent.
+
+> **Important:** the hook lives on this branch and is **not yet merged to `main`**. Start the next session
+> **on this branch**, or merge PR #111 first — otherwise the session has no compiler and the whole
+> write-blind/red-CI cycle described below starts over.
+
+Verify the toolchain, then the suite:
+
+```
+dotnet --version     # expect 10.0.x
+dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj -p:StoryboarderTfms=net10.0
+```
+
+**Baseline: 322 passing, 0 failing.** Run this before every commit. Never commit a red suite.
+
+---
+
+## 2. The product thesis (this shapes every decision)
+
+Storyboarder is **not** a graphic-novel generator. It is a **manuscript revision instrument for an audience
+of one, in which the illustration is a comprehension probe.** If the rendered art doesn't match what the
+author pictured, that is evidence the prose under-specifies the scene.
+
+Consequences, all confirmed directly by the owner:
+
+- **The revision report is the primary deliverable.** The art exists to show whether the prose conveyed
+  what was pictured.
+- **The unit of work is the draft, not the panel.** The owner explicitly declined panel regeneration,
+  variant history, reroll budgets, and panel↔prose linkage UI.
+- **It must be hands-off.** They declined review gates, design-bible editing, run controls (pause/resume,
+  queue ordering, stop-after-stage), and notifications entirely.
+- **Audience of one, screen only, phone only.** Therefore no print/PoD, no CMYK or bleed, no sharing links,
+  no collaboration, no tablet or desktop build, no EPUB/CBZ.
+
+When a feature seems obviously useful but contradicts the above, it was almost certainly already declined.
+
+## 3. Confirmed product decisions
+
+Gathered from 39 answered questions. Treat as settled unless the owner reopens them.
+
+| Area | Decision |
+|---|---|
+| Art's purpose | Faithfulness to the text over visual appeal — a literal read-back is the honest signal |
+| Art style | **Claude derives it** from the manuscript's prose and genre (not yet built — Phase 4) |
+| Colour | Colour, not black-and-white |
+| Page craft | Varied panel sizes, full-page splashes, deliberate camera progression. **No** two-page spreads |
+| Character looks | One canonical sheet unless the text describes a change; then a new sheet at that point |
+| Consistency tools | Off-model detection and fix-a-character-then-re-render. Automatic, not a review queue |
+| Reference sheets | Recurring cast only (built) |
+| Design bible | Not viewable or editable — keep it internal |
+| Dialogue | Trimmed to fit balloons (readability wins over verbatim here, unlike the art) |
+| Lettering | Balloon tails, thought-vs-speech, SFX. **No** speaker name labels |
+| Volumes | Let Claude decide the breaks |
+| Reading | In-app reader with chapter jump and panel zoom |
+| Report | Wants line edits, prose/voice, dialogue critique, scene breakdown (all built); chapter references, not quoted passages; in-app **and** PDF; report-only mode as an option |
+| Prose-signal | "The illustrator misread this" gets **its own report section** (Phase 4 — needs a vision pass) |
+| Drafts | Versions **within one project**; pick a doc each time; re-render **only what changed** |
+| Draft diff | Findings resolved/new, plus changed panels |
+| Blocked content | Auto-retry, then ask. Never cancel the book (built) |
+| Unrenderable panel | Placeholder only |
+| Cost | Estimate before running, cheap tier for grunt work (both built). No spend cap, no live counter |
+| Providers | Stay Claude + Gemini |
+| Notifications | **None** |
+| Sources | Add `.docx`. Nothing else |
+| Data safety | Drive sync, verify-after-reboot, and archive completed drafts beside the manuscript |
+| Extras | Fact-checking (built), owner's voice **propagated repo-wide** |
+
+---
+
+## 4. What Phase 1 delivered
+
+All committed and pushed. Chronological, with the commit worth reading for each:
+
+1. `52cd733` — the original five diagnostics fixes: 6-panel cap, reserved caption/dialogue bands,
+   volume-binding retry, action-not-posed prompts, reference-sheet scale.
+2. `7c75164` → `9b9131c` — schema for chapters/report/archive, plus a **snapshot-drift fix** (see traps).
+3. `7f71f72`–`5bbbd66` — chapter detection (`ChapterDetector`, deterministic, no Claude call) and the
+   report expansion; the reduce is **two Claude calls** (story half, craft half) because one reply cannot
+   carry both without truncating or outlasting the background worker.
+4. `344b8de` — advance past an already-rendered report before any preparatory work.
+5. `fa581d5` — the SessionStart hook.
+6. `580039b` — a blocked panel no longer cancels the book.
+7. `babf6b5` — reference sheets for recurring cast only.
+8. `db1dc96` — cheap model tier for per-chunk calls; run estimate driven by rate limits.
+9. `f6895c9` — fact-checking via Anthropic's hosted web search.
+10. `4f711c9` — `BATCHING.md`, the Phase 6 investigation.
+11. `bb61137` — Drive archive.
+
+---
+
+## 5. Traps that have already bitten
+
+**EF migrations are hand-written.** There is no `dotnet ef` run here. Each migration needs the `.cs`
+(Up/Down), a `.Designer.cs` (a copy of `StoryboarderDbContextModelSnapshot.cs` with `[Migration("...")]`,
+`partial class <Name>`, and `BuildTargetModel` instead of `BuildModel`, plus a `Migrations` using), and an
+update to the snapshot.
+
+**Snapshot drift is the #1 failure mode.** It compiles fine and fails at runtime as
+`PendingModelChangesWarning` (caught by `MigrationSafetyTests`). It cost two CI rounds. When adding an
+entity you must add **all three**: every property, the relationship block (`HasOne`/`WithMany`), and the
+parent's `b.Navigation("...")`. Property *order* in the snapshot is cosmetic; presence and type are not.
+A quick check that beats reading it by eye — diff entity properties against the snapshot with a script;
+just make sure the script actually matches something, since a regex that silently matches zero classes
+reports a cheerful false pass.
+
+**`ProjectStage` persists as an integer.** Append new stages to the end of the enum, never insert in
+pipeline order — inserting renumbers `Completed`/`Failed`/`Cancelled` and silently re-stages every existing
+novel. Pipeline order lives in `ProjectStateMachine`, not in enum ordering.
+
+**A new non-nullable `bool` column lands as `false` on existing rows.** If `false` changes behaviour,
+backfill it in the migration (`DesignRef.NeedsSheet` does this, or every queued sheet would have silently
+vanished for an in-flight conversion).
+
+**Check the feature is reachable.** Two near-misses this session: the rework flow was gated on
+`Stage == Cancelled` and would have become dead code once novels stopped cancelling; and the archive would
+have had no toggle. A stage or service method with no path to it from the UI is not a feature.
+
+**Session limits killed two subagents mid-task**, one of which lost everything uncommitted and left a
+migration without its `.Designer.cs`. Commit per feature, and prefer working inline over delegating large
+briefs.
+
+**A stage must not be able to strand a finished book.** Both the volume-binding retry and the archive stage
+are built so failure still lets the book complete.
+
+---
+
+## 6. Remaining work
+
+### Phase 2 — drafts + incremental re-run (largest; do first)
+The loop the owner actually cares about: revise → re-render only what changed → compare against the last
+draft.
+
+- Draft versions **inside one project** (schema change), each added by picking a doc.
+- **Blocker to solve first:** panels store no link to their source text. `Panel` has no offsets, so "what
+  changed" is uncomputable today. Persisting panel→source offsets is the real cost of this phase.
+- Diff two drafts on **findings resolved/new** and **changed panels** (side-by-side old vs new art).
+- Re-render only panels whose source text moved; reuse everything else.
+
+### Phase 3 — in-app reader
+Page reader with chapter jump and panel zoom; browsable report alongside the PDF. Mostly MAUI pages, the
+most isolated phase — a good candidate to run in parallel with Phase 2 if using worktrees.
+
+### Phase 4 — art fidelity + layout
+Claude-derived art style; literal-to-text panel prompts; **weighted layout** (varied panel sizes, splashes,
+camera progression) which is a real rewrite of `PageLayoutCalculator` plus per-panel weight/shot-type in the
+storyboard schema; balloon tails, thought-vs-speech, SFX; dialogue trimmed to fit; off-model auto-detection.
+
+Also the **prose-divergence report section**: since the owner won't hand-flag mismatches, the mechanism is a
+vision pass — feed each rendered panel plus its source passage back to the model and ask what is missing,
+added, or wrong. It is a heuristic and will have false positives; it is advisory, and it is the only design
+that satisfies "flag the prose" *and* "fully automatic" at once.
+
+### Phase 5 — odds
+`.docx` import · verify-after-reboot · **owner's voice propagated repo-wide** (DESIGN.md §11 plus FocusPhone,
+Ledger and Storyboarder copy — a design-bible change, probably its own PR).
+
+### Phase 6 — Gemini batching
+See `Storyboarder/BATCHING.md` for the full investigation. **Do the cheap thing first:**
+`RateLimitOptions.GeminiRequestsPerDay` defaults to **100**, which is *this app's own safety ceiling, not
+Google's limit*. Raising it to match the account's real tier may deliver most of the wall-clock win for one
+line. Only then batch panel renders (50% discount and a separate quota pool). The owner has asked to be
+walked through finding their real Gemini limit when we get there.
+
+---
+
+## 7. Waiting on the owner
+
+- **Register the `drive.file` scope** on the OAuth client in the Google Cloud project, then sign in again on
+  the device. Until then archiving stays off (which is the default, so nothing breaks).
+- **Check the real Gemini tier limit** and raise `GeminiRequestsPerDay` — do this before any batching work.
+- **The stuck "Heart and Mind" project recovers on its own** once this ships: tap **Retry now** and volume 1
+  re-binds, which unblocks the revision report. No manual data fix needed.
+- **PR #111's title and body still describe only the original five fixes.** Rewrite them to cover the full
+  scope before merging.

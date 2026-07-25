@@ -15,9 +15,19 @@ public class Novel
     public string ArtStyle { get; set; } = ArtStyles.Default;
     public ProjectStage Stage { get; set; } = ProjectStage.Created;
 
+    // Report-only draft: skip every art stage (storyboarding, panel renders, page composition, volume
+    // binding) and go straight from the design bible to the revision report. Not the default — the
+    // illustration is the comprehension probe, so most drafts still want it — but a re-read of a draft
+    // that has already been illustrated only needs the report, at a fraction of the cost and time.
+    public bool ReportOnly { get; set; }
+
     // Set once the per-chunk extractions have been merged into canonical DesignRefs, so the merge
     // (which would otherwise reset reference-sheet state) runs exactly once.
     public bool DesignBibleConsolidated { get; set; }
+
+    // Set once chapter boundaries have been detected and persisted at ingestion, so the (occasionally
+    // Claude-assisted) detection runs exactly once per novel.
+    public bool ChaptersDetected { get; set; }
 
     // Chunk ordinal up to which storyboarding has already run (for resumable, windowed storyboarding).
     public int StoryboardCursor { get; set; }
@@ -42,11 +52,17 @@ public class Novel
     // in local time. Auto-expires: it's only shown while still in the future.
     public DateTimeOffset? RateLimitedUntilUtc { get; set; }
 
+    // The Drive folder the finished outputs were archived into (the folder holding the source
+    // manuscript), and when the archive completed. Set by the Archiving stage; null until then.
+    public string? ArchiveFolderId { get; set; }
+    public DateTimeOffset? ArchivedAtUtc { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
     public SourceText? Source { get; set; }
     public List<Chunk> Chunks { get; set; } = [];
+    public List<Chapter> Chapters { get; set; } = [];
     public List<DesignRef> DesignRefs { get; set; } = [];
     public List<Volume> Volumes { get; set; } = [];
 
@@ -63,6 +79,25 @@ public class SourceText
     public int CharacterCount { get; set; }
 }
 
+// A detected chapter of the manuscript, spanning [StartOffset, EndOffset) of the source text. Detected
+// once at ingestion from heading heuristics (with a Claude pass only where the headings are genuinely
+// ambiguous) so every report finding can cite where in the book it came from.
+public class Chapter
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid NovelId { get; set; }
+
+    // 1-based reading order. Not necessarily the number printed in the book (a prologue is 1 here).
+    public int Number { get; set; }
+
+    // The heading as it reads in the manuscript ("Chapter Seven", "XII", "THE LONG ROAD"), or a
+    // synthesized label when the book has no headings at all.
+    public string Label { get; set; } = string.Empty;
+
+    public int StartOffset { get; set; }
+    public int EndOffset { get; set; }
+}
+
 public class Chunk : IRetryable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -71,6 +106,14 @@ public class Chunk : IRetryable
     public int StartOffset { get; set; }
     public int EndOffset { get; set; }
     public string Text { get; set; } = string.Empty;
+
+    // The chapter this chunk starts in (0 when chapters weren't detected), and a human-readable label
+    // covering every chapter the chunk overlaps ("Chapter 7", "Chapters 7–8"). Chunks are sized for the
+    // model, not for the book, so one chunk routinely straddles a chapter break — the label carries the
+    // whole span so a finding drawn from this chunk can cite it honestly.
+    public int ChapterNumber { get; set; }
+    public string ChapterLabel { get; set; } = string.Empty;
+
     public WorkStatus AnalysisStatus { get; set; } = WorkStatus.Pending;
     public string? PartialBibleJson { get; set; }
     public int Attempts { get; set; }
@@ -89,7 +132,22 @@ public class DesignRef : IRetryable
     public ReferenceKind Kind { get; set; }
     public string Name { get; set; } = string.Empty;
     public string CanonicalDescription { get; set; } = string.Empty;
+
+    // Approximate physical size (a character's height/build, a setting's extent), carried from the
+    // design bible so the reference sheet and panels keep the entity in proportion. "" when unknown.
+    public string Scale { get; set; } = string.Empty;
+
     public string AliasesJson { get; set; } = "[]";
+
+    // How many distinct chunks mentioned this entity, and whether it therefore earns a rendered
+    // reference sheet. A novel names a great many one-off entities (a barman in one scene, a road
+    // crossed once); rendering a sheet for each of them cost the owner's last book 126 image calls for
+    // an ensemble of maybe a dozen. Only recurring entities — seen in MORE THAN ONE chunk — get a sheet.
+    // Non-recurring entities stay in the design bible either way, so their descriptions still reach the
+    // storyboard and panel prompts; they simply aren't drawn on their own.
+    public int ChunkMentions { get; set; }
+    public bool NeedsSheet { get; set; } = true;
+
     public WorkStatus ReferenceSheetStatus { get; set; } = WorkStatus.Pending;
     public string? ReferenceImagePath { get; set; }
     public int Attempts { get; set; }
@@ -124,11 +182,28 @@ public class BookAnalysis
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid NovelId { get; set; }
     public string? ConsolidatedJson { get; set; }
+
+    // The craft half of the report (line edits, prose/voice, dialogue, the scene-by-scene map),
+    // serialized as a CraftReport. It is consolidated by a SECOND Claude call, so it is persisted
+    // separately: the two halves then succeed, fail, and retry independently, and a failure in one
+    // never re-bills the other. Null until that call has succeeded.
+    public string? CraftJson { get; set; }
+
+    // The web-searched verdicts on the checkable claims the per-chunk notes collected, serialized as a
+    // JSON array of FactCheck. Null until the fact-check step runs; "[]" when there was nothing to check.
+    // Persisted separately from ConsolidatedJson so the (billed, search-backed) verification survives a
+    // re-consolidation and feeds into it.
+    public string? FactChecksJson { get; set; }
+
     public WorkStatus PdfStatus { get; set; } = WorkStatus.Pending;
     public string? PdfPath { get; set; }
+
+    // The Drive file id this report was archived to, once the Archiving stage has uploaded it. Set
+    // together with clearing PdfPath: after archiving, Drive holds the copy.
+    public string? ArchivedDriveFileId { get; set; }
 }
 
-public class Volume
+public class Volume : IRetryable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid NovelId { get; set; }
@@ -137,11 +212,26 @@ public class Volume
     public WorkStatus PdfStatus { get; set; } = WorkStatus.Pending;
     public string? PdfPath { get; set; }
 
+    // The Drive file id this volume's PDF was archived to, once the Archiving stage has uploaded it.
+    // Set together with clearing PdfPath: after archiving, Drive holds the copy.
+    public string? ArchivedDriveFileId { get; set; }
+
     // How many of this volume's pages have already been appended to the growing on-disk PDF. Volume
     // assembly appends one page per worker call (plus the cover on the first), so a hang or restart
     // resumes mid-volume from this cursor instead of rebuilding every page in one memory-heavy pass.
     public int PdfPageCursor { get; set; }
+
+    // Binding a volume can throw (a corrupt partial PDF, a vanished page image): rather than failing
+    // permanently on the first error, assembly retries with backoff (bounded by MaxAttempts) before it
+    // gives up, and a manual retry can revive a Failed volume. Mirrors Panel's resumable retry state.
+    public int Attempts { get; set; }
+    public DateTimeOffset? NextAttemptAtUtc { get; set; }
+    public string? LastError { get; set; }
+
     public List<Page> Pages { get; set; } = [];
+
+    [NotMapped]
+    public WorkStatus WorkState { get => PdfStatus; set => PdfStatus = value; }
 }
 
 public class Page

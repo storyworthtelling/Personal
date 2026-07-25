@@ -119,6 +119,25 @@ public sealed class ProjectService
             page.LastError = null;
         }
 
+        // Failed/retrying volumes: revive AND restart the PDF from scratch (a partial file may be
+        // corrupt). This is what lets "Retry now" redo a failed binding so the book can finish — and its
+        // review report finally render, since ComposingAnalysis only runs once every volume is bound.
+        var volumes = await db.Volumes.Where(v => v.NovelId == id).ToListAsync(cancellationToken);
+        foreach (var volume in volumes.Where(v => v.PdfStatus is WorkStatus.Failed or WorkStatus.NeedsRetry))
+        {
+            volume.PdfStatus = WorkStatus.Pending;
+            volume.Attempts = 0;
+            volume.NextAttemptAtUtc = null;
+            volume.LastError = null;
+            volume.PdfPageCursor = 0;
+            volume.PdfPath = null;
+        }
+
+        // A failed analysis-report render resets too, so the revision report can rebuild.
+        var analysis = await db.BookAnalyses.FirstOrDefaultAsync(a => a.NovelId == id, cancellationToken);
+        if (analysis is not null && analysis.PdfStatus is WorkStatus.Failed or WorkStatus.NeedsRetry)
+            analysis.PdfStatus = WorkStatus.Pending;
+
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -130,8 +149,13 @@ public sealed class ProjectService
         var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
         var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
 
+        // Safety blocks only: these carry adjustable harm categories, which is the whole point of the
+        // approve-and-relax sheet. A prohibited block parks in the same state with no categories, and
+        // relaxing thresholds cannot lift it — offering "render it anyway" there would just fail again.
+        // Those panels are reworked instead, via GetProhibitedPanelAsync.
         var panels = await db.Panels
-            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval)
+            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval
+                        && p.BlockedCategoriesJson != null)
             .OrderBy(p => p.PanelNumber)
             .ToListAsync(cancellationToken);
 
@@ -187,7 +211,10 @@ public sealed class ProjectService
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == novelId, cancellationToken);
-        if (novel is null || novel.Stage != ProjectStage.Cancelled)
+        // A prohibited block no longer cancels the book — it parks the one panel and lets the rest render
+        // — so the offending panel now lives under an ACTIVE novel. Cancelled is still accepted for
+        // novels stopped by the older behavior (or by hand), but a finished book has nothing to rework.
+        if (novel is null || novel.Stage is ProjectStage.Completed)
             return null;
 
         var panel = await FindProhibitedPanelAsync(db, novelId, cancellationToken);
@@ -205,7 +232,10 @@ public sealed class ProjectService
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == novelId, cancellationToken);
-        if (novel is null || novel.Stage != ProjectStage.Cancelled)
+        // A prohibited block no longer cancels the book — it parks the one panel and lets the rest render
+        // — so the offending panel now lives under an ACTIVE novel. Cancelled is still accepted for
+        // novels stopped by the older behavior (or by hand), but a finished book has nothing to rework.
+        if (novel is null || novel.Stage is ProjectStage.Completed)
             return null;
 
         var panel = await FindProhibitedPanelAsync(db, novelId, cancellationToken);
@@ -230,19 +260,26 @@ public sealed class ProjectService
         return panel.PanelNumber;
     }
 
-    // The panel a Prohibited/IP block stopped the book on, carrying the provider's block message on
-    // LastError. The render loop settles that panel into Pending as it cancels, so a Pending panel with an
-    // error is the primary match (lowest number wins, though there's normally just one). A NeedsRetry
-    // panel is the fallback: a block that landed mid-retry — or an older cancel from before the loop
-    // settled it to Pending — can leave the offending panel there, and it must still be reworkable rather
-    // than the Rework button silently doing nothing. Pending is preferred so a fresh cancel picks the real
-    // offender, not a lower-numbered panel merely parked mid-retry on a transient error.
+    // The panel a Prohibited/IP block parked, carrying the provider's block message on LastError. The
+    // render loop settles such a panel into AwaitingApproval with NO BlockedCategoriesJson, and that
+    // absence is the discriminator: a SAFETY block parks in the same state but carries adjustable harm
+    // categories and belongs to the approve-and-relax flow, not here. Pending and NeedsRetry remain as
+    // fallbacks for novels stopped by the older cancel-the-book behavior — a panel stranded in either
+    // must still be reworkable rather than the Rework button silently doing nothing. Lowest panel number
+    // wins within each tier, though there is normally just one.
     private static async Task<Panel?> FindProhibitedPanelAsync(
         StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
     {
         var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
         var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
         var blocked = db.Panels.Where(p => pageIds.Contains(p.PageId) && p.LastError != null);
+
+        var awaiting = await blocked
+            .Where(p => p.Status == WorkStatus.AwaitingApproval && p.BlockedCategoriesJson == null)
+            .OrderBy(p => p.PanelNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (awaiting is not null)
+            return awaiting;
 
         var pending = await blocked
             .Where(p => p.Status == WorkStatus.Pending)
@@ -291,7 +328,7 @@ public sealed class ProjectService
         var now = clock.UtcNow;
         foreach (var id in ids)
         {
-            var status = await BuildStatus(db, id, rateLimits.MaxAttempts, now, cancellationToken);
+            var status = await BuildStatus(db, id, rateLimits, now, cancellationToken);
             if (status is not null)
                 statuses.Add(status);
         }
@@ -301,7 +338,7 @@ public sealed class ProjectService
     public async Task<NovelStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await BuildStatus(db, id, rateLimits.MaxAttempts, clock.UtcNow, cancellationToken);
+        return await BuildStatus(db, id, rateLimits, clock.UtcNow, cancellationToken);
     }
 
     public async Task<string?> GetVolumePdfPathAsync(Guid novelId, int number, CancellationToken cancellationToken)
@@ -323,14 +360,17 @@ public sealed class ProjectService
     }
 
     private static async Task<NovelStatus?> BuildStatus(
-        StoryboarderDbContext db, Guid id, int maxStoryboardAttempts, DateTimeOffset now, CancellationToken cancellationToken)
+        StoryboarderDbContext db, Guid id, RateLimitOptions limits, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
         if (novel is null)
             return null;
 
         var chunks = await Counts(db.Chunks.Where(c => c.NovelId == id), c => c.AnalysisStatus, cancellationToken);
-        var sheets = await Counts(db.DesignRefs.Where(r => r.NovelId == id), r => r.ReferenceSheetStatus, cancellationToken);
+        // Only entities that earn a sheet count toward this phase. Including the one-off entities would
+        // report "sheets 12 of 126" for a book where 114 of those were never going to be drawn.
+        var sheets = await Counts(
+            db.DesignRefs.Where(r => r.NovelId == id && r.NeedsSheet), r => r.ReferenceSheetStatus, cancellationToken);
 
         // Storyboarding walks the chunk list one window at a time; the cursor is how far it has got.
         // Clamp to the total so the moment it finishes (cursor == count) it reads a clean 100%.
@@ -347,8 +387,17 @@ public sealed class ProjectService
         var volumeList = await db.Volumes
             .Where(v => v.NovelId == id)
             .OrderBy(v => v.Number)
-            .Select(v => new VolumeStatus(v.Number, v.Title, v.PdfStatus == WorkStatus.Completed))
+            .Select(v => new VolumeStatus(
+                v.Number, v.Title, v.PdfStatus == WorkStatus.Completed, v.PdfStatus == WorkStatus.Failed))
             .ToListAsync(cancellationToken);
+
+        // A volume whose binding exhausted its retry budget: it blocks the book (and the review report)
+        // until the user redoes it, so surface it (with its error) so the card can prompt a retry.
+        var failedVolume = await db.Volumes
+            .Where(v => v.NovelId == id && v.PdfStatus == WorkStatus.Failed)
+            .OrderBy(v => v.Number)
+            .Select(v => new { v.LastError })
+            .FirstOrDefaultAsync(cancellationToken);
 
         // The analysis stage maps every chapter into notes before it consolidates and renders; the
         // per-chapter map is the long part, so surface it as its own progress.
@@ -364,29 +413,66 @@ public sealed class ProjectService
             .Select(p => p.ThumbImagePath ?? p.ComposedImagePath)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Panels safety-blocked mid-render and parked until the user approves relaxing the flagged
-        // category (or skips them). The book can't finalize while any remain.
+        // Panels parked awaiting the user, split by what the user can actually do about them. A safety
+        // block carries adjustable harm categories, so it belongs to the approve-and-relax review sheet; a
+        // prohibited block carries none, so relaxing is useless and it needs its art direction reworked.
+        // Counting them separately keeps the review sheet's badge honest about how many it will show.
         var pendingApprovals = await db.Panels
-            .CountAsync(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval, cancellationToken);
+            .CountAsync(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval
+                             && p.BlockedCategoriesJson != null, cancellationToken);
+        var prohibitedPanels = await db.Panels
+            .CountAsync(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval
+                             && p.BlockedCategoriesJson == null, cancellationToken);
 
         // The pipeline auto-retries transient failures (network drops, rate limits) with backoff, so a
         // novel-level LastError is usually a self-healing hiccup, not a stall. Two things genuinely need
         // the user: a storyboard window that has burned through its bounded retry budget, and any panel
         // parked awaiting the user's OK. Everything else stays quiet while the worker self-heals.
         var needsAttention = pendingApprovals > 0
+            || prohibitedPanels > 0
+            || failedVolume is not null
             || (novel.LastError is not null
                 && novel.Stage == ProjectStage.Storyboarding
                 && novel.StoryboardCursor < chunkCount
-                && novel.StoryboardAttempts >= maxStoryboardAttempts);
+                && novel.StoryboardAttempts >= limits.MaxAttempts);
+
+        // A failed binding sets no novel-level error (the failure is recorded on the Volume), so surface
+        // it here as the card's message when nothing more specific is set.
+        var lastError = novel.LastError ?? failedVolume?.LastError;
+
+        // Project what the run will cost, but only while abandoning it is still nearly free — once panels
+        // start rendering, "panels 40 of 2160" is better information than any projection. The daily image
+        // cap is usually what governs, and on a full-length novel that is weeks, which is worth knowing
+        // before the first render rather than discovered part-way through.
+        Domain.Pipeline.RunEstimate? estimate = null;
+        if (novel.Stage is ProjectStage.Created or ProjectStage.Ingesting
+            or ProjectStage.BuildingDesignBible or ProjectStage.Storyboarding)
+        {
+            var characters = await db.SourceTexts
+                .Where(s => s.NovelId == id)
+                .Select(s => s.CharacterCount)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (characters > 0)
+            {
+                // Once the bible is consolidated the sheet count is known exactly; before that, fall back
+                // to a small ensemble, since only recurring entities are drawn now.
+                var sheetCount = sheets.Total > 0 ? sheets.Total : 12;
+                estimate = Domain.Pipeline.RunEstimator.Estimate(
+                    characters, novel.ReportOnly,
+                    Domain.Text.TextChunker.DefaultTargetChars, limits.StoryboardWindowChars,
+                    limits.ClaudeRequestsPerDay, limits.GeminiRequestsPerDay, sheetCount);
+            }
+        }
 
         // Only surface the resume time while it's still in the future; once it passes it's stale, so the
         // card stops showing it (and the worker has presumably resumed).
         var rateLimitedUntil = novel.RateLimitedUntilUtc is { } until && until > now ? novel.RateLimitedUntilUtc : null;
 
         return new NovelStatus(
-            novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
+            novel.Id, novel.Title, novel.Stage.ToString(), lastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
-            analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals, rateLimitedUntil);
+            analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals,
+            prohibitedPanels, estimate, rateLimitedUntil);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per
@@ -421,7 +507,9 @@ public sealed class ProjectService
 
             await AppendPhase(report, "Chunks", db.Chunks.Where(c => c.NovelId == novel.Id),
                 c => c.AnalysisStatus, c => c.LastError, cancellationToken);
-            await AppendPhase(report, "Reference sheets", db.DesignRefs.Where(r => r.NovelId == novel.Id),
+            // Scoped to the entities that earn a sheet, matching the live status counts — the one-off
+            // entities are in the bible but were never queued to be drawn.
+            await AppendPhase(report, "Reference sheets", db.DesignRefs.Where(r => r.NovelId == novel.Id && r.NeedsSheet),
                 r => r.ReferenceSheetStatus, r => r.LastError, cancellationToken);
 
             var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);
@@ -430,10 +518,10 @@ public sealed class ProjectService
                 p => p.Status, p => p.LastError, cancellationToken);
             await AppendPhase(report, "Pages", db.Pages.Where(p => volumeIds.Contains(p.VolumeId)),
                 p => p.CompositionStatus, p => p.LastError, cancellationToken);
-            // Volumes carry no LastError column, so there's no message to sample (PdfPath is null on a
-            // failed volume); the failed/retry counts on the line are what matter here.
+            // Volumes now carry a LastError (binding retries with backoff), so a failed/retrying volume
+            // samples why it failed, exactly like the other phases.
             await AppendPhase(report, "Volumes", db.Volumes.Where(v => v.NovelId == novel.Id),
-                v => v.PdfStatus, v => v.PdfPath, cancellationToken);
+                v => v.PdfStatus, v => v.LastError, cancellationToken);
             await AppendPhase(report, "Analysis notes", db.ChunkAnalyses.Where(a => a.NovelId == novel.Id),
                 a => a.Status, a => a.LastError, cancellationToken);
         }

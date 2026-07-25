@@ -254,6 +254,49 @@ public class ProjectServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RetryAsync_RevivesFailedVolumeBinding_AndFailedAnalysis()
+    {
+        Guid novelId;
+        using (var context = database.NewContext())
+        {
+            var novel = new Novel
+            {
+                Title = "Quest", GoogleDocId = "doc", Stage = ProjectStage.AssemblingVolumes,
+                CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+            };
+            novel.Volumes.Add(new Volume
+            {
+                NovelId = novel.Id, Number = 1, Title = "V1",
+                PdfStatus = WorkStatus.Failed, Attempts = 6, PdfPageCursor = 2,
+                PdfPath = "/tmp/partial.pdf", NextAttemptAtUtc = clock.UtcNow.AddHours(4),
+                LastError = "binding boom"
+            });
+            novel.Analysis = new BookAnalysis { NovelId = novel.Id, PdfStatus = WorkStatus.Failed };
+            context.Novels.Add(novel);
+            context.SaveChanges();
+            novelId = novel.Id;
+        }
+
+        await NewService().RetryAsync(novelId, CancellationToken.None);
+
+        using (var context = database.NewContext())
+        {
+            // The failed binding is revived AND restarted from scratch (a partial PDF may be corrupt).
+            var volume = context.Volumes.Single(v => v.NovelId == novelId);
+            Assert.Equal(WorkStatus.Pending, volume.PdfStatus);
+            Assert.Equal(0, volume.Attempts);
+            Assert.Equal(0, volume.PdfPageCursor);
+            Assert.Null(volume.PdfPath);
+            Assert.Null(volume.NextAttemptAtUtc);
+            Assert.Null(volume.LastError);
+
+            // The failed analysis render resets too, so the report rebuilds once the volume binds.
+            var analysis = context.BookAnalyses.Single(a => a.NovelId == novelId);
+            Assert.Equal(WorkStatus.Pending, analysis.PdfStatus);
+        }
+    }
+
+    [Fact]
     public async Task RetryAsync_LeavesCancelledProjectsAlone()
     {
         var id = SeedNovel(ProjectStage.Cancelled);
@@ -309,7 +352,7 @@ public class ProjectServiceTests : IDisposable
         Assert.Contains("Panel 4", report);
         // The exact prompt the panel was rendered with, reconstructed via the shared PanelImagePrompt.
         Assert.Contains("Comic panel in this style: noir. a recognizable trademarked hero.", report);
-        Assert.Contains("Keep the characters and settings visually consistent", report);
+        Assert.Contains("Match each character's and setting's appearance", report);
         Assert.Contains("PROHIBITED_CONTENT", report);
         Assert.Contains("Hero", report);
     }

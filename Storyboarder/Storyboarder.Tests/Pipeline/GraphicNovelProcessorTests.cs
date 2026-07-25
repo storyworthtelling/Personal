@@ -1,14 +1,17 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using PdfSharp.Pdf.IO;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
+using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
+using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
 using Xunit;
 
@@ -26,6 +29,17 @@ public class GraphicNovelProcessorTests : IDisposable
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int panelRenderCalls;
     private int chapterAnalysisCalls;
+    private readonly List<string> chapterLabelsSeen = [];
+
+    // When set, NewProcessor binds volumes through this composer instead of a plain one, so a test can
+    // make PDF assembly throw. It's a field (not a NewProcessor arg) so the fresh processor DriveToCompletion
+    // builds each cycle keeps using it.
+    private IVolumePdfComposer? volumeComposerOverride;
+
+    // Archive settings and a fake Drive for the archive stage; null/off by default so every
+    // existing test drives the unarchived path.
+    private ArchiveOptions? archiveOptions;
+    private IDriveArchive? driveArchive;
 
     public GraphicNovelProcessorTests()
     {
@@ -42,14 +56,19 @@ public class GraphicNovelProcessorTests : IDisposable
                 "Hero reached the castle."));
 
         // The first chapter-analysis call is rate-limited; the worker must reschedule and succeed on retry.
-        claude.Setup(c => c.AnalyzeChapter(It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Returns(() =>
+        claude.Setup(c => c.AnalyzeChapter(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string chapterLabel, IReadOnlyList<string> _, CancellationToken _) =>
             {
                 chapterAnalysisCalls++;
+                chapterLabelsSeen.Add(chapterLabel);
                 return chapterAnalysisCalls == 1
                     ? Task.FromException<ChapterNotes>(new RateLimitException("429 from test"))
                     : Task.FromResult(new ChapterNotes(
-                        ["Hero"], ["Hero walks to the castle"], ["Hero resolves to enter"], [], [], [], ["Vivid setting"], []));
+                        chapterLabel,
+                        ["Hero"], ["Hero walks to the castle"], ["Hero resolves to enter"], [], [], [], ["Vivid setting"], [],
+                        ["\"He felt the cold.\" — cut the filter"], ["Filter words recur"], ["Hero sounds like Villain"],
+                        ["The hero knocks | opens the confrontation | earns its place"]));
             });
 
         claude.Setup(c => c.ConsolidateAnalysis(
@@ -57,10 +76,28 @@ public class GraphicNovelProcessorTests : IDisposable
             .ReturnsAsync(new BookAnalysisResult(
                 "A hero reaches a castle.", "The hero journeys to the castle and knocks.",
                 [new CharacterProfile("Hero", "protagonist", "Grows from timid to resolute.", ["approaches: Castle"])],
-                ["perseverance"], ["How did the gate open?"], ["Eye colour shifts"], ["Castle geography"], ["Slow open"],
+                ["perseverance"],
+                [new Finding("Chapter 1", "How did the gate open?")],
+                [new Finding("Chapter 1", "Eye colour shifts")],
+                [new Finding("Chapter 1", "Castle geography")],
+                [new Finding("Chapter 1", "Slow open")],
                 [new Review("developmental editor", "Promising but uneven.", ["Voice"], ["Pacing"], "Tighten the opening.")],
-                [new RevisionItem("High", "Sagging middle", "Cut a subplot.")],
-                ["Comparable Title"], "Upmarket fantasy for adult readers."));
+                [new RevisionItem("High", "Chapter 1", "Sagging middle", "Cut a subplot.")],
+                ["Comparable Title"], "Upmarket fantasy for adult readers.",
+                // The craft sections arrive from ConsolidateCraft and are folded in by the processor.
+                [], [], [], []));
+
+        claude.Setup(c => c.ConsolidateCraft(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CraftReport(
+                [new LineEdit("Chapter 1", "He felt the cold.", "The cold came.", "Filtered.")],
+                [new ProseNote("Chapter 1", "Filter words", "\"he felt\"", "Cut the filter.")],
+                [new DialogueNote("Chapter 1", "Hero", "On the nose.", "Trust the subtext.")],
+                [new SceneBeat("Chapter 1", "The hero knocks.", "Opens the confrontation.", "Earns its place.")]));
+
+        claude.Setup(c => c.CheckFacts(
+                It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new FactCheck("Paris is in France", "Correct", "Confirmed.", "Chapter 1")]);
 
         gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
@@ -85,13 +122,13 @@ public class GraphicNovelProcessorTests : IDisposable
             Directory.Delete(outputRoot, recursive: true);
     }
 
-    private GraphicNovelProcessor NewProcessor() => new(
+    private GraphicNovelProcessor NewProcessor(int maxPanelsPerPage = 6) => new(
         database,
         claude.Object,
         gemini.Object,
         new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
         new SkiaPageComposer(Options.Create(new PageLayoutOptions())),
-        new PdfVolumeComposer(),
+        volumeComposerOverride ?? new PdfVolumeComposer(),
         new AnalysisPdfComposer(new PdfVolumeComposer(), new AnalysisDocumentRenderer()),
         clock,
         Options.Create(new RateLimitOptions
@@ -100,12 +137,26 @@ public class GraphicNovelProcessorTests : IDisposable
             GeminiRequestsPerMinute = 1000, GeminiRequestsPerDay = 100000,
             BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
-        NullLogger<GraphicNovelProcessor>.Instance);
+        Options.Create(new PageLayoutOptions { MaxPanelsPerPage = maxPanelsPerPage }),
+        Options.Create(archiveOptions ?? new ArchiveOptions()),
+        NullLogger<GraphicNovelProcessor>.Instance,
+        driveArchive);
 
-    private Guid SeedNovel(string? fullText = null)
+    private ProjectService NewProjectService() => new(
+        database,
+        Mock.Of<IGoogleDocsClient>(),
+        new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
+        clock,
+        Options.Create(new RateLimitOptions { MaxAttempts = 6 }));
+
+    private Guid SeedNovel(string? fullText = null, bool reportOnly = false)
     {
         var text = fullText ?? "A short tale. The hero walked to the castle and knocked on the gate.";
-        var novel = new Novel { Title = "Quest", GoogleDocId = "doc", CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow };
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc", ReportOnly = reportOnly,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
         novel.Source = new SourceText
         {
             NovelId = novel.Id,
@@ -122,6 +173,138 @@ public class GraphicNovelProcessorTests : IDisposable
     {
         using var context = database.NewContext();
         return context.Novels.Single(n => n.Id == novelId).Stage;
+    }
+
+    [Fact]
+    public async Task Ingestion_DetectsChapters_AndLabelsEveryChunk()
+    {
+        // Three headed chapters. Chunks are sized for the model, not the book, so this whole
+        // manuscript is a single chunk — which therefore straddles both breaks and must cite the whole
+        // span it covers rather than one chapter.
+        var paragraph = string.Join(" ", Enumerable.Repeat(
+            "The hero walked on through the long grey hall toward the gate, thinking of home.", 40));
+        var manuscript = string.Join("\n\n",
+            "Chapter 1", paragraph, paragraph,
+            "Chapter 2", paragraph, paragraph,
+            "Chapter 3", paragraph, paragraph);
+        var novelId = SeedNovel(manuscript);
+
+        // Created -> Ingesting -> chunks + chapters.
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == novelId);
+        Assert.True(novel.ChaptersDetected);
+
+        var chapters = context.Chapters.Where(c => c.NovelId == novelId).OrderBy(c => c.Number).ToList();
+        Assert.Equal(["Chapter 1", "Chapter 2", "Chapter 3"], chapters.Select(c => c.Label));
+        Assert.Equal(0, chapters[0].StartOffset);
+        Assert.Equal(manuscript.Length, chapters[^1].EndOffset);
+
+        var chunk = Assert.Single(context.Chunks.Where(c => c.NovelId == novelId));
+        Assert.Equal(1, chunk.ChapterNumber);
+        Assert.Equal("Chapters 1–3", chunk.ChapterLabel);
+    }
+
+    [Fact]
+    public async Task Ingestion_WithoutHeadings_StillLabelsChunks_WithASynthesizedChapter()
+    {
+        var novelId = SeedNovel();
+
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        using var context = database.NewContext();
+        var chapter = Assert.Single(context.Chapters.Where(c => c.NovelId == novelId));
+        Assert.Equal(1, chapter.Number);
+        var chunk = Assert.Single(context.Chunks.Where(c => c.NovelId == novelId));
+        Assert.Equal(chapter.Label, chunk.ChapterLabel);
+        Assert.Equal(1, chunk.ChapterNumber);
+    }
+
+    [Fact]
+    public async Task AnalysisMapStep_CarriesEachChunksChapterIntoItsNotes()
+    {
+        var novelId = SeedNovel("Chapter 1\n\nThe hero walked to the castle and knocked on the gate.");
+
+        await DriveToCompletion(novelId, _ => { });
+
+        // Every map call was told which chapter it was reading, and the stored notes carry it through
+        // to the consolidation — that is what lets a finding in the report cite a chapter.
+        Assert.NotEmpty(chapterLabelsSeen);
+        Assert.All(chapterLabelsSeen, label => Assert.Equal("Chapter 1", label));
+
+        using var context = database.NewContext();
+        var notes = context.ChunkAnalyses.Where(a => a.NovelId == novelId).ToList();
+        Assert.NotEmpty(notes);
+        Assert.All(notes, unit => Assert.Contains("Chapter 1", unit.NotesJson));
+    }
+
+    [Fact]
+    public async Task ReportOnlyDraft_SkipsEveryArtStage_AndStillProducesTheAnalysisPdf()
+    {
+        var novelId = SeedNovel(reportOnly: true);
+        var stagesSeen = new List<ProjectStage>();
+
+        await DriveToCompletion(novelId, stagesSeen.Add);
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.Contains(ProjectStage.BuildingDesignBible, stagesSeen);
+        Assert.Contains(ProjectStage.ComposingAnalysis, stagesSeen);
+        Assert.DoesNotContain(ProjectStage.Storyboarding, stagesSeen);
+        Assert.DoesNotContain(ProjectStage.RenderingImages, stagesSeen);
+        Assert.DoesNotContain(ProjectStage.ComposingPages, stagesSeen);
+        Assert.DoesNotContain(ProjectStage.AssemblingVolumes, stagesSeen);
+
+        // No art was commissioned at all: no storyboard, no panels, and no reference sheets — which
+        // are the expensive half of the design-bible stage and useless when nothing will be drawn.
+        claude.Verify(c => c.Storyboard(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        gemini.Verify(g => g.GenerateReferenceSheet(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(0, panelRenderCalls);
+
+        using var context = database.NewContext();
+        Assert.Empty(context.Volumes.Where(v => v.NovelId == novelId));
+        // The design bible is still built — the report's cast comes from it.
+        Assert.NotEmpty(context.DesignRefs.Where(r => r.NovelId == novelId));
+
+        var analysis = Assert.Single(context.BookAnalyses.Where(a => a.NovelId == novelId));
+        Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);
+        Assert.True(File.Exists(analysis.PdfPath!));
+    }
+
+    [Fact]
+    public async Task Analysis_ConsolidatesBothHalves_AndFoldsCraftIntoTheRenderedReport()
+    {
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        // Two reduce calls, each exactly once: the story and craft halves are billed, retried, and
+        // stored independently, so neither is re-run because the other has not happened yet.
+        claude.Verify(c => c.ConsolidateAnalysis(
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        claude.Verify(c => c.ConsolidateCraft(
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        using var context = database.NewContext();
+        var analysis = Assert.Single(context.BookAnalyses.Where(a => a.NovelId == novelId));
+        Assert.NotNull(analysis.ConsolidatedJson);
+        Assert.NotNull(analysis.CraftJson);
+        Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var craft = JsonSerializer.Deserialize<CraftReport>(analysis.CraftJson!, options)!;
+        Assert.Equal("Chapter 1", Assert.Single(craft.SceneBreakdown).Chapter);
+        Assert.Equal("Chapter 1", Assert.Single(craft.LineEdits).Chapter);
+
+        // The story half's findings keep the chapter they were drawn from, all the way to storage.
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson!, options)!;
+        Assert.Equal("Chapter 1", Assert.Single(report.PlotHoles).Chapter);
     }
 
     [Fact]
@@ -480,6 +663,282 @@ public class GraphicNovelProcessorTests : IDisposable
         using var stream = new MemoryStream(File.ReadAllBytes(volume.PdfPath!));
         using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.Equal(4, pdf.PageCount); // cover + 3 pages
+    }
+
+    [Fact]
+    public async Task Storyboard_splits_a_page_over_the_cap_into_several_balanced_pages()
+    {
+        // Claude returns a single page of 8 panels; with the cap at 6 it must become two physical pages
+        // of 4 panels each (balanced, not 6+2) so panels are never squished into a dense grid.
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoryboardSegment(
+                [new VolumeDraft(1, "Volume One",
+                    [new PageDraft(1, Enumerable.Range(1, 8)
+                        .Select(i => new PanelDraft($"Beat {i} in action", null, null, ["Hero"]))
+                        .ToList())])],
+                "Hero acted."));
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var volumeIds = ctx.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToList();
+        var pages = ctx.Pages.Where(p => volumeIds.Contains(p.VolumeId)).OrderBy(p => p.PageNumber).ToList();
+
+        // Eight panels at a cap of six became two pages, split 4 + 4, numbered consecutively.
+        Assert.Equal(2, pages.Count);
+        Assert.Equal([1, 2], pages.Select(p => p.PageNumber).ToList());
+        Assert.All(pages, p => Assert.Equal(4, ctx.Panels.Count(pn => pn.PageId == p.Id)));
+    }
+
+    [Fact]
+    public async Task OneOffEntities_GetNoReferenceSheet_ButStayInTheBible()
+    {
+        // The owner's last book spent 126 image calls drawing a sheet for every named entity, including
+        // walk-ons seen once. Only entities recurring across chunks should be drawn; the rest must remain
+        // in the bible so their descriptions still reach the storyboard and panel prompts.
+        var manuscript = string.Join("\n\n",
+            Enumerable.Range(0, 2000).Select(i =>
+                $"Paragraph {i}: the hero walks the long grey hall of the castle, thinking of the road ahead " +
+                "and of everything that was left behind in the valley below."));
+
+        // A recurring pair in every chunk, plus a walk-on unique to each chunk.
+        var call = 0;
+        claude.Setup(c => c.ExtractEntities(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                var n = call++;
+                return new DesignBibleFragment(
+                    [new EntityMention("Hero", "a brave knight"), new EntityMention($"Barman {n}", "balding, aproned")],
+                    [new EntityMention("Castle", "a grey stone fortress")]);
+            });
+
+        var novelId = SeedNovel(manuscript);
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var refs = ctx.DesignRefs.Where(r => r.NovelId == novelId).ToList();
+        var chunkCount = ctx.Chunks.Count(c => c.NovelId == novelId);
+        Assert.True(chunkCount > 1, $"needed a multi-chunk manuscript to have a recurrence signal, got {chunkCount}");
+
+        var hero = refs.Single(r => r.Name == "Hero");
+        var walkOns = refs.Where(r => r.Name.StartsWith("Barman", StringComparison.Ordinal)).ToList();
+        Assert.NotEmpty(walkOns);
+
+        // The recurring cast is drawn; the walk-ons are not queued at all.
+        Assert.True(hero.NeedsSheet);
+        Assert.Equal(WorkStatus.Completed, hero.ReferenceSheetStatus);
+        Assert.All(walkOns, r =>
+        {
+            Assert.False(r.NeedsSheet);
+            Assert.Null(r.ReferenceImagePath);
+        });
+
+        // But they are still in the bible, so the storyboard and panel prompts can still describe them.
+        Assert.All(walkOns, r => Assert.False(string.IsNullOrWhiteSpace(r.CanonicalDescription)));
+
+        // And the undrawn entities didn't inflate the progress the card reports.
+        var status = await NewProjectService().GetStatusAsync(novelId, CancellationToken.None);
+        Assert.Equal(refs.Count(r => r.NeedsSheet), status!.ReferenceSheets.Total);
+        Assert.True(status.ReferenceSheets.Total < refs.Count);
+    }
+
+    // A Drive stand-in that records what was uploaded, and can be told to fail every upload.
+    private sealed class FakeDrive(bool fail = false, string? parent = "parent-folder") : IDriveArchive
+    {
+        public List<string> Uploaded { get; } = [];
+        public string? CreatedFolderUnder { get; private set; }
+
+        public Task<string?> FindParentFolder(string fileId, CancellationToken cancellationToken) =>
+            Task.FromResult(parent);
+
+        public Task<string> EnsureFolder(string parentFolderId, string name, CancellationToken cancellationToken)
+        {
+            CreatedFolderUnder = parentFolderId;
+            return Task.FromResult($"folder-for-{name}");
+        }
+
+        public Task<string> UploadFile(
+            string folderId, string name, string mimeType, byte[] content, CancellationToken cancellationToken)
+        {
+            if (fail)
+                throw new InvalidOperationException("drive is unreachable");
+            Uploaded.Add(name);
+            return Task.FromResult($"file-{Uploaded.Count}");
+        }
+    }
+
+    [Fact]
+    public async Task ArchivingOff_FinishesTheBook_WithoutTouchingDrive()
+    {
+        // The default. Archiving must be opt-in, because the Drive write scope isn't granted yet and a
+        // mandatory archive step would strand every finished book on a permission error.
+        var drive = new FakeDrive();
+        driveArchive = drive;
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.Empty(drive.Uploaded);
+        using var ctx = database.NewContext();
+        Assert.Null(ctx.Novels.Single(n => n.Id == novelId).ArchivedAtUtc);
+    }
+
+    [Fact]
+    public async Task ArchivingOn_UploadsVolumesAndReport_BesideTheManuscript()
+    {
+        var drive = new FakeDrive();
+        driveArchive = drive;
+        archiveOptions = new ArchiveOptions { Enabled = true };
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        // The folder is created under the manuscript's own parent, not somewhere app-specific.
+        Assert.Equal("parent-folder", drive.CreatedFolderUnder);
+        Assert.Contains(drive.Uploaded, n => n.Contains("Volume 1", StringComparison.Ordinal));
+        Assert.Contains(drive.Uploaded, n => n.Contains("revision report", StringComparison.Ordinal));
+
+        using var ctx = database.NewContext();
+        var novel = ctx.Novels.Single(n => n.Id == novelId);
+        Assert.NotNull(novel.ArchivedAtUtc);
+        Assert.NotNull(novel.ArchiveFolderId);
+        Assert.All(ctx.Volumes.Where(v => v.NovelId == novelId), v => Assert.NotNull(v.ArchivedDriveFileId));
+        Assert.NotNull(ctx.BookAnalyses.Single(a => a.NovelId == novelId).ArchivedDriveFileId);
+    }
+
+    [Fact]
+    public async Task ArchivingThatKeepsFailing_StillFinishesTheBook()
+    {
+        // The outputs are already on disk, so a Drive failure is an inconvenience, not a lost book. It must
+        // exhaust its retries and then finish anyway, with the reason recorded.
+        driveArchive = new FakeDrive(fail: true);
+        archiveOptions = new ArchiveOptions { Enabled = true };
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        using var ctx = database.NewContext();
+        var novel = ctx.Novels.Single(n => n.Id == novelId);
+        Assert.Null(novel.ArchivedAtUtc);
+        Assert.Contains("archive", novel.LastError!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task NoResolvableDriveFolder_FinishesWithoutArchiving()
+    {
+        // A manuscript with no resolvable parent (a shared file, or one at the root of a shared drive) has
+        // nowhere sensible to archive to. That is a reason to skip, not to fail.
+        var drive = new FakeDrive(parent: null);
+        driveArchive = drive;
+        archiveOptions = new ArchiveOptions { Enabled = true };
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.Empty(drive.Uploaded);
+    }
+
+    [Fact]
+    public async Task FreeLocalCopies_ReclaimsIntermediates_ButKeepsTheDeliverables()
+    {
+        // Panel and page rasters are the bulk of the storage and are reproducible from the PDFs; the PDFs
+        // themselves must survive, since they are what the owner actually reads.
+        driveArchive = new FakeDrive();
+        archiveOptions = new ArchiveOptions { Enabled = true, FreeLocalCopies = true };
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        using var ctx = database.NewContext();
+        var volume = ctx.Volumes.Single(v => v.NovelId == novelId);
+        Assert.True(File.Exists(volume.PdfPath!), "the volume PDF must survive being archived");
+        Assert.False(Directory.Exists(Path.Combine(outputRoot, novelId.ToString(), "panels")),
+            "intermediate panel images should have been reclaimed");
+    }
+
+    [Fact]
+    public async Task VolumeBinding_ThatThrowsOnce_RetriesWithBackoff_ThenCompletes()
+    {
+        // A throw during PDF assembly used to mark the volume Failed permanently, pinning the novel at
+        // AssemblingVolumes forever. It must instead retry with backoff and bind on recovery.
+        volumeComposerOverride = new FlakyPdfComposer(failTimes: 1);
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var volume = Assert.Single(ctx.Volumes.Where(v => v.NovelId == novelId));
+        Assert.Equal(WorkStatus.Completed, volume.PdfStatus);
+        Assert.True(File.Exists(volume.PdfPath!));
+        // The one failure was recorded then cleared on the clean bind.
+        Assert.Equal(0, volume.Attempts);
+        Assert.Null(volume.LastError);
+    }
+
+    [Fact]
+    public async Task VolumeBinding_ThatKeepsThrowing_FailsAfterMaxAttempts_BlockingAnalysis()
+    {
+        // A binding that never succeeds exhausts its retry budget and stops (Failed), leaving the novel
+        // at AssemblingVolumes with the review report not yet produced — the state a manual retry fixes.
+        volumeComposerOverride = new FlakyPdfComposer(failTimes: int.MaxValue);
+
+        var novelId = SeedNovel();
+
+        var failed = false;
+        for (int i = 0; i < 400 && !failed; i++)
+        {
+            var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+            if (result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+
+            using var ctx = database.NewContext();
+            if (ctx.Volumes.Any(v => v.NovelId == novelId && v.PdfStatus == WorkStatus.Failed))
+                failed = true;
+        }
+
+        Assert.True(failed, "The binding should have exhausted its retries and been marked Failed.");
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == novelId);
+        Assert.Equal(ProjectStage.AssemblingVolumes, novel.Stage);
+        var volume = Assert.Single(context.Volumes.Where(v => v.NovelId == novelId));
+        Assert.Equal(WorkStatus.Failed, volume.PdfStatus);
+        Assert.False(string.IsNullOrEmpty(volume.LastError));
+        // The gate held: the analysis report was never seeded, let alone rendered.
+        Assert.Empty(context.BookAnalyses.Where(a => a.NovelId == novelId));
+    }
+
+    // A volume PDF composer that throws on its first `failTimes` AppendPage calls, then delegates to a
+    // real composer — so a test can exercise binding retry/failure and still get a valid PDF on recovery.
+    private sealed class FlakyPdfComposer(int failTimes) : IVolumePdfComposer
+    {
+        private readonly PdfVolumeComposer inner = new();
+        private int failures;
+
+        public byte[] Compose(IReadOnlyList<byte[]> pageImages, int dpi) => inner.Compose(pageImages, dpi);
+
+        public byte[] AppendPage(byte[]? existingPdf, byte[] pageImage, int dpi)
+        {
+            if (failures < failTimes)
+            {
+                failures++;
+                throw new InvalidOperationException("simulated binding failure");
+            }
+            return inner.AppendPage(existingPdf, pageImage, dpi);
+        }
     }
 
     // Drives the pipeline to a terminal stage, invoking inspect() with the current stage before each

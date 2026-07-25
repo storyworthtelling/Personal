@@ -21,6 +21,10 @@ public partial class SetupPage : ContentPage
         base.OnAppearing();
         ClaudeKeyEntry.Text = SettingsStore.ClaudeApiKey;
         GeminiKeyEntry.Text = SettingsStore.GeminiApiKey;
+        ArchiveSwitch.IsToggled = SettingsStore.ArchiveToDrive;
+        FreeSpaceSwitch.IsToggled = SettingsStore.FreeLocalCopiesAfterArchive;
+        // Reclaiming space only means anything once the copies are safely elsewhere.
+        FreeSpaceSwitch.IsEnabled = ArchiveSwitch.IsToggled;
         UpdateGoogleStatus();
         SigningInfoLabel.Text = SigningInfoText();
 
@@ -308,4 +312,22 @@ public partial class SetupPage : ContentPage
         await Navigation.PopAsync();
         await Navigation.PopAsync();
     }
+
+    // Both toggles save on change — the setting is read live by the worker, so there is nothing to confirm
+    // and no success message to show (DESIGN.md §5: success is the state change itself).
+    private void OnArchiveToggled(object? sender, ToggledEventArgs e)
+    {
+        SettingsStore.ArchiveToDrive = e.Value;
+        FreeSpaceSwitch.IsEnabled = e.Value;
+        // Never leave "free up space" armed while archiving is off: that combination would delete the
+        // intermediates without anything having been uploaded.
+        if (!e.Value && FreeSpaceSwitch.IsToggled)
+        {
+            FreeSpaceSwitch.IsToggled = false;
+            SettingsStore.FreeLocalCopiesAfterArchive = false;
+        }
+    }
+
+    private void OnFreeSpaceToggled(object? sender, ToggledEventArgs e) =>
+        SettingsStore.FreeLocalCopiesAfterArchive = e.Value;
 }

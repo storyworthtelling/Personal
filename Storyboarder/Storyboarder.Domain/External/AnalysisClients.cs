@@ -18,19 +18,41 @@ public interface IClaudeAnalysisClient
 
     // Literary-analysis "map": observations for one manuscript chunk (character beats, events,
     // possible inconsistencies, checkable claims, strengths/weaknesses) anchored to the known cast.
+    // chapterLabel names the chapter(s) the chunk covers ("Chapter 7", "Chapters 7–8"); it is given to
+    // the model as context AND stamped onto the returned notes, so the consolidated report can cite a
+    // chapter for every finding. Pass an empty label when the chapters aren't known.
     Task<ChapterNotes> AnalyzeChapter(
         string chapterText,
+        string chapterLabel,
         IReadOnlyList<string> characterNames,
         CancellationToken cancellationToken);
 
-    // Literary-analysis "reduce": consolidates all chunk notes into the whole revision report
+    // Literary-analysis "reduce", story half: consolidates all chunk notes into the story report
     // (character map + arcs, plot holes, inconsistencies/inaccuracies, multi-perspective reviews,
-    // a prioritized revision plan, and publish-oriented positioning).
+    // a prioritized revision plan, and publish-oriented positioning). The craft sections come back
+    // empty here — see ConsolidateCraft.
     Task<BookAnalysisResult> ConsolidateAnalysis(
         string title,
         IReadOnlyList<ChapterNotes> notes,
         DesignBible bible,
         string continuitySummary,
+        CancellationToken cancellationToken);
+
+    // Literary-analysis "reduce", craft half: line-level edits, prose style & voice, dialogue
+    // critique, and the scene-by-scene breakdown. A SECOND call rather than more sections on the
+    // first: together they are more output than one call can produce without truncating, and a single
+    // reply that long streams for long enough that the background worker is killed mid-flight. The
+    // caller folds the result into the story report with BookAnalysisResult.WithCraft.
+    Task<CraftReport> ConsolidateCraft(
+        string title,
+        IReadOnlyList<ChapterNotes> notes,
+        CancellationToken cancellationToken);
+
+    // Puts the manuscript's checkable real-world statements to a web search and reports what it found.
+    // Separate from the other reduce calls because it is the only one granted a search tool: the rest
+    // must reason from the manuscript alone, not from whatever the web says the book should contain.
+    Task<IReadOnlyList<FactCheck>> CheckFacts(
+        IReadOnlyList<ChapterNotes> notes,
         CancellationToken cancellationToken);
 
     // Restages a panel's visual prompt so objectionable content is implied — occluded, off-frame, or

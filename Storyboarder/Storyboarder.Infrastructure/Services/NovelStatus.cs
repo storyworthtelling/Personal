@@ -8,7 +8,7 @@ public sealed record BlockedPanel(
     Guid PanelId, int PanelNumber, string VisualPrompt, string? Dialogue, string? Caption,
     IReadOnlyList<string> Categories, string? Reason);
 
-public sealed record VolumeStatus(int Number, string Title, bool PdfReady);
+public sealed record VolumeStatus(int Number, string Title, bool PdfReady, bool Failed = false);
 
 // The prohibited/IP-blocked panel a Cancelled novel is stuck on, surfaced so the user can rework its
 // art direction and resume. Reason is the provider's block message; VisualPrompt is what gets reworked.
@@ -42,6 +42,14 @@ public sealed record NovelStatus(
     // Panels safety-blocked mid-render and parked until the user approves relaxing the flagged category
     // (or skips them). Non-zero means the book can't finalize until the user reviews them.
     int PendingApprovals = 0,
+    // Panels refused as prohibited/IP content even after the prompt was restaged. These carry no
+    // adjustable harm category, so relaxing thresholds cannot help and the approve/skip sheet has nothing
+    // to offer — they need the art direction reworked instead, which is a different action on the card.
+    int ProhibitedPanels = 0,
+    // What this conversion is projected to cost, surfaced only while it is still cheap to abandon (before
+    // any panel has been rendered). Once rendering starts the real counts are better information than a
+    // projection, so this goes null. Null also when the manuscript hasn't been ingested yet.
+    Domain.Pipeline.RunEstimate? Estimate = null,
     // When a provider rate limit last deferred this novel, the (future) UTC instant it expects to try
     // again — set only when still in the future, so the card can say "resumes ~3:47 pm" in local time.
     DateTimeOffset? RateLimitedUntilUtc = null);
