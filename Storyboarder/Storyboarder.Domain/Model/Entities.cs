@@ -15,6 +15,17 @@ public class Novel
     public string ArtStyle { get; set; } = ArtStyles.Default;
     public ProjectStage Stage { get; set; } = ProjectStage.Created;
 
+    // Draft versioning. A "project" is one book the owner is revising; each draft is a fresh conversion
+    // of a re-picked Google Doc, all sharing one ProjectId. The first draft's ProjectId is its own Id
+    // (so a lone novel is a one-draft project), DraftNumber is 1, and PreviousDraftId is null. A later
+    // draft carries the same ProjectId, the next DraftNumber, and PreviousDraftId pointing at the draft
+    // it was made from — which is what the diff and the incremental re-render read to reuse the panels
+    // whose source text didn't move. Not a navigation property: drafts are queried by ProjectId, and a
+    // self-referencing FK would drag the whole prior graph into the change-tracker on every save.
+    public Guid ProjectId { get; set; }
+    public int DraftNumber { get; set; } = 1;
+    public Guid? PreviousDraftId { get; set; }
+
     // Report-only draft: skip every art stage (storyboarding, panel renders, page composition, volume
     // binding) and go straight from the design bible to the revision report. Not the default — the
     // illustration is the comprehension probe, so most drafts still want it — but a re-read of a draft
@@ -259,6 +270,20 @@ public class Panel : IRetryable
     public string VisualPrompt { get; set; } = string.Empty;
     public string? Dialogue { get; set; }
     public string? Caption { get; set; }
+
+    // The camera framing this panel was storyboarded as, which sizes it on the page. Defaults to
+    // Standard (0), so panels from before shot types existed lay out exactly as they did before.
+    public ShotType ShotType { get; set; } = ShotType.Standard;
+
+    // The half-open span [SourceStartOffset, SourceEndOffset) of the novel's source text this panel was
+    // storyboarded from — the absolute offsets of the storyboard window that produced it, not just the
+    // chunk. Every panel from one window shares that window's span; the model doesn't sub-divide a
+    // window per panel, so the window is the honest granularity. This is what makes "which panels does a
+    // re-drafted manuscript actually change" computable: a panel whose source span still reads the same
+    // in the new draft can be reused, only moved panels re-render. Zero-width on legacy rows the offsets
+    // predate.
+    public int SourceStartOffset { get; set; }
+    public int SourceEndOffset { get; set; }
 
     // Names of the design-bible entities present in this panel; their reference sheets are
     // attached to the Gemini call to keep appearance consistent.

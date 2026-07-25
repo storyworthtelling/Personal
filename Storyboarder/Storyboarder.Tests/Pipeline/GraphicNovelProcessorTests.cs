@@ -30,6 +30,7 @@ public class GraphicNovelProcessorTests : IDisposable
     private int panelRenderCalls;
     private int chapterAnalysisCalls;
     private readonly List<string> chapterLabelsSeen = [];
+    private readonly List<string> storyboardWindowsSeen = [];
 
     // When set, NewProcessor binds volumes through this composer instead of a plain one, so a test can
     // make PDF assembly throw. It's a field (not a NewProcessor arg) so the fresh processor DriveToCompletion
@@ -50,6 +51,7 @@ public class GraphicNovelProcessorTests : IDisposable
 
         claude.Setup(c => c.Storyboard(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string window, string _, DesignBible _, string _, CancellationToken _) => storyboardWindowsSeen.Add(window))
             .ReturnsAsync(new StoryboardSegment(
                 [new VolumeDraft(1, "Volume One",
                     [new PageDraft(1, [new PanelDraft("Hero stands before the Castle", "At last.", null, ["Hero", "Castle"])])])],
@@ -157,6 +159,7 @@ public class GraphicNovelProcessorTests : IDisposable
             Title = "Quest", GoogleDocId = "doc", ReportOnly = reportOnly,
             CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
         };
+        novel.ProjectId = novel.Id;
         novel.Source = new SourceText
         {
             NovelId = novel.Id,
@@ -167,6 +170,25 @@ public class GraphicNovelProcessorTests : IDisposable
         context.Novels.Add(novel);
         context.SaveChanges();
         return novel.Id;
+    }
+
+    // A follow-up draft in the same project as previousId, with either identical source text (the reuse
+    // case) or a supplied revision (the re-render case).
+    private Guid SeedNextDraft(Guid previousId, string? fullText = null)
+    {
+        using var context = database.NewContext();
+        var previous = context.Novels.Single(n => n.Id == previousId);
+        var text = fullText ?? context.SourceTexts.Single(s => s.NovelId == previousId).FullText;
+        var draft = new Novel
+        {
+            Title = previous.Title, GoogleDocId = "doc", ReportOnly = previous.ReportOnly,
+            ProjectId = previous.ProjectId, DraftNumber = previous.DraftNumber + 1, PreviousDraftId = previousId,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
+        context.Novels.Add(draft);
+        context.SaveChanges();
+        return draft.Id;
     }
 
     private ProjectStage CurrentStage(Guid novelId)
@@ -332,6 +354,93 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.Equal(1, chunkCount);
         Assert.True(storyboardCalls > 1,
             $"a single chunk should be storyboarded in several windows, but Storyboard was called {storyboardCalls} time(s)");
+    }
+
+    [Fact]
+    public async Task Storyboarding_records_each_panels_source_span()
+    {
+        // "What changed between two drafts" is uncomputable unless a panel remembers which stretch of the
+        // manuscript it was drawn from. Storyboarding adapts one text window at a time, so every panel a
+        // window produces is anchored to that window's absolute span in the source. This asserts the
+        // anchor survives to storage and delimits exactly the text the window carried.
+        var manuscript = string.Join("\n\n",
+            Enumerable.Range(0, 120).Select(i =>
+                $"Paragraph {i}: the hero walks onward through the long grey hall, thinking of home and the road ahead."));
+        var novelId = SeedNovel(manuscript);
+
+        await DriveToCompletion(novelId, _ => { });
+
+        using var context = database.NewContext();
+        var fullText = context.SourceTexts.Single(s => s.NovelId == novelId).FullText;
+        var windows = storyboardWindowsSeen.ToHashSet();
+        Assert.True(windows.Count > 1, "the manuscript should have been storyboarded in several windows");
+
+        var panels = context.Panels
+            .Where(p => context.Pages
+                .Where(pg => context.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).Contains(pg.VolumeId))
+                .Select(pg => pg.Id).Contains(p.PageId))
+            .ToList();
+        Assert.NotEmpty(panels);
+        Assert.All(panels, p =>
+        {
+            Assert.True(p.SourceEndOffset > p.SourceStartOffset,
+                $"panel {p.PanelNumber} carries no source span ({p.SourceStartOffset}..{p.SourceEndOffset})");
+            Assert.True(p.SourceEndOffset <= fullText.Length);
+            var span = fullText.Substring(p.SourceStartOffset, p.SourceEndOffset - p.SourceStartOffset);
+            Assert.Contains(span, windows);
+        });
+    }
+
+    [Fact]
+    public async Task ALaterDraft_ReusesTheRenders_OfUnchangedWindows()
+    {
+        // First draft, illustrated end to end.
+        var first = SeedNovel();
+        await DriveToCompletion(first, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(first));
+
+        var rendersAfterFirst = panelRenderCalls;
+        var storyboardsAfterFirst = storyboardWindowsSeen.Count;
+
+        // Second draft of the SAME manuscript (byte-identical source). Nothing moved, so every window's
+        // panels should carry forward from the first draft — no storyboard call, no panel render.
+        var second = SeedNextDraft(first);
+        await DriveToCompletion(second, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(second));
+
+        Assert.Equal(rendersAfterFirst, panelRenderCalls);
+        Assert.Equal(storyboardsAfterFirst, storyboardWindowsSeen.Count);
+
+        // The second draft nonetheless has its own completed, on-disk panels (copied, not shared).
+        using var context = database.NewContext();
+        var secondVolumeIds = context.Volumes.Where(v => v.NovelId == second).Select(v => v.Id).ToList();
+        var secondPageIds = context.Pages.Where(p => secondVolumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToList();
+        var secondPanels = context.Panels.Where(p => secondPageIds.Contains(p.PageId)).ToList();
+        Assert.NotEmpty(secondPanels);
+        Assert.All(secondPanels, p =>
+        {
+            Assert.Equal(WorkStatus.Completed, p.Status);
+            Assert.NotNull(p.ImagePath);
+            Assert.True(File.Exists(p.ImagePath));
+            Assert.Contains(second.ToString(), p.ImagePath!);
+        });
+    }
+
+    [Fact]
+    public async Task ALaterDraft_ReRendersWindows_WhoseTextChanged()
+    {
+        var first = SeedNovel("The hero walked to the castle and knocked on the gate.");
+        await DriveToCompletion(first, _ => { });
+        var rendersAfterFirst = panelRenderCalls;
+
+        // The manuscript was revised, so no window matches the first draft: the panels must be
+        // storyboarded and rendered afresh rather than silently reusing stale art.
+        var second = SeedNextDraft(first, "The villain fled the tower and slammed the heavy door.");
+        await DriveToCompletion(second, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(second));
+
+        Assert.True(panelRenderCalls > rendersAfterFirst,
+            "a revised manuscript should re-render its panels rather than reuse the previous draft's");
     }
 
     [Fact]
@@ -692,6 +801,73 @@ public class GraphicNovelProcessorTests : IDisposable
         Assert.Equal(2, pages.Count);
         Assert.Equal([1, 2], pages.Select(p => p.PageNumber).ToList());
         Assert.All(pages, p => Assert.Equal(4, ctx.Panels.Count(pn => pn.PageId == p.Id)));
+    }
+
+    [Fact]
+    public async Task Storyboard_givesASplashPanelAPageToItself()
+    {
+        // A page of Standard, Splash, Standard must become three physical pages: the splash is the whole
+        // page (that's what makes it a splash), the ordinary panels sit on their own pages around it.
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoryboardSegment(
+                [new VolumeDraft(1, "Volume One",
+                    [new PageDraft(1,
+                    [
+                        new PanelDraft("Hero approaches in action", null, null, ["Hero"], ShotType.Standard),
+                        new PanelDraft("The gate erupts", null, null, ["Hero"], ShotType.Splash),
+                        new PanelDraft("Hero staggers back", null, null, ["Hero"], ShotType.Standard),
+                    ])])],
+                "Hero acted."));
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var volumeIds = ctx.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToList();
+        var pages = ctx.Pages.Where(p => volumeIds.Contains(p.VolumeId)).OrderBy(p => p.PageNumber).ToList();
+
+        Assert.Equal(3, pages.Count);
+        // The middle page is the splash alone; the outer pages carry the ordinary panels.
+        Assert.All(pages, p => Assert.Equal(1, ctx.Panels.Count(pn => pn.PageId == p.Id)));
+        var splashPage = pages[1];
+        var splashPanel = Assert.Single(ctx.Panels.Where(pn => pn.PageId == splashPage.Id));
+        Assert.Equal(ShotType.Splash, splashPanel.ShotType);
+    }
+
+    [Fact]
+    public async Task DesignBible_DerivesTheArtStyleFromTheManuscript_WhenTheUserDidntPickOne()
+    {
+        claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("stark ink-wash noir with high-contrast chiaroscuro");
+
+        var novelId = SeedNovel(); // no art style chosen → defaults to ArtStyles.Default
+        await DriveToCompletion(novelId, _ => { });
+
+        using var ctx = database.NewContext();
+        Assert.Equal("stark ink-wash noir with high-contrast chiaroscuro", ctx.Novels.Single(n => n.Id == novelId).ArtStyle);
+    }
+
+    [Fact]
+    public async Task DesignBible_KeepsAUserChosenArtStyle_AndDoesNotDerive()
+    {
+        claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("SHOULD NOT BE USED");
+
+        var novelId = SeedNovel();
+        using (var ctx = database.NewContext())
+        {
+            var novel = ctx.Novels.Single(n => n.Id == novelId);
+            novel.ArtStyle = "watercolour whimsy";
+            ctx.SaveChanges();
+        }
+
+        await DriveToCompletion(novelId, _ => { });
+
+        using var check = database.NewContext();
+        Assert.Equal("watercolour whimsy", check.Novels.Single(n => n.Id == novelId).ArtStyle);
+        claude.Verify(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

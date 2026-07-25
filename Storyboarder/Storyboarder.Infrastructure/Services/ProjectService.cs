@@ -2,11 +2,13 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Configuration;
+using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Persistence;
 
 namespace Storyboarder.Infrastructure.Services;
@@ -54,11 +56,55 @@ public sealed class ProjectService
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
+        // First draft of a new project: the project is identified by this draft's own id.
+        novel.ProjectId = novel.Id;
         novel.Source = new SourceText { NovelId = novel.Id, FullText = text, CharacterCount = text.Length };
 
         db.Novels.Add(novel);
         await db.SaveChangesAsync(cancellationToken);
         return novel.Id;
+    }
+
+    // Adds the next draft to an existing project: the owner re-picks a doc (the revised manuscript) and
+    // gets a fresh conversion that shares the previous draft's ProjectId. Carrying PreviousDraftId is
+    // what lets the pipeline reuse the panels whose source text didn't move and the diff report show what
+    // changed. Art style and title default to the previous draft's unless overridden. Returns the new
+    // draft's id, or null if the previous draft doesn't exist.
+    public async Task<Guid?> CreateNextDraftAsync(
+        Guid previousDraftId, string fileId, string fileName, string accessToken,
+        string? title, string? artStyle, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var previous = await db.Novels.FirstOrDefaultAsync(n => n.Id == previousDraftId, cancellationToken);
+        if (previous is null)
+            return null;
+
+        // The newest draft in the project sets the numbering, not necessarily the one passed in — the
+        // owner might branch from an older draft, but the next number still follows the latest.
+        var highestDraft = await db.Novels
+            .Where(n => n.ProjectId == previous.ProjectId)
+            .MaxAsync(n => n.DraftNumber, cancellationToken);
+
+        var text = await docs.FetchText(fileId, accessToken, cancellationToken);
+        var now = clock.UtcNow;
+        var draft = new Novel
+        {
+            Title = string.IsNullOrWhiteSpace(title) ? previous.Title : title,
+            GoogleDocId = fileId,
+            GoogleDocName = fileName,
+            ArtStyle = string.IsNullOrWhiteSpace(artStyle) ? previous.ArtStyle : artStyle,
+            ReportOnly = previous.ReportOnly,
+            ProjectId = previous.ProjectId,
+            DraftNumber = highestDraft + 1,
+            PreviousDraftId = previous.Id,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
+
+        db.Novels.Add(draft);
+        await db.SaveChangesAsync(cancellationToken);
+        return draft.Id;
     }
 
     // True while any novel is mid-conversion (not Completed/Failed/Cancelled). The Android head checks
@@ -139,6 +185,125 @@ public sealed class ProjectService
             analysis.PdfStatus = WorkStatus.Pending;
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Data-safety pass run at app start (which covers a device reboot): reconciles the database against
+    // what's actually on disk. A unit the DB calls "done" whose file has vanished — an interrupted write,
+    // a storage hiccup, a reboot mid-flush — is reset to Pending and the novel is regressed to the stage
+    // that rebuilds it, so the pipeline heals the book forward instead of shipping a broken page or PDF.
+    // Archived outputs (PdfPath cleared, ArchivedDriveFileId set) are expected to be absent locally and
+    // left alone. Returns the number of units healed. Idempotent: a clean project heals nothing.
+    public async Task<int> VerifyAndHealOutputsAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        // Cancelled and Failed are left to the user (Retry/rework); healing files under them would quietly
+        // resurrect work they deliberately stopped.
+        var novelIds = await db.Novels
+            .Where(n => n.Stage != ProjectStage.Cancelled && n.Stage != ProjectStage.Failed)
+            .Select(n => n.Id)
+            .ToListAsync(cancellationToken);
+
+        var healed = 0;
+        foreach (var id in novelIds)
+            healed += await VerifyNovelOutputs(db, id, cancellationToken);
+
+        if (healed > 0)
+            await db.SaveChangesAsync(cancellationToken);
+        return healed;
+    }
+
+    private async Task<int> VerifyNovelOutputs(StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var novel = await db.Novels.FirstAsync(n => n.Id == novelId, cancellationToken);
+        var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
+        var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
+
+        var healed = 0;
+        var affectedPages = new HashSet<Guid>();
+        var affectedVolumes = new HashSet<Guid>();
+        ProjectStage? regressTo = null;
+        void Regress(ProjectStage stage)
+        {
+            if (regressTo is null || stage < regressTo)
+                regressTo = stage;
+        }
+
+        // Panels: a completed, non-skipped render whose image file is gone must re-render.
+        var panels = await db.Panels
+            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.Completed && !p.Skipped && p.ImagePath != null)
+            .ToListAsync(cancellationToken);
+        foreach (var panel in panels.Where(p => !imageStore.Exists(p.ImagePath!)))
+        {
+            panel.Status = WorkStatus.Pending;
+            panel.ImagePath = null;
+            panel.Attempts = 0;
+            panel.NextAttemptAtUtc = null;
+            panel.LastError = null;
+            affectedPages.Add(panel.PageId);
+            healed++;
+            Regress(ProjectStage.RenderingImages);
+        }
+
+        // Pages: a composed page whose raster (or thumbnail) is gone, or one whose panel was just reset,
+        // must recompose so it picks up the re-rendered panel.
+        var pages = await db.Pages.Where(p => pageIds.Contains(p.Id)).ToListAsync(cancellationToken);
+        foreach (var page in pages)
+        {
+            var fileGone = page.CompositionStatus == WorkStatus.Completed &&
+                ((page.ComposedImagePath != null && !imageStore.Exists(page.ComposedImagePath)) ||
+                 (page.ThumbImagePath != null && !imageStore.Exists(page.ThumbImagePath)));
+            if (!fileGone && !affectedPages.Contains(page.Id))
+                continue;
+
+            page.CompositionStatus = WorkStatus.Pending;
+            page.ComposedImagePath = null;
+            page.ThumbImagePath = null;
+            page.Attempts = 0;
+            page.LastError = null;
+            affectedVolumes.Add(page.VolumeId);
+            healed++;
+            Regress(ProjectStage.ComposingPages);
+        }
+
+        // Volumes: a bound PDF that's gone (and not archived to Drive), or one whose page was reset, rebinds.
+        var volumes = await db.Volumes.Where(v => v.NovelId == novelId).ToListAsync(cancellationToken);
+        foreach (var volume in volumes)
+        {
+            var pdfGone = volume.PdfStatus == WorkStatus.Completed && volume.PdfPath != null
+                && volume.ArchivedDriveFileId == null && !imageStore.Exists(volume.PdfPath);
+            if (!pdfGone && !affectedVolumes.Contains(volume.Id))
+                continue;
+
+            volume.PdfStatus = WorkStatus.Pending;
+            volume.PdfPath = null;
+            volume.PdfPageCursor = 0;
+            volume.Attempts = 0;
+            volume.NextAttemptAtUtc = null;
+            volume.LastError = null;
+            healed++;
+            Regress(ProjectStage.AssemblingVolumes);
+        }
+
+        // Analysis report: a rendered PDF that's gone (and not archived) re-renders — its content lives in
+        // the database, so only the PDF is rebuilt.
+        var analysis = await db.BookAnalyses.FirstOrDefaultAsync(a => a.NovelId == novelId, cancellationToken);
+        if (analysis is not null && analysis.PdfStatus == WorkStatus.Completed && analysis.PdfPath != null
+            && analysis.ArchivedDriveFileId == null && !imageStore.Exists(analysis.PdfPath))
+        {
+            analysis.PdfStatus = WorkStatus.Pending;
+            analysis.PdfPath = null;
+            healed++;
+            Regress(ProjectStage.ComposingAnalysis);
+        }
+
+        // Regress a finished or later-stage novel so the worker re-runs the healed stages; never advance.
+        if (regressTo is { } target && (int)novel.Stage > (int)target)
+        {
+            novel.Stage = target;
+            novel.UpdatedAtUtc = clock.UtcNow;
+        }
+
+        return healed;
     }
 
     // The panels parked awaiting the user's OK after a safety block, with the flagged categories and the
@@ -359,6 +524,197 @@ public sealed class ProjectService
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    // The composed pages of a book, in reading order across every volume, for the in-app reader. Only
+    // finished pages with a raster on disk are returned; the chapter label is joined in so the reader's
+    // chapter-jump control can name each chapter (empty when the book was converted before chapter
+    // detection). Null if the novel doesn't exist; an empty page list if nothing is composed yet.
+    public async Task<ReaderBook?> GetReaderPagesAsync(Guid novelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var title = await db.Novels
+            .Where(n => n.Id == novelId)
+            .Select(n => n.Title)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (title is null)
+            return null;
+
+        var chapterLabels = await db.Chapters
+            .Where(c => c.NovelId == novelId)
+            .ToDictionaryAsync(c => c.Number, c => c.Label, cancellationToken);
+
+        var rows = await (
+            from v in db.Volumes
+            where v.NovelId == novelId
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            where pg.CompositionStatus == WorkStatus.Completed && pg.ComposedImagePath != null
+            orderby v.Number, pg.PageNumber
+            select new
+            {
+                v.Number,
+                VolumeTitle = v.Title,
+                pg.PageNumber,
+                pg.ChapterNumber,
+                pg.ComposedImagePath,
+                pg.ThumbImagePath
+            })
+            .ToListAsync(cancellationToken);
+
+        var pages = rows
+            .Select(r => new ReaderPage(
+                r.Number, r.VolumeTitle, r.PageNumber, r.ChapterNumber,
+                chapterLabels.GetValueOrDefault(r.ChapterNumber, string.Empty),
+                r.ComposedImagePath!, r.ThumbImagePath))
+            .ToList();
+
+        return new ReaderBook(title, pages);
+    }
+
+    // The consolidated revision report for the in-app reader, folded together exactly as the PDF composer
+    // sees it: the story half plus the separately-persisted craft half and fact-checks. Null until the
+    // report has been consolidated (the story half is what the reader needs; craft/fact-checks fold in as
+    // they arrive).
+    public async Task<Domain.Analysis.BookAnalysisResult?> GetReportAsync(Guid novelId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var stored = await db.BookAnalyses
+            .Where(a => a.NovelId == novelId)
+            .Select(a => new { a.ConsolidatedJson, a.CraftJson, a.FactChecksJson })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (stored?.ConsolidatedJson is null)
+            return null;
+
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(stored.ConsolidatedJson, JsonResponse.CaseInsensitive)
+                     ?? BookAnalysisResult.Empty;
+        var craft = stored.CraftJson is null
+            ? CraftReport.Empty
+            : JsonSerializer.Deserialize<CraftReport>(stored.CraftJson, JsonResponse.CaseInsensitive) ?? CraftReport.Empty;
+        var checks = stored.FactChecksJson is null
+            ? Array.Empty<FactCheck>()
+            : JsonSerializer.Deserialize<List<FactCheck>>(stored.FactChecksJson, JsonResponse.CaseInsensitive)
+              ?? (IReadOnlyList<FactCheck>)Array.Empty<FactCheck>();
+
+        return report.WithCraft(craft).WithFactChecks(checks);
+    }
+
+    // What a draft changed against the one it was made from: the revision-report findings it resolved
+    // and newly raised, and the panels whose source text moved (everything else the pipeline reuses).
+    // A first draft — or an unknown id — diffs to None, since there is nothing to compare against.
+    public async Task<DraftDiff> GetDraftDiffAsync(Guid draftId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var draft = await db.Novels.FirstOrDefaultAsync(n => n.Id == draftId, cancellationToken);
+        if (draft?.PreviousDraftId is not Guid previousId)
+            return DraftDiff.None(draftId);
+
+        var currentFindings = await LoadFindingsAsync(db, draftId, cancellationToken);
+        var previousFindings = await LoadFindingsAsync(db, previousId, cancellationToken);
+
+        // Findings match on their detail text alone (whitespace/case-normalized). Resolved = the
+        // previous draft raised it and this one doesn't; New = the reverse.
+        var currentKeys = currentFindings.Select(FindingKey).ToHashSet();
+        var previousKeys = previousFindings.Select(FindingKey).ToHashSet();
+        var resolved = previousFindings
+            .Where(f => !currentKeys.Contains(FindingKey(f)))
+            .Select(f => new DiffFinding(FindingChange.Resolved, f.Category, f.Chapter, f.Detail))
+            .ToList();
+        var added = currentFindings
+            .Where(f => !previousKeys.Contains(FindingKey(f)))
+            .Select(f => new DiffFinding(FindingChange.New, f.Category, f.Chapter, f.Detail))
+            .ToList();
+
+        var currentFull = await SourceTextAsync(db, draftId, cancellationToken);
+        var previousFull = await SourceTextAsync(db, previousId, cancellationToken);
+        var currentPanels = await LoadPanelsAsync(db, draftId, cancellationToken);
+        var previousPanels = await LoadPanelsAsync(db, previousId, cancellationToken);
+
+        // The stretches of manuscript the previous draft already illustrated. A current panel whose
+        // source text is in this set didn't move, so its render carries forward untouched.
+        var previousSpans = previousPanels
+            .Select(p => PanelSourceMatching.SourceText(previousFull, p.SourceStartOffset, p.SourceEndOffset))
+            .Where(text => text is not null)
+            .ToHashSet();
+
+        // The previous render at each reading position, for the "before" side of a side-by-side on a
+        // changed panel.
+        var previousByPosition = previousPanels
+            .GroupBy(p => (p.VolumeNumber, p.PageNumber, p.PanelNumber))
+            .ToDictionary(g => g.Key, g => g.First().ImagePath);
+
+        var changed = new List<PanelChange>();
+        var reusable = 0;
+        foreach (var panel in currentPanels)
+        {
+            var text = PanelSourceMatching.SourceText(currentFull, panel.SourceStartOffset, panel.SourceEndOffset);
+            if (text is not null && previousSpans.Contains(text))
+            {
+                reusable++;
+                continue;
+            }
+
+            previousByPosition.TryGetValue((panel.VolumeNumber, panel.PageNumber, panel.PanelNumber), out var previousImage);
+            changed.Add(new PanelChange(
+                panel.VolumeNumber, panel.PageNumber, panel.PanelNumber, panel.ImagePath, previousImage));
+        }
+
+        return new DraftDiff(draftId, previousId, resolved, added, changed, reusable);
+    }
+
+    // detail text, normalized so trivial whitespace/case differences don't read as a resolved-plus-new
+    // pair. The category is part of the key so the same sentence filed under two sections stays distinct.
+    private static string FindingKey((string Category, string Chapter, string Detail) f) =>
+        f.Category + " " + string.Join(' ', f.Detail.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+
+    // Flattens a draft's consolidated report into (section, chapter, detail) triples across the four
+    // finding sections. Empty when the report hasn't been consolidated yet (an in-flight or art-only draft).
+    private static async Task<IReadOnlyList<(string Category, string Chapter, string Detail)>> LoadFindingsAsync(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var json = await db.BookAnalyses
+            .Where(a => a.NovelId == novelId)
+            .Select(a => a.ConsolidatedJson)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrEmpty(json))
+            return [];
+
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(json, JsonResponse.CaseInsensitive)
+                     ?? BookAnalysisResult.Empty;
+        var findings = new List<(string, string, string)>();
+        void Add(string category, IReadOnlyList<Finding> items)
+        {
+            foreach (var f in items)
+                findings.Add((category, f.Chapter, f.Detail));
+        }
+        Add("Plot holes", report.PlotHoles);
+        Add("Inconsistencies", report.Inconsistencies);
+        Add("Inaccuracies", report.Inaccuracies);
+        Add("Pacing", report.PacingNotes);
+        return findings;
+    }
+
+    private static async Task<string> SourceTextAsync(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken) =>
+        await db.SourceTexts
+            .Where(s => s.NovelId == novelId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+
+    private static async Task<IReadOnlyList<PanelRow>> LoadPanelsAsync(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        return await (
+            from v in db.Volumes
+            where v.NovelId == novelId
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            join pn in db.Panels on pg.Id equals pn.PageId
+            orderby v.Number, pg.PageNumber, pn.PanelNumber
+            select new PanelRow(
+                v.Number, pg.PageNumber, pn.PanelNumber, pn.SourceStartOffset, pn.SourceEndOffset, pn.ImagePath))
+            .ToListAsync(cancellationToken);
+    }
+
+    private sealed record PanelRow(
+        int VolumeNumber, int PageNumber, int PanelNumber, int SourceStartOffset, int SourceEndOffset, string? ImagePath);
+
     private static async Task<NovelStatus?> BuildStatus(
         StoryboarderDbContext db, Guid id, RateLimitOptions limits, DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -472,7 +828,8 @@ public sealed class ProjectService
             novel.Id, novel.Title, novel.Stage.ToString(), lastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
             analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals,
-            prohibitedPanels, estimate, rateLimitedUntil);
+            prohibitedPanels, estimate, rateLimitedUntil,
+            novel.DraftNumber, novel.PreviousDraftId is not null);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

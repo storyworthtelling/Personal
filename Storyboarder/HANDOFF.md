@@ -1,8 +1,37 @@
 # Storyboarder — session handoff
 
-State as of commit `bb61137` on branch `claude/storyboarder-panel-layout-p5qwah`. **Phase 1 is complete;
-Phases 2–6 remain.** Read this top to bottom before starting work — several of the traps below cost a full
-CI round each to discover.
+**Phases 1–3 are complete; Phases 4–5 are partly done; Phase 6 remains.** Phase 1 merged in PR #111.
+Everything since landed on branch `claude/storyboarder-handoff-phases-nbhko0`: Phase 2 (backend
+`bfa44bc`→`38574ad` + UI `a186b76`), Phase 3 (`000fe63`→ reader/report/diff pages), the safe half of Phase 4
+(`bf30279`→`8a9803c` — shot types, weighted layout, dialogue trim, derived art style), and two of three
+Phase 5 items (`759b5db` .docx import, `dd204f3` verify-after-reboot). What's left: the vision/lettering half
+of Phase 4 (needs a live vision model or on-device eyes), Phase 5's owner's-voice (blocked on the owner's
+Drive docs), and all of Phase 6 (owner-gated). Read this top to bottom before starting work — several of the
+traps below cost a full CI round each to discover.
+
+**Phase 2 is complete end to end.** The draft loop is built and tested in Domain/Infrastructure —
+`ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings resolved/new + changed
+panels), and the storyboard-stage reuse that carries an unchanged window's renders forward — **and now
+wired into the Android head**: each project card offers "New draft (re-pick doc)" (opens the Drive picker
+in draft mode) and, once a draft has a predecessor, "What changed since last draft" (a diff summary). The
+head compiles clean (see the build note below). The diff surface is a text summary today; the richer
+side-by-side old-vs-new **art** view the owner asked for is a Phase 3 reader job — `GetDraftDiffAsync`
+already returns the paired image paths for it.
+
+**The Android head now COMPILES in a web/CI container.** Run `Storyboarder/scripts/setup-android-build.sh`
+once (a few minutes: it installs the maui-android workload from nuget, pulls android.jar for API 36 from a
+GitHub mirror since `dl.google.com` is blocked, and stitches together a minimal SDK at `/opt/android-sdk-min`
+with the workload's bundled aapt2/r8 plus apt's zipalign). Then UI edits are no longer written blind:
+
+```
+Storyboarder/scripts/setup-android-build.sh
+dotnet build Storyboarder/Storyboarder.Android/Storyboarder.Android.csproj \
+  -p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false
+```
+
+This gets `dotnet build` green through XAML + C# + resource linking; it does **not** run the app (no
+emulator/display). The setup is ephemeral — the container is reclaimed — so re-run the script each session
+you need to build the head. Everything it does is documented in the script's header.
 
 ---
 
@@ -141,40 +170,104 @@ are built so failure still lets the book complete.
 
 ## 6. Remaining work
 
-### Phase 2 — drafts + incremental re-run (largest; do first)
+### Phase 2 — drafts + incremental re-run ✅ backend done (UI pending)
 The loop the owner actually cares about: revise → re-render only what changed → compare against the last
-draft.
+draft. All of the following is built, tested, and on the branch — only the Android UI to invoke it remains
+(see the note at the top).
 
-- Draft versions **inside one project** (schema change), each added by picking a doc.
-- **Blocker to solve first:** panels store no link to their source text. `Panel` has no offsets, so "what
-  changed" is uncomputable today. Persisting panel→source offsets is the real cost of this phase.
-- Diff two drafts on **findings resolved/new** and **changed panels** (side-by-side old vs new art).
-- Re-render only panels whose source text moved; reuse everything else.
+- **Panel→source offsets** (`bfa44bc`): every `Panel` records the absolute `[SourceStartOffset,
+  SourceEndOffset)` of the storyboard window it came from. This was the phase's real cost — "what changed"
+  is computable now. Window granularity: all panels of one window share its span (the model doesn't
+  sub-divide a window per panel).
+- **Draft versions inside one project** (`ae11d43`): `Novel` carries `ProjectId` / `DraftNumber` /
+  `PreviousDraftId`. First draft is a project of one (ProjectId = its own Id); the migration backfills
+  existing novels the same way. `ProjectService.CreateNextDraftAsync` adds the next draft from a re-picked
+  doc, inheriting title/style/report-only.
+- **Draft diff** (`8498bef`): `GetDraftDiffAsync` returns findings resolved/new (diffed by detail text
+  across the four finding sections) and changed panels (paired with the previous render at the same reading
+  position for a side-by-side). Reusable-vs-changed uses the shared `PanelSourceMatching` helper.
+- **Incremental reuse** (`38574ad`): at storyboarding, a window whose text is byte-identical to one the
+  previous draft storyboarded copies its panels — prompts and renders — forward, spending no Claude or
+  Gemini call. All-or-nothing per window; re-storyboards if a render has gone missing.
 
-### Phase 3 — in-app reader
-Page reader with chapter jump and panel zoom; browsable report alongside the PDF. Mostly MAUI pages, the
-most isolated phase — a good candidate to run in parallel with Phase 2 if using worktrees.
+**Known limitation (inherent, documented):** reuse is window-granular, and windows re-pack under edits, so
+an edit early in a chunk shifts later window boundaries and those windows re-render even if their content is
+unchanged. Finer (per-paragraph) anchoring would need the model to map panels to sub-spans, which it doesn't
+provide. The diff is honest about this — it reports what actually carried forward.
 
-### Phase 4 — art fidelity + layout
-Claude-derived art style; literal-to-text panel prompts; **weighted layout** (varied panel sizes, splashes,
-camera progression) which is a real rewrite of `PageLayoutCalculator` plus per-panel weight/shot-type in the
-storyboard schema; balloon tails, thought-vs-speech, SFX; dialogue trimmed to fit; off-model auto-detection.
+### Phase 3 — in-app reader ✅ done
+Built and compiling (via `scripts/setup-android-build.sh`). Backend read models are unit-tested; the MAUI
+pages are compile-verified (there's no emulator here to run them):
 
-Also the **prose-divergence report section**: since the owner won't hand-flag mismatches, the mechanism is a
-vision pass — feed each rendered panel plus its source passage back to the model and ask what is missing,
-added, or wrong. It is a heuristic and will have false positives; it is advisory, and it is the only design
-that satisfies "flag the prose" *and* "fully automatic" at once.
+- **ReaderPage** — a book's composed pages in reading order with a chapter-jump picker; tap a page for
+  **PageZoomPage** (pinch-zoom, pan, double-tap reset). Fed by `ProjectService.GetReaderPagesAsync`.
+- **ReportPage** — the folded revision report as browsable scrollable sections. Fed by `GetReportAsync`.
+- **DraftDiffPage** — the Phase 2 "What changed" action now opens a real view: findings resolved/new and
+  each changed panel paired **before/after**, the side-by-side old-vs-new art the owner asked for.
+- Reachable from the project card action sheet: "Read in app", "Read report in app", "What changed since
+  last draft".
 
-### Phase 5 — odds
-`.docx` import · verify-after-reboot · **owner's voice propagated repo-wide** (DESIGN.md §11 plus FocusPhone,
-Ledger and Storyboarder copy — a design-bible change, probably its own PR).
+Not yet done (deferred UI polish, all runtime-only concerns): the reader loads full-page rasters eagerly in
+its `CollectionView` — fine for a phone-sized book, but if a volume is long, switch the list to `ThumbPath`
+and load the full image only in `PageZoomPage`. Worth checking on a real device.
 
-### Phase 6 — Gemini batching
-See `Storyboarder/BATCHING.md` for the full investigation. **Do the cheap thing first:**
-`RateLimitOptions.GeminiRequestsPerDay` defaults to **100**, which is *this app's own safety ceiling, not
-Google's limit*. Raising it to match the account's real tier may deliver most of the wall-clock win for one
-line. Only then batch panel renders (50% discount and a separate quota pool). The owner has asked to be
-walked through finding their real Gemini limit when we get there.
+### Phase 4 — art fidelity + layout ⏳ partially done
+The testable, safe-to-ship-blind half is built and on the branch; the parts that need a live vision model
+or on-device visual iteration are deferred (this environment can compile the head but not run it).
+
+**Done (tested):**
+- **Shot types** (`bf30279`): `Panel.ShotType` (Standard/Wide/Splash), asked of Claude in the storyboard
+  prompt, parsed case-insensitively (unknown/absent → Standard). Migration defaults existing panels to
+  Standard.
+- **Weighted layout** (`cf8be4b`): `PageLayoutCalculator` gains a shot-aware `Layout`. A page of all
+  Standard shots lays out *identically* to the old uniform grid (unit-tested), so untagged pages are
+  unchanged; a Wide shot is a full-width cinematic band and a Splash gets a page to itself (SplitForPages
+  isolates it). The composer, `PanelArt`, and the render-time aspect-ratio calc all thread the shot through.
+- **Dialogue trimmed to fit** (`cf8be4b`): `DialogueFit` abridges dialogue to a balloon budget at a word
+  boundary when panels are created.
+- **Claude-derived art style** (`8a9803c`): `DeriveArtStyle` picks one cohesive style from the opening prose
+  + cast at design-bible time, unless the user chose one. Best-effort — failure keeps the default.
+
+**Deferred (need a live model or eyes on a device — don't ship blind):**
+- **Lettering: balloon tails, thought-vs-speech, SFX.** A Skia-composer change; correctness is visual, so it
+  needs the app running to iterate. The bands/typesetting are in `SkiaPageComposer` + `PanelSlotLayout`.
+- **Off-model auto-detection + re-render.** Needs a vision compare of each rendered panel against the
+  character's reference sheet; heuristic, unverifiable without the image models.
+- **Prose-divergence report section.** The owner won't hand-flag mismatches, so the only automatic design is
+  a **vision pass**: feed each rendered panel + its source passage (the `[SourceStartOffset,SourceEndOffset)`
+  span Phase 2 added makes this exact) back to the model and ask what's missing/added/wrong. Advisory, false
+  positives expected; render it as its own report section. Needs Claude vision — plumb + verify with the real
+  API, not blind.
+- **Literal-to-text panel prompts** is largely the existing prompt already; further tuning is visual.
+
+The weighted layout is verified as *math* (no overlap, fills the page, all-Standard == old grid) but its
+*look* wasn't — worth a glance on a device once a Wide/Splash-tagged book renders.
+
+### Phase 5 — odds ⏳ two of three done
+- **`.docx` import** ✅ (`759b5db`): `DocxTextExtractor` (pure, tested) pulls text from a .docx's
+  `word/document.xml`; `GoogleDocsClient` reads a picked file's Drive mime type and routes — Google Doc via
+  the Docs API, .docx via a Drive byte download + extract — so no service/UI signature changed. The picker
+  lists .docx too. (`Google.Apis.Drive.v3` was added to Infrastructure.)
+- **verify-after-reboot** ✅ (`dd204f3`): `ProjectService.VerifyAndHealOutputsAsync` runs at app start
+  (covers reboots, wired in `MainActivity`); resets any "done" unit whose file has vanished and regresses
+  the novel so the pipeline rebuilds it. Archived outputs and Cancelled/Failed novels are left alone.
+- **Owner's voice propagated repo-wide** ⛔ blocked on the owner: it needs the owner's self-authored Google
+  Drive docs (DESIGN.md §11) to learn the voice, and the Drive connector isn't authorized in claude.ai yet.
+  Until then copy stays quiet-neutral across DESIGN.md, FocusPhone, Ledger, and Storyboarder. Its own PR
+  when unblocked.
+
+### Phase 6 — Gemini batching ⏳ cheap step done
+See `Storyboarder/BATCHING.md` for the full investigation.
+- **Cap raise** ✅ (`ad3bf4b`): the owner's real tier is 2,000/min · 50,000/day for `gemini-2.5-flash-image`.
+  `GeminiRequestsPerDay` was a self-imposed **100/day** floor (weeks per book); raised to **60/min, 5,000/day**
+  — a deliberate safety ceiling an order of magnitude under the account's 50,000/day (images are billed each,
+  so a runaway can't drain the whole quota), while removing the bottleneck (a full book's projection drops
+  from weeks to ~10 hours). A single sequential worker is latency-bound and can't approach these anyway. If
+  the owner wants to trade the runaway guardrail for maximum headroom, bump `GeminiRequestsPerDay` toward
+  50,000.
+- **Batch API** ⬜ still open: batching panel renders gives a ~50% discount and a separate quota pool, but
+  it's asynchronous (submit-then-poll) and a real rework of the render stage. Only worth it if the cap raise
+  above doesn't already deliver acceptable wall-clock time — measure first.
 
 ---
 
@@ -182,8 +275,7 @@ walked through finding their real Gemini limit when we get there.
 
 - **Register the `drive.file` scope** on the OAuth client in the Google Cloud project, then sign in again on
   the device. Until then archiving stays off (which is the default, so nothing breaks).
-- **Check the real Gemini tier limit** and raise `GeminiRequestsPerDay` — do this before any batching work.
+- ~~**Check the real Gemini tier limit** and raise `GeminiRequestsPerDay`~~ — done (`ad3bf4b`): tier is
+  2,000/min · 50,000/day; caps raised to 60/min · 5,000/day (see Phase 6).
 - **The stuck "Heart and Mind" project recovers on its own** once this ships: tap **Retry now** and volume 1
   re-binds, which unblocks the revision report. No manual data fix needed.
-- **PR #111's title and body still describe only the original five fixes.** Rewrite them to cover the full
-  scope before merging.

@@ -52,4 +52,8 @@ public sealed record NovelStatus(
     Domain.Pipeline.RunEstimate? Estimate = null,
     // When a provider rate limit last deferred this novel, the (future) UTC instant it expects to try
     // again — set only when still in the future, so the card can say "resumes ~3:47 pm" in local time.
-    DateTimeOffset? RateLimitedUntilUtc = null);
+    DateTimeOffset? RateLimitedUntilUtc = null,
+    // Which draft of its project this is (1 for a first/only draft), and whether it has a predecessor to
+    // diff against. Drives the card's draft badge and its "What changed" action.
+    int DraftNumber = 1,
+    bool HasPreviousDraft = false);

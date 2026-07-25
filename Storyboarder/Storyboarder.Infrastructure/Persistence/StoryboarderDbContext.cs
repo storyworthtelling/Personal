@@ -69,6 +69,8 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
                 .HasForeignKey<BookAnalysis>(analysis => analysis.NovelId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(novel => novel.Stage);
+            // Drafts of one book are listed together and newest-draft-first, so index the grouping key.
+            entity.HasIndex(novel => new { novel.ProjectId, novel.DraftNumber });
         });
 
         model.Entity<SourceText>(entity => entity.HasKey(source => source.Id));
@@ -124,6 +126,7 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
         {
             entity.HasKey(panel => panel.Id);
             entity.Property(panel => panel.Status).HasConversion<int>();
+            entity.Property(panel => panel.ShotType).HasConversion<int>();
             entity.Property(panel => panel.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
             entity.HasIndex(panel => new { panel.Status, panel.NextAttemptAtUtc });
         });

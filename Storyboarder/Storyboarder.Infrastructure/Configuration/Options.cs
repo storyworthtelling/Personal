@@ -92,8 +92,14 @@ public sealed class RateLimitOptions
     // (roughly two per chunk plus a consolidation), so a day that approaches it means something is
     // looping. Kept comfortably above real usage but low enough that a runaway can't rack up cost.
     public int ClaudeRequestsPerDay { get; set; } = 500;
-    public int GeminiRequestsPerMinute { get; set; } = 5;
-    public int GeminiRequestsPerDay { get; set; } = 100;
+    // Sized to the owner's real Gemini tier (gemini-2.5-flash-image: 2,000/min, 50,000/day) but kept as a
+    // safety ceiling below it, not at it. A single background worker renders one panel per cycle and is
+    // latency-bound (~seconds per image), so it can't physically approach these — they exist to remove the
+    // old artificial 100/day bottleneck (which stretched a full book to weeks) while still catching a
+    // runaway: images are billed each, so an order-of-magnitude margin under the account's 50,000/day caps
+    // a bug's worst-case spend instead of letting it drain the whole daily quota.
+    public int GeminiRequestsPerMinute { get; set; } = 60;
+    public int GeminiRequestsPerDay { get; set; } = 5_000;
     public int MaxAttempts { get; set; } = 6;
     public int BaseDelaySeconds { get; set; } = 4;
     public int MaxDelaySeconds { get; set; } = 600;

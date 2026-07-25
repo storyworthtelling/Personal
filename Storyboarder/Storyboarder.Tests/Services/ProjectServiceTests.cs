@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Moq;
+using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Model;
 using Storyboarder.Infrastructure.Configuration;
@@ -76,6 +78,426 @@ public class ProjectServiceTests : IDisposable
     {
         SeedNovel(stage);
         Assert.False(await NewService().HasActiveWorkAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CreateFromDoc_StartsANewOneDraftProject()
+    {
+        docs.Setup(d => d.FetchText("doc-1", "token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("A short tale.");
+
+        var id = await NewService().CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == id);
+        // A lone novel is a project of one draft: its ProjectId is its own id, numbered 1, with nothing
+        // before it. This is what a later draft groups against.
+        Assert.Equal(id, novel.ProjectId);
+        Assert.Equal(1, novel.DraftNumber);
+        Assert.Null(novel.PreviousDraftId);
+    }
+
+    [Fact]
+    public async Task CreateNextDraft_AddsDraftTwoToTheSameProject()
+    {
+        docs.Setup(d => d.FetchText("doc-1", "token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("First draft.");
+        docs.Setup(d => d.FetchText("doc-2", "token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Second, revised draft.");
+
+        var service = NewService();
+        var firstId = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", "My Book", "noir", CancellationToken.None);
+        var secondId = await service.CreateNextDraftAsync(firstId, "doc-2", "Book-v2.gdoc", "token", null, null, CancellationToken.None);
+
+        Assert.NotNull(secondId);
+        using var context = database.NewContext();
+        var first = context.Novels.Single(n => n.Id == firstId);
+        var second = context.Novels.Single(n => n.Id == secondId!.Value);
+
+        // Same project, next number, chained to its predecessor — the link the diff and incremental
+        // re-render both read.
+        Assert.Equal(first.ProjectId, second.ProjectId);
+        Assert.Equal(2, second.DraftNumber);
+        Assert.Equal(firstId, second.PreviousDraftId);
+        // The revised manuscript is the new draft's source, and title/style carry forward unless overridden.
+        Assert.Equal("Second, revised draft.", context.SourceTexts.Single(s => s.NovelId == second.Id).FullText);
+        Assert.Equal("My Book", second.Title);
+        Assert.Equal("noir", second.ArtStyle);
+    }
+
+    [Fact]
+    public async Task CreateNextDraft_NumbersFromTheLatestDraft_NotTheOneBranchedFrom()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+
+        var service = NewService();
+        var d1 = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+        var d2 = await service.CreateNextDraftAsync(d1, "doc-2", "Book.gdoc", "token", null, null, CancellationToken.None);
+        // Branch a third draft off draft ONE, not the latest: it must still be numbered 3.
+        var d3 = await service.CreateNextDraftAsync(d1, "doc-3", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        Assert.Equal(3, context.Novels.Single(n => n.Id == d3!.Value).DraftNumber);
+        Assert.Equal(2, context.Novels.Single(n => n.Id == d2!.Value).DraftNumber);
+    }
+
+    [Fact]
+    public async Task CreateNextDraft_ReturnsNull_WhenThePreviousDraftIsMissing()
+    {
+        var result = await NewService().CreateNextDraftAsync(
+            Guid.NewGuid(), "doc", "Book.gdoc", "token", null, null, CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetReaderPages_ReturnsComposedPagesInReadingOrder_WithChapterLabelsAndSkipsUncomposed()
+    {
+        Guid novelId;
+        using (var context = database.NewContext())
+        {
+            var novel = new Novel
+            {
+                Title = "Quest", GoogleDocId = "doc",
+                CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+            };
+            novel.ProjectId = novel.Id;
+            novel.Chapters.Add(new Chapter { NovelId = novel.Id, Number = 1, Label = "Chapter One", StartOffset = 0, EndOffset = 10 });
+            novel.Chapters.Add(new Chapter { NovelId = novel.Id, Number = 2, Label = "Chapter Two", StartOffset = 10, EndOffset = 20 });
+
+            var v1 = new Volume { NovelId = novel.Id, Number = 1, Title = "Volume One" };
+            v1.Pages.Add(ComposedPage(1, 1, "v1p1.png"));
+            v1.Pages.Add(ComposedPage(2, 2, "v1p2.png"));
+            // An uncomposed page must be excluded from the reader.
+            v1.Pages.Add(new Page { PageNumber = 3, ChapterNumber = 2, CompositionStatus = WorkStatus.Pending });
+
+            var v2 = new Volume { NovelId = novel.Id, Number = 2, Title = "Volume Two" };
+            v2.Pages.Add(ComposedPage(1, 2, "v2p1.png"));
+
+            context.Novels.Add(novel);
+            context.Volumes.AddRange(v1, v2);
+            context.SaveChanges();
+            novelId = novel.Id;
+        }
+
+        var book = await NewService().GetReaderPagesAsync(novelId, CancellationToken.None);
+
+        Assert.NotNull(book);
+        Assert.Equal("Quest", book!.Title);
+        // Three composed pages, volume 1 before volume 2, uncomposed page dropped.
+        Assert.Equal(3, book.Pages.Count);
+        Assert.Equal([1, 1, 2], book.Pages.Select(p => p.VolumeNumber).ToArray());
+        Assert.Equal("Chapter One", book.Pages[0].ChapterLabel);
+        Assert.Equal("Chapter Two", book.Pages[1].ChapterLabel);
+        Assert.Equal("v2p1.png", book.Pages[2].ImagePath);
+    }
+
+    [Fact]
+    public async Task GetReport_FoldsStoryHalfWithCraftAndFactChecks()
+    {
+        var story = BookAnalysisResult.Empty with
+        {
+            Logline = "A hero's tale",
+            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")]
+        };
+        var craft = new CraftReport([new LineEdit("Chapter 1", "He felt cold.", "The cold came.", "Filtered.")], [], [], []);
+        var checks = new List<FactCheck> { new("Paris is in France", "Correct", "Confirmed.", "Chapter 1") };
+
+        Guid novelId;
+        using (var context = database.NewContext())
+        {
+            var novel = new Novel { Title = "Quest", GoogleDocId = "doc", CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow };
+            novel.ProjectId = novel.Id;
+            novel.Analysis = new BookAnalysis
+            {
+                NovelId = novel.Id,
+                ConsolidatedJson = JsonSerializer.Serialize(story),
+                CraftJson = JsonSerializer.Serialize(craft),
+                FactChecksJson = JsonSerializer.Serialize(checks),
+                PdfStatus = WorkStatus.Completed
+            };
+            context.Novels.Add(novel);
+            context.SaveChanges();
+            novelId = novel.Id;
+        }
+
+        var report = await NewService().GetReportAsync(novelId, CancellationToken.None);
+
+        Assert.NotNull(report);
+        Assert.Equal("A hero's tale", report!.Logline);
+        Assert.Single(report.PlotHoles);
+        Assert.Single(report.LineEdits);   // craft half folded in
+        Assert.Single(report.FactChecks);  // fact-checks folded in
+    }
+
+    [Fact]
+    public async Task GetReport_IsNull_BeforeTheReportIsConsolidated()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+        var id = await NewService().CreateFromDocAsync("doc", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        Assert.Null(await NewService().GetReportAsync(id, CancellationToken.None));
+    }
+
+    private Page ComposedPage(int pageNumber, int chapterNumber, string image) => new()
+    {
+        PageNumber = pageNumber,
+        ChapterNumber = chapterNumber,
+        CompositionStatus = WorkStatus.Completed,
+        ComposedImagePath = image,
+        ThumbImagePath = "thumb-" + image
+    };
+
+    [Fact]
+    public async Task GetDraftDiff_ReportsResolvedAndNewFindings_AndTheChangedPanels()
+    {
+        // Two drafts of one book. The middle scene's text was rewritten between them; the outer scenes
+        // are untouched. The report resolved one finding and raised a new one.
+        const string firstText = "AAAAA BBBBB CCCCC";
+        const string secondText = "AAAAA XXXXX CCCCC";
+        var projectId = Guid.NewGuid();
+
+        var firstReport = BookAnalysisResult.Empty with
+        {
+            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")],
+            Inconsistencies = [new Finding("Chapter 2", "The hero's eye colour shifts")]
+        };
+        var secondReport = BookAnalysisResult.Empty with
+        {
+            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")],
+            Inaccuracies = [new Finding("Chapter 3", "Paris is placed in Germany")]
+        };
+
+        var firstId = SeedDraft(projectId, 1, null, firstText, firstReport,
+            (1, 0, 5, "first-1.png"), (2, 6, 11, "first-2.png"), (3, 12, 17, "first-3.png"));
+        var secondId = SeedDraft(projectId, 2, firstId, secondText, secondReport,
+            (1, 0, 5, "second-1.png"), (2, 6, 11, "second-2.png"), (3, 12, 17, "second-3.png"));
+
+        var diff = await NewService().GetDraftDiffAsync(secondId, CancellationToken.None);
+
+        Assert.Equal(secondId, diff.DraftId);
+        Assert.Equal(firstId, diff.PreviousDraftId);
+
+        // The eye-colour inconsistency is gone; the Paris inaccuracy is new. The unchanged plot hole
+        // shows in neither list.
+        var resolved = Assert.Single(diff.ResolvedFindings);
+        Assert.Equal("Inconsistencies", resolved.Category);
+        Assert.Contains("eye colour", resolved.Detail);
+        var added = Assert.Single(diff.NewFindings);
+        Assert.Equal("Inaccuracies", added.Category);
+        Assert.Contains("Paris", added.Detail);
+
+        // Only the middle panel sits on rewritten text, so only it re-renders; the other two carry forward.
+        Assert.Equal(2, diff.ReusablePanelCount);
+        var change = Assert.Single(diff.ChangedPanels);
+        Assert.Equal(2, change.PanelNumber);
+        Assert.Equal("second-2.png", change.NewImagePath);
+        Assert.Equal("first-2.png", change.PreviousImagePath);
+    }
+
+    [Fact]
+    public async Task GetStatus_SurfacesDraftNumberAndWhetherThereIsAPreviousDraft()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+        var service = NewService();
+        var first = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+        var second = await service.CreateNextDraftAsync(first, "doc-2", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        var firstStatus = await service.GetStatusAsync(first, CancellationToken.None);
+        var secondStatus = await service.GetStatusAsync(second!.Value, CancellationToken.None);
+
+        Assert.Equal(1, firstStatus!.DraftNumber);
+        Assert.False(firstStatus.HasPreviousDraft);
+        Assert.Equal(2, secondStatus!.DraftNumber);
+        Assert.True(secondStatus.HasPreviousDraft);
+    }
+
+    [Fact]
+    public async Task GetDraftDiff_OfAFirstDraft_IsEmpty()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+        var id = await NewService().CreateFromDocAsync("doc", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        var diff = await NewService().GetDraftDiffAsync(id, CancellationToken.None);
+
+        Assert.Null(diff.PreviousDraftId);
+        Assert.Empty(diff.ResolvedFindings);
+        Assert.Empty(diff.NewFindings);
+        Assert.Empty(diff.ChangedPanels);
+        Assert.Equal(0, diff.ReusablePanelCount);
+    }
+
+    // Seeds one draft: the novel row, its source text, a single volume/page carrying the given panels
+    // (panelNumber, source start, source end, image path), and a consolidated report.
+    private Guid SeedDraft(
+        Guid projectId, int draftNumber, Guid? previousDraftId, string fullText,
+        BookAnalysisResult report, params (int PanelNumber, int Start, int End, string Image)[] panels)
+    {
+        using var context = database.NewContext();
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc",
+            ProjectId = projectId, DraftNumber = draftNumber, PreviousDraftId = previousDraftId,
+            Stage = ProjectStage.Completed, CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        novel.Source = new SourceText { NovelId = novel.Id, FullText = fullText, CharacterCount = fullText.Length };
+
+        var volume = new Volume { NovelId = novel.Id, Number = 1, Title = "Volume One" };
+        var page = new Page { VolumeId = volume.Id, ChapterNumber = 1, PageNumber = 1 };
+        foreach (var (panelNumber, start, end, image) in panels)
+            page.Panels.Add(new Panel
+            {
+                PageId = page.Id, PanelNumber = panelNumber,
+                SourceStartOffset = start, SourceEndOffset = end,
+                Status = WorkStatus.Completed, ImagePath = image
+            });
+        volume.Pages.Add(page);
+
+        novel.Analysis = new BookAnalysis
+        {
+            NovelId = novel.Id,
+            ConsolidatedJson = JsonSerializer.Serialize(report),
+            PdfStatus = WorkStatus.Completed
+        };
+
+        context.Novels.Add(novel);
+        context.Volumes.Add(volume);
+        context.SaveChanges();
+        return novel.Id;
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_LeavesAHealthyFinishedBookUntouched()
+    {
+        var book = SeedCompletedBookWithFiles();
+
+        var healed = await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        Assert.Equal(0, healed);
+        using var ctx = database.NewContext();
+        Assert.Equal(ProjectStage.Completed, ctx.Novels.Single(n => n.Id == book.NovelId).Stage);
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_RebindsAVolumeWhosePdfIsMissing_AndRegressesTheStage()
+    {
+        var book = SeedCompletedBookWithFiles();
+        System.IO.File.Delete(book.VolumePdf); // a reboot or storage hiccup lost the bound PDF
+
+        var healed = await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        Assert.True(healed >= 1);
+        using var ctx = database.NewContext();
+        var volume = ctx.Volumes.Single(v => v.NovelId == book.NovelId);
+        Assert.Equal(WorkStatus.Pending, volume.PdfStatus);
+        Assert.Null(volume.PdfPath);
+        Assert.Equal(0, volume.PdfPageCursor);
+        Assert.Equal(ProjectStage.AssemblingVolumes, ctx.Novels.Single(n => n.Id == book.NovelId).Stage);
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_ReRendersAPanelWhoseImageIsGone_CascadingToPageAndVolume()
+    {
+        var book = SeedCompletedBookWithFiles();
+        System.IO.File.Delete(book.PanelImage);
+
+        await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        using var ctx = database.NewContext();
+        var volumeIds = ctx.Volumes.Where(v => v.NovelId == book.NovelId).Select(v => v.Id).ToList();
+        var pageIds = ctx.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToList();
+        Assert.Equal(WorkStatus.Pending, ctx.Panels.Single(p => pageIds.Contains(p.PageId)).Status);
+        Assert.Equal(WorkStatus.Pending, ctx.Pages.Single(p => pageIds.Contains(p.Id)).CompositionStatus);
+        Assert.Equal(WorkStatus.Pending, ctx.Volumes.Single(v => v.NovelId == book.NovelId).PdfStatus);
+        // Back to the earliest healed stage so the worker re-renders, recomposes, and rebinds forward.
+        Assert.Equal(ProjectStage.RenderingImages, ctx.Novels.Single(n => n.Id == book.NovelId).Stage);
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_ReRendersAMissingAnalysisReport()
+    {
+        var book = SeedCompletedBookWithFiles();
+        System.IO.File.Delete(book.AnalysisPdf);
+
+        await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        using var ctx = database.NewContext();
+        Assert.Equal(WorkStatus.Pending, ctx.BookAnalyses.Single(a => a.NovelId == book.NovelId).PdfStatus);
+        Assert.Equal(ProjectStage.ComposingAnalysis, ctx.Novels.Single(n => n.Id == book.NovelId).Stage);
+    }
+
+    [Fact]
+    public async Task VerifyAndHeal_IgnoresAnArchivedVolume_WhoseLocalCopyIsIntentionallyGone()
+    {
+        Guid novelId;
+        using (var ctx = database.NewContext())
+        {
+            var novel = new Novel
+            {
+                Title = "Q", GoogleDocId = "d", Stage = ProjectStage.Completed,
+                CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+            };
+            novel.ProjectId = novel.Id;
+            // Archived: the PDF lives on Drive, the local path is cleared — absence here is expected.
+            ctx.Volumes.Add(new Volume
+            {
+                NovelId = novel.Id, Number = 1, Title = "V",
+                PdfStatus = WorkStatus.Completed, PdfPath = null, ArchivedDriveFileId = "drive-file-123"
+            });
+            ctx.Novels.Add(novel);
+            ctx.SaveChanges();
+            novelId = novel.Id;
+        }
+
+        var healed = await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
+
+        Assert.Equal(0, healed);
+        using var check = database.NewContext();
+        Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == novelId).Stage);
+    }
+
+    // Seeds a finished book whose panel/page/volume/analysis outputs all exist on disk.
+    private (Guid NovelId, string PanelImage, string PageImage, string VolumePdf, string AnalysisPdf)
+        SeedCompletedBookWithFiles()
+    {
+        using var ctx = database.NewContext();
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc", Stage = ProjectStage.Completed,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        novel.ProjectId = novel.Id;
+
+        var panelImg = imageStore.Save($"{novel.Id}/panels/panel.png", SampleImages.Png());
+        var pageImg = imageStore.Save($"{novel.Id}/pages/page.png", SampleImages.Png());
+        var thumbImg = imageStore.Save($"{novel.Id}/pages/page.thumb.png", SampleImages.Png());
+        var volumePdf = imageStore.Save($"{novel.Id}/volumes/volume-1.pdf", [0x25, 0x50, 0x44, 0x46]);
+        var analysisPdf = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", [0x25, 0x50, 0x44, 0x46]);
+
+        var volume = new Volume
+        {
+            NovelId = novel.Id, Number = 1, Title = "Volume One",
+            PdfStatus = WorkStatus.Completed, PdfPath = volumePdf
+        };
+        var page = new Page
+        {
+            VolumeId = volume.Id, PageNumber = 1, ChapterNumber = 1,
+            CompositionStatus = WorkStatus.Completed, ComposedImagePath = pageImg, ThumbImagePath = thumbImg
+        };
+        page.Panels.Add(new Panel { PageId = page.Id, PanelNumber = 1, Status = WorkStatus.Completed, ImagePath = panelImg });
+        volume.Pages.Add(page);
+        novel.Analysis = new BookAnalysis
+        {
+            NovelId = novel.Id, PdfStatus = WorkStatus.Completed, PdfPath = analysisPdf, ConsolidatedJson = "{}"
+        };
+
+        ctx.Novels.Add(novel);
+        ctx.Volumes.Add(volume);
+        ctx.SaveChanges();
+        return (novel.Id, panelImg, pageImg, volumePdf, analysisPdf);
     }
 
     [Fact]

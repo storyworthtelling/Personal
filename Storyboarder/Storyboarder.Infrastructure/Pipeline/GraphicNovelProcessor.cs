@@ -47,6 +47,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
     private readonly TextChunker storyboardChunker;
     private readonly ChapterDetector chapterDetector = new();
+
+    // How much opening prose the art-style derivation sees — enough to read the genre, voice and setting
+    // without paying for the whole book on a one-off, best-effort call.
+    private const int ArtStyleSampleChars = 6000;
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
     private readonly PlaceholderPanelRenderer placeholderRenderer = new();
@@ -313,6 +317,31 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         foreach (var setting in bible.Settings)
             db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Setting, setting, chunkCount));
 
+        // Derive the art style from the manuscript (owner's decision: Claude derives it from prose +
+        // genre), but only when the user didn't pick one — a custom style always wins. Best-effort and
+        // never fatal: any failure keeps the default, since art direction must not stall the book.
+        if (novel.ArtStyle == ArtStyles.Default)
+        {
+            try
+            {
+                var sample = await db.Chunks
+                    .Where(c => c.NovelId == novel.Id)
+                    .OrderBy(c => c.Ordinal)
+                    .Select(c => c.Text)
+                    .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+                if (sample.Length > ArtStyleSampleChars)
+                    sample = sample[..ArtStyleSampleChars];
+
+                var derived = await claude.DeriveArtStyle(sample, bible, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(derived))
+                    novel.ArtStyle = derived.Trim();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Art-style derivation failed; keeping the default style (novel {NovelId})", novel.Id);
+            }
+        }
+
         novel.DesignBibleConsolidated = true;
         Touch(novel);
         await db.SaveChangesAsync(cancellationToken);
@@ -335,10 +364,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (novel.StoryboardAttempts >= rateLimits.MaxAttempts)
             return ProcessResult.Idle;
 
-        var chunkText = await db.Chunks
+        var chunkInfo = await db.Chunks
             .Where(c => c.NovelId == novel.Id && c.Ordinal == novel.StoryboardCursor)
-            .Select(c => c.Text)
+            .Select(c => new { c.Text, c.StartOffset })
             .FirstAsync(cancellationToken);
+        var chunkText = chunkInfo.Text;
 
         // Adapt the chunk one small sub-window at a time. A whole ~48K-char chunk in a single call runs
         // for many minutes — long enough that Android's background worker is killed mid-stream. Slicing
@@ -357,11 +387,34 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        var windowSpan = windows[novel.StoryboardWindowIndex];
+        var window = windowSpan.Text;
+
+        // Absolute source span of this window: the chunk's own offset plus the window's offset within
+        // the chunk. Every panel this window yields is anchored here, so a later draft can tell which
+        // panels sit on text that moved.
+        int windowStart = chunkInfo.StartOffset + windowSpan.StartOffset;
+        int windowEnd = chunkInfo.StartOffset + windowSpan.EndOffset;
+
+        // Incremental re-render: if this is a later draft and the previous draft already storyboarded a
+        // window with this exact text, copy those panels — prompts AND renders — forward instead of
+        // re-storyboarding and re-illustrating unchanged material. This spends no Claude storyboard call
+        // and no Gemini render, so it runs before the Claude limiter is even acquired.
+        if (novel.PreviousDraftId is Guid previousDraftId &&
+            await TryReuseWindowAsync(db, novel, previousDraftId, window, windowStart, windowEnd, cancellationToken))
+        {
+            AdvanceStoryboardWindow(novel, windows.Count);
+            novel.StoryboardAttempts = 0;
+            novel.LastError = null;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         if (!claudeLimiter.TryAcquire())
             return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
 
         var bible = await LoadBible(db, novel.Id, cancellationToken);
-        var window = windows[novel.StoryboardWindowIndex].Text;
 
         StoryboardSegment segment;
         try
@@ -421,8 +474,13 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                             PageId = page.Id,
                             PanelNumber = panelNumber++,
                             VisualPrompt = panelDraft.VisualPrompt,
-                            Dialogue = panelDraft.Dialogue,
+                            // Abridge dialogue to what a balloon holds; the art stays faithful, the
+                            // lettering yields to readability (see DialogueFit / DESIGN.md).
+                            Dialogue = DialogueFit.Trim(panelDraft.Dialogue),
                             Caption = panelDraft.Caption,
+                            ShotType = panelDraft.Shot,
+                            SourceStartOffset = windowStart,
+                            SourceEndOffset = windowEnd,
                             ReferenceNamesJson = JsonSerializer.Serialize(panelDraft.ReferenceNames, JsonResponse.CaseInsensitive)
                         });
                     db.Pages.Add(page);
@@ -434,20 +492,131 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         }
 
         novel.ContinuitySummary = segment.ContinuitySummary;
-        novel.StoryboardWindowIndex++;
-        // Chunk finished once its last window is adapted: advance to the next chunk and reset the
-        // sub-window index. The outer cursor check ends storyboarding when the last chunk is done.
-        if (novel.StoryboardWindowIndex >= windows.Count)
-        {
-            novel.StoryboardCursor++;
-            novel.StoryboardWindowIndex = 0;
-        }
+        AdvanceStoryboardWindow(novel, windows.Count);
         novel.StoryboardAttempts = 0;
         novel.LastError = null;
         Touch(novel);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
+
+    // Advances one storyboard sub-window; a finished chunk (last window adapted) rolls the cursor to the
+    // next chunk and resets the sub-window index. The DoStoryboard cursor check ends storyboarding once
+    // the last chunk is done.
+    private static void AdvanceStoryboardWindow(Novel novel, int windowCount)
+    {
+        novel.StoryboardWindowIndex++;
+        if (novel.StoryboardWindowIndex >= windowCount)
+        {
+            novel.StoryboardCursor++;
+            novel.StoryboardWindowIndex = 0;
+        }
+    }
+
+    // Copies a previous draft's panels for an unchanged window into this draft, renders and all, so an
+    // edit re-illustrates only the windows whose text actually moved. Returns false — and the caller
+    // storyboards the window normally — when there is no previous draft window with this exact text, or
+    // any of its renders have gone (e.g. archived away), since a partial reuse would leave the page with
+    // holes. Whole panels are copied (prompt, dialogue, references, and the image bytes into this draft's
+    // own files) so the new draft is self-contained and every reused render still matches its prompt.
+    private async Task<bool> TryReuseWindowAsync(
+        StoryboarderDbContext db, Novel novel, Guid previousDraftId,
+        string window, int windowStart, int windowEnd, CancellationToken cancellationToken)
+    {
+        var previousFull = await db.SourceTexts
+            .Where(s => s.NovelId == previousDraftId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrEmpty(previousFull))
+            return false;
+
+        var previousPanels = await (
+            from v in db.Volumes
+            where v.NovelId == previousDraftId
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            join pn in db.Panels on pg.Id equals pn.PageId
+            orderby v.Number, pg.PageNumber, pn.PanelNumber
+            select new ReusablePanel(
+                v.Number, v.Title, pg.ChapterNumber, pg.PageNumber, pn.PanelNumber,
+                pn.SourceStartOffset, pn.SourceEndOffset, pn.VisualPrompt, pn.Dialogue, pn.Caption,
+                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped, pn.ShotType))
+            .ToListAsync(cancellationToken);
+
+        // Only the previous panels drawn from a window whose text is byte-identical to this one.
+        var matching = previousPanels
+            .Where(p => PanelSourceMatching.SourceText(previousFull, p.SourceStartOffset, p.SourceEndOffset) == window)
+            .ToList();
+        if (matching.Count == 0)
+            return false;
+
+        // Every rendered match must still have its image on disk; a skipped panel legitimately has none.
+        if (matching.Any(p => !p.Skipped && (p.ImagePath is null || !imageStore.Exists(p.ImagePath))))
+            return false;
+
+        var existing = (await db.Volumes
+                .Where(v => v.NovelId == novel.Id)
+                .Select(v => new { v.Id, v.Number, PageCount = v.Pages.Count })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(v => v.Number, v => (v.Id, PageCount: v.PageCount));
+
+        foreach (var volumeGroup in matching.GroupBy(p => (p.VolumeNumber, p.VolumeTitle)))
+        {
+            if (!existing.TryGetValue(volumeGroup.Key.VolumeNumber, out var target))
+            {
+                var volume = new Volume { NovelId = novel.Id, Number = volumeGroup.Key.VolumeNumber, Title = volumeGroup.Key.VolumeTitle };
+                db.Volumes.Add(volume);
+                target = (volume.Id, 0);
+            }
+
+            foreach (var pageGroup in volumeGroup.GroupBy(p => (p.PageNumber, p.ChapterNumber)))
+            {
+                var page = new Page
+                {
+                    VolumeId = target.Id,
+                    ChapterNumber = pageGroup.Key.ChapterNumber,
+                    PageNumber = ++target.PageCount
+                };
+                int panelNumber = 1;
+                foreach (var source in pageGroup.OrderBy(p => p.PanelNumber))
+                {
+                    var panel = new Panel
+                    {
+                        PageId = page.Id,
+                        PanelNumber = panelNumber++,
+                        VisualPrompt = source.VisualPrompt,
+                        Dialogue = source.Dialogue,
+                        Caption = source.Caption,
+                        ShotType = source.ShotType,
+                        SourceStartOffset = windowStart,
+                        SourceEndOffset = windowEnd,
+                        ReferenceNamesJson = source.ReferenceNamesJson,
+                        Status = WorkStatus.Completed
+                    };
+                    if (source.Skipped)
+                        panel.Skipped = true;
+                    else
+                    {
+                        var bytes = imageStore.Read(source.ImagePath!);
+                        panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", bytes);
+                    }
+                    page.Panels.Add(panel);
+                }
+                db.Pages.Add(page);
+            }
+
+            existing[volumeGroup.Key.VolumeNumber] = target;
+        }
+
+        logger.LogInformation(
+            "Reused {Count} panel(s) from a prior draft for an unchanged window (novel {NovelId})",
+            matching.Count, novel.Id);
+        return true;
+    }
+
+    private sealed record ReusablePanel(
+        int VolumeNumber, string VolumeTitle, int ChapterNumber, int PageNumber, int PanelNumber,
+        int SourceStartOffset, int SourceEndOffset, string VisualPrompt, string? Dialogue, string? Caption,
+        string ReferenceNamesJson, string? ImagePath, bool Skipped, ShotType ShotType);
 
     private async Task<ProcessResult> RenderPanels(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
@@ -544,7 +713,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 var panelArt = page.Panels
                     .Where(p => !p.Skipped)
                     .OrderBy(p => p.PanelNumber)
-                    .Select(p => new PanelArt(imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption))
+                    .Select(p => new PanelArt(imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption, p.ShotType))
                     .ToList();
                 if (panelArt.Count == 0)
                     panelArt.Add(new PanelArt(placeholderRenderer.Render(), null, null));
@@ -1196,15 +1365,23 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private static async Task<double?> PanelSlotAspectRatio(
         StoryboarderDbContext db, Panel panel, CancellationToken cancellationToken)
     {
-        var panelCount = await db.Panels.CountAsync(p => p.PageId == panel.PageId, cancellationToken);
-        if (panelCount <= 0)
+        // The panel's slot depends on the whole page's shot mix (a Wide band is short-and-wide, a Splash
+        // fills the page), so mirror the composer: the non-skipped panels of this page in reading order.
+        var pagePanels = await db.Panels
+            .Where(p => p.PageId == panel.PageId && !p.Skipped)
+            .OrderBy(p => p.PanelNumber)
+            .Select(p => new { p.Id, p.ShotType })
+            .ToListAsync(cancellationToken);
+        var index = pagePanels.FindIndex(p => p.Id == panel.Id);
+        if (index < 0)
             return null;
 
         var calculator = new PageLayoutCalculator(
             new PageMargins(DesignTokens.Comic.TopMargin, DesignTokens.Comic.SideMargin, DesignTokens.Comic.BottomMargin),
             DesignTokens.Comic.Gutter);
         var cell = calculator.Layout(
-            new PageSize(DesignTokens.Comic.PageWidth, DesignTokens.Comic.PageHeight), panelCount)[0];
+            new PageSize(DesignTokens.Comic.PageWidth, DesignTokens.Comic.PageHeight),
+            pagePanels.Select(p => p.ShotType).ToList())[index];
         var art = PanelSlotLayout.Compute(cell, panel.Dialogue, panel.Caption).Art;
         return art.Width / art.Height;
     }
@@ -1296,10 +1473,38 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return paths.Where(imageStore.Exists).Select(imageStore.Read).ToList();
     }
 
-    // Splits a page's panels into consecutive groups of at most maxPerPage, balanced so the groups
-    // differ in size by at most one (8 panels at a cap of 6 become 4+4, not 6+2). Each group becomes a
-    // physical page. An empty page yields no groups.
+    // Splits a storyboarded page's panels into physical pages: each Splash panel takes a page to itself,
+    // and the ordinary panels between splashes are balanced across pages by the cap. Each group becomes a
+    // physical page. An empty input yields no groups.
     private static IEnumerable<IReadOnlyList<PanelDraft>> SplitForPages(IReadOnlyList<PanelDraft> panels, int maxPerPage)
+    {
+        if (panels.Count == 0)
+            yield break;
+
+        // A Splash gets a page to itself (that's what makes it a splash); the runs of ordinary panels
+        // between splashes are balanced across pages by the cap, exactly as before.
+        var run = new List<PanelDraft>();
+        foreach (var panel in panels)
+        {
+            if (panel.Shot == ShotType.Splash)
+            {
+                foreach (var group in BalanceAcrossPages(run, maxPerPage))
+                    yield return group;
+                run = [];
+                yield return new[] { panel };
+            }
+            else
+            {
+                run.Add(panel);
+            }
+        }
+        foreach (var group in BalanceAcrossPages(run, maxPerPage))
+            yield return group;
+    }
+
+    // Splits a run of panels across as few pages as the cap allows, with page sizes differing by at most
+    // one (8 panels at a cap of 6 become 4+4, not 6+2). An empty run yields no pages.
+    private static IEnumerable<IReadOnlyList<PanelDraft>> BalanceAcrossPages(IReadOnlyList<PanelDraft> panels, int maxPerPage)
     {
         if (panels.Count == 0)
             yield break;

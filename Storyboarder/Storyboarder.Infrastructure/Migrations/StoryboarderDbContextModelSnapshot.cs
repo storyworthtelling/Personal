@@ -257,6 +257,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<bool>("DesignBibleConsolidated")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("DraftNumber")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("GoogleDocId")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -266,6 +269,12 @@ namespace Storyboarder.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PreviousDraftId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProjectId")
                         .HasColumnType("TEXT");
 
                     b.Property<long?>("RateLimitedUntilUtc")
@@ -296,6 +305,8 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Stage");
+
+                    b.HasIndex("ProjectId", "DraftNumber");
 
                     b.ToTable("Novels");
                 });
@@ -382,7 +393,16 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ShotType")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("Skipped")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SourceEndOffset")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SourceStartOffset")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")

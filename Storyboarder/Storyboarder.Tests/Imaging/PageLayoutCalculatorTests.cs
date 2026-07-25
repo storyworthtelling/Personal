@@ -1,4 +1,5 @@
 using Storyboarder.Domain.Imaging;
+using Storyboarder.Domain.Model;
 using Xunit;
 
 namespace Storyboarder.Tests.Imaging;
@@ -68,6 +69,73 @@ public class PageLayoutCalculatorTests
         var rects = Calculator().Layout(Letter, 4);
         var gap = rects[1].X - (rects[0].X + rects[0].Width);
         Assert.Equal(20, gap, precision: 6);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(6)]
+    public void AllStandardShots_LayOutIdenticallyToTheUniformGrid(int count)
+    {
+        // The load-bearing guarantee: a page the model didn't tag with shot types is unchanged.
+        var uniform = Calculator().Layout(Letter, count);
+        var weighted = Calculator().Layout(Letter, Enumerable.Repeat(ShotType.Standard, count).ToList());
+
+        Assert.Equal(uniform.Count, weighted.Count);
+        for (var i = 0; i < count; i++)
+        {
+            Assert.Equal(uniform[i].X, weighted[i].X, precision: 6);
+            Assert.Equal(uniform[i].Y, weighted[i].Y, precision: 6);
+            Assert.Equal(uniform[i].Width, weighted[i].Width, precision: 6);
+            Assert.Equal(uniform[i].Height, weighted[i].Height, precision: 6);
+        }
+    }
+
+    [Fact]
+    public void Splash_FillsTheWholeContentBox()
+    {
+        var rect = Assert.Single(Calculator().Layout(Letter, new[] { ShotType.Splash }));
+        Assert.Equal(Margins.Side, rect.X, precision: 6);
+        Assert.Equal(Margins.Top, rect.Y, precision: 6);
+        Assert.Equal(Letter.Width - 2 * Margins.Side, rect.Width, precision: 6);
+        Assert.Equal(Letter.Height - Margins.Top - Margins.Bottom, rect.Height, precision: 6);
+    }
+
+    [Fact]
+    public void WideShot_IsAFullWidthBand_AboveAStandardRow()
+    {
+        var rects = Calculator().Layout(Letter, new[] { ShotType.Wide, ShotType.Standard, ShotType.Standard });
+
+        // The wide band spans the full content width at the top.
+        Assert.Equal(Margins.Side, rects[0].X, precision: 6);
+        Assert.Equal(Margins.Top, rects[0].Y, precision: 6);
+        Assert.Equal(Letter.Width - 2 * Margins.Side, rects[0].Width, precision: 6);
+
+        // The two standards share the row below in equal halves (they fill the width with one gutter).
+        Assert.Equal(rects[1].Width, rects[2].Width, precision: 6);
+        Assert.True(rects[2].X > rects[1].X);
+        Assert.Equal(rects[1].Y, rects[2].Y, precision: 6);
+        Assert.True(rects[1].Y > rects[0].Y);
+        Assert.Equal(rects[0].Width, rects[1].Width + rects[2].Width + 20, precision: 6);
+
+        // The band is cinematically shorter than the standard row beneath it.
+        Assert.True(rects[0].Height < rects[1].Height);
+    }
+
+    [Fact]
+    public void WeightedLayout_KeepsEveryPanelWithinTheMargins()
+    {
+        var rects = Calculator().Layout(Letter,
+            new[] { ShotType.Wide, ShotType.Standard, ShotType.Standard, ShotType.Standard });
+        foreach (var r in rects)
+        {
+            Assert.True(r.X >= Margins.Side - 1e-6);
+            Assert.True(r.Y >= Margins.Top - 1e-6);
+            Assert.True(r.X + r.Width <= Letter.Width - Margins.Side + 1e-6);
+            Assert.True(r.Y + r.Height <= Letter.Height - Margins.Bottom + 1e-6);
+        }
     }
 
     [Fact]
