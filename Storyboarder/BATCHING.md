@@ -139,6 +139,47 @@ a rescue**. **Measure the raised-cap sync path on one real full book first.** Th
 - If the on-device sync path proves flaky or drags for a 2,000-image book (the likely outcome under Doze),
   batching becomes clearly worth it — as much for *reliable server-side completion* as for the 50% cost cut.
 
+## How rejected prompts are handled under batching
+
+The current block flow (`HandleBlockedPanel`) is a synchronous escalation ladder mixing **automatic model
+round-trips** with **two human gates**, keyed on the block reason (`ClassifyBlock` → Safety / Prohibited /
+Filtered):
+
+1. **Safety, first hit** → park the panel `AwaitingApproval` with the flagged harm categories; the owner
+   *approves-and-relaxes-once* or *skips* in the app (human gate). The rest of the book keeps rendering.
+2. **Approved, or Filtered, or first Prohibited** → ask Claude to **restage the prompt to imply** the beat,
+   then re-render.
+3. **Restaged and still blocked** → Safety/Filtered fall back to a **neutral placeholder**; Prohibited parks
+   `AwaitingApproval` for the owner to *rework the art direction* or *skip* (human gate).
+
+Each of those Gemini attempts is currently **minutes**. Naively routing every attempt through a batch makes
+each one **up to 24h**, so a single blocked panel could burn 2–3 days walking the ladder. That's the trap.
+
+**The design that avoids it — batch the first attempt only; escalate synchronously.**
+
+- **Batch = one render attempt per panel, the first pass.** Submit all panel prompts as one job. The 50%
+  discount and server-side parallelism apply to the ~99% that render clean on the first try.
+- **Rejections fall *out* of the batch, they aren't retried *in* it.** A batch returns per-request outcomes,
+  so `ClassifyBlock` runs unchanged on each result. Split the returned results: successes → save + Completed;
+  blocked → hand to the **existing** `HandleBlockedPanel` ladder.
+- **Every attempt after the first is synchronous.** The relax-and-re-render, the Claude restage-and-
+  re-render, the post-approval re-render, the post-rework re-render — all run as ordinary sync Gemini calls
+  (minutes), on a small set (a handful of panels out of ~2,000). So the batch's 24h exposure is capped at
+  exactly **one** attempt per panel, and everything iterative stays fast.
+- **The human gates are untouched.** "Retry raised in the app" (the Safety approve/skip sheet and the
+  Prohibited rework/skip flow) doesn't care whether the first render came from a batch or a sync call — a
+  parked panel is just `AwaitingApproval`. After the owner acts, the re-render is synchronous so their
+  decision takes effect in minutes, not a next-batch day.
+
+Rule of thumb: **first attempt batched, every escalation and human-gate re-render synchronous.** That keeps
+the cost/parallelism win on the bulk while the block-handling UX and timing stay exactly as they are today.
+
+The one genuinely new piece this needs (already noted under *Real complications #5*): an in-flight panel
+state — "submitted, awaiting batch," carrying the job id — that survives a restart and reconciles each
+returned result into either Completed or the block ladder. Transient (non-content) failures in a batch are
+handled the same way: pull them out and re-render synchronously (or roll into the next batch), rather than
+re-batching one at a time.
+
 ## Sources
 
 - [Batch API — Gemini API docs](https://ai.google.dev/gemini-api/docs/batch-api)
