@@ -1,13 +1,14 @@
 # Storyboarder — session handoff
 
-**Phases 1–3 are complete; Phases 4–5 are partly done; Phase 6 remains.** Phase 1 merged in PR #111.
-Everything since landed on branch `claude/storyboarder-handoff-phases-nbhko0`: Phase 2 (backend
-`bfa44bc`→`38574ad` + UI `a186b76`), Phase 3 (`000fe63`→ reader/report/diff pages), the safe half of Phase 4
-(`bf30279`→`8a9803c` — shot types, weighted layout, dialogue trim, derived art style), and two of three
-Phase 5 items (`759b5db` .docx import, `dd204f3` verify-after-reboot). What's left: the vision/lettering half
-of Phase 4 (needs a live vision model or on-device eyes), Phase 5's owner's-voice (blocked on the owner's
-Drive docs), and all of Phase 6 (owner-gated). Read this top to bottom before starting work — several of the
-traps below cost a full CI round each to discover.
+**Phases 1–3 are complete; Phases 4–6 are partly done.** Phase 1 merged in PR #111. Everything since landed
+on branch `claude/storyboarder-handoff-phases-nbhko0`: Phase 2 (backend `bfa44bc`→`38574ad` + UI `a186b76`),
+Phase 3 (`000fe63`→ reader/report/diff pages), the safe half of Phase 4 (`bf30279`→`8a9803c` — shot types,
+weighted layout, dialogue trim, derived art style), two of three Phase 5 items (`759b5db` .docx import,
+`dd204f3` verify-after-reboot), and Phase 6 (`ad3bf4b` Gemini cap raise + `c9d3066`→`df50b5f` the batch
+renderer, built but off-by-default and unverified against the live API). What's left: the vision/lettering
+half of Phase 4 (needs a live vision model or on-device eyes), Phase 5's owner's-voice (blocked on the
+owner's Drive docs), and Phase 6's live batch verification (see BATCHING.md's pre-enable checklist). Read
+this top to bottom before starting work — several of the traps below cost a full CI round each to discover.
 
 **Phase 2 is complete end to end.** The draft loop is built and tested in Domain/Infrastructure —
 `ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings resolved/new + changed
@@ -256,7 +257,7 @@ The weighted layout is verified as *math* (no overlap, fills the page, all-Stand
   Until then copy stays quiet-neutral across DESIGN.md, FocusPhone, Ledger, and Storyboarder. Its own PR
   when unblocked.
 
-### Phase 6 — Gemini batching ⏳ cheap step done
+### Phase 6 — Gemini batching ⏳ cap raised; batch renderer built (off by default, unverified)
 See `Storyboarder/BATCHING.md` for the full investigation.
 - **Cap raise** ✅ (`ad3bf4b`): the owner's real tier is 2,000/min · 50,000/day for `gemini-2.5-flash-image`.
   `GeminiRequestsPerDay` was a self-imposed **100/day** floor (weeks per book); raised to **60/min, 5,000/day**
@@ -265,9 +266,15 @@ See `Storyboarder/BATCHING.md` for the full investigation.
   from weeks to ~10 hours). A single sequential worker is latency-bound and can't approach these anyway. If
   the owner wants to trade the runaway guardrail for maximum headroom, bump `GeminiRequestsPerDay` toward
   50,000.
-- **Batch API** ⬜ still open: batching panel renders gives a ~50% discount and a separate quota pool, but
-  it's asynchronous (submit-then-poll) and a real rework of the render stage. Only worth it if the cap raise
-  above doesn't already deliver acceptable wall-clock time — measure first.
+- **Batch API** ⏳ built, off by default, needs live verification (`c9d3066`→`df50b5f`): the whole batch
+  render mode exists — `IGeminiBatchClient` + `GeminiBatchImageClient`, in-flight state (`Novel.BatchJobId`,
+  `Panel.BatchAttempted`, `WorkStatus.SubmittedToBatch`), and `GraphicNovelProcessor.RunBatchStep` (submit
+  the first pass as one job, poll, reconcile; a batch failure/block falls back to the synchronous render +
+  block ladder). E2E-tested with a fake; the real HTTP client is parse-tested but **not** verified against
+  the live API. Gated behind `GeminiOptions.UseBatchRendering` (default off). **See BATCHING.md's
+  "Implementation status" for the pre-enable checklist** — verify the Batch REST envelope against a real
+  call, and move reference sheets to the Files API (inline blows the 20 MB cap on a full book) — and
+  measure the raised-cap synchronous path first; batching is an optimization, not a rescue.
 
 ---
 

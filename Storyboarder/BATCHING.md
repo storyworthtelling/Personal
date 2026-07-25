@@ -180,6 +180,39 @@ returned result into either Completed or the block ladder. Transient (non-conten
 handled the same way: pull them out and re-render synchronously (or roll into the next batch), rather than
 re-batching one at a time.
 
+## Implementation status — built, off by default, needs live verification
+
+The batch renderer is built end to end and tested with a fake, gated behind `GeminiOptions.UseBatchRendering`
+(default **false** — the synchronous path is the verified default). Pieces:
+
+- `IGeminiBatchClient` + models (`Domain/External/GeminiBatch.cs`); `GeminiBatchImageClient` (the real HTTP
+  client, `Infrastructure/External`), registered in DI but dormant while the flag is off.
+- In-flight state: `Novel.BatchJobId`/`BatchSubmittedAtUtc`, `Panel.BatchAttempted`, `WorkStatus
+  .SubmittedToBatch` (+ migration).
+- `GraphicNovelProcessor.RunBatchStep`: submit never-batched Pending panels as one job, poll, reconcile —
+  success completes the panel; a failure/block returns it to Pending for the **synchronous** render +
+  `HandleBlockedPanel` ladder (first attempt batched, every escalation synchronous). E2E-tested with a fake
+  batch client (happy path + synchronous fallback).
+
+**Before switching `UseBatchRendering` on, verify against a live key (this can't be checked in the sandbox):**
+
+1. **The Batch REST envelope.** `GeminiBatchImageClient.SubmitAsync`/`PollAsync` assume the
+   `models/{model}:batchGenerateContent` request wrapper (`batch.inputConfig.requests.requests[]` with a
+   `metadata.key` per request) and the polled Operation's result nesting (`response.inlinedResponses…`,
+   correlated by `metadata.key`). Run one real submit+poll, diff the actual JSON, and adjust the builder/
+   parser (the 5 parse tests localize the change). Parsing already degrades to "no image → synchronous
+   fallback" on a mismatch, so a wrong shape is safe-but-useless, not crashy.
+2. **Reference sheets at scale.** They're inlined (base64) per request today — fine for verification and a
+   small book, but a full book (~2,000 panels × ~a dozen sheets) blows the ~20 MB inline ceiling. Move
+   sheets to the **Files API**: upload each once per submission, reference by URI in every request. Until
+   that's done, only run batch mode on a short book.
+3. **Then decide exposure.** There's deliberately no user-facing toggle yet (enabling unverified, billed
+   batch calls from the UI would be a footgun). After verification, either flip the LiveOptions default in
+   `MauiProgram` or add a Settings switch bound to a new `SettingsStore.UseBatchRendering`.
+
+Measure the raised-cap synchronous path on a real book first (per the economics section) — batching is an
+optimization, and this last mile of verification is only worth walking if that path proves too slow/flaky.
+
 ## Sources
 
 - [Batch API — Gemini API docs](https://ai.google.dev/gemini-api/docs/batch-api)
