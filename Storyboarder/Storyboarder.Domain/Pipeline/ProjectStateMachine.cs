@@ -14,7 +14,11 @@ public sealed record PipelineProgress(
     bool AllPanelsRendered,
     bool AllPagesComposed,
     bool AllVolumesAssembled,
-    bool AnalysisComplete = false);
+    bool AnalysisComplete = false,
+    // The novel is a report-only draft: the art stages are skipped entirely and the design bible hands
+    // straight over to the revision report. Defaulted false — the illustration is the comprehension
+    // probe, so a conversion still wants it unless the owner explicitly asked for the report alone.
+    bool ReportOnly = false);
 
 // Decides the next stage for a novel given its progress. Pure and idempotent: a stage only advances
 // when its completion predicate holds; Completed and Failed are terminal.
@@ -25,9 +29,12 @@ public static class ProjectStateMachine
         ProjectStage.Created => ProjectStage.Ingesting,
         ProjectStage.Ingesting =>
             progress.SourceIngested ? ProjectStage.BuildingDesignBible : ProjectStage.Ingesting,
+        // The one branch in the pipeline: a report-only draft leaves the design bible for the revision
+        // report directly, skipping storyboarding, panel renders, page composition and volume binding.
+        // The bible is still built — the report's cast and continuity come from it.
         ProjectStage.BuildingDesignBible =>
             progress.AllChunksAnalyzed && progress.BibleConsolidated && progress.AllReferenceSheetsRendered
-                ? ProjectStage.Storyboarding
+                ? (progress.ReportOnly ? ProjectStage.ComposingAnalysis : ProjectStage.Storyboarding)
                 : ProjectStage.BuildingDesignBible,
         ProjectStage.Storyboarding =>
             progress.StoryboardCreated ? ProjectStage.RenderingImages : ProjectStage.Storyboarding,

@@ -130,10 +130,14 @@ public class GraphicNovelProcessorTests : IDisposable
         Options.Create(new PageLayoutOptions { MaxPanelsPerPage = maxPanelsPerPage }),
         NullLogger<GraphicNovelProcessor>.Instance);
 
-    private Guid SeedNovel(string? fullText = null)
+    private Guid SeedNovel(string? fullText = null, bool reportOnly = false)
     {
         var text = fullText ?? "A short tale. The hero walked to the castle and knocked on the gate.";
-        var novel = new Novel { Title = "Quest", GoogleDocId = "doc", CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow };
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc", ReportOnly = reportOnly,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
         novel.Source = new SourceText
         {
             NovelId = novel.Id,
@@ -216,6 +220,41 @@ public class GraphicNovelProcessorTests : IDisposable
         var notes = context.ChunkAnalyses.Where(a => a.NovelId == novelId).ToList();
         Assert.NotEmpty(notes);
         Assert.All(notes, unit => Assert.Contains("Chapter 1", unit.NotesJson));
+    }
+
+    [Fact]
+    public async Task ReportOnlyDraft_SkipsEveryArtStage_AndStillProducesTheAnalysisPdf()
+    {
+        var novelId = SeedNovel(reportOnly: true);
+        var stagesSeen = new List<ProjectStage>();
+
+        await DriveToCompletion(novelId, stagesSeen.Add);
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.Contains(ProjectStage.BuildingDesignBible, stagesSeen);
+        Assert.Contains(ProjectStage.ComposingAnalysis, stagesSeen);
+        Assert.DoesNotContain(ProjectStage.Storyboarding, stagesSeen);
+        Assert.DoesNotContain(ProjectStage.RenderingImages, stagesSeen);
+        Assert.DoesNotContain(ProjectStage.ComposingPages, stagesSeen);
+        Assert.DoesNotContain(ProjectStage.AssemblingVolumes, stagesSeen);
+
+        // No art was commissioned at all: no storyboard, no panels, and no reference sheets — which
+        // are the expensive half of the design-bible stage and useless when nothing will be drawn.
+        claude.Verify(c => c.Storyboard(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        gemini.Verify(g => g.GenerateReferenceSheet(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(0, panelRenderCalls);
+
+        using var context = database.NewContext();
+        Assert.Empty(context.Volumes.Where(v => v.NovelId == novelId));
+        // The design bible is still built — the report's cast comes from it.
+        Assert.NotEmpty(context.DesignRefs.Where(r => r.NovelId == novelId));
+
+        var analysis = Assert.Single(context.BookAnalyses.Where(a => a.NovelId == novelId));
+        Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);
+        Assert.True(File.Exists(analysis.PdfPath!));
     }
 
     [Fact]

@@ -211,8 +211,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 3) Render one pending/due reference sheet.
-        var reference = await db.DesignRefs
+        // 3) Render one pending/due reference sheet — unless this is a report-only draft, which draws
+        // no art at all. Reference sheets exist solely to keep the panels consistent, and they are the
+        // expensive half of this stage (one image call per bible entity), so a report-only run skips
+        // them outright rather than paying to illustrate a book that will never be illustrated.
+        var reference = novel.ReportOnly ? null : await db.DesignRefs
             .Where(r => r.NovelId == novel.Id &&
                         (r.ReferenceSheetStatus == WorkStatus.Pending ||
                          (r.ReferenceSheetStatus == WorkStatus.NeedsRetry && r.NextAttemptAtUtc <= now)))
@@ -253,17 +256,21 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         // Reference sheets are optional consistency aids — panels render with whatever sheets exist —
         // so a permanently-failed sheet must not block the stage. Only sheets still awaiting a retry
         // hold us here; once none remain Pending/NeedsRetry, advance even if some ended up Failed.
-        var pendingSheetRetries = await db.DesignRefs
-            .Where(r => r.NovelId == novel.Id && r.ReferenceSheetStatus == WorkStatus.NeedsRetry)
-            .Select(r => r.NextAttemptAtUtc)
-            .ToListAsync(cancellationToken);
-        if (pendingSheetRetries.Count > 0)
-            return ProcessResult.Waiting((pendingSheetRetries.Min() ?? now) - now, novel.Id);
+        if (!novel.ReportOnly)
+        {
+            var pendingSheetRetries = await db.DesignRefs
+                .Where(r => r.NovelId == novel.Id && r.ReferenceSheetStatus == WorkStatus.NeedsRetry)
+                .Select(r => r.NextAttemptAtUtc)
+                .ToListAsync(cancellationToken);
+            if (pendingSheetRetries.Count > 0)
+                return ProcessResult.Waiting((pendingSheetRetries.Min() ?? now) - now, novel.Id);
+        }
 
-        // 4) Everything ready: advance.
+        // 4) Everything ready: advance. A report-only draft goes straight to the revision report from
+        // here; every other novel goes on to storyboarding (see ProjectStateMachine).
         SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, false, AllChunksAnalyzed: true, BibleConsolidated: true, AllReferenceSheetsRendered: true,
-            false, false, false, false)));
+            false, false, false, false, ReportOnly: novel.ReportOnly)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }

@@ -15,9 +15,11 @@ public class ProjectStateMachineTests
         bool allPanelsRendered = false,
         bool allPagesComposed = false,
         bool allVolumesAssembled = false,
-        bool analysisComplete = false) =>
+        bool analysisComplete = false,
+        bool reportOnly = false) =>
         new(stage, sourceIngested, allChunksAnalyzed, bibleConsolidated, allReferenceSheetsRendered,
-            storyboardCreated, allPanelsRendered, allPagesComposed, allVolumesAssembled, analysisComplete);
+            storyboardCreated, allPanelsRendered, allPagesComposed, allVolumesAssembled, analysisComplete,
+            reportOnly);
 
     [Fact]
     public void Created_Advances_ToIngesting() =>
@@ -46,6 +48,33 @@ public class ProjectStateMachineTests
         Assert.Equal(ProjectStage.Storyboarding, ProjectStateMachine.NextStage(
             At(ProjectStage.BuildingDesignBible,
                 allChunksAnalyzed: true, bibleConsolidated: true, allReferenceSheetsRendered: true)));
+
+    [Fact]
+    public void BuildingDesignBible_ReportOnly_SkipsStraightToComposingAnalysis() =>
+        Assert.Equal(ProjectStage.ComposingAnalysis, ProjectStateMachine.NextStage(
+            At(ProjectStage.BuildingDesignBible,
+                allChunksAnalyzed: true, bibleConsolidated: true, allReferenceSheetsRendered: true,
+                reportOnly: true)));
+
+    [Fact]
+    public void ReportOnly_IsNotTheDefault() =>
+        // The illustration is the comprehension probe, so a conversion only skips the art stages when
+        // the draft was explicitly marked report-only.
+        Assert.Equal(ProjectStage.Storyboarding, ProjectStateMachine.NextStage(
+            At(ProjectStage.BuildingDesignBible,
+                allChunksAnalyzed: true, bibleConsolidated: true, allReferenceSheetsRendered: true)));
+
+    [Fact]
+    public void ReportOnly_DoesNotShortCircuitTheStagesBeforeTheDesignBible() =>
+        Assert.Equal(ProjectStage.BuildingDesignBible, ProjectStateMachine.NextStage(
+            At(ProjectStage.Ingesting, sourceIngested: true, reportOnly: true)));
+
+    [Fact]
+    public void ReportOnly_LeavesTheArtStagesUnchanged_WhenAlreadyInThem() =>
+        // Flipping the flag on a novel already past the design bible must not strand it: the stages it
+        // is in still advance normally.
+        Assert.Equal(ProjectStage.ComposingPages, ProjectStateMachine.NextStage(
+            At(ProjectStage.RenderingImages, allPanelsRendered: true, reportOnly: true)));
 
     [Fact]
     public void Storyboarding_Advances_WhenStoryboardCreated() =>
