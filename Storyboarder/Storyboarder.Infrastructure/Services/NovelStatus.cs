@@ -42,6 +42,10 @@ public sealed record NovelStatus(
     // Panels safety-blocked mid-render and parked until the user approves relaxing the flagged category
     // (or skips them). Non-zero means the book can't finalize until the user reviews them.
     int PendingApprovals = 0,
+    // Panels refused as prohibited/IP content even after the prompt was restaged. These carry no
+    // adjustable harm category, so relaxing thresholds cannot help and the approve/skip sheet has nothing
+    // to offer — they need the art direction reworked instead, which is a different action on the card.
+    int ProhibitedPanels = 0,
     // When a provider rate limit last deferred this novel, the (future) UTC instant it expects to try
     // again — set only when still in the future, so the card can say "resumes ~3:47 pm" in local time.
     DateTimeOffset? RateLimitedUntilUtc = null);

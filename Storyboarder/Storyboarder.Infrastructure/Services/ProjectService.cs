@@ -149,8 +149,13 @@ public sealed class ProjectService
         var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
         var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
 
+        // Safety blocks only: these carry adjustable harm categories, which is the whole point of the
+        // approve-and-relax sheet. A prohibited block parks in the same state with no categories, and
+        // relaxing thresholds cannot lift it — offering "render it anyway" there would just fail again.
+        // Those panels are reworked instead, via GetProhibitedPanelAsync.
         var panels = await db.Panels
-            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval)
+            .Where(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval
+                        && p.BlockedCategoriesJson != null)
             .OrderBy(p => p.PanelNumber)
             .ToListAsync(cancellationToken);
 
@@ -206,7 +211,10 @@ public sealed class ProjectService
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == novelId, cancellationToken);
-        if (novel is null || novel.Stage != ProjectStage.Cancelled)
+        // A prohibited block no longer cancels the book — it parks the one panel and lets the rest render
+        // — so the offending panel now lives under an ACTIVE novel. Cancelled is still accepted for
+        // novels stopped by the older behavior (or by hand), but a finished book has nothing to rework.
+        if (novel is null || novel.Stage is ProjectStage.Completed)
             return null;
 
         var panel = await FindProhibitedPanelAsync(db, novelId, cancellationToken);
@@ -224,7 +232,10 @@ public sealed class ProjectService
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == novelId, cancellationToken);
-        if (novel is null || novel.Stage != ProjectStage.Cancelled)
+        // A prohibited block no longer cancels the book — it parks the one panel and lets the rest render
+        // — so the offending panel now lives under an ACTIVE novel. Cancelled is still accepted for
+        // novels stopped by the older behavior (or by hand), but a finished book has nothing to rework.
+        if (novel is null || novel.Stage is ProjectStage.Completed)
             return null;
 
         var panel = await FindProhibitedPanelAsync(db, novelId, cancellationToken);
@@ -249,19 +260,26 @@ public sealed class ProjectService
         return panel.PanelNumber;
     }
 
-    // The panel a Prohibited/IP block stopped the book on, carrying the provider's block message on
-    // LastError. The render loop settles that panel into Pending as it cancels, so a Pending panel with an
-    // error is the primary match (lowest number wins, though there's normally just one). A NeedsRetry
-    // panel is the fallback: a block that landed mid-retry — or an older cancel from before the loop
-    // settled it to Pending — can leave the offending panel there, and it must still be reworkable rather
-    // than the Rework button silently doing nothing. Pending is preferred so a fresh cancel picks the real
-    // offender, not a lower-numbered panel merely parked mid-retry on a transient error.
+    // The panel a Prohibited/IP block parked, carrying the provider's block message on LastError. The
+    // render loop settles such a panel into AwaitingApproval with NO BlockedCategoriesJson, and that
+    // absence is the discriminator: a SAFETY block parks in the same state but carries adjustable harm
+    // categories and belongs to the approve-and-relax flow, not here. Pending and NeedsRetry remain as
+    // fallbacks for novels stopped by the older cancel-the-book behavior — a panel stranded in either
+    // must still be reworkable rather than the Rework button silently doing nothing. Lowest panel number
+    // wins within each tier, though there is normally just one.
     private static async Task<Panel?> FindProhibitedPanelAsync(
         StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
     {
         var volumeIds = await db.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToListAsync(cancellationToken);
         var pageIds = await db.Pages.Where(p => volumeIds.Contains(p.VolumeId)).Select(p => p.Id).ToListAsync(cancellationToken);
         var blocked = db.Panels.Where(p => pageIds.Contains(p.PageId) && p.LastError != null);
+
+        var awaiting = await blocked
+            .Where(p => p.Status == WorkStatus.AwaitingApproval && p.BlockedCategoriesJson == null)
+            .OrderBy(p => p.PanelNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (awaiting is not null)
+            return awaiting;
 
         var pending = await blocked
             .Where(p => p.Status == WorkStatus.Pending)
@@ -392,16 +410,23 @@ public sealed class ProjectService
             .Select(p => p.ThumbImagePath ?? p.ComposedImagePath)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // Panels safety-blocked mid-render and parked until the user approves relaxing the flagged
-        // category (or skips them). The book can't finalize while any remain.
+        // Panels parked awaiting the user, split by what the user can actually do about them. A safety
+        // block carries adjustable harm categories, so it belongs to the approve-and-relax review sheet; a
+        // prohibited block carries none, so relaxing is useless and it needs its art direction reworked.
+        // Counting them separately keeps the review sheet's badge honest about how many it will show.
         var pendingApprovals = await db.Panels
-            .CountAsync(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval, cancellationToken);
+            .CountAsync(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval
+                             && p.BlockedCategoriesJson != null, cancellationToken);
+        var prohibitedPanels = await db.Panels
+            .CountAsync(p => pageIds.Contains(p.PageId) && p.Status == WorkStatus.AwaitingApproval
+                             && p.BlockedCategoriesJson == null, cancellationToken);
 
         // The pipeline auto-retries transient failures (network drops, rate limits) with backoff, so a
         // novel-level LastError is usually a self-healing hiccup, not a stall. Two things genuinely need
         // the user: a storyboard window that has burned through its bounded retry budget, and any panel
         // parked awaiting the user's OK. Everything else stays quiet while the worker self-heals.
         var needsAttention = pendingApprovals > 0
+            || prohibitedPanels > 0
             || failedVolume is not null
             || (novel.LastError is not null
                 && novel.Stage == ProjectStage.Storyboarding
@@ -419,7 +444,8 @@ public sealed class ProjectService
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), lastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
-            analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals, rateLimitedUntil);
+            analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals,
+            prohibitedPanels, rateLimitedUntil);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

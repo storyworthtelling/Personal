@@ -940,27 +940,27 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private async Task<ProcessResult?> HandleBlockedPanel(
         Novel novel, Panel panel, ImageContentBlockedException blocked, CancellationToken cancellationToken)
     {
-        if (blocked.Reason == ImageBlockReason.Prohibited)
+        if (blocked.Reason == ImageBlockReason.Prohibited && panel.PromptRewrittenForSafety)
         {
-            // IP / copyrighted / otherwise-prohibited content: no safety threshold can bypass it, so stop
-            // the whole book with a clear fallout reason rather than parking or retrying it. Settle the
-            // offending panel into a deterministic Pending state (clearing any retry schedule left over
-            // from a block that landed mid-retry) so the rework flow can reliably find and reset it — a
-            // panel stranded in NeedsRetry is invisible to the Rework button.
-            panel.Status = WorkStatus.Pending;
+            // Restaged to imply the beat and STILL refused as prohibited/IP content: rewording could not
+            // get around it, so this panel needs the owner. Park the PANEL, never the book — cancelling
+            // the whole conversion over one panel is what killed two of the owner's novels after hours of
+            // rendering. The render query skips AwaitingApproval, so every other panel keeps rendering;
+            // the book simply can't finalize until this one is reworked or left out.
+            //
+            // No BlockedCategoriesJson: prohibited content is not an adjustable harm category, so there is
+            // nothing for an "approve and relax" to act on. The review UI offers rework-or-skip instead.
+            // Settle it with no retry schedule so the rework lookup finds it deterministically.
+            panel.Status = WorkStatus.AwaitingApproval;
             panel.NextAttemptAtUtc = null;
+            panel.BlockedCategoriesJson = null;
             panel.LastError = blocked.Message;
-            SetStage(novel, ProjectStage.Cancelled);
-            novel.LastError =
-                $"Cancelled: panel {panel.PanelNumber} was blocked as prohibited or copyrighted content, " +
-                "which relaxing the safety settings cannot bypass. Rework the panel's art direction and resume, " +
-                "or start a new conversion.";
             // Capture the exact prompt that tripped the filter alongside the block, so the blocked-panel
             // diagnostic (and the log) carry what's needed to rework the art direction — not just the refusal.
             logger.LogWarning(
-                "Novel {NovelId} cancelled: prohibited image content on panel {PanelId} (#{PanelNumber}). " +
-                "Prompt sent to Gemini: {Prompt}. Provider reason: {Error}",
-                novel.Id, panel.Id, panel.PanelNumber, ReconstructPanelPrompt(novel, panel), blocked.Message);
+                "Panel {PanelId} (#{PanelNumber}) still refused as prohibited content after restaging; " +
+                "awaiting the user (novel {NovelId} continues). Prompt sent to Gemini: {Prompt}. Provider reason: {Error}",
+                panel.Id, panel.PanelNumber, novel.Id, ReconstructPanelPrompt(novel, panel), blocked.Message);
             return null;
         }
 
@@ -985,8 +985,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         if (!panel.PromptRewrittenForSafety)
         {
             // Still blocked past what relaxing can reach — an approved Safety render at the model's floor,
-            // or a Filtered (IMAGE_SAFETY) block, which can't be relaxed at all. Ask Claude to restage the
-            // beat so the content is implied, then re-render the reworked prompt next cycle.
+            // a Filtered (IMAGE_SAFETY) block, which can't be relaxed at all, or a first Prohibited block,
+            // where rewording is the only lever that can help. Ask Claude to restage the beat so the
+            // content is implied, then re-render the reworked prompt next cycle.
             if (!claudeLimiter.TryAcquire())
                 return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
             try

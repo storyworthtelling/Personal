@@ -111,7 +111,12 @@ public partial class MainPage : ContentPage
         // A book the pipeline cancelled on a prohibited/IP block carries a reason (a user-stopped one
         // doesn't): offer to rework that panel's art direction and resume, rather than restart the whole
         // conversion and discard the panels already rendered.
-        var reworkable = status.Stage == "Cancelled" && !string.IsNullOrEmpty(status.LastError);
+        // A panel refused as prohibited/IP content is parked for rework: relaxing thresholds can't lift
+        // that block, so the only way forward is revising its art direction. The book keeps rendering
+        // around it, so this is an active novel, not a cancelled one — the Cancelled case is still
+        // honoured for books stopped by the older behaviour of cancelling the whole conversion.
+        var reworkable = status.ProhibitedPanels > 0
+            || (status.Stage == "Cancelled" && !string.IsNullOrEmpty(status.LastError));
         if (reworkable)
             buttons.Add(ReworkPanelAction);
         if (isActive)

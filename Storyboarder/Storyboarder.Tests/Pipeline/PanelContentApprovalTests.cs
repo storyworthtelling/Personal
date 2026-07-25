@@ -294,16 +294,37 @@ public class PanelContentApprovalTests : IDisposable
     }
 
     [Fact]
-    public async Task ProhibitedPanel_CancelsTheBook_WithAFalloutReason()
+    public async Task ProhibitedPanel_ParksThePanel_WithoutCancellingTheBook()
     {
+        // A prohibited block used to cancel the whole conversion, which lost the owner two books after
+        // hours of rendering. It must now restage the prompt first and, if that is still refused, park
+        // only the offending panel — the novel stays alive with every other panel intact.
         BlockPanelRenders(ImageBlockReason.Prohibited, []);
         var novelId = SeedNovel();
 
-        Assert.Equal(ProjectStage.Cancelled, await Drive(novelId));
+        var stage = await Drive(novelId);
+
+        Assert.NotEqual(ProjectStage.Cancelled, stage);
+        Assert.NotEqual(ProjectStage.Failed, stage);
         using var context = database.NewContext();
         var novel = context.Novels.Single(n => n.Id == novelId);
-        Assert.Equal(ProjectStage.Cancelled, novel.Stage);
-        Assert.Contains("prohibited", novel.LastError);
+        Assert.NotEqual(ProjectStage.Cancelled, novel.Stage);
+
+        var panel = SinglePanel(novelId);
+        Assert.Equal(WorkStatus.AwaitingApproval, panel.Status);
+        // Rewording was tried before giving up, and there are no harm categories to relax — prohibited
+        // content is not adjustable, which is what tells the rework flow this panel is its business.
+        Assert.True(panel.PromptRewrittenForSafety);
+        Assert.Null(panel.BlockedCategoriesJson);
+
+        // Surfaced to the user so the book doesn't look silently stalled — as a panel to REWORK, not one
+        // to approve: there is no adjustable category here, so the approve-and-relax sheet would have
+        // nothing to offer and must not claim it has something to review.
+        var status = await NewProjectService().GetStatusAsync(novelId, CancellationToken.None);
+        Assert.Equal(1, status!.ProhibitedPanels);
+        Assert.Equal(0, status.PendingApprovals);
+        Assert.True(status.NeedsAttention);
+        Assert.Empty(await NewProjectService().GetBlockedPanelsAsync(novelId, CancellationToken.None));
     }
 
     [Fact]
@@ -311,7 +332,8 @@ public class PanelContentApprovalTests : IDisposable
     {
         BlockPanelRenders(ImageBlockReason.Prohibited, []);
         var novelId = SeedNovel();
-        Assert.Equal(ProjectStage.Cancelled, await Drive(novelId));
+        // The panel parks awaiting the user; the book is not cancelled.
+        Assert.NotEqual(ProjectStage.Cancelled, await Drive(novelId));
 
         // The user reworks the art direction to avoid the gated content; the reworked prompt renders clean.
         gemini.Setup(g => g.GeneratePanel(
@@ -323,8 +345,8 @@ public class PanelContentApprovalTests : IDisposable
             novelId, "a generic knight, an original design", CancellationToken.None);
         Assert.NotNull(reworked);
 
-        // The book resumes from Cancelled and runs through to the end — the panels rendered before the
-        // block are kept, and the reworked panel is rendered (not skipped).
+        // The book runs through to the end — the panels rendered before the block are kept, and the
+        // reworked panel is rendered (not skipped).
         Assert.Equal(ProjectStage.Completed, await Drive(novelId));
         var panel = SinglePanel(novelId);
         Assert.Equal(WorkStatus.Completed, panel.Status);
@@ -334,22 +356,21 @@ public class PanelContentApprovalTests : IDisposable
     }
 
     [Fact]
-    public async Task ProhibitedBlock_OnARetryingPanel_CancelsButLeavesItReworkable()
+    public async Task ProhibitedBlock_OnARetryingPanel_ParksItReworkable_WithoutCancelling()
     {
         // A panel that already had a transient failure (NeedsRetry, now due) hits a prohibited block on
-        // its retry render. The book cancels — but the offending panel must be left in a state the rework
-        // flow can find and reset, not stranded in NeedsRetry where GetProhibitedPanel can't see it (which
-        // is what made the Rework button silently do nothing).
+        // its retry render. The book must not cancel, and once rewording has been tried and refused the
+        // panel must be left in a state the rework flow can find and reset — not stranded in NeedsRetry
+        // where GetProhibitedPanel can't see it, which is what made the Rework button silently do nothing.
         BlockPanelRenders(ImageBlockReason.Prohibited, []);
         var novelId = SeedRetryingRenderingNovel();
 
-        var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        var stage = await Drive(novelId);
 
-        Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
-        Assert.Equal(ProjectStage.Cancelled, StageOf(novelId));
-        // Deterministically reset to Pending (retry schedule cleared) so the rework lookup finds it.
+        Assert.NotEqual(ProjectStage.Cancelled, stage);
         var panel = SinglePanel(novelId);
-        Assert.Equal(WorkStatus.Pending, panel.Status);
+        Assert.Equal(WorkStatus.AwaitingApproval, panel.Status);
+        // No retry schedule left dangling, so the rework lookup finds it deterministically.
         Assert.Null(panel.NextAttemptAtUtc);
         Assert.NotNull(panel.LastError);
 
