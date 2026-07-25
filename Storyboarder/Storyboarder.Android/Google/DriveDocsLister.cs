@@ -11,16 +11,19 @@ public sealed class DriveDocsLister
 {
     private const string FolderMime = "application/vnd.google-apps.folder";
     private const string DocMime = "application/vnd.google-apps.document";
+    private const string DocxMime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-    // A child of a Drive folder: either a sub-folder (navigate into) or a Google Doc (selectable).
+    // A child of a Drive folder: either a sub-folder (navigate into) or a document (selectable) — a
+    // native Google Doc or an uploaded .docx (the owner asked for those two source kinds, nothing else).
+    // GoogleDocsClient reads the file's type itself when fetching, so the entry needn't carry it.
     public sealed record DriveEntry(string Id, string Name, bool IsFolder)
     {
         // Shown in the list; the glyph distinguishes folders from docs without a custom cell template.
         public string Display => (IsFolder ? "\U0001F4C1  " : "\U0001F4C4  ") + Name;
     }
 
-    // Lists the folders and Google Docs directly inside the given folder ("root" = My Drive root),
-    // folders first then by name.
+    // Lists the folders and documents (Google Docs and .docx files) directly inside the given folder
+    // ("root" = My Drive root), folders first then by name.
     public async Task<IReadOnlyList<DriveEntry>> ListChildrenAsync(
         string accessToken, string folderId, CancellationToken cancellationToken)
     {
@@ -34,7 +37,7 @@ public sealed class DriveDocsLister
 
         var request = service.Files.List();
         request.Q = $"'{folderId}' in parents and trashed=false and " +
-                    $"(mimeType='{FolderMime}' or mimeType='{DocMime}')";
+                    $"(mimeType='{FolderMime}' or mimeType='{DocMime}' or mimeType='{DocxMime}')";
         request.Fields = "files(id,name,mimeType)";
         request.OrderBy = "folder,name";
         request.PageSize = 200;
