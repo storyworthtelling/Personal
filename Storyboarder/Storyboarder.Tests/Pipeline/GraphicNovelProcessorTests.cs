@@ -804,6 +804,39 @@ public class GraphicNovelProcessorTests : IDisposable
     }
 
     [Fact]
+    public async Task Storyboard_givesASplashPanelAPageToItself()
+    {
+        // A page of Standard, Splash, Standard must become three physical pages: the splash is the whole
+        // page (that's what makes it a splash), the ordinary panels sit on their own pages around it.
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoryboardSegment(
+                [new VolumeDraft(1, "Volume One",
+                    [new PageDraft(1,
+                    [
+                        new PanelDraft("Hero approaches in action", null, null, ["Hero"], ShotType.Standard),
+                        new PanelDraft("The gate erupts", null, null, ["Hero"], ShotType.Splash),
+                        new PanelDraft("Hero staggers back", null, null, ["Hero"], ShotType.Standard),
+                    ])])],
+                "Hero acted."));
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var volumeIds = ctx.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).ToList();
+        var pages = ctx.Pages.Where(p => volumeIds.Contains(p.VolumeId)).OrderBy(p => p.PageNumber).ToList();
+
+        Assert.Equal(3, pages.Count);
+        // The middle page is the splash alone; the outer pages carry the ordinary panels.
+        Assert.All(pages, p => Assert.Equal(1, ctx.Panels.Count(pn => pn.PageId == p.Id)));
+        var splashPage = pages[1];
+        var splashPanel = Assert.Single(ctx.Panels.Where(pn => pn.PageId == splashPage.Id));
+        Assert.Equal(ShotType.Splash, splashPanel.ShotType);
+    }
+
+    [Fact]
     public async Task OneOffEntities_GetNoReferenceSheet_ButStayInTheBible()
     {
         // The owner's last book spent 126 image calls drawing a sheet for every named entity, including

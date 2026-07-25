@@ -445,7 +445,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                             PageId = page.Id,
                             PanelNumber = panelNumber++,
                             VisualPrompt = panelDraft.VisualPrompt,
-                            Dialogue = panelDraft.Dialogue,
+                            // Abridge dialogue to what a balloon holds; the art stays faithful, the
+                            // lettering yields to readability (see DialogueFit / DESIGN.md).
+                            Dialogue = DialogueFit.Trim(panelDraft.Dialogue),
                             Caption = panelDraft.Caption,
                             ShotType = panelDraft.Shot,
                             SourceStartOffset = windowStart,
@@ -682,7 +684,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 var panelArt = page.Panels
                     .Where(p => !p.Skipped)
                     .OrderBy(p => p.PanelNumber)
-                    .Select(p => new PanelArt(imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption))
+                    .Select(p => new PanelArt(imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption, p.ShotType))
                     .ToList();
                 if (panelArt.Count == 0)
                     panelArt.Add(new PanelArt(placeholderRenderer.Render(), null, null));
@@ -1334,15 +1336,23 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private static async Task<double?> PanelSlotAspectRatio(
         StoryboarderDbContext db, Panel panel, CancellationToken cancellationToken)
     {
-        var panelCount = await db.Panels.CountAsync(p => p.PageId == panel.PageId, cancellationToken);
-        if (panelCount <= 0)
+        // The panel's slot depends on the whole page's shot mix (a Wide band is short-and-wide, a Splash
+        // fills the page), so mirror the composer: the non-skipped panels of this page in reading order.
+        var pagePanels = await db.Panels
+            .Where(p => p.PageId == panel.PageId && !p.Skipped)
+            .OrderBy(p => p.PanelNumber)
+            .Select(p => new { p.Id, p.ShotType })
+            .ToListAsync(cancellationToken);
+        var index = pagePanels.FindIndex(p => p.Id == panel.Id);
+        if (index < 0)
             return null;
 
         var calculator = new PageLayoutCalculator(
             new PageMargins(DesignTokens.Comic.TopMargin, DesignTokens.Comic.SideMargin, DesignTokens.Comic.BottomMargin),
             DesignTokens.Comic.Gutter);
         var cell = calculator.Layout(
-            new PageSize(DesignTokens.Comic.PageWidth, DesignTokens.Comic.PageHeight), panelCount)[0];
+            new PageSize(DesignTokens.Comic.PageWidth, DesignTokens.Comic.PageHeight),
+            pagePanels.Select(p => p.ShotType).ToList())[index];
         var art = PanelSlotLayout.Compute(cell, panel.Dialogue, panel.Caption).Art;
         return art.Width / art.Height;
     }
@@ -1434,10 +1444,38 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return paths.Where(imageStore.Exists).Select(imageStore.Read).ToList();
     }
 
-    // Splits a page's panels into consecutive groups of at most maxPerPage, balanced so the groups
-    // differ in size by at most one (8 panels at a cap of 6 become 4+4, not 6+2). Each group becomes a
-    // physical page. An empty page yields no groups.
+    // Splits a storyboarded page's panels into physical pages: each Splash panel takes a page to itself,
+    // and the ordinary panels between splashes are balanced across pages by the cap. Each group becomes a
+    // physical page. An empty input yields no groups.
     private static IEnumerable<IReadOnlyList<PanelDraft>> SplitForPages(IReadOnlyList<PanelDraft> panels, int maxPerPage)
+    {
+        if (panels.Count == 0)
+            yield break;
+
+        // A Splash gets a page to itself (that's what makes it a splash); the runs of ordinary panels
+        // between splashes are balanced across pages by the cap, exactly as before.
+        var run = new List<PanelDraft>();
+        foreach (var panel in panels)
+        {
+            if (panel.Shot == ShotType.Splash)
+            {
+                foreach (var group in BalanceAcrossPages(run, maxPerPage))
+                    yield return group;
+                run = [];
+                yield return new[] { panel };
+            }
+            else
+            {
+                run.Add(panel);
+            }
+        }
+        foreach (var group in BalanceAcrossPages(run, maxPerPage))
+            yield return group;
+    }
+
+    // Splits a run of panels across as few pages as the cap allows, with page sizes differing by at most
+    // one (8 panels at a cap of 6 become 4+4, not 6+2). An empty run yields no pages.
+    private static IEnumerable<IReadOnlyList<PanelDraft>> BalanceAcrossPages(IReadOnlyList<PanelDraft> panels, int maxPerPage)
     {
         if (panels.Count == 0)
             yield break;
