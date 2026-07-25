@@ -55,27 +55,77 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "excerpt and record concise, concrete, accurate observations. Respond with ONLY a JSON object: " +
         "{\"charactersPresent\":[string],\"keyEvents\":[string],\"characterBeats\":[string]," +
         "\"setupsAndPayoffs\":[string],\"possibleInconsistencies\":[string],\"factualClaims\":[string]," +
-        "\"notableStrengths\":[string],\"notableWeaknesses\":[string]}. characterBeats = decisions, " +
+        "\"notableStrengths\":[string],\"notableWeaknesses\":[string],\"lineEditCandidates\":[string]," +
+        "\"proseObservations\":[string],\"dialogueObservations\":[string],\"sceneBeats\":[string]}. " +
+        "characterBeats = decisions, " +
         "changes, or motivation shifts; setupsAndPayoffs = planted elements or promises (note if paid " +
         "off here); factualClaims = checkable real-world statements that may need fact-checking; " +
         "possibleInconsistencies = anything that may contradict earlier text (names, timeline, physical " +
-        "details, world rules). Use [] when none are present. No prose outside the JSON.";
+        "details, world rules). " +
+        // The craft half of the read. It has to happen here, while the actual sentences are in front of
+        // the model: by consolidation time only these notes survive, so a line edit not quoted now can
+        // never be quoted at all.
+        "lineEditCandidates = specific sentences to cut, tighten, or rewrite — QUOTE the sentence " +
+        "verbatim, then say what to do with it and why; proseObservations = prose-style and voice " +
+        "patterns (repetition, filter words like \"she felt\"/\"he saw\", verbal tics, monotonous " +
+        "sentence rhythm, overused constructions, slips out of the established POV) — quote a short " +
+        "example for each; dialogueObservations = whether the speakers sound distinct from one another, " +
+        "on-the-nose exchanges, and exposition dumped into speech — name the speakers; sceneBeats = one " +
+        "line per SCENE in reading order, in the form \"<what happens> | <what it accomplishes for the " +
+        "book> | <does it earn its place>\". " +
+        "Use [] when none are present. Give AT MOST 12 items in each list, the most significant ones. " +
+        "No prose outside the JSON.";
 
     private const string ConsolidationInstruction =
-        "You are a panel of professional readers producing a REVISION REPORT for an author preparing a " +
-        "novel for publication. You are given per-chunk notes gathered across the whole manuscript in " +
-        "reading order, plus the cast. Synthesize the WHOLE book (do not merely concatenate the notes); " +
+        "You are a panel of professional readers producing the STORY half of a REVISION REPORT for an " +
+        "author preparing a novel for publication. You are given per-chunk notes gathered across the " +
+        "whole manuscript in reading order, plus the cast. Each note carries the chapter it was taken " +
+        "from. Synthesize the WHOLE book (do not merely concatenate the notes); " +
         "be accurate, fair, specific, and constructive. Respond with ONLY a JSON object: " +
         "{\"logline\":string,\"synopsis\":string,\"characters\":[{\"name\":string,\"role\":string," +
-        "\"arcSummary\":string,\"relationships\":[string]}],\"themes\":[string],\"plotHoles\":[string]," +
-        "\"inconsistencies\":[string],\"inaccuracies\":[string],\"pacingNotes\":[string],\"reviews\":" +
+        "\"arcSummary\":string,\"relationships\":[string]}],\"themes\":[string],\"plotHoles\":[FINDING]," +
+        "\"inconsistencies\":[FINDING],\"inaccuracies\":[FINDING],\"pacingNotes\":[FINDING],\"reviews\":" +
         "[{\"perspective\":string,\"assessment\":string,\"strengths\":[string],\"weaknesses\":[string]," +
-        "\"recommendation\":string}],\"revisionPlan\":[{\"priority\":string,\"issue\":string," +
-        "\"suggestedFix\":string}],\"comparableTitles\":[string],\"marketPositioning\":string}. " +
+        "\"recommendation\":string}],\"revisionPlan\":[{\"priority\":string,\"chapter\":string," +
+        "\"issue\":string,\"suggestedFix\":string}],\"comparableTitles\":[string]," +
+        "\"marketPositioning\":string}. " +
+        // Every finding has to be findable: an observation the author can't locate in the manuscript
+        // costs them a re-read to act on. The chapter is already on the notes, so it only has to be
+        // carried through rather than worked out.
+        "FINDING is an object {\"chapter\":string,\"detail\":string}: copy \"chapter\" from the note the " +
+        "observation came from (\"Chapter 7\", \"Chapters 7–8\"), naming the EARLIEST chapter involved " +
+        "when an observation spans several, and use \"\" only when the notes carry no chapter at all. " +
+        "Set \"chapter\" on each revisionPlan item the same way. " +
         "Provide AT LEAST THREE reviews from DISTINCT, fair perspectives (e.g. developmental editor, " +
         "target-genre reader, literary critic, acquiring agent) — differing but honest, each with real " +
         "strengths and weaknesses. Order revisionPlan HIGHEST-IMPACT FIRST and set priority to " +
         "\"High\", \"Medium\", or \"Low\". Use [] when none. No prose outside the JSON.";
+
+    private const string CraftConsolidationInstruction =
+        "You are a line editor and craft critic producing the CRAFT half of a REVISION REPORT for an " +
+        "author preparing a novel for publication. You are given per-chunk notes gathered across the " +
+        "whole manuscript in reading order; each carries the chapter it was taken from, and " +
+        "lineEditCandidates/proseObservations/dialogueObservations/sceneBeats are the raw material for " +
+        "your four sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
+        "book — merge duplicates, drop the trivial, keep the author's own words when quoting. Respond " +
+        "with ONLY a JSON object: " +
+        "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string}]," +
+        "\"proseNotes\":[{\"chapter\":string,\"pattern\":string,\"evidence\":string,\"fix\":string}]," +
+        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string}]," +
+        "\"sceneBreakdown\":[{\"chapter\":string,\"scene\":string,\"purpose\":string,\"verdict\":string}]}. " +
+        "lineEdits: specific sentences to cut, tighten, or rewrite — \"excerpt\" quoted verbatim from " +
+        "the notes so the author can find it, \"suggestion\" the actual replacement or cut, \"reason\" " +
+        "one short clause. AT MOST 40, chosen for impact. " +
+        "proseNotes: recurring prose-style and voice patterns — repetition, filter words, verbal tics, " +
+        "monotonous sentence rhythm, overused constructions, POV slips — with \"evidence\" quoting a " +
+        "real example. AT MOST 20. " +
+        "dialogueNotes: whether the characters sound distinct from one another, on-the-nose exchanges, " +
+        "and exposition dumped into speech. AT MOST 20. " +
+        "sceneBreakdown: the scene-by-scene map in reading order — \"scene\" what happens, \"purpose\" " +
+        "what it accomplishes for the book (plot, character, theme, information), \"verdict\" whether it " +
+        "earns its place and what is missing if not. Say plainly when a scene does no work. AT MOST 100. " +
+        "Every \"chapter\" is copied from the note the item came from; \"\" only when the notes carry " +
+        "none. Use [] when none. No prose outside the JSON.";
 
     private const string ImplyInstruction =
         "You are a comics director revising a single panel's visual prompt. The image model refused to " +
@@ -167,7 +217,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             chapterLabel,
             dto.CharactersPresent ?? [], dto.KeyEvents ?? [], dto.CharacterBeats ?? [],
             dto.SetupsAndPayoffs ?? [], dto.PossibleInconsistencies ?? [], dto.FactualClaims ?? [],
-            dto.NotableStrengths ?? [], dto.NotableWeaknesses ?? []);
+            dto.NotableStrengths ?? [], dto.NotableWeaknesses ?? [],
+            dto.LineEditCandidates ?? [], dto.ProseObservations ?? [],
+            dto.DialogueObservations ?? [], dto.SceneBeats ?? []);
     }
 
     public async Task<BookAnalysisResult> ConsolidateAnalysis(
@@ -204,9 +256,47 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             (dto.Reviews ?? []).Select(r =>
                 new Review(r.Perspective ?? string.Empty, r.Assessment ?? string.Empty, r.Strengths ?? [], r.Weaknesses ?? [], r.Recommendation ?? string.Empty)).ToList(),
             (dto.RevisionPlan ?? []).Select(r =>
-                new RevisionItem(r.Priority ?? string.Empty, r.Issue ?? string.Empty, r.SuggestedFix ?? string.Empty)).ToList(),
+                new RevisionItem(r.Priority ?? string.Empty, r.Chapter ?? string.Empty,
+                    r.Issue ?? string.Empty, r.SuggestedFix ?? string.Empty)).ToList(),
             dto.ComparableTitles ?? [],
-            dto.MarketPositioning ?? string.Empty);
+            dto.MarketPositioning ?? string.Empty,
+            // The craft sections come from their own call (ConsolidateCraft) and are folded in by the
+            // caller; this half of the report leaves them empty rather than half-answering them.
+            CraftReport.Empty.LineEdits, CraftReport.Empty.ProseNotes,
+            CraftReport.Empty.DialogueNotes, CraftReport.Empty.SceneBreakdown);
+    }
+
+    public async Task<CraftReport> ConsolidateCraft(
+        string title, IReadOnlyList<ChapterNotes> notes, CancellationToken cancellationToken)
+    {
+        var notesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
+        var userContent =
+            $"TITLE: {title}\n\n" +
+            $"PER-CHUNK NOTES (JSON array, in reading order):\n{notesJson}";
+
+        var reply = await SendMessage(
+            CraftConsolidationInstruction, userContent, cancellationToken, options.CraftMaxTokens);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return CraftReport.Empty;
+
+        var dto = JsonResponse.Deserialize<CraftReportDto>(json);
+        if (dto is null)
+            return CraftReport.Empty;
+
+        return new CraftReport(
+            (dto.LineEdits ?? []).Select(e => new LineEdit(
+                e.Chapter ?? string.Empty, e.Excerpt ?? string.Empty,
+                e.Suggestion ?? string.Empty, e.Reason ?? string.Empty)).ToList(),
+            (dto.ProseNotes ?? []).Select(n => new ProseNote(
+                n.Chapter ?? string.Empty, n.Pattern ?? string.Empty,
+                n.Evidence ?? string.Empty, n.Fix ?? string.Empty)).ToList(),
+            (dto.DialogueNotes ?? []).Select(n => new DialogueNote(
+                n.Chapter ?? string.Empty, n.Speakers ?? string.Empty,
+                n.Observation ?? string.Empty, n.Fix ?? string.Empty)).ToList(),
+            (dto.SceneBreakdown ?? []).Select(s => new SceneBeat(
+                s.Chapter ?? string.Empty, s.Scene ?? string.Empty,
+                s.Purpose ?? string.Empty, s.Verdict ?? string.Empty)).ToList());
     }
 
     public async Task<string> RewritePromptToImply(string visualPrompt, CancellationToken cancellationToken)
@@ -449,6 +539,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? FactualClaims { get; set; }
         public List<string>? NotableStrengths { get; set; }
         public List<string>? NotableWeaknesses { get; set; }
+        public List<string>? LineEditCandidates { get; set; }
+        public List<string>? ProseObservations { get; set; }
+        public List<string>? DialogueObservations { get; set; }
+        public List<string>? SceneBeats { get; set; }
     }
 
     private sealed class BookAnalysisDto
@@ -457,14 +551,58 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Synopsis { get; set; }
         public List<CharacterProfileDto>? Characters { get; set; }
         public List<string>? Themes { get; set; }
-        public List<string>? PlotHoles { get; set; }
-        public List<string>? Inconsistencies { get; set; }
-        public List<string>? Inaccuracies { get; set; }
-        public List<string>? PacingNotes { get; set; }
+
+        // Findings are read as the domain type, not a DTO: its converter already tolerates both the
+        // {"chapter","detail"} object asked for and a bare string (which is what a model that skims
+        // the instruction returns, and what every report stored before citations existed contains).
+        public List<Finding>? PlotHoles { get; set; }
+        public List<Finding>? Inconsistencies { get; set; }
+        public List<Finding>? Inaccuracies { get; set; }
+        public List<Finding>? PacingNotes { get; set; }
         public List<ReviewDto>? Reviews { get; set; }
         public List<RevisionItemDto>? RevisionPlan { get; set; }
         public List<string>? ComparableTitles { get; set; }
         public string? MarketPositioning { get; set; }
+    }
+
+    private sealed class CraftReportDto
+    {
+        public List<LineEditDto>? LineEdits { get; set; }
+        public List<ProseNoteDto>? ProseNotes { get; set; }
+        public List<DialogueNoteDto>? DialogueNotes { get; set; }
+        public List<SceneBeatDto>? SceneBreakdown { get; set; }
+    }
+
+    private sealed class LineEditDto
+    {
+        public string? Chapter { get; set; }
+        public string? Excerpt { get; set; }
+        public string? Suggestion { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    private sealed class ProseNoteDto
+    {
+        public string? Chapter { get; set; }
+        public string? Pattern { get; set; }
+        public string? Evidence { get; set; }
+        public string? Fix { get; set; }
+    }
+
+    private sealed class DialogueNoteDto
+    {
+        public string? Chapter { get; set; }
+        public string? Speakers { get; set; }
+        public string? Observation { get; set; }
+        public string? Fix { get; set; }
+    }
+
+    private sealed class SceneBeatDto
+    {
+        public string? Chapter { get; set; }
+        public string? Scene { get; set; }
+        public string? Purpose { get; set; }
+        public string? Verdict { get; set; }
     }
 
     private sealed class CharacterProfileDto
@@ -487,6 +625,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private sealed class RevisionItemDto
     {
         public string? Priority { get; set; }
+        public string? Chapter { get; set; }
         public string? Issue { get; set; }
         public string? SuggestedFix { get; set; }
     }

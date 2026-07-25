@@ -715,7 +715,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         var analysis = await db.BookAnalyses.FirstAsync(a => a.NovelId == novel.Id, cancellationToken);
 
-        // 2) Reduce: consolidate all chunk notes into the whole report (one Claude call).
+        // 2) Reduce, story half: consolidate all chunk notes into the story report (one Claude call).
         if (analysis.ConsolidatedJson is null)
         {
             if (!claudeLimiter.TryAcquire())
@@ -734,13 +734,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             // closed") with backoff instead of letting it escape and fail the whole worker cycle.
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                novel.LastError = ex.Message;
-                var retryAfter = (ex as RateLimitException)?.RetryAfter;
-                var delay = backoff.NextDelay(0, retryAfter);
-                if (ex is RateLimitException)
-                    novel.RateLimitedUntilUtc = clock.UtcNow + delay;
-                await db.SaveChangesAsync(cancellationToken);
-                return ProcessResult.Waiting(delay, novel.Id);
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
             }
 
             Touch(novel);
@@ -748,14 +742,44 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 3) Render: compose the analysis PDF from the consolidated report.
+        // 2b) Reduce, craft half: line edits, prose style & voice, dialogue, and the scene-by-scene
+        // map. Its own call with its own output budget, and persisted separately: asking for both
+        // halves at once needs more output than one reply can carry, and a failure in either half
+        // must not re-bill the one that already succeeded.
+        if (analysis.CraftJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var notes = await LoadChapterNotes(db, novel.Id, cancellationToken);
+
+            try
+            {
+                var craft = await claude.ConsolidateCraft(novel.Title, notes, cancellationToken);
+                analysis.CraftJson = JsonSerializer.Serialize(craft, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 3) Render: compose the analysis PDF from the consolidated report (both halves folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
             try
             {
                 var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
                              ?? BookAnalysisResult.Empty;
-                var pdf = analysisPdfComposer.Compose(report, novel.Title);
+                var craft = analysis.CraftJson is null
+                    ? CraftReport.Empty
+                    : JsonSerializer.Deserialize<CraftReport>(analysis.CraftJson, JsonResponse.CaseInsensitive) ?? CraftReport.Empty;
+                var pdf = analysisPdfComposer.Compose(report.WithCraft(craft), novel.Title);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -779,6 +803,22 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     }
 
     // --- helpers ---
+
+    // Records a failed once-per-novel Claude call (a report consolidation) and parks the novel for a
+    // backoff window instead of letting the failure escape and fail the whole worker cycle. There is
+    // no per-unit attempt counter to hang the schedule off here — the unit IS the novel — so the delay
+    // is the base one, or whatever the provider asked us to wait.
+    private async Task<ProcessResult> DeferAfterFailedCall(
+        StoryboarderDbContext db, Novel novel, Exception exception, CancellationToken cancellationToken)
+    {
+        novel.LastError = exception.Message;
+        var retryAfter = (exception as RateLimitException)?.RetryAfter;
+        var delay = backoff.NextDelay(0, retryAfter);
+        if (exception is RateLimitException)
+            novel.RateLimitedUntilUtc = clock.UtcNow + delay;
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.Waiting(delay, novel.Id);
+    }
 
     // Detects the manuscript's chapters exactly once (guarded by Novel.ChaptersDetected) and stamps
     // every not-yet-labelled chunk with the chapters its [StartOffset, EndOffset) overlaps, so a

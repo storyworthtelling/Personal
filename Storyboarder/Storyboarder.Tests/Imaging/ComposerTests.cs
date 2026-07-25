@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using PdfSharp.Pdf.IO;
 using SkiaSharp;
@@ -324,6 +325,12 @@ public class AnalysisPdfComposerTests
             .Select(i => $"{prefix} {i}: a sentence with enough words to wrap across a line or two in the report.")
             .ToList();
 
+        List<Finding> ManyFindings(string prefix) => Enumerable.Range(1, 3 * scale)
+            .Select(i => new Finding(
+                $"Chapter {i}",
+                $"{prefix} {i}: a sentence with enough words to wrap across a line or two in the report."))
+            .ToList();
+
         var characters = Enumerable.Range(1, 2 * scale)
             .Select(i => new CharacterProfile(
                 $"Character {i}", "protagonist",
@@ -337,14 +344,38 @@ public class AnalysisPdfComposerTests
             .ToList();
         var plan = Enumerable.Range(1, 3 * scale)
             .Select(i => new RevisionItem(
-                i == 1 ? "High" : "Medium", $"Issue {i}", "A concrete suggested fix for the issue described above."))
+                i == 1 ? "High" : "Medium", $"Chapter {i}", $"Issue {i}",
+                "A concrete suggested fix for the issue described above."))
+            .ToList();
+        var lineEdits = Enumerable.Range(1, 3 * scale)
+            .Select(i => new LineEdit(
+                $"Chapter {i}", $"He felt the cold creeping in, and it was then that he knew, in that moment {i}.",
+                "Cut to: The cold crept in.", "Filtered through the viewpoint and padded with throat-clearing."))
+            .ToList();
+        var proseNotes = Enumerable.Range(1, 3 * scale)
+            .Select(i => new ProseNote(
+                $"Chapter {i}", "Filter words", "\"she felt\", \"he saw\", \"it seemed\" recur throughout.",
+                "Delete the filter and let the sensation land directly."))
+            .ToList();
+        var dialogueNotes = Enumerable.Range(1, 3 * scale)
+            .Select(i => new DialogueNote(
+                $"Chapter {i}", "Character 1, Character 2", "The exchange states the theme outright.",
+                "Let the subtext carry it; cut the last two lines."))
+            .ToList();
+        var scenes = Enumerable.Range(1, 3 * scale)
+            .Select(i => new SceneBeat(
+                $"Chapter {i}", $"Scene {i}: the hero arrives at the gate and waits.",
+                "Establishes the setting and stalls the confrontation.",
+                i % 3 == 0 ? "Does no work: the same beat is played two scenes earlier." : "Earns its place."))
             .ToList();
 
         return new BookAnalysisResult(
             "A concise logline for the book.",
             string.Join(" ", Enumerable.Repeat("The synopsis recounts the plot across several sentences.", 4 * scale)),
-            characters, Many("Theme"), Many("Plot hole"), Many("Inconsistency"), Many("Inaccuracy"), Many("Pacing"),
-            reviews, plan, Many("Comp"), "Positioned as upmarket literary fiction for adult readers.");
+            characters, Many("Theme"), ManyFindings("Plot hole"), ManyFindings("Inconsistency"),
+            ManyFindings("Inaccuracy"), ManyFindings("Pacing"),
+            reviews, plan, Many("Comp"), "Positioned as upmarket literary fiction for adult readers.",
+            lineEdits, proseNotes, dialogueNotes, scenes);
     }
 
     private static int PageCount(byte[] pdf)
@@ -440,6 +471,42 @@ public class AnalysisPdfComposerTests
         // Entries are in reading order.
         var pagesInOrder = result.TocEntries.Select(e => e.Page).ToList();
         Assert.Equal(pagesInOrder.OrderBy(p => p), pagesInOrder);
+    }
+
+    [Fact]
+    public void Renderer_TocIncludesTheCraftSections()
+    {
+        var result = new AnalysisDocumentRenderer().RenderReport(Sample(1), "My Novel");
+        var titles = result.TocEntries.Select(entry => entry.Title).ToList();
+
+        // The four dimensions the owner asked for are rendered AND findable from the contents page.
+        Assert.Contains("Line-level edits", titles);
+        Assert.Contains("Prose style & voice", titles);
+        Assert.Contains("Dialogue", titles);
+        Assert.Contains("Scene-by-scene breakdown", titles);
+    }
+
+    [Fact]
+    public void Renderer_LegacyReportWithoutCraftSectionsOrCitations_StillRenders()
+    {
+        // A report consolidated by an earlier version: findings are bare strings and the craft lists
+        // are absent entirely, so they deserialize as null. Re-rendering one must not throw.
+        const string legacy =
+            "{\"Logline\":\"A girl quests.\",\"Synopsis\":\"She grows up.\",\"Characters\":[]," +
+            "\"Themes\":[\"courage\"],\"PlotHoles\":[\"Where is the key?\"],\"Inconsistencies\":[]," +
+            "\"Inaccuracies\":[],\"PacingNotes\":[\"Middle sags\"],\"Reviews\":[],\"RevisionPlan\":" +
+            "[{\"Priority\":\"High\",\"Issue\":\"Sagging middle\",\"SuggestedFix\":\"Cut a subplot.\"}]," +
+            "\"ComparableTitles\":[],\"MarketPositioning\":\"YA fantasy\"}";
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(
+            legacy, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+
+        Assert.Equal("Where is the key?", Assert.Single(report.PlotHoles).Detail);
+        Assert.Equal(string.Empty, Assert.Single(report.PlotHoles).Chapter);
+        Assert.Null(report.LineEdits);
+
+        var pages = new AnalysisDocumentRenderer().Render(report, "My Novel");
+
+        Assert.NotEmpty(pages);
     }
 
     [Fact]

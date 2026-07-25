@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -59,7 +60,9 @@ public class GraphicNovelProcessorTests : IDisposable
                     ? Task.FromException<ChapterNotes>(new RateLimitException("429 from test"))
                     : Task.FromResult(new ChapterNotes(
                         chapterLabel,
-                        ["Hero"], ["Hero walks to the castle"], ["Hero resolves to enter"], [], [], [], ["Vivid setting"], []));
+                        ["Hero"], ["Hero walks to the castle"], ["Hero resolves to enter"], [], [], [], ["Vivid setting"], [],
+                        ["\"He felt the cold.\" — cut the filter"], ["Filter words recur"], ["Hero sounds like Villain"],
+                        ["The hero knocks | opens the confrontation | earns its place"]));
             });
 
         claude.Setup(c => c.ConsolidateAnalysis(
@@ -67,10 +70,24 @@ public class GraphicNovelProcessorTests : IDisposable
             .ReturnsAsync(new BookAnalysisResult(
                 "A hero reaches a castle.", "The hero journeys to the castle and knocks.",
                 [new CharacterProfile("Hero", "protagonist", "Grows from timid to resolute.", ["approaches: Castle"])],
-                ["perseverance"], ["How did the gate open?"], ["Eye colour shifts"], ["Castle geography"], ["Slow open"],
+                ["perseverance"],
+                [new Finding("Chapter 1", "How did the gate open?")],
+                [new Finding("Chapter 1", "Eye colour shifts")],
+                [new Finding("Chapter 1", "Castle geography")],
+                [new Finding("Chapter 1", "Slow open")],
                 [new Review("developmental editor", "Promising but uneven.", ["Voice"], ["Pacing"], "Tighten the opening.")],
-                [new RevisionItem("High", "Sagging middle", "Cut a subplot.")],
-                ["Comparable Title"], "Upmarket fantasy for adult readers."));
+                [new RevisionItem("High", "Chapter 1", "Sagging middle", "Cut a subplot.")],
+                ["Comparable Title"], "Upmarket fantasy for adult readers.",
+                // The craft sections arrive from ConsolidateCraft and are folded in by the processor.
+                [], [], [], []));
+
+        claude.Setup(c => c.ConsolidateCraft(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CraftReport(
+                [new LineEdit("Chapter 1", "He felt the cold.", "The cold came.", "Filtered.")],
+                [new ProseNote("Chapter 1", "Filter words", "\"he felt\"", "Cut the filter.")],
+                [new DialogueNote("Chapter 1", "Hero", "On the nose.", "Trust the subtext.")],
+                [new SceneBeat("Chapter 1", "The hero knocks.", "Opens the confrontation.", "Earns its place.")]));
 
         gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
@@ -199,6 +216,37 @@ public class GraphicNovelProcessorTests : IDisposable
         var notes = context.ChunkAnalyses.Where(a => a.NovelId == novelId).ToList();
         Assert.NotEmpty(notes);
         Assert.All(notes, unit => Assert.Contains("Chapter 1", unit.NotesJson));
+    }
+
+    [Fact]
+    public async Task Analysis_ConsolidatesBothHalves_AndFoldsCraftIntoTheRenderedReport()
+    {
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        // Two reduce calls, each exactly once: the story and craft halves are billed, retried, and
+        // stored independently, so neither is re-run because the other has not happened yet.
+        claude.Verify(c => c.ConsolidateAnalysis(
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        claude.Verify(c => c.ConsolidateCraft(
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        using var context = database.NewContext();
+        var analysis = Assert.Single(context.BookAnalyses.Where(a => a.NovelId == novelId));
+        Assert.NotNull(analysis.ConsolidatedJson);
+        Assert.NotNull(analysis.CraftJson);
+        Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var craft = JsonSerializer.Deserialize<CraftReport>(analysis.CraftJson!, options)!;
+        Assert.Equal("Chapter 1", Assert.Single(craft.SceneBreakdown).Chapter);
+        Assert.Equal("Chapter 1", Assert.Single(craft.LineEdits).Chapter);
+
+        // The story half's findings keep the chapter they were drawn from, all the way to storage.
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson!, options)!;
+        Assert.Equal("Chapter 1", Assert.Single(report.PlotHoles).Chapter);
     }
 
     [Fact]

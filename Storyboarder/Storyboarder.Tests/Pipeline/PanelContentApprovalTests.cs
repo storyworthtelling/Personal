@@ -45,13 +45,18 @@ public class PanelContentApprovalTests : IDisposable
 
         claude.Setup(c => c.AnalyzeChapter(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ChapterNotes("Chapter 1", ["Hero"], ["fights"], [], [], [], [], ["Vivid"], []));
+            .ReturnsAsync(new ChapterNotes(
+                "Chapter 1", ["Hero"], ["fights"], [], [], [], [], ["Vivid"], [], [], [], [], []));
 
         claude.Setup(c => c.ConsolidateAnalysis(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BookAnalysisResult(
                 "A duel.", "A hero duels.", [], [], [], [], [], [],
-                [new Review("editor", "ok", [], [], "revise")], [], [], "positioning"));
+                [new Review("editor", "ok", [], [], "revise")], [], [], "positioning", [], [], [], []));
+
+        claude.Setup(c => c.ConsolidateCraft(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(CraftReport.Empty);
 
         claude.Setup(c => c.RewritePromptToImply(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("The blow lands off-frame; the crowd recoils.");

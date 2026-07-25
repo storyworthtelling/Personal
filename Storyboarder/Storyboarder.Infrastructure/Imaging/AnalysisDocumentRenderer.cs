@@ -71,7 +71,7 @@ public sealed class AnalysisDocumentRenderer
             writer.Paragraph(analysis.Synopsis, body, Ink);
         }
 
-        if (analysis.Characters.Count > 0)
+        if (analysis.Characters is { Count: > 0 })
         {
             writer.Heading("Character map & arcs", h2, Ink, ruled: true);
             foreach (var character in analysis.Characters)
@@ -87,12 +87,67 @@ public sealed class AnalysisDocumentRenderer
         }
 
         Section(writer, "Themes", analysis.Themes, body, h2);
+
+        // The scene map comes before the problem sections: it is the reference the rest of the report
+        // points back at, and reading it first is what makes "this scene does no work" land.
+        if (analysis.SceneBreakdown is { Count: > 0 })
+        {
+            writer.Heading("Scene-by-scene breakdown", h2, Ink, ruled: true);
+            writer.Paragraph("What each scene accomplishes, and whether it earns its place.", bodyItalic, Muted);
+            foreach (var scene in analysis.SceneBreakdown)
+            {
+                writer.Bullet(Join(scene.Chapter, scene.Scene, scene.Purpose), body, Ink);
+                if (!string.IsNullOrWhiteSpace(scene.Verdict))
+                    writer.Paragraph(scene.Verdict, bodyItalic, Muted);
+            }
+            writer.Gap(18f);
+        }
+
         Section(writer, "Plot holes", analysis.PlotHoles, body, h2);
         Section(writer, "Inconsistencies", analysis.Inconsistencies, body, h2);
         Section(writer, "Inaccuracies to fact-check", analysis.Inaccuracies, body, h2);
         Section(writer, "Pacing", analysis.PacingNotes, body, h2);
 
-        if (analysis.Reviews.Count > 0)
+        if (analysis.ProseNotes is { Count: > 0 })
+        {
+            writer.Heading("Prose style & voice", h2, Ink, ruled: true);
+            foreach (var note in analysis.ProseNotes)
+            {
+                writer.Bullet(Join(note.Chapter, note.Pattern, note.Evidence), body, Ink);
+                if (!string.IsNullOrWhiteSpace(note.Fix))
+                    writer.Paragraph(note.Fix, bodyItalic, Muted);
+            }
+            writer.Gap(18f);
+        }
+
+        if (analysis.DialogueNotes is { Count: > 0 })
+        {
+            writer.Heading("Dialogue", h2, Ink, ruled: true);
+            foreach (var note in analysis.DialogueNotes)
+            {
+                writer.Bullet(Join(note.Chapter, note.Speakers, note.Observation), body, Ink);
+                if (!string.IsNullOrWhiteSpace(note.Fix))
+                    writer.Paragraph(note.Fix, bodyItalic, Muted);
+            }
+            writer.Gap(18f);
+        }
+
+        if (analysis.LineEdits is { Count: > 0 })
+        {
+            writer.Heading("Line-level edits", h2, Ink, ruled: true);
+            writer.Paragraph("Sentences to cut, tighten, or rewrite. The excerpt is quoted as written.", bodyItalic, Muted);
+            foreach (var edit in analysis.LineEdits)
+            {
+                writer.Bullet(Join(edit.Chapter, Quoted(edit.Excerpt)), bodyItalic, Ink);
+                if (!string.IsNullOrWhiteSpace(edit.Suggestion))
+                    writer.Paragraph(edit.Suggestion, body, Ink);
+                if (!string.IsNullOrWhiteSpace(edit.Reason))
+                    writer.Paragraph(edit.Reason, bodyItalic, Muted);
+                writer.Gap(8f);
+            }
+        }
+
+        if (analysis.Reviews is { Count: > 0 })
         {
             writer.Heading("Reviews (differing perspectives)", h2, Ink, ruled: true);
             foreach (var review in analysis.Reviews)
@@ -118,14 +173,14 @@ public sealed class AnalysisDocumentRenderer
             }
         }
 
-        if (analysis.RevisionPlan.Count > 0)
+        if (analysis.RevisionPlan is { Count: > 0 })
         {
             writer.Heading("Revision plan (highest impact first)", h2, Ink, ruled: true);
             int number = 1;
             foreach (var item in analysis.RevisionPlan)
             {
                 var label = string.IsNullOrWhiteSpace(item.Priority) ? $"{number}." : $"{number}. [{item.Priority}]";
-                writer.Heading($"{label} {item.Issue}", h3, Ink);
+                writer.Heading($"{label} {Join(item.Chapter, item.Issue)}", h3, Ink);
                 if (!string.IsNullOrWhiteSpace(item.SuggestedFix))
                     writer.Paragraph(item.SuggestedFix, body, Ink);
                 writer.Gap(12f);
@@ -133,12 +188,12 @@ public sealed class AnalysisDocumentRenderer
             }
         }
 
-        if (analysis.ComparableTitles.Count > 0 || !string.IsNullOrWhiteSpace(analysis.MarketPositioning))
+        if (analysis.ComparableTitles is { Count: > 0 } || !string.IsNullOrWhiteSpace(analysis.MarketPositioning))
         {
             writer.Heading("Positioning for publication", h2, Ink, ruled: true);
             if (!string.IsNullOrWhiteSpace(analysis.MarketPositioning))
                 writer.Paragraph(analysis.MarketPositioning, body, Ink);
-            if (analysis.ComparableTitles.Count > 0)
+            if (analysis.ComparableTitles is { Count: > 0 })
             {
                 writer.Paragraph("Comparable titles:", bodyBold, Ink);
                 foreach (var comparable in analysis.ComparableTitles)
@@ -151,15 +206,35 @@ public sealed class AnalysisDocumentRenderer
         return pages;
     }
 
-    private static void Section(PageWriter writer, string heading, IReadOnlyList<string> items, SKFont body, SKFont h2)
+    private static void Section(PageWriter writer, string heading, IReadOnlyList<string>? items, SKFont body, SKFont h2)
     {
-        if (items.Count == 0)
+        if (items is not { Count: > 0 })
             return;
         writer.Heading(heading, h2, Ink, ruled: true);
         foreach (var item in items)
             writer.Bullet(item, body, Ink);
         writer.Gap(18f);
     }
+
+    // A section of findings. Each bullet leads with the chapter it was drawn from, which is the first
+    // thing the author needs in order to act on it.
+    private static void Section(PageWriter writer, string heading, IReadOnlyList<Finding>? items, SKFont body, SKFont h2)
+    {
+        if (items is not { Count: > 0 })
+            return;
+        writer.Heading(heading, h2, Ink, ruled: true);
+        foreach (var item in items)
+            writer.Bullet(Join(item.Chapter, item.Detail), body, Ink);
+        writer.Gap(18f);
+    }
+
+    // Joins the parts of one finding, dropping the empty ones: a model that skipped a field — or an
+    // older report that never had it (no chapter citation, say) — must not render as a dangling dash.
+    private static string Join(params string?[] parts) =>
+        string.Join(" — ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+
+    private static string Quoted(string? excerpt) =>
+        string.IsNullOrWhiteSpace(excerpt) ? string.Empty : $"“{excerpt}”";
 
     // Accumulates drawn text down a page, snapshotting to PNG and starting a fresh page when the
     // content cursor would overflow the bottom margin. All positions derive from DesignTokens.Pdf

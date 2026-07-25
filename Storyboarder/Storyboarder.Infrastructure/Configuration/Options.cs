@@ -23,9 +23,19 @@ public sealed class ClaudeOptions
     // budget is thrown away wholesale (ResponseTruncatedException), not merely trimmed.
     public int ChapterNotesMaxTokens { get; set; } = 12_000;
 
-    // The consolidated revision report is long (many sections + several reviews), so its single
-    // "reduce" call gets a larger output budget than the per-chunk/per-panel calls.
+    // The consolidated revision report is long (many sections + several reviews), so its "reduce"
+    // call gets a larger output budget than the per-chunk/per-panel calls. This covers the STORY half
+    // only — synopsis, character map, plot holes, inconsistencies, pacing, reviews, revision plan.
     public int AnalysisMaxTokens { get; set; } = 16_000;
+
+    // The CRAFT half of the report (line edits, prose/voice, dialogue, the scene-by-scene map) is
+    // consolidated by its own call with its own budget. The scene map alone is one entry per scene
+    // across a whole novel, so it is the larger of the two halves. Splitting the reduce in two is
+    // deliberate: one call producing both halves would need ~40K output tokens, which both risks
+    // truncation (the client throws on stop_reason=max_tokens rather than returning a partial report)
+    // and streams for long enough that Android's background worker can be killed mid-response. Two
+    // calls of this size each stream for about as long as the storyboard calls that already work.
+    public int CraftMaxTokens { get; set; } = 20_000;
 }
 
 public sealed class GeminiOptions

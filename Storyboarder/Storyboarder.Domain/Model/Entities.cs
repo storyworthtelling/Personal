@@ -183,6 +183,12 @@ public class BookAnalysis
     public Guid NovelId { get; set; }
     public string? ConsolidatedJson { get; set; }
 
+    // The craft half of the report (line edits, prose/voice, dialogue, the scene-by-scene map),
+    // serialized as a CraftReport. It is consolidated by a SECOND Claude call, so it is persisted
+    // separately: the two halves then succeed, fail, and retry independently, and a failure in one
+    // never re-bills the other. Null until that call has succeeded.
+    public string? CraftJson { get; set; }
+
     // The web-searched verdicts on the checkable claims the per-chunk notes collected, serialized as a
     // JSON array of FactCheck. Null until the fact-check step runs; "[]" when there was nothing to check.
     // Persisted separately from ConsolidatedJson so the (billed, search-backed) verification survives a

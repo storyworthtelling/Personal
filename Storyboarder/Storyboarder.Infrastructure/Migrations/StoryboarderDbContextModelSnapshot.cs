@@ -29,6 +29,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("ConsolidatedJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CraftJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FactChecksJson")
                         .HasColumnType("TEXT");
 

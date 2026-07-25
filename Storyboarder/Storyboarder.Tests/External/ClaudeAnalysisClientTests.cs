@@ -223,9 +223,114 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("developmental editor", Assert.Single(report.Reviews).Perspective);
         Assert.Equal("High", Assert.Single(report.RevisionPlan).Priority);
         Assert.Equal("YA fantasy", report.MarketPositioning);
+        // A model that answered with bare strings instead of {chapter, detail} still parses; the
+        // finding simply has nothing to cite.
+        Assert.Equal("Where is the key?", Assert.Single(report.PlotHoles).Detail);
+        Assert.Equal(string.Empty, Assert.Single(report.PlotHoles).Chapter);
 
         // The reduce call must request the larger analysis output budget, not the default MaxTokens.
         Assert.Contains("\"max_tokens\":4096", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task ConsolidateAnalysis_CarriesChapterCitationsOntoFindingsAndThePlan()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"logline\":\"A girl quests.\",\"plotHoles\":[{\"chapter\":\"Chapter 4\",\"detail\":\"The key is never found.\"}]," +
+            "\"pacingNotes\":[{\"chapter\":\"Chapters 7–8\",\"detail\":\"The middle sags.\"}]," +
+            "\"revisionPlan\":[{\"priority\":\"High\",\"chapter\":\"Chapter 4\",\"issue\":\"Sagging middle\"," +
+            "\"suggestedFix\":\"Cut a subplot.\"}]}"));
+
+        var report = await client.ConsolidateAnalysis(
+            "Quest", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        Assert.Equal("Chapter 4", Assert.Single(report.PlotHoles).Chapter);
+        Assert.Equal("The key is never found.", Assert.Single(report.PlotHoles).Detail);
+        Assert.Equal("Chapters 7–8", Assert.Single(report.PacingNotes).Chapter);
+        Assert.Equal("Chapter 4", Assert.Single(report.RevisionPlan).Chapter);
+        // The prompt has to ask for the citation, or the model has no reason to carry it through.
+        Assert.Contains("chapter", handler.RequestBodies[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConsolidateAnalysis_LeavesTheCraftSectionsToTheirOwnCall()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"logline\":\"A girl quests.\"}"));
+
+        var report = await client.ConsolidateAnalysis(
+            "Quest", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        Assert.Empty(report.LineEdits);
+        Assert.Empty(report.ProseNotes);
+        Assert.Empty(report.DialogueNotes);
+        Assert.Empty(report.SceneBreakdown);
+    }
+
+    [Fact]
+    public async Task ConsolidateCraft_ParsesAllFourSections_AndUsesTheCraftBudget()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", MaxTokens = 256, CraftMaxTokens = 9001
+        });
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
+        handler.EnqueueOk(Reply(
+            "{\"lineEdits\":[{\"chapter\":\"Chapter 2\",\"excerpt\":\"He felt the cold.\"," +
+            "\"suggestion\":\"The cold came.\",\"reason\":\"Filtered.\"}]," +
+            "\"proseNotes\":[{\"chapter\":\"Chapter 3\",\"pattern\":\"Filter words\"," +
+            "\"evidence\":\"she felt\",\"fix\":\"Cut the filter.\"}]," +
+            "\"dialogueNotes\":[{\"chapter\":\"Chapter 4\",\"speakers\":\"Alice, Bob\"," +
+            "\"observation\":\"They sound identical.\",\"fix\":\"Give Bob a shorter line.\"}]," +
+            "\"sceneBreakdown\":[{\"chapter\":\"Chapter 5\",\"scene\":\"Alice waits.\"," +
+            "\"purpose\":\"Stalls the confrontation.\",\"verdict\":\"Does no work.\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        Assert.Equal("Chapter 2", Assert.Single(craft.LineEdits).Chapter);
+        Assert.Equal("The cold came.", Assert.Single(craft.LineEdits).Suggestion);
+        Assert.Equal("Filter words", Assert.Single(craft.ProseNotes).Pattern);
+        Assert.Equal("Alice, Bob", Assert.Single(craft.DialogueNotes).Speakers);
+        Assert.Equal("Does no work.", Assert.Single(craft.SceneBreakdown).Verdict);
+
+        // The craft half is the larger of the two reduce calls and must request its own budget.
+        Assert.Contains("\"max_tokens\":9001", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task ConsolidateCraft_MissingOrUnparseableSections_DegradeToEmpty()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"lineEdits\":[{\"chapter\":\"Chapter 2\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        var edit = Assert.Single(craft.LineEdits);
+        Assert.Equal("Chapter 2", edit.Chapter);
+        Assert.Equal(string.Empty, edit.Excerpt);
+        Assert.Empty(craft.SceneBreakdown);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_GathersTheCraftObservations_WhileTheSentencesAreStillAvailable()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"lineEditCandidates\":[\"\\\"He felt the cold.\\\" — cut the filter\"]," +
+            "\"proseObservations\":[\"Filter words recur\"],\"dialogueObservations\":[\"Alice and Bob sound alike\"]," +
+            "\"sceneBeats\":[\"Alice waits | stalls the confrontation | does no work\"]}"));
+
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 2", [], CancellationToken.None);
+
+        Assert.Single(notes.LineEditCandidates);
+        Assert.Single(notes.ProseObservations);
+        Assert.Single(notes.DialogueObservations);
+        Assert.Single(notes.SceneBeats);
+        // By consolidation time only the notes survive, so the prompt must gather these per chunk.
+        Assert.Contains("lineEditCandidates", handler.RequestBodies[0]);
+        Assert.Contains("sceneBeats", handler.RequestBodies[0]);
     }
 
     [Fact]
