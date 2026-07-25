@@ -212,10 +212,11 @@ public class NovelStatusTests : IDisposable
 
         Assert.NotNull(status!.Estimate);
         Assert.True(status.Estimate!.Panels > 0);
-        // A full-length novel against the default daily image cap is weeks, not minutes — that is the
-        // number the sentence exists to surface.
-        Assert.True(status.Estimate.Duration > TimeSpan.FromDays(7),
-            $"expected the daily image cap to dominate, got {status.Estimate.Duration}");
+        // A full-length novel is hours against the raised daily image cap (it was weeks at the old 100/day
+        // ceiling) — still a multi-hour projection worth surfacing while abandoning the run is nearly free,
+        // and still governed by image generation.
+        Assert.True(status.Estimate.Duration > TimeSpan.FromHours(1),
+            $"expected a multi-hour projection dominated by the image cap, got {status.Estimate.Duration}");
         Assert.Equal("image generation", status.Estimate.LimitingFactor);
 
         var rendering = SeedNovel(ProjectStage.RenderingImages, seed =>
