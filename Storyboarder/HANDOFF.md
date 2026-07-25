@@ -1,11 +1,13 @@
 # Storyboarder — session handoff
 
-**Phases 1–3 are complete; Phase 4 is partly done; Phases 5–6 remain.** Phase 1 merged in PR #111. Phases 2,
-3, and the safe half of 4 landed on branch `claude/storyboarder-handoff-phases-nbhko0` (Phase 2 backend
-`bfa44bc`→`38574ad` + UI `a186b76`; Phase 3 `000fe63`→ reader/report/diff pages; Phase 4 `bf30279`→`8a9803c`
-— shot types, weighted layout, dialogue trim, derived art style). The rest of Phase 4 needs a live vision
-model or on-device visual iteration (see its section). Read this top to bottom before starting work —
-several of the traps below cost a full CI round each to discover.
+**Phases 1–3 are complete; Phases 4–5 are partly done; Phase 6 remains.** Phase 1 merged in PR #111.
+Everything since landed on branch `claude/storyboarder-handoff-phases-nbhko0`: Phase 2 (backend
+`bfa44bc`→`38574ad` + UI `a186b76`), Phase 3 (`000fe63`→ reader/report/diff pages), the safe half of Phase 4
+(`bf30279`→`8a9803c` — shot types, weighted layout, dialogue trim, derived art style), and two of three
+Phase 5 items (`759b5db` .docx import, `dd204f3` verify-after-reboot). What's left: the vision/lettering half
+of Phase 4 (needs a live vision model or on-device eyes), Phase 5's owner's-voice (blocked on the owner's
+Drive docs), and all of Phase 6 (owner-gated). Read this top to bottom before starting work — several of the
+traps below cost a full CI round each to discover.
 
 **Phase 2 is complete end to end.** The draft loop is built and tested in Domain/Infrastructure —
 `ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings resolved/new + changed
@@ -241,9 +243,18 @@ or on-device visual iteration are deferred (this environment can compile the hea
 The weighted layout is verified as *math* (no overlap, fills the page, all-Standard == old grid) but its
 *look* wasn't — worth a glance on a device once a Wide/Splash-tagged book renders.
 
-### Phase 5 — odds
-`.docx` import · verify-after-reboot · **owner's voice propagated repo-wide** (DESIGN.md §11 plus FocusPhone,
-Ledger and Storyboarder copy — a design-bible change, probably its own PR).
+### Phase 5 — odds ⏳ two of three done
+- **`.docx` import** ✅ (`759b5db`): `DocxTextExtractor` (pure, tested) pulls text from a .docx's
+  `word/document.xml`; `GoogleDocsClient` reads a picked file's Drive mime type and routes — Google Doc via
+  the Docs API, .docx via a Drive byte download + extract — so no service/UI signature changed. The picker
+  lists .docx too. (`Google.Apis.Drive.v3` was added to Infrastructure.)
+- **verify-after-reboot** ✅ (`dd204f3`): `ProjectService.VerifyAndHealOutputsAsync` runs at app start
+  (covers reboots, wired in `MainActivity`); resets any "done" unit whose file has vanished and regresses
+  the novel so the pipeline rebuilds it. Archived outputs and Cancelled/Failed novels are left alone.
+- **Owner's voice propagated repo-wide** ⛔ blocked on the owner: it needs the owner's self-authored Google
+  Drive docs (DESIGN.md §11) to learn the voice, and the Drive connector isn't authorized in claude.ai yet.
+  Until then copy stays quiet-neutral across DESIGN.md, FocusPhone, Ledger, and Storyboarder. Its own PR
+  when unblocked.
 
 ### Phase 6 — Gemini batching
 See `Storyboarder/BATCHING.md` for the full investigation. **Do the cheap thing first:**
