@@ -15,6 +15,17 @@ public class Novel
     public string ArtStyle { get; set; } = ArtStyles.Default;
     public ProjectStage Stage { get; set; } = ProjectStage.Created;
 
+    // Draft versioning. A "project" is one book the owner is revising; each draft is a fresh conversion
+    // of a re-picked Google Doc, all sharing one ProjectId. The first draft's ProjectId is its own Id
+    // (so a lone novel is a one-draft project), DraftNumber is 1, and PreviousDraftId is null. A later
+    // draft carries the same ProjectId, the next DraftNumber, and PreviousDraftId pointing at the draft
+    // it was made from — which is what the diff and the incremental re-render read to reuse the panels
+    // whose source text didn't move. Not a navigation property: drafts are queried by ProjectId, and a
+    // self-referencing FK would drag the whole prior graph into the change-tracker on every save.
+    public Guid ProjectId { get; set; }
+    public int DraftNumber { get; set; } = 1;
+    public Guid? PreviousDraftId { get; set; }
+
     // Report-only draft: skip every art stage (storyboarding, panel renders, page composition, volume
     // binding) and go straight from the design bible to the revision report. Not the default — the
     // illustration is the comprehension probe, so most drafts still want it — but a re-read of a draft

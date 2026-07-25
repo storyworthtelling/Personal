@@ -54,11 +54,55 @@ public sealed class ProjectService
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
+        // First draft of a new project: the project is identified by this draft's own id.
+        novel.ProjectId = novel.Id;
         novel.Source = new SourceText { NovelId = novel.Id, FullText = text, CharacterCount = text.Length };
 
         db.Novels.Add(novel);
         await db.SaveChangesAsync(cancellationToken);
         return novel.Id;
+    }
+
+    // Adds the next draft to an existing project: the owner re-picks a doc (the revised manuscript) and
+    // gets a fresh conversion that shares the previous draft's ProjectId. Carrying PreviousDraftId is
+    // what lets the pipeline reuse the panels whose source text didn't move and the diff report show what
+    // changed. Art style and title default to the previous draft's unless overridden. Returns the new
+    // draft's id, or null if the previous draft doesn't exist.
+    public async Task<Guid?> CreateNextDraftAsync(
+        Guid previousDraftId, string fileId, string fileName, string accessToken,
+        string? title, string? artStyle, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var previous = await db.Novels.FirstOrDefaultAsync(n => n.Id == previousDraftId, cancellationToken);
+        if (previous is null)
+            return null;
+
+        // The newest draft in the project sets the numbering, not necessarily the one passed in — the
+        // owner might branch from an older draft, but the next number still follows the latest.
+        var highestDraft = await db.Novels
+            .Where(n => n.ProjectId == previous.ProjectId)
+            .MaxAsync(n => n.DraftNumber, cancellationToken);
+
+        var text = await docs.FetchText(fileId, accessToken, cancellationToken);
+        var now = clock.UtcNow;
+        var draft = new Novel
+        {
+            Title = string.IsNullOrWhiteSpace(title) ? previous.Title : title,
+            GoogleDocId = fileId,
+            GoogleDocName = fileName,
+            ArtStyle = string.IsNullOrWhiteSpace(artStyle) ? previous.ArtStyle : artStyle,
+            ReportOnly = previous.ReportOnly,
+            ProjectId = previous.ProjectId,
+            DraftNumber = highestDraft + 1,
+            PreviousDraftId = previous.Id,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
+
+        db.Novels.Add(draft);
+        await db.SaveChangesAsync(cancellationToken);
+        return draft.Id;
     }
 
     // True while any novel is mid-conversion (not Completed/Failed/Cancelled). The Android head checks

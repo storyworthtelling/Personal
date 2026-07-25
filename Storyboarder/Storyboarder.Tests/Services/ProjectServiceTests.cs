@@ -79,6 +79,76 @@ public class ProjectServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateFromDoc_StartsANewOneDraftProject()
+    {
+        docs.Setup(d => d.FetchText("doc-1", "token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("A short tale.");
+
+        var id = await NewService().CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == id);
+        // A lone novel is a project of one draft: its ProjectId is its own id, numbered 1, with nothing
+        // before it. This is what a later draft groups against.
+        Assert.Equal(id, novel.ProjectId);
+        Assert.Equal(1, novel.DraftNumber);
+        Assert.Null(novel.PreviousDraftId);
+    }
+
+    [Fact]
+    public async Task CreateNextDraft_AddsDraftTwoToTheSameProject()
+    {
+        docs.Setup(d => d.FetchText("doc-1", "token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("First draft.");
+        docs.Setup(d => d.FetchText("doc-2", "token", It.IsAny<CancellationToken>()))
+            .ReturnsAsync("Second, revised draft.");
+
+        var service = NewService();
+        var firstId = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", "My Book", "noir", CancellationToken.None);
+        var secondId = await service.CreateNextDraftAsync(firstId, "doc-2", "Book-v2.gdoc", "token", null, null, CancellationToken.None);
+
+        Assert.NotNull(secondId);
+        using var context = database.NewContext();
+        var first = context.Novels.Single(n => n.Id == firstId);
+        var second = context.Novels.Single(n => n.Id == secondId!.Value);
+
+        // Same project, next number, chained to its predecessor — the link the diff and incremental
+        // re-render both read.
+        Assert.Equal(first.ProjectId, second.ProjectId);
+        Assert.Equal(2, second.DraftNumber);
+        Assert.Equal(firstId, second.PreviousDraftId);
+        // The revised manuscript is the new draft's source, and title/style carry forward unless overridden.
+        Assert.Equal("Second, revised draft.", context.SourceTexts.Single(s => s.NovelId == second.Id).FullText);
+        Assert.Equal("My Book", second.Title);
+        Assert.Equal("noir", second.ArtStyle);
+    }
+
+    [Fact]
+    public async Task CreateNextDraft_NumbersFromTheLatestDraft_NotTheOneBranchedFrom()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+
+        var service = NewService();
+        var d1 = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+        var d2 = await service.CreateNextDraftAsync(d1, "doc-2", "Book.gdoc", "token", null, null, CancellationToken.None);
+        // Branch a third draft off draft ONE, not the latest: it must still be numbered 3.
+        var d3 = await service.CreateNextDraftAsync(d1, "doc-3", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        Assert.Equal(3, context.Novels.Single(n => n.Id == d3!.Value).DraftNumber);
+        Assert.Equal(2, context.Novels.Single(n => n.Id == d2!.Value).DraftNumber);
+    }
+
+    [Fact]
+    public async Task CreateNextDraft_ReturnsNull_WhenThePreviousDraftIsMissing()
+    {
+        var result = await NewService().CreateNextDraftAsync(
+            Guid.NewGuid(), "doc", "Book.gdoc", "token", null, null, CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task CancelAsync_MarksNovelCancelled_SoItNoLongerCountsAsActiveWork()
     {
         var id = SeedNovel(ProjectStage.BuildingDesignBible);
