@@ -107,6 +107,70 @@ public class ClaudeAnalysisClientTests
         Assert.Contains("ephemeral", handler.RequestBodies[0]);
     }
 
+    private static ChapterNotes NotesWithClaims(string chapter, params string[] claims) =>
+        ChapterNotes.Empty with { Chapter = chapter, FactualClaims = claims };
+
+    [Fact]
+    public async Task CheckFacts_GrantsWebSearch_AndSendsOnlyTheClaims()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"checks\":[{\"claim\":\"Paris is the capital of Spain\",\"verdict\":\"Incorrect\"," +
+            "\"note\":\"Paris is the capital of France; Madrid is Spain's.\",\"chapter\":\"Chapter 3\"}]}"));
+
+        var checks = await client.CheckFacts(
+            [NotesWithClaims("Chapter 3", "Paris is the capital of Spain")], CancellationToken.None);
+
+        var check = Assert.Single(checks);
+        Assert.Equal("Incorrect", check.Verdict);
+        Assert.Equal("Chapter 3", check.Chapter);
+
+        var body = handler.RequestBodies[0];
+        // The hosted search tool is granted for this call — it is the only one that gets it.
+        Assert.Contains("web_search", body);
+        Assert.Contains("tools", body);
+        Assert.Contains("Paris is the capital of Spain", body);
+    }
+
+    [Fact]
+    public async Task OtherCalls_AreNotGivenASearchTool()
+    {
+        // The rest of the report must reason from the manuscript alone, not from what the web says a book
+        // like this should contain.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
+
+        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+
+        Assert.DoesNotContain("web_search", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task CheckFacts_WithNoClaims_MakesNoCallAtAll()
+    {
+        // Fiction that asserts nothing checkable is a normal outcome; confirming an empty list isn't worth
+        // a billed request, let alone a web search.
+        var (client, handler) = Create();
+
+        var checks = await client.CheckFacts([ChapterNotes.Empty], CancellationToken.None);
+
+        Assert.Empty(checks);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task CheckFacts_MissingVerdict_DefaultsToUnverified()
+    {
+        // Never present an unchecked claim as settled — that would send the author after a non-problem.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"checks\":[{\"claim\":\"The tower is 90m tall\",\"chapter\":\"Chapter 2\"}]}"));
+
+        var checks = await client.CheckFacts(
+            [NotesWithClaims("Chapter 2", "The tower is 90m tall")], CancellationToken.None);
+
+        Assert.Equal("Unverified", Assert.Single(checks).Verdict);
+    }
+
     [Fact]
     public async Task MechanicalPerChunkCalls_UseTheFastModel()
     {

@@ -61,6 +61,10 @@ public class PanelContentApprovalTests : IDisposable
         claude.Setup(c => c.RewritePromptToImply(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("The blow lands off-frame; the crowd recoils.");
 
+        claude.Setup(c => c.CheckFacts(
+                It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new FactCheck("Paris is in France", "Correct", "Confirmed.", "Chapter 1")]);
+
         gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
     }

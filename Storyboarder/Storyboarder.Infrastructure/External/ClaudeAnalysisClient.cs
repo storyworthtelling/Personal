@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
@@ -18,6 +19,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 {
     private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
     private const string AnthropicVersion = "2023-06-01";
+
+    // Anthropic's hosted web-search tool, used only by the fact-check call. The versioned type string
+    // is the API's identifier for it; if the tool is ever renamed this is the one place to change.
+    private const string WebSearchToolType = "web_search_20250305";
+    private const int WebSearchMaxUses = 8;
 
     private const string ExtractionInstruction =
         "You are a visual-development analyst preparing a graphic-novel design bible. Read the novel " +
@@ -126,6 +132,19 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "earns its place and what is missing if not. Say plainly when a scene does no work. AT MOST 100. " +
         "Every \"chapter\" is copied from the note the item came from; \"\" only when the notes carry " +
         "none. Use [] when none. No prose outside the JSON.";
+
+    private const string FactCheckInstruction =
+        "You are a fact-checker for a novel heading toward publication. You are given the checkable " +
+        "real-world statements the manuscript makes, each with the chapter it came from. SEARCH THE WEB to " +
+        "verify each one, then report what you found. Respond with ONLY a JSON object: " +
+        "{\"checks\":[{\"claim\":string,\"verdict\":string,\"note\":string,\"chapter\":string}]}. " +
+        "verdict is EXACTLY one of \"Correct\", \"Incorrect\", \"Partly correct\", or \"Unverified\". Use " +
+        "\"Unverified\" whenever the search does not settle it — a confident \"Incorrect\" on something you " +
+        "could not actually check sends the author chasing a problem that isn't there. note says what you " +
+        "found and, for anything not Correct, what the accurate version is. Copy \"chapter\" from the claim " +
+        "you were given. Judge only real-world accuracy: invented places, people and history in a work of " +
+        "fiction are not errors, so leave them out entirely rather than reporting them as Incorrect. " +
+        "Report at most 30 checks, the ones that most matter. No prose outside the JSON.";
 
     private const string ImplyInstruction =
         "You are a comics director revising a single panel's visual prompt. The image model refused to " +
@@ -303,6 +322,38 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 s.Purpose ?? string.Empty, s.Verdict ?? string.Empty)).ToList());
     }
 
+    public async Task<IReadOnlyList<FactCheck>> CheckFacts(
+        IReadOnlyList<ChapterNotes> notes, CancellationToken cancellationToken)
+    {
+        // Only the claims, each tagged with where it came from. Sending the whole notes payload would
+        // bury the task and invite the model to fact-check the fiction itself.
+        var claims = notes
+            .SelectMany(n => n.FactualClaims.Select(claim => new { chapter = n.Chapter, claim }))
+            .Where(c => !string.IsNullOrWhiteSpace(c.claim))
+            .ToList();
+
+        // Nothing checkable in the whole book is a normal outcome for some fiction — don't spend a call
+        // (or a search) to confirm an empty list.
+        if (claims.Count == 0)
+            return Array.Empty<FactCheck>();
+
+        var userContent = "CLAIMS TO CHECK (JSON):\n" + JsonSerializer.Serialize(claims, JsonResponse.CaseInsensitive);
+
+        var reply = await SendMessage(
+            FactCheckInstruction, userContent, cancellationToken, options.AnalysisMaxTokens, webSearch: true);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return Array.Empty<FactCheck>();
+
+        var dto = JsonResponse.Deserialize<FactCheckReplyDto>(json);
+        return (dto?.Checks ?? [])
+            .Where(c => !string.IsNullOrWhiteSpace(c.Claim))
+            .Select(c => new FactCheck(
+                c.Claim!, string.IsNullOrWhiteSpace(c.Verdict) ? "Unverified" : c.Verdict!,
+                c.Note ?? string.Empty, c.Chapter ?? string.Empty))
+            .ToList();
+    }
+
     public async Task<string> RewritePromptToImply(string visualPrompt, CancellationToken cancellationToken)
     {
         var reply = await SendMessage(ImplyInstruction, visualPrompt, cancellationToken);
@@ -316,7 +367,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     // fast one — see ClaudeOptions.FastModel for why those two and not the rest.
     private async Task<string> SendMessage(
         string instruction, string userText, CancellationToken cancellationToken,
-        int? maxTokens = null, string? cachedContext = null, string? model = null)
+        int? maxTokens = null, string? cachedContext = null, string? model = null, bool webSearch = false)
     {
         // Invariant, reused context (the design bible) is cached as its own block so repeated calls
         // within the cache window bill it as a cache read instead of full input. Both blocks share one
@@ -345,11 +396,28 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             }
         };
 
+        // Serialized through a node so the optional server-side tool can be attached without a second
+        // payload shape. Property names are already snake_case on the anonymous type, so they survive
+        // as written.
+        var requestBody = JsonSerializer.SerializeToNode(payload)!.AsObject();
+        if (webSearch)
+        {
+            // Anthropic's hosted web-search tool: the search runs server-side and the model keeps
+            // generating, so the existing text accumulation needs no special handling. Capped because
+            // each search bills, and the fact-check has a bounded list of claims to settle.
+            requestBody["tools"] = new JsonArray(new JsonObject
+            {
+                ["type"] = WebSearchToolType,
+                ["name"] = "web_search",
+                ["max_uses"] = WebSearchMaxUses
+            });
+        }
+
         using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
         request.Headers.Add("x-api-key", options.ApiKey);
         request.Headers.Add("anthropic-version", AnthropicVersion);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-        request.Content = JsonContent.Create(payload);
+        request.Content = new StringContent(requestBody.ToJsonString(), Encoding.UTF8, "application/json");
 
         // Stream the response as server-sent events. A large storyboard generation runs well past the
         // default 100s HttpClient timeout, and a non-streaming request leaves the socket idle for those
@@ -634,5 +702,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Chapter { get; set; }
         public string? Issue { get; set; }
         public string? SuggestedFix { get; set; }
+    }
+
+    private sealed class FactCheckReplyDto
+    {
+        public List<FactCheckDto>? Checks { get; set; }
+    }
+
+    private sealed class FactCheckDto
+    {
+        public string? Claim { get; set; }
+        public string? Verdict { get; set; }
+        public string? Note { get; set; }
+        public string? Chapter { get; set; }
     }
 }

@@ -48,6 +48,13 @@ public interface IClaudeAnalysisClient
         IReadOnlyList<ChapterNotes> notes,
         CancellationToken cancellationToken);
 
+    // Puts the manuscript's checkable real-world statements to a web search and reports what it found.
+    // Separate from the other reduce calls because it is the only one granted a search tool: the rest
+    // must reason from the manuscript alone, not from whatever the web says the book should contain.
+    Task<IReadOnlyList<FactCheck>> CheckFacts(
+        IReadOnlyList<ChapterNotes> notes,
+        CancellationToken cancellationToken);
+
     // Restages a panel's visual prompt so objectionable content is implied — occluded, off-frame, or
     // cut away from — rather than depicted. Used only when even a relaxed render hit the image model's
     // non-adjustable floor, to salvage the beat without showing what the model refuses to draw.

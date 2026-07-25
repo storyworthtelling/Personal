@@ -797,6 +797,34 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2c) Fact-check the manuscript's checkable real-world statements against a web search. Its own
+        // resumable step for the same reason the craft half is: it is the only call granted a search tool,
+        // it bills separately, and a failure here must not re-run the two consolidations that succeeded.
+        // Reaching here means the report PDF is still outstanding (step 0 returned otherwise), so the
+        // results can still make it into the rendered document.
+        if (analysis.FactChecksJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var notes = await LoadChapterNotes(db, novel.Id, cancellationToken);
+
+            try
+            {
+                var checks = await claude.CheckFacts(notes, cancellationToken);
+                analysis.FactChecksJson = JsonSerializer.Serialize(checks, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 3) Render: compose the analysis PDF from the consolidated report (both halves folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
@@ -807,7 +835,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 var craft = analysis.CraftJson is null
                     ? CraftReport.Empty
                     : JsonSerializer.Deserialize<CraftReport>(analysis.CraftJson, JsonResponse.CaseInsensitive) ?? CraftReport.Empty;
-                var pdf = analysisPdfComposer.Compose(report.WithCraft(craft), novel.Title);
+                var checks = analysis.FactChecksJson is null
+                    ? Array.Empty<FactCheck>()
+                    : JsonSerializer.Deserialize<List<FactCheck>>(analysis.FactChecksJson, JsonResponse.CaseInsensitive)
+                      ?? (IReadOnlyList<FactCheck>)Array.Empty<FactCheck>();
+                var pdf = analysisPdfComposer.Compose(report.WithCraft(craft).WithFactChecks(checks), novel.Title);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }

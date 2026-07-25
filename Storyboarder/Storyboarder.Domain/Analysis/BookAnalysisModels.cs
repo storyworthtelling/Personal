@@ -185,6 +185,10 @@ public sealed record BookAnalysisResult(
     IReadOnlyList<DialogueNote> DialogueNotes,
     IReadOnlyList<SceneBeat> SceneBreakdown)
 {
+    // Verified factual claims. Arrives from its own call (the checks need web search, which the other
+    // reduce calls must not have) and is folded in the same way the craft half is.
+    public IReadOnlyList<FactCheck> FactChecks { get; init; } = Array.Empty<FactCheck>();
+
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
         Array.Empty<Finding>(), Array.Empty<Finding>(), Array.Empty<Finding>(), Array.Empty<Finding>(),
@@ -199,4 +203,13 @@ public sealed record BookAnalysisResult(
         DialogueNotes = craft.DialogueNotes,
         SceneBreakdown = craft.SceneBreakdown
     };
+
+    public BookAnalysisResult WithFactChecks(IReadOnlyList<FactCheck> checks) =>
+        this with { FactChecks = checks };
 }
+
+// One checkable real-world statement from the manuscript, put to a web search. Verdict is the model's
+// call after searching; Note carries what it found. Chapter is copied from the note the claim came from
+// so the author can find the sentence. A claim the search couldn't settle is reported as unverified
+// rather than guessed at — a confidently wrong "incorrect" would send the author chasing a non-problem.
+public sealed record FactCheck(string Claim, string Verdict, string Note, string Chapter);

@@ -90,6 +90,10 @@ public class GraphicNovelProcessorTests : IDisposable
                 [new DialogueNote("Chapter 1", "Hero", "On the nose.", "Trust the subtext.")],
                 [new SceneBeat("Chapter 1", "The hero knocks.", "Opens the confrontation.", "Earns its place.")]));
 
+        claude.Setup(c => c.CheckFacts(
+                It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new FactCheck("Paris is in France", "Correct", "Confirmed.", "Chapter 1")]);
+
         gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
 
