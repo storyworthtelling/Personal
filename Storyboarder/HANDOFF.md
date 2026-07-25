@@ -1,8 +1,16 @@
 # Storyboarder — session handoff
 
-State as of commit `bb61137` on branch `claude/storyboarder-panel-layout-p5qwah`. **Phase 1 is complete;
-Phases 2–6 remain.** Read this top to bottom before starting work — several of the traps below cost a full
-CI round each to discover.
+**Phase 1 and Phase 2 are complete; Phases 3–6 remain.** Phase 1 merged in PR #111. Phase 2's backend
+landed on branch `claude/storyboarder-handoff-phases-nbhko0` (commits `bfa44bc`→`38574ad`). Read this top
+to bottom before starting work — several of the traps below cost a full CI round each to discover.
+
+**What Phase 2 still needs (backend done, UI not):** the draft loop is fully built and tested in
+Domain/Infrastructure — `ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings
+resolved/new + changed panels), and the storyboard-stage reuse that carries an unchanged window's renders
+forward. **None of it is wired into the Android head yet** (a "New draft" action on a project card, and a
+diff view). That UI belongs with the Phase 3 reader and needs the MAUI/Android workload to build — it was
+not attempted in the backend session because the head can't be compiled or run there. Wire it in an
+environment that can build the head, and mind the handoff's "check the feature is reachable" trap.
 
 ---
 
@@ -141,15 +149,30 @@ are built so failure still lets the book complete.
 
 ## 6. Remaining work
 
-### Phase 2 — drafts + incremental re-run (largest; do first)
+### Phase 2 — drafts + incremental re-run ✅ backend done (UI pending)
 The loop the owner actually cares about: revise → re-render only what changed → compare against the last
-draft.
+draft. All of the following is built, tested, and on the branch — only the Android UI to invoke it remains
+(see the note at the top).
 
-- Draft versions **inside one project** (schema change), each added by picking a doc.
-- **Blocker to solve first:** panels store no link to their source text. `Panel` has no offsets, so "what
-  changed" is uncomputable today. Persisting panel→source offsets is the real cost of this phase.
-- Diff two drafts on **findings resolved/new** and **changed panels** (side-by-side old vs new art).
-- Re-render only panels whose source text moved; reuse everything else.
+- **Panel→source offsets** (`bfa44bc`): every `Panel` records the absolute `[SourceStartOffset,
+  SourceEndOffset)` of the storyboard window it came from. This was the phase's real cost — "what changed"
+  is computable now. Window granularity: all panels of one window share its span (the model doesn't
+  sub-divide a window per panel).
+- **Draft versions inside one project** (`ae11d43`): `Novel` carries `ProjectId` / `DraftNumber` /
+  `PreviousDraftId`. First draft is a project of one (ProjectId = its own Id); the migration backfills
+  existing novels the same way. `ProjectService.CreateNextDraftAsync` adds the next draft from a re-picked
+  doc, inheriting title/style/report-only.
+- **Draft diff** (`8498bef`): `GetDraftDiffAsync` returns findings resolved/new (diffed by detail text
+  across the four finding sections) and changed panels (paired with the previous render at the same reading
+  position for a side-by-side). Reusable-vs-changed uses the shared `PanelSourceMatching` helper.
+- **Incremental reuse** (`38574ad`): at storyboarding, a window whose text is byte-identical to one the
+  previous draft storyboarded copies its panels — prompts and renders — forward, spending no Claude or
+  Gemini call. All-or-nothing per window; re-storyboards if a render has gone missing.
+
+**Known limitation (inherent, documented):** reuse is window-granular, and windows re-pack under edits, so
+an edit early in a chunk shifts later window boundaries and those windows re-render even if their content is
+unchanged. Finer (per-paragraph) anchoring would need the model to map panels to sub-spans, which it doesn't
+provide. The diff is honest about this — it reports what actually carried forward.
 
 ### Phase 3 — in-app reader
 Page reader with chapter jump and panel zoom; browsable report alongside the PDF. Mostly MAUI pages, the
@@ -185,5 +208,3 @@ walked through finding their real Gemini limit when we get there.
 - **Check the real Gemini tier limit** and raise `GeminiRequestsPerDay` — do this before any batching work.
 - **The stuck "Heart and Mind" project recovers on its own** once this ships: tap **Retry now** and volume 1
   re-binds, which unblocks the revision report. No manual data fix needed.
-- **PR #111's title and body still describe only the original five fixes.** Rewrite them to cover the full
-  scope before merging.
