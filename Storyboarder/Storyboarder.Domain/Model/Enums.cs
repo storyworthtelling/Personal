@@ -14,7 +14,14 @@ public enum ProjectStage
     ComposingAnalysis,
     Completed,
     Failed,
-    Cancelled    // stopped by the user; terminal, and the worker leaves it alone
+    Cancelled,   // stopped by the user; terminal, and the worker leaves it alone
+
+    // Uploads the finished outputs to Google Drive beside the source manuscript, then frees the local
+    // copies. Runs between ComposingAnalysis and Completed. APPENDED DELIBERATELY: the stage is
+    // persisted as its integer value, so inserting it in pipeline order would renumber Completed/
+    // Failed/Cancelled and silently re-stage every existing novel. Pipeline order lives in
+    // ProjectStateMachine, not in this enum's ordering.
+    Archiving
 }
 
 // The status of a single unit of work (a chunk analysis, a reference sheet, a panel render,

@@ -23,7 +23,13 @@ namespace Storyboarder.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ArchivedDriveFileId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ConsolidatedJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FactChecksJson")
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("NovelId")
@@ -43,6 +49,35 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.ToTable("BookAnalyses");
                 });
 
+            modelBuilder.Entity("Storyboarder.Domain.Model.Chapter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EndOffset")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("NovelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StartOffset")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NovelId", "Number");
+
+                    b.ToTable("Chapters");
+                });
+
             modelBuilder.Entity("Storyboarder.Domain.Model.Chunk", b =>
                 {
                     b.Property<Guid>("Id")
@@ -53,6 +88,13 @@ namespace Storyboarder.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ChapterLabel")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ChapterNumber")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("EndOffset")
@@ -142,6 +184,9 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ChunkMentions")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("Kind")
                         .HasColumnType("INTEGER");
 
@@ -151,6 +196,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("NeedsSheet")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("NextAttemptAtUtc")
                         .HasColumnType("INTEGER");
