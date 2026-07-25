@@ -86,6 +86,12 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IGeminiImageClient, GeminiImageClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // The batch client submits/polls jobs (short calls); it's registered so the processor has it, but
+        // it stays dormant while GeminiOptions.UseBatchRendering is off (the verified default — batch mode
+        // needs live verification before it's switched on; see GeminiBatchImageClient / BATCHING.md).
+        builder.Services.AddHttpClient<IGeminiBatchClient, GeminiBatchImageClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         // Infrastructure collaborators.
         builder.Services.AddSingleton<IGoogleDocsClient, GoogleDocsClient>();
