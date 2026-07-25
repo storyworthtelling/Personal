@@ -12,7 +12,11 @@ public sealed class TextChunker
     private readonly int targetChars;
     private readonly int maxChars;
 
-    public TextChunker(int targetChars = 48_000, int maxChars = 60_000)
+    // The design-bible chunk size. Exposed so a cost estimate can be computed from the same arithmetic
+    // the pipeline actually chunks by, rather than a second copy of the number that could drift from it.
+    public const int DefaultTargetChars = 48_000;
+
+    public TextChunker(int targetChars = DefaultTargetChars, int maxChars = 60_000)
     {
         if (targetChars <= 0)
             throw new ArgumentOutOfRangeException(nameof(targetChars), "Target size must be positive.");

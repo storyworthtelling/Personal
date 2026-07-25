@@ -46,6 +46,10 @@ public sealed record NovelStatus(
     // adjustable harm category, so relaxing thresholds cannot help and the approve/skip sheet has nothing
     // to offer — they need the art direction reworked instead, which is a different action on the card.
     int ProhibitedPanels = 0,
+    // What this conversion is projected to cost, surfaced only while it is still cheap to abandon (before
+    // any panel has been rendered). Once rendering starts the real counts are better information than a
+    // projection, so this goes null. Null also when the manuscript hasn't been ingested yet.
+    Domain.Pipeline.RunEstimate? Estimate = null,
     // When a provider rate limit last deferred this novel, the (future) UTC instant it expects to try
     // again — set only when still in the future, so the card can say "resumes ~3:47 pm" in local time.
     DateTimeOffset? RateLimitedUntilUtc = null);

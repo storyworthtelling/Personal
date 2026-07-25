@@ -198,6 +198,44 @@ public class NovelStatusTests : IDisposable
     }
 
     [Fact]
+    public async Task RunEstimate_isSurfacedEarly_andDropsOnceRenderingStarts()
+    {
+        // Worth seeing while abandoning the run is still nearly free. Once panels are rendering, the real
+        // counts are better information than a projection, so it goes away.
+        var early = SeedNovel(ProjectStage.BuildingDesignBible, seed =>
+            seed.Context.SourceTexts.Add(new SourceText
+            {
+                NovelId = seed.NovelId, FullText = "x", CharacterCount = 432_000
+            }));
+
+        var status = await NewService().GetStatusAsync(early, CancellationToken.None);
+
+        Assert.NotNull(status!.Estimate);
+        Assert.True(status.Estimate!.Panels > 0);
+        // A full-length novel against the default daily image cap is weeks, not minutes — that is the
+        // number the sentence exists to surface.
+        Assert.True(status.Estimate.Duration > TimeSpan.FromDays(7),
+            $"expected the daily image cap to dominate, got {status.Estimate.Duration}");
+        Assert.Equal("image generation", status.Estimate.LimitingFactor);
+
+        var rendering = SeedNovel(ProjectStage.RenderingImages, seed =>
+            seed.Context.SourceTexts.Add(new SourceText
+            {
+                NovelId = seed.NovelId, FullText = "x", CharacterCount = 432_000
+            }));
+
+        Assert.Null((await NewService().GetStatusAsync(rendering, CancellationToken.None))!.Estimate);
+    }
+
+    [Fact]
+    public async Task RunEstimate_isNull_beforeTheManuscriptIsIngested()
+    {
+        var id = SeedNovel(ProjectStage.Created);
+
+        Assert.Null((await NewService().GetStatusAsync(id, CancellationToken.None))!.Estimate);
+    }
+
+    [Fact]
     public async Task Progress_phases_are_zero_when_no_work_has_been_seeded()
     {
         var id = SeedNovel(ProjectStage.Created);

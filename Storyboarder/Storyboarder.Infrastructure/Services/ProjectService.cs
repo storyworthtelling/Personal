@@ -328,7 +328,7 @@ public sealed class ProjectService
         var now = clock.UtcNow;
         foreach (var id in ids)
         {
-            var status = await BuildStatus(db, id, rateLimits.MaxAttempts, now, cancellationToken);
+            var status = await BuildStatus(db, id, rateLimits, now, cancellationToken);
             if (status is not null)
                 statuses.Add(status);
         }
@@ -338,7 +338,7 @@ public sealed class ProjectService
     public async Task<NovelStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await BuildStatus(db, id, rateLimits.MaxAttempts, clock.UtcNow, cancellationToken);
+        return await BuildStatus(db, id, rateLimits, clock.UtcNow, cancellationToken);
     }
 
     public async Task<string?> GetVolumePdfPathAsync(Guid novelId, int number, CancellationToken cancellationToken)
@@ -360,7 +360,7 @@ public sealed class ProjectService
     }
 
     private static async Task<NovelStatus?> BuildStatus(
-        StoryboarderDbContext db, Guid id, int maxStoryboardAttempts, DateTimeOffset now, CancellationToken cancellationToken)
+        StoryboarderDbContext db, Guid id, RateLimitOptions limits, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
         if (novel is null)
@@ -434,11 +434,35 @@ public sealed class ProjectService
             || (novel.LastError is not null
                 && novel.Stage == ProjectStage.Storyboarding
                 && novel.StoryboardCursor < chunkCount
-                && novel.StoryboardAttempts >= maxStoryboardAttempts);
+                && novel.StoryboardAttempts >= limits.MaxAttempts);
 
         // A failed binding sets no novel-level error (the failure is recorded on the Volume), so surface
         // it here as the card's message when nothing more specific is set.
         var lastError = novel.LastError ?? failedVolume?.LastError;
+
+        // Project what the run will cost, but only while abandoning it is still nearly free — once panels
+        // start rendering, "panels 40 of 2160" is better information than any projection. The daily image
+        // cap is usually what governs, and on a full-length novel that is weeks, which is worth knowing
+        // before the first render rather than discovered part-way through.
+        Domain.Pipeline.RunEstimate? estimate = null;
+        if (novel.Stage is ProjectStage.Created or ProjectStage.Ingesting
+            or ProjectStage.BuildingDesignBible or ProjectStage.Storyboarding)
+        {
+            var characters = await db.SourceTexts
+                .Where(s => s.NovelId == id)
+                .Select(s => s.CharacterCount)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (characters > 0)
+            {
+                // Once the bible is consolidated the sheet count is known exactly; before that, fall back
+                // to a small ensemble, since only recurring entities are drawn now.
+                var sheetCount = sheets.Total > 0 ? sheets.Total : 12;
+                estimate = Domain.Pipeline.RunEstimator.Estimate(
+                    characters, novel.ReportOnly,
+                    Domain.Text.TextChunker.DefaultTargetChars, limits.StoryboardWindowChars,
+                    limits.ClaudeRequestsPerDay, limits.GeminiRequestsPerDay, sheetCount);
+            }
+        }
 
         // Only surface the resume time while it's still in the future; once it passes it's stale, so the
         // card stops showing it (and the worker has presumably resumed).
@@ -448,7 +472,7 @@ public sealed class ProjectService
             novel.Id, novel.Title, novel.Stage.ToString(), lastError,
             chunks, sheets, storyboard, panels, pages, volumes, volumeList,
             analysisNotes, analysis, analysisReady, coverThumb, needsAttention, pendingApprovals,
-            prohibitedPanels, rateLimitedUntil);
+            prohibitedPanels, estimate, rateLimitedUntil);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

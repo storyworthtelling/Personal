@@ -8,6 +8,14 @@ public sealed class ClaudeOptions
     public const string SectionName = "Claude";
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = "claude-sonnet-4-6";
+
+    // The cheap tier, used for the two high-volume mechanical calls: pulling entities out of a chunk and
+    // taking per-chunk analysis notes. Both run once per chunk — by far the most calls a novel makes —
+    // and both are extraction against an explicit JSON contract rather than judgement, which is what the
+    // small model is good at. The work that actually needs the strong model (adapting prose into panels,
+    // and synthesising the whole manuscript into a report) stays on Model.
+    public string FastModel { get; set; } = "claude-haiku-4-5-20251001";
+
     public int MaxTokens { get; set; } = 8_000;
 
     // Storyboarding is the heaviest output the pipeline produces (a panel-by-panel breakdown as one

@@ -16,7 +16,10 @@ public class ClaudeAnalysisClientTests
     private static (ClaudeAnalysisClient Client, FakeHttpMessageHandler Handler) Create()
     {
         var handler = new FakeHttpMessageHandler();
-        var options = Options.Create(new ClaudeOptions { ApiKey = "test-key", Model = "test-model", MaxTokens = 256 });
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", FastModel = "test-fast-model", MaxTokens = 256
+        });
         return (new ClaudeAnalysisClient(new HttpClient(handler), options), handler);
     }
 
@@ -102,7 +105,39 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("2023-06-01", Assert.Single(request.Headers.GetValues("anthropic-version")));
         Assert.Contains("cache_control", handler.RequestBodies[0]);
         Assert.Contains("ephemeral", handler.RequestBodies[0]);
-        Assert.Contains("test-model", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task MechanicalPerChunkCalls_UseTheFastModel()
+    {
+        // Entity extraction and chapter notes run once per chunk — by far the most calls a novel makes —
+        // and both are extraction against a fixed JSON contract rather than judgement, so they go to the
+        // cheap tier.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
+        handler.EnqueueOk(Reply("{}"));
+
+        await client.ExtractEntities("excerpt", CancellationToken.None);
+        await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
+
+        Assert.Contains("\"model\":\"test-fast-model\"", handler.RequestBodies[0]);
+        Assert.Contains("\"model\":\"test-fast-model\"", handler.RequestBodies[1]);
+    }
+
+    [Fact]
+    public async Task JudgementCalls_StayOnTheStrongModel()
+    {
+        // Adapting prose into panels and synthesising the whole manuscript are the calls whose quality the
+        // owner actually sees, so they must not be downgraded to save pennies.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
+        handler.EnqueueOk(Reply("{}"));
+
+        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+        await client.ConsolidateAnalysis("Title", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[0]);
+        Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[1]);
     }
 
     [Fact]

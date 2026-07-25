@@ -146,7 +146,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     public async Task<DesignBibleFragment> ExtractEntities(string chunkText, CancellationToken cancellationToken)
     {
-        var reply = await SendMessage(ExtractionInstruction, chunkText, cancellationToken);
+        // Fast tier: one call per chunk, and the job is extraction against a fixed JSON contract.
+        var reply = await SendMessage(ExtractionInstruction, chunkText, cancellationToken, model: options.FastModel);
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
             return DesignBibleFragment.Empty;
@@ -200,8 +201,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var location = string.IsNullOrWhiteSpace(chapterLabel) ? "(unknown)" : chapterLabel;
         var userContent = $"LOCATION IN THE BOOK: {location}\n\nKNOWN CAST: {cast}\n\nEXCERPT:\n{chapterText}";
 
+        // Fast tier: one call per chunk, recording observations against a fixed JSON contract. The
+        // judgement calls — synthesising these notes into a report — stay on the strong model.
         var reply = await SendMessage(
-            ChapterAnalysisInstruction, userContent, cancellationToken, options.ChapterNotesMaxTokens);
+            ChapterAnalysisInstruction, userContent, cancellationToken, options.ChapterNotesMaxTokens,
+            model: options.FastModel);
         var json = JsonResponse.ExtractObject(reply);
         // The chapter is known exactly from the chunk's offsets, so it is stamped on here rather than
         // trusted to the model — even a reply that failed to parse still carries where it came from.
@@ -308,9 +312,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return string.IsNullOrWhiteSpace(rewritten) ? visualPrompt : rewritten;
     }
 
+    // model selects the tier: null means the strong default. Only the mechanical per-chunk calls pass the
+    // fast one — see ClaudeOptions.FastModel for why those two and not the rest.
     private async Task<string> SendMessage(
         string instruction, string userText, CancellationToken cancellationToken,
-        int? maxTokens = null, string? cachedContext = null)
+        int? maxTokens = null, string? cachedContext = null, string? model = null)
     {
         // Invariant, reused context (the design bible) is cached as its own block so repeated calls
         // within the cache window bill it as a cache read instead of full input. Both blocks share one
@@ -329,7 +335,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var effectiveMaxTokens = maxTokens ?? options.MaxTokens;
         var payload = new
         {
-            model = options.Model,
+            model = string.IsNullOrWhiteSpace(model) ? options.Model : model,
             max_tokens = effectiveMaxTokens,
             stream = true,
             system,
