@@ -163,7 +163,10 @@ public sealed class ChapterDetector
         };
 
         var best = categories.Where(category => category.Count >= 2).MaxBy(category => category.Count);
-        return best is null ? [] : best.Select(line => new Heading(line.Start, line.Text)).ToList();
+        if (best is null)
+            return Array.Empty<Heading>();
+
+        return best.Select(line => new Heading(line.Start, line.Text)).ToList();
     }
 
     // Ornament rules used as the last resort. The sections they cut are unnamed, so their labels are
@@ -176,7 +179,7 @@ public sealed class ChapterDetector
             .Select(line => new Heading(line.Start, null))
             .ToList();
 
-        return rules.Count >= 2 ? rules : [];
+        return rules.Count >= 2 ? rules : (IReadOnlyList<Heading>)Array.Empty<Heading>();
     }
 
     private static IReadOnlyList<Heading> MergeByOffset(IReadOnlyList<Heading> first, IReadOnlyList<Heading> second)
