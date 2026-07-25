@@ -70,9 +70,79 @@ Step 2 is a substantial phase — comparable to Phase 2 — because it adds a ge
 (in-flight batch state, job reconciliation, a second code path for rendering) rather than adjusting an
 existing one.
 
+## Economics & wall-clock — best estimate (after the cap raise)
+
+Ballpark, not exact. Anchored on the owner's real converted novel: **432K characters → 2,162 panel
+renders** (RunEstimator, ~1 panel/200 chars) plus ~a dozen recurring-cast reference sheets. Prices as of
+mid-2026: `gemini-2.5-flash-image` bills image output at ~$30/1M tokens ≈ **~$0.039 per image**; the Batch
+API is **50% off** everything ≈ **~$0.02 per image**.
+
+### Financial benefit — real, modest, and it scales with usage
+
+| | Sync | Batch (panels) |
+|---|---|---|
+| Per image | ~$0.039 | ~$0.020 |
+| ~2,162 panels | ~$84 | ~$43 |
+| ~12 sheets (kept sync either way) | ~$0.5 | ~$0.5 |
+| **Image bill / full book** | **~$85** | **~$43** |
+
+- **~$42 saved per full-length book (~50% of the image bill).**
+- Image generation is the dominant API cost by far — the Claude text calls for a whole book (design bible,
+  ~50 storyboard windows, the map-reduce report) land somewhere around **$5–15**, i.e. well under a fifth of
+  the image spend. So halving the image bill cuts **total per-book API cost by ~40–45%**.
+- It's linear in volume: every book *and every re-drafted book* saves ~half its image cost. Phase 2's
+  incremental re-render already shrinks a redraft's render count; batching halves whatever's left. Over many
+  books/drafts the 50% compounds; on any single book it's a modest ~$40.
+
+### Wall-clock benefit — not a smaller headline number, a *robustness* win on the phone
+
+This is the part that's easy to get wrong. There are two regimes:
+
+- **On paper (a worker running flat-out):** post-cap-raise, the synchronous path is latency-bound at
+  ~10–15s/image and no longer daily-capped, so ~2,162 panels ≈ **~10 hours** (what the estimator now shows).
+  The Batch API's headline is a **24-hour SLA — an upper bound, not a speedup**. Image batches often finish
+  much sooner, but the guarantee is 24h. So *idealised*, batching is **not** a wall-clock win; it can even be
+  slower.
+- **On a real phone (the regime that actually governs this app):** the sync path runs in a background
+  **WorkManager** worker that Android throttles hard — Doze, ~15-minute periodic windows, shrinking execution
+  windows when backgrounded, and outright kills when the device is busy or asleep (this is *why* the app
+  already slices storyboarding into tiny windows). A 2,000-image book almost certainly does **not** get 10
+  continuous hours; it grinds in bursts and effectively stretches to **days**, gated by how often the phone
+  lets the worker run. The batch path instead **submits one job and the rendering happens on Google's
+  servers, in parallel, independent of the phone being awake, charging, or foregrounded** — the phone only
+  polls occasionally to collect results.
+
+So the honest verdict: batching's wall-clock value is **decoupling the long render from the phone's
+battery/Doze constraints**, so a big book completes reliably server-side instead of depending on hours of
+cooperative background execution. Under the 24-hour SLA it very likely beats the *effective* on-device sync
+time for a full book, and it removes the "did the worker actually get to run?" fragility.
+
+### The catch: cost of building it, and when it's worth it
+
+- It's a **substantial phase** (comparable to Phase 2): a genuinely new execution mode — in-flight
+  "submitted, awaiting batch" panel state that survives restarts, job-id persistence and reconciliation,
+  once-per-submission Files-API sheet upload (48h retention), JSONL submission, per-result classification —
+  **plus** a synchronous fallback for refusals and retries (a blocked panel through a batch costs +24h per
+  attempt) and for small runs (a 20-panel quick draft shouldn't wait up to a day).
+- **Break-even is dominated by robustness, not dollars.** The ~$40/book saving alone pays back a
+  Phase-2-sized build only after a good number of books; if the owner converts a handful, the cost case is
+  weak on its own. The compelling case is the mobile-execution decoupling — *if* the raised-cap sync path
+  proves too flaky/slow on-device for a 2,000-image book.
+
+### Recommendation
+
+The cap raise turned "unusable (weeks)" into "usable (hours-ish)", so batching is now an **optimization, not
+a rescue**. **Measure the raised-cap sync path on one real full book first.** Then:
+- If the on-device sync path completes a full book acceptably (a day or two of background running), batching
+  buys ~40–45% cost and some robustness — worth doing **if** the owner converts books often, otherwise
+  deprioritize against its build/maintenance cost.
+- If the on-device sync path proves flaky or drags for a 2,000-image book (the likely outcome under Doze),
+  batching becomes clearly worth it — as much for *reliable server-side completion* as for the 50% cost cut.
+
 ## Sources
 
 - [Batch API — Gemini API docs](https://ai.google.dev/gemini-api/docs/batch-api)
 - [Batch Mode in the Gemini API: Process more for less — Google Developers Blog](https://developers.googleblog.com/en/scale-your-ai-workloads-batch-mode-gemini-api/)
+- [Gemini Developer API pricing](https://ai.google.dev/gemini-api/docs/pricing) — image output ~$30/1M tokens (~$0.039/image); Batch API 50% off
 - [Rate limits — Gemini API docs](https://ai.google.dev/gemini-api/docs/rate-limits)
 - [Batch processing — google-gemini/cookbook](https://deepwiki.com/google-gemini/cookbook/2.6-batch-processing)
