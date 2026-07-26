@@ -40,6 +40,10 @@ public class Novel
     // Claude-assisted) detection runs exactly once per novel.
     public bool ChaptersDetected { get; set; }
 
+    // Set once this draft's manuscript has fed the owner's shared voice profile at ingestion, so the
+    // (billed) refine runs exactly once per draft even if the Ingesting stage is retried.
+    public bool VoiceAnalyzed { get; set; }
+
     // Chunk ordinal up to which storyboarding has already run (for resumable, windowed storyboarding).
     public int StoryboardCursor { get; set; }
 

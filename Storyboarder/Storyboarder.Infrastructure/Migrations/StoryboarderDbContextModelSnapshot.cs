@@ -308,6 +308,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<long>("UpdatedAtUtc")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("VoiceAnalyzed")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Stage");

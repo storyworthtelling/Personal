@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Tests.Support;
 using Xunit;
@@ -24,7 +25,7 @@ public class VoiceClientTests
         });
 
     private static VoiceClient Client(FakeHttpMessageHandler handler) =>
-        new(new HttpClient(handler), Options);
+        new(new HttpClient(handler), Microsoft.Extensions.Options.Options.Create(Options));
 
     [Fact]
     public async Task ComposeAsync_WritesTheMessage_UsingTheFastModelAndTheKey()

@@ -14,6 +14,7 @@ using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Persistence;
+using Storyworthtelling.Voice;
 
 namespace Storyboarder.Infrastructure.Pipeline;
 
@@ -43,6 +44,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     // stage treats that exactly like archiving being switched off.
     private readonly IDriveArchive? driveArchive;
 
+    // The owner's-voice learner + shared profile store. Both null on a head that wires no voice feature
+    // (or on any non-Android host without a Claude key for it); voice refinement then simply doesn't run.
+    private readonly IVoiceClient? voiceClient;
+    private readonly IVoiceProfileStore? voiceStore;
+
     // The Gemini Batch API client and config. Batch rendering is active only when GeminiOptions
     // .UseBatchRendering is on AND a batch client was supplied; otherwise panels render synchronously.
     private readonly IGeminiBatchClient? batchClient;
@@ -56,6 +62,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     // How much opening prose the art-style derivation sees — enough to read the genre, voice and setting
     // without paying for the whole book on a one-off, best-effort call.
     private const int ArtStyleSampleChars = 6000;
+
+    // How much manuscript the voice refinement reads. Voice is about HOW the owner writes — cadence,
+    // register, attitude — which a generous opening sample captures without paying to send a whole novel
+    // to Claude just to distil a short profile.
+    private const int VoiceSampleChars = 12000;
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
     private readonly PlaceholderPanelRenderer placeholderRenderer = new();
@@ -75,7 +86,9 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         ILogger<GraphicNovelProcessor> logger,
         IDriveArchive? driveArchive = null,
         IGeminiBatchClient? batchClient = null,
-        IOptions<GeminiOptions>? geminiOptions = null)
+        IOptions<GeminiOptions>? geminiOptions = null,
+        IVoiceClient? voiceClient = null,
+        IVoiceProfileStore? voiceStore = null)
     {
         this.dbContextFactory = dbContextFactory;
         this.claude = claude;
@@ -87,6 +100,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         this.clock = clock;
         this.logger = logger;
         this.batchClient = batchClient;
+        this.voiceClient = voiceClient;
+        this.voiceStore = voiceStore;
         geminiConfig = geminiOptions?.Value ?? new GeminiOptions();
 
         rateLimits = rateLimitOptions.Value;
@@ -181,9 +196,39 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         await EnsureChaptersLabelled(db, novel, source.FullText, cancellationToken);
 
+        // Learn the owner's voice from this manuscript into the shared profile every com.storyworthtelling
+        // app reads. Best-effort and guarded by VoiceAnalyzed, so it runs once per draft and never fails or
+        // stalls the book. Persisted with the stage change below.
+        await RefineOwnerVoice(novel, source.FullText, cancellationToken);
+
         SetStage(novel, ProjectStage.BuildingDesignBible);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
+    }
+
+    // Folds this draft's manuscript into the owner's shared voice profile. No-op when no voice client/store
+    // is wired or the draft has already been analyzed. A failure is swallowed (logged) and leaves
+    // VoiceAnalyzed false so a later ingest can retry — voiced messaging is a nicety, never a gate on a book.
+    private async Task RefineOwnerVoice(Novel novel, string manuscript, CancellationToken cancellationToken)
+    {
+        if (voiceClient is null || voiceStore is null || novel.VoiceAnalyzed)
+            return;
+
+        try
+        {
+            var sample = manuscript.Length > VoiceSampleChars ? manuscript[..VoiceSampleChars] : manuscript;
+            var existing = await voiceStore.LoadAsync(cancellationToken);
+            var refined = await voiceClient.RefineAsync(existing, sample, cancellationToken);
+            await voiceStore.SaveAsync(refined, cancellationToken);
+            novel.VoiceAnalyzed = true;
+            logger.LogInformation(
+                "Refined owner voice from novel {NovelId} ({Documents} document(s) now analyzed)",
+                novel.Id, refined.DocumentsAnalyzed);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Owner voice refinement failed for novel {NovelId}; continuing without it", novel.Id);
+        }
     }
 
     private async Task<ProcessResult> BuildDesignBible(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)

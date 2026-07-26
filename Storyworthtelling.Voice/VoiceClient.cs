@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 
 namespace Storyworthtelling.Voice;
 
@@ -38,17 +39,20 @@ public sealed class VoiceClient : IVoiceClient
         "markup, no quotes, no preamble — just the message itself.";
 
     private readonly HttpClient httpClient;
-    private readonly VoiceOptions options;
+    // Read fresh on each call (not cached) so a head that supplies live options — the API key the user
+    // enters in-app after launch — is seen without a restart, the same way the rest of the repo works.
+    private readonly IOptions<VoiceOptions> optionsAccessor;
 
-    public VoiceClient(HttpClient httpClient, VoiceOptions options)
+    public VoiceClient(HttpClient httpClient, IOptions<VoiceOptions> options)
     {
         this.httpClient = httpClient;
-        this.options = options;
+        optionsAccessor = options;
     }
 
     public async Task<VoiceProfile> RefineAsync(
         VoiceProfile existing, string documentText, CancellationToken cancellationToken)
     {
+        var options = optionsAccessor.Value;
         var existingJson = JsonSerializer.Serialize(new
         {
             summary = existing.Summary,
@@ -91,6 +95,7 @@ public sealed class VoiceClient : IVoiceClient
     public async Task<string> ComposeAsync(
         VoiceProfile profile, MessageRequest request, CancellationToken cancellationToken)
     {
+        var options = optionsAccessor.Value;
         var profileJson = JsonSerializer.Serialize(new
         {
             summary = profile.Summary,
@@ -122,7 +127,7 @@ public sealed class VoiceClient : IVoiceClient
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        request.Headers.Add("x-api-key", options.ApiKey);
+        request.Headers.Add("x-api-key", optionsAccessor.Value.ApiKey);
         request.Headers.Add("anthropic-version", AnthropicVersion);
         request.Content = new StringContent(
             JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");

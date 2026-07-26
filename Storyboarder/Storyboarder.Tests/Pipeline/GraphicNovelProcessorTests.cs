@@ -13,6 +13,7 @@ using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
+using Storyworthtelling.Voice;
 using Xunit;
 
 namespace Storyboarder.Tests.Pipeline;
@@ -144,11 +145,17 @@ public class GraphicNovelProcessorTests : IDisposable
         NullLogger<GraphicNovelProcessor>.Instance,
         driveArchive,
         batchClient,
-        Options.Create(new GeminiOptions { UseBatchRendering = useBatchRendering, BatchPollSeconds = 1 }));
+        Options.Create(new GeminiOptions { UseBatchRendering = useBatchRendering, BatchPollSeconds = 1 }),
+        voiceClient,
+        voiceStore);
 
     // Batch rendering is off unless a test opts in (sets both a fake client and the flag).
     private IGeminiBatchClient? batchClient;
     private bool useBatchRendering;
+
+    // The owner's-voice feature is unwired unless a test sets these (as the Android head does).
+    private IVoiceClient? voiceClient;
+    private IVoiceProfileStore? voiceStore;
 
     private ProjectService NewProjectService() => new(
         database,
@@ -249,6 +256,70 @@ public class GraphicNovelProcessorTests : IDisposable
         var chunk = Assert.Single(context.Chunks.Where(c => c.NovelId == novelId));
         Assert.Equal(chapter.Label, chunk.ChapterLabel);
         Assert.Equal(1, chunk.ChapterNumber);
+    }
+
+    [Fact]
+    public async Task Ingestion_RefinesTheOwnerVoice_FromTheManuscript_Once()
+    {
+        var store = new InMemoryVoiceProfileStore();
+        var client = new Mock<IVoiceClient>();
+        client.Setup(c => c.RefineAsync(It.IsAny<VoiceProfile>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((VoiceProfile existing, string _, CancellationToken _) =>
+                new VoiceProfile("Wry and warm.", ["wry"], ["At last."], ["hype"], existing.DocumentsAnalyzed + 1));
+        voiceClient = client.Object;
+        voiceStore = store;
+
+        var novelId = SeedNovel("Chapter 1\n\nThe hero walked to the castle and knocked on the gate.");
+
+        // Created -> Ingesting (the pass that ingests + refines voice).
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        // The manuscript fed the shared profile, and the novel is flagged so it won't be re-billed.
+        Assert.Equal(1, store.Saved!.DocumentsAnalyzed);
+        Assert.Equal("Wry and warm.", store.Saved.Summary);
+        using (var context = database.NewContext())
+            Assert.True(context.Novels.Single(n => n.Id == novelId).VoiceAnalyzed);
+
+        // Re-running the pipeline does not analyze the voice a second time.
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        client.Verify(c => c.RefineAsync(It.IsAny<VoiceProfile>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Ingestion_SurvivesAVoiceFailure_AndStillIngests()
+    {
+        var client = new Mock<IVoiceClient>();
+        client.Setup(c => c.RefineAsync(It.IsAny<VoiceProfile>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("no voice key"));
+        voiceClient = client.Object;
+        voiceStore = new InMemoryVoiceProfileStore();
+
+        var novelId = SeedNovel();
+
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == novelId);
+        // Voice is a nicety: a failure leaves VoiceAnalyzed false (so a later ingest can retry) but never
+        // blocks the book — ingestion completed and the pipeline moved on.
+        Assert.False(novel.VoiceAnalyzed);
+        Assert.NotEqual(ProjectStage.Created, novel.Stage);
+        Assert.NotEqual(ProjectStage.Ingesting, novel.Stage);
+    }
+
+    // A trivial in-memory voice profile store for the ingestion tests.
+    private sealed class InMemoryVoiceProfileStore : IVoiceProfileStore
+    {
+        public VoiceProfile? Saved { get; private set; }
+        public Task<VoiceProfile> LoadAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(Saved ?? VoiceProfile.Empty);
+        public Task SaveAsync(VoiceProfile profile, CancellationToken cancellationToken)
+        {
+            Saved = profile;
+            return Task.CompletedTask;
+        }
     }
 
     [Fact]
