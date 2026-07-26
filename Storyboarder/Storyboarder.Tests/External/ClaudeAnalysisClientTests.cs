@@ -281,6 +281,30 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task Storyboard_ParsesDialogueKindAndSfx_DefaultingToSpokenNoSfx()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"continuitySummary\":\"x\",\"volumes\":[{\"number\":1,\"title\":\"V\",\"pages\":[{\"chapterNumber\":1,\"panels\":[" +
+            "{\"visualPrompt\":\"a\",\"dialogue\":\"Maybe I should run.\",\"caption\":null,\"referenceNames\":[]," +
+            "\"dialogueKind\":\"thought\",\"sfx\":null}," +
+            "{\"visualPrompt\":\"b\",\"dialogue\":\"Stop!\",\"caption\":null,\"referenceNames\":[],\"sfx\":\"  crash  \"}," +
+            "{\"visualPrompt\":\"c\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"dialogueKind\":\"whispered\"}" +
+            "]}]}]}"));
+
+        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+        var panels = Assert.Single(Assert.Single(segment.Volumes).Pages).Panels;
+
+        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Thought, panels[0].DialogueKind);
+        Assert.Null(panels[0].Sfx);
+        // Absent dialogueKind → Speech; sfx is trimmed.
+        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Speech, panels[1].DialogueKind);
+        Assert.Equal("crash", panels[1].Sfx);
+        // An unrecognized dialogueKind falls back to Speech, like an unknown shot falls back to Standard.
+        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Speech, panels[2].DialogueKind);
+    }
+
+    [Fact]
     public async Task AnalyzeChapter_ParsesNotes_ToleratingProse()
     {
         var (client, handler) = Create();

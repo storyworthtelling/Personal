@@ -383,6 +383,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("Dialogue")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("DialogueKind")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ImagePath")
                         .HasColumnType("TEXT");
 
@@ -403,6 +406,9 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.Property<string>("ReferenceNamesJson")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Sfx")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("ShotType")

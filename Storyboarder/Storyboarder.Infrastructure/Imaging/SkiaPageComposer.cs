@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using SkiaSharp;
 using Storyboarder.Domain.Design;
 using Storyboarder.Domain.Imaging;
+using Storyboarder.Domain.Model;
 using Storyboarder.Infrastructure.Configuration;
 
 namespace Storyboarder.Infrastructure.Imaging;
@@ -19,6 +20,7 @@ public sealed class SkiaPageComposer : IPageComposer
     private static readonly SKColor PaperShade = SKColor.Parse(DesignTokens.PaperShade);
     private static readonly SKColor Ink = SKColor.Parse(DesignTokens.Ink);
     private static readonly SKColor InkMuted = SKColor.Parse(DesignTokens.InkMuted);
+    private static readonly SKColor Accent = SKColor.Parse(DesignTokens.Accent);
 
     // Mitchell cubic resampling: high quality for both the up- and down-scaling a panel needs to fit its
     // slot, avoiding the blockiness/aliasing of the default nearest-neighbour sampling.
@@ -63,9 +65,14 @@ public sealed class SkiaPageComposer : IPageComposer
             canvas.DrawRect(art, border);
 
             if (slot.Dialogue is { } dialogueBand)
-                DrawTextBox(canvas, panels[i].Dialogue!, ToRect(dialogueBand), anchorTop: true);
+                DrawTextBox(canvas, panels[i].Dialogue!, ToRect(dialogueBand), anchorTop: true, panels[i].DialogueKind);
             if (slot.Caption is { } captionBand)
                 DrawTextBox(canvas, panels[i].Caption!, ToRect(captionBand), anchorTop: false);
+
+            // A prominent sound effect is lettered over the art itself, comic-style — display type, not a
+            // reserved band. Drawn last so it sits on top of the panel image.
+            if (!string.IsNullOrWhiteSpace(panels[i].Sfx))
+                DrawSfx(canvas, panels[i].Sfx!, art);
         }
 
         DrawFolio(canvas, chrome);
@@ -105,7 +112,7 @@ public sealed class SkiaPageComposer : IPageComposer
     // art). Dialogue: bright-paper balloon, Sans lettering, in the band above the art. Caption:
     // deep-paper box, Serif Italic, in the band below it. PanelSlotLayout sized the band to the wrapped
     // text, so the box fills the band; a band the layout had to clamp simply clips any overflow line.
-    private static void DrawTextBox(SKCanvas canvas, string text, SKRect band, bool anchorTop)
+    private static void DrawTextBox(SKCanvas canvas, string text, SKRect band, bool anchorTop, DialogueKind? kind = null)
     {
         var typeface = anchorTop ? EmbeddedTypefaces.SansRegular : EmbeddedTypefaces.SerifItalic;
         var fontSize = anchorTop ? DesignTokens.Comic.LetteringSize : DesignTokens.Comic.CaptionSize;
@@ -132,12 +139,18 @@ public sealed class SkiaPageComposer : IPageComposer
         canvas.DrawRoundRect(boxRect, radius, radius, fill);
         canvas.DrawRoundRect(boxRect, radius, radius, stroke);
 
-        // Speech balloons get a tail pointing down into the panel art below, so the bright box reads as a
-        // balloon spoken into the scene rather than a floating label. (Captions — anchorTop false — are
-        // narration and take no tail.) The exact speaker isn't known, so the tail points straight down from
-        // just left of centre, the neutral comics default.
-        if (anchorTop)
-            DrawBalloonTail(canvas, boxRect, fill, stroke);
+        // Spoken dialogue gets a tail pointing down into the scene; a thought balloon trails shrinking
+        // bubbles toward the thinker instead. Captions (anchorTop false, no kind) are narration and take
+        // neither. The speaker/thinker position isn't known, so both point down from just left of centre.
+        switch (kind)
+        {
+            case DialogueKind.Speech:
+                DrawBalloonTail(canvas, boxRect, fill, stroke);
+                break;
+            case DialogueKind.Thought:
+                DrawThoughtTrail(canvas, boxRect, fill, stroke);
+                break;
+        }
 
         float baseline = band.Top + padding + fontSize;
         foreach (var line in lines)
@@ -177,6 +190,56 @@ public sealed class SkiaPageComposer : IPageComposer
         sides.LineTo(apexX, apexY);
         sides.LineTo(baseX + halfBase, baseY);
         canvas.DrawPath(sides, stroke);
+    }
+
+    // Draws the thought-bubble trail: a few shrinking circles descending from below the balloon toward the
+    // thinker, the comics convention that reads as interior thought (in place of the speech balloon's tail).
+    // Each is filled like the balloon and outlined in ink; they drift toward centre as they shrink.
+    private static void DrawThoughtTrail(SKCanvas canvas, SKRect box, SKPaint fill, SKPaint stroke)
+    {
+        float maxRadius = Math.Min(box.Height * 0.22f, box.Width * 0.06f);
+        if (maxRadius < 3f)
+            return; // too small to read as a trail; leave the plain box
+
+        float cx = box.Left + box.Width * 0.4f;
+        float cy = box.Bottom + maxRadius; // a small gap below the balloon, then the first bubble
+        float radius = maxRadius;
+        for (var i = 0; i < 3; i++)
+        {
+            canvas.DrawCircle(cx, cy, radius, fill);
+            canvas.DrawCircle(cx, cy, radius, stroke);
+            cy += radius * 1.7f;
+            radius *= 0.6f;
+            cx -= maxRadius * 0.3f;
+        }
+    }
+
+    // Letters a sound effect over the panel art as display type: Serif Semibold in terracotta with an ink
+    // outline, tilted for energy, near the top-left of the art. Shrinks to fit if the word is long.
+    private static void DrawSfx(SKCanvas canvas, string sfx, SKRect art)
+    {
+        var text = sfx.Trim().ToUpperInvariant();
+        using var font = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Comic.SfxSize);
+
+        float maxWidth = art.Width * 0.8f;
+        float measured = font.MeasureText(text);
+        if (measured > maxWidth && measured > 0)
+            font.Size = DesignTokens.Comic.SfxSize * (maxWidth / measured);
+
+        float x = art.Left + DesignTokens.Comic.BoxPadding * 2;
+        float baseline = art.Top + font.Size + DesignTokens.Comic.BoxPadding;
+
+        using var outline = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke, StrokeWidth = DesignTokens.Comic.BoxStroke * 2, Color = Ink, IsAntialias = true
+        };
+        using var fillPaint = new SKPaint { Color = Accent, IsAntialias = true };
+
+        canvas.Save();
+        canvas.RotateDegrees(-8f, x, baseline);
+        canvas.DrawText(text, x, baseline, font, outline);
+        canvas.DrawText(text, x, baseline, font, fillPaint);
+        canvas.Restore();
     }
 
     // The folio band inside the bottom margin: running volume title bottom-left

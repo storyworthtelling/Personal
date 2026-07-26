@@ -532,6 +532,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                             // lettering yields to readability (see DialogueFit / DESIGN.md).
                             Dialogue = DialogueFit.Trim(panelDraft.Dialogue),
                             Caption = panelDraft.Caption,
+                            DialogueKind = panelDraft.DialogueKind,
+                            Sfx = panelDraft.Sfx,
                             ShotType = panelDraft.Shot,
                             SourceStartOffset = windowStart,
                             SourceEndOffset = windowEnd,
@@ -593,7 +595,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             select new ReusablePanel(
                 v.Number, v.Title, pg.ChapterNumber, pg.PageNumber, pn.PanelNumber,
                 pn.SourceStartOffset, pn.SourceEndOffset, pn.VisualPrompt, pn.Dialogue, pn.Caption,
-                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped, pn.ShotType))
+                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped, pn.ShotType, pn.DialogueKind, pn.Sfx))
             .ToListAsync(cancellationToken);
 
         // Only the previous panels drawn from a window whose text is byte-identical to this one.
@@ -640,6 +642,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                         VisualPrompt = source.VisualPrompt,
                         Dialogue = source.Dialogue,
                         Caption = source.Caption,
+                        DialogueKind = source.DialogueKind,
+                        Sfx = source.Sfx,
                         ShotType = source.ShotType,
                         SourceStartOffset = windowStart,
                         SourceEndOffset = windowEnd,
@@ -670,7 +674,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private sealed record ReusablePanel(
         int VolumeNumber, string VolumeTitle, int ChapterNumber, int PageNumber, int PanelNumber,
         int SourceStartOffset, int SourceEndOffset, string VisualPrompt, string? Dialogue, string? Caption,
-        string ReferenceNamesJson, string? ImagePath, bool Skipped, ShotType ShotType);
+        string ReferenceNamesJson, string? ImagePath, bool Skipped, ShotType ShotType,
+        DialogueKind DialogueKind, string? Sfx);
 
     private async Task<ProcessResult> RenderPanels(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
@@ -891,7 +896,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 var panelArt = page.Panels
                     .Where(p => !p.Skipped)
                     .OrderBy(p => p.PanelNumber)
-                    .Select(p => new PanelArt(imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption, p.ShotType))
+                    .Select(p => new PanelArt(
+                        imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption, p.ShotType, p.DialogueKind, p.Sfx))
                     .ToList();
                 if (panelArt.Count == 0)
                     panelArt.Add(new PanelArt(placeholderRenderer.Render(), null, null));

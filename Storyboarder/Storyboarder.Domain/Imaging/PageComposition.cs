@@ -6,4 +6,8 @@ namespace Storyboarder.Domain.Imaging;
 // on the page). Text is drawn deterministically by the composer rather than asked of the image model,
 // which renders lettering unreliably. Shot defaults to Standard, so a caller that doesn't set it gets
 // the uniform grid.
-public sealed record PanelArt(byte[] Image, string? Dialogue, string? Caption, ShotType Shot = ShotType.Standard);
+public sealed record PanelArt(
+    byte[] Image, string? Dialogue, string? Caption, ShotType Shot = ShotType.Standard,
+    // Whether the dialogue is spoken or thought (balloon styling) and any sound effect typeset over the
+    // art. Both default to the no-op case so a caller that doesn't set them gets a plain spoken balloon.
+    DialogueKind DialogueKind = DialogueKind.Speech, string? Sfx = null);

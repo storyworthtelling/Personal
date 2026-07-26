@@ -51,10 +51,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "and the names of design-bible entities present. Give each panel a shotType of \"standard\", " +
         "\"wide\" (a full-width establishing/landscape shot), or \"splash\" (a full-page moment reserved " +
         "for a genuinely pivotal beat — use sparingly). Maintain continuity with the running summary. " +
+        "Set dialogueKind to \"thought\" only when the dialogue is a character's unspoken interior " +
+        "thought (it letters as a thought balloon); otherwise \"speech\". Set sfx to a short onomatopoeia " +
+        "for a prominent sound in the panel (e.g. \"CRASH\", \"BOOM\", \"KNOCK\") in the book's language, " +
+        "or null when there is no notable sound — which is most panels. " +
         "Respond with ONLY a JSON object: " +
         "{\"continuitySummary\":string,\"volumes\":[{\"number\":int,\"title\":string,\"pages\":" +
         "[{\"chapterNumber\":int,\"panels\":[{\"visualPrompt\":string,\"dialogue\":string|null," +
-        "\"caption\":string|null,\"referenceNames\":[string],\"shotType\":\"standard\"|\"wide\"|\"splash\"}]}]}]}." +
+        "\"caption\":string|null,\"referenceNames\":[string],\"shotType\":\"standard\"|\"wide\"|\"splash\"," +
+        "\"dialogueKind\":\"speech\"|\"thought\",\"sfx\":string|null}]}]}]}." +
         " No prose outside the JSON.";
 
     private const string ArtStyleInstruction =
@@ -585,8 +590,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         new(page.ChapterNumber,
             (page.Panels ?? [])
                 .Select(p => new PanelDraft(
-                    p.VisualPrompt ?? string.Empty, p.Dialogue, p.Caption, p.ReferenceNames ?? [], ParseShot(p.ShotType)))
+                    p.VisualPrompt ?? string.Empty, p.Dialogue, p.Caption, p.ReferenceNames ?? [],
+                    ParseShot(p.ShotType), ParseDialogueKind(p.DialogueKind),
+                    string.IsNullOrWhiteSpace(p.Sfx) ? null : p.Sfx!.Trim()))
                 .ToList());
+
+    // Maps the model's dialogueKind string to the enum, defaulting to Speech for anything unrecognized or
+    // absent (an older reply, a typo) — so a missing value simply letters as a normal spoken balloon.
+    private static DialogueKind ParseDialogueKind(string? kind) =>
+        kind?.Trim().ToLowerInvariant() == "thought" ? DialogueKind.Thought : DialogueKind.Speech;
 
     // Maps the model's shotType string to the enum, defaulting to Standard for anything unrecognized or
     // absent (an older reply, a typo, or a shot vocabulary we don't lay out specially) — so a missing or
@@ -643,6 +655,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Caption { get; set; }
         public List<string>? ReferenceNames { get; set; }
         public string? ShotType { get; set; }
+        public string? DialogueKind { get; set; }
+        public string? Sfx { get; set; }
     }
 
     private sealed class ChapterNotesDto

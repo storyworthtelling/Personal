@@ -60,3 +60,13 @@ public enum ShotType
     // A full-page splash for a pivotal beat: the panel gets a page to itself (page splitting isolates it).
     Splash
 }
+
+// Whether a panel's dialogue is spoken aloud or thought. Drives how the composer letters it — a spoken
+// balloon points a tail into the scene, a thought balloon trails bubbles toward the thinker. Speech is the
+// default and matches every panel lettered before this existed. Persisted as an integer, so append new
+// values — never insert.
+public enum DialogueKind
+{
+    Speech,
+    Thought
+}

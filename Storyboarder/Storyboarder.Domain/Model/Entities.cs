@@ -281,6 +281,14 @@ public class Panel : IRetryable
     public string? Dialogue { get; set; }
     public string? Caption { get; set; }
 
+    // Whether Dialogue is spoken or thought, which changes how the composer letters it (spoken tail vs
+    // thought-bubble trail). Defaults to Speech (0), so panels lettered before this existed are unchanged.
+    public DialogueKind DialogueKind { get; set; } = DialogueKind.Speech;
+
+    // A prominent sound effect in the panel (onomatopoeia like "CRASH"), typeset over the art as display
+    // lettering. Null when the panel has no notable sound — most panels.
+    public string? Sfx { get; set; }
+
     // The camera framing this panel was storyboarded as, which sizes it on the page. Defaults to
     // Standard (0), so panels from before shot types existed lay out exactly as they did before.
     public ShotType ShotType { get; set; } = ShotType.Standard;
