@@ -130,27 +130,29 @@ public static class MauiProgram
         builder.Services.AddSingleton<DriveDocsLister>();
         builder.Services.AddSingleton<IDriveArchive, DeviceAccountDriveArchive>();
 
-        // Owner's-voice profile store: one JSON file in Drive, reached with the device-account token the
-        // same way the archive is. Under the drive.file scope this is the app's own copy of the shared
-        // profile; a broader scope is needed before other com.storyworthtelling apps read the same file
-        // (see DriveTextFile). The pipeline writes it at ingestion; VoicedMessenger reads it for greetings.
-        builder.Services.AddSingleton<IDriveTextFile>(sp =>
+        // Owner's-voice Drive files, each ONE JSON file found by name and reached with the device-account
+        // token (full `drive` scope, shared across every com.storyworthtelling app) the same way the archive
+        // is: the voice PROFILE (the pipeline writes it at ingestion; VoicedMessenger reads it for greetings)
+        // and the shared CONFIG carrying the Claude key (this app's settings publish it so the other apps
+        // read the key from Drive rather than each keeping their own).
+        static Func<CancellationToken, Task<DriveService>> DriveFactory(IServiceProvider sp)
         {
             var tokens = sp.GetRequiredService<DeviceAccountTokenProvider>();
-            return new DriveTextFile(
-                async _ =>
+            return async _ =>
+            {
+                var token = await tokens.GetAccessToken();
+                return new DriveService(new GoogleClientInitializer
                 {
-                    var token = await tokens.GetAccessToken();
-                    return new DriveService(new GoogleClientInitializer
-                    {
-                        HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                        ApplicationName = "Storyboarder",
-                        HttpClientFactory = new AndroidGoogleHttpClientFactory()
-                    });
-                },
-                DriveVoiceProfileStore.FileName);
-        });
-        builder.Services.AddSingleton<IVoiceProfileStore, DriveVoiceProfileStore>();
+                    HttpClientInitializer = GoogleCredential.FromAccessToken(token),
+                    ApplicationName = "Storyboarder",
+                    HttpClientFactory = new AndroidGoogleHttpClientFactory()
+                });
+            };
+        }
+        builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
+            new DriveVoiceProfileStore(new DriveTextFile(DriveFactory(sp), DriveVoiceProfileStore.FileName)));
+        builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
+            new DriveVoiceConfigStore(new DriveTextFile(DriveFactory(sp), DriveVoiceConfigStore.FileName)));
         builder.Services.AddTransient<VoicedMessenger>();
 
         // Pages.

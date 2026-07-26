@@ -3,6 +3,7 @@ using Microsoft.Maui;
 using Storyboarder.Android.Google;
 using Storyboarder.Android.Platforms.Android;
 using Storyboarder.Infrastructure.Services;
+using Storyworthtelling.Voice;
 
 namespace Storyboarder.Android.Pages;
 
@@ -308,9 +309,30 @@ public partial class SetupPage : ContentPage
     {
         SettingsStore.ClaudeApiKey = ClaudeKeyEntry.Text?.Trim() ?? string.Empty;
         SettingsStore.GeminiApiKey = GeminiKeyEntry.Text?.Trim() ?? string.Empty;
+        // Publish the Claude key to the shared Drive config so every com.storyworthtelling app can compose
+        // voiced messages without its own key screen. Best-effort and fire-and-forget: the key already works
+        // locally here, and a failed publish (no network/scope yet) just means the other apps pick it up on
+        // the next successful save.
+        PublishVoiceKeyToDrive(SettingsStore.ClaudeApiKey);
         // Success is the state change: saving returns to the library.
         await Navigation.PopAsync();
         await Navigation.PopAsync();
+    }
+
+    private static async void PublishVoiceKeyToDrive(string apiKey)
+    {
+        if (string.IsNullOrEmpty(apiKey))
+            return;
+        try
+        {
+            var configStore = IPlatformApplication.Current!.Services.GetService<IVoiceConfigStore>();
+            if (configStore is not null)
+                await configStore.SaveAsync(new VoiceConfig(apiKey), CancellationToken.None);
+        }
+        catch
+        {
+            // Best-effort: the other apps read the key from Drive once a publish succeeds.
+        }
     }
 
     // Both toggles save on change — the setting is read live by the worker, so there is nothing to confirm
