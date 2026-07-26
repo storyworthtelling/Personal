@@ -252,10 +252,22 @@ The weighted layout is verified as *math* (no overlap, fills the page, all-Stand
 - **verify-after-reboot** ✅ (`dd204f3`): `ProjectService.VerifyAndHealOutputsAsync` runs at app start
   (covers reboots, wired in `MainActivity`); resets any "done" unit whose file has vanished and regresses
   the novel so the pipeline rebuilds it. Archived outputs and Cancelled/Failed novels are left alone.
-- **Owner's voice propagated repo-wide** ⛔ blocked on the owner: it needs the owner's self-authored Google
-  Drive docs (DESIGN.md §11) to learn the voice, and the Drive connector isn't authorized in claude.ai yet.
-  Until then copy stays quiet-neutral across DESIGN.md, FocusPhone, Ledger, and Storyboarder. Its own PR
-  when unblocked.
+- **Owner's voice propagated repo-wide** ⏳ built for Storyboarder; rollout to the other apps pending. The
+  earlier "blocked on the claude.ai Drive connector" framing is gone: the reframed design learns the voice
+  from the documents the owner **uploads into the app** and composes messages with the app's own Claude key
+  at runtime, so no external authorization is needed. A shared **`Storyworthtelling.Voice`** library (net10.0,
+  referenced by every com.storyworthtelling app so its DLL ships in each APK) holds it: `VoiceProfile` (JSON
+  in Drive), `VoiceClient` (Claude — `RefineAsync` distils a profile from a document, `ComposeAsync` writes a
+  situational message), `DriveVoiceProfileStore` over a narrow `IDriveTextFile` seam, and `VoicedMessenger`
+  (the entry point apps call — loads the profile, composes fresh, degrades to neutral copy, never throws).
+  In Storyboarder: the pipeline refines the voice from each manuscript at ingestion (best-effort, guarded by
+  `Novel.VoiceAnalyzed` so it runs once per draft), and MainPage shows a voiced welcome that stays hidden
+  until a profile exists. **Decisions locked in:** all apps get a Claude key; messages composed fresh every
+  time; profile lives in a Drive file; static labels stay minimalist (only situational messaging is voiced).
+  **Remaining:** (1) the Drive file is per-app under the `drive.file` scope — for every app to read ONE shared
+  profile, move it to a shared folder or a broader scope (flagged in `DriveTextFile`); (2) reference the
+  library from Ledger + FocusPhone and add a Claude key to each; (3) `VoiceClient` is parse-tested but not
+  verified against the live Anthropic API.
 
 ### Phase 6 — Gemini batching ⏳ cap raised; batch renderer built (off by default, unverified)
 See `Storyboarder/BATCHING.md` for the full investigation.
