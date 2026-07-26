@@ -132,6 +132,13 @@ public sealed class SkiaPageComposer : IPageComposer
         canvas.DrawRoundRect(boxRect, radius, radius, fill);
         canvas.DrawRoundRect(boxRect, radius, radius, stroke);
 
+        // Speech balloons get a tail pointing down into the panel art below, so the bright box reads as a
+        // balloon spoken into the scene rather than a floating label. (Captions — anchorTop false — are
+        // narration and take no tail.) The exact speaker isn't known, so the tail points straight down from
+        // just left of centre, the neutral comics default.
+        if (anchorTop)
+            DrawBalloonTail(canvas, boxRect, fill, stroke);
+
         float baseline = band.Top + padding + fontSize;
         foreach (var line in lines)
         {
@@ -140,6 +147,36 @@ public sealed class SkiaPageComposer : IPageComposer
             canvas.DrawText(line, boxX + padding, baseline, font, textPaint);
             baseline += lineHeight;
         }
+    }
+
+    // Draws the downward tail of a speech balloon. The filled triangle covers the balloon's bottom stroke
+    // between its base points (opening the balloon into the tail), then the two slanted sides are stroked to
+    // finish the outline. Points down from ~40% across the balloon, angled slightly toward the panel centre.
+    private static void DrawBalloonTail(SKCanvas canvas, SKRect box, SKPaint fill, SKPaint stroke)
+    {
+        float tailHeight = Math.Min(box.Height * 0.5f, box.Width * 0.12f);
+        if (tailHeight < 4f)
+            return; // a band too short to carry a legible tail just keeps the plain box
+
+        float halfBase = tailHeight * 0.5f;
+        float baseX = box.Left + box.Width * 0.4f;
+        float apexX = baseX - tailHeight * 0.35f; // lean toward the balloon's centre for a natural hook
+        float baseY = box.Bottom;
+        float apexY = box.Bottom + tailHeight;
+
+        using var tail = new SKPath();
+        tail.MoveTo(baseX - halfBase, baseY);
+        tail.LineTo(baseX + halfBase, baseY);
+        tail.LineTo(apexX, apexY);
+        tail.Close();
+        canvas.DrawPath(tail, fill);
+
+        // Stroke only the two sides — the base sits under the balloon and is meant to read as open.
+        using var sides = new SKPath();
+        sides.MoveTo(baseX - halfBase, baseY);
+        sides.LineTo(apexX, apexY);
+        sides.LineTo(baseX + halfBase, baseY);
+        canvas.DrawPath(sides, stroke);
     }
 
     // The folio band inside the bottom margin: running volume title bottom-left

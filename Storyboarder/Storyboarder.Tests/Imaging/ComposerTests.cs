@@ -245,6 +245,34 @@ public class SkiaPageComposerTests
     }
 
     [Fact]
+    public void Compose_SpeechBalloon_HasATailPointingDown()
+    {
+        var dialogue = string.Join(" ", Enumerable.Repeat("words", 12));
+        var bytes = Composer().Compose(
+            [new PanelArt(SampleImages.Png(color: SKColors.CornflowerBlue), dialogue, null)], Chrome);
+
+        using var decoded = SKBitmap.Decode(bytes)!;
+        var bright = Token(DesignTokens.PaperBright);
+
+        // Lowest bright-paper pixel in a column ~75% across the balloon (no tail there): the balloon bottom.
+        int LowestBright(int x)
+        {
+            var lowest = -1;
+            for (var y = DesignTokens.Comic.TopMargin; y < DesignTokens.Comic.PageHeight / 3; y++)
+                if (decoded.GetPixel(x, y) == bright)
+                    lowest = y;
+            return lowest;
+        }
+
+        var balloonBottom = LowestBright((int)(DesignTokens.Comic.PageWidth * 0.75));
+        // The tail is drawn ~40% across the balloon, so its bright fill reaches deeper than the flat bottom.
+        var tailBottom = LowestBright((int)(DesignTokens.Comic.PageWidth * 0.42));
+
+        Assert.True(balloonBottom > 0 && tailBottom > balloonBottom,
+            $"expected the tail column ({tailBottom}) to reach below the balloon bottom ({balloonBottom})");
+    }
+
+    [Fact]
     public void Compose_NoPanels_Throws()
     {
         Assert.Throws<ArgumentException>(() => Composer().Compose([], Chrome));
