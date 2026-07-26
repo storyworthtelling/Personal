@@ -90,6 +90,10 @@ public class ClaudeAnalysisClientTests
         var body = handler.RequestBodies[0];
         Assert.Contains("panels per page", body);
         Assert.Contains("ONGOING ACTION", body);
+        // Steered to be economical: only load-bearing beats, skipping transitional/in-between panels
+        // (fewer panels = less render cost and wall-clock).
+        Assert.Contains("ECONOMICAL", body);
+        Assert.Contains("SKIP transitional", body);
     }
 
     [Fact]

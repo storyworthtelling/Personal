@@ -40,8 +40,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private const string StoryboardInstruction =
         "You are a comics writer adapting a novel into a graphic novel. Using the supplied design bible " +
-        "for consistency, break the provided passage into as many volumes, pages, and panels as the " +
-        "story needs. Aim for roughly 3 to 6 panels per page (never more than 6), and give a pivotal " +
+        "for consistency, break the provided passage into volumes, pages, and panels — but be " +
+        "ECONOMICAL. This graphic novel is a comprehension aid: draw only the beats a reader needs to " +
+        "follow WHAT happens, WHO does it, and WHERE it happens. Each panel must carry a distinct, " +
+        "load-bearing action; SKIP transitional, in-between, establishing-only, and reaction-only " +
+        "moments that don't advance the action, and skip a beat already clear from an adjacent panel. " +
+        "Prefer the fewest panels that keep the action legible over a dense shot-by-shot breakdown. " +
+        "Aim for 1 to 4 panels per page (never more than 6), and give a pivotal " +
         "beat its own page. For each panel give a vivid visual prompt that captures a SPECIFIC MOMENT " +
         "OF ONGOING ACTION — the characters caught mid-gesture or mid-movement, interacting with each " +
         "other and the setting — with an explicit shot type or camera angle (e.g. wide establishing " +
