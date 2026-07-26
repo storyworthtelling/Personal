@@ -95,9 +95,10 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IGeminiImageClient, GeminiImageClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
-        // The batch client submits/polls jobs (short calls); it's registered so the processor has it, but
-        // it stays dormant while GeminiOptions.UseBatchRendering is off (the verified default — batch mode
-        // needs live verification before it's switched on; see GeminiBatchImageClient / BATCHING.md).
+        // The batch client submits/polls jobs (short calls). Batch mode is on by default now (reference
+        // sheets go through the Files API, so a real book stays under the inline ceiling); the first live
+        // run confirms the REST envelope, degrading safely to synchronous rendering on any mismatch (see
+        // GeminiBatchImageClient / BATCHING.md).
         builder.Services.AddHttpClient<IGeminiBatchClient, GeminiBatchImageClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);

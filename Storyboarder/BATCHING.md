@@ -182,8 +182,9 @@ re-batching one at a time.
 
 ## Implementation status — built, off by default, needs live verification
 
-The batch renderer is built end to end and tested with a fake, gated behind `GeminiOptions.UseBatchRendering`
-(default **false** — the synchronous path is the verified default). Pieces:
+The batch renderer is built end to end and tested with a fake. It is now **on by default**
+(`GeminiOptions.UseBatchRendering = true`); the first real run doubles as the live verification because every
+failure path degrades to synchronous rendering (see below). Pieces:
 
 - `IGeminiBatchClient` + models (`Domain/External/GeminiBatch.cs`); `GeminiBatchImageClient` (the real HTTP
   client, `Infrastructure/External`), registered in DI but dormant while the flag is off.
@@ -194,24 +195,27 @@ The batch renderer is built end to end and tested with a fake, gated behind `Gem
   `HandleBlockedPanel` ladder (first attempt batched, every escalation synchronous). E2E-tested with a fake
   batch client (happy path + synchronous fallback).
 
-**Before switching `UseBatchRendering` on, verify against a live key (this can't be checked in the sandbox):**
+**What's settled, and the one thing the first live run confirms:**
 
-1. **The Batch REST envelope.** `GeminiBatchImageClient.SubmitAsync`/`PollAsync` assume the
+1. **Reference sheets at scale** ✅ — sheets now go through the **Files API**: `SubmitAsync` uploads each
+   DISTINCT sheet once (deduped by content hash) and references it by `fileData` URI in every request, so a
+   full book no longer blows the ~20 MB inline ceiling. Unit-tested (dedup + fileData shape, no inlined
+   base64). The Files API *upload protocol itself* (single-request `X-Goog-Upload-Protocol: raw`) is
+   reconstructed from docs — if the live API needs the resumable handshake, `UploadReferenceAsync` is the one
+   method to adjust, and a failed upload fails the submit into the synchronous fallback, so it's safe.
+2. **The Batch REST envelope** ⏳ first-run check. `SubmitAsync`/`PollAsync` assume the
    `models/{model}:batchGenerateContent` request wrapper (`batch.inputConfig.requests.requests[]` with a
    `metadata.key` per request) and the polled Operation's result nesting (`response.inlinedResponses…`,
-   correlated by `metadata.key`). Run one real submit+poll, diff the actual JSON, and adjust the builder/
-   parser (the 5 parse tests localize the change). Parsing already degrades to "no image → synchronous
-   fallback" on a mismatch, so a wrong shape is safe-but-useless, not crashy.
-2. **Reference sheets at scale.** They're inlined (base64) per request today — fine for verification and a
-   small book, but a full book (~2,000 panels × ~a dozen sheets) blows the ~20 MB inline ceiling. Move
-   sheets to the **Files API**: upload each once per submission, reference by URI in every request. Until
-   that's done, only run batch mode on a short book.
-3. **Then decide exposure.** There's deliberately no user-facing toggle yet (enabling unverified, billed
-   batch calls from the UI would be a footgun). After verification, either flip the LiveOptions default in
-   `MauiProgram` or add a Settings switch bound to a new `SettingsStore.UseBatchRendering`.
+   correlated by `metadata.key`). If the real JSON differs, adjust the builder/parser (the 6 parse tests
+   localize the change). Parsing already degrades to "no image → synchronous fallback" on a mismatch, so a
+   wrong shape is safe-but-useless, not crashy — which is why the default could be flipped on without a
+   sandbox-impossible live check first.
+3. **Exposure** ✅ — flipped the `UseBatchRendering` default on (no Settings toggle; the safe-fallback design
+   makes a footgun toggle unnecessary — set the option false to force synchronous).
 
-Measure the raised-cap synchronous path on a real book first (per the economics section) — batching is an
-optimization, and this last mile of verification is only worth walking if that path proves too slow/flaky.
+Still worth measuring the raised-cap synchronous path on a real book (per the economics section): batching is
+an optimization, and if the synchronous path is already fast enough, the up-to-24h batch turnaround may not
+be worth it — set `UseBatchRendering = false` if so.
 
 ## Sources
 

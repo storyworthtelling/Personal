@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
@@ -13,18 +14,21 @@ namespace Storyboarder.Infrastructure.External;
 // one batch job and reads results back on poll.
 //
 // ⚠ NOT LIVE-VERIFIED. The exact Batch REST envelope below (the batchGenerateContent request wrapper and
-// the polled Operation's result nesting) is reconstructed from Google's docs and MUST be checked against a
-// real call before this is trusted — that's why GeminiOptions.UseBatchRendering defaults OFF. The parsing
-// is written defensively so a shape mismatch degrades to "no image → falls back to synchronous render"
-// rather than throwing. See BATCHING.md for the verification checklist.
+// the polled Operation's result nesting) is reconstructed from Google's docs and should be confirmed on the
+// first real run. Batch mode is now on by default, so that first run IS the verification: the parsing is
+// written defensively so a shape mismatch degrades to "no image → falls back to synchronous render" rather
+// than throwing, and a bad submit likewise fails the job into the synchronous path. See BATCHING.md.
 //
-// ⚠ KNOWN GAP: reference sheets are inlined (base64) per request here, exactly like the sync client. That
-// is fine for verification and small books but blows the ~20 MB inline batch ceiling on a full book with a
-// dozen sheets across ~2000 panels. Before running a real book, move sheets to the Files API — upload each
-// once and reference it by URI in every request (BATCHING.md, complication #1).
+// Reference sheets go through the Files API: each distinct sheet is uploaded ONCE per submission and
+// referenced by URI in every request (BATCHING.md, complication #1). Inlining the base64 bytes per request
+// — a dozen sheets across ~2000 panels — would blow the ~20 MB inline batch ceiling many times over; the
+// same sheet recurs across most panels, so uploading it once and pointing every request at the same URI is
+// both correct at scale and far less wasteful. ⚠ The Files API upload protocol below is likewise
+// reconstructed from Google's docs and NOT live-verified — see the class warning and BATCHING.md.
 public sealed class GeminiBatchImageClient : IGeminiBatchClient
 {
     private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
+    private const string UploadUrl = "https://generativelanguage.googleapis.com/upload/v1beta/files";
 
     private readonly HttpClient httpClient;
     private readonly GeminiOptions options;
@@ -37,13 +41,25 @@ public sealed class GeminiBatchImageClient : IGeminiBatchClient
 
     public async Task<string> SubmitAsync(IReadOnlyList<BatchPanelRequest> requests, CancellationToken cancellationToken)
     {
+        // Upload each DISTINCT reference sheet once (keyed by content hash, since the same sheet's bytes
+        // recur across every panel that cites that character/setting) and remember its URI. Every request
+        // then references the sheet by URI instead of carrying the bytes.
+        var uriByHash = new Dictionary<string, string>();
+        foreach (var request in requests)
+            foreach (var reference in request.References)
+            {
+                var hash = Hash(reference);
+                if (!uriByHash.ContainsKey(hash))
+                    uriByHash[hash] = await UploadReferenceAsync(reference, cancellationToken);
+            }
+
         var inlined = new JsonArray();
         foreach (var request in requests)
             inlined.Add(new JsonObject
             {
                 // metadata.key correlates each result back to its panel on poll.
                 ["metadata"] = new JsonObject { ["key"] = request.PanelId.ToString() },
-                ["request"] = BuildGenerateContentBody(request)
+                ["request"] = BuildGenerateContentBody(request, uriByHash)
             });
 
         var payload = new JsonObject
@@ -188,19 +204,57 @@ public sealed class GeminiBatchImageClient : IGeminiBatchClient
         return null;
     }
 
+    // Uploads one reference sheet to the Files API and returns its file URI. Uses the single-request "raw"
+    // upload protocol (the whole body is the image bytes; the JSON reply carries file.uri). ⚠ Not
+    // live-verified — if the real API needs the resumable start/upload handshake instead, this is the one
+    // method to adjust; the submit path degrades to a failed job → synchronous fallback on any mismatch.
+    private async Task<string> UploadReferenceAsync(byte[] reference, CancellationToken cancellationToken)
+    {
+        var url = $"{UploadUrl}?key={Uri.EscapeDataString(options.ApiKey)}";
+        using var content = new ByteArrayContent(reference);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        using var message = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+        message.Headers.Add("X-Goog-Upload-Protocol", "raw");
+
+        var response = await httpClient.SendAsync(message, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"Gemini Files API upload failed: {(int)response.StatusCode}: {body}");
+
+        var uri = ExtractFileUri(body);
+        return uri ?? throw new InvalidOperationException($"Gemini Files API upload returned no file uri: {body}");
+    }
+
+    // Reads file.uri (or a top-level uri) from a Files API upload reply.
+    private static string? ExtractFileUri(string body)
+    {
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+        if (root.TryGetProperty("file", out var file) && file.TryGetProperty("uri", out var nested) &&
+            nested.GetString() is { Length: > 0 } fileUri)
+            return fileUri;
+        if (root.TryGetProperty("uri", out var flat) && flat.GetString() is { Length: > 0 } topUri)
+            return topUri;
+        return null;
+    }
+
+    private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
+
     // The generateContent body for one panel — the same shape GeminiImageClient sends synchronously (text
-    // prompt + inlined reference images + IMAGE modality at the panel's aspect ratio).
-    private static JsonObject BuildGenerateContentBody(BatchPanelRequest request)
+    // prompt + reference images + IMAGE modality at the panel's aspect ratio). Unlike the sync client the
+    // references are fileData URIs (uploaded once via the Files API), not inlined bytes, so the batch stays
+    // under the inline size ceiling.
+    private static JsonObject BuildGenerateContentBody(BatchPanelRequest request, IReadOnlyDictionary<string, string> uriByHash)
     {
         var prompt = PanelImagePrompt.Build(request.ArtStyle, request.VisualPrompt, request.References.Count > 0);
         var parts = new JsonArray { new JsonObject { ["text"] = prompt } };
         foreach (var reference in request.References)
             parts.Add(new JsonObject
             {
-                ["inlineData"] = new JsonObject
+                ["fileData"] = new JsonObject
                 {
                     ["mimeType"] = "image/png",
-                    ["data"] = Convert.ToBase64String(reference)
+                    ["fileUri"] = uriByHash[Hash(reference)]
                 }
             });
 

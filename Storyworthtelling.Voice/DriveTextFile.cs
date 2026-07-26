@@ -8,12 +8,11 @@ namespace Storyworthtelling.Voice;
 // via the factory, the same shape the Storyboarder archive uses) so the account/token wiring stays
 // app-side and this library depends only on the Drive API.
 //
-// NOT yet verified against live Drive. One thing must be settled before enabling it (see the voice
-// section of BATCHING.md / the wiring notes): the com.storyworthtelling apps request the drive.file scope,
-// which only sees files the app itself created or opened — so for every app to read ONE shared profile the
-// file has to be reachable under that scope in each app (a shared folder the user grants, or a broader
-// scope). Until that's settled a single app can still read and write its own copy; the store degrades to
-// neutral copy when it can't.
+// The profile is ONE file shared across every com.storyworthtelling app, found by name. That requires each
+// app's Drive token to carry the full `drive` scope, not the narrower `drive.file` (which would scope each
+// app to its own copy) — Storyboarder's DeviceAccountTokenProvider requests it; the other apps must do the
+// same, and the owner registers the scope on each OAuth client. Not yet verified against live Drive; a
+// token without the scope (or any failure) just degrades the store to neutral copy.
 public sealed class DriveTextFile : IDriveTextFile
 {
     private readonly Func<CancellationToken, Task<DriveService>> serviceFactory;

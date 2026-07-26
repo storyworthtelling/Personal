@@ -264,10 +264,10 @@ The weighted layout is verified as *math* (no overlap, fills the page, all-Stand
   `Novel.VoiceAnalyzed` so it runs once per draft), and MainPage shows a voiced welcome that stays hidden
   until a profile exists. **Decisions locked in:** all apps get a Claude key; messages composed fresh every
   time; profile lives in a Drive file; static labels stay minimalist (only situational messaging is voiced).
-  **Remaining:** (1) the Drive file is per-app under the `drive.file` scope — for every app to read ONE shared
-  profile, move it to a shared folder or a broader scope (flagged in `DriveTextFile`); (2) reference the
-  library from Ledger + FocusPhone and add a Claude key to each; (3) `VoiceClient` is parse-tested but not
-  verified against the live Anthropic API.
+  The profile is ONE Drive file shared across apps, found by name — Storyboarder's `DeviceAccountTokenProvider`
+  now requests the full `drive` scope (superseding `drive.readonly`+`drive.file`) so every app can reach it.
+  **Remaining:** (1) reference the library from Ledger + FocusPhone (each needs the same full-`drive` scope +
+  a Claude key); (2) `VoiceClient` is parse-tested but not verified against the live Anthropic API.
 
 ### Phase 6 — Gemini batching ⏳ cap raised; batch renderer built (off by default, unverified)
 See `Storyboarder/BATCHING.md` for the full investigation.
@@ -278,22 +278,26 @@ See `Storyboarder/BATCHING.md` for the full investigation.
   from weeks to ~10 hours). A single sequential worker is latency-bound and can't approach these anyway. If
   the owner wants to trade the runaway guardrail for maximum headroom, bump `GeminiRequestsPerDay` toward
   50,000.
-- **Batch API** ⏳ built, off by default, needs live verification (`c9d3066`→`df50b5f`): the whole batch
-  render mode exists — `IGeminiBatchClient` + `GeminiBatchImageClient`, in-flight state (`Novel.BatchJobId`,
+- **Batch API** ✅ built and **on by default**, first run is the live verification: the whole batch render
+  mode exists — `IGeminiBatchClient` + `GeminiBatchImageClient`, in-flight state (`Novel.BatchJobId`,
   `Panel.BatchAttempted`, `WorkStatus.SubmittedToBatch`), and `GraphicNovelProcessor.RunBatchStep` (submit
   the first pass as one job, poll, reconcile; a batch failure/block falls back to the synchronous render +
-  block ladder). E2E-tested with a fake; the real HTTP client is parse-tested but **not** verified against
-  the live API. Gated behind `GeminiOptions.UseBatchRendering` (default off). **See BATCHING.md's
-  "Implementation status" for the pre-enable checklist** — verify the Batch REST envelope against a real
-  call, and move reference sheets to the Files API (inline blows the 20 MB cap on a full book) — and
-  measure the raised-cap synchronous path first; batching is an optimization, not a rescue.
+  block ladder). Reference sheets now go through the **Files API** (`SubmitAsync` uploads each distinct sheet
+  once, deduped by content hash, references it by `fileData` URI) so a full book stays under the 20 MB inline
+  cap. `GeminiOptions.UseBatchRendering` defaults **true**. The Batch REST envelope + the Files API upload
+  protocol are reconstructed from docs and not yet live-verified, but every mismatch path degrades to
+  synchronous rendering (safe, not crashy), which is why it could be flipped on without a sandbox-impossible
+  live check. Still worth measuring the raised-cap synchronous path on a real book (BATCHING.md); set
+  `UseBatchRendering = false` if the synchronous path is fast enough that the ≤24h batch turnaround isn't
+  worth it.
 
 ---
 
 ## 7. Waiting on the owner
 
-- **Register the `drive.file` scope** on the OAuth client in the Google Cloud project, then sign in again on
-  the device. Until then archiving stays off (which is the default, so nothing breaks).
+- **Register the full `drive` scope** on the OAuth client(s) in the Google Cloud project, then sign in again
+  on the device. It now covers both archiving (off by default) and the shared owner's-voice profile file;
+  until it's registered, archiving stays off and the voice profile just degrades to neutral copy.
 - ~~**Check the real Gemini tier limit** and raise `GeminiRequestsPerDay`~~ — done (`ad3bf4b`): tier is
   2,000/min · 50,000/day; caps raised to 60/min · 5,000/day (see Phase 6).
 - **The stuck "Heart and Mind" project recovers on its own** once this ships: tap **Retry now** and volume 1

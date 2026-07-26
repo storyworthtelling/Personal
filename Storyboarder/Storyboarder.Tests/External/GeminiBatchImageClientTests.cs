@@ -38,6 +38,41 @@ public class GeminiBatchImageClientTests
     }
 
     [Fact]
+    public async Task Submit_UploadsEachDistinctReferenceSheetOnce_AndReferencesItByUri()
+    {
+        var (client, handler) = Create();
+        // Two upload replies (one per distinct sheet), then the batch submit reply.
+        handler.EnqueueOk("{\"file\":{\"uri\":\"https://files/sheet-a\"}}");
+        handler.EnqueueOk("{\"file\":{\"uri\":\"https://files/sheet-b\"}}");
+        handler.EnqueueOk("{\"name\":\"batches/job-1\"}");
+
+        var sheetA = new byte[] { 10, 20, 30 };
+        var sheetB = new byte[] { 40, 50, 60 };
+        // Panel 1 cites sheet A; panel 2 cites the SAME sheet A (fresh array, identical bytes) plus sheet B.
+        var requests = new[]
+        {
+            new BatchPanelRequest(Guid.NewGuid(), "p1", "style", [sheetA], null),
+            new BatchPanelRequest(Guid.NewGuid(), "p2", "style", [[10, 20, 30], sheetB], null),
+        };
+
+        var jobId = await client.SubmitAsync(requests, CancellationToken.None);
+
+        Assert.Equal("batches/job-1", jobId);
+        // Sheet A recurs but is uploaded once: two uploads (A, B) + one submit = three calls.
+        Assert.Equal(3, handler.Requests.Count);
+        Assert.Contains("/upload/v1beta/files", handler.Requests[0].RequestUri!.ToString());
+        Assert.Contains("/upload/v1beta/files", handler.Requests[1].RequestUri!.ToString());
+        Assert.Contains("batchGenerateContent", handler.Requests[2].RequestUri!.ToString());
+
+        var submit = handler.RequestBodies[2];
+        // References ride as fileData URIs, never inlined base64 (that would blow the batch size ceiling).
+        Assert.Contains("fileData", submit);
+        Assert.Contains("https://files/sheet-a", submit);
+        Assert.Contains("https://files/sheet-b", submit);
+        Assert.DoesNotContain("inlineData", submit);
+    }
+
+    [Fact]
     public async Task Poll_ReportsRunning_WhileTheOperationIsNotDone()
     {
         var (client, handler) = Create();
