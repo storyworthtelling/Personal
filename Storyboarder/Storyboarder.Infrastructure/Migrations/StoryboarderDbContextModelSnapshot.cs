@@ -44,6 +44,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("PdfStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("VoiceJson")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NovelId")

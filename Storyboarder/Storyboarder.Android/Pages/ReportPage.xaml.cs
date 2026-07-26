@@ -51,6 +51,14 @@ public partial class ReportPage : ContentPage
         Section("Fact checks", report.FactChecks,
             f => $"{f.Claim} — {f.Verdict}", f => $"{f.Note}{(string.IsNullOrWhiteSpace(f.Chapter) ? "" : $" ({f.Chapter})")}");
 
+        if (!string.IsNullOrWhiteSpace(report.VoiceConsistency.DominantVoice))
+        {
+            Heading("Authorial voice");
+            Paragraph(report.VoiceConsistency.DominantVoice);
+        }
+        Section("Voice drift", report.VoiceConsistency.Divergences,
+            v => $"{Chapter(v.Chapter)}“{v.Excerpt}”", v => $"{v.Divergence} — {v.Suggestion}");
+
         Bullets("Comparable titles", report.ComparableTitles);
         if (!string.IsNullOrWhiteSpace(report.MarketPositioning))
         {

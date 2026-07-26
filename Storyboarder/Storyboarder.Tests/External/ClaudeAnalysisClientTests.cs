@@ -244,6 +244,40 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task AssessVoiceConsistency_ParsesDominantVoiceAndDivergences()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"dominantVoice\":\"Lyrical close third-person.\",\"divergences\":[" +
+            "{\"chapter\":\"Chapter 5\",\"excerpt\":\"It was bad. Real bad.\"," +
+            "\"divergence\":\"Clipped noir voice unlike the rest.\",\"suggestion\":\"Restore the cadence.\"}," +
+            "{\"chapter\":\"Chapter 9\",\"excerpt\":\"   \",\"divergence\":\"x\",\"suggestion\":\"y\"}]}"));
+
+        var result = await client.AssessVoiceConsistency(
+            [new ChapterSample("Chapter 1", "lyrical prose"), new ChapterSample("Chapter 5", "clipped prose")],
+            CancellationToken.None);
+
+        Assert.Equal("Lyrical close third-person.", result.DominantVoice);
+        // The blank-excerpt divergence is dropped (nothing for the author to find).
+        var divergence = Assert.Single(result.Divergences);
+        Assert.Equal("Chapter 5", divergence.Chapter);
+        Assert.Equal("It was bad. Real bad.", divergence.Excerpt);
+        Assert.Equal("Restore the cadence.", divergence.Suggestion);
+    }
+
+    [Fact]
+    public async Task AssessVoiceConsistency_SkipsTheCall_WithFewerThanTwoSamples()
+    {
+        var (client, handler) = Create(); // nothing queued: a call would throw "no response"
+
+        var result = await client.AssessVoiceConsistency(
+            [new ChapterSample("Chapter 1", "the only chapter")], CancellationToken.None);
+
+        Assert.Equal(VoiceConsistency.Empty, result); // one chapter gives nothing to compare against
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task DeriveArtStyle_ParsesTheStyle()
     {
         var (client, handler) = Create();

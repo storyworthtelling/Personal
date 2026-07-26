@@ -577,6 +577,21 @@ public class AnalysisPdfComposerTests
     }
 
     [Fact]
+    public void Renderer_TocIncludesVoiceConsistency_WhenPresent()
+    {
+        var withVoice = Sample(1) with
+        {
+            VoiceConsistency = new VoiceConsistency(
+                "Lyrical, close third-person with long cadenced sentences.",
+                [new VoiceDivergence("Chapter 3", "It was bad. Real bad.", "Clipped, off-register.", "Restore the cadence.")])
+        };
+
+        var result = new AnalysisDocumentRenderer().RenderReport(withVoice, "My Novel");
+
+        Assert.Contains("Authorial voice consistency", result.TocEntries.Select(e => e.Title));
+    }
+
+    [Fact]
     public void Renderer_LegacyReportWithoutCraftSectionsOrCitations_StillRenders()
     {
         // A report consolidated by an earlier version: findings are bare strings and the craft lists

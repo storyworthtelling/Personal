@@ -216,6 +216,11 @@ public class BookAnalysis
     // re-consolidation and feeds into it.
     public string? FactChecksJson { get; set; }
 
+    // The authorial-voice-consistency read (dominant voice + divergent passages), serialized as a
+    // VoiceConsistency. Its own call — it needs per-chapter prose samples rather than the notes — so it is
+    // persisted separately and folded in at render, exactly like the fact checks. Null until it runs.
+    public string? VoiceJson { get; set; }
+
     public WorkStatus PdfStatus { get; set; } = WorkStatus.Pending;
     public string? PdfPath { get; set; }
 

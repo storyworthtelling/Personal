@@ -212,9 +212,11 @@ Not yet done (deferred UI polish, all runtime-only concerns): the reader loads f
 its `CollectionView` — fine for a phone-sized book, but if a volume is long, switch the list to `ThumbPath`
 and load the full image only in `PageZoomPage`. Worth checking on a real device.
 
-### Phase 4 — art fidelity + layout ⏳ partially done
-The testable, safe-to-ship-blind half is built and on the branch; the parts that need a live vision model
-or on-device visual iteration are deferred (this environment can compile the head but not run it).
+### Phase 4 — art fidelity + layout ✅ done (look unverified on device)
+Shot types, weighted layout, dialogue-fit, derived art style, lettering (speech/thought balloons + SFX),
+minimalist storyboarding, and the voice-consistency report are all built and tested. Only on-device visual
+verification of the lettering/layout look remains (this environment compiles the head but can't run it), and
+off-model auto-detection is dropped (owner-flagged by eye).
 
 **Done (tested):**
 - **Shot types** (`bf30279`): `Panel.ShotType` (Standard/Wide/Splash), asked of Claude in the storyboard
@@ -229,20 +231,25 @@ or on-device visual iteration are deferred (this environment can compile the hea
 - **Claude-derived art style** (`8a9803c`): `DeriveArtStyle` picks one cohesive style from the opening prose
   + cast at design-bible time, unless the user chose one. Best-effort — failure keeps the default.
 
-**Deferred (need a live model or eyes on a device — don't ship blind):**
-- **Lettering: balloon tails, thought-vs-speech, SFX.** A Skia-composer change; correctness is visual, so it
-  needs the app running to iterate. The bands/typesetting are in `SkiaPageComposer` + `PanelSlotLayout`.
-- **Off-model auto-detection + re-render.** Needs a vision compare of each rendered panel against the
-  character's reference sheet; heuristic, unverifiable without the image models.
-- **Prose-divergence report section.** The owner won't hand-flag mismatches, so the only automatic design is
-  a **vision pass**: feed each rendered panel + its source passage (the `[SourceStartOffset,SourceEndOffset)`
-  span Phase 2 added makes this exact) back to the model and ask what's missing/added/wrong. Advisory, false
-  positives expected; render it as its own report section. Needs Claude vision — plumb + verify with the real
-  API, not blind.
-- **Literal-to-text panel prompts** is largely the existing prompt already; further tuning is visual.
+**Also done since:**
+- **Lettering** ✅ — `Panel.DialogueKind` (speech/thought) + `Panel.Sfx`, tagged by the storyboard model:
+  the composer draws a tail on spoken balloons, a shrinking-bubble trail on thought balloons, and letters
+  SFX over the art as tilted display type (Serif Semibold, terracotta, ink outline). Tested as geometry/
+  colour; the *look* is compile-verified only — glance on a device.
+- **Minimalist storyboarding** ✅ — the prompt now asks for the fewest load-bearing panels (a distinct
+  action, who, where), skipping transitional/in-between beats; per-page target 1–4 (capped at 6). The
+  graphic novel is a comprehension aid, so fewer panels is the goal, and it cuts render cost/wall-clock.
+- **Voice-consistency report section** ✅ — reframed from the old "prose vs art vision pass". It flags where
+  the author's OWN prose drifts from the book's dominant authorial voice (a register slip, a tonal wobble),
+  quoted with chapter + how it diverges + a fix. `AssessVoiceConsistency` reads one representative prose
+  sample per chapter (`GatherChapterSamples`), runs as its own resumable analysis sub-step stored in
+  `BookAnalysis.VoiceJson`, and renders as its own report section (PDF + in-app `ReportPage`).
 
-The weighted layout is verified as *math* (no overlap, fills the page, all-Standard == old grid) but its
-*look* wasn't — worth a glance on a device once a Wide/Splash-tagged book renders.
+**Deferred / dropped:**
+- **Off-model auto-detection + re-render** — dropped for now: the owner flags off-model panels by eye rather
+  than automating a per-panel vision compare.
+- The weighted-layout and lettering *look* is verified as math/colour, not visually — worth a glance on a
+  device once a Wide/Splash-tagged, lettered book renders.
 
 ### Phase 5 — odds ⏳ two of three done
 - **`.docx` import** ✅ (`759b5db`): `DocxTextExtractor` (pure, tested) pulls text from a .docx's

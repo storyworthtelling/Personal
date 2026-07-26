@@ -67,6 +67,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     // register, attitude — which a generous opening sample captures without paying to send a whole novel
     // to Claude just to distil a short profile.
     private const int VoiceSampleChars = 12000;
+
+    // How much of each chapter the voice-consistency read samples. One representative opening passage per
+    // chapter is enough to characterise that chapter's register and cadence and to catch a chapter that
+    // drifts from the book's voice, while keeping the whole book's samples inside a single Claude call.
+    private const int VoiceConsistencySampleChars = 800;
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
     private readonly PlaceholderPanelRenderer placeholderRenderer = new();
@@ -1188,7 +1193,34 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 3) Render: compose the analysis PDF from the consolidated report (both halves folded into one).
+        // 2d) Assess authorial-voice consistency: where the author's own prose drifts from the book's
+        // dominant voice. Its own resumable step for the same reasons the craft and fact-check halves are —
+        // its own call, its own column, billed separately — and it needs per-chapter prose SAMPLES rather
+        // than the notes, since register/cadence can only be judged from the actual sentences.
+        if (analysis.VoiceJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var samples = await GatherChapterSamples(db, novel.Id, cancellationToken);
+
+            try
+            {
+                var voice = await claude.AssessVoiceConsistency(samples, cancellationToken);
+                analysis.VoiceJson = JsonSerializer.Serialize(voice, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 3) Render: compose the analysis PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
             try
@@ -1202,7 +1234,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                     ? Array.Empty<FactCheck>()
                     : JsonSerializer.Deserialize<List<FactCheck>>(analysis.FactChecksJson, JsonResponse.CaseInsensitive)
                       ?? (IReadOnlyList<FactCheck>)Array.Empty<FactCheck>();
-                var pdf = analysisPdfComposer.Compose(report.WithCraft(craft).WithFactChecks(checks), novel.Title);
+                var voice = analysis.VoiceJson is null
+                    ? VoiceConsistency.Empty
+                    : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive) ?? VoiceConsistency.Empty;
+                var pdf = analysisPdfComposer.Compose(
+                    report.WithCraft(craft).WithFactChecks(checks).WithVoiceConsistency(voice), novel.Title);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -1640,6 +1676,54 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return notesJson
             .Select(json => JsonSerializer.Deserialize<ChapterNotes>(json, JsonResponse.CaseInsensitive) ?? ChapterNotes.Empty)
             .ToList();
+    }
+
+    // Pulls one representative opening prose sample from each detected chapter, for the voice-consistency
+    // read. Uses the source text + chapter spans directly (not the notes) because that read judges the
+    // actual sentences. A chapter's heading line is skipped so the sample is prose, not the title.
+    private async Task<IReadOnlyList<ChapterSample>> GatherChapterSamples(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var fullText = await db.SourceTexts
+            .Where(s => s.NovelId == novelId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrEmpty(fullText))
+            return Array.Empty<ChapterSample>();
+
+        var chapters = await db.Chapters
+            .Where(c => c.NovelId == novelId)
+            .OrderBy(c => c.Number)
+            .ToListAsync(cancellationToken);
+
+        var samples = new List<ChapterSample>();
+        foreach (var chapter in chapters)
+        {
+            var start = Math.Clamp(chapter.StartOffset, 0, fullText.Length);
+            var end = Math.Clamp(chapter.EndOffset, start, fullText.Length);
+            var excerpt = SampleExcerpt(fullText[start..end]);
+            if (!string.IsNullOrWhiteSpace(excerpt))
+                samples.Add(new ChapterSample(chapter.Label, excerpt));
+        }
+        return samples;
+    }
+
+    // Takes the opening prose of a chapter span: drop a leading heading line, then up to
+    // VoiceConsistencySampleChars cut at a word boundary.
+    private static string SampleExcerpt(string span)
+    {
+        var text = span.TrimStart();
+        var firstBreak = text.IndexOf('\n');
+        // A short first line (a "Chapter 7"-style heading) is dropped; a long one is already prose.
+        if (firstBreak >= 0 && firstBreak <= 60)
+            text = text[(firstBreak + 1)..].TrimStart();
+
+        text = text.Trim();
+        if (text.Length <= VoiceConsistencySampleChars)
+            return text;
+
+        var cut = text.LastIndexOf(' ', VoiceConsistencySampleChars - 1);
+        return (cut > 0 ? text[..cut] : text[..VoiceConsistencySampleChars]).TrimEnd() + "…";
     }
 
     private async Task<IReadOnlyList<byte[]>> LoadReferenceImages(

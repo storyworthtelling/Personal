@@ -102,6 +102,13 @@ public class GraphicNovelProcessorTests : IDisposable
                 It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([new FactCheck("Paris is in France", "Correct", "Confirmed.", "Chapter 1")]);
 
+        claude.Setup(c => c.AssessVoiceConsistency(
+                It.IsAny<IReadOnlyList<ChapterSample>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new VoiceConsistency(
+                "Lyrical, close third-person with long cadenced sentences.",
+                [new VoiceDivergence("Chapter 1", "The gate was there. He went in.",
+                    "Clipped, flat diction unlike the lyrical norm.", "Restore the sensory rhythm of the surrounding prose.")]));
+
         gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
 

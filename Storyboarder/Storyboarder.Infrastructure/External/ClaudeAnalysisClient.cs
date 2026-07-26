@@ -167,6 +167,23 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "fiction are not errors, so leave them out entirely rather than reporting them as Incorrect. " +
         "Report at most 30 checks, the ones that most matter. No prose outside the JSON.";
 
+    private const string VoiceConsistencyInstruction =
+        "You are a developmental editor assessing a manuscript's VOICE CONSISTENCY for an author preparing " +
+        "it for publication. You are given a representative prose sample from each chapter, each tagged " +
+        "with its chapter. First infer the book's DOMINANT authorial voice — its register, diction, " +
+        "sentence cadence, tone, and narrative stance — from the body of samples. Then flag the passages " +
+        "whose prose DRIFTS from that dominant voice: a chapter that slips into a different register, an " +
+        "out-of-place tonal shift, diction or rhythm unlike the rest. Judge consistency of VOICE only — " +
+        "not quality, plot, or subject matter. A deliberately distinct voice (a different POV character's " +
+        "chapter, a letter or document embedded in the text) is NOT a defect, so flag only drift that " +
+        "reads as unintentional. Respond with ONLY a JSON object: " +
+        "{\"dominantVoice\":string,\"divergences\":[{\"chapter\":string,\"excerpt\":string," +
+        "\"divergence\":string,\"suggestion\":string}]}. dominantVoice: two or three sentences " +
+        "characterizing the book's established voice. excerpt: quote the divergent prose VERBATIM from the " +
+        "sample so the author can find it. divergence: how it departs from the dominant voice. suggestion: " +
+        "how to bring it into line. Report AT MOST 20 divergences, the clearest ones, and use [] when the " +
+        "voice is consistent throughout. No prose outside the JSON.";
+
     private const string ImplyInstruction =
         "You are a comics director revising a single panel's visual prompt. The image model refused to " +
         "draw it because some element is too explicit to depict. Rewrite the prompt so that same beat is " +
@@ -388,6 +405,33 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 c.Claim!, string.IsNullOrWhiteSpace(c.Verdict) ? "Unverified" : c.Verdict!,
                 c.Note ?? string.Empty, c.Chapter ?? string.Empty))
             .ToList();
+    }
+
+    public async Task<VoiceConsistency> AssessVoiceConsistency(
+        IReadOnlyList<ChapterSample> samples, CancellationToken cancellationToken)
+    {
+        var meaningful = samples.Where(s => !string.IsNullOrWhiteSpace(s.Excerpt)).ToList();
+        // A single chapter (or none) gives nothing to judge consistency against — don't spend a call.
+        if (meaningful.Count < 2)
+            return VoiceConsistency.Empty;
+
+        var userContent = "CHAPTER SAMPLES (JSON):\n" + JsonSerializer.Serialize(meaningful, JsonResponse.CaseInsensitive);
+        var reply = await SendMessage(VoiceConsistencyInstruction, userContent, cancellationToken, options.AnalysisMaxTokens);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return VoiceConsistency.Empty;
+
+        var dto = JsonResponse.Deserialize<VoiceConsistencyDto>(json);
+        if (dto is null)
+            return VoiceConsistency.Empty;
+
+        return new VoiceConsistency(
+            dto.DominantVoice ?? string.Empty,
+            (dto.Divergences ?? [])
+                .Where(d => !string.IsNullOrWhiteSpace(d.Excerpt))
+                .Select(d => new VoiceDivergence(
+                    d.Chapter ?? string.Empty, d.Excerpt!, d.Divergence ?? string.Empty, d.Suggestion ?? string.Empty))
+                .ToList());
     }
 
     public async Task<string> RewritePromptToImply(string visualPrompt, CancellationToken cancellationToken)
@@ -768,6 +812,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private sealed class FactCheckReplyDto
     {
         public List<FactCheckDto>? Checks { get; set; }
+    }
+
+    private sealed class VoiceConsistencyDto
+    {
+        public string? DominantVoice { get; set; }
+        public List<VoiceDivergenceDto>? Divergences { get; set; }
+    }
+
+    private sealed class VoiceDivergenceDto
+    {
+        public string? Chapter { get; set; }
+        public string? Excerpt { get; set; }
+        public string? Divergence { get; set; }
+        public string? Suggestion { get; set; }
     }
 
     private sealed class FactCheckDto
