@@ -16,6 +16,10 @@ using Storyboarder.Infrastructure.Persistence;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Infrastructure.Time;
+using Storyworthtelling.Voice;
+using GoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
+using GoogleClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
+using DriveService = global::Google.Apis.Drive.v3.DriveService;
 
 namespace Storyboarder.Android;
 
@@ -69,6 +73,11 @@ public static class MauiProgram
                 DatabasePath = dbPath,
                 OutputRoot = outputRoot
             }));
+        // The owner's-voice API key is the Claude key, read live so entering it in Settings takes effect
+        // on the next call without a restart (the singleton worker holds one VoiceClient, which reads
+        // these options fresh on every call).
+        builder.Services.AddSingleton<IOptions<VoiceOptions>>(
+            _ => new LiveOptions<VoiceOptions>(() => new VoiceOptions { ApiKey = SettingsStore.ClaudeApiKey }));
 
         // Data access: a context factory so the worker and request-scoped services create contexts freely.
         builder.Services.AddDbContextFactory<StoryboarderDbContext>(options =>
@@ -92,6 +101,12 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IGeminiBatchClient, GeminiBatchImageClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // The owner's-voice client. Its key is the same Claude key, read live from Preferences so it
+        // tracks the Settings page like every other credential. Short calls (a distilled profile, a
+        // one-sentence message), so a 2-minute ceiling is ample.
+        builder.Services.AddHttpClient<IVoiceClient, VoiceClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(2))
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         // Infrastructure collaborators.
         builder.Services.AddSingleton<IGoogleDocsClient, GoogleDocsClient>();
@@ -113,6 +128,29 @@ public static class MauiProgram
         builder.Services.AddSingleton<DeviceAccountTokenProvider>();
         builder.Services.AddSingleton<DriveDocsLister>();
         builder.Services.AddSingleton<IDriveArchive, DeviceAccountDriveArchive>();
+
+        // Owner's-voice profile store: one JSON file in Drive, reached with the device-account token the
+        // same way the archive is. Under the drive.file scope this is the app's own copy of the shared
+        // profile; a broader scope is needed before other com.storyworthtelling apps read the same file
+        // (see DriveTextFile). The pipeline writes it at ingestion; VoicedMessenger reads it for greetings.
+        builder.Services.AddSingleton<IDriveTextFile>(sp =>
+        {
+            var tokens = sp.GetRequiredService<DeviceAccountTokenProvider>();
+            return new DriveTextFile(
+                async _ =>
+                {
+                    var token = await tokens.GetAccessToken();
+                    return new DriveService(new GoogleClientInitializer
+                    {
+                        HttpClientInitializer = GoogleCredential.FromAccessToken(token),
+                        ApplicationName = "Storyboarder",
+                        HttpClientFactory = new AndroidGoogleHttpClientFactory()
+                    });
+                },
+                DriveVoiceProfileStore.FileName);
+        });
+        builder.Services.AddSingleton<IVoiceProfileStore, DriveVoiceProfileStore>();
+        builder.Services.AddTransient<VoicedMessenger>();
 
         // Pages.
         builder.Services.AddTransient<Pages.MainPage>();

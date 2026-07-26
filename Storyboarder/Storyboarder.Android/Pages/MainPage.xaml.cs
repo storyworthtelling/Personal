@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
 using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Services;
+using Storyworthtelling.Voice;
 
 namespace Storyboarder.Android.Pages;
 
@@ -24,6 +25,7 @@ public partial class MainPage : ContentPage
         LastRunLabel.Text = SettingsStore.LastRunSummary;
 
         _ = RefreshAsync();
+        _ = ShowWelcomeAsync();
 
         refreshTimer = Dispatcher.CreateTimer();
         refreshTimer.Interval = TimeSpan.FromSeconds(5);
@@ -74,6 +76,36 @@ public partial class MainPage : ContentPage
         {
             // A transient read failure shouldn't crash the page; the next tick retries.
         }
+    }
+
+    // A greeting written in the owner's voice, composed fresh each time the page appears (the owner chose
+    // "fresh every time"). Shown only when a voice profile has been learned: VoicedMessenger returns the
+    // fallback — here the empty string — when there's no voice yet, and the line then stays hidden rather
+    // than showing generic copy. Never blocks or crashes the page: the messenger degrades to the fallback,
+    // and this is fired-and-forgotten off OnAppearing.
+    private async Task ShowWelcomeAsync()
+    {
+        if (!SettingsStore.IsConfigured)
+        {
+            WelcomeLabel.IsVisible = false;
+            return;
+        }
+
+        string message;
+        try
+        {
+            var messenger = IPlatformApplication.Current!.Services.GetRequiredService<VoicedMessenger>();
+            var context = rows.Count == 0 ? "no projects yet" : $"{rows.Count} project(s) under way";
+            message = await messenger.ComposeAsync(
+                new MessageRequest("welcome", context), fallback: string.Empty, CancellationToken.None);
+        }
+        catch
+        {
+            message = string.Empty;
+        }
+
+        WelcomeLabel.Text = message;
+        WelcomeLabel.IsVisible = !string.IsNullOrWhiteSpace(message);
     }
 
     private async void OnProjectSelected(object? sender, SelectionChangedEventArgs e)
