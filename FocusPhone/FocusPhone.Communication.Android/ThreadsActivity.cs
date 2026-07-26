@@ -39,6 +39,11 @@ public class ThreadsActivity : Activity
     private EditText? filterField;
     private Button? syncButton;
 
+    // Owner's-voice greeting under the header (sign-in lives on the Settings screen).
+    private readonly FocusPhone.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
+    private FocusPhone.Ui.Voice.VoiceGreeting? greeting;
+    private TextView? greetingView;
+
     // Accumulated inputs, only ever mutated on the UI thread once a background
     // load returns; the merge/title work itself runs off the UI thread.
     private readonly List<TimelineItem> liveItems = [];
@@ -62,6 +67,7 @@ public class ThreadsActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
+        greeting = new FocusPhone.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "FocusPhone.Communication");
         SetContentView(BuildLayout());
 
         threadList!.ItemClick += (_, e) =>
@@ -104,6 +110,20 @@ public class ThreadsActivity : Activity
     {
         base.OnResume();
         ReloadThreads();
+        ShowGreetingAsync();
+    }
+
+    // A greeting in the owner's voice under the header, shown only when signed in (Settings) and a shared
+    // profile + key exist; hidden otherwise. Best-effort, never throws.
+    private async void ShowGreetingAsync()
+    {
+        if (greeting is null || greetingView is null || !FocusPhone.Ui.Voice.VoiceGoogleAccount.IsSignedIn)
+            return;
+        var message = await greeting.ComposeAsync("welcome", "the owner is opening their messages", CancellationToken.None);
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+        greetingView.Text = message;
+        greetingView.Visibility = ViewStates.Visible;
     }
 
     private View BuildLayout()
@@ -133,6 +153,14 @@ public class ThreadsActivity : Activity
         header.AddView(settings);
 
         root.AddView(header, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        greetingView = PaperUi.Secondary(this, string.Empty);
+        greetingView.SetPadding(
+            PaperTheme.Dp(this, DesignTokens.Space.X4), 0, PaperTheme.Dp(this, DesignTokens.Space.X4),
+            PaperTheme.Dp(this, DesignTokens.Space.X3));
+        greetingView.Visibility = ViewStates.Gone;
+        root.AddView(greetingView, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
         // Lightweight find-a-person filter (names only, no full-text search).
