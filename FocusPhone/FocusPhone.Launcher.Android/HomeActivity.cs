@@ -29,6 +29,12 @@ public class HomeActivity : Activity
     private PaperClockView? clockView;
     private TextView? dateView;
     private Button? setDefaultLauncherButton;
+
+    // Owner's-voice greeting under the date, and a one-time sign-in so it can read the shared profile.
+    private readonly FocusPhone.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
+    private FocusPhone.Ui.Voice.VoiceGreeting? greeting;
+    private TextView? greetingView;
+    private Button? voiceSignInButton;
     private readonly Dictionary<Tile, ImageView> tileViews = [];
     private TimeTickReceiver? timeTickReceiver;
     private NotificationsChangedReceiver? notificationsReceiver;
@@ -38,6 +44,7 @@ public class HomeActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
+        greeting = new FocusPhone.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "FocusPhone.Launcher");
         SetContentView(BuildLayout());
         gestureDetector = new GestureDetector(this, new SwipeUpListener(OpenAppTray));
         PolicyManager.ApplyCurrentPolicy(this);
@@ -49,6 +56,7 @@ public class HomeActivity : Activity
         base.OnResume();
         UpdateClock();
         UpdateSetDefaultLauncherButton();
+        UpdateVoiceGreeting();
         timeTickReceiver = new TimeTickReceiver(UpdateClock);
         RegisterReceiver(timeTickReceiver, new IntentFilter(Intent.ActionTimeTick));
         notificationsReceiver = new NotificationsChangedReceiver(UpdateTileTints);
@@ -71,6 +79,47 @@ public class HomeActivity : Activity
             gestureDetector?.OnTouchEvent(e);
         }
         return base.DispatchTouchEvent(e);
+    }
+
+    // Shows the sign-in button when there's no Google account yet, then composes the greeting once there
+    // is. Both stay quiet (hidden) when there's no shared profile/key or on any error.
+    private void UpdateVoiceGreeting()
+    {
+        if (voiceSignInButton is not null)
+            voiceSignInButton.Visibility = FocusPhone.Ui.Voice.VoiceGoogleAccount.IsSignedIn ? ViewStates.Gone : ViewStates.Visible;
+        if (FocusPhone.Ui.Voice.VoiceGoogleAccount.IsSignedIn)
+            ShowGreetingAsync();
+    }
+
+    private async void ShowGreetingAsync()
+    {
+        if (greeting is null || greetingView is null)
+            return;
+        var message = await greeting.ComposeAsync("welcome", "the owner is looking at their home screen", CancellationToken.None);
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+        greetingView.Text = message;
+        greetingView.Visibility = ViewStates.Visible;
+    }
+
+    private async Task VoiceSignInAsync()
+    {
+        try
+        {
+            await voiceAccount.SignIn(this);
+        }
+        catch
+        {
+            // Cancelled or failed — leave the button up to try again.
+        }
+        UpdateVoiceGreeting();
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == FocusPhone.Ui.Voice.VoiceGoogleAccount.RequestCode)
+            FocusPhone.Ui.Voice.VoiceGoogleAccount.HandleChooserResult(resultCode, data);
     }
 
     private View BuildLayout()
@@ -97,6 +146,21 @@ public class HomeActivity : Activity
         var dateParams = MatchWrap();
         dateParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
         root.AddView(dateView, dateParams);
+
+        // A greeting in the owner's voice under the date, hidden until composed (needs the shared profile
+        // + a signed-in Google account); and a one-time sign-in button that shows only until then.
+        greetingView = PaperUi.Secondary(this, string.Empty);
+        greetingView.Gravity = GravityFlags.CenterHorizontal;
+        greetingView.Visibility = ViewStates.Gone;
+        var greetingParams = MatchWrap();
+        greetingParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X2);
+        root.AddView(greetingView, greetingParams);
+
+        voiceSignInButton = PaperUi.SecondaryButton(this, "Sign in for a voiced hello", () => _ = VoiceSignInAsync());
+        voiceSignInButton.Visibility = ViewStates.Gone;
+        var voiceButtonParams = MatchWrap();
+        voiceButtonParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X2);
+        root.AddView(voiceSignInButton, voiceButtonParams);
 
         // Shown only until FocusPhone is the default home app (before device-owner
         // pinning). ROLE_HOME cannot be force-granted programmatically, so this

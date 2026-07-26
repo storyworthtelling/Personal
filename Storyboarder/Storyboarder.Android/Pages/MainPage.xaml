@@ -5,9 +5,16 @@
              Title="Storyboarder">
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="{StaticResource ScreenPadding}" RowSpacing="12">
 
-        <Label Grid.Row="0"
-               Text="Your graphic novels"
-               Style="{StaticResource DisplayLabel}" />
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Text="Your graphic novels"
+                   Style="{StaticResource DisplayLabel}" />
+            <!-- A situational greeting written in the owner's voice when a profile exists; otherwise the
+                 neutral fallback set in code. Kept a quiet secondary line so it never competes with the
+                 title (DESIGN.md §5 — messaging, not a banner). -->
+            <Label x:Name="WelcomeLabel"
+                   Style="{StaticResource SecondaryLabel}"
+                   IsVisible="False" />
+        </VerticalStackLayout>
 
         <Border x:Name="ConfigWarningCard" Grid.Row="1"
                 Style="{StaticResource WarningCard}" IsVisible="False">

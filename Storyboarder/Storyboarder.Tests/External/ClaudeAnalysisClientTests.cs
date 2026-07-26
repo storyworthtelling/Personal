@@ -90,6 +90,10 @@ public class ClaudeAnalysisClientTests
         var body = handler.RequestBodies[0];
         Assert.Contains("panels per page", body);
         Assert.Contains("ONGOING ACTION", body);
+        // Steered to be economical: only load-bearing beats, skipping transitional/in-between panels
+        // (fewer panels = less render cost and wall-clock).
+        Assert.Contains("ECONOMICAL", body);
+        Assert.Contains("SKIP transitional", body);
     }
 
     [Fact]
@@ -240,6 +244,40 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task AssessVoiceConsistency_ParsesDominantVoiceAndDivergences()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"dominantVoice\":\"Lyrical close third-person.\",\"divergences\":[" +
+            "{\"chapter\":\"Chapter 5\",\"excerpt\":\"It was bad. Real bad.\"," +
+            "\"divergence\":\"Clipped noir voice unlike the rest.\",\"suggestion\":\"Restore the cadence.\"}," +
+            "{\"chapter\":\"Chapter 9\",\"excerpt\":\"   \",\"divergence\":\"x\",\"suggestion\":\"y\"}]}"));
+
+        var result = await client.AssessVoiceConsistency(
+            [new ChapterSample("Chapter 1", "lyrical prose"), new ChapterSample("Chapter 5", "clipped prose")],
+            CancellationToken.None);
+
+        Assert.Equal("Lyrical close third-person.", result.DominantVoice);
+        // The blank-excerpt divergence is dropped (nothing for the author to find).
+        var divergence = Assert.Single(result.Divergences);
+        Assert.Equal("Chapter 5", divergence.Chapter);
+        Assert.Equal("It was bad. Real bad.", divergence.Excerpt);
+        Assert.Equal("Restore the cadence.", divergence.Suggestion);
+    }
+
+    [Fact]
+    public async Task AssessVoiceConsistency_SkipsTheCall_WithFewerThanTwoSamples()
+    {
+        var (client, handler) = Create(); // nothing queued: a call would throw "no response"
+
+        var result = await client.AssessVoiceConsistency(
+            [new ChapterSample("Chapter 1", "the only chapter")], CancellationToken.None);
+
+        Assert.Equal(VoiceConsistency.Empty, result); // one chapter gives nothing to compare against
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task DeriveArtStyle_ParsesTheStyle()
     {
         var (client, handler) = Create();
@@ -278,6 +316,30 @@ public class ClaudeAnalysisClientTests
         Assert.Equal(Storyboarder.Domain.Model.ShotType.Splash, panels[0].Shot);
         Assert.Equal(Storyboarder.Domain.Model.ShotType.Wide, panels[1].Shot);   // case-insensitive
         Assert.Equal(Storyboarder.Domain.Model.ShotType.Standard, panels[2].Shot); // unknown → Standard
+    }
+
+    [Fact]
+    public async Task Storyboard_ParsesDialogueKindAndSfx_DefaultingToSpokenNoSfx()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"continuitySummary\":\"x\",\"volumes\":[{\"number\":1,\"title\":\"V\",\"pages\":[{\"chapterNumber\":1,\"panels\":[" +
+            "{\"visualPrompt\":\"a\",\"dialogue\":\"Maybe I should run.\",\"caption\":null,\"referenceNames\":[]," +
+            "\"dialogueKind\":\"thought\",\"sfx\":null}," +
+            "{\"visualPrompt\":\"b\",\"dialogue\":\"Stop!\",\"caption\":null,\"referenceNames\":[],\"sfx\":\"  crash  \"}," +
+            "{\"visualPrompt\":\"c\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"dialogueKind\":\"whispered\"}" +
+            "]}]}]}"));
+
+        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+        var panels = Assert.Single(Assert.Single(segment.Volumes).Pages).Panels;
+
+        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Thought, panels[0].DialogueKind);
+        Assert.Null(panels[0].Sfx);
+        // Absent dialogueKind → Speech; sfx is trimmed.
+        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Speech, panels[1].DialogueKind);
+        Assert.Equal("crash", panels[1].Sfx);
+        // An unrecognized dialogueKind falls back to Speech, like an unknown shot falls back to Standard.
+        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Speech, panels[2].DialogueKind);
     }
 
     [Fact]

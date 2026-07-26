@@ -189,6 +189,11 @@ public sealed record BookAnalysisResult(
     // reduce calls must not have) and is folded in the same way the craft half is.
     public IReadOnlyList<FactCheck> FactChecks { get; init; } = Array.Empty<FactCheck>();
 
+    // Where the author's own prose drifts from the book's dominant authorial voice. Arrives from its own
+    // call (it needs actual prose samples per chapter, not the notes the other reduces work from) and is
+    // folded in the same way. Defaults to Empty so a report stored before this existed re-renders fine.
+    public VoiceConsistency VoiceConsistency { get; init; } = VoiceConsistency.Empty;
+
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
         Array.Empty<Finding>(), Array.Empty<Finding>(), Array.Empty<Finding>(), Array.Empty<Finding>(),
@@ -206,7 +211,27 @@ public sealed record BookAnalysisResult(
 
     public BookAnalysisResult WithFactChecks(IReadOnlyList<FactCheck> checks) =>
         this with { FactChecks = checks };
+
+    public BookAnalysisResult WithVoiceConsistency(VoiceConsistency voice) =>
+        this with { VoiceConsistency = voice };
 }
+
+// The authorial-voice-consistency read: a short characterization of the book's dominant voice, and the
+// passages whose prose drifts from it. This is about the manuscript's consistency WITH ITSELF — a chapter
+// that slips into a different register, a tonal wobble — not a comparison to anything external.
+public sealed record VoiceConsistency(string DominantVoice, IReadOnlyList<VoiceDivergence> Divergences)
+{
+    public static VoiceConsistency Empty { get; } = new(string.Empty, Array.Empty<VoiceDivergence>());
+}
+
+// One passage that reads as off from the book's established voice. Chapter locates it; Excerpt quotes the
+// divergent prose verbatim so the author can find it; Divergence says how it departs from the dominant
+// voice (register, diction, cadence, tone); Suggestion says how to bring it back into line.
+public sealed record VoiceDivergence(string Chapter, string Excerpt, string Divergence, string Suggestion);
+
+// A representative prose sample from one chapter, fed to the voice-consistency read so the model judges
+// the actual writing rather than a summary of it.
+public sealed record ChapterSample(string Chapter, string Excerpt);
 
 // One checkable real-world statement from the manuscript, put to a web search. Verdict is the model's
 // call after searching; Note carries what it found. Chapter is copied from the note the claim came from

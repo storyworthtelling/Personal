@@ -147,6 +147,39 @@ public sealed class AnalysisDocumentRenderer
             }
         }
 
+        var voice = analysis.VoiceConsistency;
+        if (!string.IsNullOrWhiteSpace(voice.DominantVoice) || voice.Divergences is { Count: > 0 })
+        {
+            writer.Heading("Authorial voice consistency", h2, Ink, ruled: true);
+            writer.Paragraph(
+                "Where the manuscript's own prose drifts from its dominant voice — a register slip, a tonal " +
+                "wobble — not a judgment of quality. Deliberately distinct voices (a different POV, an " +
+                "embedded letter) are left out.",
+                bodyItalic, Muted);
+            if (!string.IsNullOrWhiteSpace(voice.DominantVoice))
+            {
+                writer.Paragraph("The book's voice:", bodyBold, Ink);
+                writer.Paragraph(voice.DominantVoice, body, Ink);
+            }
+            if (voice.Divergences is { Count: > 0 })
+            {
+                writer.Paragraph("Passages that drift:", bodyBold, Ink);
+                foreach (var divergence in voice.Divergences)
+                {
+                    writer.Bullet(Join(divergence.Chapter, Quoted(divergence.Excerpt)), bodyItalic, Ink);
+                    if (!string.IsNullOrWhiteSpace(divergence.Divergence))
+                        writer.Paragraph(divergence.Divergence, body, Ink);
+                    if (!string.IsNullOrWhiteSpace(divergence.Suggestion))
+                        writer.Paragraph(divergence.Suggestion, bodyItalic, Muted);
+                    writer.Gap(8f);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(voice.DominantVoice))
+            {
+                writer.Paragraph("No passages read as drifting from this voice.", bodyItalic, Muted);
+            }
+        }
+
         if (analysis.FactChecks is { Count: > 0 })
         {
             writer.Heading("Fact checks", h2, Ink, ruled: true);

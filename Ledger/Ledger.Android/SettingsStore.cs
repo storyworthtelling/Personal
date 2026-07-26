@@ -37,6 +37,15 @@ public static class SettingsStore
         set => Preferences.Set(nameof(LastRunAtUtc), value);
     }
 
+    // The Google account chosen for reading the shared owner's-voice profile from Drive (the voiced
+    // greeting). Empty until the owner signs in on the Settings page; empty simply means the greeting
+    // stays neutral.
+    public static string GoogleAccountEmail
+    {
+        get => Preferences.Get(nameof(GoogleAccountEmail), string.Empty);
+        set => Preferences.Set(nameof(GoogleAccountEmail), value);
+    }
+
     // Set when applying EF migrations at process start fails, cleared on success. Surfaced on the
     // Settings page so a broken update is visible instead of silently stalling the worker.
     public static string LastMigrationError

@@ -50,6 +50,7 @@ public static class DesignTokens
         public const float BoxStroke = 3f;
         public const float LetteringSize = 34f;  // dialogue, Sans
         public const float CaptionSize = 32f;    // captions, Serif Italic
+        public const float SfxSize = 96f;        // sound-effect display lettering over the art, Serif Semibold
         public const float FolioSize = 36f;      // page number + running title, Serif
         public const float BalloonRadius = 28f;
         public const float CaptionRadius = 20f;

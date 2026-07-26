@@ -13,6 +13,11 @@ using Ledger.Infrastructure.Persistence;
 using Ledger.Infrastructure.Pipeline;
 using Ledger.Infrastructure.Services;
 using Ledger.Infrastructure.Time;
+using Ledger.Android.Google;
+using Storyworthtelling.Voice;
+using GoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
+using GoogleClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
+using DriveService = global::Google.Apis.Drive.v3.DriveService;
 
 namespace Ledger.Android;
 
@@ -69,6 +74,38 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPipelineStep>(sp => sp.GetRequiredService<BalanceRefreshProcessor>());
         builder.Services.AddSingleton<PipelineRunner>();
         builder.Services.AddScoped<AccountService>();
+
+        // Owner's voice: read the shared profile + Claude key from Drive (device-account sign-in, read-only)
+        // and greet the owner in their voice on the account list, degrading to neutral copy when the profile,
+        // key, or Drive access isn't there. The key is published by Storyboarder's settings; Ledger keeps no
+        // key of its own.
+        builder.Services.AddSingleton<DeviceAccountTokenProvider>();
+        static Func<CancellationToken, Task<DriveService>> DriveFactory(IServiceProvider sp)
+        {
+            var tokens = sp.GetRequiredService<DeviceAccountTokenProvider>();
+            return async _ =>
+            {
+                var token = await tokens.GetAccessToken();
+                return new DriveService(new GoogleClientInitializer
+                {
+                    HttpClientInitializer = GoogleCredential.FromAccessToken(token),
+                    ApplicationName = "Ledger",
+                    HttpClientFactory = new AndroidGoogleHttpClientFactory()
+                });
+            };
+        }
+        builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
+            new DriveVoiceProfileStore(new DriveTextFile(DriveFactory(sp), DriveVoiceProfileStore.FileName)));
+        builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
+            new DriveVoiceConfigStore(new DriveTextFile(DriveFactory(sp), DriveVoiceConfigStore.FileName)));
+        // One DriveVoiceOptions instance is both the IOptions<VoiceOptions> VoiceClient reads and the handle
+        // the page refreshes (pull the key from Drive) just before composing.
+        builder.Services.AddSingleton<DriveVoiceOptions>();
+        builder.Services.AddSingleton<IOptions<VoiceOptions>>(sp => sp.GetRequiredService<DriveVoiceOptions>());
+        builder.Services.AddHttpClient<IVoiceClient, VoiceClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(2))
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddTransient<VoicedMessenger>();
 
         // Pages.
         builder.Services.AddTransient<Pages.MainPage>();

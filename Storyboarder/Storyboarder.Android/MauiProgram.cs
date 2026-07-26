@@ -16,6 +16,10 @@ using Storyboarder.Infrastructure.Persistence;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Infrastructure.Time;
+using Storyworthtelling.Voice;
+using GoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
+using GoogleClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
+using DriveService = global::Google.Apis.Drive.v3.DriveService;
 
 namespace Storyboarder.Android;
 
@@ -69,6 +73,11 @@ public static class MauiProgram
                 DatabasePath = dbPath,
                 OutputRoot = outputRoot
             }));
+        // The owner's-voice API key is the Claude key, read live so entering it in Settings takes effect
+        // on the next call without a restart (the singleton worker holds one VoiceClient, which reads
+        // these options fresh on every call).
+        builder.Services.AddSingleton<IOptions<VoiceOptions>>(
+            _ => new LiveOptions<VoiceOptions>(() => new VoiceOptions { ApiKey = SettingsStore.ClaudeApiKey }));
 
         // Data access: a context factory so the worker and request-scoped services create contexts freely.
         builder.Services.AddDbContextFactory<StoryboarderDbContext>(options =>
@@ -85,6 +94,19 @@ public static class MauiProgram
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddHttpClient<IGeminiImageClient, GeminiImageClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // The batch client submits/polls jobs (short calls). Batch mode is on by default now (reference
+        // sheets go through the Files API, so a real book stays under the inline ceiling); the first live
+        // run confirms the REST envelope, degrading safely to synchronous rendering on any mismatch (see
+        // GeminiBatchImageClient / BATCHING.md).
+        builder.Services.AddHttpClient<IGeminiBatchClient, GeminiBatchImageClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // The owner's-voice client. Its key is the same Claude key, read live from Preferences so it
+        // tracks the Settings page like every other credential. Short calls (a distilled profile, a
+        // one-sentence message), so a 2-minute ceiling is ample.
+        builder.Services.AddHttpClient<IVoiceClient, VoiceClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(2))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         // Infrastructure collaborators.
@@ -107,6 +129,31 @@ public static class MauiProgram
         builder.Services.AddSingleton<DeviceAccountTokenProvider>();
         builder.Services.AddSingleton<DriveDocsLister>();
         builder.Services.AddSingleton<IDriveArchive, DeviceAccountDriveArchive>();
+
+        // Owner's-voice Drive files, each ONE JSON file found by name and reached with the device-account
+        // token (full `drive` scope, shared across every com.storyworthtelling app) the same way the archive
+        // is: the voice PROFILE (the pipeline writes it at ingestion; VoicedMessenger reads it for greetings)
+        // and the shared CONFIG carrying the Claude key (this app's settings publish it so the other apps
+        // read the key from Drive rather than each keeping their own).
+        static Func<CancellationToken, Task<DriveService>> DriveFactory(IServiceProvider sp)
+        {
+            var tokens = sp.GetRequiredService<DeviceAccountTokenProvider>();
+            return async _ =>
+            {
+                var token = await tokens.GetAccessToken();
+                return new DriveService(new GoogleClientInitializer
+                {
+                    HttpClientInitializer = GoogleCredential.FromAccessToken(token),
+                    ApplicationName = "Storyboarder",
+                    HttpClientFactory = new AndroidGoogleHttpClientFactory()
+                });
+            };
+        }
+        builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
+            new DriveVoiceProfileStore(new DriveTextFile(DriveFactory(sp), DriveVoiceProfileStore.FileName)));
+        builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
+            new DriveVoiceConfigStore(new DriveTextFile(DriveFactory(sp), DriveVoiceConfigStore.FileName)));
+        builder.Services.AddTransient<VoicedMessenger>();
 
         // Pages.
         builder.Services.AddTransient<Pages.MainPage>();

@@ -5,9 +5,14 @@
              Title="Ledger">
     <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" Padding="{StaticResource ScreenPadding}" RowSpacing="12">
 
-        <Label Grid.Row="0"
-               Text="Balances"
-               Style="{StaticResource DisplayLabel}" />
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label Text="Balances"
+                   Style="{StaticResource DisplayLabel}" />
+            <!-- A greeting in the owner's voice when a shared profile exists; otherwise hidden (neutral). -->
+            <Label x:Name="WelcomeLabel"
+                   Style="{StaticResource SecondaryLabel}"
+                   IsVisible="False" />
+        </VerticalStackLayout>
 
         <Border x:Name="ConfigWarningCard" Grid.Row="1"
                 Style="{StaticResource WarningCard}" IsVisible="False">

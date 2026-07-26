@@ -9,6 +9,10 @@ on:
       - 'Storyboarder/Storyboarder.Infrastructure/**'
       - 'Storyboarder/Storyboarder.Domain/**'
       - 'Storyboarder/Storyboarder.Tests/**'
+      # The shared owner's-voice library ships in the APK (referenced by Infrastructure), so a change
+      # to it must rebuild Storyboarder too.
+      - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Voice.Tests/**'
       - '.github/workflows/build-storyboarder.yml'
 
 jobs:
@@ -29,6 +33,11 @@ jobs:
         run: >
           dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj
           -p:StoryboarderTfms=net10.0
+
+      # The shared owner's-voice library (net10.0, pure .NET) ships in the APK; its own tests run here so
+      # a change to it is verified in the same workflow that rebuilds Storyboarder.
+      - name: Run voice tests
+        run: dotnet test Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj
 
   build:
     needs: test

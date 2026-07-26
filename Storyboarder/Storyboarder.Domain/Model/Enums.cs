@@ -33,8 +33,13 @@ public enum WorkStatus
     Completed,
     Failed,           // terminal after maxAttempts
     NeedsRetry,       // transient (e.g. rate-limited); retried after NextAttemptAtUtc
-    AwaitingApproval  // a panel render was safety-blocked and is parked until the user approves relaxing
+    AwaitingApproval, // a panel render was safety-blocked and is parked until the user approves relaxing
                       // the flagged category for that one render (see GraphicNovelProcessor.RenderPanels)
+
+    // A panel render is in flight in a Gemini batch job (opt-in batch mode). Not yet done and not
+    // retryable on its own — the worker polls the job and reconciles the result. Appended deliberately:
+    // WorkStatus is persisted as its integer value, so new values go at the end.
+    SubmittedToBatch
 }
 
 public enum ReferenceKind
@@ -54,4 +59,14 @@ public enum ShotType
     Wide,
     // A full-page splash for a pivotal beat: the panel gets a page to itself (page splitting isolates it).
     Splash
+}
+
+// Whether a panel's dialogue is spoken aloud or thought. Drives how the composer letters it — a spoken
+// balloon points a tail into the scene, a thought balloon trails bubbles toward the thinker. Speech is the
+// default and matches every panel lettered before this existed. Persisted as an integer, so append new
+// values — never insert.
+public enum DialogueKind
+{
+    Speech,
+    Thought
 }

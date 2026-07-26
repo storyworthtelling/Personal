@@ -40,6 +40,10 @@ public class Novel
     // Claude-assisted) detection runs exactly once per novel.
     public bool ChaptersDetected { get; set; }
 
+    // Set once this draft's manuscript has fed the owner's shared voice profile at ingestion, so the
+    // (billed) refine runs exactly once per draft even if the Ingesting stage is retried.
+    public bool VoiceAnalyzed { get; set; }
+
     // Chunk ordinal up to which storyboarding has already run (for resumable, windowed storyboarding).
     public int StoryboardCursor { get; set; }
 
@@ -67,6 +71,12 @@ public class Novel
     // manuscript), and when the archive completed. Set by the Archiving stage; null until then.
     public string? ArchiveFolderId { get; set; }
     public DateTimeOffset? ArchivedAtUtc { get; set; }
+
+    // The in-flight Gemini batch job rendering this novel's panels (opt-in batch mode), and when it was
+    // submitted. Null when no batch is outstanding; the worker polls this job and reconciles its results,
+    // then clears it. Only one batch per novel is in flight at a time.
+    public string? BatchJobId { get; set; }
+    public DateTimeOffset? BatchSubmittedAtUtc { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
@@ -206,6 +216,11 @@ public class BookAnalysis
     // re-consolidation and feeds into it.
     public string? FactChecksJson { get; set; }
 
+    // The authorial-voice-consistency read (dominant voice + divergent passages), serialized as a
+    // VoiceConsistency. Its own call — it needs per-chapter prose samples rather than the notes — so it is
+    // persisted separately and folded in at render, exactly like the fact checks. Null until it runs.
+    public string? VoiceJson { get; set; }
+
     public WorkStatus PdfStatus { get; set; } = WorkStatus.Pending;
     public string? PdfPath { get; set; }
 
@@ -271,9 +286,22 @@ public class Panel : IRetryable
     public string? Dialogue { get; set; }
     public string? Caption { get; set; }
 
+    // Whether Dialogue is spoken or thought, which changes how the composer letters it (spoken tail vs
+    // thought-bubble trail). Defaults to Speech (0), so panels lettered before this existed are unchanged.
+    public DialogueKind DialogueKind { get; set; } = DialogueKind.Speech;
+
+    // A prominent sound effect in the panel (onomatopoeia like "CRASH"), typeset over the art as display
+    // lettering. Null when the panel has no notable sound — most panels.
+    public string? Sfx { get; set; }
+
     // The camera framing this panel was storyboarded as, which sizes it on the page. Defaults to
     // Standard (0), so panels from before shot types existed lay out exactly as they did before.
     public ShotType ShotType { get; set; } = ShotType.Standard;
+
+    // Set once this panel has been through a batch render (opt-in batch mode), so it is never re-batched:
+    // a panel the batch failed or blocked returns to Pending and is re-rendered SYNCHRONOUSLY from then on
+    // (the escalation ladder and its retries stay fast, not one batch turnaround per attempt).
+    public bool BatchAttempted { get; set; }
 
     // The half-open span [SourceStartOffset, SourceEndOffset) of the novel's source text this panel was
     // storyboarded from — the absolute offsets of the storyboard window that produced it, not just the

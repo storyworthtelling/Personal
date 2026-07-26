@@ -10,7 +10,11 @@ public sealed record PanelDraft(
     string? Dialogue,
     string? Caption,
     IReadOnlyList<string> ReferenceNames,
-    ShotType Shot = ShotType.Standard);
+    ShotType Shot = ShotType.Standard,
+    // Whether the dialogue is spoken or thought, and any prominent sound effect. Both default to the
+    // no-op case (spoken, no SFX) so a model reply that omits them letters exactly as before.
+    DialogueKind DialogueKind = DialogueKind.Speech,
+    string? Sfx = null);
 
 public sealed record PageDraft(int ChapterNumber, IReadOnlyList<PanelDraft> Panels);
 

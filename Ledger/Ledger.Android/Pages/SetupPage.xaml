@@ -78,6 +78,15 @@
             <Button Text="Share refresh log" Clicked="OnShareLogClicked" Style="{StaticResource SecondaryButton}" />
             <Label x:Name="DiagnosticsStatusLabel" Style="{StaticResource StatusLine}" />
 
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+
+            <Label Text="Voiced greeting" Style="{StaticResource TitleLabel}" />
+            <Label Text="Sign in with Google to read your shared voice profile from Drive and greet you in your own voice. Read-only; skip it to keep neutral copy."
+                   Style="{StaticResource SecondaryLabel}" />
+            <Button x:Name="VoiceSignInButton" Text="Sign in with Google"
+                    Clicked="OnVoiceSignInClicked" Style="{StaticResource SecondaryButton}" />
+            <Label x:Name="VoiceStatusLabel" Style="{StaticResource StatusLine}" />
+
         </VerticalStackLayout>
     </ScrollView>
 

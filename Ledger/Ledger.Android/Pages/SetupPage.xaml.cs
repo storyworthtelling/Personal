@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.ApplicationModel.DataTransfer;
 using Microsoft.Maui.Storage;
+using Ledger.Android.Google;
 using Ledger.Domain.External;
 using Ledger.Domain.Model;
 using Ledger.Domain.Time;
@@ -37,6 +39,28 @@ public partial class SetupPage : ContentPage
         MigrationErrorLabel.Text = migrationError;
 
         await ReloadConnectedAsync();
+
+        VoiceStatusLabel.Text = string.IsNullOrEmpty(SettingsStore.GoogleAccountEmail)
+            ? string.Empty
+            : $"Signed in as {SettingsStore.GoogleAccountEmail}.";
+    }
+
+    // Opens the system Google account picker and requests read-only Drive consent, so Ledger can read the
+    // shared owner's-voice profile. The result returns through MainActivity.OnActivityResult.
+    private async void OnVoiceSignInClicked(object sender, EventArgs e)
+    {
+        var activity = Platform.CurrentActivity;
+        if (activity is null)
+            return;
+        try
+        {
+            var email = await DeviceAccountSignIn.SignIn(activity);
+            VoiceStatusLabel.Text = $"Signed in as {email}.";
+        }
+        catch (Exception ex)
+        {
+            VoiceStatusLabel.Text = $"Sign-in didn't complete. {ex.Message}";
+        }
     }
 
     protected override void OnDisappearing()

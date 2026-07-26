@@ -5,6 +5,7 @@ using SkiaSharp;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.Design;
 using Storyboarder.Domain.Imaging;
+using Storyboarder.Domain.Model;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Tests.Support;
@@ -242,6 +243,95 @@ public class SkiaPageComposerTests
             }
         }
         Assert.True(found, "expected a PaperBright dialogue balloon at the panel top");
+    }
+
+    [Fact]
+    public void Compose_SpeechBalloon_HasATailPointingDown()
+    {
+        var dialogue = string.Join(" ", Enumerable.Repeat("words", 12));
+        var bytes = Composer().Compose(
+            [new PanelArt(SampleImages.Png(color: SKColors.CornflowerBlue), dialogue, null)], Chrome);
+
+        using var decoded = SKBitmap.Decode(bytes)!;
+        var bright = Token(DesignTokens.PaperBright);
+
+        // Lowest bright-paper pixel in a column ~75% across the balloon (no tail there): the balloon bottom.
+        int LowestBright(int x)
+        {
+            var lowest = -1;
+            for (var y = DesignTokens.Comic.TopMargin; y < DesignTokens.Comic.PageHeight / 3; y++)
+                if (decoded.GetPixel(x, y) == bright)
+                    lowest = y;
+            return lowest;
+        }
+
+        var balloonBottom = LowestBright((int)(DesignTokens.Comic.PageWidth * 0.75));
+        // The tail is drawn ~40% across the balloon, so its bright fill reaches deeper than the flat bottom.
+        var tailBottom = LowestBright((int)(DesignTokens.Comic.PageWidth * 0.42));
+
+        Assert.True(balloonBottom > 0 && tailBottom > balloonBottom,
+            $"expected the tail column ({tailBottom}) to reach below the balloon bottom ({balloonBottom})");
+    }
+
+    [Fact]
+    public void Compose_ThoughtBalloon_RendersDifferentlyThanSpeech_WithBubblesBelow()
+    {
+        var dialogue = string.Join(" ", Enumerable.Repeat("words", 12));
+        var speech = Composer().Compose(
+            [new PanelArt(SampleImages.Png(), dialogue, null, ShotType.Standard, DialogueKind.Speech)], Chrome);
+        var thought = Composer().Compose(
+            [new PanelArt(SampleImages.Png(), dialogue, null, ShotType.Standard, DialogueKind.Thought)], Chrome);
+
+        // A pointed tail and a bubble trail are different marks, so the pages differ.
+        Assert.NotEqual(speech, thought);
+
+        // The trail places bright bubbles below the balloon (~30–55% across); assert bright paper appears
+        // strictly below the balloon's flat bottom there.
+        using var decoded = SKBitmap.Decode(thought)!;
+        var bright = Token(DesignTokens.PaperBright);
+        // Balloon bottom from a column solidly inside the box (60% across), away from the trail.
+        var balloonBottom = -1;
+        var probe = (int)(DesignTokens.Comic.PageWidth * 0.6);
+        for (var y = DesignTokens.Comic.TopMargin; y < DesignTokens.Comic.PageHeight / 3; y++)
+            if (decoded.GetPixel(probe, y) == bright)
+                balloonBottom = y;
+
+        var bubbleFound = false;
+        for (var y = balloonBottom + 2; y <= balloonBottom + 80 && !bubbleFound; y++)
+            for (var x = (int)(DesignTokens.Comic.PageWidth * 0.30); x <= (int)(DesignTokens.Comic.PageWidth * 0.55); x++)
+                if (decoded.GetPixel(x, y) == bright)
+                {
+                    bubbleFound = true;
+                    break;
+                }
+        Assert.True(balloonBottom > 0 && bubbleFound,
+            $"expected thought bubbles below the balloon bottom ({balloonBottom})");
+    }
+
+    [Fact]
+    public void Compose_Sfx_LettersTerracottaOverTheArt()
+    {
+        var accent = Token(DesignTokens.Accent);
+        int AccentPixels(byte[] png)
+        {
+            using var b = SKBitmap.Decode(png)!;
+            var n = 0;
+            for (var x = 0; x < b.Width; x += 3)
+                for (var y = 0; y < b.Height; y += 3)
+                    if (b.GetPixel(x, y) == accent)
+                        n++;
+            return n;
+        }
+
+        var withSfx = Composer().Compose(
+            [new PanelArt(SampleImages.Png(color: SKColors.CornflowerBlue), null, null, ShotType.Standard, DialogueKind.Speech, "BOOM")],
+            Chrome);
+        var withoutSfx = Composer().Compose(
+            [new PanelArt(SampleImages.Png(color: SKColors.CornflowerBlue), null, null)], Chrome);
+
+        // The page composer's own palette has no terracotta, so accent pixels are the SFX lettering.
+        Assert.Equal(0, AccentPixels(withoutSfx));
+        Assert.True(AccentPixels(withSfx) > 0, "expected terracotta SFX lettering over the art");
     }
 
     [Fact]
@@ -484,6 +574,21 @@ public class AnalysisPdfComposerTests
         Assert.Contains("Prose style & voice", titles);
         Assert.Contains("Dialogue", titles);
         Assert.Contains("Scene-by-scene breakdown", titles);
+    }
+
+    [Fact]
+    public void Renderer_TocIncludesVoiceConsistency_WhenPresent()
+    {
+        var withVoice = Sample(1) with
+        {
+            VoiceConsistency = new VoiceConsistency(
+                "Lyrical, close third-person with long cadenced sentences.",
+                [new VoiceDivergence("Chapter 3", "It was bad. Real bad.", "Clipped, off-register.", "Restore the cadence.")])
+        };
+
+        var result = new AnalysisDocumentRenderer().RenderReport(withVoice, "My Novel");
+
+        Assert.Contains("Authorial voice consistency", result.TocEntries.Select(e => e.Title));
     }
 
     [Fact]

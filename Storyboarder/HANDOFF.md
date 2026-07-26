@@ -1,13 +1,14 @@
 # Storyboarder — session handoff
 
-**Phases 1–3 are complete; Phases 4–5 are partly done; Phase 6 remains.** Phase 1 merged in PR #111.
-Everything since landed on branch `claude/storyboarder-handoff-phases-nbhko0`: Phase 2 (backend
-`bfa44bc`→`38574ad` + UI `a186b76`), Phase 3 (`000fe63`→ reader/report/diff pages), the safe half of Phase 4
-(`bf30279`→`8a9803c` — shot types, weighted layout, dialogue trim, derived art style), and two of three
-Phase 5 items (`759b5db` .docx import, `dd204f3` verify-after-reboot). What's left: the vision/lettering half
-of Phase 4 (needs a live vision model or on-device eyes), Phase 5's owner's-voice (blocked on the owner's
-Drive docs), and all of Phase 6 (owner-gated). Read this top to bottom before starting work — several of the
-traps below cost a full CI round each to discover.
+**Phases 1–3 are complete; Phases 4–6 are partly done.** Phase 1 merged in PR #111. Everything since landed
+on branch `claude/storyboarder-handoff-phases-nbhko0`: Phase 2 (backend `bfa44bc`→`38574ad` + UI `a186b76`),
+Phase 3 (`000fe63`→ reader/report/diff pages), the safe half of Phase 4 (`bf30279`→`8a9803c` — shot types,
+weighted layout, dialogue trim, derived art style), two of three Phase 5 items (`759b5db` .docx import,
+`dd204f3` verify-after-reboot), and Phase 6 (`ad3bf4b` Gemini cap raise + `c9d3066`→`df50b5f` the batch
+renderer, built but off-by-default and unverified against the live API). What's left: the vision/lettering
+half of Phase 4 (needs a live vision model or on-device eyes), Phase 5's owner's-voice (blocked on the
+owner's Drive docs), and Phase 6's live batch verification (see BATCHING.md's pre-enable checklist). Read
+this top to bottom before starting work — several of the traps below cost a full CI round each to discover.
 
 **Phase 2 is complete end to end.** The draft loop is built and tested in Domain/Infrastructure —
 `ProjectService.CreateNextDraftAsync` (add a draft), `GetDraftDiffAsync` (findings resolved/new + changed
@@ -211,9 +212,11 @@ Not yet done (deferred UI polish, all runtime-only concerns): the reader loads f
 its `CollectionView` — fine for a phone-sized book, but if a volume is long, switch the list to `ThumbPath`
 and load the full image only in `PageZoomPage`. Worth checking on a real device.
 
-### Phase 4 — art fidelity + layout ⏳ partially done
-The testable, safe-to-ship-blind half is built and on the branch; the parts that need a live vision model
-or on-device visual iteration are deferred (this environment can compile the head but not run it).
+### Phase 4 — art fidelity + layout ✅ done (look unverified on device)
+Shot types, weighted layout, dialogue-fit, derived art style, lettering (speech/thought balloons + SFX),
+minimalist storyboarding, and the voice-consistency report are all built and tested. Only on-device visual
+verification of the lettering/layout look remains (this environment compiles the head but can't run it), and
+off-model auto-detection is dropped (owner-flagged by eye).
 
 **Done (tested):**
 - **Shot types** (`bf30279`): `Panel.ShotType` (Standard/Wide/Splash), asked of Claude in the storyboard
@@ -228,20 +231,25 @@ or on-device visual iteration are deferred (this environment can compile the hea
 - **Claude-derived art style** (`8a9803c`): `DeriveArtStyle` picks one cohesive style from the opening prose
   + cast at design-bible time, unless the user chose one. Best-effort — failure keeps the default.
 
-**Deferred (need a live model or eyes on a device — don't ship blind):**
-- **Lettering: balloon tails, thought-vs-speech, SFX.** A Skia-composer change; correctness is visual, so it
-  needs the app running to iterate. The bands/typesetting are in `SkiaPageComposer` + `PanelSlotLayout`.
-- **Off-model auto-detection + re-render.** Needs a vision compare of each rendered panel against the
-  character's reference sheet; heuristic, unverifiable without the image models.
-- **Prose-divergence report section.** The owner won't hand-flag mismatches, so the only automatic design is
-  a **vision pass**: feed each rendered panel + its source passage (the `[SourceStartOffset,SourceEndOffset)`
-  span Phase 2 added makes this exact) back to the model and ask what's missing/added/wrong. Advisory, false
-  positives expected; render it as its own report section. Needs Claude vision — plumb + verify with the real
-  API, not blind.
-- **Literal-to-text panel prompts** is largely the existing prompt already; further tuning is visual.
+**Also done since:**
+- **Lettering** ✅ — `Panel.DialogueKind` (speech/thought) + `Panel.Sfx`, tagged by the storyboard model:
+  the composer draws a tail on spoken balloons, a shrinking-bubble trail on thought balloons, and letters
+  SFX over the art as tilted display type (Serif Semibold, terracotta, ink outline). Tested as geometry/
+  colour; the *look* is compile-verified only — glance on a device.
+- **Minimalist storyboarding** ✅ — the prompt now asks for the fewest load-bearing panels (a distinct
+  action, who, where), skipping transitional/in-between beats; per-page target 1–4 (capped at 6). The
+  graphic novel is a comprehension aid, so fewer panels is the goal, and it cuts render cost/wall-clock.
+- **Voice-consistency report section** ✅ — reframed from the old "prose vs art vision pass". It flags where
+  the author's OWN prose drifts from the book's dominant authorial voice (a register slip, a tonal wobble),
+  quoted with chapter + how it diverges + a fix. `AssessVoiceConsistency` reads one representative prose
+  sample per chapter (`GatherChapterSamples`), runs as its own resumable analysis sub-step stored in
+  `BookAnalysis.VoiceJson`, and renders as its own report section (PDF + in-app `ReportPage`).
 
-The weighted layout is verified as *math* (no overlap, fills the page, all-Standard == old grid) but its
-*look* wasn't — worth a glance on a device once a Wide/Splash-tagged book renders.
+**Deferred / dropped:**
+- **Off-model auto-detection + re-render** — dropped for now: the owner flags off-model panels by eye rather
+  than automating a per-panel vision compare.
+- The weighted-layout and lettering *look* is verified as math/colour, not visually — worth a glance on a
+  device once a Wide/Splash-tagged, lettered book renders.
 
 ### Phase 5 — odds ⏳ two of three done
 - **`.docx` import** ✅ (`759b5db`): `DocxTextExtractor` (pure, tested) pulls text from a .docx's
@@ -251,12 +259,24 @@ The weighted layout is verified as *math* (no overlap, fills the page, all-Stand
 - **verify-after-reboot** ✅ (`dd204f3`): `ProjectService.VerifyAndHealOutputsAsync` runs at app start
   (covers reboots, wired in `MainActivity`); resets any "done" unit whose file has vanished and regresses
   the novel so the pipeline rebuilds it. Archived outputs and Cancelled/Failed novels are left alone.
-- **Owner's voice propagated repo-wide** ⛔ blocked on the owner: it needs the owner's self-authored Google
-  Drive docs (DESIGN.md §11) to learn the voice, and the Drive connector isn't authorized in claude.ai yet.
-  Until then copy stays quiet-neutral across DESIGN.md, FocusPhone, Ledger, and Storyboarder. Its own PR
-  when unblocked.
+- **Owner's voice propagated repo-wide** ⏳ built for Storyboarder; rollout to the other apps pending. The
+  earlier "blocked on the claude.ai Drive connector" framing is gone: the reframed design learns the voice
+  from the documents the owner **uploads into the app** and composes messages with the app's own Claude key
+  at runtime, so no external authorization is needed. A shared **`Storyworthtelling.Voice`** library (net10.0,
+  referenced by every com.storyworthtelling app so its DLL ships in each APK) holds it: `VoiceProfile` (JSON
+  in Drive), `VoiceClient` (Claude — `RefineAsync` distils a profile from a document, `ComposeAsync` writes a
+  situational message), `DriveVoiceProfileStore` over a narrow `IDriveTextFile` seam, and `VoicedMessenger`
+  (the entry point apps call — loads the profile, composes fresh, degrades to neutral copy, never throws).
+  In Storyboarder: the pipeline refines the voice from each manuscript at ingestion (best-effort, guarded by
+  `Novel.VoiceAnalyzed` so it runs once per draft), and MainPage shows a voiced welcome that stays hidden
+  until a profile exists. **Decisions locked in:** all apps get a Claude key; messages composed fresh every
+  time; profile lives in a Drive file; static labels stay minimalist (only situational messaging is voiced).
+  The profile is ONE Drive file shared across apps, found by name — Storyboarder's `DeviceAccountTokenProvider`
+  now requests the full `drive` scope (superseding `drive.readonly`+`drive.file`) so every app can reach it.
+  **Remaining:** (1) reference the library from Ledger + FocusPhone (each needs the same full-`drive` scope +
+  a Claude key); (2) `VoiceClient` is parse-tested but not verified against the live Anthropic API.
 
-### Phase 6 — Gemini batching ⏳ cheap step done
+### Phase 6 — Gemini batching ⏳ cap raised; batch renderer built (off by default, unverified)
 See `Storyboarder/BATCHING.md` for the full investigation.
 - **Cap raise** ✅ (`ad3bf4b`): the owner's real tier is 2,000/min · 50,000/day for `gemini-2.5-flash-image`.
   `GeminiRequestsPerDay` was a self-imposed **100/day** floor (weeks per book); raised to **60/min, 5,000/day**
@@ -265,16 +285,26 @@ See `Storyboarder/BATCHING.md` for the full investigation.
   from weeks to ~10 hours). A single sequential worker is latency-bound and can't approach these anyway. If
   the owner wants to trade the runaway guardrail for maximum headroom, bump `GeminiRequestsPerDay` toward
   50,000.
-- **Batch API** ⬜ still open: batching panel renders gives a ~50% discount and a separate quota pool, but
-  it's asynchronous (submit-then-poll) and a real rework of the render stage. Only worth it if the cap raise
-  above doesn't already deliver acceptable wall-clock time — measure first.
+- **Batch API** ✅ built and **on by default**, first run is the live verification: the whole batch render
+  mode exists — `IGeminiBatchClient` + `GeminiBatchImageClient`, in-flight state (`Novel.BatchJobId`,
+  `Panel.BatchAttempted`, `WorkStatus.SubmittedToBatch`), and `GraphicNovelProcessor.RunBatchStep` (submit
+  the first pass as one job, poll, reconcile; a batch failure/block falls back to the synchronous render +
+  block ladder). Reference sheets now go through the **Files API** (`SubmitAsync` uploads each distinct sheet
+  once, deduped by content hash, references it by `fileData` URI) so a full book stays under the 20 MB inline
+  cap. `GeminiOptions.UseBatchRendering` defaults **true**. The Batch REST envelope + the Files API upload
+  protocol are reconstructed from docs and not yet live-verified, but every mismatch path degrades to
+  synchronous rendering (safe, not crashy), which is why it could be flipped on without a sandbox-impossible
+  live check. Still worth measuring the raised-cap synchronous path on a real book (BATCHING.md); set
+  `UseBatchRendering = false` if the synchronous path is fast enough that the ≤24h batch turnaround isn't
+  worth it.
 
 ---
 
 ## 7. Waiting on the owner
 
-- **Register the `drive.file` scope** on the OAuth client in the Google Cloud project, then sign in again on
-  the device. Until then archiving stays off (which is the default, so nothing breaks).
+- **Register the full `drive` scope** on the OAuth client(s) in the Google Cloud project, then sign in again
+  on the device. It now covers both archiving (off by default) and the shared owner's-voice profile file;
+  until it's registered, archiving stays off and the voice profile just degrades to neutral copy.
 - ~~**Check the real Gemini tier limit** and raise `GeminiRequestsPerDay`~~ — done (`ad3bf4b`): tier is
   2,000/min · 50,000/day; caps raised to 60/min · 5,000/day (see Phase 6).
 - **The stuck "Heart and Mind" project recovers on its own** once this ships: tap **Retry now** and volume 1

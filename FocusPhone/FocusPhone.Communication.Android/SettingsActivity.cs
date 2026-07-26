@@ -19,6 +19,30 @@ namespace FocusPhone.Communication;
     Theme = "@style/Theme.FocusPhone.Paper")]
 public class SettingsActivity : Activity
 {
+    private readonly FocusPhone.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
+
+    // Opens the system Google account picker and requests read-only Drive consent, so the inbox can read
+    // the shared owner's-voice profile. The picker result returns through OnActivityResult.
+    private async Task VoiceSignInAsync(TextView status)
+    {
+        try
+        {
+            var email = await voiceAccount.SignIn(this);
+            status.Text = $"Voiced greeting on, signed in as {email}.";
+        }
+        catch (Exception ex)
+        {
+            status.Text = $"Sign-in didn't complete. {ex.Message}";
+        }
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == FocusPhone.Ui.Voice.VoiceGoogleAccount.RequestCode)
+            FocusPhone.Ui.Voice.VoiceGoogleAccount.HandleChooserResult(resultCode, data);
+    }
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
@@ -79,6 +103,15 @@ public class SettingsActivity : Activity
         var diagnostics = PaperUi.QuietButton(this, "Diagnostics", () =>
             StartActivity(new Intent(this, typeof(DiagnosticsActivity))));
         layout.AddView(diagnostics, Spaced(DesignTokens.Space.X4, 0));
+
+        // Sign in with Google (read-only Drive) so the inbox can greet the owner in their own voice,
+        // reading the shared voice profile. Skipping it just keeps neutral copy.
+        var voiceStatus = PaperUi.Secondary(this, FocusPhone.Ui.Voice.VoiceGoogleAccount.IsSignedIn
+            ? $"Voiced greeting on, signed in as {FocusPhone.Ui.Voice.VoiceGoogleAccount.Email}."
+            : "Sign in with Google to be greeted in your own voice — reads your shared voice profile, read-only.");
+        var voiceSignIn = PaperUi.SecondaryButton(this, "Sign in with Google", () => _ = VoiceSignInAsync(voiceStatus));
+        layout.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));
+        layout.AddView(voiceStatus, Spaced(DesignTokens.Space.X2, 0));
 
         scroll.AddView(layout);
         root.AddView(scroll, new LinearLayout.LayoutParams(

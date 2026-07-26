@@ -44,6 +44,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("PdfStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("VoiceJson")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NovelId")
@@ -244,6 +247,12 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("BatchJobId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("BatchSubmittedAtUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("ChaptersDetected")
                         .HasColumnType("INTEGER");
 
@@ -300,6 +309,9 @@ namespace Storyboarder.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<long>("UpdatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("VoiceAnalyzed")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
@@ -362,6 +374,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("Attempts")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("BatchAttempted")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("BlockedCategoriesJson")
                         .HasColumnType("TEXT");
 
@@ -370,6 +385,9 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.Property<string>("Dialogue")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("DialogueKind")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ImagePath")
                         .HasColumnType("TEXT");
@@ -391,6 +409,9 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.Property<string>("ReferenceNamesJson")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Sfx")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("ShotType")

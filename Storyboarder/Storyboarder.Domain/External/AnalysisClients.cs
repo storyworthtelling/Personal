@@ -64,6 +64,14 @@ public interface IClaudeAnalysisClient
         IReadOnlyList<ChapterNotes> notes,
         CancellationToken cancellationToken);
 
+    // Reads a representative prose sample from each chapter and reports where the author's own writing
+    // drifts from the book's dominant authorial voice. Its own call because it needs actual prose in front
+    // of the model (register, diction, cadence can't be judged from the per-chunk notes the other reduces
+    // work from). Returns the dominant-voice characterization plus the divergent passages.
+    Task<VoiceConsistency> AssessVoiceConsistency(
+        IReadOnlyList<ChapterSample> samples,
+        CancellationToken cancellationToken);
+
     // Restages a panel's visual prompt so objectionable content is implied — occluded, off-frame, or
     // cut away from — rather than depicted. Used only when even a relaxed render hit the image model's
     // non-adjustable floor, to salvage the beat without showing what the model refuses to draw.

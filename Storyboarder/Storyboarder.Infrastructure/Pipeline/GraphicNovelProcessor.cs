@@ -14,6 +14,7 @@ using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Persistence;
+using Storyworthtelling.Voice;
 
 namespace Storyboarder.Infrastructure.Pipeline;
 
@@ -42,6 +43,16 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     // Null when the platform head supplies no Drive archive (and on any non-Android host). The archive
     // stage treats that exactly like archiving being switched off.
     private readonly IDriveArchive? driveArchive;
+
+    // The owner's-voice learner + shared profile store. Both null on a head that wires no voice feature
+    // (or on any non-Android host without a Claude key for it); voice refinement then simply doesn't run.
+    private readonly IVoiceClient? voiceClient;
+    private readonly IVoiceProfileStore? voiceStore;
+
+    // The Gemini Batch API client and config. Batch rendering is active only when GeminiOptions
+    // .UseBatchRendering is on AND a batch client was supplied; otherwise panels render synchronously.
+    private readonly IGeminiBatchClient? batchClient;
+    private readonly GeminiOptions geminiConfig;
     private readonly TextChunker chunker = new();
     // A finer chunker used only for storyboarding: it slices each (large) design-bible chunk into small
     // sub-windows so a single storyboard Claude call stays short (see RateLimitOptions.StoryboardWindowChars).
@@ -51,6 +62,16 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     // How much opening prose the art-style derivation sees — enough to read the genre, voice and setting
     // without paying for the whole book on a one-off, best-effort call.
     private const int ArtStyleSampleChars = 6000;
+
+    // How much manuscript the voice refinement reads. Voice is about HOW the owner writes — cadence,
+    // register, attitude — which a generous opening sample captures without paying to send a whole novel
+    // to Claude just to distil a short profile.
+    private const int VoiceSampleChars = 12000;
+
+    // How much of each chapter the voice-consistency read samples. One representative opening passage per
+    // chapter is enough to characterise that chapter's register and cadence and to catch a chapter that
+    // drifts from the book's voice, while keeping the whole book's samples inside a single Claude call.
+    private const int VoiceConsistencySampleChars = 800;
     private readonly DesignBibleMerger merger = new();
     private readonly CoverPageRenderer coverRenderer = new();
     private readonly PlaceholderPanelRenderer placeholderRenderer = new();
@@ -68,7 +89,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         IOptions<PageLayoutOptions> pageLayoutOptions,
         IOptions<ArchiveOptions> archiveOptions,
         ILogger<GraphicNovelProcessor> logger,
-        IDriveArchive? driveArchive = null)
+        IDriveArchive? driveArchive = null,
+        IGeminiBatchClient? batchClient = null,
+        IOptions<GeminiOptions>? geminiOptions = null,
+        IVoiceClient? voiceClient = null,
+        IVoiceProfileStore? voiceStore = null)
     {
         this.dbContextFactory = dbContextFactory;
         this.claude = claude;
@@ -79,6 +104,10 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         this.analysisPdfComposer = analysisPdfComposer;
         this.clock = clock;
         this.logger = logger;
+        this.batchClient = batchClient;
+        this.voiceClient = voiceClient;
+        this.voiceStore = voiceStore;
+        geminiConfig = geminiOptions?.Value ?? new GeminiOptions();
 
         rateLimits = rateLimitOptions.Value;
         pageLayout = pageLayoutOptions.Value;
@@ -172,9 +201,39 @@ public sealed class GraphicNovelProcessor : IPipelineStep
 
         await EnsureChaptersLabelled(db, novel, source.FullText, cancellationToken);
 
+        // Learn the owner's voice from this manuscript into the shared profile every com.storyworthtelling
+        // app reads. Best-effort and guarded by VoiceAnalyzed, so it runs once per draft and never fails or
+        // stalls the book. Persisted with the stage change below.
+        await RefineOwnerVoice(novel, source.FullText, cancellationToken);
+
         SetStage(novel, ProjectStage.BuildingDesignBible);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
+    }
+
+    // Folds this draft's manuscript into the owner's shared voice profile. No-op when no voice client/store
+    // is wired or the draft has already been analyzed. A failure is swallowed (logged) and leaves
+    // VoiceAnalyzed false so a later ingest can retry — voiced messaging is a nicety, never a gate on a book.
+    private async Task RefineOwnerVoice(Novel novel, string manuscript, CancellationToken cancellationToken)
+    {
+        if (voiceClient is null || voiceStore is null || novel.VoiceAnalyzed)
+            return;
+
+        try
+        {
+            var sample = manuscript.Length > VoiceSampleChars ? manuscript[..VoiceSampleChars] : manuscript;
+            var existing = await voiceStore.LoadAsync(cancellationToken);
+            var refined = await voiceClient.RefineAsync(existing, sample, cancellationToken);
+            await voiceStore.SaveAsync(refined, cancellationToken);
+            novel.VoiceAnalyzed = true;
+            logger.LogInformation(
+                "Refined owner voice from novel {NovelId} ({Documents} document(s) now analyzed)",
+                novel.Id, refined.DocumentsAnalyzed);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Owner voice refinement failed for novel {NovelId}; continuing without it", novel.Id);
+        }
     }
 
     private async Task<ProcessResult> BuildDesignBible(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
@@ -478,6 +537,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                             // lettering yields to readability (see DialogueFit / DESIGN.md).
                             Dialogue = DialogueFit.Trim(panelDraft.Dialogue),
                             Caption = panelDraft.Caption,
+                            DialogueKind = panelDraft.DialogueKind,
+                            Sfx = panelDraft.Sfx,
                             ShotType = panelDraft.Shot,
                             SourceStartOffset = windowStart,
                             SourceEndOffset = windowEnd,
@@ -539,7 +600,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             select new ReusablePanel(
                 v.Number, v.Title, pg.ChapterNumber, pg.PageNumber, pn.PanelNumber,
                 pn.SourceStartOffset, pn.SourceEndOffset, pn.VisualPrompt, pn.Dialogue, pn.Caption,
-                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped, pn.ShotType))
+                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped, pn.ShotType, pn.DialogueKind, pn.Sfx))
             .ToListAsync(cancellationToken);
 
         // Only the previous panels drawn from a window whose text is byte-identical to this one.
@@ -586,6 +647,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                         VisualPrompt = source.VisualPrompt,
                         Dialogue = source.Dialogue,
                         Caption = source.Caption,
+                        DialogueKind = source.DialogueKind,
+                        Sfx = source.Sfx,
                         ShotType = source.ShotType,
                         SourceStartOffset = windowStart,
                         SourceEndOffset = windowEnd,
@@ -616,7 +679,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
     private sealed record ReusablePanel(
         int VolumeNumber, string VolumeTitle, int ChapterNumber, int PageNumber, int PanelNumber,
         int SourceStartOffset, int SourceEndOffset, string VisualPrompt, string? Dialogue, string? Caption,
-        string ReferenceNamesJson, string? ImagePath, bool Skipped, ShotType ShotType);
+        string ReferenceNamesJson, string? ImagePath, bool Skipped, ShotType ShotType,
+        DialogueKind DialogueKind, string? Sfx);
 
     private async Task<ProcessResult> RenderPanels(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
@@ -624,6 +688,17 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         var volumeIds = await db.Volumes.Where(v => v.NovelId == novel.Id).Select(v => v.Id).ToListAsync(cancellationToken);
         var pageIds = await db.Pages.Where(pg => volumeIds.Contains(pg.VolumeId)).Select(pg => pg.Id).ToListAsync(cancellationToken);
         var panelsForNovel = db.Panels.Where(p => pageIds.Contains(p.PageId));
+
+        // Opt-in batch mode: render the first pass through a Gemini batch job. Returns non-null while the
+        // batch owns the step (a job is in flight, or one was just submitted); returns null once there's
+        // nothing left to batch, so the synchronous path below handles escalation/retry panels (which a
+        // batch failure or block sends back to Pending) and the advance to page composition.
+        if (geminiConfig.UseBatchRendering && batchClient is not null)
+        {
+            var batchStep = await RunBatchStep(db, novel, panelsForNovel, now, cancellationToken);
+            if (batchStep is not null)
+                return batchStep.Value;
+        }
 
         var panel = await panelsForNovel
             .Where(p => p.Status == WorkStatus.Pending ||
@@ -687,6 +762,119 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return ProcessResult.DidWork(novel.Id);
     }
 
+    // The batch render step. Returns:
+    //  - a poll wait, or DidWork after reconciling, while a batch job is in flight;
+    //  - DidWork after submitting a new batch of never-batched panels;
+    //  - null when there's nothing to batch (no job, no un-batched panels), so RenderPanels falls through
+    //    to the synchronous path for the panels a batch failed/blocked (now Pending) and the stage advance.
+    private async Task<ProcessResult?> RunBatchStep(
+        StoryboarderDbContext db, Novel novel, IQueryable<Panel> panelsForNovel, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        // A job is in flight: poll and reconcile.
+        if (novel.BatchJobId is { } jobId)
+        {
+            BatchJobStatus status;
+            try
+            {
+                status = await batchClient!.PollAsync(jobId, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Couldn't reach the batch service; try again on the next poll rather than crash the cycle.
+                logger.LogWarning(ex, "Polling batch {JobId} failed; will retry (novel {NovelId})", jobId, novel.Id);
+                return ProcessResult.Waiting(TimeSpan.FromSeconds(geminiConfig.BatchPollSeconds), novel.Id);
+            }
+
+            if (status.State == BatchJobState.Running)
+                return ProcessResult.Waiting(TimeSpan.FromSeconds(geminiConfig.BatchPollSeconds), novel.Id);
+
+            var inFlight = await panelsForNovel
+                .Where(p => p.Status == WorkStatus.SubmittedToBatch)
+                .ToListAsync(cancellationToken);
+            var byId = inFlight.ToDictionary(p => p.Id);
+
+            if (status.State == BatchJobState.Succeeded)
+            {
+                foreach (var outcome in status.Results)
+                {
+                    if (!byId.Remove(outcome.PanelId, out var panel))
+                        continue;
+                    if (outcome.Succeeded)
+                    {
+                        panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", outcome.Image!);
+                        panel.Status = WorkStatus.Completed;
+                        panel.LastError = null;
+                    }
+                    else
+                    {
+                        // Failed or blocked in the batch → back to the synchronous path, which re-renders
+                        // it (re-surfacing any real content block to HandleBlockedPanel, or just succeeding).
+                        panel.Status = WorkStatus.Pending;
+                        panel.LastError = outcome.Error;
+                    }
+                }
+            }
+
+            // A whole-job failure, or any panel the results didn't mention, falls back to synchronous
+            // rendering (BatchAttempted is already set, so it's never re-batched).
+            foreach (var orphan in byId.Values)
+                orphan.Status = WorkStatus.Pending;
+
+            var reconciled = inFlight.Count;
+            novel.BatchJobId = null;
+            novel.BatchSubmittedAtUtc = null;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            logger.LogInformation(
+                "Reconciled batch {JobId} ({State}) for {Count} panel(s) (novel {NovelId})",
+                jobId, status.State, reconciled, novel.Id);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // No job in flight: submit the panels that have never been through a batch. Everything else
+        // (already-batched Pending/NeedsRetry escalations) is left to the synchronous path.
+        var toBatch = await panelsForNovel
+            .Where(p => p.Status == WorkStatus.Pending && !p.BatchAttempted)
+            .OrderBy(p => p.PanelNumber)
+            .ToListAsync(cancellationToken);
+        if (toBatch.Count == 0)
+            return null;
+
+        var requests = new List<BatchPanelRequest>(toBatch.Count);
+        foreach (var panel in toBatch)
+        {
+            var references = await LoadReferenceImages(db, novel.Id, panel.ReferenceNamesJson, cancellationToken);
+            var aspectRatio = await PanelSlotAspectRatio(db, panel, cancellationToken);
+            requests.Add(new BatchPanelRequest(panel.Id, panel.VisualPrompt, novel.ArtStyle, references, aspectRatio));
+        }
+
+        string newJobId;
+        try
+        {
+            newJobId = await batchClient!.SubmitAsync(requests, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Submission failed (transient): the panels stay Pending and un-batched, so the next cycle
+            // tries again. Don't spin — defer by the poll interval.
+            logger.LogWarning(ex, "Submitting a render batch failed; will retry (novel {NovelId})", novel.Id);
+            return ProcessResult.Waiting(TimeSpan.FromSeconds(geminiConfig.BatchPollSeconds), novel.Id);
+        }
+
+        foreach (var panel in toBatch)
+        {
+            panel.Status = WorkStatus.SubmittedToBatch;
+            panel.BatchAttempted = true;
+        }
+        novel.BatchJobId = newJobId;
+        novel.BatchSubmittedAtUtc = now;
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Submitted {Count} panel(s) as batch {JobId} (novel {NovelId})", toBatch.Count, newJobId, novel.Id);
+        return ProcessResult.DidWork(novel.Id);
+    }
+
     private async Task<ProcessResult> ComposePages(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
         // Self-heal: a Completed panel whose image file has vanished (cache eviction, a partial
@@ -713,7 +901,8 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 var panelArt = page.Panels
                     .Where(p => !p.Skipped)
                     .OrderBy(p => p.PanelNumber)
-                    .Select(p => new PanelArt(imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption, p.ShotType))
+                    .Select(p => new PanelArt(
+                        imageStore.Read(p.ImagePath!), p.Dialogue, p.Caption, p.ShotType, p.DialogueKind, p.Sfx))
                     .ToList();
                 if (panelArt.Count == 0)
                     panelArt.Add(new PanelArt(placeholderRenderer.Render(), null, null));
@@ -1004,7 +1193,34 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 3) Render: compose the analysis PDF from the consolidated report (both halves folded into one).
+        // 2d) Assess authorial-voice consistency: where the author's own prose drifts from the book's
+        // dominant voice. Its own resumable step for the same reasons the craft and fact-check halves are —
+        // its own call, its own column, billed separately — and it needs per-chapter prose SAMPLES rather
+        // than the notes, since register/cadence can only be judged from the actual sentences.
+        if (analysis.VoiceJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var samples = await GatherChapterSamples(db, novel.Id, cancellationToken);
+
+            try
+            {
+                var voice = await claude.AssessVoiceConsistency(samples, cancellationToken);
+                analysis.VoiceJson = JsonSerializer.Serialize(voice, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 3) Render: compose the analysis PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
             try
@@ -1018,7 +1234,11 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                     ? Array.Empty<FactCheck>()
                     : JsonSerializer.Deserialize<List<FactCheck>>(analysis.FactChecksJson, JsonResponse.CaseInsensitive)
                       ?? (IReadOnlyList<FactCheck>)Array.Empty<FactCheck>();
-                var pdf = analysisPdfComposer.Compose(report.WithCraft(craft).WithFactChecks(checks), novel.Title);
+                var voice = analysis.VoiceJson is null
+                    ? VoiceConsistency.Empty
+                    : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive) ?? VoiceConsistency.Empty;
+                var pdf = analysisPdfComposer.Compose(
+                    report.WithCraft(craft).WithFactChecks(checks).WithVoiceConsistency(voice), novel.Title);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -1456,6 +1676,54 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return notesJson
             .Select(json => JsonSerializer.Deserialize<ChapterNotes>(json, JsonResponse.CaseInsensitive) ?? ChapterNotes.Empty)
             .ToList();
+    }
+
+    // Pulls one representative opening prose sample from each detected chapter, for the voice-consistency
+    // read. Uses the source text + chapter spans directly (not the notes) because that read judges the
+    // actual sentences. A chapter's heading line is skipped so the sample is prose, not the title.
+    private async Task<IReadOnlyList<ChapterSample>> GatherChapterSamples(
+        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var fullText = await db.SourceTexts
+            .Where(s => s.NovelId == novelId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrEmpty(fullText))
+            return Array.Empty<ChapterSample>();
+
+        var chapters = await db.Chapters
+            .Where(c => c.NovelId == novelId)
+            .OrderBy(c => c.Number)
+            .ToListAsync(cancellationToken);
+
+        var samples = new List<ChapterSample>();
+        foreach (var chapter in chapters)
+        {
+            var start = Math.Clamp(chapter.StartOffset, 0, fullText.Length);
+            var end = Math.Clamp(chapter.EndOffset, start, fullText.Length);
+            var excerpt = SampleExcerpt(fullText[start..end]);
+            if (!string.IsNullOrWhiteSpace(excerpt))
+                samples.Add(new ChapterSample(chapter.Label, excerpt));
+        }
+        return samples;
+    }
+
+    // Takes the opening prose of a chapter span: drop a leading heading line, then up to
+    // VoiceConsistencySampleChars cut at a word boundary.
+    private static string SampleExcerpt(string span)
+    {
+        var text = span.TrimStart();
+        var firstBreak = text.IndexOf('\n');
+        // A short first line (a "Chapter 7"-style heading) is dropped; a long one is already prose.
+        if (firstBreak >= 0 && firstBreak <= 60)
+            text = text[(firstBreak + 1)..].TrimStart();
+
+        text = text.Trim();
+        if (text.Length <= VoiceConsistencySampleChars)
+            return text;
+
+        var cut = text.LastIndexOf(' ', VoiceConsistencySampleChars - 1);
+        return (cut > 0 ? text[..cut] : text[..VoiceConsistencySampleChars]).TrimEnd() + "…";
     }
 
     private async Task<IReadOnlyList<byte[]>> LoadReferenceImages(

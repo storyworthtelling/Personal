@@ -40,8 +40,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private const string StoryboardInstruction =
         "You are a comics writer adapting a novel into a graphic novel. Using the supplied design bible " +
-        "for consistency, break the provided passage into as many volumes, pages, and panels as the " +
-        "story needs. Aim for roughly 3 to 6 panels per page (never more than 6), and give a pivotal " +
+        "for consistency, break the provided passage into volumes, pages, and panels — but be " +
+        "ECONOMICAL. This graphic novel is a comprehension aid: draw only the beats a reader needs to " +
+        "follow WHAT happens, WHO does it, and WHERE it happens. Each panel must carry a distinct, " +
+        "load-bearing action; SKIP transitional, in-between, establishing-only, and reaction-only " +
+        "moments that don't advance the action, and skip a beat already clear from an adjacent panel. " +
+        "Prefer the fewest panels that keep the action legible over a dense shot-by-shot breakdown. " +
+        "Aim for 1 to 4 panels per page (never more than 6), and give a pivotal " +
         "beat its own page. For each panel give a vivid visual prompt that captures a SPECIFIC MOMENT " +
         "OF ONGOING ACTION — the characters caught mid-gesture or mid-movement, interacting with each " +
         "other and the setting — with an explicit shot type or camera angle (e.g. wide establishing " +
@@ -51,10 +56,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "and the names of design-bible entities present. Give each panel a shotType of \"standard\", " +
         "\"wide\" (a full-width establishing/landscape shot), or \"splash\" (a full-page moment reserved " +
         "for a genuinely pivotal beat — use sparingly). Maintain continuity with the running summary. " +
+        "Set dialogueKind to \"thought\" only when the dialogue is a character's unspoken interior " +
+        "thought (it letters as a thought balloon); otherwise \"speech\". Set sfx to a short onomatopoeia " +
+        "for a prominent sound in the panel (e.g. \"CRASH\", \"BOOM\", \"KNOCK\") in the book's language, " +
+        "or null when there is no notable sound — which is most panels. " +
         "Respond with ONLY a JSON object: " +
         "{\"continuitySummary\":string,\"volumes\":[{\"number\":int,\"title\":string,\"pages\":" +
         "[{\"chapterNumber\":int,\"panels\":[{\"visualPrompt\":string,\"dialogue\":string|null," +
-        "\"caption\":string|null,\"referenceNames\":[string],\"shotType\":\"standard\"|\"wide\"|\"splash\"}]}]}]}." +
+        "\"caption\":string|null,\"referenceNames\":[string],\"shotType\":\"standard\"|\"wide\"|\"splash\"," +
+        "\"dialogueKind\":\"speech\"|\"thought\",\"sfx\":string|null}]}]}]}." +
         " No prose outside the JSON.";
 
     private const string ArtStyleInstruction =
@@ -156,6 +166,23 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "you were given. Judge only real-world accuracy: invented places, people and history in a work of " +
         "fiction are not errors, so leave them out entirely rather than reporting them as Incorrect. " +
         "Report at most 30 checks, the ones that most matter. No prose outside the JSON.";
+
+    private const string VoiceConsistencyInstruction =
+        "You are a developmental editor assessing a manuscript's VOICE CONSISTENCY for an author preparing " +
+        "it for publication. You are given a representative prose sample from each chapter, each tagged " +
+        "with its chapter. First infer the book's DOMINANT authorial voice — its register, diction, " +
+        "sentence cadence, tone, and narrative stance — from the body of samples. Then flag the passages " +
+        "whose prose DRIFTS from that dominant voice: a chapter that slips into a different register, an " +
+        "out-of-place tonal shift, diction or rhythm unlike the rest. Judge consistency of VOICE only — " +
+        "not quality, plot, or subject matter. A deliberately distinct voice (a different POV character's " +
+        "chapter, a letter or document embedded in the text) is NOT a defect, so flag only drift that " +
+        "reads as unintentional. Respond with ONLY a JSON object: " +
+        "{\"dominantVoice\":string,\"divergences\":[{\"chapter\":string,\"excerpt\":string," +
+        "\"divergence\":string,\"suggestion\":string}]}. dominantVoice: two or three sentences " +
+        "characterizing the book's established voice. excerpt: quote the divergent prose VERBATIM from the " +
+        "sample so the author can find it. divergence: how it departs from the dominant voice. suggestion: " +
+        "how to bring it into line. Report AT MOST 20 divergences, the clearest ones, and use [] when the " +
+        "voice is consistent throughout. No prose outside the JSON.";
 
     private const string ImplyInstruction =
         "You are a comics director revising a single panel's visual prompt. The image model refused to " +
@@ -380,6 +407,33 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             .ToList();
     }
 
+    public async Task<VoiceConsistency> AssessVoiceConsistency(
+        IReadOnlyList<ChapterSample> samples, CancellationToken cancellationToken)
+    {
+        var meaningful = samples.Where(s => !string.IsNullOrWhiteSpace(s.Excerpt)).ToList();
+        // A single chapter (or none) gives nothing to judge consistency against — don't spend a call.
+        if (meaningful.Count < 2)
+            return VoiceConsistency.Empty;
+
+        var userContent = "CHAPTER SAMPLES (JSON):\n" + JsonSerializer.Serialize(meaningful, JsonResponse.CaseInsensitive);
+        var reply = await SendMessage(VoiceConsistencyInstruction, userContent, cancellationToken, options.AnalysisMaxTokens);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return VoiceConsistency.Empty;
+
+        var dto = JsonResponse.Deserialize<VoiceConsistencyDto>(json);
+        if (dto is null)
+            return VoiceConsistency.Empty;
+
+        return new VoiceConsistency(
+            dto.DominantVoice ?? string.Empty,
+            (dto.Divergences ?? [])
+                .Where(d => !string.IsNullOrWhiteSpace(d.Excerpt))
+                .Select(d => new VoiceDivergence(
+                    d.Chapter ?? string.Empty, d.Excerpt!, d.Divergence ?? string.Empty, d.Suggestion ?? string.Empty))
+                .ToList());
+    }
+
     public async Task<string> RewritePromptToImply(string visualPrompt, CancellationToken cancellationToken)
     {
         var reply = await SendMessage(ImplyInstruction, visualPrompt, cancellationToken);
@@ -585,8 +639,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         new(page.ChapterNumber,
             (page.Panels ?? [])
                 .Select(p => new PanelDraft(
-                    p.VisualPrompt ?? string.Empty, p.Dialogue, p.Caption, p.ReferenceNames ?? [], ParseShot(p.ShotType)))
+                    p.VisualPrompt ?? string.Empty, p.Dialogue, p.Caption, p.ReferenceNames ?? [],
+                    ParseShot(p.ShotType), ParseDialogueKind(p.DialogueKind),
+                    string.IsNullOrWhiteSpace(p.Sfx) ? null : p.Sfx!.Trim()))
                 .ToList());
+
+    // Maps the model's dialogueKind string to the enum, defaulting to Speech for anything unrecognized or
+    // absent (an older reply, a typo) — so a missing value simply letters as a normal spoken balloon.
+    private static DialogueKind ParseDialogueKind(string? kind) =>
+        kind?.Trim().ToLowerInvariant() == "thought" ? DialogueKind.Thought : DialogueKind.Speech;
 
     // Maps the model's shotType string to the enum, defaulting to Standard for anything unrecognized or
     // absent (an older reply, a typo, or a shot vocabulary we don't lay out specially) — so a missing or
@@ -643,6 +704,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Caption { get; set; }
         public List<string>? ReferenceNames { get; set; }
         public string? ShotType { get; set; }
+        public string? DialogueKind { get; set; }
+        public string? Sfx { get; set; }
     }
 
     private sealed class ChapterNotesDto
@@ -749,6 +812,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private sealed class FactCheckReplyDto
     {
         public List<FactCheckDto>? Checks { get; set; }
+    }
+
+    private sealed class VoiceConsistencyDto
+    {
+        public string? DominantVoice { get; set; }
+        public List<VoiceDivergenceDto>? Divergences { get; set; }
+    }
+
+    private sealed class VoiceDivergenceDto
+    {
+        public string? Chapter { get; set; }
+        public string? Excerpt { get; set; }
+        public string? Divergence { get; set; }
+        public string? Suggestion { get; set; }
     }
 
     private sealed class FactCheckDto

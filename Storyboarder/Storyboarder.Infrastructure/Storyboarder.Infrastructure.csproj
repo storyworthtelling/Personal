@@ -12,6 +12,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Storyboarder.Domain\Storyboarder.Domain.csproj" />
+    <!-- The shared owner's-voice library (net10.0, pure .NET): every com.storyworthtelling app references
+         it so situational messaging can be written in the owner's voice. Referencing it here ships the
+         voice DLL in the Android APK and gives the pipeline the client + profile store. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
   </ItemGroup>
 
   <!-- The shared Paper & Ink fonts, embedded for the Skia page/report renderers

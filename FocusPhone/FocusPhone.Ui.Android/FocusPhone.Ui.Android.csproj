@@ -9,6 +9,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FocusPhone.Domain\FocusPhone.Domain.csproj" />
+    <!-- Shared owner's-voice library: every head greets the owner in their voice, reading the shared
+         profile + Claude key from Drive and degrading to neutral copy when unavailable. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+  </ItemGroup>
+
+  <!-- Google Drive read access for the shared voice profile/config. -->
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -22,4 +22,13 @@ public class MainActivity : MauiAppCompatActivity
         if (SettingsStore.IsConfigured)
             RefreshWorker.RunNow(this);
     }
+
+    // Routes the Google account-picker result back to the voice sign-in flow (SetupPage → device-account
+    // Drive read of the shared voice profile).
+    protected override void OnActivityResult(int requestCode, Result resultCode, global::Android.Content.Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == Google.DeviceAccountSignIn.RequestCode)
+            Google.DeviceAccountSignIn.HandleChooserResult(resultCode, data);
+    }
 }
