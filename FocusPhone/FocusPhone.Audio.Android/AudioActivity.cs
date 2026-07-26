@@ -52,6 +52,10 @@ public class AudioActivity : Activity
 
     // Music side (Phase 3: sign-in + scan + browse; playback lands in Phase 4).
     private readonly DeviceAccountTokenProvider musicTokens = new();
+
+    // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
+    private FocusPhone.Ui.Voice.VoiceGreeting? greeting;
+    private TextView? greetingView;
     private DriveMusicClient? driveClient;
     private MusicTagReader? tagReader;
     private MusicCatalog? musicCatalog;
@@ -80,8 +84,10 @@ public class AudioActivity : Activity
         tagReader = new MusicTagReader(Path.Combine(CacheDir!.AbsolutePath, "art"));
         LoadMusicCatalog();
 
+        greeting = new FocusPhone.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "FocusPhone.Audio");
         SetContentView(BuildLayout());
         ConnectController();
+        ShowGreetingAsync();
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
     }
@@ -109,6 +115,20 @@ public class AudioActivity : Activity
         subscriptionStore.Save(subscriptions.Export());
     }
 
+    // Composes a greeting in the owner's voice (from the shared Drive profile + key) and shows it under the
+    // header. Best-effort: it stays hidden when there's no signed-in account, profile, key, or on any error.
+    private async void ShowGreetingAsync()
+    {
+        if (greeting is null || greetingView is null)
+            return;
+        var message = await greeting.ComposeAsync(
+            "welcome", "the owner is opening their music and podcasts", CancellationToken.None);
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+        greetingView.Text = message;
+        greetingView.Visibility = ViewStates.Visible;
+    }
+
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
@@ -117,6 +137,12 @@ public class AudioActivity : Activity
         var header = PaperUi.PageHeader(this, "Audio");
         header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
         root.AddView(header);
+
+        // A greeting in the owner's voice, hidden until composed (and only when a shared profile exists).
+        greetingView = PaperUi.Secondary(this, string.Empty);
+        greetingView.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X4));
+        greetingView.Visibility = ViewStates.Gone;
+        root.AddView(greetingView);
 
         var toggle = PaperUi.SegmentedToggle(this, "Podcasts", "Music", index =>
         {
