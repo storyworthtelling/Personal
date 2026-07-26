@@ -6,6 +6,7 @@ using Ledger.Domain.External;
 using Ledger.Domain.Model;
 using Ledger.Domain.Time;
 using Ledger.Infrastructure.Services;
+using Storyworthtelling.Voice;
 
 namespace Ledger.Android.Pages;
 
@@ -13,18 +14,50 @@ public partial class MainPage : ContentPage
 {
     private readonly AccountService accounts;
     private readonly IPlaidClient plaid;
+    private readonly DriveVoiceOptions voiceOptions;
+    private readonly VoicedMessenger voice;
 
-    public MainPage(AccountService accounts, IPlaidClient plaid)
+    public MainPage(AccountService accounts, IPlaidClient plaid, DriveVoiceOptions voiceOptions, VoicedMessenger voice)
     {
         InitializeComponent();
         this.accounts = accounts;
         this.plaid = plaid;
+        this.voiceOptions = voiceOptions;
+        this.voice = voice;
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
         await ReloadAsync();
+        _ = ShowWelcomeAsync();
+    }
+
+    // A greeting composed fresh in the owner's voice, shown only once a shared voice profile exists.
+    // Pulls the Claude key from the shared Drive config first (RefreshAsync); everything degrades to a
+    // hidden label when the profile, key, or Drive access isn't there — never blocks or crashes the page.
+    private async Task ShowWelcomeAsync()
+    {
+        if (string.IsNullOrEmpty(SettingsStore.GoogleAccountEmail))
+        {
+            WelcomeLabel.IsVisible = false;
+            return;
+        }
+
+        string message;
+        try
+        {
+            await voiceOptions.RefreshAsync(CancellationToken.None);
+            var context = "the owner is checking their balances in Ledger";
+            message = await voice.ComposeAsync(new MessageRequest("welcome", context), fallback: string.Empty, CancellationToken.None);
+        }
+        catch
+        {
+            message = string.Empty;
+        }
+
+        WelcomeLabel.Text = message;
+        WelcomeLabel.IsVisible = !string.IsNullOrWhiteSpace(message);
     }
 
     private async Task ReloadAsync()
