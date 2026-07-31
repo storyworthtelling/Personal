@@ -60,11 +60,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "thought (it letters as a thought balloon); otherwise \"speech\". Set sfx to a short onomatopoeia " +
         "for a prominent sound in the panel (e.g. \"CRASH\", \"BOOM\", \"KNOCK\") in the book's language, " +
         "or null when there is no notable sound — which is most panels. " +
+        "Mark scene boundaries: set newScene to true on a panel that BEGINS A NEW SCENE — a change of " +
+        "location, a jump in time, or a distinct dramatic unit — and false on a panel that continues the " +
+        "current scene. The very first panel of the passage begins a scene. These groupings are used to " +
+        "render panels efficiently, so place them at genuine story boundaries. " +
         "Respond with ONLY a JSON object: " +
         "{\"continuitySummary\":string,\"volumes\":[{\"number\":int,\"title\":string,\"pages\":" +
         "[{\"chapterNumber\":int,\"panels\":[{\"visualPrompt\":string,\"dialogue\":string|null," +
         "\"caption\":string|null,\"referenceNames\":[string],\"shotType\":\"standard\"|\"wide\"|\"splash\"," +
-        "\"dialogueKind\":\"speech\"|\"thought\",\"sfx\":string|null}]}]}]}." +
+        "\"dialogueKind\":\"speech\"|\"thought\",\"sfx\":string|null,\"newScene\":bool}]}]}]}." +
         " No prose outside the JSON.";
 
     private const string ArtStyleInstruction =
@@ -641,7 +645,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 .Select(p => new PanelDraft(
                     p.VisualPrompt ?? string.Empty, p.Dialogue, p.Caption, p.ReferenceNames ?? [],
                     ParseShot(p.ShotType), ParseDialogueKind(p.DialogueKind),
-                    string.IsNullOrWhiteSpace(p.Sfx) ? null : p.Sfx!.Trim()))
+                    string.IsNullOrWhiteSpace(p.Sfx) ? null : p.Sfx!.Trim(), p.NewScene))
                 .ToList());
 
     // Maps the model's dialogueKind string to the enum, defaulting to Speech for anything unrecognized or
@@ -706,6 +710,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? ShotType { get; set; }
         public string? DialogueKind { get; set; }
         public string? Sfx { get; set; }
+        public bool NewScene { get; set; }
     }
 
     private sealed class ChapterNotesDto

@@ -286,17 +286,22 @@ See `Storyboarder/BATCHING.md` for the full investigation.
   the owner wants to trade the runaway guardrail for maximum headroom, bump `GeminiRequestsPerDay` toward
   50,000.
 - **Batch API** ✅ built and **on by default**, first run is the live verification: the whole batch render
-  mode exists — `IGeminiBatchClient` + `GeminiBatchImageClient`, in-flight state (`Novel.BatchJobId`,
-  `Panel.BatchAttempted`, `WorkStatus.SubmittedToBatch`), and `GraphicNovelProcessor.RunBatchStep` (submit
-  the first pass as one job, poll, reconcile; a batch failure/block falls back to the synchronous render +
-  block ladder). Reference sheets now go through the **Files API** (`SubmitAsync` uploads each distinct sheet
-  once, deduped by content hash, references it by `fileData` URI) so a full book stays under the 20 MB inline
-  cap. `GeminiOptions.UseBatchRendering` defaults **true**. The Batch REST envelope + the Files API upload
-  protocol are reconstructed from docs and not yet live-verified, but every mismatch path degrades to
-  synchronous rendering (safe, not crashy), which is why it could be flipped on without a sandbox-impossible
-  live check. Still worth measuring the raised-cap synchronous path on a real book (BATCHING.md); set
-  `UseBatchRendering = false` if the synchronous path is fast enough that the ≤24h batch turnaround isn't
-  worth it.
+  mode exists — `IGeminiBatchClient` + `GeminiBatchImageClient`, per-panel in-flight state
+  (`Panel.BatchAttempted`, `Panel.NewScene`, `Panel.BatchJobId`/`BatchSubmittedAtUtc`,
+  `WorkStatus.SubmittedToBatch`), and `GraphicNovelProcessor.RunBatchStep`. Batching is **per-scene**: Claude
+  tags scene boundaries (`NewScene`) and the pipeline submits one job per scene (splitting a scene past
+  `BatchMaxPanelsPerJob`), up to `MaxConcurrentBatchJobs` at once; each cycle polls/reconciles every job,
+  **gives up on a job older than `BatchGiveUpHours`** (→ synchronous), recovers stranded panels, and logs
+  result-to-panel correlation gaps. This replaced the original single-book-job design after the owner's first
+  run wedged a 664-panel job for days and returned mis-correlated art. A batch failure/block still falls back
+  to the synchronous render + block ladder. Reference sheets go through the **Files API** (`SubmitAsync`
+  uploads each distinct sheet once, deduped by content hash, references it by `fileData` URI) so a full book
+  stays under the 20 MB inline cap. `GeminiOptions.UseBatchRendering` defaults **true**. The Batch REST
+  envelope + the Files API upload protocol are reconstructed from docs and not yet live-verified, but every
+  mismatch path degrades to synchronous rendering (safe, not crashy), which is why it could be flipped on
+  without a sandbox-impossible live check. Still worth measuring the raised-cap synchronous path on a real
+  book (BATCHING.md); set `UseBatchRendering = false` if the synchronous path is fast enough that the ≤24h
+  batch turnaround isn't worth it. (`Novel.BatchJobId`/`BatchSubmittedAtUtc` are legacy, retained but unused.)
 
 ---
 

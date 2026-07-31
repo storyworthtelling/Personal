@@ -152,13 +152,22 @@ public class GraphicNovelProcessorTests : IDisposable
         NullLogger<GraphicNovelProcessor>.Instance,
         driveArchive,
         batchClient,
-        Options.Create(new GeminiOptions { UseBatchRendering = useBatchRendering, BatchPollSeconds = 1 }),
+        Options.Create(new GeminiOptions
+        {
+            UseBatchRendering = useBatchRendering, BatchPollSeconds = 1,
+            MaxConcurrentBatchJobs = maxConcurrentBatchJobs, BatchMaxPanelsPerJob = batchMaxPanelsPerJob,
+            BatchGiveUpHours = batchGiveUpHours
+        }),
         voiceClient,
         voiceStore);
 
-    // Batch rendering is off unless a test opts in (sets both a fake client and the flag).
+    // Batch rendering is off unless a test opts in (sets both a fake client and the flag). The three
+    // knobs mirror GeminiOptions' production defaults; per-scene tests override them.
     private IGeminiBatchClient? batchClient;
     private bool useBatchRendering;
+    private int maxConcurrentBatchJobs = 4;
+    private int batchMaxPanelsPerJob = 50;
+    private int batchGiveUpHours = 24;
 
     // The owner's-voice feature is unwired unless a test sets these (as the Android head does).
     private IVoiceClient? voiceClient;
@@ -983,8 +992,176 @@ public class GraphicNovelProcessorTests : IDisposable
             Assert.NotNull(p.ImagePath);
             Assert.True(p.BatchAttempted);
         });
-        // No batch job is left dangling on the finished novel.
+        // No batch job is left dangling — neither on the (legacy) novel column nor on any reconciled panel.
         Assert.Null(ctx.Novels.Single(n => n.Id == novelId).BatchJobId);
+        Assert.All(panels, p =>
+        {
+            Assert.Null(p.BatchJobId);
+            Assert.Null(p.BatchSubmittedAtUtc);
+        });
+    }
+
+    [Fact]
+    public async Task BatchMode_SubmitsOneJobPerScene()
+    {
+        // A short manuscript storyboarded in a single window, tagged into three scenes (panels between
+        // NewScene markers). Per-scene batching must submit exactly one job per scene, each carrying only
+        // that scene's panels — never one giant job for the book.
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoryboardSegment(
+                [new VolumeDraft(1, "Volume One",
+                    [new PageDraft(1,
+                    [
+                        new PanelDraft("Scene A opens", null, null, [], NewScene: true),
+                        new PanelDraft("Scene A continues", null, null, []),
+                        new PanelDraft("Scene B opens", null, null, [], NewScene: true),
+                        new PanelDraft("Scene C opens", null, null, [], NewScene: true),
+                        new PanelDraft("Scene C continues", null, null, []),
+                    ])])],
+                "Three scenes."));
+
+        var fake = new FakeBatchClient(() => SampleImages.Png());
+        batchClient = fake;
+        useBatchRendering = true;
+        maxConcurrentBatchJobs = 8;
+        // The five panels fit one page (default cap 6), so scene grouping — not page splitting — drives it.
+
+        var novelId = SeedNovel("A short manuscript that storyboards in one window.");
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.Equal(3, fake.JobCount);
+        Assert.Equal(0, panelRenderCalls);
+
+        using var ctx = database.NewContext();
+        var pageIds = ctx.Pages.Where(p => ctx.Volumes.Where(v => v.NovelId == novelId).Select(v => v.Id).Contains(p.VolumeId)).Select(p => p.Id).ToList();
+        Assert.All(ctx.Panels.Where(p => pageIds.Contains(p.PageId)), p => Assert.Equal(WorkStatus.Completed, p.Status));
+    }
+
+    [Fact]
+    public async Task BatchMode_SplitsAnOversizedScene_AcrossJobs()
+    {
+        // One long scene (five panels, no interior boundary) with a per-job cap of two must be split into
+        // three jobs so no single job is oversized.
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoryboardSegment(
+                [new VolumeDraft(1, "Volume One",
+                    [new PageDraft(1,
+                    [
+                        new PanelDraft("Beat 1", null, null, [], NewScene: true),
+                        new PanelDraft("Beat 2", null, null, []),
+                        new PanelDraft("Beat 3", null, null, []),
+                        new PanelDraft("Beat 4", null, null, []),
+                        new PanelDraft("Beat 5", null, null, []),
+                    ])])],
+                "One long scene."));
+
+        var fake = new FakeBatchClient(() => SampleImages.Png());
+        batchClient = fake;
+        useBatchRendering = true;
+        maxConcurrentBatchJobs = 8;
+        batchMaxPanelsPerJob = 2;
+
+        var novelId = SeedNovel("A short manuscript that storyboards in one window.");
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.Equal(3, fake.JobCount);
+        Assert.True(fake.MaxPanelsInAnyJob <= 2, "no single scene job may exceed the per-job cap");
+    }
+
+    [Fact]
+    public async Task BatchMode_GivesUpOnAStaleJob_AndRendersSynchronously()
+    {
+        // A job that never finishes (the failure mode that froze the owner's 664-panel run) must be given
+        // up on once it outlives the give-up window, so its panels fall back to the synchronous path and
+        // the book still completes rather than waiting forever.
+        var fake = new FakeBatchClient(() => SampleImages.Png(), runningPolls: int.MaxValue);
+        batchClient = fake;
+        useBatchRendering = true;
+        batchGiveUpHours = 2;
+
+        var novelId = SeedNovel("A short manuscript that storyboards in one window.");
+
+        // Drive to a submitted batch, then jump past the give-up window so the next poll abandons the job.
+        Guid[] batchedPanels = [];
+        for (int i = 0; i < 400; i++)
+        {
+            var stage = CurrentStage(novelId);
+            if (stage is ProjectStage.Completed or ProjectStage.Failed)
+                break;
+            var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+            using (var ctx = database.NewContext())
+            {
+                var submitted = ctx.Panels.Where(p => p.Status == WorkStatus.SubmittedToBatch).Select(p => p.Id).ToList();
+                if (submitted.Count > 0 && batchedPanels.Length == 0)
+                    batchedPanels = [.. submitted];
+            }
+
+            // Once a batch is in flight, advance well past the give-up window on each poll wait.
+            if (result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(batchedPanels.Length > 0 ? TimeSpan.FromHours(3) : result.Wait + TimeSpan.FromSeconds(1));
+        }
+
+        Assert.NotEmpty(batchedPanels);
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        Assert.True(fake.SubmitCalls >= 1, "the panels went through a batch first");
+        Assert.True(panelRenderCalls >= 1, "the abandoned batch's panels re-rendered synchronously");
+
+        using var final = database.NewContext();
+        Assert.All(final.Panels.Where(p => batchedPanels.Contains(p.Id)), p =>
+        {
+            Assert.Equal(WorkStatus.Completed, p.Status);
+            Assert.True(p.BatchAttempted);
+            Assert.Null(p.BatchJobId);
+        });
+    }
+
+    [Fact]
+    public async Task BatchMode_RecoversAPanelStrandedWithNoJobId()
+    {
+        // Defensive: a panel left in SubmittedToBatch with no job id (a crash between submit and the state
+        // persist) can never be reconciled. The batch step must send it back to Pending so it renders.
+        var fake = new FakeBatchClient(() => SampleImages.Png(), runningPolls: int.MaxValue);
+        batchClient = fake;
+        useBatchRendering = true;
+
+        var novelId = SeedNovel("A short manuscript that storyboards in one window.");
+
+        // Drive until a batch is in flight.
+        for (int i = 0; i < 400; i++)
+        {
+            var stage = CurrentStage(novelId);
+            if (stage is ProjectStage.RenderingImages)
+            {
+                using var ctx = database.NewContext();
+                if (ctx.Panels.Any(p => p.Status == WorkStatus.SubmittedToBatch))
+                    break;
+            }
+            if (stage is ProjectStage.Completed or ProjectStage.Failed)
+                break;
+            var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+            if (result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+        }
+
+        // Strand one in-flight panel by clearing its job id, then run the batch step.
+        Guid strandedId;
+        using (var ctx = database.NewContext())
+        {
+            var panel = ctx.Panels.First(p => p.Status == WorkStatus.SubmittedToBatch);
+            strandedId = panel.Id;
+            panel.BatchJobId = null;
+            ctx.SaveChanges();
+        }
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        using var after = database.NewContext();
+        var strayPanel = after.Panels.Single(p => p.Id == strandedId);
+        Assert.NotEqual(WorkStatus.SubmittedToBatch, strayPanel.Status);
     }
 
     [Fact]
@@ -1011,22 +1188,30 @@ public class GraphicNovelProcessorTests : IDisposable
             p => Assert.Equal(WorkStatus.Completed, p.Status));
     }
 
-    // A fake Gemini batch client: records what it was asked to render and hands back images on poll, with
-    // a configurable number of "still running" polls and a count of leading requests to fail (so the
-    // synchronous fallback can be exercised).
+    // A fake Gemini batch client: records what it was asked to render, keeps each job's requests separate
+    // (so per-scene batching can be asserted job-by-job), and hands back images on poll — with a
+    // configurable number of "still running" polls and a count of leading requests to fail (so the
+    // synchronous fallback can be exercised). A poll returns only the requested job's panels, exactly as
+    // the real Batch API correlates results by the metadata key.
     private sealed class FakeBatchClient(Func<byte[]> image, int runningPolls = 0, int failFirst = 0) : IGeminiBatchClient
     {
         private readonly List<BatchPanelRequest> submitted = [];
+        private readonly Dictionary<string, List<BatchPanelRequest>> byJob = [];
+        private int failsRemaining = failFirst;
 
         public int SubmitCalls { get; private set; }
         public int PollCalls { get; private set; }
         public IReadOnlyList<BatchPanelRequest> Submitted => submitted;
+        public int JobCount => byJob.Count;
+        public int MaxPanelsInAnyJob => byJob.Count == 0 ? 0 : byJob.Values.Max(job => job.Count);
 
         public Task<string> SubmitAsync(IReadOnlyList<BatchPanelRequest> requests, CancellationToken cancellationToken)
         {
             SubmitCalls++;
+            var jobId = $"job-{SubmitCalls}";
             submitted.AddRange(requests);
-            return Task.FromResult($"job-{SubmitCalls}");
+            byJob[jobId] = [.. requests];
+            return Task.FromResult(jobId);
         }
 
         public Task<BatchJobStatus> PollAsync(string jobId, CancellationToken cancellationToken)
@@ -1034,10 +1219,16 @@ public class GraphicNovelProcessorTests : IDisposable
             PollCalls++;
             if (PollCalls <= runningPolls)
                 return Task.FromResult(BatchJobStatus.StillRunning);
-            var results = submitted
-                .Select((r, i) => i < failFirst
-                    ? new BatchPanelOutcome(r.PanelId, null, "blocked in batch")
-                    : new BatchPanelOutcome(r.PanelId, image(), null))
+            var results = byJob[jobId]
+                .Select(r =>
+                {
+                    if (failsRemaining > 0)
+                    {
+                        failsRemaining--;
+                        return new BatchPanelOutcome(r.PanelId, null, "blocked in batch");
+                    }
+                    return new BatchPanelOutcome(r.PanelId, image(), null);
+                })
                 .ToList();
             return Task.FromResult(new BatchJobStatus(BatchJobState.Succeeded, results));
         }
