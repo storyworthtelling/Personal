@@ -157,8 +157,17 @@ each one **up to 24h**, so a single blocked panel could burn 2–3 days walking 
 
 **The design that avoids it — batch the first attempt only; escalate synchronously.**
 
-- **Batch = one render attempt per panel, the first pass.** Submit all panel prompts as one job. The 50%
-  discount and server-side parallelism apply to the ~99% that render clean on the first try.
+- **Batch = one render attempt per panel, the first pass.** Submit each panel's prompt once, through a batch.
+  The 50% discount and server-side parallelism apply to the ~99% that render clean on the first try.
+- **Batch per scene, not per book.** Claude tags scene boundaries at storyboard time (`Panel.NewScene`), and
+  the pipeline submits **one job per scene** (a scene past `BatchMaxPanelsPerJob` splits across jobs), running
+  up to `MaxConcurrentBatchJobs` at once. This replaced the original single-book-job design after the owner's
+  first real run: a single 664-panel job returned wrong/mismatched art and then wedged (repeated 503s) for
+  days, freezing the whole book. Scene-sized jobs keep each submission well under the size ceiling, bound a
+  bad job's blast radius to one scene, and — with a **give-up-by-age** guard (`BatchGiveUpHours`) — mean no
+  single stuck job can freeze the book: a job that outlives the window has its panels fall back to synchronous
+  rendering. The reconcile also logs result-to-panel **correlation gaps** (a result key matching no submitted
+  panel, or a submitted panel with no result) so a recurrence of the wrong-art mis-correlation is diagnosable.
 - **Rejections fall *out* of the batch, they aren't retried *in* it.** A batch returns per-request outcomes,
   so `ClassifyBlock` runs unchanged on each result. Split the returned results: successes → save + Completed;
   blocked → hand to the **existing** `HandleBlockedPanel` ladder.
@@ -188,12 +197,18 @@ failure path degrades to synchronous rendering (see below). Pieces:
 
 - `IGeminiBatchClient` + models (`Domain/External/GeminiBatch.cs`); `GeminiBatchImageClient` (the real HTTP
   client, `Infrastructure/External`), registered in DI but dormant while the flag is off.
-- In-flight state: `Novel.BatchJobId`/`BatchSubmittedAtUtc`, `Panel.BatchAttempted`, `WorkStatus
-  .SubmittedToBatch` (+ migration).
-- `GraphicNovelProcessor.RunBatchStep`: submit never-batched Pending panels as one job, poll, reconcile —
-  success completes the panel; a failure/block returns it to Pending for the **synchronous** render +
-  `HandleBlockedPanel` ladder (first attempt batched, every escalation synchronous). E2E-tested with a fake
-  batch client (happy path + synchronous fallback).
+- In-flight state (now **per-panel**, so several scene jobs run at once): `Panel.BatchAttempted`,
+  `Panel.NewScene`, `Panel.BatchJobId`/`Panel.BatchSubmittedAtUtc`, `WorkStatus.SubmittedToBatch` (+
+  migration `AddPanelSceneBatchState`). `Novel.BatchJobId`/`BatchSubmittedAtUtc` are the legacy single-job
+  columns — retained for schema stability, no longer read or written.
+- `GraphicNovelProcessor.RunBatchStep`: group never-batched Pending panels into scenes (at the `NewScene`
+  markers, capped at `BatchMaxPanelsPerJob`), submit one job per scene up to `MaxConcurrentBatchJobs`
+  concurrently, then each cycle poll/reconcile every in-flight job — success completes the panel; a
+  failure/block returns it to Pending for the **synchronous** render + `HandleBlockedPanel` ladder (first
+  attempt batched, every escalation synchronous). A job older than `BatchGiveUpHours` is abandoned to the
+  synchronous path; a panel stranded in `SubmittedToBatch` with no job id is recovered. E2E-tested with a
+  fake batch client: one-job-per-scene, oversized-scene split, give-up-and-render-synchronously, and
+  stranded recovery.
 
 **What's settled, and the one thing the first live run confirms:**
 

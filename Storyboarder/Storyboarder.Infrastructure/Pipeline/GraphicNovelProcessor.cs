@@ -539,6 +539,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                             Caption = panelDraft.Caption,
                             DialogueKind = panelDraft.DialogueKind,
                             Sfx = panelDraft.Sfx,
+                            NewScene = panelDraft.NewScene,
                             ShotType = panelDraft.Shot,
                             SourceStartOffset = windowStart,
                             SourceEndOffset = windowEnd,
@@ -600,7 +601,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             select new ReusablePanel(
                 v.Number, v.Title, pg.ChapterNumber, pg.PageNumber, pn.PanelNumber,
                 pn.SourceStartOffset, pn.SourceEndOffset, pn.VisualPrompt, pn.Dialogue, pn.Caption,
-                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped, pn.ShotType, pn.DialogueKind, pn.Sfx))
+                pn.ReferenceNamesJson, pn.ImagePath, pn.Skipped, pn.ShotType, pn.DialogueKind, pn.Sfx, pn.NewScene))
             .ToListAsync(cancellationToken);
 
         // Only the previous panels drawn from a window whose text is byte-identical to this one.
@@ -649,6 +650,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                         Caption = source.Caption,
                         DialogueKind = source.DialogueKind,
                         Sfx = source.Sfx,
+                        NewScene = source.NewScene,
                         ShotType = source.ShotType,
                         SourceStartOffset = windowStart,
                         SourceEndOffset = windowEnd,
@@ -680,7 +682,7 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         int VolumeNumber, string VolumeTitle, int ChapterNumber, int PageNumber, int PanelNumber,
         int SourceStartOffset, int SourceEndOffset, string VisualPrompt, string? Dialogue, string? Caption,
         string ReferenceNamesJson, string? ImagePath, bool Skipped, ShotType ShotType,
-        DialogueKind DialogueKind, string? Sfx);
+        DialogueKind DialogueKind, string? Sfx, bool NewScene);
 
     private async Task<ProcessResult> RenderPanels(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
@@ -762,18 +764,48 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return ProcessResult.DidWork(novel.Id);
     }
 
-    // The batch render step. Returns:
-    //  - a poll wait, or DidWork after reconciling, while a batch job is in flight;
-    //  - DidWork after submitting a new batch of never-batched panels;
-    //  - null when there's nothing to batch (no job, no un-batched panels), so RenderPanels falls through
-    //    to the synchronous path for the panels a batch failed/blocked (now Pending) and the stage advance.
+    // The batch render step, per-scene. A book batches scene-by-scene (Claude tags scene boundaries at
+    // storyboard time), running up to GeminiOptions.MaxConcurrentBatchJobs scene jobs at once instead of
+    // one giant job — that keeps each job small (well under the size ceiling), bounds a bad job's blast
+    // radius to one scene, and never wedges the whole book on a single stuck job. Each call:
+    //   1. polls and reconciles every in-flight scene job (per-panel job ids), giving up on any job that
+    //      has outlived GeminiOptions.BatchGiveUpHours so it can't freeze the book;
+    //   2. recovers any panel stranded in SubmittedToBatch with no job id;
+    //   3. submits new scene jobs to fill the freed concurrency slots.
+    // Returns DidWork after reconciling/submitting, a poll wait while jobs are still in flight, or null
+    // when there's nothing left to batch — so RenderPanels falls through to the synchronous path for the
+    // panels a batch failed/blocked (now Pending) and the stage advance.
     private async Task<ProcessResult?> RunBatchStep(
         StoryboarderDbContext db, Novel novel, IQueryable<Panel> panelsForNovel, DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        // A job is in flight: poll and reconcile.
-        if (novel.BatchJobId is { } jobId)
+        var didWork = false;
+
+        var inFlight = await panelsForNovel
+            .Where(p => p.Status == WorkStatus.SubmittedToBatch)
+            .ToListAsync(cancellationToken);
+
+        // Stranded safety: a panel marked SubmittedToBatch but with no job id (a crash between submit and
+        // the state persist, say) can never be reconciled — send it back to the synchronous path.
+        var stranded = inFlight.Where(p => p.BatchJobId is null).ToList();
+        foreach (var panel in stranded)
         {
+            panel.Status = WorkStatus.Pending;
+            panel.BatchSubmittedAtUtc = null;
+        }
+        if (stranded.Count > 0)
+        {
+            didWork = true;
+            logger.LogWarning("Recovered {Count} stranded batch panel(s) with no job id (novel {NovelId})", stranded.Count, novel.Id);
+        }
+
+        // Poll and reconcile every distinct in-flight scene job.
+        var runningJobs = 0;
+        foreach (var job in inFlight.Where(p => p.BatchJobId is not null).GroupBy(p => p.BatchJobId!))
+        {
+            var jobId = job.Key;
+            var jobPanels = job.ToList();
+
             BatchJobStatus status;
             try
             {
@@ -781,25 +813,36 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Couldn't reach the batch service; try again on the next poll rather than crash the cycle.
+                // Couldn't reach the batch service; retry on the next poll rather than crash the cycle —
+                // unless the job has outlived the give-up window, in which case fall it back to synchronous.
                 logger.LogWarning(ex, "Polling batch {JobId} failed; will retry (novel {NovelId})", jobId, novel.Id);
-                return ProcessResult.Waiting(TimeSpan.FromSeconds(geminiConfig.BatchPollSeconds), novel.Id);
+                if (GiveUpIfStale(jobId, jobPanels, now, novel)) didWork = true; else runningJobs++;
+                continue;
             }
 
             if (status.State == BatchJobState.Running)
-                return ProcessResult.Waiting(TimeSpan.FromSeconds(geminiConfig.BatchPollSeconds), novel.Id);
+            {
+                if (GiveUpIfStale(jobId, jobPanels, now, novel)) didWork = true; else runningJobs++;
+                continue;
+            }
 
-            var inFlight = await panelsForNovel
-                .Where(p => p.Status == WorkStatus.SubmittedToBatch)
-                .ToListAsync(cancellationToken);
-            var byId = inFlight.ToDictionary(p => p.Id);
-
+            // Finished (Succeeded or Failed): reconcile each panel and release it from the job.
+            var byId = jobPanels.ToDictionary(p => p.Id);
+            var matched = 0;
+            var unknownKeys = 0;
             if (status.State == BatchJobState.Succeeded)
             {
                 foreach (var outcome in status.Results)
                 {
                     if (!byId.Remove(outcome.PanelId, out var panel))
+                    {
+                        // A result whose key matches no panel we submitted in this job is the signature of a
+                        // mis-correlated batch response — log it so a recurrence is diagnosable, and drop it
+                        // (never assign a stray image to a panel by position).
+                        unknownKeys++;
                         continue;
+                    }
+                    matched++;
                     if (outcome.Succeeded)
                     {
                         panel.ImagePath = imageStore.Save($"{novel.Id}/panels/{panel.Id}.png", outcome.Image!);
@@ -813,66 +856,138 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                         panel.Status = WorkStatus.Pending;
                         panel.LastError = outcome.Error;
                     }
+                    panel.BatchJobId = null;
+                    panel.BatchSubmittedAtUtc = null;
                 }
             }
 
             // A whole-job failure, or any panel the results didn't mention, falls back to synchronous
             // rendering (BatchAttempted is already set, so it's never re-batched).
+            var unmatchedPanels = byId.Count;
             foreach (var orphan in byId.Values)
+            {
                 orphan.Status = WorkStatus.Pending;
+                orphan.BatchJobId = null;
+                orphan.BatchSubmittedAtUtc = null;
+            }
+            didWork = true;
+            logger.LogInformation(
+                "Reconciled scene batch {JobId} ({State}) for {Count} panel(s): {Matched} matched, {Unmatched} unmatched → sync, {UnknownKeys} stray result key(s) (novel {NovelId})",
+                jobId, status.State, jobPanels.Count, matched, unmatchedPanels, unknownKeys, novel.Id);
+            if (unknownKeys > 0 || (status.State == BatchJobState.Succeeded && unmatchedPanels > 0))
+                logger.LogWarning(
+                    "Scene batch {JobId} correlation gap: {UnknownKeys} result(s) matched no submitted panel, {Unmatched} submitted panel(s) had no result (novel {NovelId})",
+                    jobId, unknownKeys, unmatchedPanels, novel.Id);
+        }
 
-            var reconciled = inFlight.Count;
-            novel.BatchJobId = null;
-            novel.BatchSubmittedAtUtc = null;
+        // Fill the freed concurrency slots with the next scenes' un-batched panels.
+        var submitFailed = false;
+        var openSlots = geminiConfig.MaxConcurrentBatchJobs - runningJobs;
+        if (openSlots > 0)
+        {
+            foreach (var sceneBatch in await NextSceneBatches(db, novel, openSlots, cancellationToken))
+            {
+                var requests = new List<BatchPanelRequest>(sceneBatch.Count);
+                foreach (var panel in sceneBatch)
+                {
+                    var references = await LoadReferenceImages(db, novel.Id, panel.ReferenceNamesJson, cancellationToken);
+                    var aspectRatio = await PanelSlotAspectRatio(db, panel, cancellationToken);
+                    requests.Add(new BatchPanelRequest(panel.Id, panel.VisualPrompt, novel.ArtStyle, references, aspectRatio));
+                }
+
+                string newJobId;
+                try
+                {
+                    newJobId = await batchClient!.SubmitAsync(requests, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Submission failed (transient): these panels stay Pending and un-batched, so a later
+                    // cycle tries again. Stop submitting for now rather than hammer a failing service.
+                    logger.LogWarning(ex, "Submitting a scene render batch failed; will retry (novel {NovelId})", novel.Id);
+                    submitFailed = true;
+                    break;
+                }
+
+                foreach (var panel in sceneBatch)
+                {
+                    panel.Status = WorkStatus.SubmittedToBatch;
+                    panel.BatchAttempted = true;
+                    panel.BatchJobId = newJobId;
+                    panel.BatchSubmittedAtUtc = now;
+                }
+                runningJobs++;
+                didWork = true;
+                logger.LogInformation("Submitted {Count} panel(s) as scene batch {JobId} (novel {NovelId})", sceneBatch.Count, newJobId, novel.Id);
+            }
+        }
+
+        if (didWork)
+        {
             Touch(novel);
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation(
-                "Reconciled batch {JobId} ({State}) for {Count} panel(s) (novel {NovelId})",
-                jobId, status.State, reconciled, novel.Id);
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // No job in flight: submit the panels that have never been through a batch. Everything else
-        // (already-batched Pending/NeedsRetry escalations) is left to the synchronous path.
-        var toBatch = await panelsForNovel
-            .Where(p => p.Status == WorkStatus.Pending && !p.BatchAttempted)
-            .OrderBy(p => p.PanelNumber)
-            .ToListAsync(cancellationToken);
-        if (toBatch.Count == 0)
-            return null;
-
-        var requests = new List<BatchPanelRequest>(toBatch.Count);
-        foreach (var panel in toBatch)
-        {
-            var references = await LoadReferenceImages(db, novel.Id, panel.ReferenceNamesJson, cancellationToken);
-            var aspectRatio = await PanelSlotAspectRatio(db, panel, cancellationToken);
-            requests.Add(new BatchPanelRequest(panel.Id, panel.VisualPrompt, novel.ArtStyle, references, aspectRatio));
-        }
-
-        string newJobId;
-        try
-        {
-            newJobId = await batchClient!.SubmitAsync(requests, cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // Submission failed (transient): the panels stay Pending and un-batched, so the next cycle
-            // tries again. Don't spin — defer by the poll interval.
-            logger.LogWarning(ex, "Submitting a render batch failed; will retry (novel {NovelId})", novel.Id);
+        // Nothing changed this cycle. If scene jobs are still in flight (or a submit failed transiently),
+        // wait and poll again; otherwise there's nothing left to batch — hand off to the synchronous path.
+        if (runningJobs > 0 || submitFailed)
             return ProcessResult.Waiting(TimeSpan.FromSeconds(geminiConfig.BatchPollSeconds), novel.Id);
-        }
+        return null;
+    }
 
-        foreach (var panel in toBatch)
+    // Sends a scene job's panels back to synchronous rendering once the job has been in flight longer than
+    // the give-up window — the guard against a provider job that wedges and would otherwise freeze the book
+    // forever. Returns true when it gave up (the panels changed), false when the job is still within window.
+    private bool GiveUpIfStale(string jobId, List<Panel> jobPanels, DateTimeOffset now, Novel novel)
+    {
+        var oldest = jobPanels.Min(p => p.BatchSubmittedAtUtc);
+        if (oldest is null || now - oldest.Value < TimeSpan.FromHours(geminiConfig.BatchGiveUpHours))
+            return false;
+        foreach (var panel in jobPanels)
         {
-            panel.Status = WorkStatus.SubmittedToBatch;
-            panel.BatchAttempted = true;
+            panel.Status = WorkStatus.Pending;
+            panel.BatchJobId = null;
+            panel.BatchSubmittedAtUtc = null;
         }
-        novel.BatchJobId = newJobId;
-        novel.BatchSubmittedAtUtc = now;
-        Touch(novel);
-        await db.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Submitted {Count} panel(s) as batch {JobId} (novel {NovelId})", toBatch.Count, newJobId, novel.Id);
-        return ProcessResult.DidWork(novel.Id);
+        logger.LogWarning(
+            "Gave up on scene batch {JobId} after {Hours}h; {Count} panel(s) fall back to synchronous (novel {NovelId})",
+            jobId, geminiConfig.BatchGiveUpHours, jobPanels.Count, novel.Id);
+        return true;
+    }
+
+    // The next un-batched scenes to submit, in true reading order (volume, page, panel). Panels are grouped
+    // into scenes at the NewScene markers Claude tagged; a scene longer than BatchMaxPanelsPerJob is split
+    // across several jobs so no single job is oversized. Returns at most maxScenes complete batches; the
+    // rest wait for a later cycle when a concurrency slot frees.
+    private async Task<List<List<Panel>>> NextSceneBatches(
+        StoryboarderDbContext db, Novel novel, int maxScenes, CancellationToken cancellationToken)
+    {
+        var ordered = await (
+            from v in db.Volumes.Where(v => v.NovelId == novel.Id)
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            join pn in db.Panels on pg.Id equals pn.PageId
+            where pn.Status == WorkStatus.Pending && !pn.BatchAttempted
+            orderby v.Number, pg.PageNumber, pn.PanelNumber
+            select pn)
+            .ToListAsync(cancellationToken);
+
+        var batches = new List<List<Panel>>();
+        List<Panel>? current = null;
+        foreach (var panel in ordered)
+        {
+            // A scene marker (or the very first panel) starts a new batch; a scene past the per-job cap
+            // also rolls to a new batch so no single job is oversized.
+            if (current is null || panel.NewScene || current.Count >= geminiConfig.BatchMaxPanelsPerJob)
+            {
+                if (batches.Count == maxScenes)
+                    break;
+                current = new List<Panel>();
+                batches.Add(current);
+            }
+            current.Add(panel);
+        }
+        return batches;
     }
 
     private async Task<ProcessResult> ComposePages(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)

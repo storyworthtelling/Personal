@@ -72,9 +72,9 @@ public class Novel
     public string? ArchiveFolderId { get; set; }
     public DateTimeOffset? ArchivedAtUtc { get; set; }
 
-    // The in-flight Gemini batch job rendering this novel's panels (opt-in batch mode), and when it was
-    // submitted. Null when no batch is outstanding; the worker polls this job and reconciles its results,
-    // then clears it. Only one batch per novel is in flight at a time.
+    // Legacy single-job batch state, retained for schema stability. Batch rendering is now tracked
+    // per-panel (Panel.BatchJobId / Panel.BatchSubmittedAtUtc) so a novel runs several scene-sized jobs at
+    // once instead of one giant one; these columns are no longer read or written by the pipeline.
     public string? BatchJobId { get; set; }
     public DateTimeOffset? BatchSubmittedAtUtc { get; set; }
 
@@ -302,6 +302,17 @@ public class Panel : IRetryable
     // a panel the batch failed or blocked returns to Pending and is re-rendered SYNCHRONOUSLY from then on
     // (the escalation ladder and its retries stay fast, not one batch turnaround per attempt).
     public bool BatchAttempted { get; set; }
+
+    // Whether this panel begins a new scene (Claude tags it at storyboard time). Panels between markers
+    // form one scene — the unit batch rendering submits as a job, so a book batches scene-by-scene rather
+    // than as one giant job. The first panel of the book is treated as a scene start regardless.
+    public bool NewScene { get; set; }
+
+    // The provider batch job this panel was submitted in (per-scene batching runs several jobs per novel at
+    // once), and when it was submitted. Null when the panel isn't in flight. BatchSubmittedAtUtc bounds how
+    // long a job is polled before it's given up on and its panels fall back to synchronous rendering.
+    public string? BatchJobId { get; set; }
+    public DateTimeOffset? BatchSubmittedAtUtc { get; set; }
 
     // The half-open span [SourceStartOffset, SourceEndOffset) of the novel's source text this panel was
     // storyboarded from — the absolute offsets of the storyboard window that produced it, not just the

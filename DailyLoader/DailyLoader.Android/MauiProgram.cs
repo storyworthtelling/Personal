@@ -15,6 +15,10 @@ using DailyLoader.Infrastructure.Pdf;
 using DailyLoader.Infrastructure.Remarkable;
 using DailyLoader.Android.Google;
 using PdfSharp.Fonts;
+using Storyworthtelling.Voice;
+using VoiceGoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
+using VoiceClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
+using VoiceDriveService = global::Google.Apis.Drive.v3.DriveService;
 
 namespace DailyLoader.Android;
 
@@ -99,6 +103,34 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddTransient<DailyDeliveryService>();
+
+        // Owner's voice: greet on the delivery screen, reading the shared profile + Claude key from Drive
+        // via the existing device account (drive.readonly is now in the token scope). No local key — the key
+        // is published once by Storyboarder and read from Drive here. Degrades to neutral when unavailable.
+        static Func<CancellationToken, Task<VoiceDriveService>> VoiceDriveFactory(IServiceProvider sp)
+        {
+            var tokens = sp.GetRequiredService<IGoogleAccessTokenProvider>();
+            return async _ =>
+            {
+                var token = await tokens.GetAccessToken();
+                return new VoiceDriveService(new VoiceClientInitializer
+                {
+                    HttpClientInitializer = VoiceGoogleCredential.FromAccessToken(token),
+                    ApplicationName = "DailyLoader",
+                    HttpClientFactory = new AndroidGoogleHttpClientFactory()
+                });
+            };
+        }
+        builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
+            new DriveVoiceProfileStore(new DriveTextFile(VoiceDriveFactory(sp), DriveVoiceProfileStore.FileName)));
+        builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
+            new DriveVoiceConfigStore(new DriveTextFile(VoiceDriveFactory(sp), DriveVoiceConfigStore.FileName)));
+        builder.Services.AddSingleton<DriveVoiceOptions>();
+        builder.Services.AddSingleton<IOptions<VoiceOptions>>(sp => sp.GetRequiredService<DriveVoiceOptions>());
+        builder.Services.AddHttpClient<IVoiceClient, VoiceClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(2))
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddTransient<VoicedMessenger>();
 
         builder.Services.AddTransient<Pages.MainPage>();
         builder.Services.AddTransient<Pages.SetupPage>();

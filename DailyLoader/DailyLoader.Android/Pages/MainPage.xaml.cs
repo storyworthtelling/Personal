@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using DailyLoader.Infrastructure.Delivery;
+using Storyworthtelling.Voice;
 
 namespace DailyLoader.Android.Pages;
 
@@ -11,9 +12,14 @@ public partial class MainPage : ContentPage
     private static string DeliveryLogPath =>
         System.IO.Path.Combine(FileSystem.AppDataDirectory, "delivery.log");
 
-    public MainPage()
+    private readonly DriveVoiceOptions voiceOptions;
+    private readonly VoicedMessenger voice;
+
+    public MainPage(DriveVoiceOptions voiceOptions, VoicedMessenger voice)
     {
         InitializeComponent();
+        this.voiceOptions = voiceOptions;
+        this.voice = voice;
     }
 
     protected override void OnAppearing()
@@ -28,6 +34,36 @@ public partial class MainPage : ContentPage
         var batteryOptimized = IsBatteryOptimized();
         BatteryWarningLabel.IsVisible = batteryOptimized;
         BatterySettingsButton.IsVisible = batteryOptimized;
+
+        _ = ShowWelcomeAsync();
+    }
+
+    // A greeting composed fresh in the owner's voice, shown only once a shared voice profile exists. Pulls
+    // the Claude key from the shared Drive config first (RefreshAsync); everything degrades to a hidden
+    // label when the profile, key, or Drive access isn't there — never blocks or crashes the page.
+    private async Task ShowWelcomeAsync()
+    {
+        if (!CredentialStore.IsGoogleConfigured)
+        {
+            WelcomeLabel.IsVisible = false;
+            return;
+        }
+
+        string message;
+        try
+        {
+            await voiceOptions.RefreshAsync(CancellationToken.None);
+            message = await voice.ComposeAsync(
+                new MessageRequest("welcome", "the owner is checking their crossword delivery"),
+                fallback: string.Empty, CancellationToken.None);
+        }
+        catch
+        {
+            message = string.Empty;
+        }
+
+        WelcomeLabel.Text = message;
+        WelcomeLabel.IsVisible = !string.IsNullOrWhiteSpace(message);
     }
 
     private static bool IsBatteryOptimized()

@@ -129,6 +129,7 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.Property(panel => panel.Status).HasConversion<int>();
             entity.Property(panel => panel.ShotType).HasConversion<int>();
             entity.Property(panel => panel.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
+            entity.Property(panel => panel.BatchSubmittedAtUtc).HasConversion(NullableTicksConverter);
             entity.HasIndex(panel => new { panel.Status, panel.NextAttemptAtUtc });
         });
 

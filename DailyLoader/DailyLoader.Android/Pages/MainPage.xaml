@@ -11,6 +11,13 @@
                        Style="{StaticResource DisplayLabel}"
                        HorizontalOptions="Center" />
 
+                <!-- A greeting in the owner's voice when a shared profile exists; hidden otherwise. -->
+                <Label x:Name="WelcomeLabel"
+                       Style="{StaticResource SecondaryLabel}"
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center"
+                       IsVisible="False" />
+
                 <Label x:Name="StatusLabel"
                        Style="{StaticResource StatusLine}"
                        HorizontalOptions="Center"

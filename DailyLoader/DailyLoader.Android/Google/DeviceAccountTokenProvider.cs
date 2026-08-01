@@ -9,8 +9,12 @@ namespace DailyLoader.Android.Google;
 public class DeviceAccountTokenProvider : IGoogleAccessTokenProvider
 {
     // AccountManager auth-token type: "oauth2:" followed by the space-separated scopes.
+    // Calendar + Tasks for the delivery augmenter, plus read-only Drive so the app can read the ONE shared
+    // owner's-voice profile + config (the greeting). Adding drive.readonly changes the consent screen, so
+    // it must be registered on this app's OAuth client and re-consented on the device.
     internal const string TokenScope =
-        "oauth2:https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks";
+        "oauth2:https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks " +
+        "https://www.googleapis.com/auth/drive.readonly";
 
     private readonly object gate = new();
     private string? cachedToken;

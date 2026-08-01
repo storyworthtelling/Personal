@@ -63,6 +63,20 @@ public sealed class GeminiOptions
     // How long to wait between polls of an in-flight batch job. The job can take hours, so polling every
     // few minutes is plenty and keeps the worker cheap.
     public int BatchPollSeconds { get; set; } = 300;
+
+    // Panels are batched per SCENE (Claude tags scene boundaries), so a book runs several small jobs
+    // instead of one giant one — that keeps every job well under the inline/Files-API size ceiling and
+    // bounds the blast radius of a bad job to one scene. At most this many scene jobs are in flight at
+    // once (more scenes queue until a slot frees), and a single job never carries more than
+    // BatchMaxPanelsPerJob panels — a very long scene is split across several jobs.
+    public int MaxConcurrentBatchJobs { get; set; } = 4;
+    public int BatchMaxPanelsPerJob { get; set; } = 50;
+
+    // A batch job polled for longer than this without finishing is given up on: its panels go back to
+    // Pending and render synchronously (they're marked BatchAttempted, so they're never re-batched). This
+    // is the guard against the failure mode where a provider job wedges (e.g. repeated 503s) and the book
+    // would otherwise stay frozen forever waiting on a job that never completes.
+    public int BatchGiveUpHours { get; set; } = 24;
 }
 
 // Browser-side Google credentials surfaced to the status page for the Drive Picker.

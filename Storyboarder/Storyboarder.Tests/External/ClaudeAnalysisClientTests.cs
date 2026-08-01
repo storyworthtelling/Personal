@@ -343,6 +343,26 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task Storyboard_ParsesNewSceneMarkers_DefaultingFalse()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"continuitySummary\":\"x\",\"volumes\":[{\"number\":1,\"title\":\"V\",\"pages\":[{\"chapterNumber\":1,\"panels\":[" +
+            "{\"visualPrompt\":\"a\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"newScene\":true}," +
+            "{\"visualPrompt\":\"b\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"newScene\":false}," +
+            "{\"visualPrompt\":\"c\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[]}" +
+            "]}]}]}"));
+
+        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+        var panels = Assert.Single(Assert.Single(segment.Volumes).Pages).Panels;
+
+        Assert.True(panels[0].NewScene);
+        Assert.False(panels[1].NewScene);
+        // Absent newScene → false (no boundary), so an omitting model reply groups panels as before.
+        Assert.False(panels[2].NewScene);
+    }
+
+    [Fact]
     public async Task AnalyzeChapter_ParsesNotes_ToleratingProse()
     {
         var (client, handler) = Create();

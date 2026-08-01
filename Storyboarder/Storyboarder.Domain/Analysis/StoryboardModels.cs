@@ -14,7 +14,11 @@ public sealed record PanelDraft(
     // Whether the dialogue is spoken or thought, and any prominent sound effect. Both default to the
     // no-op case (spoken, no SFX) so a model reply that omits them letters exactly as before.
     DialogueKind DialogueKind = DialogueKind.Speech,
-    string? Sfx = null);
+    string? Sfx = null,
+    // Whether this panel begins a new scene (a change of place/time/dramatic unit). Panels between markers
+    // form one scene, the unit batch rendering groups by. Defaults false; the pipeline treats the first
+    // panel as a scene start regardless.
+    bool NewScene = false);
 
 public sealed record PageDraft(int ChapterNumber, IReadOnlyList<PanelDraft> Panels);
 
