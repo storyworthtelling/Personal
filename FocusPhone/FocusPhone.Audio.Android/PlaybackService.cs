@@ -37,6 +37,8 @@ public class PlaybackService : MediaLibraryService
     private PlaybackProgressBook book = new();
     private Handler? handler;
     private Java.Lang.Runnable? recorder;
+    private EqualizerStore? equalizerStore;
+    private readonly AudioEffects audioEffects = new();
 
     public override void OnCreate()
     {
@@ -63,9 +65,25 @@ public class PlaybackService : MediaLibraryService
         var tree = new MediaBrowseTree(LoadCatalog());
         mediaSession = new MediaLibrarySession.Builder(this, player, new LibraryCallback(tree)).Build();
 
+        equalizerStore = new EqualizerStore(this);
+        ApplyAudioEffects();
+
         handler = new Handler(Looper.MainLooper!);
         recorder = new Java.Lang.Runnable(RecordTick);
         handler.PostDelayed(recorder, RecordIntervalMs);
+    }
+
+    // Bind the saved equalizer curve + loudness boost to the player's current audio session. Cheap to call
+    // repeatedly — AudioEffects only re-attaches when the session id actually changes.
+    private void ApplyAudioEffects()
+    {
+        if (player is null || equalizerStore is null)
+        {
+            return;
+        }
+
+        var settings = equalizerStore.LoadLibrary()?.Active ?? new EqualizerSettings(false, []);
+        audioEffects.Apply(player.AudioSessionId, settings, equalizerStore.LoudnessMillibels);
     }
 
     // Covariant return (MediaLibrarySession, not MediaSession): Java's
@@ -90,12 +108,19 @@ public class PlaybackService : MediaLibraryService
             return StartCommandResult.Sticky;
         }
 
+        if (intent?.Action == AudioPlaybackCommands.ActionApplyAudioEffects)
+        {
+            ApplyAudioEffects();
+            return StartCommandResult.Sticky;
+        }
+
         return base.OnStartCommand(intent, flags, startId);
     }
 
     private void RecordTick()
     {
         RecordCurrentPosition();
+        ApplyAudioEffects(); // keep effects bound as the audio session changes across tracks
         if (handler is not null && recorder is not null)
         {
             handler.PostDelayed(recorder, RecordIntervalMs);
@@ -126,6 +151,7 @@ public class PlaybackService : MediaLibraryService
             handler.RemoveCallbacks(recorder);
         }
 
+        audioEffects.Release();
         mediaSession?.Player?.Release();
         mediaSession?.Release();
         mediaSession = null;

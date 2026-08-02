@@ -337,6 +337,7 @@ public class AudioActivity : Activity
         head.AddView(PaperUi.Heading(this, musicView.ToString()),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         head.AddView(PaperUi.QuietButton(this, "Shuffle", () => PlayShuffled((musicCatalog ?? new MusicCatalog([])).Songs())));
+        head.AddView(PaperUi.QuietButton(this, "Sound", () => StartActivity(new Intent(this, typeof(EqualizerActivity)))));
         head.AddView(PaperUi.QuietButton(this, "Rescan", () => _ = ScanAsync()));
         container.AddView(head);
 
