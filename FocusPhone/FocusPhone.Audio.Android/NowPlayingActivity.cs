@@ -22,10 +22,14 @@ namespace FocusPhone.Audio;
 [Activity(Label = "Now Playing", Theme = "@style/Theme.FocusPhone.Paper")]
 public class NowPlayingActivity : Activity
 {
+    private const int PickArtCode = 7301;
+
     private MediaController? controller;
+    private ArtworkOverrideStore artworkStore = null!;
     private Handler? uiHandler;
     private Java.Lang.Runnable? ticker;
     private bool dragging;
+    private string? pendingAlbumKey;
 
     private ImageView artwork = null!;
     private TextView titleView = null!;
@@ -41,6 +45,7 @@ public class NowPlayingActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
+        artworkStore = new ArtworkOverrideStore(this);
         SetContentView(BuildLayout());
         ConnectController();
     }
@@ -106,6 +111,7 @@ public class NowPlayingActivity : Activity
         repeat = PaperUi.QuietButton(this, "Repeat: off", CycleRepeat);
         modes.AddView(shuffle);
         modes.AddView(repeat);
+        modes.AddView(PaperUi.QuietButton(this, "Art", PickArt));
         root.AddView(modes);
 
         root.AddView(PaperUi.BottomBar(this, PaperUi.SecondaryButton(this, "Back", Finish)));
@@ -179,6 +185,13 @@ public class NowPlayingActivity : Activity
 
     private void RenderArtwork(MediaMetadata? metadata)
     {
+        // Precedence: the owner's override for this album, then the embedded art, then nothing.
+        var overrideUri = artworkStore.Resolve(AlbumKeyOf(metadata));
+        if (overrideUri is not null && TrySetOverrideArt(overrideUri))
+        {
+            return;
+        }
+
         var data = metadata?.ArtworkData;
         if (data is { Count: > 0 })
         {
@@ -189,6 +202,60 @@ public class NowPlayingActivity : Activity
         {
             artwork.SetImageDrawable(null);
         }
+    }
+
+    private bool TrySetOverrideArt(string uri)
+    {
+        try
+        {
+            using var stream = ContentResolver!.OpenInputStream(Android.Net.Uri.Parse(uri));
+            var bitmap = BitmapFactory.DecodeStream(stream);
+            if (bitmap is not null)
+            {
+                artwork.SetImageBitmap(bitmap);
+                return true;
+            }
+        }
+        catch (Exception e) when (e is Java.IO.FileNotFoundException or Java.Lang.SecurityException or Java.IO.IOException)
+        {
+            // A revoked or missing override just falls through to the embedded art.
+        }
+
+        return false;
+    }
+
+    private static string AlbumKeyOf(MediaMetadata? metadata) => ArtworkOverrides.AlbumKey(
+        metadata?.AlbumArtist?.ToString() ?? metadata?.Artist?.ToString() ?? string.Empty,
+        metadata?.AlbumTitle?.ToString() ?? string.Empty);
+
+    private void PickArt()
+    {
+        pendingAlbumKey = AlbumKeyOf(controller?.MediaMetadata);
+        var intent = new Intent(Intent.ActionOpenDocument);
+        intent.AddCategory(Intent.CategoryOpenable!);
+        intent.SetType("image/*");
+        StartActivityForResult(intent, PickArtCode);
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode != PickArtCode || resultCode != Result.Ok || data?.Data is not { } uri || pendingAlbumKey is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ContentResolver!.TakePersistableUriPermission(uri, ActivityFlags.GrantReadUriPermission);
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            // Some providers don't grant persistable access; the override still works for this session.
+        }
+
+        artworkStore.Set(pendingAlbumKey, uri.ToString());
+        Render();
     }
 
     private void UpdateClockLabels(double fraction)

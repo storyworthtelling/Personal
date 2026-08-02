@@ -17,6 +17,12 @@ public class ArtworkOverridesTests
     }
 
     [Fact]
+    public void AlbumKey_TrackAndRawTagsAgree()
+    {
+        Assert.Equal(ArtworkOverrides.AlbumKey(T("Blue", "Miles")), ArtworkOverrides.AlbumKey("Miles", "Blue"));
+    }
+
+    [Fact]
     public void SetResolveClear()
     {
         var overrides = new ArtworkOverrides();

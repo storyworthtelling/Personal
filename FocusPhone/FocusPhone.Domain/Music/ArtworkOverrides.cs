@@ -15,7 +15,10 @@ public sealed class ArtworkOverrides
         byAlbum = saved is null ? [] : new Dictionary<string, string>(saved);
 
     /// <summary>The album grouping key — album artist + album, matching how the catalog groups albums.</summary>
-    public static string AlbumKey(Track track) => $"{track.DisplayAlbumArtist}{Separator}{track.DisplayAlbum}";
+    public static string AlbumKey(Track track) => AlbumKey(track.DisplayAlbumArtist, track.DisplayAlbum);
+
+    /// <summary>The album key from raw tags, for callers (like the now-playing screen) holding metadata, not a Track.</summary>
+    public static string AlbumKey(string albumArtist, string album) => $"{albumArtist}{Separator}{album}";
 
     public string? Resolve(string albumKey) => byAlbum.TryGetValue(albumKey, out var path) ? path : null;
 
