@@ -55,6 +55,11 @@ public class AudioActivity : Activity
     // Music side (Phase 3: sign-in + scan + browse; playback lands in Phase 4).
     private readonly DeviceAccountTokenProvider musicTokens = new();
 
+    // Listening Genius (Phase 6): passive on-device recording -> Drive-backed Taste Profile.
+    private ListeningEventStore listeningStore = null!;
+    private readonly MusicListeningRecorder listeningRecorder = new();
+    private FocusPhone.Audio.Google.MusicTasteService? tasteService;
+
     // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
     private FocusPhone.Ui.Voice.VoiceGreeting? greeting;
     private TextView? greetingView;
@@ -85,6 +90,10 @@ public class AudioActivity : Activity
         driveClient = new DriveMusicClient(musicTokens);
         tagReader = new MusicTagReader(Path.Combine(CacheDir!.AbsolutePath, "art"));
         LoadMusicCatalog();
+
+        listeningStore = new ListeningEventStore(this);
+        listeningRecorder.LearningEnabled = MusicSettingsStore.ListeningGeniusEnabled;
+        tasteService = new FocusPhone.Audio.Google.MusicTasteService(musicTokens.GetAccessToken, "FocusPhone.Audio");
 
         greeting = new FocusPhone.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "FocusPhone.Audio");
         SetContentView(BuildLayout());
@@ -183,6 +192,44 @@ public class AudioActivity : Activity
     {
         base.OnPause();
         StopTicking();
+
+        // Finalize whatever was mid-play, then fold the day's listening into the Taste Profile (throttled).
+        RecordListening(listeningRecorder.Stop());
+        MaybeRefreshTaste();
+    }
+
+    // ---- Listening Genius ----
+
+    private void RecordListening(IReadOnlyList<ListeningEvent> events)
+    {
+        if (events.Count > 0)
+        {
+            listeningStore.Append(events);
+        }
+    }
+
+    // Refreshes the Taste Profile at most once a day, off the UI thread; best-effort and never fatal.
+    private void MaybeRefreshTaste()
+    {
+        if (!MusicSettingsStore.ListeningGeniusEnabled || tasteService is null)
+        {
+            return;
+        }
+
+        var last = MusicSettingsStore.TasteLastRefreshUtc;
+        if (last is { } when && DateTimeOffset.UtcNow - when < TimeSpan.FromHours(20))
+        {
+            return;
+        }
+
+        var events = listeningStore.Load();
+        if (events.Count == 0)
+        {
+            return;
+        }
+
+        MusicSettingsStore.TasteLastRefreshUtc = DateTimeOffset.UtcNow;
+        _ = tasteService.RefreshAsync(events, CancellationToken.None);
     }
 
     protected override void OnDestroy()
@@ -372,7 +419,7 @@ public class AudioActivity : Activity
         }
     }
 
-    private void PlayTracks(IReadOnlyList<Track> tracks, int index)
+    private void PlayTracks(IReadOnlyList<Track> tracks, int index, PlaybackLaunch launch = PlaybackLaunch.Album)
     {
         if (controller is null || tracks.Count == 0)
         {
@@ -386,13 +433,17 @@ public class AudioActivity : Activity
         controller.Prepare();
         controller.Play();
         SendSkipSilence(false); // skip-silence is a podcast setting; off for music
+
+        // Start a listening sitting for Genius; replay is judged against the saved progress book.
+        var progress = new PlaybackProgressBook(progressStore.Load());
+        RecordListening(listeningRecorder.BeginSelection(tracks, index, launch, progress.IsComplete));
     }
 
     private void PlayShuffled(IReadOnlyList<Track> tracks) =>
-        PlayTracks(new ShufflePlanner().Shuffle(tracks), 0);
+        PlayTracks(new ShufflePlanner().Shuffle(tracks), 0, PlaybackLaunch.Shuffle);
 
     private void PlaySmartMix(Track seed, MusicCatalog catalog) =>
-        PlayTracks(new SmartMixBuilder(new ShufflePlanner()).Build(seed, catalog), 0);
+        PlayTracks(new SmartMixBuilder(new ShufflePlanner()).Build(seed, catalog), 0, PlaybackLaunch.Shuffle);
 
     private static MediaItem BuildTrackItem(Track track)
     {
@@ -864,9 +915,26 @@ public class AudioActivity : Activity
         if (controller is not null)
         {
             nowPlayingBar.Update(controller.MediaMetadata?.Title?.ToString(), controller.IsPlaying);
+            ObserveListening();
         }
 
         uiHandler?.PostDelayed(ticker!, 1000);
+    }
+
+    // Sample the music player for Genius. Only music counts (a podcast sets nowPlaying); the recorder turns
+    // id changes into completed/skipped signals itself.
+    private void ObserveListening()
+    {
+        if (controller is null || nowPlaying is not null || controller.CurrentMediaItem is null)
+        {
+            return;
+        }
+
+        var mediaId = controller.CurrentMediaItem.MediaId;
+        var position = TimeSpan.FromMilliseconds(Math.Max(0, controller.CurrentPosition));
+        var durationMs = controller.Duration;
+        var duration = durationMs > 0 ? TimeSpan.FromMilliseconds(durationMs) : TimeSpan.Zero;
+        RecordListening(listeningRecorder.Observe(mediaId, position, duration));
     }
 
     private void ConnectController()
