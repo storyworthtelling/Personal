@@ -7,7 +7,6 @@ using AndroidX.Media3.DataSource;
 using AndroidX.Media3.ExoPlayer;
 using AndroidX.Media3.ExoPlayer.Source;
 using AndroidX.Media3.Session;
-using Com.Google.Common.Util.Concurrent;
 using FocusPhone.Audio.Google;
 using FocusPhone.Domain.Audio;
 using FocusPhone.Domain.Music;
@@ -160,26 +159,17 @@ public class PlaybackService : MediaLibraryService
         base.OnDestroy();
     }
 
-    // The session's library callback, now populating the browsable tree for Android Auto / Assistant via the
-    // Guava ListenableFuture binding. The tree content is the unit-tested MediaBrowseTree; each answer is an
-    // already-resolved future. Playback, lockscreen, and Bluetooth work through the session regardless.
+    // The session's library callback. Converting to MediaLibraryService makes the service
+    // Android-Auto/Assistant capable structurally, and the browsable content it would serve is the
+    // unit-tested MediaBrowseTree (root -> Albums/Artists/Songs -> tracks). Actually answering
+    // OnGetLibraryRoot/OnGetChildren needs the Guava ListenableFuture binding, which isn't referenced in
+    // this head yet (Com.Google.Common.Util.Concurrent doesn't resolve) — wiring it needs the
+    // Xamarin.Google.Guava.ListenableFuture package matched to Media3.Session, plus a car/DHU to verify.
+    // Deferred as an on-device follow-up; the tree is ready. Playback, lockscreen, and Bluetooth work
+    // through the session regardless.
     private sealed class LibraryCallback(MediaBrowseTree tree)
         : Java.Lang.Object, MediaLibrarySession.ICallback
     {
-        private readonly MediaBrowseTree tree = tree;
-
-        public IListenableFuture OnGetLibraryRoot(
-            MediaLibrarySession session, MediaSession.ControllerInfo browser, MediaLibraryService.LibraryParams? @params) =>
-            Futures.ImmediateFuture(LibraryResult.OfItem(tree.Root(), @params));
-
-        public IListenableFuture OnGetChildren(
-            MediaLibrarySession session, MediaSession.ControllerInfo browser,
-            string parentId, int page, int pageSize, MediaLibraryService.LibraryParams? @params) =>
-            Futures.ImmediateFuture(LibraryResult.OfItemList(tree.Children(parentId), @params));
-
-        // Auto rarely calls this (it navigates via children); answer with the root as a harmless best-effort.
-        public IListenableFuture OnGetItem(
-            MediaLibrarySession session, MediaSession.ControllerInfo browser, string mediaId) =>
-            Futures.ImmediateFuture(LibraryResult.OfItem(tree.Root(), null));
+        public MediaBrowseTree Tree { get; } = tree;
     }
 }
