@@ -93,8 +93,9 @@ ListeningEventStore (rolling window, Drive or on-device) ────┘
   Reads its key/model from the shared `VoiceConfig` via `DriveVoiceOptions`. Faked in tests.
 - **`DriveTasteProfileStore`** over `IDriveTextFile` (reuse the Voice seam), one file
   `storyworthtelling-taste.json`; absent/garbled ⇒ `TasteProfile.Empty` (never throws).
-- **`ListeningEventStore`** + a codec: append-only with a **rolling cap** (e.g. last N sessions or M
-  events) so the file can't grow unbounded. Codec unit-tested like `SubscriptionListCodec`.
+- **`ListeningEventStore`** + a codec: **on-device only** (SQLite/preferences) — the raw per-play history
+  never leaves the phone; only the summarized `TasteProfile` syncs to Drive. Append-only with a **rolling
+  cap of the last ~200 sessions** so it can't grow unbounded. Codec unit-tested like `SubscriptionListCodec`.
 - **`TasteProfileRefresher`** (the `VoicedMessenger` analogue): loads events → builds evidence → refines
   → saves. Best-effort; degrades to a no-op when there's no key/profile/consent or on any error.
 
@@ -132,8 +133,10 @@ Consumes the Phase 6 `TasteProfile`. Playlists are **prompted, never automatic**
 - **"Make me a playlist"** — the only generation trigger. A prompt UI (seed = a mood/genre/free-text line)
   → `IDiscoveryClient.GeneratePlaylistAsync(profile, catalog, request)` → an ordered set of catalog track
   ids → play/queue via the existing `PlayTracks`. Nothing generates on its own.
-- **Friday picks** — a quiet "New for you" shelf, no push/badge. On app open, if it's Friday (owner-local)
-  and none generated this ISO week, generate quietly and show a dismissable shelf.
+- **Friday picks** — a quiet "New for you" shelf, no push/badge. A **weekly WorkManager `PeriodicWorkRequest`**
+  (like the MAUI apps' on-device workers) generates the picks in the background so they're ready before the
+  app is opened; the pure `FridayPicksSchedule` decides whether picks are due (worker stays a thin trigger).
+  The shelf is quiet and dismissable — the worker never pushes or badges.
 
 ### Domain
 
@@ -154,8 +157,11 @@ Consumes the Phase 6 `TasteProfile`. Playlists are **prompted, never automatic**
 
 ### Android — thin
 
-- A Discovery view (prompt field + "Make a playlist"), a "New for you" shelf on the Music/Home surface,
-  and wiring to `PlayTracks`/queue. Inline, quiet, dismissable; no success toasts; loading is a sentence.
+- A Discovery view (prompt field + "Make a playlist") reached from the **Music menu**, a "New for you"
+  shelf on the Music surface, and wiring to `PlayTracks`/queue. Inline, quiet, dismissable; no success
+  toasts; loading is a sentence.
+- A weekly **`PeriodicWorkRequest`** (`Xamarin.AndroidX.Work.Runtime`) that runs `FridayPicksSchedule` +
+  `DiscoveryClient.FridayPicksAsync` and stashes the result for the shelf to read on open.
 
 ### TDD test list
 
@@ -195,15 +201,14 @@ real device (and Phase 9 a car), so they come after the on-device Phase 6/7 logi
 - **Git** — same branch/PR as Phase 5 per the owner's request; commit per logical group; no model id in
   any pushed artifact.
 
-## Open decisions to confirm before building Phase 6/7
+## Decisions (resolved with the owner)
 
-1. **Discovery placement** — Music sub-menu entry (recommended, keeps the top toggle 2-way) vs a third
-   top segment `Podcasts | Music | Discovery`.
-2. **Friday-picks trigger** — on-open date check (recommended, no worker) vs a WorkManager periodic job.
-3. **Event storage location** — on-device preferences/SQLite (recommended; raw listening history is
-   higher-volume and more sensitive than the summary) with **only the summarized `TasteProfile`** synced
-   to Drive, vs storing events in Drive too. The profile is the propagatable artifact; events need not
-   leave the device.
-4. **Rolling window size** — cap on retained events/sessions (proposal: last ~200 sessions).
-5. **Claude models** — reuse `VoiceConfig`'s tiers (sonnet for refine/generate, haiku where cheap) vs a
-   dedicated tier.
+1. **Event storage** — **on-device only** (SQLite/preferences); raw listening history never leaves the
+   phone. Only the summarized `TasteProfile` syncs to Drive as the propagatable artifact.
+2. **Discovery placement** — a **Music-menu entry** (alongside Playlists/Artists/Albums/Songs/Genres);
+   the top toggle stays 2-way (`Podcasts | Music`).
+3. **Friday-picks trigger** — a **weekly WorkManager `PeriodicWorkRequest`** generates picks in the
+   background; the shelf reads them on open. Quiet and dismissable — no push, no badge.
+4. **Claude models** — **reuse the shared `VoiceConfig` tiers** (sonnet for refine/generate, haiku where
+   cheap); no separate model config.
+5. **Rolling window** — retain the **last ~200 sessions** of events on device.
