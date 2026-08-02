@@ -981,7 +981,7 @@ public class AudioActivity : Activity
                     subscriptions.UpdateTitle(subscription.FeedUrl, feed.Title);
                 }
                 catch (Exception e) when (
-                    e is HttpRequestException or InvalidDataException or OperationCanceledException or UriFormatException)
+                    e is HttpRequestException or InvalidDataException or System.OperationCanceledException or UriFormatException)
                 {
                     // One bad feed must never sink the whole refresh (or the app): a
                     // moved feed serving HTML (InvalidDataException), a network drop
