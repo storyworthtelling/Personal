@@ -174,7 +174,8 @@ public class AudioActivity : Activity
         root.AddView(content, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        nowPlayingBar = new NowPlayingBar(this, SkipBack, TogglePlayPause, SkipForward);
+        nowPlayingBar = new NowPlayingBar(this, SkipBack, TogglePlayPause, SkipForward,
+            onOpen: () => StartActivity(new Intent(this, typeof(NowPlayingActivity))));
         root.AddView(nowPlayingBar);
 
         root.AddView(PaperUi.BottomBar(this,
