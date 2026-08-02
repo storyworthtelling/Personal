@@ -23,6 +23,7 @@ public sealed class MusicTasteService
     private readonly DriveVoiceOptions options;
     private readonly ITasteProfileStore store;
     private readonly TasteProfileRefresher refresher;
+    private readonly IDiscoveryClient discovery;
 
     public MusicTasteService(Func<Task<string>> accessToken, string applicationName)
     {
@@ -43,6 +44,7 @@ public sealed class MusicTasteService
         var client = new TasteProfileClient(http, options);
         store = new DriveTasteProfileStore(new DriveTextFile(driveFactory, DriveTasteProfileStore.FileName));
         refresher = new TasteProfileRefresher(client, store, options);
+        discovery = new DiscoveryClient(http, options);
     }
 
     /// <summary>Refreshes the Drive profile from the on-device events. Returns the profile (possibly unchanged).</summary>
@@ -69,6 +71,44 @@ public sealed class MusicTasteService
         catch (Exception e) when (e is not OperationCanceledException)
         {
             return TasteProfile.Empty;
+        }
+    }
+
+    /// <summary>Generates a prompted playlist and resolves it to playable catalog tracks. Empty on any failure.</summary>
+    public async Task<DiscoveryPlaylist> MakePlaylistAsync(
+        IReadOnlyList<Track> catalog, PlaylistRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await options.RefreshAsync(cancellationToken);
+            var profile = await store.LoadAsync(cancellationToken);
+            var selection = await discovery.GeneratePlaylistAsync(profile, catalog, request, cancellationToken);
+            return PlaylistPlan.Resolve(selection.Title, selection.TrackIds, catalog, request.MaxTracks);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return DiscoveryPlaylist.Empty;
+        }
+    }
+
+    /// <summary>Picks the weekly "New for you" set as a raw selection (title + ids) for the worker to persist.</summary>
+    public async Task<DiscoverySelection> FridayPicksAsync(
+        IReadOnlyList<Track> catalog, int maxTracks, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await options.RefreshAsync(cancellationToken);
+            var profile = await store.LoadAsync(cancellationToken);
+            if (profile.IsEmpty)
+            {
+                return DiscoverySelection.Empty; // no taste learned yet -> nothing to surface
+            }
+
+            return await discovery.FridayPicksAsync(profile, catalog, maxTracks, cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return DiscoverySelection.Empty;
         }
     }
 }

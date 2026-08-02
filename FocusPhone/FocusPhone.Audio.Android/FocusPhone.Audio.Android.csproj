@@ -23,5 +23,6 @@
     <PackageReference Include="Xamarin.AndroidX.Media3.Session" Version="1.8.0.2" />
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
   </ItemGroup>
 </Project>

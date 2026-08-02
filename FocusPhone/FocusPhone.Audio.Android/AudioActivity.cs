@@ -60,6 +60,10 @@ public class AudioActivity : Activity
     private readonly MusicListeningRecorder listeningRecorder = new();
     private FocusPhone.Audio.Google.MusicTasteService? tasteService;
 
+    // Discovery (Phase 7): prompted playlists + the quiet weekly shelf.
+    private FridayPicksStore fridayPicksStore = null!;
+    private string? discoveryStatus;
+
     // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
     private FocusPhone.Ui.Voice.VoiceGreeting? greeting;
     private TextView? greetingView;
@@ -94,6 +98,8 @@ public class AudioActivity : Activity
         listeningStore = new ListeningEventStore(this);
         listeningRecorder.LearningEnabled = MusicSettingsStore.ListeningGeniusEnabled;
         tasteService = new FocusPhone.Audio.Google.MusicTasteService(musicTokens.GetAccessToken, "FocusPhone.Audio");
+        fridayPicksStore = new FridayPicksStore(this);
+        FridayPicksWorker.Schedule(this); // weekly "New for you"; no-ops until signed in
 
         greeting = new FocusPhone.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "FocusPhone.Audio");
         SetContentView(BuildLayout());
@@ -409,14 +415,107 @@ public class AudioActivity : Activity
             case MusicView.Playlists:
                 return PaperUi.EmptyState(this, "No playlists yet.");
 
+            case MusicView.Discovery:
+                return BuildDiscovery(catalog);
+
             default:
-                var items = new[] { "Playlists", "Artists", "Albums", "Songs", "Genres" };
+                var items = new[] { "Discovery", "Playlists", "Artists", "Albums", "Songs", "Genres" };
                 return BuildList([.. items.Select(item => new PaperListRow(item))], position =>
                 {
                     musicView = Enum.Parse<MusicView>(items[position]);
                     RenderContent();
                 });
         }
+    }
+
+    // Discovery: a prompted playlist from the owner's own library, a quiet weekly "New for you" shelf, and
+    // the Listening Genius control + honest data note. Playlists generate only when asked (DESIGN.md: no
+    // surprise work); loading is a sentence, and the shelf is dismissable — never a toast, push, or badge.
+    private View BuildDiscovery(MusicCatalog catalog)
+    {
+        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+
+        var picks = ResolveFridayPicks(catalog);
+        if (picks is not null && !fridayPicksStore.Dismissed)
+        {
+            layout.AddView(PaperUi.Heading(this, "New for you"));
+            layout.AddView(PaperUi.Secondary(this, picks.Title));
+            layout.AddView(PaperUi.SecondaryButton(this, "Play these", () => PlayTracks(picks.Tracks, 0)));
+            layout.AddView(PaperUi.QuietButton(this, "Dismiss", () =>
+            {
+                fridayPicksStore.Dismissed = true;
+                RenderContent();
+            }));
+        }
+
+        layout.AddView(PaperUi.Body(this, "Make a playlist from your library."));
+        var input = PaperUi.Field(this, "What do you want to hear? A mood, a genre, an idea.");
+        layout.AddView(input);
+        layout.AddView(PaperUi.PrimaryButton(this, "Make a playlist", () => _ = MakePlaylistAsync(input.Text, catalog)));
+
+        if (!string.IsNullOrEmpty(discoveryStatus))
+        {
+            layout.AddView(PaperUi.Secondary(this, discoveryStatus));
+        }
+
+        layout.AddView(PaperUi.SecondaryButton(this, GeniusToggleLabel(), ToggleListeningGenius));
+        layout.AddView(PaperUi.Secondary(this,
+            "Listening Genius learns your taste on this phone from what you play — nothing you rate — and " +
+            "sends a short summary to Claude with your key to describe it. Turn it off any time; that also " +
+            "clears what's been gathered."));
+        return WrapScroll(layout);
+    }
+
+    private DiscoveryPlaylist? ResolveFridayPicks(MusicCatalog catalog)
+    {
+        var selection = fridayPicksStore.LoadSelection();
+        if (selection.TrackIds.Count == 0)
+        {
+            return null;
+        }
+
+        var playlist = PlaylistPlan.Resolve(selection.Title, selection.TrackIds, catalog.Songs(), 25);
+        return playlist.IsEmpty ? null : playlist;
+    }
+
+    private async Task MakePlaylistAsync(string? seed, MusicCatalog catalog)
+    {
+        if (string.IsNullOrWhiteSpace(seed) || tasteService is null)
+        {
+            return;
+        }
+
+        discoveryStatus = "Building a playlist…";
+        RenderContent();
+
+        var playlist = await tasteService.MakePlaylistAsync(
+            catalog.Songs(), new PlaylistRequest(seed.Trim()), CancellationToken.None);
+        if (playlist.IsEmpty)
+        {
+            discoveryStatus = "Couldn't build a playlist from that. Try another idea.";
+            RenderContent();
+            return;
+        }
+
+        discoveryStatus = null;
+        PlayTracks(playlist.Tracks, 0);
+        RenderContent();
+    }
+
+    private string GeniusToggleLabel() =>
+        MusicSettingsStore.ListeningGeniusEnabled ? "Listening Genius: on" : "Listening Genius: off";
+
+    private void ToggleListeningGenius()
+    {
+        var enabled = !MusicSettingsStore.ListeningGeniusEnabled;
+        MusicSettingsStore.ListeningGeniusEnabled = enabled;
+        listeningRecorder.LearningEnabled = enabled;
+        if (!enabled)
+        {
+            listeningStore.Clear(); // off means forget what was gathered, not just stop
+        }
+
+        RenderContent();
     }
 
     private void PlayTracks(IReadOnlyList<Track> tracks, int index, PlaybackLaunch launch = PlaybackLaunch.Album)
@@ -1020,4 +1119,5 @@ internal enum MusicView
     Albums,
     Songs,
     Genres,
+    Discovery,
 }
