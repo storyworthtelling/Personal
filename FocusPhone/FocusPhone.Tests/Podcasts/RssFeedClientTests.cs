@@ -119,4 +119,20 @@ public class RssFeedClientTests
             () => client.FetchAsync(new Uri("https://feeds.example.com/missing.rss")));
         Assert.Contains("missing.rss", ex.Message);
     }
+
+    [Fact]
+    public async Task Fetch_NonXmlBody_ThrowsInvalidDataException()
+    {
+        // A feed URL that answers 200 with an HTML error/redirect page (common
+        // when a feed has moved) must not leak a raw XmlException — the refresh
+        // loop only expects the network/parse family, and an escaping XmlException
+        // crashes the app and wedges the shelf on "Fetching episodes…".
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(FeedUrl, "<html><meta charset=\"utf-8\"><body>Not here &amp yet</body></html>", "text/html");
+        var client = new RssFeedClient(new HttpClient(handler));
+
+        var ex = await Assert.ThrowsAsync<InvalidDataException>(
+            () => client.FetchAsync(new Uri(FeedUrl)));
+        Assert.Contains(FeedUrl, ex.Message);
+    }
 }

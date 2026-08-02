@@ -1,3 +1,4 @@
+using System.Xml;
 using System.Xml.Linq;
 using FocusPhone.Domain.Audio;
 
@@ -30,7 +31,21 @@ public class RssFeedClient
                 $"Fetching podcast feed {feedUrl} failed with {(int)response.StatusCode} {response.StatusCode}.");
         }
 
-        var document = XDocument.Parse(await response.Content.ReadAsStringAsync());
+        var body = await response.Content.ReadAsStringAsync();
+        XDocument document;
+        try
+        {
+            document = XDocument.Parse(body);
+        }
+        catch (XmlException e)
+        {
+            // A moved or misconfigured feed often answers 200 with an HTML error
+            // or redirect page rather than RSS. Surface it as invalid feed data —
+            // the same family the refresh loop already handles — instead of
+            // leaking a raw XmlException that escapes and crashes the app.
+            throw new InvalidDataException($"Feed {feedUrl} is not valid XML: {e.Message}", e);
+        }
+
         var channel = document.Root?.Element("channel")
             ?? throw new InvalidDataException($"Feed {feedUrl} is not valid RSS: no <channel> element.");
 

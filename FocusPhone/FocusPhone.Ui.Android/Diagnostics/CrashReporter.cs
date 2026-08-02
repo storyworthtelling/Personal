@@ -44,6 +44,17 @@ public static class CrashReporter
         {
             return;
         }
+
+        // An unobserved task exception arrives wrapped in an AggregateException
+        // whose own StackTrace is empty (it was never thrown), which is why a
+        // crash surfaced this way reads as "no stack trace". Unwrap a single
+        // inner exception so the real fault and its stack trace are recorded.
+        if (exception is AggregateException aggregate)
+        {
+            var flattened = aggregate.Flatten();
+            exception = flattened.InnerExceptions.Count == 1 ? flattened.InnerExceptions[0] : flattened;
+        }
+
         try
         {
             store.Save(new CrashReport(
