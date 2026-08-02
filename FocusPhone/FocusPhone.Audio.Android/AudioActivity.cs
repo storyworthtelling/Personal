@@ -11,6 +11,7 @@ using FocusPhone.Domain.Audio;
 using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Music;
 using FocusPhone.Domain.Time;
+using FocusPhone.Infrastructure.Music;
 using FocusPhone.Infrastructure.Podcasts;
 using FocusPhone.Ui;
 
@@ -49,6 +50,7 @@ public class AudioActivity : Activity
     private int side; // 0 = podcasts, 1 = music
     private string? openFeedId;
     private bool showingQueue;
+    private bool isRefreshing; // a feed refresh is in flight — the empty shelf says so instead of "nothing new"
 
     // Music side (Phase 3: sign-in + scan + browse; playback lands in Phase 4).
     private readonly DeviceAccountTokenProvider musicTokens = new();
@@ -289,9 +291,35 @@ public class AudioActivity : Activity
             container.AddView(PaperUi.Secondary(this, musicStatus));
         }
 
-        container.AddView(BuildMusicBody(), new LinearLayout.LayoutParams(
+        // An empty catalog (and no scan running) is the cold-start dead-end: show the
+        // "how to add music" guide instead of a bare "no music" line under every browse view.
+        var catalogEmpty = (musicCatalog ?? new MusicCatalog([])).Songs().Count == 0;
+        var body = catalogEmpty && string.IsNullOrEmpty(musicStatus)
+            ? BuildMusicEmptyGuide()
+            : BuildMusicBody();
+        container.AddView(body, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         return container;
+    }
+
+    // The cold-start guide: how to get music into the Drive folder. Tone stays quiet-neutral
+    // (DESIGN.md §11) and the supported extensions come straight from AudioFileTypes so the
+    // guide can't drift from what the scanner actually accepts.
+    private View BuildMusicEmptyGuide()
+    {
+        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        layout.AddView(PaperUi.Body(this, "No music in this folder yet. Here's how to add some."));
+        layout.AddView(PaperUi.Secondary(this,
+            "Put audio files in your Drive music folder — rip your CDs to tagged FLAC or MP3, copy the " +
+            "files iTunes already made, or buy real downloads (Bandcamp, Qobuz, Amazon Music). Streaming " +
+            "apps like YouTube Music can't be saved here."));
+        layout.AddView(PaperUi.Secondary(this,
+            "What organizes the library is each file's embedded tags — title, artist, album artist, album, " +
+            "track number, genre. Folder names and structure don't matter; the tags do."));
+        layout.AddView(PaperUi.Secondary(this,
+            "Playable file types: " + string.Join(", ", AudioFileTypes.SupportedExtensions) + "."));
+        layout.AddView(PaperUi.PrimaryButton(this, "Scan again", () => _ = ScanAsync()));
+        return WrapScroll(layout);
     }
 
     private View BuildMusicBody()
@@ -476,7 +504,7 @@ public class AudioActivity : Activity
         var shelf = PodcastShelf.Build(episodes, feedTitles, doneIds);
         if (shelf.Count == 0)
         {
-            return PaperUi.EmptyState(this, "Nothing new to hear.");
+            return PaperUi.EmptyState(this, EmptyShelfMessage());
         }
 
         var rows = shelf
@@ -487,6 +515,18 @@ public class AudioActivity : Activity
             openFeedId = shelf[position].FeedId;
             RenderContent();
         });
+    }
+
+    // The empty shelf must never read like a dead-end: no shows points at Manage, a
+    // refresh in flight says so (loading is a sentence, DESIGN.md §6), otherwise caught up.
+    private string EmptyShelfMessage()
+    {
+        if (subscriptions.Ordered.Count == 0)
+        {
+            return "No shows yet. Tap Manage to add a podcast or import an OPML file.";
+        }
+
+        return isRefreshing ? "Fetching episodes…" : "Nothing new to hear.";
     }
 
     private View BuildShowEpisodes(string feedId)
@@ -767,6 +807,12 @@ public class AudioActivity : Activity
 
     private async Task RefreshFeedsAsync()
     {
+        isRefreshing = true;
+        if (side == 0 && !showingQueue && openFeedId is null)
+        {
+            RenderContent(); // surface "Fetching episodes…" while the first pull is in flight
+        }
+
         var all = new List<Episode>();
         var titles = new Dictionary<string, string>();
         using var http = new HttpClient();
@@ -791,6 +837,7 @@ public class AudioActivity : Activity
         subscriptionStore.Save(subscriptions.Export());
         episodes = all;
         feedTitles = titles;
+        isRefreshing = false;
         RecomputeDone();
         RenderContent();
     }

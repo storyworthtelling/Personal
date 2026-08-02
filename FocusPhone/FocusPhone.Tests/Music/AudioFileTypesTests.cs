@@ -18,4 +18,22 @@ public class AudioFileTypesTests
     {
         Assert.Equal(expected, AudioFileTypes.IsAudio(name, mimeType));
     }
+
+    [Fact]
+    public void SupportedExtensions_AreDotPrefixedLowercaseAndDeduped()
+    {
+        var extensions = AudioFileTypes.SupportedExtensions;
+
+        Assert.NotEmpty(extensions);
+        Assert.All(extensions, extension => Assert.StartsWith(".", extension));
+        Assert.All(extensions, extension => Assert.Equal(extension.ToLowerInvariant(), extension));
+        Assert.Equal(extensions.Count, extensions.Distinct().Count());
+    }
+
+    [Fact]
+    public void SupportedExtensions_AreTheOnesIsAudioAccepts()
+    {
+        Assert.All(AudioFileTypes.SupportedExtensions,
+            extension => Assert.True(AudioFileTypes.IsAudio("song" + extension, null)));
+    }
 }
