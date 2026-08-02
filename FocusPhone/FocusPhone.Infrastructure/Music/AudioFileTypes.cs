@@ -7,10 +7,17 @@ namespace FocusPhone.Infrastructure.Music;
 /// </summary>
 public static class AudioFileTypes
 {
-    private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
-    {
+    /// <summary>
+    /// The playable audio extensions, dot-prefixed and lowercase — the single list the
+    /// Drive/tag pipeline classifies by and the music "how to add" guide shows the user.
+    /// </summary>
+    public static readonly IReadOnlyList<string> SupportedExtensions =
+    [
         ".mp3", ".m4a", ".m4b", ".aac", ".flac", ".ogg", ".oga", ".opus", ".wav", ".alac", ".wma",
-    };
+    ];
+
+    private static readonly HashSet<string> Extensions =
+        new(SupportedExtensions, StringComparer.OrdinalIgnoreCase);
 
     public static bool IsAudio(string name, string? mimeType) =>
         (mimeType?.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ?? false)

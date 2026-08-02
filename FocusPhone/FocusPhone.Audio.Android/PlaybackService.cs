@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using AndroidX.Media3.Common;
 using AndroidX.Media3.DataSource;
 using AndroidX.Media3.ExoPlayer;
 using AndroidX.Media3.ExoPlayer.Source;
@@ -36,6 +37,8 @@ public class PlaybackService : MediaLibraryService
     private PlaybackProgressBook book = new();
     private Handler? handler;
     private Java.Lang.Runnable? recorder;
+    private EqualizerStore? equalizerStore;
+    private readonly AudioEffects audioEffects = new();
 
     public override void OnCreate()
     {
@@ -48,15 +51,39 @@ public class PlaybackService : MediaLibraryService
         var resolvingFactory = new ResolvingDataSource.Factory(
             new DefaultHttpDataSource.Factory(),
             new DriveMediaResolver(new DeviceAccountTokenProvider()));
+        // Hand audio focus to ExoPlayer so playback ducks/pauses for a call or nav prompt and resumes after,
+        // and pauses when headphones unplug (Phase 8 — none of this was configured before).
+        var audioAttributes = new AudioAttributes.Builder()
+            .SetUsage(C.UsageMedia)!
+            .SetContentType(C.AudioContentTypeMusic)!
+            .Build()!;
         player = new ExoPlayerBuilder(this)
             .SetMediaSourceFactory(new DefaultMediaSourceFactory(resolvingFactory))
+            .SetAudioAttributes(audioAttributes, true)
+            .SetHandleAudioBecomingNoisy(true)
             .Build()!;
         var tree = new MediaBrowseTree(LoadCatalog());
         mediaSession = new MediaLibrarySession.Builder(this, player, new LibraryCallback(tree)).Build();
 
+        equalizerStore = new EqualizerStore(this);
+        ApplyAudioEffects();
+
         handler = new Handler(Looper.MainLooper!);
         recorder = new Java.Lang.Runnable(RecordTick);
         handler.PostDelayed(recorder, RecordIntervalMs);
+    }
+
+    // Bind the saved equalizer curve + loudness boost to the player's current audio session. Cheap to call
+    // repeatedly — AudioEffects only re-attaches when the session id actually changes.
+    private void ApplyAudioEffects()
+    {
+        if (player is null || equalizerStore is null)
+        {
+            return;
+        }
+
+        var settings = equalizerStore.LoadLibrary()?.Active ?? new EqualizerSettings(false, []);
+        audioEffects.Apply(player.AudioSessionId, settings, equalizerStore.LoudnessMillibels);
     }
 
     // Covariant return (MediaLibrarySession, not MediaSession): Java's
@@ -81,12 +108,19 @@ public class PlaybackService : MediaLibraryService
             return StartCommandResult.Sticky;
         }
 
+        if (intent?.Action == AudioPlaybackCommands.ActionApplyAudioEffects)
+        {
+            ApplyAudioEffects();
+            return StartCommandResult.Sticky;
+        }
+
         return base.OnStartCommand(intent, flags, startId);
     }
 
     private void RecordTick()
     {
         RecordCurrentPosition();
+        ApplyAudioEffects(); // keep effects bound as the audio session changes across tracks
         if (handler is not null && recorder is not null)
         {
             handler.PostDelayed(recorder, RecordIntervalMs);
@@ -117,6 +151,7 @@ public class PlaybackService : MediaLibraryService
             handler.RemoveCallbacks(recorder);
         }
 
+        audioEffects.Release();
         mediaSession?.Player?.Release();
         mediaSession?.Release();
         mediaSession = null;
@@ -124,10 +159,13 @@ public class PlaybackService : MediaLibraryService
         base.OnDestroy();
     }
 
-    // The session's library callback. Converting to MediaLibraryService makes the
-    // service Android-Auto/Assistant capable structurally; the browsable content
-    // tree (built from `tree`) is populated in a follow-up once the Guava
-    // ListenableFuture binding is wired. Playback, lockscreen, and Bluetooth work
+    // The session's library callback. Converting to MediaLibraryService makes the service
+    // Android-Auto/Assistant capable structurally, and the browsable content it would serve is the
+    // unit-tested MediaBrowseTree (root -> Albums/Artists/Songs -> tracks). Actually answering
+    // OnGetLibraryRoot/OnGetChildren needs the Guava ListenableFuture binding, which isn't referenced in
+    // this head yet (Com.Google.Common.Util.Concurrent doesn't resolve) — wiring it needs the
+    // Xamarin.Google.Guava.ListenableFuture package matched to Media3.Session, plus a car/DHU to verify.
+    // Deferred as an on-device follow-up; the tree is ready. Playback, lockscreen, and Bluetooth work
     // through the session regardless.
     private sealed class LibraryCallback(MediaBrowseTree tree)
         : Java.Lang.Object, MediaLibrarySession.ICallback

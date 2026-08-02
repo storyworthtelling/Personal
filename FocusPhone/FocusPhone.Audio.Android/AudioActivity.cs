@@ -11,6 +11,7 @@ using FocusPhone.Domain.Audio;
 using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Music;
 using FocusPhone.Domain.Time;
+using FocusPhone.Infrastructure.Music;
 using FocusPhone.Infrastructure.Podcasts;
 using FocusPhone.Ui;
 
@@ -49,9 +50,19 @@ public class AudioActivity : Activity
     private int side; // 0 = podcasts, 1 = music
     private string? openFeedId;
     private bool showingQueue;
+    private bool isRefreshing; // a feed refresh is in flight — the empty shelf says so instead of "nothing new"
 
     // Music side (Phase 3: sign-in + scan + browse; playback lands in Phase 4).
     private readonly DeviceAccountTokenProvider musicTokens = new();
+
+    // Listening Genius (Phase 6): passive on-device recording -> Drive-backed Taste Profile.
+    private ListeningEventStore listeningStore = null!;
+    private readonly MusicListeningRecorder listeningRecorder = new();
+    private FocusPhone.Audio.Google.MusicTasteService? tasteService;
+
+    // Discovery (Phase 7): prompted playlists + the quiet weekly shelf.
+    private FridayPicksStore fridayPicksStore = null!;
+    private string? discoveryStatus;
 
     // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
     private FocusPhone.Ui.Voice.VoiceGreeting? greeting;
@@ -83,6 +94,12 @@ public class AudioActivity : Activity
         driveClient = new DriveMusicClient(musicTokens);
         tagReader = new MusicTagReader(Path.Combine(CacheDir!.AbsolutePath, "art"));
         LoadMusicCatalog();
+
+        listeningStore = new ListeningEventStore(this);
+        listeningRecorder.LearningEnabled = MusicSettingsStore.ListeningGeniusEnabled;
+        tasteService = new FocusPhone.Audio.Google.MusicTasteService(musicTokens.GetAccessToken, "FocusPhone.Audio");
+        fridayPicksStore = new FridayPicksStore(this);
+        FridayPicksWorker.Schedule(this); // weekly "New for you"; no-ops until signed in
 
         greeting = new FocusPhone.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "FocusPhone.Audio");
         SetContentView(BuildLayout());
@@ -157,7 +174,8 @@ public class AudioActivity : Activity
         root.AddView(content, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        nowPlayingBar = new NowPlayingBar(this, SkipBack, TogglePlayPause, SkipForward);
+        nowPlayingBar = new NowPlayingBar(this, SkipBack, TogglePlayPause, SkipForward,
+            onOpen: () => StartActivity(new Intent(this, typeof(NowPlayingActivity))));
         root.AddView(nowPlayingBar);
 
         root.AddView(PaperUi.BottomBar(this,
@@ -181,6 +199,44 @@ public class AudioActivity : Activity
     {
         base.OnPause();
         StopTicking();
+
+        // Finalize whatever was mid-play, then fold the day's listening into the Taste Profile (throttled).
+        RecordListening(listeningRecorder.Stop());
+        MaybeRefreshTaste();
+    }
+
+    // ---- Listening Genius ----
+
+    private void RecordListening(IReadOnlyList<ListeningEvent> events)
+    {
+        if (events.Count > 0)
+        {
+            listeningStore.Append(events);
+        }
+    }
+
+    // Refreshes the Taste Profile at most once a day, off the UI thread; best-effort and never fatal.
+    private void MaybeRefreshTaste()
+    {
+        if (!MusicSettingsStore.ListeningGeniusEnabled || tasteService is null)
+        {
+            return;
+        }
+
+        var last = MusicSettingsStore.TasteLastRefreshUtc;
+        if (last is { } when && DateTimeOffset.UtcNow - when < TimeSpan.FromHours(20))
+        {
+            return;
+        }
+
+        var events = listeningStore.Load();
+        if (events.Count == 0)
+        {
+            return;
+        }
+
+        MusicSettingsStore.TasteLastRefreshUtc = DateTimeOffset.UtcNow;
+        _ = tasteService.RefreshAsync(events, CancellationToken.None);
     }
 
     protected override void OnDestroy()
@@ -281,6 +337,7 @@ public class AudioActivity : Activity
         head.AddView(PaperUi.Heading(this, musicView.ToString()),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         head.AddView(PaperUi.QuietButton(this, "Shuffle", () => PlayShuffled((musicCatalog ?? new MusicCatalog([])).Songs())));
+        head.AddView(PaperUi.QuietButton(this, "Sound", () => StartActivity(new Intent(this, typeof(EqualizerActivity)))));
         head.AddView(PaperUi.QuietButton(this, "Rescan", () => _ = ScanAsync()));
         container.AddView(head);
 
@@ -289,9 +346,35 @@ public class AudioActivity : Activity
             container.AddView(PaperUi.Secondary(this, musicStatus));
         }
 
-        container.AddView(BuildMusicBody(), new LinearLayout.LayoutParams(
+        // An empty catalog (and no scan running) is the cold-start dead-end: show the
+        // "how to add music" guide instead of a bare "no music" line under every browse view.
+        var catalogEmpty = (musicCatalog ?? new MusicCatalog([])).Songs().Count == 0;
+        var body = catalogEmpty && string.IsNullOrEmpty(musicStatus)
+            ? BuildMusicEmptyGuide()
+            : BuildMusicBody();
+        container.AddView(body, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         return container;
+    }
+
+    // The cold-start guide: how to get music into the Drive folder. Tone stays quiet-neutral
+    // (DESIGN.md §11) and the supported extensions come straight from AudioFileTypes so the
+    // guide can't drift from what the scanner actually accepts.
+    private View BuildMusicEmptyGuide()
+    {
+        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        layout.AddView(PaperUi.Body(this, "No music in this folder yet. Here's how to add some."));
+        layout.AddView(PaperUi.Secondary(this,
+            "Put audio files in your Drive music folder — rip your CDs to tagged FLAC or MP3, copy the " +
+            "files iTunes already made, or buy real downloads (Bandcamp, Qobuz, Amazon Music). Streaming " +
+            "apps like YouTube Music can't be saved here."));
+        layout.AddView(PaperUi.Secondary(this,
+            "What organizes the library is each file's embedded tags — title, artist, album artist, album, " +
+            "track number, genre. Folder names and structure don't matter; the tags do."));
+        layout.AddView(PaperUi.Secondary(this,
+            "Playable file types: " + string.Join(", ", AudioFileTypes.SupportedExtensions) + "."));
+        layout.AddView(PaperUi.PrimaryButton(this, "Scan again", () => _ = ScanAsync()));
+        return WrapScroll(layout);
     }
 
     private View BuildMusicBody()
@@ -334,8 +417,11 @@ public class AudioActivity : Activity
             case MusicView.Playlists:
                 return PaperUi.EmptyState(this, "No playlists yet.");
 
+            case MusicView.Discovery:
+                return BuildDiscovery(catalog);
+
             default:
-                var items = new[] { "Playlists", "Artists", "Albums", "Songs", "Genres" };
+                var items = new[] { "Discovery", "Playlists", "Artists", "Albums", "Songs", "Genres" };
                 return BuildList([.. items.Select(item => new PaperListRow(item))], position =>
                 {
                     musicView = Enum.Parse<MusicView>(items[position]);
@@ -344,7 +430,97 @@ public class AudioActivity : Activity
         }
     }
 
-    private void PlayTracks(IReadOnlyList<Track> tracks, int index)
+    // Discovery: a prompted playlist from the owner's own library, a quiet weekly "New for you" shelf, and
+    // the Listening Genius control + honest data note. Playlists generate only when asked (DESIGN.md: no
+    // surprise work); loading is a sentence, and the shelf is dismissable — never a toast, push, or badge.
+    private View BuildDiscovery(MusicCatalog catalog)
+    {
+        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+
+        var picks = ResolveFridayPicks(catalog);
+        if (picks is not null && !fridayPicksStore.Dismissed)
+        {
+            layout.AddView(PaperUi.Heading(this, "New for you"));
+            layout.AddView(PaperUi.Secondary(this, picks.Title));
+            layout.AddView(PaperUi.SecondaryButton(this, "Play these", () => PlayTracks(picks.Tracks, 0)));
+            layout.AddView(PaperUi.QuietButton(this, "Dismiss", () =>
+            {
+                fridayPicksStore.Dismissed = true;
+                RenderContent();
+            }));
+        }
+
+        layout.AddView(PaperUi.Body(this, "Make a playlist from your library."));
+        var input = PaperUi.Field(this, "What do you want to hear? A mood, a genre, an idea.");
+        layout.AddView(input);
+        layout.AddView(PaperUi.PrimaryButton(this, "Make a playlist", () => _ = MakePlaylistAsync(input.Text, catalog)));
+
+        if (!string.IsNullOrEmpty(discoveryStatus))
+        {
+            layout.AddView(PaperUi.Secondary(this, discoveryStatus));
+        }
+
+        layout.AddView(PaperUi.SecondaryButton(this, GeniusToggleLabel(), ToggleListeningGenius));
+        layout.AddView(PaperUi.Secondary(this,
+            "Listening Genius learns your taste on this phone from what you play — nothing you rate — and " +
+            "sends a short summary to Claude with your key to describe it. Turn it off any time; that also " +
+            "clears what's been gathered."));
+        return WrapScroll(layout);
+    }
+
+    private DiscoveryPlaylist? ResolveFridayPicks(MusicCatalog catalog)
+    {
+        var selection = fridayPicksStore.LoadSelection();
+        if (selection.TrackIds.Count == 0)
+        {
+            return null;
+        }
+
+        var playlist = PlaylistPlan.Resolve(selection.Title, selection.TrackIds, catalog.Songs(), 25);
+        return playlist.IsEmpty ? null : playlist;
+    }
+
+    private async Task MakePlaylistAsync(string? seed, MusicCatalog catalog)
+    {
+        if (string.IsNullOrWhiteSpace(seed) || tasteService is null)
+        {
+            return;
+        }
+
+        discoveryStatus = "Building a playlist…";
+        RenderContent();
+
+        var playlist = await tasteService.MakePlaylistAsync(
+            catalog.Songs(), new PlaylistRequest(seed.Trim()), CancellationToken.None);
+        if (playlist.IsEmpty)
+        {
+            discoveryStatus = "Couldn't build a playlist from that. Try another idea.";
+            RenderContent();
+            return;
+        }
+
+        discoveryStatus = null;
+        PlayTracks(playlist.Tracks, 0);
+        RenderContent();
+    }
+
+    private string GeniusToggleLabel() =>
+        MusicSettingsStore.ListeningGeniusEnabled ? "Listening Genius: on" : "Listening Genius: off";
+
+    private void ToggleListeningGenius()
+    {
+        var enabled = !MusicSettingsStore.ListeningGeniusEnabled;
+        MusicSettingsStore.ListeningGeniusEnabled = enabled;
+        listeningRecorder.LearningEnabled = enabled;
+        if (!enabled)
+        {
+            listeningStore.Clear(); // off means forget what was gathered, not just stop
+        }
+
+        RenderContent();
+    }
+
+    private void PlayTracks(IReadOnlyList<Track> tracks, int index, PlaybackLaunch launch = PlaybackLaunch.Album)
     {
         if (controller is null || tracks.Count == 0)
         {
@@ -358,13 +534,17 @@ public class AudioActivity : Activity
         controller.Prepare();
         controller.Play();
         SendSkipSilence(false); // skip-silence is a podcast setting; off for music
+
+        // Start a listening sitting for Genius; replay is judged against the saved progress book.
+        var progress = new PlaybackProgressBook(progressStore.Load());
+        RecordListening(listeningRecorder.BeginSelection(tracks, index, launch, progress.IsComplete));
     }
 
     private void PlayShuffled(IReadOnlyList<Track> tracks) =>
-        PlayTracks(new ShufflePlanner().Shuffle(tracks), 0);
+        PlayTracks(new ShufflePlanner().Shuffle(tracks), 0, PlaybackLaunch.Shuffle);
 
     private void PlaySmartMix(Track seed, MusicCatalog catalog) =>
-        PlayTracks(new SmartMixBuilder(new ShufflePlanner()).Build(seed, catalog), 0);
+        PlayTracks(new SmartMixBuilder(new ShufflePlanner()).Build(seed, catalog), 0, PlaybackLaunch.Shuffle);
 
     private static MediaItem BuildTrackItem(Track track)
     {
@@ -476,7 +656,7 @@ public class AudioActivity : Activity
         var shelf = PodcastShelf.Build(episodes, feedTitles, doneIds);
         if (shelf.Count == 0)
         {
-            return PaperUi.EmptyState(this, "Nothing new to hear.");
+            return PaperUi.EmptyState(this, EmptyShelfMessage());
         }
 
         var rows = shelf
@@ -487,6 +667,18 @@ public class AudioActivity : Activity
             openFeedId = shelf[position].FeedId;
             RenderContent();
         });
+    }
+
+    // The empty shelf must never read like a dead-end: no shows points at Manage, a
+    // refresh in flight says so (loading is a sentence, DESIGN.md §6), otherwise caught up.
+    private string EmptyShelfMessage()
+    {
+        if (subscriptions.Ordered.Count == 0)
+        {
+            return "No shows yet. Tap Manage to add a podcast or import an OPML file.";
+        }
+
+        return isRefreshing ? "Fetching episodes…" : "Nothing new to hear.";
     }
 
     private View BuildShowEpisodes(string feedId)
@@ -767,6 +959,12 @@ public class AudioActivity : Activity
 
     private async Task RefreshFeedsAsync()
     {
+        isRefreshing = true;
+        if (side == 0 && !showingQueue && openFeedId is null)
+        {
+            RenderContent(); // surface "Fetching episodes…" while the first pull is in flight
+        }
+
         var all = new List<Episode>();
         var titles = new Dictionary<string, string>();
         using var http = new HttpClient();
@@ -791,6 +989,7 @@ public class AudioActivity : Activity
         subscriptionStore.Save(subscriptions.Export());
         episodes = all;
         feedTitles = titles;
+        isRefreshing = false;
         RecomputeDone();
         RenderContent();
     }
@@ -817,9 +1016,26 @@ public class AudioActivity : Activity
         if (controller is not null)
         {
             nowPlayingBar.Update(controller.MediaMetadata?.Title?.ToString(), controller.IsPlaying);
+            ObserveListening();
         }
 
         uiHandler?.PostDelayed(ticker!, 1000);
+    }
+
+    // Sample the music player for Genius. Only music counts (a podcast sets nowPlaying); the recorder turns
+    // id changes into completed/skipped signals itself.
+    private void ObserveListening()
+    {
+        if (controller is null || nowPlaying is not null || controller.CurrentMediaItem is null)
+        {
+            return;
+        }
+
+        var mediaId = controller.CurrentMediaItem.MediaId;
+        var position = TimeSpan.FromMilliseconds(Math.Max(0, controller.CurrentPosition));
+        var durationMs = controller.Duration;
+        var duration = durationMs > 0 ? TimeSpan.FromMilliseconds(durationMs) : TimeSpan.Zero;
+        RecordListening(listeningRecorder.Observe(mediaId, position, duration));
     }
 
     private void ConnectController()
@@ -905,4 +1121,5 @@ internal enum MusicView
     Albums,
     Songs,
     Genres,
+    Discovery,
 }

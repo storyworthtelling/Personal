@@ -136,7 +136,7 @@ public class ManageSubscriptionsActivity : Activity
                 {
                     subscriptions.Add(input.Text!, input.Text!, DateTimeOffset.Now);
                     Persist();
-                    Render();
+                    ReturnToHome(); // land on Home so the new show is visibly there, not a dead-end here
                 }
                 else
                 {
@@ -166,22 +166,49 @@ public class ManageSubscriptionsActivity : Activity
         {
             using var stream = ContentResolver!.OpenInputStream(uri);
             using var reader = new StreamReader(stream!);
-            var added = 0;
-            foreach (var imported in OpmlImportParser.Parse(reader.ReadToEnd()))
+            var selection = new OpmlImportSelection(OpmlImportParser.Parse(reader.ReadToEnd()), subscriptions);
+            if (selection.Items.Count == 0)
             {
-                subscriptions.Add(imported.FeedUrl, imported.Title, DateTimeOffset.Now);
-                added++;
+                Toast.MakeText(this, "No feeds found in that file.", ToastLength.Short)!.Show();
+                return;
             }
 
-            Persist();
-            Render();
-            Toast.MakeText(this, $"Imported {added} feeds.", ToastLength.Short)!.Show();
+            ShowImportChecklist(selection);
         }
         catch (Exception e) when (e is IOException or InvalidOperationException or System.Xml.XmlException)
         {
             Toast.MakeText(this, "That file couldn't be read as OPML.", ToastLength.Short)!.Show();
         }
     }
+
+    // Confirm which feeds to add before subscribing (new ones pre-checked), then land on
+    // a populated Home rather than stranding the user on this management list.
+    private void ShowImportChecklist(OpmlImportSelection selection)
+    {
+        var labels = selection.Items
+            .Select(item => item.AlreadySubscribed ? $"{item.Title} (subscribed)" : item.Title)
+            .ToArray();
+        var checkedState = selection.Items.Select(item => item.Checked).ToArray();
+
+        new AlertDialog.Builder(this)
+            .SetTitle("Import subscriptions")!
+            .SetMultiChoiceItems(labels, checkedState, (_, args) => checkedState[args.Which] = args.IsChecked)!
+            .SetPositiveButton("Add selected", (_, _) =>
+            {
+                var chosen = selection.Items
+                    .Where((_, index) => checkedState[index])
+                    .Select(item => item.FeedUrl);
+                subscriptions = selection.Apply(chosen, DateTimeOffset.Now);
+                Persist();
+                ReturnToHome();
+            })!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    // Persisted; AudioActivity reloads subscriptions and refreshes feeds in OnResume, so
+    // popping back to it shows the shows and their fetching state.
+    private void ReturnToHome() => Finish();
 
     private void Persist() => store.Save(subscriptions.Export());
 }

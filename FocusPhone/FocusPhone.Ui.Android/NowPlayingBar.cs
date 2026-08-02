@@ -15,7 +15,7 @@ public sealed class NowPlayingBar : LinearLayout
     private readonly TextView title;
     private readonly Button playPause;
 
-    public NowPlayingBar(Context context, Action onBack, Action onPlayPause, Action onForward) : base(context)
+    public NowPlayingBar(Context context, Action onBack, Action onPlayPause, Action onForward, Action? onOpen = null) : base(context)
     {
         Orientation = Orientation.Vertical;
 
@@ -38,6 +38,12 @@ public sealed class NowPlayingBar : LinearLayout
         };
         title.SetTextColor(PaperTheme.Ink);
         title.SetSingleLine(true);
+        if (onOpen is not null)
+        {
+            title.Clickable = true;
+            title.Click += (_, _) => onOpen();
+        }
+
         row.AddView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
         row.AddView(PaperUi.QuietButton(context, "−30s", onBack));

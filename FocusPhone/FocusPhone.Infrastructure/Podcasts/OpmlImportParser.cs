@@ -1,9 +1,7 @@
 using System.Xml.Linq;
+using FocusPhone.Domain.Audio;
 
 namespace FocusPhone.Infrastructure.Podcasts;
-
-/// <summary>A subscription read from an OPML file: its display title and feed URL.</summary>
-public record OpmlSubscription(string Title, string FeedUrl);
 
 /// <summary>
 /// Parses a Podcast Addict (or any) OPML export into subscriptions for a one-shot
