@@ -180,9 +180,10 @@ public class NowPlayingActivity : Activity
     private void RenderArtwork(MediaMetadata? metadata)
     {
         var data = metadata?.ArtworkData;
-        if (data is { Length: > 0 })
+        if (data is { Count: > 0 })
         {
-            artwork.SetImageBitmap(BitmapFactory.DecodeByteArray(data, 0, data.Length));
+            var bytes = data.ToArray();
+            artwork.SetImageBitmap(BitmapFactory.DecodeByteArray(bytes, 0, bytes.Length));
         }
         else
         {
@@ -263,20 +264,23 @@ public class NowPlayingActivity : Activity
         _ => "Repeat: off",
     };
 
+    // Media3 Player repeat-mode contract values (REPEAT_MODE_OFF/ONE/ALL). The Xamarin binding doesn't
+    // surface them as named constants on IPlayer, and these are stable, documented API values.
+    private const int RepeatOff = 0;
+    private const int RepeatOne = 1;
+    private const int RepeatAll = 2;
+
     private static int ToPlayerRepeat(RepeatMode mode) => mode switch
     {
-        RepeatMode.All => IPlayer.RepeatModeAll,
-        RepeatMode.One => IPlayer.RepeatModeOne,
-        _ => IPlayer.RepeatModeOff,
+        RepeatMode.All => RepeatAll,
+        RepeatMode.One => RepeatOne,
+        _ => RepeatOff,
     };
 
-    private static RepeatMode FromPlayerRepeat(int repeat)
+    private static RepeatMode FromPlayerRepeat(int repeat) => repeat switch
     {
-        if (repeat == IPlayer.RepeatModeAll)
-        {
-            return RepeatMode.All;
-        }
-
-        return repeat == IPlayer.RepeatModeOne ? RepeatMode.One : RepeatMode.Off;
-    }
+        RepeatAll => RepeatMode.All,
+        RepeatOne => RepeatMode.One,
+        _ => RepeatMode.Off,
+    };
 }
