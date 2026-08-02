@@ -967,29 +967,46 @@ public class AudioActivity : Activity
 
         var all = new List<Episode>();
         var titles = new Dictionary<string, string>();
-        using var http = new HttpClient();
-        var client = new RssFeedClient(http);
-        foreach (var subscription in subscriptions.Ordered)
+        try
         {
-            try
+            using var http = new HttpClient();
+            var client = new RssFeedClient(http);
+            foreach (var subscription in subscriptions.Ordered)
             {
-                var feed = await client.FetchAsync(new Uri(subscription.FeedUrl));
-                all.AddRange(feed.Episodes);
-                titles[subscription.FeedUrl] = feed.Title;
-                subscriptions.UpdateTitle(subscription.FeedUrl, feed.Title);
+                try
+                {
+                    var feed = await client.FetchAsync(new Uri(subscription.FeedUrl));
+                    all.AddRange(feed.Episodes);
+                    titles[subscription.FeedUrl] = feed.Title;
+                    subscriptions.UpdateTitle(subscription.FeedUrl, feed.Title);
+                }
+                catch (Exception e) when (
+                    e is HttpRequestException or InvalidDataException or OperationCanceledException or UriFormatException)
+                {
+                    // One bad feed must never sink the whole refresh (or the app): a
+                    // moved feed serving HTML (InvalidDataException), a network drop
+                    // (HttpRequestException), a timeout (OperationCanceledException),
+                    // or a corrupt stored URL (UriFormatException) all fall through
+                    // to the same spoken failure. Failure may speak (DESIGN.md §7).
+                    var host = Uri.TryCreate(subscription.FeedUrl, UriKind.Absolute, out var uri)
+                        ? uri.Host
+                        : subscription.FeedUrl;
+                    Toast.MakeText(this, $"{host} didn't answer. It retries on the next refresh.",
+                        ToastLength.Short)!.Show();
+                }
             }
-            catch (Exception e) when (e is HttpRequestException or InvalidDataException)
-            {
-                // Failure may speak (DESIGN.md §7); worded per the error template.
-                Toast.MakeText(this, $"{new Uri(subscription.FeedUrl).Host} didn't answer. It retries on the next refresh.",
-                    ToastLength.Short)!.Show();
-            }
+
+            subscriptionStore.Save(subscriptions.Export());
+            episodes = all;
+            feedTitles = titles;
+        }
+        finally
+        {
+            // Always leave the refreshing state — otherwise an unexpected failure
+            // wedges the shelf on "Fetching episodes…" until the app is restarted.
+            isRefreshing = false;
         }
 
-        subscriptionStore.Save(subscriptions.Export());
-        episodes = all;
-        feedTitles = titles;
-        isRefreshing = false;
         RecomputeDone();
         RenderContent();
     }
