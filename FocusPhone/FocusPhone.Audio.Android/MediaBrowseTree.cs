@@ -4,84 +4,46 @@ using FocusPhone.Domain.Music;
 namespace FocusPhone.Audio;
 
 /// <summary>
-/// The browsable content tree Android Auto / Assistant navigate: root → Albums /
-/// Artists / Songs → playable tracks (drive:// uris). Built from the cached
-/// <see cref="MusicCatalog"/>. Playable leaves carry the same drive:// uri the
-/// in-app player uses, so the resolving data source streams them the same way.
+/// The Android adapter over the pure <see cref="MusicBrowseCatalog"/>: maps its <see cref="BrowseNode"/>s to
+/// Media3 <see cref="MediaItem"/>s for the Android Auto / Assistant browse tree. All the tree logic (ids,
+/// expansion, album-key encoding) is unit-tested in the Domain; this file only builds MediaItems, so it
+/// stays a thin, mechanical mapping. Playable leaves carry the same drive:// uri the in-app player uses.
 /// </summary>
 public sealed class MediaBrowseTree
 {
-    public const string RootId = "root";
-    private const string AlbumsId = "albums";
-    private const string ArtistsId = "artists";
-    private const string SongsId = "songs";
-    private const char Separator = '\u001f';
+    public const string RootId = MusicBrowseCatalog.RootId;
 
-    private readonly MusicCatalog catalog;
+    private readonly MusicBrowseCatalog catalog;
 
-    public MediaBrowseTree(MusicCatalog catalog) => this.catalog = catalog;
+    public MediaBrowseTree(MusicCatalog catalog) => this.catalog = new MusicBrowseCatalog(catalog);
 
-    public MediaItem Root() => Browsable(RootId, "Audio");
+    public MediaItem Root() => ToItem(catalog.Root());
 
-    public IList<MediaItem> Children(string parentId)
-    {
-        if (parentId == RootId)
-        {
-            return [Browsable(AlbumsId, "Albums"), Browsable(ArtistsId, "Artists"), Browsable(SongsId, "Songs")];
-        }
+    public IList<MediaItem> Children(string parentId) => [.. catalog.Children(parentId).Select(ToItem)];
 
-        if (parentId == AlbumsId)
-        {
-            return [.. catalog.Albums().Select(album =>
-                Browsable($"album/{album.AlbumArtist}{Separator}{album.Name}", album.Name))];
-        }
+    private static MediaItem ToItem(BrowseNode node) => node.IsPlayable ? Playable(node) : Browsable(node);
 
-        if (parentId == ArtistsId)
-        {
-            return [.. catalog.Artists().Select(artist => Browsable($"artist/{artist.Name}", artist.Name))];
-        }
-
-        if (parentId == SongsId)
-        {
-            return [.. catalog.Songs().Select(Playable)];
-        }
-
-        if (parentId.StartsWith("album/", StringComparison.Ordinal))
-        {
-            var parts = parentId["album/".Length..].Split(Separator);
-            return [.. catalog.TracksInAlbum(parts[0], parts.Length > 1 ? parts[1] : string.Empty).Select(Playable)];
-        }
-
-        if (parentId.StartsWith("artist/", StringComparison.Ordinal))
-        {
-            return [.. catalog.TracksByArtist(parentId["artist/".Length..]).Select(Playable)];
-        }
-
-        return [];
-    }
-
-    private static MediaItem Browsable(string id, string title)
+    private static MediaItem Browsable(BrowseNode node)
     {
         var metadata = new MediaMetadata.Builder()
-            .SetTitle(title)!
+            .SetTitle(node.Title)!
             .SetIsBrowsable(Java.Lang.Boolean.True)!
             .SetIsPlayable(Java.Lang.Boolean.False)!
             .Build()!;
-        return new MediaItem.Builder().SetMediaId(id)!.SetMediaMetadata(metadata)!.Build()!;
+        return new MediaItem.Builder().SetMediaId(node.Id)!.SetMediaMetadata(metadata)!.Build()!;
     }
 
-    private static MediaItem Playable(Track track)
+    private static MediaItem Playable(BrowseNode node)
     {
         var metadata = new MediaMetadata.Builder()
-            .SetTitle(track.DisplayTitle)!
-            .SetArtist(track.DisplayArtist)!
-            .SetAlbumTitle(track.DisplayAlbum)!
+            .SetTitle(node.Title)!
+            .SetArtist(node.Subtitle)!
             .SetIsBrowsable(Java.Lang.Boolean.False)!
             .SetIsPlayable(Java.Lang.Boolean.True)!
             .Build()!;
         return new MediaItem.Builder()
-            .SetMediaId(track.Id)!
-            .SetUri($"drive://{track.Id}")!
+            .SetMediaId(node.Id)!
+            .SetUri(node.MediaUri)!
             .SetMediaMetadata(metadata)!
             .Build()!;
     }

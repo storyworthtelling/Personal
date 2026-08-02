@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using AndroidX.Media3.Common;
 using AndroidX.Media3.DataSource;
 using AndroidX.Media3.ExoPlayer;
 using AndroidX.Media3.ExoPlayer.Source;
@@ -48,8 +49,16 @@ public class PlaybackService : MediaLibraryService
         var resolvingFactory = new ResolvingDataSource.Factory(
             new DefaultHttpDataSource.Factory(),
             new DriveMediaResolver(new DeviceAccountTokenProvider()));
+        // Hand audio focus to ExoPlayer so playback ducks/pauses for a call or nav prompt and resumes after,
+        // and pauses when headphones unplug (Phase 8 — none of this was configured before).
+        var audioAttributes = new AudioAttributes.Builder()
+            .SetUsage(C.UsageMedia)!
+            .SetContentType(C.AudioContentTypeMusic)!
+            .Build()!;
         player = new ExoPlayerBuilder(this)
             .SetMediaSourceFactory(new DefaultMediaSourceFactory(resolvingFactory))
+            .SetAudioAttributes(audioAttributes, true)
+            .SetHandleAudioBecomingNoisy(true)
             .Build()!;
         var tree = new MediaBrowseTree(LoadCatalog());
         mediaSession = new MediaLibrarySession.Builder(this, player, new LibraryCallback(tree)).Build();
