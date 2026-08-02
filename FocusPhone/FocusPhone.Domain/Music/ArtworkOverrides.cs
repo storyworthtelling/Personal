@@ -7,7 +7,7 @@ namespace FocusPhone.Domain.Music;
 /// </summary>
 public sealed class ArtworkOverrides
 {
-    private const char Separator = '';
+    private const char Separator = '\u001f';
 
     private readonly Dictionary<string, string> byAlbum;
 
