@@ -7,6 +7,7 @@ using AndroidX.Media3.DataSource;
 using AndroidX.Media3.ExoPlayer;
 using AndroidX.Media3.ExoPlayer.Source;
 using AndroidX.Media3.Session;
+using Com.Google.Common.Util.Concurrent;
 using FocusPhone.Audio.Google;
 using FocusPhone.Domain.Audio;
 using FocusPhone.Domain.Music;
@@ -159,14 +160,26 @@ public class PlaybackService : MediaLibraryService
         base.OnDestroy();
     }
 
-    // The session's library callback. Converting to MediaLibraryService makes the
-    // service Android-Auto/Assistant capable structurally; the browsable content
-    // tree (built from `tree`) is populated in a follow-up once the Guava
-    // ListenableFuture binding is wired. Playback, lockscreen, and Bluetooth work
-    // through the session regardless.
+    // The session's library callback, now populating the browsable tree for Android Auto / Assistant via the
+    // Guava ListenableFuture binding. The tree content is the unit-tested MediaBrowseTree; each answer is an
+    // already-resolved future. Playback, lockscreen, and Bluetooth work through the session regardless.
     private sealed class LibraryCallback(MediaBrowseTree tree)
         : Java.Lang.Object, MediaLibrarySession.ICallback
     {
-        public MediaBrowseTree Tree { get; } = tree;
+        private readonly MediaBrowseTree tree = tree;
+
+        public IListenableFuture OnGetLibraryRoot(
+            MediaLibrarySession session, MediaSession.ControllerInfo browser, MediaLibraryService.LibraryParams? @params) =>
+            Futures.ImmediateFuture(LibraryResult.OfItem(tree.Root(), @params));
+
+        public IListenableFuture OnGetChildren(
+            MediaLibrarySession session, MediaSession.ControllerInfo browser,
+            string parentId, int page, int pageSize, MediaLibraryService.LibraryParams? @params) =>
+            Futures.ImmediateFuture(LibraryResult.OfItemList(tree.Children(parentId), @params));
+
+        // Auto rarely calls this (it navigates via children); answer with the root as a harmless best-effort.
+        public IListenableFuture OnGetItem(
+            MediaLibrarySession session, MediaSession.ControllerInfo browser, string mediaId) =>
+            Futures.ImmediateFuture(LibraryResult.OfItem(tree.Root(), null));
     }
 }
