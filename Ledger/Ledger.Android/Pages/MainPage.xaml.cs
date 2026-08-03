@@ -49,7 +49,8 @@ public partial class MainPage : ContentPage
         {
             await voiceOptions.RefreshAsync(CancellationToken.None);
             var context = "the owner is checking their balances in Ledger";
-            message = await voice.ComposeAsync(new MessageRequest("welcome", context), fallback: string.Empty, CancellationToken.None);
+            message = await voice.ComposeAsync(
+                new MessageRequest("welcome", context, HighVisibility: true), fallback: string.Empty, CancellationToken.None);
         }
         catch
         {

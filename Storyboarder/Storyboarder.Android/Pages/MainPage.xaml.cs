@@ -97,7 +97,7 @@ public partial class MainPage : ContentPage
             var messenger = IPlatformApplication.Current!.Services.GetRequiredService<VoicedMessenger>();
             var context = rows.Count == 0 ? "no projects yet" : $"{rows.Count} project(s) under way";
             message = await messenger.ComposeAsync(
-                new MessageRequest("welcome", context), fallback: string.Empty, CancellationToken.None);
+                new MessageRequest("welcome", context, HighVisibility: true), fallback: string.Empty, CancellationToken.None);
         }
         catch
         {

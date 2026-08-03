@@ -24,19 +24,24 @@ public sealed class VoiceClient : IVoiceClient
         "SAMPLE. Update the profile to reflect the sample, folding it into what's already there rather " +
         "than replacing it. Capture how the person actually writes — tone, register, attitude, cadence — " +
         "not the subject matter. Respond with ONLY a JSON object: " +
-        "{\"summary\":string,\"traits\":[string],\"examples\":[string],\"avoid\":[string]}. " +
+        "{\"summary\":string,\"traits\":[string],\"examples\":[string],\"avoid\":[string]," +
+        "\"signatureMoves\":[string]}. " +
         "summary = a short paragraph describing the voice. traits = a few short descriptors (\"wry\", " +
-        "\"warm\", \"economical\"). examples = a few characteristic phrasings drawn from the sample, to " +
-        "anchor the voice concretely. avoid = things that would read as not-them (\"corporate " +
-        "boilerplate\", \"exclamation marks\", \"hype\"). Keep each list to at most 6 items. No prose " +
-        "outside the JSON.";
+        "\"warm\", \"economical\"). examples = 2 or 3 characteristic phrasings drawn from THIS sample, " +
+        "quoted closely, to anchor the voice concretely — supply only fresh ones from this sample; do NOT " +
+        "repeat the profile's existing examples, as the app preserves those itself. signatureMoves = " +
+        "recurring structural habits — sentence shapes, favored transitions, punctuation tics (\"em-dash " +
+        "asides\", \"short declarative openers\", \"lists of three\"). avoid = things that would read as " +
+        "not-them (\"corporate boilerplate\", \"exclamation marks\", \"hype\"). Keep traits, avoid, and " +
+        "signatureMoves to at most 6 items each. No prose outside the JSON.";
 
     private const string ComposeInstruction =
         "You are writing a single situational message inside an app, in the voice described by the PROFILE " +
         "below. The message is UI copy shown for a specific occasion — write it to sound like the person " +
-        "the profile describes, honoring their traits and avoiding what they'd avoid. PURPOSE names the " +
-        "occasion; CONTEXT gives the specifics to reflect. Keep it within the word limit, plain text, no " +
-        "markup, no quotes, no preamble — just the message itself.";
+        "the profile describes, honoring their traits, echoing their signature moves, drawing on their " +
+        "example phrasings, and avoiding what they'd avoid. PURPOSE names the occasion; CONTEXT gives the " +
+        "specifics to reflect. Keep it within the word limit, plain text, no markup, no quotes, no " +
+        "preamble — just the message itself.";
 
     private readonly HttpClient httpClient;
     // Read fresh on each call (not cached) so a head that supplies live options — the API key the user
@@ -58,7 +63,8 @@ public sealed class VoiceClient : IVoiceClient
             summary = existing.Summary,
             traits = existing.Traits,
             examples = existing.Examples,
-            avoid = existing.Avoid
+            avoid = existing.Avoid,
+            signatureMoves = existing.SignatureMoves
         });
         var userContent = $"CURRENT PROFILE (JSON):\n{existingJson}\n\nNEW WRITING SAMPLE:\n{documentText}";
 
@@ -83,13 +89,31 @@ public sealed class VoiceClient : IVoiceClient
             return existing;
 
         // Provenance is counted here rather than trusted to the model: one more document has now fed the
-        // profile than fed the one we passed in.
+        // profile than fed the one we passed in. Examples are merged (never replaced) here rather than
+        // trusted to the model, so the concrete voice anchors accumulate across every book.
         return new VoiceProfile(
             dto.Summary.Trim(),
             dto.Traits ?? [],
-            dto.Examples ?? [],
+            MergeExamples(existing.Examples, dto.Examples),
             dto.Avoid ?? [],
+            dto.SignatureMoves ?? [],
             existing.DocumentsAnalyzed + 1);
+    }
+
+    // Folds the sample's fresh examples onto the ones already learned, keeping every old example (they are
+    // the accumulated voice anchors) and appending any new ones the model returned. Trimmed, blanks
+    // dropped, deduped case-insensitively so a phrase the model happens to echo isn't stored twice.
+    private static IReadOnlyList<string> MergeExamples(IReadOnlyList<string> existing, List<string>? fresh)
+    {
+        var merged = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var example in existing.Concat(fresh ?? []))
+        {
+            var trimmed = example.Trim();
+            if (trimmed.Length > 0 && seen.Add(trimmed))
+                merged.Add(trimmed);
+        }
+        return merged;
     }
 
     public async Task<string> ComposeAsync(
@@ -101,7 +125,8 @@ public sealed class VoiceClient : IVoiceClient
             summary = profile.Summary,
             traits = profile.Traits,
             examples = profile.Examples,
-            avoid = profile.Avoid
+            avoid = profile.Avoid,
+            signatureMoves = profile.SignatureMoves
         });
         var context = string.IsNullOrWhiteSpace(request.Context) ? "(none)" : request.Context;
         var userContent =
@@ -110,8 +135,11 @@ public sealed class VoiceClient : IVoiceClient
             $"CONTEXT: {context}\n" +
             $"WORD LIMIT: {request.MaxWords}";
 
+        // A message the owner actually reads for its voice runs on the strong model, where cadence and wit
+        // survive; the many low-stakes messages stay on the cheap tier.
+        var model = request.HighVisibility ? options.Model : options.FastModel;
         var reply = await SendMessage(
-            ComposeInstruction, userContent, options.FastModel, options.ComposeMaxTokens, cancellationToken);
+            ComposeInstruction, userContent, model, options.ComposeMaxTokens, cancellationToken);
         return reply.Trim();
     }
 
@@ -204,5 +232,6 @@ public sealed class VoiceClient : IVoiceClient
         public List<string>? Traits { get; set; }
         public List<string>? Examples { get; set; }
         public List<string>? Avoid { get; set; }
+        public List<string>? SignatureMoves { get; set; }
     }
 }

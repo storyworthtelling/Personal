@@ -281,7 +281,7 @@ public class GraphicNovelProcessorTests : IDisposable
         var client = new Mock<IVoiceClient>();
         client.Setup(c => c.RefineAsync(It.IsAny<VoiceProfile>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((VoiceProfile existing, string _, CancellationToken _) =>
-                new VoiceProfile("Wry and warm.", ["wry"], ["At last."], ["hype"], existing.DocumentsAnalyzed + 1));
+                new VoiceProfile("Wry and warm.", ["wry"], ["At last."], ["hype"], [], existing.DocumentsAnalyzed + 1));
         voiceClient = client.Object;
         voiceStore = store;
 

@@ -54,7 +54,7 @@ public partial class MainPage : ContentPage
         {
             await voiceOptions.RefreshAsync(CancellationToken.None);
             message = await voice.ComposeAsync(
-                new MessageRequest("welcome", "the owner is checking their crossword delivery"),
+                new MessageRequest("welcome", "the owner is checking their crossword delivery", HighVisibility: true),
                 fallback: string.Empty, CancellationToken.None);
         }
         catch

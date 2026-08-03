@@ -3,7 +3,11 @@ namespace Storyworthtelling.Voice;
 // What situational message to write. Purpose names the occasion ("welcome", "book complete", "nothing to
 // show yet"); Context gives the specifics the message should reflect (counts, a title, a name). MaxWords
 // keeps the result to a UI-sized sentence or two — situational messaging, never a wall of text.
-public sealed record MessageRequest(string Purpose, string Context = "", int MaxWords = 40);
+// HighVisibility marks the message as one the owner actually reads for its voice (a landing-screen
+// greeting), routing it to the strong model where cadence and wit land better; the many low-stakes
+// messages stay on the cheap tier.
+public sealed record MessageRequest(
+    string Purpose, string Context = "", int MaxWords = 40, bool HighVisibility = false);
 
 // The model-backed half of the voice feature: learning the voice from documents, and writing messages in
 // it. Implemented by a Claude client; kept an interface so apps can fake it in tests and so a keyless app
