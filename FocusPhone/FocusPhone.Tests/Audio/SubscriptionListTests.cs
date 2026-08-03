@@ -91,6 +91,27 @@ public class SubscriptionListTests
     }
 
     [Fact]
+    public void UpdateTitle_DuringEnumerationOfOrdered_DoesNotThrow()
+    {
+        // RefreshFeedsAsync walks Ordered and calls UpdateTitle for each feed as its
+        // real title arrives. When Ordered handed back the live backing list, that
+        // mid-loop write bumped the list version and crashed the refresh with
+        // InvalidOperation_EnumFailedVersion. Ordered must be a snapshot.
+        var list = new SubscriptionList();
+        list.Add("https://a.com/feed", "https://a.com/feed", Now);
+        list.Add("https://b.com/feed", "https://b.com/feed", Now);
+
+        foreach (var subscription in list.Ordered)
+        {
+            list.UpdateTitle(subscription.FeedUrl, $"Title for {subscription.FeedUrl}");
+        }
+
+        Assert.Equal(
+            ["Title for https://a.com/feed", "Title for https://b.com/feed"],
+            list.Ordered.Select(subscription => subscription.Title).ToArray());
+    }
+
+    [Fact]
     public void UpdateTitle_IsNoOpForUnknownFeed()
     {
         var list = new SubscriptionList();

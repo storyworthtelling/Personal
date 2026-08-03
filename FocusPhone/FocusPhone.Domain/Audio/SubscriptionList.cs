@@ -13,7 +13,13 @@ public class SubscriptionList
     public SubscriptionList(IEnumerable<PodcastSubscription>? saved = null) =>
         subscriptions = saved is null ? [] : [.. saved.OrderBy(subscription => subscription.SortOrder)];
 
-    public IReadOnlyList<PodcastSubscription> Ordered => subscriptions;
+    /// <summary>
+    /// A snapshot of the ordered subscriptions. This is a copy, not the live backing
+    /// list, so a caller may mutate the list (e.g. <see cref="UpdateTitle"/>) while
+    /// walking the result — the refresh loop does exactly that, and enumerating the
+    /// live list there crashed with InvalidOperation_EnumFailedVersion.
+    /// </summary>
+    public IReadOnlyList<PodcastSubscription> Ordered => [.. subscriptions];
 
     /// <summary>Adds a show; a feed URL already present is a no-op (dedupe by URL).</summary>
     public void Add(string feedUrl, string title, DateTimeOffset addedUtc)
