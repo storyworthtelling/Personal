@@ -34,7 +34,7 @@ public sealed class DriveVoiceProfileStore : IVoiceProfileStore
         try
         {
             var profile = JsonSerializer.Deserialize<VoiceProfile>(content, SerializerOptions);
-            return profile ?? VoiceProfile.Empty;
+            return profile is null ? VoiceProfile.Empty : Normalize(profile);
         }
         catch (JsonException)
         {
@@ -46,4 +46,16 @@ public sealed class DriveVoiceProfileStore : IVoiceProfileStore
 
     public Task SaveAsync(VoiceProfile profile, CancellationToken cancellationToken) =>
         file.WriteAsync(JsonSerializer.Serialize(profile, SerializerOptions), cancellationToken);
+
+    // A profile written before a list field existed (e.g. signatureMoves, added later) deserializes that
+    // field as null; replace any null list with an empty one so consumers never have to null-check.
+    private static VoiceProfile Normalize(VoiceProfile profile) => new(
+        profile.Summary,
+        Safe(profile.Traits),
+        Safe(profile.Examples),
+        Safe(profile.Avoid),
+        Safe(profile.SignatureMoves),
+        profile.DocumentsAnalyzed);
+
+    private static IReadOnlyList<string> Safe(IReadOnlyList<string>? list) => list ?? [];
 }

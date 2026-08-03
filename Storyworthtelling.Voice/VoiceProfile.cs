@@ -9,14 +9,19 @@ public sealed record VoiceProfile(
     string Summary,
     // Short descriptors ("wry", "warm", "economical", "plain-spoken").
     IReadOnlyList<string> Traits,
-    // A few characteristic phrasings drawn from the owner's own writing, to anchor the voice concretely.
+    // Characteristic phrasings drawn from the owner's own writing, to anchor the voice concretely. These
+    // are STICKY: each refine adds a couple from the new document and never drops the ones already learned,
+    // so the concrete anchors only accumulate as more books feed the profile.
     IReadOnlyList<string> Examples,
     // Things that would read as not-them ("corporate boilerplate", "exclamation marks", "hype").
     IReadOnlyList<string> Avoid,
+    // Recurring structural habits — sentence shapes, favored transitions, punctuation tics ("em-dash
+    // asides", "short declarative openers", "lists of three"). The "how", where Traits are the "what".
+    IReadOnlyList<string> SignatureMoves,
     // How many documents have fed this profile — provenance, and a signal of how settled the voice is.
     int DocumentsAnalyzed)
 {
-    public static VoiceProfile Empty { get; } = new(string.Empty, [], [], [], 0);
+    public static VoiceProfile Empty { get; } = new(string.Empty, [], [], [], [], 0);
 
     // Nothing has been learned yet, so there's no voice to write in — the caller should fall back to its
     // neutral copy.

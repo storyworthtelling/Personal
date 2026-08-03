@@ -36,13 +36,17 @@ public sealed class VoiceGreeting
     }
 
     // Composes a greeting in the owner's voice for the occasion, or "" when it can't (no profile, no key,
-    // no Drive access, or a call failed). The key is pulled fresh from the shared Drive config first.
-    public async Task<string> ComposeAsync(string purpose, string context, CancellationToken cancellationToken)
+    // no Drive access, or a call failed). The key is pulled fresh from the shared Drive config first. A
+    // greeting is a screen the owner reads, so it defaults to the strong model (highVisibility).
+    public async Task<string> ComposeAsync(
+        string purpose, string context, CancellationToken cancellationToken, bool highVisibility = true)
     {
         try
         {
             await options.RefreshAsync(cancellationToken);
-            return await messenger.ComposeAsync(new MessageRequest(purpose, context), fallback: string.Empty, cancellationToken);
+            return await messenger.ComposeAsync(
+                new MessageRequest(purpose, context, HighVisibility: highVisibility),
+                fallback: string.Empty, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

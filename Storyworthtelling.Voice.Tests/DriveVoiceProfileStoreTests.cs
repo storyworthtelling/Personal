@@ -40,7 +40,8 @@ public class DriveVoiceProfileStoreTests
     {
         var file = new InMemoryTextFile();
         var store = new DriveVoiceProfileStore(file);
-        var profile = new VoiceProfile("Wry and warm.", ["wry", "warm"], ["At last, the gate."], ["hype"], DocumentsAnalyzed: 3);
+        var profile = new VoiceProfile(
+            "Wry and warm.", ["wry", "warm"], ["At last, the gate."], ["hype"], ["em-dash asides"], DocumentsAnalyzed: 3);
 
         await store.SaveAsync(profile, CancellationToken.None);
         var loaded = await store.LoadAsync(CancellationToken.None);
@@ -51,6 +52,22 @@ public class DriveVoiceProfileStoreTests
         Assert.Equal(profile.Traits, loaded.Traits);
         Assert.Equal(profile.Examples, loaded.Examples);
         Assert.Equal(profile.Avoid, loaded.Avoid);
+        Assert.Equal(profile.SignatureMoves, loaded.SignatureMoves);
         Assert.Equal(profile.DocumentsAnalyzed, loaded.DocumentsAnalyzed);
+    }
+
+    [Fact]
+    public async Task LoadAsync_DefaultsNewLists_ForAProfileSavedBeforeTheFieldExisted()
+    {
+        // A profile written before signatureMoves was added has no such field; it must load as an empty
+        // list, never null, so every consumer can enumerate it without a null-check.
+        var legacy = """{"summary":"Plain-spoken.","traits":["plain"],"examples":[],"avoid":[],"documentsAnalyzed":2}""";
+        var store = new DriveVoiceProfileStore(new InMemoryTextFile { Content = legacy });
+
+        var loaded = await store.LoadAsync(CancellationToken.None);
+
+        Assert.NotNull(loaded.SignatureMoves);
+        Assert.Empty(loaded.SignatureMoves);
+        Assert.Equal("Plain-spoken.", loaded.Summary);
     }
 }
