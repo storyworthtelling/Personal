@@ -411,6 +411,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         var chunkCount = await db.Chunks.CountAsync(c => c.NovelId == novel.Id, cancellationToken);
         if (novel.StoryboardCursor >= chunkCount)
         {
+            // Regroup the storyboarded pages into one bounded volume per chapter before any rendering or
+            // binding, replacing the model's own volume split (which once bundled 338 pages into a single
+            // volume assembly could never finish). Done in the same save as the stage advance, so a crash
+            // before commit just re-runs it next cycle.
+            await RedecomposeVolumesByChapter(db, novel, cancellationToken);
+
             SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
                 novel.Stage, false, false, false, false, StoryboardCreated: true, false, false, false)));
             await db.SaveChangesAsync(cancellationToken);
@@ -560,6 +566,87 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         Touch(novel);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
+    }
+
+    // Regroups every storyboarded page into volumes by chapter (see VolumeDecomposer): one volume per
+    // chapter, a chapter over PageLayoutOptions.MaxPagesPerVolume split into parts at scene boundaries.
+    // Re-parents Page rows onto the planned volumes and renumbers both, mutating the tracked entities so
+    // the caller commits it together with the stage advance. No schema change — Page already carries its
+    // ChapterNumber. Only volume grouping changes; the pages, panels, and any renders are untouched.
+    private async Task RedecomposeVolumesByChapter(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        // Every page in true reading order, tagged with whether it opens a scene (its first panel's
+        // NewScene) so an oversized chapter can be cut between scenes rather than mid-scene.
+        var pageRows = await (
+            from v in db.Volumes.Where(v => v.NovelId == novel.Id)
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            orderby v.Number, pg.PageNumber
+            select new
+            {
+                pg.Id,
+                pg.ChapterNumber,
+                StartsNewScene = pg.Panels.OrderBy(p => p.PanelNumber).Select(p => p.NewScene).FirstOrDefault()
+            }).ToListAsync(cancellationToken);
+
+        if (pageRows.Count == 0)
+            return;
+
+        var labels = await db.Chapters
+            .Where(c => c.NovelId == novel.Id)
+            .ToDictionaryAsync(c => c.Number, c => c.Label, cancellationToken);
+
+        var plan = VolumeDecomposer.Decompose(
+            [.. pageRows.Select(p => new DecomposablePage(
+                p.Id, p.ChapterNumber, labels.GetValueOrDefault(p.ChapterNumber, string.Empty), p.StartsNewScene))],
+            pageLayout.MaxPagesPerVolume);
+
+        var volumes = await db.Volumes
+            .Where(v => v.NovelId == novel.Id)
+            .OrderBy(v => v.Number)
+            .ToListAsync(cancellationToken);
+        var volumeIds = volumes.Select(v => v.Id).ToList();
+        var pagesById = await db.Pages
+            .Where(pg => volumeIds.Contains(pg.VolumeId))
+            .ToDictionaryAsync(pg => pg.Id, cancellationToken);
+
+        // Reuse existing volume rows where the plan has one, appending rows when it needs more. Reassign
+        // each planned page onto its volume and renumber it within that volume.
+        for (int i = 0; i < plan.Count; i++)
+        {
+            Volume volume;
+            if (i < volumes.Count)
+                volume = volumes[i];
+            else
+            {
+                volume = new Volume { NovelId = novel.Id };
+                db.Volumes.Add(volume);
+            }
+
+            volume.Number = plan[i].Number;
+            volume.Title = plan[i].Title;
+            // Nothing has been bound yet at this transition; clear any binding/retry state so the new
+            // grouping starts clean.
+            volume.PdfStatus = WorkStatus.Pending;
+            volume.PdfPath = null;
+            volume.PdfPageCursor = 0;
+            volume.Attempts = 0;
+            volume.NextAttemptAtUtc = null;
+            volume.LastError = null;
+            volume.ArchivedDriveFileId = null;
+
+            int pageNumber = 1;
+            foreach (var pageId in plan[i].PageIds)
+            {
+                var page = pagesById[pageId];
+                page.VolumeId = volume.Id;
+                page.PageNumber = pageNumber++;
+            }
+        }
+
+        // Surplus volume rows have had all their pages moved onto the planned volumes, so removing them is
+        // safe — the cascade only deletes pages of a volume that still owns them.
+        for (int i = plan.Count; i < volumes.Count; i++)
+            db.Volumes.Remove(volumes[i]);
     }
 
     // Advances one storyboard sub-window; a finished chunk (last window adapted) rolls the cursor to the

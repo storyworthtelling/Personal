@@ -21,8 +21,40 @@ public sealed class FileSystemImageStore : IImageStore
         var directory = Path.GetDirectoryName(fullPath)
             ?? throw new ArgumentException($"Could not determine a directory for '{relativePath}'.", nameof(relativePath));
         Directory.CreateDirectory(directory);
-        File.WriteAllBytes(fullPath, content);
+
+        // Write to a uniquely-named temp file in the same directory, then atomically rename it over the
+        // target. A background worker force-stopped mid-write (WorkManager's ~10-minute hard cap while
+        // saving a large volume PDF) then leaves only a stray .tmp, never a truncated target — so the
+        // next open of the volume can't hit "StartXRef table could not be found" and wedge the novel.
+        // The unique name also makes two writers to the same path resolve to one clean rename rather than
+        // interleaving bytes into a single file. Rename is atomic within a filesystem; temp and target
+        // share a directory, so it never degrades to a copy.
+        var tempPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllBytes(tempPath, content);
+            File.Move(tempPath, fullPath, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(tempPath);
+            throw;
+        }
         return fullPath;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+            // Best-effort cleanup of the temp file; the original write failure is what matters and is
+            // rethrown by the caller.
+        }
     }
 
     public byte[] Read(string absolutePath) => File.ReadAllBytes(absolutePath);

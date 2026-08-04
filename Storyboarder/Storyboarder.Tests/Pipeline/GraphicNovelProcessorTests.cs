@@ -830,11 +830,13 @@ public class GraphicNovelProcessorTests : IDisposable
         claude.Setup(c => c.Storyboard(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new StoryboardSegment(
+                // All three pages are in the same chapter, so per-chapter decomposition binds them as one
+                // multi-page volume — the case this test exercises (one append per cycle from the cursor).
                 [new VolumeDraft(1, "Volume One",
                     [
                         new PageDraft(1, [new PanelDraft("Hero approaches", "One.", null, ["Hero", "Castle"])]),
-                        new PageDraft(2, [new PanelDraft("Hero knocks", "Two.", null, ["Hero", "Castle"])]),
-                        new PageDraft(3, [new PanelDraft("The gate opens", "Three.", null, ["Hero", "Castle"])]),
+                        new PageDraft(1, [new PanelDraft("Hero knocks", "Two.", null, ["Hero", "Castle"])]),
+                        new PageDraft(1, [new PanelDraft("The gate opens", "Three.", null, ["Hero", "Castle"])]),
                     ])],
                 "Hero reached the castle."));
 
@@ -865,6 +867,41 @@ public class GraphicNovelProcessorTests : IDisposable
         using var stream = new MemoryStream(File.ReadAllBytes(volume.PdfPath!));
         using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.Equal(4, pdf.PageCount); // cover + 3 pages
+    }
+
+    [Fact]
+    public async Task DecomposesVolumesByChapter_RegardlessOfTheModelsOwnSplit()
+    {
+        // The model may lump the whole book into one volume; the pipeline re-decomposes into one bounded
+        // volume per chapter after storyboarding, so a huge single volume can never wedge assembly again.
+        claude.Setup(c => c.Storyboard(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new StoryboardSegment(
+                [new VolumeDraft(1, "One Giant Volume",
+                    [
+                        new PageDraft(1, [new PanelDraft("Opening", "A.", null, [])]),
+                        new PageDraft(1, [new PanelDraft("Still chapter one", "B.", null, [])]),
+                        new PageDraft(2, [new PanelDraft("Chapter two begins", "C.", null, [])]),
+                    ])],
+                "The story so far."));
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var ctx = database.NewContext();
+        var volumes = ctx.Volumes.Where(v => v.NovelId == novelId).OrderBy(v => v.Number).ToList();
+        Assert.Equal(2, volumes.Count);
+        Assert.Equal([1, 2], volumes.Select(v => v.Number).ToList());
+
+        var chapterOnePages = ctx.Pages.Count(p => p.VolumeId == volumes[0].Id);
+        var chapterTwoPages = ctx.Pages.Count(p => p.VolumeId == volumes[1].Id);
+        Assert.Equal(2, chapterOnePages);
+        Assert.Equal(1, chapterTwoPages);
+        // Each volume renumbers its own pages from 1.
+        Assert.Equal([1, 2], ctx.Pages.Where(p => p.VolumeId == volumes[0].Id).OrderBy(p => p.PageNumber).Select(p => p.PageNumber).ToList());
+        Assert.Equal([1], ctx.Pages.Where(p => p.VolumeId == volumes[1].Id).Select(p => p.PageNumber).ToList());
     }
 
     [Fact]

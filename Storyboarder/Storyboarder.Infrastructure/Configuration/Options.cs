@@ -156,4 +156,11 @@ public sealed class PageLayoutOptions
     // this, but a page it returns with more panels is split across several pages at storyboard time so
     // panels never get squished into a dense grid.
     public int MaxPanelsPerPage { get; set; } = 6;
+
+    // The most pages one bound volume may hold. Volumes are decomposed one-per-chapter, but a chapter
+    // (or a chapterless book) larger than this is split into parts at scene boundaries so no single
+    // volume PDF grows large enough to blow the phone's memory or the worker's time budget while binding.
+    // Sized well under the 338-page volume that used to wedge assembly for days; a chapter-sized volume
+    // is typically far smaller, so this only ever trips on unusually long chapters or unchaptered books.
+    public int MaxPagesPerVolume { get; set; } = 40;
 }
