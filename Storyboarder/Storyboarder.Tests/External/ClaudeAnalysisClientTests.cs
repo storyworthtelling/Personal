@@ -80,6 +80,24 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task DescribeVolumeCover_ReturnsConcept_AndPromptForbidsSpoilersAndLettering()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("A lone rider crests a moonlit ridge, cloak snapping in the wind."));
+
+        var concept = await client.DescribeVolumeCover(
+            "My Novel", "The Long Road", "excerpt text", "noir ink wash", CancellationToken.None);
+
+        Assert.Contains("lone rider", concept);
+        var body = handler.RequestBodies[0];
+        Assert.Contains("cover", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("twists", body, StringComparison.OrdinalIgnoreCase);   // spoiler-free
+        Assert.Contains("lettering", body, StringComparison.OrdinalIgnoreCase); // no text baked into the art
+        // Owner-visible art, so it runs on the strong model, not the cheap tier.
+        Assert.Contains("\"model\":\"test-model\"", body);
+    }
+
+    [Fact]
     public async Task ExtractEntities_PromptDemandsExhaustiveCoverage()
     {
         // The whole point of extraction is reference-sheet coverage: every character (including minor and

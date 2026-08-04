@@ -1,8 +1,10 @@
+using System.Net.Http;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using PdfSharp.Pdf.IO;
+using SkiaSharp;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
@@ -867,6 +869,44 @@ public class GraphicNovelProcessorTests : IDisposable
         using var stream = new MemoryStream(File.ReadAllBytes(volume.PdfPath!));
         using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.Equal(4, pdf.PageCount); // cover + 3 pages
+    }
+
+    [Fact]
+    public async Task GeneratesSpoilerFreeCoverArt_ForEachVolume()
+    {
+        // A cover concept is requested per volume and rendered into a cover image that lands beside the
+        // volume PDF; the book still completes.
+        claude.Setup(c => c.DescribeVolumeCover(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("a lantern-lit gate at dusk, no spoilers");
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+        claude.Verify(c => c.DescribeVolumeCover(
+            "Quest", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce());
+
+        var coverPath = Path.Combine(outputRoot, novelId.ToString(), "volumes", "volume-1-cover.png");
+        Assert.True(File.Exists(coverPath), "expected the generated cover art beside the volume PDF");
+        using var cover = SKBitmap.Decode(coverPath);
+        Assert.NotNull(cover);
+    }
+
+    [Fact]
+    public async Task CoverArtFailure_FallsBackToThePlainCover_WithoutBlocking()
+    {
+        // Cover art is a nicety: if the concept call throws, the volume still binds (with the plain cover)
+        // and the book completes.
+        claude.Setup(c => c.DescribeVolumeCover(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("cover concept unavailable"));
+
+        var novelId = SeedNovel();
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
     }
 
     [Fact]

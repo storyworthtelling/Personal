@@ -568,6 +568,89 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         return ProcessResult.DidWork(novel.Id);
     }
 
+    // How much of a chapter the cover concept reads: enough to catch the section's mood and imagery
+    // without paying to send the whole chapter, and the prompt is told to stay spoiler-free regardless.
+    private const int CoverExcerptChars = 4000;
+
+    // Best-effort spoiler-free cover illustration for one volume: Claude writes a cover concept from the
+    // volume's chapter, Gemini renders it in the book's art style. Returns null (and the caller uses the
+    // plain typographic cover) on any failure or when a rate-limit slot isn't free — a cover is a nicety
+    // and must never fail or stall the binding. Never throws except on cancellation.
+    private async Task<byte[]?> TryGenerateCoverArt(
+        StoryboarderDbContext db, Novel novel, Volume volume, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!claudeLimiter.TryAcquire())
+                return null;
+
+            var excerpt = await CoverExcerpt(db, novel, volume, cancellationToken);
+            if (string.IsNullOrWhiteSpace(excerpt))
+                return null;
+
+            var concept = await claude.DescribeVolumeCover(
+                novel.Title, volume.Title, excerpt, novel.ArtStyle, cancellationToken);
+            if (string.IsNullOrWhiteSpace(concept))
+                return null;
+
+            if (!geminiLimiter.TryAcquire())
+                return null;
+
+            var aspectRatio = (double)DesignTokens.Comic.PageWidth / DesignTokens.Comic.PageHeight;
+            var art = await gemini.GeneratePanel(concept, novel.ArtStyle, [], aspectRatio, cancellationToken);
+
+            // Persist it beside the volume PDF so it's a reusable artifact (and survives a binding retry).
+            imageStore.Save($"{novel.Id}/volumes/volume-{volume.Number}-cover.png", art);
+            return art;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Cover art generation failed for volume {Number} of novel {NovelId}; using the plain cover.",
+                volume.Number, novel.Id);
+            return null;
+        }
+    }
+
+    // A bounded prose sample for the cover concept: the volume's dominant chapter, or the manuscript's
+    // opening when chapters weren't detected.
+    private async Task<string?> CoverExcerpt(
+        StoryboarderDbContext db, Novel novel, Volume volume, CancellationToken cancellationToken)
+    {
+        var fullText = await db.SourceTexts
+            .Where(s => s.NovelId == novel.Id)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrEmpty(fullText))
+            return null;
+
+        var chapterNumber = volume.Pages
+            .GroupBy(p => p.ChapterNumber)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key)
+            .Select(g => (int?)g.Key)
+            .FirstOrDefault();
+
+        if (chapterNumber is int number && number > 0)
+        {
+            var chapter = await db.Chapters
+                .FirstOrDefaultAsync(c => c.NovelId == novel.Id && c.Number == number, cancellationToken);
+            if (chapter is not null)
+            {
+                var start = Math.Clamp(chapter.StartOffset, 0, fullText.Length);
+                var end = Math.Clamp(chapter.EndOffset, start, fullText.Length);
+                var chapterText = fullText[start..end];
+                return chapterText.Length > CoverExcerptChars ? chapterText[..CoverExcerptChars] : chapterText;
+            }
+        }
+
+        return fullText.Length > CoverExcerptChars ? fullText[..CoverExcerptChars] : fullText;
+    }
+
     // Regroups every storyboarded page into volumes by chapter (see VolumeDecomposer): one volume per
     // chapter, a chapter over PageLayoutOptions.MaxPagesPerVolume split into parts at scene boundaries.
     // Re-parents Page rows onto the planned volumes and renumbers both, mutating the tracked entities so
@@ -1166,8 +1249,15 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 // cover is written once, as the first page, when the cursor is still 0.
                 cancellationToken.ThrowIfCancellationRequested();
 
+                // On the cover page (cursor 0), try to generate a spoiler-free comic cover illustration and
+                // typeset the title over it; a failed or quota-skipped attempt falls back to the plain
+                // typographic cover, so covers never block binding.
+                var coverArt = volume.PdfPageCursor == 0
+                    ? await TryGenerateCoverArt(db, novel, volume, cancellationToken)
+                    : null;
+
                 var pdf = volume.PdfPageCursor == 0
-                    ? pdfComposer.AppendPage(null, coverRenderer.VolumeCover(novel.Title, volume.Number, volume.Title), DesignTokens.Comic.PrintDpi)
+                    ? pdfComposer.AppendPage(null, coverRenderer.VolumeCover(novel.Title, volume.Number, volume.Title, coverArt), DesignTokens.Comic.PrintDpi)
                     : imageStore.Read(volume.PdfPath!);
 
                 if (volume.PdfPageCursor < pages.Count)

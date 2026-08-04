@@ -70,6 +70,32 @@ public class CoverPageRendererTests
     }
 
     [Fact]
+    public void VolumeCover_WithArt_FillsPageWithArtwork_NotPaper()
+    {
+        // A supplied illustration fills the page and the title is set over a dark scrim, rather than the
+        // plain grained-paper cover.
+        using var artSurface = SKSurface.Create(new SKImageInfo(400, 600));
+        artSurface.Canvas.Clear(new SKColor(0x2E, 0x8B, 0x57)); // sea green, unmistakable vs paper/ink
+        using var artImg = artSurface.Snapshot();
+        using var artData = artImg.Encode(SKEncodedImageFormat.Png, 100);
+
+        var cover = renderer.VolumeCover("The Lighthouse Keeper", 2, "The Harbour Debt", artData.ToArray());
+
+        using var bitmap = SKBitmap.Decode(cover)!;
+        Assert.Equal(DesignTokens.Comic.PageWidth, bitmap.Width);
+        Assert.Equal(DesignTokens.Comic.PageHeight, bitmap.Height);
+
+        // The artwork covers the page: the clear centre band is the green art.
+        var mid = bitmap.GetPixel(bitmap.Width / 2, bitmap.Height / 2);
+        Assert.True(mid.Green > mid.Red && mid.Green > mid.Blue, $"expected green artwork at centre, got {mid}");
+
+        // Not the paper cover: the top-left corner is under the dark scrim, nowhere near paper.
+        var paper = SKColor.Parse(DesignTokens.Paper);
+        var corner = bitmap.GetPixel(5, 5);
+        Assert.True(Math.Abs(corner.Red - paper.Red) > 40, $"expected a dark scrim over the art, got {corner}");
+    }
+
+    [Fact]
     public void AnalysisCover_HasReportGeometry()
     {
         var cover = renderer.AnalysisCover("My Novel");
