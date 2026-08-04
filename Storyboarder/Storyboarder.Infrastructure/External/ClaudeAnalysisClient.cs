@@ -27,11 +27,16 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private const int WebSearchMaxUses = 8;
 
     private const string ExtractionInstruction =
-        "You are a visual-development analyst preparing a graphic-novel design bible. Read the novel " +
-        "excerpt and list every distinct CHARACTER and every distinct SETTING/LOCATION that appears, " +
-        "with concrete visual details useful for an illustrator (appearance, clothing, age, build for " +
-        "characters; architecture, era, mood, palette for settings). For each entity also give its " +
-        "approximate physical SCALE so the illustrations stay proportionate: for a character an " +
+        "You are a visual-development analyst preparing a graphic-novel design bible. Your list becomes the " +
+        "illustrator's reference sheets, so any character or place you omit gets drawn from scratch and " +
+        "breaks visual consistency. Be EXHAUSTIVE. List EVERY CHARACTER that appears or is described — " +
+        "named or unnamed, major, minor, background, or a briefly-glimpsed walk-on (e.g. \"a scarred " +
+        "innkeeper\", \"two guards at the gate\") — and EVERY SETTING/LOCATION/SET that appears or is " +
+        "described, including interiors, exteriors, vehicles, and distinct rooms or areas within a larger " +
+        "place. Do not skip an entity just because it seems unimportant or appears only once. Give each " +
+        "concrete visual details useful for an illustrator (appearance, clothing, age, build for " +
+        "characters; architecture, era, mood, palette, notable props for settings). For each entity also " +
+        "give its approximate physical SCALE so the illustrations stay proportionate: for a character an " +
         "approximate height and build relative to an average adult; for a setting its approximate size " +
         "and any notable scale cues. Respond with ONLY a JSON object: " +
         "{\"characters\":[{\"name\":string,\"description\":string,\"scale\":string,\"aliases\":[string]}]," +
@@ -207,8 +212,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     public async Task<DesignBibleFragment> ExtractEntities(string chunkText, CancellationToken cancellationToken)
     {
-        // Fast tier: one call per chunk, and the job is extraction against a fixed JSON contract.
-        var reply = await SendMessage(ExtractionInstruction, chunkText, cancellationToken, model: options.FastModel);
+        // Strong tier: this call decides how many reference sheets get drawn, and the cheap model
+        // under-extracts — it drops minor characters and described sets, leaving those panels with no
+        // reference so the illustrator invents faces and relocates scenes. Coverage is worth the strong
+        // model here even though it runs once per chunk.
+        var reply = await SendMessage(ExtractionInstruction, chunkText, cancellationToken, model: options.Model);
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
             return DesignBibleFragment.Empty;

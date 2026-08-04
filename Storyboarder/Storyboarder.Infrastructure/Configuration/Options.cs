@@ -9,11 +9,12 @@ public sealed class ClaudeOptions
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = "claude-sonnet-4-6";
 
-    // The cheap tier, used for the two high-volume mechanical calls: pulling entities out of a chunk and
-    // taking per-chunk analysis notes. Both run once per chunk — by far the most calls a novel makes —
-    // and both are extraction against an explicit JSON contract rather than judgement, which is what the
-    // small model is good at. The work that actually needs the strong model (adapting prose into panels,
-    // and synthesising the whole manuscript into a report) stays on Model.
+    // The cheap tier, used for the per-chunk analysis notes: genuinely mechanical note-taking against an
+    // explicit JSON contract, run once per chunk (the most calls a novel makes), which is what the small
+    // model is good at. Entity extraction was on this tier too, but the cheap model under-extracted —
+    // dropping minor characters and described sets, so those panels lost their reference sheets — so it
+    // moved back to Model. The other work needing the strong model (adapting prose into panels,
+    // synthesising the report) has always stayed on Model.
     public string FastModel { get; set; } = "claude-haiku-4-5-20251001";
 
     public int MaxTokens { get; set; } = 8_000;

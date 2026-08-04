@@ -80,6 +80,24 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task ExtractEntities_PromptDemandsExhaustiveCoverage()
+    {
+        // The whole point of extraction is reference-sheet coverage: every character (including minor and
+        // background) and every setting/set the excerpt describes must be listed, or the illustrator
+        // invents them and consistency breaks. The prompt must insist on exhaustiveness, not just "every
+        // distinct" (which the model reads as "the notable ones").
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
+
+        await client.ExtractEntities("excerpt", CancellationToken.None);
+
+        var body = handler.RequestBodies[0];
+        Assert.Contains("EXHAUSTIVE", body);
+        Assert.Contains("minor", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("background", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Storyboard_PromptSteersPanelDensityAndAction()
     {
         var (client, handler) = Create();
@@ -176,11 +194,12 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
-    public async Task MechanicalPerChunkCalls_UseTheFastModel()
+    public async Task EntityExtraction_UsesTheStrongModel_ButChapterNotesStayCheap()
     {
-        // Entity extraction and chapter notes run once per chunk — by far the most calls a novel makes —
-        // and both are extraction against a fixed JSON contract rather than judgement, so they go to the
-        // cheap tier.
+        // Entity extraction drives how many reference sheets get drawn, and the cheap model under-extracts
+        // — it drops minor characters and described sets, which the illustrator then has no reference for
+        // (wrong faces, drifting locations). So extraction runs on the strong model. Chapter notes are
+        // genuinely mechanical note-taking against a fixed contract, so they stay on the cheap tier.
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
         handler.EnqueueOk(Reply("{}"));
@@ -188,7 +207,7 @@ public class ClaudeAnalysisClientTests
         await client.ExtractEntities("excerpt", CancellationToken.None);
         await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
 
-        Assert.Contains("\"model\":\"test-fast-model\"", handler.RequestBodies[0]);
+        Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[0]);
         Assert.Contains("\"model\":\"test-fast-model\"", handler.RequestBodies[1]);
     }
 
