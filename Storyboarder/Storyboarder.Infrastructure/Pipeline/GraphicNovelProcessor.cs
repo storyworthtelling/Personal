@@ -411,6 +411,12 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         var chunkCount = await db.Chunks.CountAsync(c => c.NovelId == novel.Id, cancellationToken);
         if (novel.StoryboardCursor >= chunkCount)
         {
+            // Regroup the storyboarded pages into one bounded volume per chapter before any rendering or
+            // binding, replacing the model's own volume split (which once bundled 338 pages into a single
+            // volume assembly could never finish). Done in the same save as the stage advance, so a crash
+            // before commit just re-runs it next cycle.
+            await RedecomposeVolumesByChapter(db, novel, cancellationToken);
+
             SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
                 novel.Stage, false, false, false, false, StoryboardCreated: true, false, false, false)));
             await db.SaveChangesAsync(cancellationToken);
@@ -560,6 +566,170 @@ public sealed class GraphicNovelProcessor : IPipelineStep
         Touch(novel);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
+    }
+
+    // How much of a chapter the cover concept reads: enough to catch the section's mood and imagery
+    // without paying to send the whole chapter, and the prompt is told to stay spoiler-free regardless.
+    private const int CoverExcerptChars = 4000;
+
+    // Best-effort spoiler-free cover illustration for one volume: Claude writes a cover concept from the
+    // volume's chapter, Gemini renders it in the book's art style. Returns null (and the caller uses the
+    // plain typographic cover) on any failure or when a rate-limit slot isn't free — a cover is a nicety
+    // and must never fail or stall the binding. Never throws except on cancellation.
+    private async Task<byte[]?> TryGenerateCoverArt(
+        StoryboarderDbContext db, Novel novel, Volume volume, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!claudeLimiter.TryAcquire())
+                return null;
+
+            var excerpt = await CoverExcerpt(db, novel, volume, cancellationToken);
+            if (string.IsNullOrWhiteSpace(excerpt))
+                return null;
+
+            var concept = await claude.DescribeVolumeCover(
+                novel.Title, volume.Title, excerpt, novel.ArtStyle, cancellationToken);
+            if (string.IsNullOrWhiteSpace(concept))
+                return null;
+
+            if (!geminiLimiter.TryAcquire())
+                return null;
+
+            var aspectRatio = (double)DesignTokens.Comic.PageWidth / DesignTokens.Comic.PageHeight;
+            var art = await gemini.GeneratePanel(concept, novel.ArtStyle, [], aspectRatio, cancellationToken);
+
+            // Persist it beside the volume PDF so it's a reusable artifact (and survives a binding retry).
+            imageStore.Save($"{novel.Id}/volumes/volume-{volume.Number}-cover.png", art);
+            return art;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Cover art generation failed for volume {Number} of novel {NovelId}; using the plain cover.",
+                volume.Number, novel.Id);
+            return null;
+        }
+    }
+
+    // A bounded prose sample for the cover concept: the volume's dominant chapter, or the manuscript's
+    // opening when chapters weren't detected.
+    private async Task<string?> CoverExcerpt(
+        StoryboarderDbContext db, Novel novel, Volume volume, CancellationToken cancellationToken)
+    {
+        var fullText = await db.SourceTexts
+            .Where(s => s.NovelId == novel.Id)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrEmpty(fullText))
+            return null;
+
+        var chapterNumber = volume.Pages
+            .GroupBy(p => p.ChapterNumber)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key)
+            .Select(g => (int?)g.Key)
+            .FirstOrDefault();
+
+        if (chapterNumber is int number && number > 0)
+        {
+            var chapter = await db.Chapters
+                .FirstOrDefaultAsync(c => c.NovelId == novel.Id && c.Number == number, cancellationToken);
+            if (chapter is not null)
+            {
+                var start = Math.Clamp(chapter.StartOffset, 0, fullText.Length);
+                var end = Math.Clamp(chapter.EndOffset, start, fullText.Length);
+                var chapterText = fullText[start..end];
+                return chapterText.Length > CoverExcerptChars ? chapterText[..CoverExcerptChars] : chapterText;
+            }
+        }
+
+        return fullText.Length > CoverExcerptChars ? fullText[..CoverExcerptChars] : fullText;
+    }
+
+    // Regroups every storyboarded page into volumes by chapter (see VolumeDecomposer): one volume per
+    // chapter, a chapter over PageLayoutOptions.MaxPagesPerVolume split into parts at scene boundaries.
+    // Re-parents Page rows onto the planned volumes and renumbers both, mutating the tracked entities so
+    // the caller commits it together with the stage advance. No schema change — Page already carries its
+    // ChapterNumber. Only volume grouping changes; the pages, panels, and any renders are untouched.
+    private async Task RedecomposeVolumesByChapter(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        // Every page in true reading order, tagged with whether it opens a scene (its first panel's
+        // NewScene) so an oversized chapter can be cut between scenes rather than mid-scene.
+        var pageRows = await (
+            from v in db.Volumes.Where(v => v.NovelId == novel.Id)
+            join pg in db.Pages on v.Id equals pg.VolumeId
+            orderby v.Number, pg.PageNumber
+            select new
+            {
+                pg.Id,
+                pg.ChapterNumber,
+                StartsNewScene = pg.Panels.OrderBy(p => p.PanelNumber).Select(p => p.NewScene).FirstOrDefault()
+            }).ToListAsync(cancellationToken);
+
+        if (pageRows.Count == 0)
+            return;
+
+        var labels = await db.Chapters
+            .Where(c => c.NovelId == novel.Id)
+            .ToDictionaryAsync(c => c.Number, c => c.Label, cancellationToken);
+
+        var plan = VolumeDecomposer.Decompose(
+            [.. pageRows.Select(p => new DecomposablePage(
+                p.Id, p.ChapterNumber, labels.GetValueOrDefault(p.ChapterNumber, string.Empty), p.StartsNewScene))],
+            pageLayout.MaxPagesPerVolume);
+
+        var volumes = await db.Volumes
+            .Where(v => v.NovelId == novel.Id)
+            .OrderBy(v => v.Number)
+            .ToListAsync(cancellationToken);
+        var volumeIds = volumes.Select(v => v.Id).ToList();
+        var pagesById = await db.Pages
+            .Where(pg => volumeIds.Contains(pg.VolumeId))
+            .ToDictionaryAsync(pg => pg.Id, cancellationToken);
+
+        // Reuse existing volume rows where the plan has one, appending rows when it needs more. Reassign
+        // each planned page onto its volume and renumber it within that volume.
+        for (int i = 0; i < plan.Count; i++)
+        {
+            Volume volume;
+            if (i < volumes.Count)
+                volume = volumes[i];
+            else
+            {
+                volume = new Volume { NovelId = novel.Id };
+                db.Volumes.Add(volume);
+            }
+
+            volume.Number = plan[i].Number;
+            volume.Title = plan[i].Title;
+            // Nothing has been bound yet at this transition; clear any binding/retry state so the new
+            // grouping starts clean.
+            volume.PdfStatus = WorkStatus.Pending;
+            volume.PdfPath = null;
+            volume.PdfPageCursor = 0;
+            volume.Attempts = 0;
+            volume.NextAttemptAtUtc = null;
+            volume.LastError = null;
+            volume.ArchivedDriveFileId = null;
+
+            int pageNumber = 1;
+            foreach (var pageId in plan[i].PageIds)
+            {
+                var page = pagesById[pageId];
+                page.VolumeId = volume.Id;
+                page.PageNumber = pageNumber++;
+            }
+        }
+
+        // Surplus volume rows have had all their pages moved onto the planned volumes, so removing them is
+        // safe — the cascade only deletes pages of a volume that still owns them.
+        for (int i = plan.Count; i < volumes.Count; i++)
+            db.Volumes.Remove(volumes[i]);
     }
 
     // Advances one storyboard sub-window; a finished chunk (last window adapted) rolls the cursor to the
@@ -1079,8 +1249,15 @@ public sealed class GraphicNovelProcessor : IPipelineStep
                 // cover is written once, as the first page, when the cursor is still 0.
                 cancellationToken.ThrowIfCancellationRequested();
 
+                // On the cover page (cursor 0), try to generate a spoiler-free comic cover illustration and
+                // typeset the title over it; a failed or quota-skipped attempt falls back to the plain
+                // typographic cover, so covers never block binding.
+                var coverArt = volume.PdfPageCursor == 0
+                    ? await TryGenerateCoverArt(db, novel, volume, cancellationToken)
+                    : null;
+
                 var pdf = volume.PdfPageCursor == 0
-                    ? pdfComposer.AppendPage(null, coverRenderer.VolumeCover(novel.Title, volume.Number, volume.Title), DesignTokens.Comic.PrintDpi)
+                    ? pdfComposer.AppendPage(null, coverRenderer.VolumeCover(novel.Title, volume.Number, volume.Title, coverArt), DesignTokens.Comic.PrintDpi)
                     : imageStore.Read(volume.PdfPath!);
 
                 if (volume.PdfPageCursor < pages.Count)

@@ -27,12 +27,23 @@ public sealed class CoverPageRenderer
         return SKBitmap.Decode(stream)!;
     });
 
-    public byte[] VolumeCover(string novelTitle, int volumeNumber, string volumeTitle)
+    // backgroundArt (optional) is a spoiler-free comic-style illustration for the volume: when supplied it
+    // fills the page and the novel + chapter names are typeset over it in light ink on dark scrims; when
+    // null (no art, or its generation failed) the cover falls back to the plain Paper & Ink treatment.
+    public byte[] VolumeCover(string novelTitle, int volumeNumber, string volumeTitle, byte[]? backgroundArt = null)
     {
         var width = DesignTokens.Comic.PageWidth;
         var height = DesignTokens.Comic.PageHeight;
         using var surface = SKSurface.Create(new SKImageInfo(width, height));
         var canvas = surface.Canvas;
+
+        using var art = backgroundArt is { Length: > 0 } ? SKBitmap.Decode(backgroundArt) : null;
+        if (art is not null)
+        {
+            DrawArtCover(canvas, art, novelTitle, volumeNumber, volumeTitle, width, height);
+            return Encode(surface);
+        }
+
         canvas.Clear(Paper);
         PaperGrain.Draw(canvas, width, height);
 
@@ -60,6 +71,60 @@ public sealed class CoverPageRenderer
 
         DrawMedallion(canvas, width / 2f, height * 0.84f, DesignTokens.Comic.CoverMedallionSize);
         return Encode(surface);
+    }
+
+    // The illustrated cover: the art fills the page (aspect-fill, centred), a dark gradient scrim top and
+    // bottom keeps the type legible over any illustration, and the novel + volume/chapter names are set in
+    // light ink. No paper grain or medallion — the artwork is the surface.
+    private static void DrawArtCover(
+        SKCanvas canvas, SKBitmap art, string novelTitle, int volumeNumber, string volumeTitle, int width, int height)
+    {
+        canvas.Clear(Ink);
+
+        // Aspect-fill: scale so the art covers the whole page, cropping the overflow, centred.
+        var scale = Math.Max((float)width / art.Width, (float)height / art.Height);
+        var drawWidth = art.Width * scale;
+        var drawHeight = art.Height * scale;
+        var dest = new SKRect(
+            (width - drawWidth) / 2f, (height - drawHeight) / 2f,
+            (width + drawWidth) / 2f, (height + drawHeight) / 2f);
+        using (var artPaint = new SKPaint { IsAntialias = true })
+            canvas.DrawBitmap(art, dest, artPaint);
+
+        var scrim = new SKColor(0x14, 0x12, 0x10); // near-Ink, opaque at the edges
+        var topHeight = height * 0.42f;
+        using (var shader = SKShader.CreateLinearGradient(
+            new SKPoint(0, 0), new SKPoint(0, topHeight),
+            [scrim.WithAlpha(0xE6), scrim.WithAlpha(0)], [0f, 1f], SKShaderTileMode.Clamp))
+        using (var paint = new SKPaint { Shader = shader })
+            canvas.DrawRect(0, 0, width, topHeight, paint);
+
+        var bottomHeight = height * 0.30f;
+        using (var shader = SKShader.CreateLinearGradient(
+            new SKPoint(0, height - bottomHeight), new SKPoint(0, height),
+            [scrim.WithAlpha(0), scrim.WithAlpha(0xE6)], [0f, 1f], SKShaderTileMode.Clamp))
+        using (var paint = new SKPaint { Shader = shader })
+            canvas.DrawRect(0, height - bottomHeight, width, height, paint);
+
+        var contentLeft = (float)DesignTokens.Comic.SideMargin * 2;
+        var contentWidth = width - 2 * contentLeft;
+
+        // Novel title over the top scrim, in light ink.
+        using var titleFont = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Comic.CoverTitleSize);
+        DrawWrapped(canvas, novelTitle, titleFont, Paper, contentLeft, height * 0.14f, contentWidth);
+
+        // Volume line + chapter title over the bottom scrim.
+        using var volumeFont = new SKFont(EmbeddedTypefaces.SerifRegular, DesignTokens.Pdf.H3);
+        using var lightMuted = new SKPaint { Color = Paper.WithAlpha(0xC0), IsAntialias = true };
+        var y = height - bottomHeight * 0.5f;
+        canvas.DrawText($"Volume {volumeNumber}", contentLeft, y, volumeFont, lightMuted);
+        if (!string.IsNullOrWhiteSpace(volumeTitle))
+        {
+            y += volumeFont.Size * DesignTokens.Comic.LineSpacing;
+            using var italic = new SKFont(EmbeddedTypefaces.SerifItalic, DesignTokens.Pdf.H3);
+            using var light = new SKPaint { Color = Paper, IsAntialias = true };
+            canvas.DrawText(volumeTitle, contentLeft, y, italic, light);
+        }
     }
 
     public byte[] AnalysisCover(string reportTitle)

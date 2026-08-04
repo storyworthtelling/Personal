@@ -49,6 +49,38 @@ public class FileSystemImageStoreTests : IDisposable
     }
 
     [Fact]
+    public void Save_LeavesNoTemporaryResidue()
+    {
+        // Save must write via a temp file and atomically rename it into place, so a worker force-stop
+        // mid-write can never leave a truncated PDF (the "StartXRef table could not be found" loop). A
+        // completed Save therefore leaves exactly the target file — no .tmp sidecar — in the directory.
+        var store = Store();
+        var path = store.Save(Path.Combine("novel", "volumes", "volume-1.pdf"), [1, 2, 3, 4]);
+
+        var files = Directory.GetFiles(Path.GetDirectoryName(path)!);
+        Assert.Equal([path], files);
+    }
+
+    [Fact]
+    public void Save_OverExistingFile_NeverLeavesItPartiallyWritten()
+    {
+        // Even overwriting an existing volume PDF, the write goes to a temp file first; the destination
+        // only ever flips from the old complete bytes to the new complete bytes via the rename. A stale
+        // temp left by an earlier interrupted write must not block or corrupt a fresh Save.
+        var store = Store();
+        var path = store.Save("volume-1.pdf", [1, 1, 1, 1]);
+        File.WriteAllBytes(path + ".orphan.tmp", [0, 0]);
+
+        var rewritten = store.Save("volume-1.pdf", [7, 7, 7, 7, 7]);
+
+        Assert.Equal(path, rewritten);
+        Assert.Equal<byte[]>([7, 7, 7, 7, 7], store.Read(rewritten));
+        Assert.DoesNotContain(
+            Directory.GetFiles(root),
+            f => f.EndsWith(".tmp", StringComparison.Ordinal) && !f.Contains("orphan"));
+    }
+
+    [Fact]
     public void Delete_RemovesAWholeSubtree()
     {
         var store = Store();

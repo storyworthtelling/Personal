@@ -9,11 +9,12 @@ public sealed class ClaudeOptions
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = "claude-sonnet-4-6";
 
-    // The cheap tier, used for the two high-volume mechanical calls: pulling entities out of a chunk and
-    // taking per-chunk analysis notes. Both run once per chunk — by far the most calls a novel makes —
-    // and both are extraction against an explicit JSON contract rather than judgement, which is what the
-    // small model is good at. The work that actually needs the strong model (adapting prose into panels,
-    // and synthesising the whole manuscript into a report) stays on Model.
+    // The cheap tier, used for the per-chunk analysis notes: genuinely mechanical note-taking against an
+    // explicit JSON contract, run once per chunk (the most calls a novel makes), which is what the small
+    // model is good at. Entity extraction was on this tier too, but the cheap model under-extracted —
+    // dropping minor characters and described sets, so those panels lost their reference sheets — so it
+    // moved back to Model. The other work needing the strong model (adapting prose into panels,
+    // synthesising the report) has always stayed on Model.
     public string FastModel { get; set; } = "claude-haiku-4-5-20251001";
 
     public int MaxTokens { get; set; } = 8_000;
@@ -156,4 +157,11 @@ public sealed class PageLayoutOptions
     // this, but a page it returns with more panels is split across several pages at storyboard time so
     // panels never get squished into a dense grid.
     public int MaxPanelsPerPage { get; set; } = 6;
+
+    // The most pages one bound volume may hold. Volumes are decomposed one-per-chapter, but a chapter
+    // (or a chapterless book) larger than this is split into parts at scene boundaries so no single
+    // volume PDF grows large enough to blow the phone's memory or the worker's time budget while binding.
+    // Sized well under the 338-page volume that used to wedge assembly for days; a chapter-sized volume
+    // is typically far smaller, so this only ever trips on unusually long chapters or unchaptered books.
+    public int MaxPagesPerVolume { get; set; } = 40;
 }

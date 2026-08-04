@@ -25,6 +25,18 @@ public interface IClaudeAnalysisClient
         DesignBible bible,
         CancellationToken cancellationToken);
 
+    // Describes a single comic-book cover illustration for one volume, from an excerpt of the chapter it
+    // covers. Deliberately spoiler-free: it evokes the section's mood and iconography without revealing
+    // twists or endings. Returns a plain-text visual prompt for the image model (no lettering — the novel
+    // and chapter names are typeset over the art separately), or empty when it can't be derived, so a
+    // failed cover concept degrades to the plain typographic cover rather than blocking the book.
+    Task<string> DescribeVolumeCover(
+        string novelTitle,
+        string chapterTitle,
+        string chapterExcerpt,
+        string artStyle,
+        CancellationToken cancellationToken);
+
     // Literary-analysis "map": observations for one manuscript chunk (character beats, events,
     // possible inconsistencies, checkable claims, strengths/weaknesses) anchored to the known cast.
     // chapterLabel names the chapter(s) the chunk covers ("Chapter 7", "Chapters 7–8"); it is given to

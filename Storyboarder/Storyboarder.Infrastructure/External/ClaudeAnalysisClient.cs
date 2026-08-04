@@ -27,11 +27,16 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private const int WebSearchMaxUses = 8;
 
     private const string ExtractionInstruction =
-        "You are a visual-development analyst preparing a graphic-novel design bible. Read the novel " +
-        "excerpt and list every distinct CHARACTER and every distinct SETTING/LOCATION that appears, " +
-        "with concrete visual details useful for an illustrator (appearance, clothing, age, build for " +
-        "characters; architecture, era, mood, palette for settings). For each entity also give its " +
-        "approximate physical SCALE so the illustrations stay proportionate: for a character an " +
+        "You are a visual-development analyst preparing a graphic-novel design bible. Your list becomes the " +
+        "illustrator's reference sheets, so any character or place you omit gets drawn from scratch and " +
+        "breaks visual consistency. Be EXHAUSTIVE. List EVERY CHARACTER that appears or is described — " +
+        "named or unnamed, major, minor, background, or a briefly-glimpsed walk-on (e.g. \"a scarred " +
+        "innkeeper\", \"two guards at the gate\") — and EVERY SETTING/LOCATION/SET that appears or is " +
+        "described, including interiors, exteriors, vehicles, and distinct rooms or areas within a larger " +
+        "place. Do not skip an entity just because it seems unimportant or appears only once. Give each " +
+        "concrete visual details useful for an illustrator (appearance, clothing, age, build for " +
+        "characters; architecture, era, mood, palette, notable props for settings). For each entity also " +
+        "give its approximate physical SCALE so the illustrations stay proportionate: for a character an " +
         "approximate height and build relative to an average adult; for a setting its approximate size " +
         "and any notable scale cues. Respond with ONLY a JSON object: " +
         "{\"characters\":[{\"name\":string,\"description\":string,\"scale\":string,\"aliases\":[string]}]," +
@@ -77,6 +82,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "cohesive illustration style for the WHOLE book — medium, rendering, linework, colour palette, " +
         "lighting and mood — in a single vivid sentence a comics illustrator could follow consistently. " +
         "Respond with ONLY a JSON object: {\"artStyle\":string}. No prose outside the JSON.";
+
+    private const string CoverConceptInstruction =
+        "You are a comic-book cover artist. From the chapter excerpt below, describe ONE iconic cover " +
+        "illustration for this volume that captures the section's mood, atmosphere and central imagery — a " +
+        "single arresting composition, as a graphic-novel cover would frame it. CRITICAL: give away NO " +
+        "twists, reveals, deaths, or endings — evoke the feeling and the setting, never a spoiler; when in " +
+        "doubt, stay with the opening mood. Do NOT put any lettering, title, or text in the image; the book " +
+        "and chapter names are added separately. Keep the whole book's established art style. Respond with " +
+        "ONLY the visual description as plain text — no preamble, no quotes, no JSON.";
 
     private const string ChapterAnalysisInstruction =
         "You are a developmental editor analyzing ONE excerpt of a novel manuscript to help the author " +
@@ -207,8 +221,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     public async Task<DesignBibleFragment> ExtractEntities(string chunkText, CancellationToken cancellationToken)
     {
-        // Fast tier: one call per chunk, and the job is extraction against a fixed JSON contract.
-        var reply = await SendMessage(ExtractionInstruction, chunkText, cancellationToken, model: options.FastModel);
+        // Strong tier: this call decides how many reference sheets get drawn, and the cheap model
+        // under-extracts — it drops minor characters and described sets, leaving those panels with no
+        // reference so the illustrator invents faces and relocates scenes. Coverage is worth the strong
+        // model here even though it runs once per chunk.
+        var reply = await SendMessage(ExtractionInstruction, chunkText, cancellationToken, model: options.Model);
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
             return DesignBibleFragment.Empty;
@@ -233,6 +250,19 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             return string.Empty;
         var dto = JsonResponse.Deserialize<ArtStyleDto>(json);
         return dto?.ArtStyle?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> DescribeVolumeCover(
+        string novelTitle, string chapterTitle, string chapterExcerpt, string artStyle,
+        CancellationToken cancellationToken)
+    {
+        var userContent =
+            $"NOVEL: {novelTitle}\nCHAPTER/VOLUME: {chapterTitle}\nART STYLE: {artStyle}\n\nCHAPTER EXCERPT:\n{chapterExcerpt}";
+
+        // Best-effort: a spoiler-free cover is a nicety, so any empty/failed reply just yields an empty
+        // concept and the caller falls back to the plain typographic cover.
+        var reply = await SendMessage(CoverConceptInstruction, userContent, cancellationToken);
+        return reply.Trim();
     }
 
     public async Task<StoryboardSegment> Storyboard(
