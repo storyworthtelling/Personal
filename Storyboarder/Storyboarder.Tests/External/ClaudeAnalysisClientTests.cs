@@ -595,6 +595,25 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task ExtractEntities_UsesExtractionMaxTokens_NotDefault()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", MaxTokens = 256, ExtractionMaxTokens = 16000
+        });
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
+        handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
+
+        await client.ExtractEntities("excerpt", CancellationToken.None);
+
+        // Extraction is EXHAUSTIVE over a whole (large) chunk, so its JSON output outgrows the small
+        // default MaxTokens; a truncated reply is thrown away wholesale and eventually fails the chunk,
+        // so this call must request its own large budget rather than the default.
+        Assert.Contains("\"max_tokens\":16000", handler.RequestBodies[0]);
+    }
+
+    [Fact]
     public async Task Storyboard_UsesStoryboardMaxTokens_NotDefault()
     {
         var handler = new FakeHttpMessageHandler();

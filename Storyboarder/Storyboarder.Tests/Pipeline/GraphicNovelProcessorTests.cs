@@ -11,6 +11,7 @@ using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
+using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
@@ -1004,6 +1005,41 @@ public class GraphicNovelProcessorTests : IDisposable
         var splashPage = pages[1];
         var splashPanel = Assert.Single(ctx.Panels.Where(pn => pn.PageId == splashPage.Id));
         Assert.Equal(ShotType.Splash, splashPanel.ShotType);
+    }
+
+    [Fact]
+    public async Task CompletesDesignBible_EvenWhenEveryExtractionChunkPermanentlyFails()
+    {
+        // Entity extraction can keep hitting the model's output ceiling on a dense chunk — the reply is
+        // thrown away wholesale (ResponseTruncatedException) and, after the retries run out, the chunk is
+        // marked Failed. A permanently-failed extraction chunk must not wedge the whole book at
+        // BuildingDesignBible: its entities are simply missing from the bible, exactly as a permanently-
+        // failed reference sheet is tolerated. (This is the failure the owner hit: two chunks truncated,
+        // were given up on, and the design bible then idled forever.)
+        claude.Setup(c => c.ExtractEntities(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ResponseTruncatedException(
+                "Claude response was truncated at the 8000-token output limit (stop_reason=max_tokens)."));
+
+        var novelId = SeedNovel();
+
+        await DriveToCompletion(novelId, _ => { });
+
+        Assert.Equal(ProjectStage.Completed, CurrentStage(novelId));
+
+        using var context = database.NewContext();
+        var chunks = context.Chunks.Where(c => c.NovelId == novelId).ToList();
+        Assert.NotEmpty(chunks);
+        Assert.All(chunks, c =>
+        {
+            Assert.Equal(WorkStatus.Failed, c.AnalysisStatus);
+            Assert.NotNull(c.LastError);
+        });
+
+        // The bible was consolidated (with whatever chunks succeeded — here, none) and the book bound.
+        Assert.True(context.Novels.Single(n => n.Id == novelId).DesignBibleConsolidated);
+        var volume = Assert.Single(context.Volumes.Where(v => v.NovelId == novelId));
+        Assert.Equal(WorkStatus.Completed, volume.PdfStatus);
+        Assert.True(File.Exists(volume.PdfPath!));
     }
 
     [Fact]

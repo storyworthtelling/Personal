@@ -225,7 +225,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         // under-extracts — it drops minor characters and described sets, leaving those panels with no
         // reference so the illustrator invents faces and relocates scenes. Coverage is worth the strong
         // model here even though it runs once per chunk.
-        var reply = await SendMessage(ExtractionInstruction, chunkText, cancellationToken, model: options.Model);
+        var reply = await SendMessage(
+            ExtractionInstruction, chunkText, cancellationToken, options.ExtractionMaxTokens, model: options.Model);
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
             return DesignBibleFragment.Empty;

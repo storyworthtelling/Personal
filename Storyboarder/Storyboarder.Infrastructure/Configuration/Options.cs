@@ -19,6 +19,14 @@ public sealed class ClaudeOptions
 
     public int MaxTokens { get; set; } = 8_000;
 
+    // Entity extraction is EXHAUSTIVE by design — every character and setting in a chunk of up to ~48K
+    // characters, each with a description, an approximate scale, and aliases — so its JSON output
+    // routinely outgrows the small default MaxTokens. A reply that runs out of budget is not merely
+    // trimmed: it is thrown away wholesale (ResponseTruncatedException) and, once the retries are spent,
+    // permanently fails the chunk — which used to leave the design bible unable to consolidate at all.
+    // So this call gets a budget sized for a full cast-and-set list, like the other heavy calls.
+    public int ExtractionMaxTokens { get; set; } = 16_000;
+
     // Storyboarding is the heaviest output the pipeline produces (a panel-by-panel breakdown as one
     // JSON object), so it gets its own budget rather than the small default MaxTokens. Storyboarding now
     // runs on small text sub-windows (see RateLimitOptions.StoryboardWindowChars), so this doubles as a
