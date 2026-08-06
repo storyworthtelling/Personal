@@ -273,11 +273,19 @@ public sealed class GraphicNovelProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        if (await PendingWork(db.Chunks.Where(c => c.NovelId == novel.Id), c => c.AnalysisStatus, c => c.NextAttemptAtUtc, now)
-                is { } chunkWait)
-            return chunkWait == TimeSpan.MinValue ? ProcessResult.Idle : ProcessResult.Waiting(chunkWait, novel.Id);
+        // A chunk whose extraction has permanently FAILED (e.g. a reply that kept truncating at the output
+        // ceiling) must not wedge the whole book: its entities are simply absent from the bible, exactly as
+        // a permanently-failed reference sheet is tolerated below. Only chunks still awaiting a retry hold
+        // us here; once none remain Pending/NeedsRetry, consolidate with whatever chunks succeeded rather
+        // than idling forever. (Waiting past a Failed chunk indefinitely is what froze the design bible.)
+        var pendingChunkRetries = await db.Chunks
+            .Where(c => c.NovelId == novel.Id && c.AnalysisStatus == WorkStatus.NeedsRetry)
+            .Select(c => c.NextAttemptAtUtc)
+            .ToListAsync(cancellationToken);
+        if (pendingChunkRetries.Count > 0)
+            return ProcessResult.Waiting((pendingChunkRetries.Min() ?? now) - now, novel.Id);
 
-        // 2) All chunks analyzed: consolidate the bible exactly once.
+        // 2) Every chunk has been analyzed or given up on: consolidate the bible exactly once.
         if (!novel.DesignBibleConsolidated)
         {
             await ConsolidateBible(db, novel, cancellationToken);
