@@ -64,4 +64,7 @@ reboot to see a new icon.
   and time tests.
 
 The connect flow (Hosted Link → `public_token` → exchange) is the one seam to finalize against Plaid's
-current Hosted Link documentation; the refresh/storage/display path is fully covered by tests.
+current Hosted Link documentation; the refresh/storage/display path is fully covered by tests. The Link
+WebView needs **DOM storage** enabled — Plaid Link keeps its session in `localStorage`, and MAUI's Android
+WebView leaves that off by default, which renders the Link page blank; `MauiProgram` turns it on for every
+WebView in the app (there is only the one).
