@@ -16,14 +16,16 @@ aggregator with a free personal Trial plan (real production data, capped at 10 c
 
 1. **Create a Plaid account** at [dashboard.plaid.com](https://dashboard.plaid.com) and copy your
    **client ID** and a **secret** (start with the Sandbox secret).
-2. **Register the Android app** as an Android OAuth/Link client for package
-   `com.storyworthtelling.ledger`, and enable the **Balance**, **Liabilities**, and **Transactions**
-   products. (Transactions is a Plaid subscription product — billed per connected Item in production —
-   and powers the expandable recent-transactions panel; the link token requests it as the required
-   `product` because Plaid rejects a link token with no product. **Liabilities** is requested via
+2. **Enable the products** on your Plaid account: **Balance**, **Liabilities**, and **Transactions**.
+   (Transactions is a Plaid subscription product — billed per connected Item in production — and powers
+   the expandable recent-transactions panel; the link token requests it as the required `product` because
+   Plaid rejects a link token with no product. **Liabilities** is requested via
    `required_if_supported_products`, so deposit-only institutions still connect; institutions that don't
    support Transactions, e.g. some standalone loan/mortgage servicers, may not connect and fall back to
-   manual awareness.)
+   manual awareness.) No Android package/app-ID registration is needed: Ledger connects through **Hosted
+   Link** (a WebView), not the native Android SDK, so the link token omits `android_package_name` — sending
+   it makes Plaid reject the token (`INVALID_FIELD`) until the package is registered, which a hosted flow
+   never uses.
 3. Install the APK (build it in CI — see below), open **Settings**, paste the client ID + secret,
    choose the **sandbox** environment, and **Save**.
 4. Tap **Connect an account** → finish Plaid Hosted Link in the WebView → **Done**. The account list

@@ -7,8 +7,9 @@ namespace Ledger.Domain.External;
 public interface IPlaidClient
 {
     // Creates a Link token and (via Hosted Link) a URL the app opens in a WebView to connect an
-    // institution. androidPackageName is registered with Plaid so the redirect returns to the app.
-    Task<PlaidLinkToken> CreateLinkTokenAsync(string androidPackageName, CancellationToken cancellationToken);
+    // institution. This is a hosted (WebView) flow, not the native Android SDK, so no android_package_name
+    // is sent — Plaid handles OAuth redirects within the hosted page.
+    Task<PlaidLinkToken> CreateLinkTokenAsync(CancellationToken cancellationToken);
 
     // Reads a Hosted Link session's result (/link/token/get). Returns the public_token + chosen
     // institution once the user has finished connecting, or null while the session is still open.
