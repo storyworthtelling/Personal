@@ -44,6 +44,20 @@ public static class MauiProgram
                 fonts.AddFont("CascadiaCode-Regular.ttf", "Mono");
             });
 
+        // Plaid Hosted Link is a JavaScript app that keeps its session state in localStorage; MAUI's
+        // Android WebView leaves DOM storage off by default, which makes the Link page render blank.
+        // Enable DOM/database storage (and JavaScript explicitly) so the hosted connect flow loads —
+        // Ledger's only WebView is the Plaid connect page (PlaidLinkPage).
+        Microsoft.Maui.Handlers.WebViewHandler.Mapper.AppendToMapping("LedgerEnableWebStorage", (handler, _) =>
+        {
+            if (handler.PlatformView.Settings is { } settings)
+            {
+                settings.JavaScriptEnabled = true;
+                settings.DomStorageEnabled = true;
+                settings.DatabaseEnabled = true;
+            }
+        });
+
         var dbPath = Path.Combine(FileSystem.AppDataDirectory, "ledger.db");
 
         // Options read live from Preferences: the Plaid credentials + environment vary on-device;
