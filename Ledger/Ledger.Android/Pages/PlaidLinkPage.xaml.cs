@@ -43,8 +43,7 @@ public partial class PlaidLinkPage : ContentPage
 
         try
         {
-            var packageName = global::Android.App.Application.Context.PackageName ?? "com.storyworthtelling.ledger";
-            var token = await plaid.CreateLinkTokenAsync(packageName, CancellationToken.None);
+            var token = await plaid.CreateLinkTokenAsync(CancellationToken.None);
             linkToken = token.LinkToken;
             logger.LogInformation(
                 "Connect: link token created (tokenLength={Length}, hasHostedUrl={HasUrl}).",

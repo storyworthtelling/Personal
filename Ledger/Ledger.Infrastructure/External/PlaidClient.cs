@@ -24,7 +24,7 @@ public sealed class PlaidClient : IPlaidClient
         this.options = options;
     }
 
-    public async Task<PlaidLinkToken> CreateLinkTokenAsync(string androidPackageName, CancellationToken cancellationToken)
+    public async Task<PlaidLinkToken> CreateLinkTokenAsync(CancellationToken cancellationToken)
     {
         var opts = options.Value;
         var payload = new
@@ -44,8 +44,10 @@ public sealed class PlaidClient : IPlaidClient
             // standalone loan/mortgage servicers) may not link — those fall back to manual awareness.
             products = new[] { "transactions" },
             required_if_supported_products = new[] { "liabilities" },
-            android_package_name = androidPackageName,
-            // Hosted Link returns a URL the app opens in a WebView (no native Link SDK needed).
+            // Hosted Link returns a URL the app opens in a WebView (no native Link SDK needed). Because this
+            // is a hosted flow, android_package_name is deliberately omitted — sending it makes Plaid demand
+            // that the package be registered in the developer dashboard (INVALID_FIELD) and switches OAuth to
+            // a native app-to-app redirect the WebView can't complete.
             hosted_link = new { }
         };
 

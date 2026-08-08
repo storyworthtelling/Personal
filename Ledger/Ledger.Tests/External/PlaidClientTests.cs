@@ -267,12 +267,15 @@ public class PlaidClientTests
           "hosted_link_url": "https://hosted.plaid.com/link?token=abc", "request_id": "r" }
         """);
 
-        var token = await client.CreateLinkTokenAsync("com.storyworthtelling.ledger", CancellationToken.None);
+        var token = await client.CreateLinkTokenAsync(CancellationToken.None);
 
         Assert.Equal("link-sandbox-abc", token.LinkToken);
         Assert.Equal("https://hosted.plaid.com/link?token=abc", token.HostedLinkUrl);
         var body = handler.RequestBodies[0];
-        Assert.Contains("\"android_package_name\":\"com.storyworthtelling.ledger\"", body);
+        // Hosted Link is a WebView flow, not the native Android SDK, so android_package_name is not sent —
+        // sending it makes Plaid reject the token (INVALID_FIELD) until the package is registered in the
+        // dashboard, which a hosted integration never needs.
+        Assert.DoesNotContain("android_package_name", body);
         // Plaid rejects an empty products array (INVALID_PRODUCT); transactions is the required product,
         // liabilities is requested only where the institution supports it (can't be in both lists).
         Assert.Contains("\"products\":[\"transactions\"]", body);
