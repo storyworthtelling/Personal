@@ -259,7 +259,7 @@ public class PlaidClientTests
     }
 
     [Fact]
-    public async Task CreateLinkToken_ParsesHostedLinkUrlAndRequestsLiabilities()
+    public async Task CreateLinkToken_ParsesHostedLinkUrl_RequestsTransactionsAndLiabilities()
     {
         var (client, handler) = Create();
         handler.EnqueueOk("""
@@ -273,7 +273,10 @@ public class PlaidClientTests
         Assert.Equal("https://hosted.plaid.com/link?token=abc", token.HostedLinkUrl);
         var body = handler.RequestBodies[0];
         Assert.Contains("\"android_package_name\":\"com.storyworthtelling.ledger\"", body);
-        Assert.Contains("liabilities", body);
+        // Plaid rejects an empty products array (INVALID_PRODUCT); transactions is the required product,
+        // liabilities is requested only where the institution supports it (can't be in both lists).
+        Assert.Contains("\"products\":[\"transactions\"]", body);
+        Assert.Contains("\"required_if_supported_products\":[\"liabilities\"]", body);
         Assert.Contains("hosted_link", body);
     }
 }
