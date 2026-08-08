@@ -19,8 +19,11 @@ aggregator with a free personal Trial plan (real production data, capped at 10 c
 2. **Register the Android app** as an Android OAuth/Link client for package
    `com.storyworthtelling.ledger`, and enable the **Balance**, **Liabilities**, and **Transactions**
    products. (Transactions is a Plaid subscription product — billed per connected Item in production —
-   and powers the expandable recent-transactions panel; it's requested via `required_if_supported_products`
-   so institutions that don't support it still connect.)
+   and powers the expandable recent-transactions panel; the link token requests it as the required
+   `product` because Plaid rejects a link token with no product. **Liabilities** is requested via
+   `required_if_supported_products`, so deposit-only institutions still connect; institutions that don't
+   support Transactions, e.g. some standalone loan/mortgage servicers, may not connect and fall back to
+   manual awareness.)
 3. Install the APK (build it in CI — see below), open **Settings**, paste the client ID + secret,
    choose the **sandbox** environment, and **Save**.
 4. Tap **Connect an account** → finish Plaid Hosted Link in the WebView → **Done**. The account list

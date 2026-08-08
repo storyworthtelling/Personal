@@ -35,11 +35,15 @@ public sealed class PlaidClient : IPlaidClient
             client_name = "Ledger",
             language = "en",
             country_codes = new[] { "US" },
-            // No mandatory products: the app links deposit, card, and loan institutions through the same
-            // token, so Liabilities is requested only where the institution supports it. Balance works on
-            // any linked Item without being a link product.
-            products = Array.Empty<string>(),
-            required_if_supported_products = new[] { "liabilities", "transactions" },
+            // Plaid requires at least one product in `products` — an empty array is rejected with
+            // INVALID_PRODUCT. Transactions is the app's broadest data product (it powers the recent-
+            // transactions panel and is supported across banks and cards), so it is the required product;
+            // Balance data comes free with any product, so balances work on every linked Item. Liabilities
+            // is requested only where the institution supports it (a product can't appear in both lists),
+            // so deposit-only institutions still link. Institutions that don't support Transactions (some
+            // standalone loan/mortgage servicers) may not link — those fall back to manual awareness.
+            products = new[] { "transactions" },
+            required_if_supported_products = new[] { "liabilities" },
             android_package_name = androidPackageName,
             // Hosted Link returns a URL the app opens in a WebView (no native Link SDK needed).
             hosted_link = new { }
