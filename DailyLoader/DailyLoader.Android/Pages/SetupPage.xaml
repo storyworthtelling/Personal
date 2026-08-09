@@ -52,8 +52,10 @@
             <Label Text="Secrets vault" Style="{StaticResource FieldLabel}" />
             <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys — here, your NYT cookie and key, the reMarkable token, and the Anthropic key. Set the same passphrase in each app; after a factory reset or reinstall, sign in with Google above and your keys restore automatically. Needs the Google sign-in above."
                    Style="{StaticResource SecondaryLabel}" />
-            <Entry x:Name="VaultPassphraseEntry" IsPassword="True" Placeholder="Choose a passphrase"
+            <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
                    Style="{StaticResource MonoEntry}" Margin="0,8,0,0" />
+            <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
+                   Style="{StaticResource SecondaryLabel}" />
 
             <Label Text="Anthropic API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
             <Entry x:Name="AnthropicKeyEntry"

@@ -41,8 +41,10 @@
             <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys — here, your Plaid credentials and each connected bank's access token. Set the same passphrase in each app; after a factory reset or reinstall, sign in with Google below and your banks restore automatically. Needs the Google sign-in below."
                    Style="{StaticResource SecondaryLabel}" />
             <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Entry x:Name="VaultPassphraseEntry" IsPassword="True" Placeholder="Choose a passphrase"
+            <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
                    Style="{StaticResource MonoEntry}" />
+            <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
+                   Style="{StaticResource SecondaryLabel}" />
 
             <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
 

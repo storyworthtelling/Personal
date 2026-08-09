@@ -139,12 +139,12 @@ public class SettingsActivity : Activity
         // Secrets vault: a passphrase encrypts the shared Drive file that backs up the Gmail address, app
         // password, and Messages-for-Web session, so after a factory reset they restore automatically (with
         // the Google sign-in above). Set the same passphrase in each app.
+        // Shown in the clear (not a password field) so it can be read back and copied — it's the one secret
+        // that isn't kept in the vault, so being able to see it is what lets the owner set the same one everywhere.
         var passphrase = PaperUi.MonoField(this, "Choose a passphrase");
         passphrase.Text = VaultPassphraseStore.Passphrase;
-        passphrase.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationPassword;
-        passphrase.Typeface = PaperTheme.Mono(this);
         AddFieldGroup(layout, "Secrets vault passphrase", passphrase,
-            "Backs up your Gmail credentials to your Google Drive, encrypted. Restores after a reset.");
+            "Backs up your Gmail credentials to your Google Drive, encrypted. Restores after a reset. Shown in the clear so you can copy it into your other apps.");
 
         scroll.AddView(layout);
         root.AddView(scroll, new LinearLayout.LayoutParams(
