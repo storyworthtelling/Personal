@@ -3,6 +3,7 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using FocusPhone.Audio.Google;
 using FocusPhone.Domain.Audio;
 using FocusPhone.Domain.Design;
 using FocusPhone.Infrastructure.Podcasts;
@@ -22,6 +23,8 @@ public class ManageSubscriptionsActivity : Activity
     private const int OpmlRequestCode = 4021;
 
     private SubscriptionStore store = null!;
+    private PodcastLibrarySync librarySync = null!;
+    private readonly DeviceAccountTokenProvider tokens = new();
     private SubscriptionList subscriptions = new();
     private FrameLayout undoHost = null!;
     private LinearLayout rows = null!;
@@ -31,9 +34,30 @@ public class ManageSubscriptionsActivity : Activity
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
         store = new SubscriptionStore(this);
+        librarySync = new PodcastLibrarySync(
+            tokens.GetAccessToken, "FocusPhone.Audio",
+            new PodcastStore(this), store, new PlaybackProgressStore(this));
         subscriptions = new SubscriptionList(store.Load());
         SetContentView(BuildLayout());
         Render();
+    }
+
+    // Mirror subscription edits up to Drive on the way out, so a show added or removed here is backed up
+    // even if the app is killed before the home screen next pauses. Best-effort and off the UI thread.
+    protected override void OnPause()
+    {
+        base.OnPause();
+        Task.Run(async () =>
+        {
+            try
+            {
+                await librarySync.BackupAsync(System.Threading.CancellationToken.None);
+            }
+            catch
+            {
+                // Best-effort: the home screen's backup catches the cloud copy up next time.
+            }
+        });
     }
 
     private View BuildLayout()

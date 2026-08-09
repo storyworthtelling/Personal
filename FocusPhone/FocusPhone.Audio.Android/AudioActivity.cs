@@ -38,6 +38,7 @@ public class AudioActivity : Activity
     private PlaybackProgressStore progressStore = null!;
     private PlaybackSettingsStore settingsStore = null!;
     private SubscriptionStore subscriptionStore = null!;
+    private PodcastLibrarySync librarySync = null!;
 
     private PlaybackSettingsSnapshot settings = PlaybackSettingsSnapshot.Empty();
     private SubscriptionList subscriptions = new();
@@ -89,9 +90,12 @@ public class AudioActivity : Activity
         progressStore = new PlaybackProgressStore(this);
         settingsStore = new PlaybackSettingsStore(this);
         subscriptionStore = new SubscriptionStore(this);
+        librarySync = new PodcastLibrarySync(
+            musicTokens.GetAccessToken, "FocusPhone.Audio", store, subscriptionStore, progressStore);
         settings = settingsStore.Load();
         subscriptions = new SubscriptionList(subscriptionStore.Load());
         MigrateLegacyFeedsIfNeeded();
+        RestoreLibraryFromDrive();
 
         driveClient = new DriveMusicClient(musicTokens);
         tagReader = new MusicTagReader(Path.Combine(CacheDir!.AbsolutePath, "art"));
@@ -153,6 +157,45 @@ public class AudioActivity : Activity
             // Best-effort: the vault picks the folder up on the next successful publish.
         }
     }
+
+    // Pulls the podcast library (shows + listened + resume points) down from Drive when this device has
+    // none of its own — a factory reset or a new phone. Best-effort and off the UI thread; on success it
+    // reloads the local state and re-renders. Local always wins when it already has shows, so this never
+    // clobbers a working device (see PodcastLibrarySync / AudioLibrarySync).
+    private void RestoreLibraryFromDrive() => Task.Run(async () =>
+    {
+        try
+        {
+            if (!await librarySync.RestoreAsync(CancellationToken.None))
+                return;
+
+            RunOnUiThread(() =>
+            {
+                subscriptions = new SubscriptionList(subscriptionStore.Load());
+                RecomputeDone();
+                RenderContent();
+                _ = RefreshFeedsAsync();
+            });
+        }
+        catch
+        {
+            // Ignore: restore is a convenience; the app works from local storage regardless.
+        }
+    });
+
+    // Mirrors the podcast library up to Drive when it has drifted from the backup. Best-effort and off the
+    // UI thread; called when leaving the screen and after a bulk mark so the cloud copy tracks the device.
+    private void BackupLibraryToDrive() => Task.Run(async () =>
+    {
+        try
+        {
+            await librarySync.BackupAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // Best-effort: the next successful backup catches the cloud copy up.
+        }
+    });
 
     private void LoadMusicCatalog()
     {
@@ -248,6 +291,10 @@ public class AudioActivity : Activity
         // Finalize whatever was mid-play, then fold the day's listening into the Taste Profile (throttled).
         RecordListening(listeningRecorder.Stop());
         MaybeRefreshTaste();
+
+        // Mirror the podcast library to Drive on the way out — captures anything marked played this visit,
+        // plus resume points the playback service saved, and subscription edits made in Manage.
+        BackupLibraryToDrive();
     }
 
     // ---- Listening Genius ----
