@@ -721,11 +721,23 @@ public class AudioActivity : Activity
         var rows = shelf
             .Select(show => new PaperListRow(show.Title, $"{show.UnplayedCount} unplayed"))
             .ToList();
-        return BuildList(rows, position =>
-        {
-            openFeedId = shelf[position].FeedId;
-            RenderContent();
-        });
+        return BuildList(rows,
+            position =>
+            {
+                openFeedId = shelf[position].FeedId;
+                RenderContent();
+            },
+            position => ShowShelfActions(shelf[position]));
+    }
+
+    // Long-press a show on the shelf: its one bulk action, marking every episode played.
+    private void ShowShelfActions(ShowSummary show)
+    {
+        new AlertDialog.Builder(this)
+            .SetTitle(show.Title)!
+            .SetItems(new[] { "Mark all as played" }, (_, _) =>
+                MarkManyWithUndo(BulkListen.AllInShow(episodes, show.FeedId), "Marked show played."))!
+            .Show();
     }
 
     // The empty shelf must never read like a dead-end: no shows points at Manage, a
@@ -757,7 +769,26 @@ public class AudioActivity : Activity
             .ToList();
         return BuildList(rows,
             position => EnqueueAndPlay(showEpisodes[position]),
-            position => MarkDoneWithUndo(showEpisodes[position]));
+            position => ShowEpisodeActions(showEpisodes[position]));
+    }
+
+    // Long-press an episode: mark just it, or clear everything older beneath it.
+    private void ShowEpisodeActions(Episode episode)
+    {
+        new AlertDialog.Builder(this)
+            .SetTitle(episode.Title)!
+            .SetItems(new[] { "Mark played", "Mark older as played" }, (_, args) =>
+            {
+                if (args.Which == 0)
+                {
+                    MarkDoneWithUndo(episode);
+                }
+                else
+                {
+                    MarkManyWithUndo(BulkListen.OlderInShow(episodes, episode), "Marked older played.");
+                }
+            })!
+            .Show();
     }
 
     private View BuildQueuePane()
@@ -992,6 +1023,31 @@ public class AudioActivity : Activity
     {
         SetListened(episode.Id, listened: true);
         UndoBar.Show(this, content, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
+    }
+
+    // Marks a batch played, remembering only the ids this action newly added so undo
+    // restores exactly them and leaves already-played episodes alone. A no-op batch
+    // (nothing left to mark) skips the undo bar rather than showing an empty promise.
+    private void MarkManyWithUndo(IReadOnlyList<string> episodeIds, string message)
+    {
+        var listened = store.ListenedIds.ToHashSet();
+        var added = episodeIds.Where(id => listened.Add(id)).ToList();
+        if (added.Count == 0)
+        {
+            return;
+        }
+
+        store.SaveListenedIds(listened);
+        RecomputeDone();
+        RenderContent();
+        UndoBar.Show(this, content, message, onUndo: () =>
+        {
+            var ids = store.ListenedIds.ToHashSet();
+            ids.ExceptWith(added);
+            store.SaveListenedIds(ids);
+            RecomputeDone();
+            RenderContent();
+        });
     }
 
     private void SetListened(string episodeId, bool listened)
