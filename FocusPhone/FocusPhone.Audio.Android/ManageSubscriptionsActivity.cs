@@ -36,7 +36,8 @@ public class ManageSubscriptionsActivity : Activity
         store = new SubscriptionStore(this);
         librarySync = new PodcastLibrarySync(
             tokens.GetAccessToken, "FocusPhone.Audio",
-            new PodcastStore(this), store, new PlaybackProgressStore(this));
+            new PodcastStore(this), store, new PlaybackProgressStore(this),
+            new PlaybackSettingsStore(this), new EqualizerStore(this));
         subscriptions = new SubscriptionList(store.Load());
         SetContentView(BuildLayout());
         Render();

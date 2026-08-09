@@ -1,4 +1,5 @@
 using FocusPhone.Domain.Audio;
+using FocusPhone.Domain.Music;
 using Xunit;
 
 namespace FocusPhone.Tests.Audio;
@@ -64,5 +65,69 @@ public class AudioLibrarySnapshotTests
         var b = new AudioLibrarySnapshot([Sub("f")], ["x", "y"], []);
 
         Assert.False(a.ContentEquals(b));
+    }
+
+    [Fact]
+    public void ContentEquals_NullSettings_EqualsDefaultSettings()
+    {
+        var withNull = new AudioLibrarySnapshot([Sub("f")], [], []);
+        var withDefault = new AudioLibrarySnapshot([Sub("f")], [], [], PlaybackSettingsSnapshot.Empty());
+
+        Assert.True(withNull.ContentEquals(withDefault));
+    }
+
+    [Fact]
+    public void ContentEquals_DetectsDifferentDefaultSpeed()
+    {
+        var slow = new AudioLibrarySnapshot([Sub("f")], [], [],
+            new PlaybackSettingsSnapshot(new PlaybackSettings(1.0f), []));
+        var fast = new AudioLibrarySnapshot([Sub("f")], [], [],
+            new PlaybackSettingsSnapshot(new PlaybackSettings(1.5f), []));
+
+        Assert.False(slow.ContentEquals(fast));
+    }
+
+    [Fact]
+    public void ContentEquals_DetectsDifferentPerFeedOverride()
+    {
+        var a = new AudioLibrarySnapshot([Sub("f")], [], [],
+            new PlaybackSettingsSnapshot(new PlaybackSettings(), new() { ["f"] = new PlaybackSettings(2.0f) }));
+        var b = new AudioLibrarySnapshot([Sub("f")], [], [],
+            new PlaybackSettingsSnapshot(new PlaybackSettings(), new() { ["f"] = new PlaybackSettings(1.2f) }));
+
+        Assert.False(a.ContentEquals(b));
+    }
+
+    [Fact]
+    public void ContentEquals_DetectsDifferentEqualizerGains()
+    {
+        var flat = new AudioLibrarySnapshot([Sub("f")], [], [], null,
+            new EqualizerLibrary(new EqualizerSettings(true, [0, 0, 0]), []));
+        var bumped = new AudioLibrarySnapshot([Sub("f")], [], [], null,
+            new EqualizerLibrary(new EqualizerSettings(true, [300, 0, 0]), []));
+
+        Assert.False(flat.ContentEquals(bumped));
+    }
+
+    [Fact]
+    public void ContentEquals_MatchesEqualizerWithReorderedPresets()
+    {
+        var a = new AudioLibrarySnapshot([Sub("f")], [], [], null,
+            new EqualizerLibrary(new EqualizerSettings(false, [0, 0]),
+                [new EqualizerPreset("Bass", [100, 0]), new EqualizerPreset("Voice", [0, 100])]));
+        var b = new AudioLibrarySnapshot([Sub("f")], [], [], null,
+            new EqualizerLibrary(new EqualizerSettings(false, [0, 0]),
+                [new EqualizerPreset("Voice", [0, 100]), new EqualizerPreset("Bass", [100, 0])]));
+
+        Assert.True(a.ContentEquals(b));
+    }
+
+    [Fact]
+    public void ContentEquals_DetectsDifferentLoudness()
+    {
+        var quiet = new AudioLibrarySnapshot([Sub("f")], [], [], null, null, LoudnessMillibels: 0);
+        var loud = new AudioLibrarySnapshot([Sub("f")], [], [], null, null, LoudnessMillibels: 500);
+
+        Assert.False(quiet.ContentEquals(loud));
     }
 }

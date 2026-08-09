@@ -67,6 +67,17 @@ public class AudioLibrarySyncTests
     }
 
     [Fact]
+    public void LocalHasShows_AndOnlySettingsDrifted_BacksUp()
+    {
+        var local = new AudioLibrarySnapshot([Sub("feed1")], [], [],
+            new PlaybackSettingsSnapshot(new PlaybackSettings(1.5f), []));
+        var remote = new AudioLibrarySnapshot([Sub("feed1")], [], [],
+            new PlaybackSettingsSnapshot(new PlaybackSettings(1.0f), []));
+
+        Assert.Equal(LibrarySyncDirection.Backup, AudioLibrarySync.Decide(local, remote));
+    }
+
+    [Fact]
     public void UnsubscribeToEmpty_PropagatesAsBackup_NotResurrected()
     {
         // Removing the last show leaves local with no subscriptions but different from a

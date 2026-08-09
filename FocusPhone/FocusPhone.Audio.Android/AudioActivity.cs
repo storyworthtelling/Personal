@@ -93,7 +93,8 @@ public class AudioActivity : Activity
         subscriptionStore = new SubscriptionStore(this);
         episodeCache = new EpisodeCacheStore(this);
         librarySync = new PodcastLibrarySync(
-            musicTokens.GetAccessToken, "FocusPhone.Audio", store, subscriptionStore, progressStore);
+            musicTokens.GetAccessToken, "FocusPhone.Audio",
+            store, subscriptionStore, progressStore, settingsStore, new EqualizerStore(this));
         settings = settingsStore.Load();
         subscriptions = new SubscriptionList(subscriptionStore.Load());
         MigrateLegacyFeedsIfNeeded();
@@ -175,6 +176,7 @@ public class AudioActivity : Activity
             RunOnUiThread(() =>
             {
                 subscriptions = new SubscriptionList(subscriptionStore.Load());
+                settings = settingsStore.Load(); // restored speed/skip-silence takes effect on next play
                 RecomputeDone();
                 RenderContent();
                 _ = RefreshFeedsAsync();
