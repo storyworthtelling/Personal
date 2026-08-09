@@ -3,12 +3,14 @@ using global::Android.Accounts;
 namespace Ledger.Android.Google;
 
 // Supplies Google access tokens for the device account chosen during sign-in, using the core Android
-// AccountManager. No Play Services binding is required. Scope is read-only Drive — Ledger only READS the
-// shared owner's-voice profile + config the other apps wrote; it never writes to Drive.
+// AccountManager. No Play Services binding is required. Scope is full Drive: Ledger reads the shared
+// owner's-voice profile/config AND writes its section of the encrypted secrets vault (Plaid credentials +
+// each bank's access token) back to Drive, which read-only can't do. The owner re-registers this scope on
+// the OAuth client — until then, vault publish/restore degrade quietly and the app works from local settings.
 public class DeviceAccountTokenProvider
 {
     // AccountManager auth-token type: "oauth2:" followed by the space-separated scopes.
-    internal const string TokenScope = "oauth2:https://www.googleapis.com/auth/drive.readonly";
+    internal const string TokenScope = "oauth2:https://www.googleapis.com/auth/drive";
 
     private readonly object gate = new();
     private string? cachedToken;

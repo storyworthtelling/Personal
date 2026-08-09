@@ -42,6 +42,16 @@ public static class CredentialStore
         set => Preferences.Set(nameof(CalendarMappingJson), value);
     }
 
+    // The passphrase that encrypts the shared Drive secrets vault (Storyworthtelling.Voice.Secrets). It is
+    // the one credential deliberately NOT kept in the vault — wiped by a factory reset and re-entered once
+    // here, which then unlocks restoring the NYT cookie/key, the reMarkable token, and the Anthropic key
+    // from Drive. Empty means this app doesn't yet participate in the vault.
+    public static string VaultPassphrase
+    {
+        get => Preferences.Get(nameof(VaultPassphrase), string.Empty);
+        set => Preferences.Set(nameof(VaultPassphrase), value);
+    }
+
     public static string LastDeliveryOutcome
     {
         get => Preferences.Get(nameof(LastDeliveryOutcome), string.Empty);

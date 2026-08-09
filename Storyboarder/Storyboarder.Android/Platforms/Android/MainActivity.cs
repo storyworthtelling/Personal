@@ -18,9 +18,27 @@ public class MainActivity : MauiAppCompatActivity
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        RestoreVaultSecrets();
         PipelineWorker.Schedule(this);
         ResumeActiveWork();
     }
+
+    // After a reinstall or the FocusPhone cutover's factory reset, the local API keys are gone but the
+    // encrypted Drive vault still holds them. If the owner has set the vault passphrase, refill any missing
+    // key from Drive so the pipeline can run without re-typing them. Best-effort: no passphrase, no network,
+    // or no vault yet simply leaves the keys as they are.
+    private void RestoreVaultSecrets() => Task.Run(() =>
+    {
+        try
+        {
+            var sync = IPlatformApplication.Current!.Services.GetRequiredService<VaultSync>();
+            sync.RestoreAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // Ignore: restore is a convenience; the Settings page always accepts the keys manually.
+        }
+    });
 
     // On launch (which, after a reboot, is the first time the app runs again) verify the outputs on disk
     // against the database and heal anything a reboot or interrupted write left dangling, then — if a

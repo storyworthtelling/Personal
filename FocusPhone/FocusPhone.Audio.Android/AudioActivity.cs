@@ -14,6 +14,8 @@ using FocusPhone.Domain.Time;
 using FocusPhone.Infrastructure.Music;
 using FocusPhone.Infrastructure.Podcasts;
 using FocusPhone.Ui;
+using FocusPhone.Ui.Voice;
+using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Audio;
 
@@ -105,8 +107,51 @@ public class AudioActivity : Activity
         SetContentView(BuildLayout());
         ConnectController();
         ShowGreetingAsync();
+        RestoreMusicFolderFromVault();
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
+    }
+
+    // After a reinstall or the cutover's factory reset, refill the chosen music-folder id from the encrypted
+    // Drive vault (needs the vault passphrase set + Google signed in), so the library reappears without
+    // re-picking the folder. Runs only when none is set locally. Best-effort and off the UI thread.
+    private void RestoreMusicFolderFromVault() => Task.Run(async () =>
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId))
+                return;
+
+            var access = new SecretsVaultAccess(musicTokens.GetAccessToken, "FocusPhone.Audio");
+            var result = await access.Service.LoadAsync(System.Threading.CancellationToken.None);
+            if (result.Status == SecretsVaultStatus.Loaded
+                && !string.IsNullOrEmpty(result.Vault.Music.FolderId)
+                && string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId))
+            {
+                MusicSettingsStore.MusicFolderId = result.Vault.Music.FolderId;
+                RunOnUiThread(() => { RenderContent(); _ = ScanAsync(); });
+            }
+        }
+        catch
+        {
+            // Ignore: restore is a convenience; the folder picker is always available.
+        }
+    });
+
+    // Backs the chosen music-folder id up to the encrypted vault. Best-effort and off the UI thread.
+    private async void PublishMusicFolderToVault(string folderId)
+    {
+        try
+        {
+            var access = new SecretsVaultAccess(musicTokens.GetAccessToken, "FocusPhone.Audio");
+            await access.Service.PublishAsync(
+                v => v with { Music = new MusicSecrets(folderId) },
+                System.Threading.CancellationToken.None);
+        }
+        catch
+        {
+            // Best-effort: the vault picks the folder up on the next successful publish.
+        }
     }
 
     private void LoadMusicCatalog()
@@ -297,7 +342,20 @@ public class AudioActivity : Activity
         layout.AddView(PaperUi.Secondary(this,
             "First register this app as an Android OAuth client (Drive API enabled), then sign in:\n\n" +
             $"Package: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
-        layout.AddView(PaperUi.PrimaryButton(this, "Sign in with Google", () => _ = SignInAsync()));
+
+        // The secrets-vault passphrase (optional): set the same one as your other apps to back up and restore
+        // your keys from Drive, encrypted. Persisted when you sign in.
+        var passphrase = PaperUi.MonoField(this, "Secrets vault passphrase (optional)");
+        passphrase.Text = VaultPassphraseStore.Passphrase;
+        passphrase.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationPassword;
+        passphrase.Typeface = PaperTheme.Mono(this);
+        layout.AddView(passphrase);
+
+        layout.AddView(PaperUi.PrimaryButton(this, "Sign in with Google", () =>
+        {
+            VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
+            _ = SignInAsync();
+        }));
         return WrapScroll(layout);
     }
 
@@ -323,6 +381,7 @@ public class AudioActivity : Activity
     private void ChooseFolder(string folderId)
     {
         MusicSettingsStore.MusicFolderId = folderId;
+        PublishMusicFolderToVault(folderId);
         driveFolders = null;
         RenderContent();
         _ = ScanAsync();

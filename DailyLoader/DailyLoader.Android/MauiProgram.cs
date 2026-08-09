@@ -16,6 +16,7 @@ using DailyLoader.Infrastructure.Remarkable;
 using DailyLoader.Android.Google;
 using PdfSharp.Fonts;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Secrets;
 using VoiceGoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
 using VoiceClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
 using VoiceDriveService = global::Google.Apis.Drive.v3.DriveService;
@@ -123,8 +124,18 @@ public static class MauiProgram
         }
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
             new DriveVoiceProfileStore(new DriveTextFile(VoiceDriveFactory(sp), DriveVoiceProfileStore.FileName)));
+
+        // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
+        // the owner's passphrase (CredentialStore.VaultPassphrase). DailyLoader publishes its own credentials
+        // to it (VaultSync) and sources the shared Claude voice key from it, so secrets live in one place
+        // (in place of the old plaintext voice config).
+        builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
+            new DriveSecretsVaultStore(new DriveTextFile(VoiceDriveFactory(sp), DriveSecretsVaultStore.FileName)));
+        builder.Services.AddSingleton(sp =>
+            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
+        builder.Services.AddSingleton<VaultSync>();
         builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
-            new DriveVoiceConfigStore(new DriveTextFile(VoiceDriveFactory(sp), DriveVoiceConfigStore.FileName)));
+            new VaultVoiceConfigStore(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
         builder.Services.AddSingleton<DriveVoiceOptions>();
         builder.Services.AddSingleton<IOptions<VoiceOptions>>(sp => sp.GetRequiredService<DriveVoiceOptions>());
         builder.Services.AddHttpClient<IVoiceClient, VoiceClient>()

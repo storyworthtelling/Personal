@@ -17,6 +17,16 @@ public static class SettingsStore
         set => Preferences.Set(nameof(GeminiApiKey), value);
     }
 
+    // The passphrase that encrypts the shared Drive secrets vault (Storyworthtelling.Voice.Secrets). It is
+    // the one credential deliberately NOT kept in the vault — it is wiped by a factory reset and re-entered
+    // once here, which then unlocks restoring every other key from Drive. Empty means this app doesn't yet
+    // participate in the vault (it keeps working from the keys above).
+    public static string VaultPassphrase
+    {
+        get => Preferences.Get(nameof(VaultPassphrase), string.Empty);
+        set => Preferences.Set(nameof(VaultPassphrase), value);
+    }
+
     // Copy each finished book's PDFs to a Drive folder beside its manuscript. Off until the drive.file
     // write scope is registered on the OAuth client and consented to on the device — turning it on before
     // then just sends every finished book through a stage that can only fail.

@@ -15,6 +15,7 @@ using Ledger.Infrastructure.Services;
 using Ledger.Infrastructure.Time;
 using Ledger.Android.Google;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Secrets;
 using GoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
 using GoogleClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
 using DriveService = global::Google.Apis.Drive.v3.DriveService;
@@ -110,8 +111,18 @@ public static class MauiProgram
         }
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
             new DriveVoiceProfileStore(new DriveTextFile(DriveFactory(sp), DriveVoiceProfileStore.FileName)));
+
+        // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
+        // the owner's passphrase (SettingsStore.VaultPassphrase). Ledger publishes its Plaid credentials and
+        // each bank's access token to it (VaultSync) and sources the shared Claude voice key from it, so the
+        // vault is the single place secrets live (in place of the old plaintext voice config).
+        builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
+            new DriveSecretsVaultStore(new DriveTextFile(DriveFactory(sp), DriveSecretsVaultStore.FileName)));
+        builder.Services.AddSingleton(sp =>
+            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase));
+        builder.Services.AddScoped<VaultSync>();
         builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
-            new DriveVoiceConfigStore(new DriveTextFile(DriveFactory(sp), DriveVoiceConfigStore.FileName)));
+            new VaultVoiceConfigStore(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase));
         // One DriveVoiceOptions instance is both the IOptions<VoiceOptions> VoiceClient reads and the handle
         // the page refreshes (pull the key from Drive) just before composing.
         builder.Services.AddSingleton<DriveVoiceOptions>();

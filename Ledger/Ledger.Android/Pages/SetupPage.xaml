@@ -37,6 +37,15 @@
 
             <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
 
+            <Label Text="Secrets vault" Style="{StaticResource TitleLabel}" />
+            <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys — here, your Plaid credentials and each connected bank's access token. Set the same passphrase in each app; after a factory reset or reinstall, sign in with Google below and your banks restore automatically. Needs the Google sign-in below."
+                   Style="{StaticResource SecondaryLabel}" />
+            <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+            <Entry x:Name="VaultPassphraseEntry" IsPassword="True" Placeholder="Choose a passphrase"
+                   Style="{StaticResource MonoEntry}" />
+
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+
             <Label Text="Connected accounts" Style="{StaticResource TitleLabel}" />
             <Label x:Name="NoAccountsLabel" Text="Nothing connected yet."
                    Style="{StaticResource SecondaryLabel}" />
@@ -80,8 +89,8 @@
 
             <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
 
-            <Label Text="Voiced greeting" Style="{StaticResource TitleLabel}" />
-            <Label Text="Sign in with Google to read your shared voice profile from Drive and greet you in your own voice. Read-only; skip it to keep neutral copy."
+            <Label Text="Google account" Style="{StaticResource TitleLabel}" />
+            <Label Text="Sign in with Google to back up your keys to the secrets vault and to greet you in your own voice from your shared Drive profile. Skip it to keep neutral copy and local-only settings."
                    Style="{StaticResource SecondaryLabel}" />
             <Button x:Name="VoiceSignInButton" Text="Sign in with Google"
                     Clicked="OnVoiceSignInClicked" Style="{StaticResource SecondaryButton}" />

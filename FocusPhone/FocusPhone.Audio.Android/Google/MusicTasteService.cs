@@ -2,8 +2,10 @@ using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Secrets;
 using FocusPhone.Domain.Music;
 using FocusPhone.Infrastructure.Music;
+using FocusPhone.Ui.Voice;
 
 namespace FocusPhone.Audio.Google;
 
@@ -38,8 +40,11 @@ public sealed class MusicTasteService
             });
         };
 
+        // The shared Claude key now lives in the encrypted secrets vault (single source of truth, in place of
+        // the old plaintext voice config); VaultVoiceConfigStore reads it back with this head's passphrase.
+        var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName));
         options = new DriveVoiceOptions(
-            new DriveVoiceConfigStore(new DriveTextFile(driveFactory, DriveVoiceConfigStore.FileName)));
+            new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
         var client = new TasteProfileClient(http, options);
         store = new DriveTasteProfileStore(new DriveTextFile(driveFactory, DriveTasteProfileStore.FileName));

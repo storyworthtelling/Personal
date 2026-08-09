@@ -6,6 +6,8 @@ using FocusPhone.Domain.Apps;
 using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Unlock;
 using FocusPhone.Ui;
+using FocusPhone.Ui.Voice;
+using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Launcher;
 
@@ -207,17 +209,52 @@ public class UnlockActivity : Activity
     private void ShowUpdateTokenPrompt()
     {
         var input = PaperUi.MonoField(this, "GitHub token with repo read access");
+        input.Text = new UpdateSettingsStore(this).GitHubToken;
+
+        // The secrets-vault passphrase lives with the other admin secret: it encrypts the shared Drive file
+        // that backs up the update token (and every app's keys) so a factory reset can restore them.
+        var passphrase = PaperUi.MonoField(this, "Secrets vault passphrase");
+        passphrase.Text = VaultPassphraseStore.Passphrase;
+        passphrase.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationPassword;
+        passphrase.Typeface = PaperTheme.Mono(this);
+
+        var fields = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        fields.SetPadding(
+            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X4),
+            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), 0);
+        fields.AddView(input);
+        fields.AddView(passphrase);
+
         new AlertDialog.Builder(this)
             .SetTitle("Update channel token")!
-            .SetView(input)!
+            .SetView(fields)!
             .SetPositiveButton("Save", (_, _) =>
             {
                 new UpdateSettingsStore(this).GitHubToken = input.Text;
+                VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
+                PublishTokenToVault(input.Text);
                 inlineStatus = "Update token set.";
                 Render();
             })!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
+    }
+
+    // Backs the GitHub update token up to the owner's encrypted secrets vault (needs Google signed in for the
+    // greeting/vault and a passphrase set). Best-effort and off the UI thread.
+    private async void PublishTokenToVault(string? token)
+    {
+        try
+        {
+            var access = new SecretsVaultAccess(new VoiceGoogleAccount().GetAccessToken, "FocusPhone.Launcher");
+            await access.Service.PublishAsync(
+                v => v with { GitHubUpdateToken = token ?? string.Empty },
+                System.Threading.CancellationToken.None);
+        }
+        catch
+        {
+            // Best-effort: the vault picks the token up on the next successful save.
+        }
     }
 
     private void Transition(Action action)

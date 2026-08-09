@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui;
 
 namespace DailyLoader.Android.Pages;
 
@@ -18,6 +20,7 @@ public partial class SetupPage : ContentPage
         RemarkableTokenEntry.Text = CredentialStore.RemarkableDeviceToken;
         AnthropicKeyEntry.Text = CredentialStore.AnthropicApiKey;
         CalendarMappingEditor.Text = CredentialStore.CalendarMappingJson;
+        VaultPassphraseEntry.Text = CredentialStore.VaultPassphrase;
         GoogleStatusLabel.Text = CredentialStore.IsGoogleConfigured
             ? $"Signed in as {CredentialStore.GoogleAccountEmail} ✓"
             : "Not signed in";
@@ -30,9 +33,27 @@ public partial class SetupPage : ContentPage
         CredentialStore.RemarkableDeviceToken = RemarkableTokenEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.AnthropicApiKey = AnthropicKeyEntry.Text?.Trim() ?? string.Empty;
         CredentialStore.CalendarMappingJson = CalendarMappingEditor.Text?.Trim() ?? string.Empty;
+        CredentialStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
 
+        // Back up the credentials to the encrypted Drive vault. Best-effort: they already work locally, so a
+        // failed publish (no passphrase/network/scope yet) is silent.
+        PublishToVault();
         // Success is the state change: saving returns home (DESIGN.md §7).
         await Navigation.PopAsync();
+    }
+
+    private static async void PublishToVault()
+    {
+        try
+        {
+            var sync = IPlatformApplication.Current!.Services.GetService<VaultSync>();
+            if (sync is not null)
+                await sync.PublishAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // Best-effort: the vault picks the credentials up on the next successful save.
+        }
     }
 
     private async void OnGoogleSignInClicked(object sender, EventArgs e)
@@ -109,6 +130,8 @@ public partial class SetupPage : ContentPage
             var token = (await response.Content.ReadAsStringAsync()).Trim().Trim('"');
             CredentialStore.RemarkableDeviceToken = token;
             RemarkableTokenEntry.Text = token;
+            // Back up the freshly paired token so a later reset doesn't force re-registration.
+            PublishToVault();
             await DisplayAlert("Registered!", "Device registered and token saved.", "OK");
         }
         catch (Exception ex)

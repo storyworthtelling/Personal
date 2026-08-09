@@ -9,6 +9,8 @@ using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Time;
 using FocusPhone.Domain.Timeline;
 using FocusPhone.Ui;
+using FocusPhone.Ui.Voice;
+using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Communication;
 
@@ -63,11 +65,45 @@ public class ThreadsActivity : Activity
     // and filtering stay cheap.
     private sealed record ThreadRow(string ContactKey, string Title, string Subtitle, bool HasUnread);
 
+    // After a reinstall or the cutover's factory reset, refill the Gmail credentials from the encrypted
+    // Drive vault (needs the vault passphrase set + Google signed in). Runs only when nothing is configured
+    // locally, and syncs once if the restore completes the setup. Best-effort and off the UI thread.
+    private void RestoreGmailFromVault() => Task.Run(async () =>
+    {
+        try
+        {
+            var account = new AccountStore(this);
+            if (account.IsConfigured)
+                return; // already have local credentials — never overwrite them
+
+            var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "FocusPhone.Communication");
+            var result = await access.Service.LoadAsync(System.Threading.CancellationToken.None);
+            if (result.Status != SecretsVaultStatus.Loaded)
+                return;
+
+            var gmail = result.Vault.Gmail;
+            if (string.IsNullOrEmpty(account.GmailAddress) && !string.IsNullOrEmpty(gmail.Address))
+                account.GmailAddress = gmail.Address;
+            if (string.IsNullOrEmpty(account.GmailAppPassword) && !string.IsNullOrEmpty(gmail.AppPassword))
+                account.GmailAppPassword = gmail.AppPassword;
+            if (string.IsNullOrEmpty(account.GmBridgeSession) && !string.IsNullOrEmpty(gmail.BridgeSession))
+                account.GmBridgeSession = gmail.BridgeSession;
+
+            if (account.IsConfigured)
+                EmailSyncWorker.RunOnce(this);
+        }
+        catch
+        {
+            // Ignore: restore is a convenience; Settings always accepts the credentials manually.
+        }
+    });
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
         greeting = new FocusPhone.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "FocusPhone.Communication");
+        RestoreGmailFromVault();
         SetContentView(BuildLayout());
 
         threadList!.ItemClick += (_, e) =>

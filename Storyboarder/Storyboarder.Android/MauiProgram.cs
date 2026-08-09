@@ -17,6 +17,7 @@ using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Infrastructure.Time;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Secrets;
 using GoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
 using GoogleClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
 using DriveService = global::Google.Apis.Drive.v3.DriveService;
@@ -151,8 +152,18 @@ public static class MauiProgram
         }
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
             new DriveVoiceProfileStore(new DriveTextFile(DriveFactory(sp), DriveVoiceProfileStore.FileName)));
+
+        // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
+        // the owner's passphrase (SettingsStore.VaultPassphrase). Storyboarder both publishes its own keys to
+        // it (VaultSync) and, being the app the shared Claude key is entered in, sources the voice key from it
+        // (VaultVoiceConfigStore) so there is a single source of truth in place of the old plaintext config.
+        builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
+            new DriveSecretsVaultStore(new DriveTextFile(DriveFactory(sp), DriveSecretsVaultStore.FileName)));
+        builder.Services.AddSingleton(sp =>
+            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase));
+        builder.Services.AddSingleton<VaultSync>();
         builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
-            new DriveVoiceConfigStore(new DriveTextFile(DriveFactory(sp), DriveVoiceConfigStore.FileName)));
+            new VaultVoiceConfigStore(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase));
         builder.Services.AddTransient<VoicedMessenger>();
 
         // Pages.

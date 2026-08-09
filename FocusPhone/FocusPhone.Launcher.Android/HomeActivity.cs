@@ -6,6 +6,8 @@ using Android.Widget;
 using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Time;
 using FocusPhone.Ui;
+using FocusPhone.Ui.Voice;
+using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Launcher;
 
@@ -45,11 +47,34 @@ public class HomeActivity : Activity
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
         greeting = new FocusPhone.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "FocusPhone.Launcher");
+        RestoreUpdateTokenFromVault();
         SetContentView(BuildLayout());
         gestureDetector = new GestureDetector(this, new SwipeUpListener(OpenAppTray));
         PolicyManager.ApplyCurrentPolicy(this);
         CrashReporter.ShowPendingCrash(this);
     }
+
+    // After a reinstall or the cutover's factory reset, refill the GitHub update token from the encrypted
+    // Drive vault (needs the vault passphrase set + Google signed in), so the self-update channel keeps
+    // working without re-entering it in admin mode. Runs only when the token is missing locally.
+    private void RestoreUpdateTokenFromVault() => Task.Run(async () =>
+    {
+        try
+        {
+            var settings = new UpdateSettingsStore(this);
+            if (!string.IsNullOrEmpty(settings.GitHubToken))
+                return; // already have a local token — never overwrite it
+
+            var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "FocusPhone.Launcher");
+            var result = await access.Service.LoadAsync(System.Threading.CancellationToken.None);
+            if (result.Status == SecretsVaultStatus.Loaded && !string.IsNullOrEmpty(result.Vault.GitHubUpdateToken))
+                settings.GitHubToken = result.Vault.GitHubUpdateToken;
+        }
+        catch
+        {
+            // Ignore: restore is a convenience; admin mode always re-enters the token manually.
+        }
+    });
 
     protected override void OnResume()
     {
