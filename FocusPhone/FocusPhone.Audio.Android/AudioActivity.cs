@@ -38,6 +38,7 @@ public class AudioActivity : Activity
     private PlaybackProgressStore progressStore = null!;
     private PlaybackSettingsStore settingsStore = null!;
     private SubscriptionStore subscriptionStore = null!;
+    private EpisodeCacheStore episodeCache = null!;
     private PodcastLibrarySync librarySync = null!;
 
     private PlaybackSettingsSnapshot settings = PlaybackSettingsSnapshot.Empty();
@@ -90,11 +91,13 @@ public class AudioActivity : Activity
         progressStore = new PlaybackProgressStore(this);
         settingsStore = new PlaybackSettingsStore(this);
         subscriptionStore = new SubscriptionStore(this);
+        episodeCache = new EpisodeCacheStore(this);
         librarySync = new PodcastLibrarySync(
             musicTokens.GetAccessToken, "FocusPhone.Audio", store, subscriptionStore, progressStore);
         settings = settingsStore.Load();
         subscriptions = new SubscriptionList(subscriptionStore.Load());
         MigrateLegacyFeedsIfNeeded();
+        LoadCachedEpisodes(); // paint the shelf from the previous fetch before the network refresh
         RestoreLibraryFromDrive();
 
         driveClient = new DriveMusicClient(musicTokens);
@@ -1119,48 +1122,35 @@ public class AudioActivity : Activity
 
     // ---- Feeds ----
 
+    // Seed the shelf from the last fetch so a cold launch shows shows immediately instead of a blank
+    // "Fetching episodes…". The background RefreshFeedsAsync then updates it in place.
+    private void LoadCachedEpisodes()
+    {
+        var cache = episodeCache.Load();
+        episodes = [.. cache.Episodes];
+        feedTitles = new Dictionary<string, string>(cache.FeedTitles);
+        RecomputeDone();
+    }
+
+    private sealed record FeedFetchResult(PodcastSubscription Subscription, PodcastFeed? Feed, string? FailedHost);
+
     private async Task RefreshFeedsAsync()
     {
         isRefreshing = true;
-        if (side == 0 && !showingQueue && openFeedId is null)
+        // Only blank to "Fetching episodes…" when there's nothing cached to show yet (true first run).
+        if (side == 0 && !showingQueue && openFeedId is null && episodes.Count == 0)
         {
-            RenderContent(); // surface "Fetching episodes…" while the first pull is in flight
+            RenderContent();
         }
 
-        var all = new List<Episode>();
-        var titles = new Dictionary<string, string>();
+        var ordered = subscriptions.Ordered.ToList();
+        FeedFetchResult[] results;
         try
         {
             using var http = new HttpClient();
             var client = new RssFeedClient(http);
-            foreach (var subscription in subscriptions.Ordered)
-            {
-                try
-                {
-                    var feed = await client.FetchAsync(new Uri(subscription.FeedUrl));
-                    all.AddRange(feed.Episodes);
-                    titles[subscription.FeedUrl] = feed.Title;
-                    subscriptions.UpdateTitle(subscription.FeedUrl, feed.Title);
-                }
-                catch (Exception e) when (
-                    e is HttpRequestException or InvalidDataException or System.OperationCanceledException or UriFormatException)
-                {
-                    // One bad feed must never sink the whole refresh (or the app): a
-                    // moved feed serving HTML (InvalidDataException), a network drop
-                    // (HttpRequestException), a timeout (OperationCanceledException),
-                    // or a corrupt stored URL (UriFormatException) all fall through
-                    // to the same spoken failure. Failure may speak (DESIGN.md §7).
-                    var host = Uri.TryCreate(subscription.FeedUrl, UriKind.Absolute, out var uri)
-                        ? uri.Host
-                        : subscription.FeedUrl;
-                    Toast.MakeText(this, $"{host} didn't answer. It retries on the next refresh.",
-                        ToastLength.Short)!.Show();
-                }
-            }
-
-            subscriptionStore.Save(subscriptions.Export());
-            episodes = all;
-            feedTitles = titles;
+            // Fetch every feed concurrently — wall time is now the slowest feed, not the sum of all.
+            results = await Task.WhenAll(ordered.Select(subscription => FetchFeedAsync(client, subscription)));
         }
         finally
         {
@@ -1169,8 +1159,72 @@ public class AudioActivity : Activity
             isRefreshing = false;
         }
 
+        // Start from the current (cached) episodes, pruned to still-subscribed feeds, so a feed that
+        // failed to fetch keeps its last-known episodes rather than vanishing on a flaky network.
+        var subscribed = ordered.Select(subscription => subscription.FeedUrl).ToHashSet();
+        var byFeed = episodes
+            .Where(episode => subscribed.Contains(episode.FeedId))
+            .GroupBy(episode => episode.FeedId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<Episode>)group.ToList());
+        var titles = feedTitles
+            .Where(pair => subscribed.Contains(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+
+        var failedHosts = new List<string>();
+        foreach (var result in results)
+        {
+            if (result.Feed is { } feed)
+            {
+                byFeed[result.Subscription.FeedUrl] = feed.Episodes;
+                titles[result.Subscription.FeedUrl] = feed.Title;
+                subscriptions.UpdateTitle(result.Subscription.FeedUrl, feed.Title);
+            }
+            else if (result.FailedHost is { } host)
+            {
+                failedHosts.Add(host);
+            }
+        }
+
+        subscriptionStore.Save(subscriptions.Export());
+        episodes = [.. byFeed.Values.SelectMany(feedEpisodes => feedEpisodes)];
+        feedTitles = titles;
+        episodeCache.Save(episodes, titles); // persist for the next cold launch
+
+        // Failure may speak (DESIGN.md §7), but a wall of toasts must not: summarize when several feeds fail.
+        if (failedHosts.Count == 1)
+        {
+            Toast.MakeText(this, $"{failedHosts[0]} didn't answer. It retries on the next refresh.",
+                ToastLength.Short)!.Show();
+        }
+        else if (failedHosts.Count > 1)
+        {
+            Toast.MakeText(this, $"{failedHosts.Count} shows didn't answer. They retry on the next refresh.",
+                ToastLength.Short)!.Show();
+        }
+
         RecomputeDone();
         RenderContent();
+    }
+
+    // Fetches one feed, folding the family of expected feed failures into a result rather than throwing, so
+    // one bad feed never sinks the whole concurrent refresh: a moved feed serving HTML (InvalidDataException),
+    // a network drop (HttpRequestException), a timeout (OperationCanceledException), or a corrupt stored URL
+    // (UriFormatException) all come back as a failed host.
+    private static async Task<FeedFetchResult> FetchFeedAsync(RssFeedClient client, PodcastSubscription subscription)
+    {
+        try
+        {
+            var feed = await client.FetchAsync(new Uri(subscription.FeedUrl));
+            return new FeedFetchResult(subscription, feed, null);
+        }
+        catch (Exception e) when (
+            e is HttpRequestException or InvalidDataException or System.OperationCanceledException or UriFormatException)
+        {
+            var host = Uri.TryCreate(subscription.FeedUrl, UriKind.Absolute, out var uri)
+                ? uri.Host
+                : subscription.FeedUrl;
+            return new FeedFetchResult(subscription, null, host);
+        }
     }
 
     // ---- Now-playing bar poll ----
