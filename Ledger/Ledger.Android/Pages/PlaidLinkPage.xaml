@@ -11,7 +11,11 @@
                    Text="Preparing a secure connection…" />
         </VerticalStackLayout>
 
-        <WebView x:Name="LinkWebView" Grid.Row="1" />
+        <VerticalStackLayout Grid.Row="1" Padding="24,8" Spacing="16" VerticalOptions="Start">
+            <Label Style="{StaticResource StatusLine}"
+                   Text="Plaid opens in your browser so banks like Chase that block in-app windows can sign you in. When you finish and return here, tap Done." />
+            <Button x:Name="OpenButton" Text="Open connection page" Clicked="OnOpenClicked" IsEnabled="False" />
+        </VerticalStackLayout>
 
         <!-- Pinned bottom bar (DESIGN.md §7). -->
         <VerticalStackLayout Grid.Row="2">
