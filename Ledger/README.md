@@ -78,3 +78,12 @@ browser environment and refuse to render their login inside a WebView (a generic
 isn't working" error), so a real browser is the only surface that completes. When the user returns and
 taps **Done**, the app polls `/link/token/get` for the completed session — the same finish step regardless
 of which browser completed it.
+
+On the owner's **FocusPhone** the device-owner policy suspends every real browser and pins FocusPhone's own
+single-domain WebView as the default http/https handler, so opening Plaid Link there would dead-end (a
+WebView Chase blocks, confined to one domain so the OAuth redirect is refused). `PlaidLinkPage` detects this
+up front (`ConnectBrowserPolicy.IsRestrictedViewer`, keyed off the resolved default-browser package) and,
+instead of minting an unusable link token, tells the owner to connect banks on a browser-capable phone — the
+encrypted vault backup restores the access token onto the FocusPhone, where the daily refresh needs no
+browser. The detection query needs the `<queries>` web-intent entry in the manifest for Android 11+ package
+visibility; the decision itself is pure and unit-tested.

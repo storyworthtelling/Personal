@@ -9,4 +9,13 @@
   <uses-permission android:name="android.permission.WAKE_LOCK" />
   <!-- Required for WorkManager on API 33+ -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <!-- Package visibility (Android 11+): the Plaid connect page resolves the default browser so it can
+       detect the FocusPhone restricted viewer and guide the owner elsewhere instead of dead-ending. -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.VIEW" />
+      <category android:name="android.intent.category.BROWSABLE" />
+      <data android:scheme="https" />
+    </intent>
+  </queries>
 </manifest>

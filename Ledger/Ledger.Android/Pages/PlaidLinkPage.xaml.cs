@@ -1,4 +1,7 @@
+using Android.Content;
+using Android.Content.PM;
 using Microsoft.Extensions.Logging;
+using Ledger.Domain.Connect;
 using Ledger.Domain.External;
 using Ledger.Infrastructure.Services;
 
@@ -42,6 +45,24 @@ public partial class PlaidLinkPage : ContentPage
         base.OnAppearing();
         if (linkToken is not null)
             return; // already prepared; returning from the browser must not recreate the token or reopen the tab
+
+        // On the FocusPhone the device-owner policy suspends every real browser and pins FocusPhone's own
+        // single-domain WebView as the default http/https handler. Opening Plaid Link there dead-ends (a
+        // WebView Chase blocks, confined to one domain so the OAuth redirect is refused). Detect that and
+        // send the owner to link on a browser-capable phone — the vault restores the token here, and the
+        // daily refresh needs no browser. Don't even mint a link token we can't use.
+        var defaultBrowser = ResolveDefaultBrowserPackage();
+        if (ConnectBrowserPolicy.IsRestrictedViewer(defaultBrowser))
+        {
+            logger.LogInformation("Connect: default browser is the restricted viewer ({Package}); guiding to link elsewhere.", defaultBrowser);
+            InstructionsLabel.Text =
+                "This phone can't open a bank's sign-in page. Connect your banks on a phone with a browser — " +
+                "Ledger backs up each connection and restores it here automatically. Balances still refresh here " +
+                "without a browser.";
+            OpenButton.IsVisible = false;
+            StatusLabel.Text = "Nothing to do here on this phone.";
+            return;
+        }
 
         logger.LogInformation(
             "Connect: creating link token (environment={Environment}, configured={Configured}).",
@@ -142,6 +163,29 @@ public partial class PlaidLinkPage : ContentPage
             StatusLabel.Text = $"Couldn't finish connecting: {ex.Message}";
             DoneButton.IsEnabled = true;
             finishing = false;
+        }
+    }
+
+    // The package that would handle an https link — the phone's default browser. On the FocusPhone this
+    // resolves to the launcher's restricted viewer (the pinned preferred activity); on a normal phone it's
+    // Chrome or whatever the owner set. Returns null if nothing resolves, which the policy treats as
+    // "not restricted" so a browser-capable phone is never falsely blocked. Requires the <queries> entry
+    // in the manifest for package visibility on Android 11+.
+    private string? ResolveDefaultBrowserPackage()
+    {
+        try
+        {
+            var context = global::Android.App.Application.Context;
+            using var intent = new Intent(Intent.ActionView, global::Android.Net.Uri.Parse("https://example.com"));
+            intent.AddCategory(Intent.CategoryBrowsable);
+            var resolved = context.PackageManager?.ResolveActivity(intent, PackageInfoFlags.MatchDefaultOnly);
+            return resolved?.ActivityInfo?.PackageName;
+        }
+        catch (Exception ex)
+        {
+            // Detection is best-effort; a failure here must not stop a normal phone from connecting.
+            logger.LogWarning(ex, "Connect: could not resolve the default browser; proceeding.");
+            return null;
         }
     }
 
