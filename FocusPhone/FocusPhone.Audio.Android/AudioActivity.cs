@@ -38,6 +38,8 @@ public class AudioActivity : Activity
     private PlaybackProgressStore progressStore = null!;
     private PlaybackSettingsStore settingsStore = null!;
     private SubscriptionStore subscriptionStore = null!;
+    private EpisodeCacheStore episodeCache = null!;
+    private PodcastLibrarySync librarySync = null!;
 
     private PlaybackSettingsSnapshot settings = PlaybackSettingsSnapshot.Empty();
     private SubscriptionList subscriptions = new();
@@ -89,9 +91,15 @@ public class AudioActivity : Activity
         progressStore = new PlaybackProgressStore(this);
         settingsStore = new PlaybackSettingsStore(this);
         subscriptionStore = new SubscriptionStore(this);
+        episodeCache = new EpisodeCacheStore(this);
+        librarySync = new PodcastLibrarySync(
+            musicTokens.GetAccessToken, "FocusPhone.Audio",
+            store, subscriptionStore, progressStore, settingsStore, new EqualizerStore(this));
         settings = settingsStore.Load();
         subscriptions = new SubscriptionList(subscriptionStore.Load());
         MigrateLegacyFeedsIfNeeded();
+        LoadCachedEpisodes(); // paint the shelf from the previous fetch before the network refresh
+        RestoreLibraryFromDrive();
 
         driveClient = new DriveMusicClient(musicTokens);
         tagReader = new MusicTagReader(Path.Combine(CacheDir!.AbsolutePath, "art"));
@@ -153,6 +161,46 @@ public class AudioActivity : Activity
             // Best-effort: the vault picks the folder up on the next successful publish.
         }
     }
+
+    // Pulls the podcast library (shows + listened + resume points) down from Drive when this device has
+    // none of its own — a factory reset or a new phone. Best-effort and off the UI thread; on success it
+    // reloads the local state and re-renders. Local always wins when it already has shows, so this never
+    // clobbers a working device (see PodcastLibrarySync / AudioLibrarySync).
+    private void RestoreLibraryFromDrive() => Task.Run(async () =>
+    {
+        try
+        {
+            if (!await librarySync.RestoreAsync(CancellationToken.None))
+                return;
+
+            RunOnUiThread(() =>
+            {
+                subscriptions = new SubscriptionList(subscriptionStore.Load());
+                settings = settingsStore.Load(); // restored speed/skip-silence takes effect on next play
+                RecomputeDone();
+                RenderContent();
+                _ = RefreshFeedsAsync();
+            });
+        }
+        catch
+        {
+            // Ignore: restore is a convenience; the app works from local storage regardless.
+        }
+    });
+
+    // Mirrors the podcast library up to Drive when it has drifted from the backup. Best-effort and off the
+    // UI thread; called when leaving the screen and after a bulk mark so the cloud copy tracks the device.
+    private void BackupLibraryToDrive() => Task.Run(async () =>
+    {
+        try
+        {
+            await librarySync.BackupAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // Best-effort: the next successful backup catches the cloud copy up.
+        }
+    });
 
     private void LoadMusicCatalog()
     {
@@ -248,6 +296,10 @@ public class AudioActivity : Activity
         // Finalize whatever was mid-play, then fold the day's listening into the Taste Profile (throttled).
         RecordListening(listeningRecorder.Stop());
         MaybeRefreshTaste();
+
+        // Mirror the podcast library to Drive on the way out — captures anything marked played this visit,
+        // plus resume points the playback service saved, and subscription edits made in Manage.
+        BackupLibraryToDrive();
     }
 
     // ---- Listening Genius ----
@@ -666,19 +718,17 @@ public class AudioActivity : Activity
         try
         {
             using var database = MusicDatabase.Open(this);
+            // The scanner reports once per parallel batch, so render each callback rather than re-throttling.
             await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
             {
-                if (done == total || done % 25 == 0)
+                RunOnUiThread(() =>
                 {
-                    RunOnUiThread(() =>
+                    musicStatus = done >= total ? null : $"Scanning… {done} of {total}";
+                    if (side == 1)
                     {
-                        musicStatus = done >= total ? null : $"Scanning… {done} of {total}";
-                        if (side == 1)
-                        {
-                            RenderContent();
-                        }
-                    });
-                }
+                        RenderContent();
+                    }
+                });
             }, CancellationToken.None);
             LoadMusicCatalog();
             musicStatus = null;
@@ -721,11 +771,23 @@ public class AudioActivity : Activity
         var rows = shelf
             .Select(show => new PaperListRow(show.Title, $"{show.UnplayedCount} unplayed"))
             .ToList();
-        return BuildList(rows, position =>
-        {
-            openFeedId = shelf[position].FeedId;
-            RenderContent();
-        });
+        return BuildList(rows,
+            position =>
+            {
+                openFeedId = shelf[position].FeedId;
+                RenderContent();
+            },
+            position => ShowShelfActions(shelf[position]));
+    }
+
+    // Long-press a show on the shelf: its one bulk action, marking every episode played.
+    private void ShowShelfActions(ShowSummary show)
+    {
+        new AlertDialog.Builder(this)
+            .SetTitle(show.Title)!
+            .SetItems(new[] { "Mark all as played" }, (_, _) =>
+                MarkManyWithUndo(BulkListen.AllInShow(episodes, show.FeedId), "Marked show played."))!
+            .Show();
     }
 
     // The empty shelf must never read like a dead-end: no shows points at Manage, a
@@ -757,7 +819,26 @@ public class AudioActivity : Activity
             .ToList();
         return BuildList(rows,
             position => EnqueueAndPlay(showEpisodes[position]),
-            position => MarkDoneWithUndo(showEpisodes[position]));
+            position => ShowEpisodeActions(showEpisodes[position]));
+    }
+
+    // Long-press an episode: mark just it, or clear everything older beneath it.
+    private void ShowEpisodeActions(Episode episode)
+    {
+        new AlertDialog.Builder(this)
+            .SetTitle(episode.Title)!
+            .SetItems(new[] { "Mark played", "Mark older as played" }, (_, args) =>
+            {
+                if (args.Which == 0)
+                {
+                    MarkDoneWithUndo(episode);
+                }
+                else
+                {
+                    MarkManyWithUndo(BulkListen.OlderInShow(episodes, episode), "Marked older played.");
+                }
+            })!
+            .Show();
     }
 
     private View BuildQueuePane()
@@ -994,6 +1075,31 @@ public class AudioActivity : Activity
         UndoBar.Show(this, content, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
     }
 
+    // Marks a batch played, remembering only the ids this action newly added so undo
+    // restores exactly them and leaves already-played episodes alone. A no-op batch
+    // (nothing left to mark) skips the undo bar rather than showing an empty promise.
+    private void MarkManyWithUndo(IReadOnlyList<string> episodeIds, string message)
+    {
+        var listened = store.ListenedIds.ToHashSet();
+        var added = episodeIds.Where(id => listened.Add(id)).ToList();
+        if (added.Count == 0)
+        {
+            return;
+        }
+
+        store.SaveListenedIds(listened);
+        RecomputeDone();
+        RenderContent();
+        UndoBar.Show(this, content, message, onUndo: () =>
+        {
+            var ids = store.ListenedIds.ToHashSet();
+            ids.ExceptWith(added);
+            store.SaveListenedIds(ids);
+            RecomputeDone();
+            RenderContent();
+        });
+    }
+
     private void SetListened(string episodeId, bool listened)
     {
         var ids = store.ListenedIds.ToHashSet();
@@ -1016,48 +1122,35 @@ public class AudioActivity : Activity
 
     // ---- Feeds ----
 
+    // Seed the shelf from the last fetch so a cold launch shows shows immediately instead of a blank
+    // "Fetching episodes…". The background RefreshFeedsAsync then updates it in place.
+    private void LoadCachedEpisodes()
+    {
+        var cache = episodeCache.Load();
+        episodes = [.. cache.Episodes];
+        feedTitles = new Dictionary<string, string>(cache.FeedTitles);
+        RecomputeDone();
+    }
+
+    private sealed record FeedFetchResult(PodcastSubscription Subscription, PodcastFeed? Feed, string? FailedHost);
+
     private async Task RefreshFeedsAsync()
     {
         isRefreshing = true;
-        if (side == 0 && !showingQueue && openFeedId is null)
+        // Only blank to "Fetching episodes…" when there's nothing cached to show yet (true first run).
+        if (side == 0 && !showingQueue && openFeedId is null && episodes.Count == 0)
         {
-            RenderContent(); // surface "Fetching episodes…" while the first pull is in flight
+            RenderContent();
         }
 
-        var all = new List<Episode>();
-        var titles = new Dictionary<string, string>();
+        var ordered = subscriptions.Ordered.ToList();
+        FeedFetchResult[] results;
         try
         {
             using var http = new HttpClient();
             var client = new RssFeedClient(http);
-            foreach (var subscription in subscriptions.Ordered)
-            {
-                try
-                {
-                    var feed = await client.FetchAsync(new Uri(subscription.FeedUrl));
-                    all.AddRange(feed.Episodes);
-                    titles[subscription.FeedUrl] = feed.Title;
-                    subscriptions.UpdateTitle(subscription.FeedUrl, feed.Title);
-                }
-                catch (Exception e) when (
-                    e is HttpRequestException or InvalidDataException or System.OperationCanceledException or UriFormatException)
-                {
-                    // One bad feed must never sink the whole refresh (or the app): a
-                    // moved feed serving HTML (InvalidDataException), a network drop
-                    // (HttpRequestException), a timeout (OperationCanceledException),
-                    // or a corrupt stored URL (UriFormatException) all fall through
-                    // to the same spoken failure. Failure may speak (DESIGN.md §7).
-                    var host = Uri.TryCreate(subscription.FeedUrl, UriKind.Absolute, out var uri)
-                        ? uri.Host
-                        : subscription.FeedUrl;
-                    Toast.MakeText(this, $"{host} didn't answer. It retries on the next refresh.",
-                        ToastLength.Short)!.Show();
-                }
-            }
-
-            subscriptionStore.Save(subscriptions.Export());
-            episodes = all;
-            feedTitles = titles;
+            // Fetch every feed concurrently — wall time is now the slowest feed, not the sum of all.
+            results = await Task.WhenAll(ordered.Select(subscription => FetchFeedAsync(client, subscription)));
         }
         finally
         {
@@ -1066,8 +1159,72 @@ public class AudioActivity : Activity
             isRefreshing = false;
         }
 
+        // Start from the current (cached) episodes, pruned to still-subscribed feeds, so a feed that
+        // failed to fetch keeps its last-known episodes rather than vanishing on a flaky network.
+        var subscribed = ordered.Select(subscription => subscription.FeedUrl).ToHashSet();
+        var byFeed = episodes
+            .Where(episode => subscribed.Contains(episode.FeedId))
+            .GroupBy(episode => episode.FeedId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<Episode>)group.ToList());
+        var titles = feedTitles
+            .Where(pair => subscribed.Contains(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+
+        var failedHosts = new List<string>();
+        foreach (var result in results)
+        {
+            if (result.Feed is { } feed)
+            {
+                byFeed[result.Subscription.FeedUrl] = feed.Episodes;
+                titles[result.Subscription.FeedUrl] = feed.Title;
+                subscriptions.UpdateTitle(result.Subscription.FeedUrl, feed.Title);
+            }
+            else if (result.FailedHost is { } host)
+            {
+                failedHosts.Add(host);
+            }
+        }
+
+        subscriptionStore.Save(subscriptions.Export());
+        episodes = [.. byFeed.Values.SelectMany(feedEpisodes => feedEpisodes)];
+        feedTitles = titles;
+        episodeCache.Save(episodes, titles); // persist for the next cold launch
+
+        // Failure may speak (DESIGN.md §7), but a wall of toasts must not: summarize when several feeds fail.
+        if (failedHosts.Count == 1)
+        {
+            Toast.MakeText(this, $"{failedHosts[0]} didn't answer. It retries on the next refresh.",
+                ToastLength.Short)!.Show();
+        }
+        else if (failedHosts.Count > 1)
+        {
+            Toast.MakeText(this, $"{failedHosts.Count} shows didn't answer. They retry on the next refresh.",
+                ToastLength.Short)!.Show();
+        }
+
         RecomputeDone();
         RenderContent();
+    }
+
+    // Fetches one feed, folding the family of expected feed failures into a result rather than throwing, so
+    // one bad feed never sinks the whole concurrent refresh: a moved feed serving HTML (InvalidDataException),
+    // a network drop (HttpRequestException), a timeout (OperationCanceledException), or a corrupt stored URL
+    // (UriFormatException) all come back as a failed host.
+    private static async Task<FeedFetchResult> FetchFeedAsync(RssFeedClient client, PodcastSubscription subscription)
+    {
+        try
+        {
+            var feed = await client.FetchAsync(new Uri(subscription.FeedUrl));
+            return new FeedFetchResult(subscription, feed, null);
+        }
+        catch (Exception e) when (
+            e is HttpRequestException or InvalidDataException or System.OperationCanceledException or UriFormatException)
+        {
+            var host = Uri.TryCreate(subscription.FeedUrl, UriKind.Absolute, out var uri)
+                ? uri.Host
+                : subscription.FeedUrl;
+            return new FeedFetchResult(subscription, null, host);
+        }
     }
 
     // ---- Now-playing bar poll ----

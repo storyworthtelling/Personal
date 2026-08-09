@@ -1,16 +1,26 @@
 using FocusPhone.Audio.Google;
+using FocusPhone.Domain.Music;
+using FocusPhone.Infrastructure.Music;
 using FocusPhone.Infrastructure.Storage;
 
 namespace FocusPhone.Audio;
 
 /// <summary>
-/// Full library scan: list every audio file under the chosen Drive folder, read
-/// each one's tags, and upsert the resulting tracks into the catalog cache. The
-/// blocking per-file reads run off the UI thread; progress is reported as
-/// (done, total) so the Music pane can show a status sentence.
+/// Incremental library scan: list every audio file under the chosen Drive folder,
+/// diff it against what the cache already knows (by modified-time + size), then only
+/// re-read the tags of files that are new or changed and drop tracks whose file is
+/// gone. The per-file tag reads are network-bound and independent, so they run in
+/// bounded-parallel batches off the UI thread; each batch's tracks are written in one
+/// serialized transaction (a single SQLite connection is not safe for concurrent
+/// writes). Progress is reported as (done, total) over the work actually needed — the
+/// files being read — so a rescan that changed little finishes fast.
 /// </summary>
 public sealed class MusicScanner
 {
+    // Bounds how many Drive tag reads run at once: enough to hide per-file latency without hammering the
+    // Drive API quota or the mobile radio. Also the write-batch size, so a batch of reads lands in one txn.
+    private const int MaxConcurrentReads = 8;
+
     private readonly DriveMusicClient driveClient;
     private readonly DeviceAccountTokenProvider tokens;
     private readonly MusicTagReader tagReader;
@@ -26,30 +36,56 @@ public sealed class MusicScanner
         string folderId, MusicCatalogCache cache, Action<int, int> onProgress, CancellationToken cancellationToken)
     {
         var files = await driveClient.ListAudioRecursiveAsync(folderId, cancellationToken);
+        var filesById = files.ToDictionary(file => file.Id);
+        var current = files.ToDictionary(
+            file => file.Id, file => new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size));
 
-        await Task.Run(() =>
+        var plan = MusicScanPlan.Compute(current, cache.LoadVersions());
+
+        // Drop tracks whose file disappeared from Drive (replaces the old clear-and-rebuild).
+        foreach (var id in plan.ToDelete)
         {
-            cache.Clear();
-            var total = files.Count;
-            var done = 0;
-            onProgress(0, total);
+            cache.Delete(id);
+        }
 
-            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
-            foreach (var file in files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    using var stream = new DriveSeekableStream(file.Id, file.Size, tokens, http);
-                    cache.Upsert([tagReader.Read(file.Id, file.Name, stream)]);
-                }
-                catch
-                {
-                    // Skip a file we can't read; the rest of the library still scans.
-                }
+        var toRead = plan.ToRead.Select(id => filesById[id]).ToList();
+        var total = toRead.Count;
+        onProgress(0, total);
+        if (total == 0)
+        {
+            return; // nothing new or changed — the cached catalog already matches Drive
+        }
 
-                onProgress(++done, total);
-            }
-        }, cancellationToken);
+        using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+        var done = 0;
+        foreach (var batch in toRead.Chunk(MaxConcurrentReads))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Read this batch's tags concurrently (blocking TagLib/Drive work offloaded to the pool)...
+            var reads = batch.Select(file => Task.Run(() => ReadTags(file, http), cancellationToken));
+            var results = await Task.WhenAll(reads);
+
+            // ...then write them in one serialized transaction (SQLite single-writer).
+            cache.Upsert(results.Where(entry => entry is not null).Select(entry => entry!.Value));
+
+            done += batch.Length;
+            onProgress(done, total);
+        }
+    }
+
+    private (Track Track, MusicFileVersion Version)? ReadTags(DriveAudioFile file, HttpClient http)
+    {
+        try
+        {
+            using var stream = new DriveSeekableStream(file.Id, file.Size, tokens, http);
+            var track = tagReader.Read(file.Id, file.Name, stream);
+            return (track, new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size));
+        }
+        catch
+        {
+            // Skip a file we can't read; the rest of the library still scans.
+            return null;
+        }
     }
 }

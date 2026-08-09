@@ -4,6 +4,7 @@ using Android.Media.Audiofx;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using FocusPhone.Audio.Google;
 using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Music;
 using FocusPhone.Ui;
@@ -22,6 +23,7 @@ public class EqualizerActivity : Activity
     private const int MaxLoudnessMillibels = 1500;
 
     private EqualizerStore store = null!;
+    private readonly DeviceAccountTokenProvider tokens = new();
     private EqualizerLibrary library = EqualizerLibrary.Flat(0);
     private short bandMin;
     private short bandMax;
@@ -32,6 +34,28 @@ public class EqualizerActivity : Activity
         PaperTransitions.Apply(this);
         store = new EqualizerStore(this);
         SetContentView(BuildLayout());
+    }
+
+    // Mirror equalizer curve/presets/loudness up to Drive on the way out, so a tuning change here is backed
+    // up even if the app is killed before the home screen next pauses. Best-effort and off the UI thread.
+    protected override void OnPause()
+    {
+        base.OnPause();
+        var sync = new PodcastLibrarySync(
+            tokens.GetAccessToken, "FocusPhone.Audio",
+            new PodcastStore(this), new SubscriptionStore(this), new PlaybackProgressStore(this),
+            new PlaybackSettingsStore(this), store);
+        Task.Run(async () =>
+        {
+            try
+            {
+                await sync.BackupAsync(System.Threading.CancellationToken.None);
+            }
+            catch
+            {
+                // Best-effort: the home screen's backup catches the cloud copy up next time.
+            }
+        });
     }
 
     private View BuildLayout()

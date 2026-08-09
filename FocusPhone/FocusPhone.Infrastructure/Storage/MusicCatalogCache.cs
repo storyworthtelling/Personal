@@ -29,22 +29,67 @@ public class MusicCatalogCache
                 discNumber INTEGER NOT NULL,
                 genre TEXT NOT NULL,
                 durationTicks INTEGER NOT NULL,
-                artRef TEXT
+                artRef TEXT,
+                modifiedTimeTicks INTEGER NOT NULL DEFAULT 0,
+                sizeBytes INTEGER NOT NULL DEFAULT 0
             )
             """;
         create.ExecuteNonQuery();
+
+        // Older caches predate the change-signature columns the incremental scan needs; add them in place so
+        // an upgrade keeps its rows (they read as version 0, i.e. "unknown", so the next scan re-reads once).
+        EnsureColumn("modifiedTimeTicks");
+        EnsureColumn("sizeBytes");
     }
 
-    public void Upsert(IEnumerable<Track> tracks)
+    private void EnsureColumn(string name)
+    {
+        var present = false;
+        using (var info = connection.CreateCommand())
+        {
+            info.CommandText = "PRAGMA table_info(tracks)";
+            using var reader = info.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), name, StringComparison.OrdinalIgnoreCase))
+                {
+                    present = true;
+                    break;
+                }
+            }
+        }
+
+        if (present)
+        {
+            return;
+        }
+
+        using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE tracks ADD COLUMN {name} INTEGER NOT NULL DEFAULT 0";
+        alter.ExecuteNonQuery();
+    }
+
+    /// <summary>Upserts tracks without change signatures (version 0) — used by tests and callers that don't scan.</summary>
+    public void Upsert(IEnumerable<Track> tracks) =>
+        Upsert(tracks.Select(track => (track, default(MusicFileVersion))));
+
+    /// <summary>
+    /// Upserts each track together with its file's change signature, so a later scan can tell what is
+    /// unchanged. One transaction per call, so the scanner can batch a chunk of parallel reads into a
+    /// single serialized write.
+    /// </summary>
+    public void Upsert(IEnumerable<(Track Track, MusicFileVersion Version)> entries)
     {
         using var transaction = connection.BeginTransaction();
         using var upsert = connection.CreateCommand();
         upsert.Transaction = transaction;
         upsert.CommandText = """
             INSERT INTO tracks (
-                id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef)
+                id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef,
+                modifiedTimeTicks, sizeBytes)
             VALUES (
-                $id, $title, $artist, $album, $albumArtist, $trackNumber, $discNumber, $genre, $durationTicks, $artRef)
+                $id, $title, $artist, $album, $albumArtist, $trackNumber, $discNumber, $genre, $durationTicks, $artRef,
+                $modifiedTimeTicks, $sizeBytes)
             ON CONFLICT (id) DO UPDATE SET
                 title = excluded.title,
                 artist = excluded.artist,
@@ -54,7 +99,9 @@ public class MusicCatalogCache
                 discNumber = excluded.discNumber,
                 genre = excluded.genre,
                 durationTicks = excluded.durationTicks,
-                artRef = excluded.artRef
+                artRef = excluded.artRef,
+                modifiedTimeTicks = excluded.modifiedTimeTicks,
+                sizeBytes = excluded.sizeBytes
             """;
 
         var parameters = new Dictionary<string, SqliteParameter>();
@@ -62,6 +109,7 @@ public class MusicCatalogCache
         {
             "$id", "$title", "$artist", "$album", "$albumArtist",
             "$trackNumber", "$discNumber", "$genre", "$durationTicks", "$artRef",
+            "$modifiedTimeTicks", "$sizeBytes",
         })
         {
             var parameter = upsert.CreateParameter();
@@ -70,7 +118,7 @@ public class MusicCatalogCache
             parameters[name] = parameter;
         }
 
-        foreach (var track in tracks)
+        foreach (var (track, version) in entries)
         {
             parameters["$id"].Value = track.Id;
             parameters["$title"].Value = track.Title;
@@ -82,10 +130,28 @@ public class MusicCatalogCache
             parameters["$genre"].Value = track.Genre;
             parameters["$durationTicks"].Value = track.Duration.Ticks;
             parameters["$artRef"].Value = (object?)track.ArtRef ?? DBNull.Value;
+            parameters["$modifiedTimeTicks"].Value = version.ModifiedTimeTicks;
+            parameters["$sizeBytes"].Value = version.SizeBytes;
             upsert.ExecuteNonQuery();
         }
 
         transaction.Commit();
+    }
+
+    /// <summary>The change signature of every cached track, keyed by Drive file id — the scan's "what I already have".</summary>
+    public IReadOnlyDictionary<string, MusicFileVersion> LoadVersions()
+    {
+        using var select = connection.CreateCommand();
+        select.CommandText = "SELECT id, modifiedTimeTicks, sizeBytes FROM tracks";
+        using var reader = select.ExecuteReader();
+
+        var versions = new Dictionary<string, MusicFileVersion>();
+        while (reader.Read())
+        {
+            versions[reader.GetString(0)] = new MusicFileVersion(reader.GetInt64(1), reader.GetInt64(2));
+        }
+
+        return versions;
     }
 
     public void Delete(string id)
