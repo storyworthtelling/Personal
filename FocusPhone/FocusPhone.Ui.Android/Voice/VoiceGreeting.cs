@@ -3,6 +3,7 @@ using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Http;
 using global::Google.Apis.Services;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Ui.Voice;
 
@@ -29,7 +30,11 @@ public sealed class VoiceGreeting
             });
         };
 
-        options = new DriveVoiceOptions(new DriveVoiceConfigStore(new DriveTextFile(driveFactory, DriveVoiceConfigStore.FileName)));
+        // The shared Claude key now lives in the encrypted secrets vault (the single source of truth, in
+        // place of the old plaintext voice config). VaultVoiceConfigStore reads it back given this head's
+        // passphrase; with no passphrase or no key it yields VoiceConfig.Empty and the greeting stays neutral.
+        var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName));
+        options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
         var client = new VoiceClient(http, options);
         messenger = new VoicedMessenger(new DriveVoiceProfileStore(new DriveTextFile(driveFactory, DriveVoiceProfileStore.FileName)), client);

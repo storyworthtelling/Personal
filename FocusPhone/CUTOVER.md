@@ -29,6 +29,19 @@ irreversible, so it comes absolutely last.
    for the update channel unless you always rebuild on the same machine.)
 3. Back up anything on the device.
 
+> **Back up every app's secrets to the encrypted vault first.** All four
+> FocusPhone heads and the owner's own apps (Storyboarder, Ledger, DailyLoader)
+> now share one AES-256-GCM-encrypted file in the owner's Google Drive
+> (`storyworthtelling-secrets.json`) that holds their keys and tokens — so the
+> reset below no longer means re-entering everything by hand. In each app's
+> settings, **set the same secrets-vault passphrase** and Save; each app writes
+> its section (Claude/Gemini keys, Plaid credentials + every bank's access token,
+> the NYT cookie/key, the reMarkable token, the Gmail app password +
+> Messages-for-Web session, the GitHub update token, the music-folder id). The
+> passphrase is the one thing the vault does **not** store — memorize it; it is
+> all you re-enter after the reset. (The release keystore is separate and still
+> lives in CI, not the vault — keep the off-GitHub copy per step 2.)
+
 ## Provisioning
 
 4. Factory reset the phone.
@@ -69,13 +82,25 @@ irreversible, so it comes absolutely last.
 10. Add the Google account in Settings (permitted — `DISALLOW_MODIFY_ACCOUNTS`
     is never set). This enables Play remote install, Gemini, Drive, Maps, and
     YT Music.
+
+> **Restore secrets from the vault.** In each app, sign in with Google (grant
+> the Drive permission when prompted — Ledger, DailyLoader, and the FocusPhone
+> heads now request full `drive` so they can read the vault) and enter the
+> **same vault passphrase** you set before the reset. On the next launch each app
+> refills its own missing keys/tokens from Drive automatically — so the manual
+> re-entry in steps 11, 12, and 14 is only needed if the vault wasn't set up, or
+> for the sensor permissions in step 13 (which can never be restored). Ledger
+> re-creates every connected bank from the vault; no re-linking.
+
 11. In the Communication app: enter the Gmail address + app password
-    (myaccount.google.com/apppasswords; requires 2-Step Verification).
+    (myaccount.google.com/apppasswords; requires 2-Step Verification) — or let
+    the vault restore them after you sign in and enter the passphrase.
 12. Complete Google-account pairing for the messaging bridge (emoji confirm in
-    Google Messages).
+    Google Messages) if the restored Messages-for-Web session isn't accepted.
 13. Tap through the CAMERA / RECORD_AUDIO runtime dialogs (sensor permissions
     cannot be silently granted; they persist for the life of the install).
-14. In the launcher admin screen: set the GitHub token for the update channel.
+14. In the launcher admin screen: set the GitHub token for the update channel —
+    or let the vault restore it (enter the passphrase in the same admin prompt).
 15. Verify each app end-to-end on the device. For Communication, check the
     feed intermixes all four sources: place a call, receive a text (exactly
     one feed item, not a provider/notification duplicate), and leave a

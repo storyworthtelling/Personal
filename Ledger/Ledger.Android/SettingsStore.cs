@@ -25,6 +25,16 @@ public static class SettingsStore
         set => Preferences.Set(nameof(PlaidEnvironment), value);
     }
 
+    // The passphrase that encrypts the shared Drive secrets vault (Storyworthtelling.Voice.Secrets). It is
+    // the one credential deliberately NOT kept in the vault — wiped by a factory reset and re-entered once
+    // here, which then unlocks restoring the Plaid credentials and every bank's access token from Drive.
+    // Empty means this app doesn't yet participate in the vault.
+    public static string VaultPassphrase
+    {
+        get => Preferences.Get(nameof(VaultPassphrase), string.Empty);
+        set => Preferences.Set(nameof(VaultPassphrase), value);
+    }
+
     public static string LastRunOutcome
     {
         get => Preferences.Get(nameof(LastRunOutcome), string.Empty);

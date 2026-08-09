@@ -22,6 +22,7 @@ public partial class SetupPage : ContentPage
         base.OnAppearing();
         ClaudeKeyEntry.Text = SettingsStore.ClaudeApiKey;
         GeminiKeyEntry.Text = SettingsStore.GeminiApiKey;
+        VaultPassphraseEntry.Text = SettingsStore.VaultPassphrase;
         ArchiveSwitch.IsToggled = SettingsStore.ArchiveToDrive;
         FreeSpaceSwitch.IsToggled = SettingsStore.FreeLocalCopiesAfterArchive;
         // Reclaiming space only means anything once the copies are safely elsewhere.
@@ -309,29 +310,28 @@ public partial class SetupPage : ContentPage
     {
         SettingsStore.ClaudeApiKey = ClaudeKeyEntry.Text?.Trim() ?? string.Empty;
         SettingsStore.GeminiApiKey = GeminiKeyEntry.Text?.Trim() ?? string.Empty;
-        // Publish the Claude key to the shared Drive config so every com.storyworthtelling app can compose
-        // voiced messages without its own key screen. Best-effort and fire-and-forget: the key already works
-        // locally here, and a failed publish (no network/scope yet) just means the other apps pick it up on
-        // the next successful save.
-        PublishVoiceKeyToDrive(SettingsStore.ClaudeApiKey);
+        SettingsStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
+        // Publish this app's keys (and, since the shared Claude key is entered here, the voice key) to the
+        // encrypted Drive vault so every com.storyworthtelling app can back up and restore from one place.
+        // Best-effort: the keys already work locally, and a failed publish (no network/scope/passphrase yet)
+        // just means the vault picks them up on the next successful save.
+        PublishToVault();
         // Success is the state change: saving returns to the library.
         await Navigation.PopAsync();
         await Navigation.PopAsync();
     }
 
-    private static async void PublishVoiceKeyToDrive(string apiKey)
+    private static async void PublishToVault()
     {
-        if (string.IsNullOrEmpty(apiKey))
-            return;
         try
         {
-            var configStore = IPlatformApplication.Current!.Services.GetService<IVoiceConfigStore>();
-            if (configStore is not null)
-                await configStore.SaveAsync(new VoiceConfig(apiKey), CancellationToken.None);
+            var sync = IPlatformApplication.Current!.Services.GetService<VaultSync>();
+            if (sync is not null)
+                await sync.PublishAsync(CancellationToken.None);
         }
         catch
         {
-            // Best-effort: the other apps read the key from Drive once a publish succeeds.
+            // Best-effort: the vault picks the keys up on the next successful save.
         }
     }
 

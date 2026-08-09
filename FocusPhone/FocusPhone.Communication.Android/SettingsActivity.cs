@@ -5,6 +5,8 @@ using Android.Views;
 using Android.Widget;
 using FocusPhone.Domain.Design;
 using FocusPhone.Ui;
+using FocusPhone.Ui.Voice;
+using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Communication;
 
@@ -41,6 +43,27 @@ public class SettingsActivity : Activity
         base.OnActivityResult(requestCode, resultCode, data);
         if (requestCode == FocusPhone.Ui.Voice.VoiceGoogleAccount.RequestCode)
             FocusPhone.Ui.Voice.VoiceGoogleAccount.HandleChooserResult(resultCode, data);
+    }
+
+    // Publishes the Gmail address, app password, and Messages-for-Web session to this owner's encrypted
+    // secrets vault so a later reset can restore them. Best-effort and off the UI thread.
+    private async void PublishGmailToVault(AccountStore account)
+    {
+        try
+        {
+            var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "FocusPhone.Communication");
+            await access.Service.PublishAsync(v => v with
+            {
+                Gmail = new GmailSecrets(
+                    account.GmailAddress ?? string.Empty,
+                    account.GmailAppPassword ?? string.Empty,
+                    account.GmBridgeSession ?? string.Empty)
+            }, System.Threading.CancellationToken.None);
+        }
+        catch
+        {
+            // Best-effort: the vault picks the credentials up on the next successful save.
+        }
     }
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -113,6 +136,16 @@ public class SettingsActivity : Activity
         layout.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));
         layout.AddView(voiceStatus, Spaced(DesignTokens.Space.X2, 0));
 
+        // Secrets vault: a passphrase encrypts the shared Drive file that backs up the Gmail address, app
+        // password, and Messages-for-Web session, so after a factory reset they restore automatically (with
+        // the Google sign-in above). Set the same passphrase in each app.
+        var passphrase = PaperUi.MonoField(this, "Choose a passphrase");
+        passphrase.Text = VaultPassphraseStore.Passphrase;
+        passphrase.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationPassword;
+        passphrase.Typeface = PaperTheme.Mono(this);
+        AddFieldGroup(layout, "Secrets vault passphrase", passphrase,
+            "Backs up your Gmail credentials to your Google Drive, encrypted. Restores after a reset.");
+
         scroll.AddView(layout);
         root.AddView(scroll, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
@@ -122,6 +155,10 @@ public class SettingsActivity : Activity
         {
             account.GmailAddress = address.Text;
             account.GmailAppPassword = password.Text;
+            VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
+            // Back up the Gmail credentials to the encrypted Drive vault. Best-effort — they already work
+            // locally, so no passphrase/Google/network yet just means the vault picks them up next save.
+            PublishGmailToVault(account);
             if (account.IsConfigured)
             {
                 // Sync now so conversations appear promptly instead of waiting

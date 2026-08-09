@@ -4,14 +4,16 @@ using global::Android.Content;
 
 namespace FocusPhone.Ui.Voice;
 
-// Device-account Google sign-in + access token for reading the shared owner's-voice profile from Drive,
-// for heads that don't already have their own Google account (Audio does, for streaming music). Read-only
-// Drive scope; the chosen account email is stored in the head's OWN SharedPreferences (a fixed key, but
-// each app's prefs are isolated), so every head keeps its own selection.
+// Device-account Google sign-in + access token for the shared owner's-voice profile AND the encrypted
+// secrets vault on Drive, for heads that don't already have their own Google account (Audio does, for
+// streaming music). Full `drive` scope: reading the voice profile only needs read, but writing this head's
+// section of the secrets vault needs write, so both go through one sign-in. The chosen account email is
+// stored in the head's OWN SharedPreferences (a fixed key, but each app's prefs are isolated), so every head
+// keeps its own selection. Changing the scope changes the consent screen — re-register + re-consent.
 public sealed class VoiceGoogleAccount
 {
     public const int RequestCode = 9201;
-    private const string TokenScope = "oauth2:https://www.googleapis.com/auth/drive.readonly";
+    private const string TokenScope = "oauth2:https://www.googleapis.com/auth/drive";
     private const string PrefsName = "voice";
     private const string EmailKey = "googleAccountEmail";
 

@@ -33,6 +33,16 @@
 
             <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
 
+            <Label Text="Secrets vault" Style="{StaticResource TitleLabel}" />
+            <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
+                   Style="{StaticResource SecondaryLabel}" />
+            <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+            <Entry x:Name="VaultPassphraseEntry" IsPassword="True" Placeholder="Choose a passphrase"
+                   Style="{StaticResource MonoEntry}" />
+            <Label x:Name="VaultStatusLabel" Style="{StaticResource StatusLine}" />
+
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+
             <Label Text="Google account" Style="{StaticResource TitleLabel}" />
             <Label Text="Sign in with the Google account on this phone to pick a Doc to convert. Grant the documents and Drive read permissions when prompted."
                    Style="{StaticResource SecondaryLabel}" />

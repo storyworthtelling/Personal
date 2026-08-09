@@ -5,6 +5,9 @@ using Ledger.Infrastructure.Persistence;
 
 namespace Ledger.Infrastructure.Services;
 
+// One connected Plaid Item's durable credentials, moved between the database and the shared secrets vault.
+public sealed record InstitutionCredential(string ItemId, string AccessToken, string Name);
+
 // The application service the UI talks to, so pages never touch the DbContext directly (per the repo's
 // architecture). Reads institutions for display and handles connect / remove / manual-refresh actions.
 public sealed class AccountService
@@ -52,6 +55,51 @@ public sealed class AccountService
         db.Institutions.Add(institution);
         await db.SaveChangesAsync(cancellationToken);
         return institution;
+    }
+
+    // The durable per-Item Plaid credentials, for backing up to the shared secrets vault. These tokens are
+    // generated on-device by Hosted Link and are otherwise lost on a factory reset — without a backup every
+    // bank would have to be re-linked by hand after the FocusPhone cutover.
+    public async Task<IReadOnlyList<InstitutionCredential>> GetInstitutionCredentialsAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var rows = await db.Institutions.AsNoTracking().OrderBy(i => i.CreatedAtUtc).ToListAsync(cancellationToken);
+        return rows.Select(i => new InstitutionCredential(i.ItemId, i.AccessToken, i.Name)).ToList();
+    }
+
+    // Re-creates institutions from vault-restored credentials after a reinstall, skipping any Item already
+    // present (matched by ItemId) and any with a blank id/token. Each restored Item is marked due now so the
+    // next refresh repopulates its accounts and balances from Plaid using the restored access token. Returns
+    // how many were added.
+    public async Task<int> RestoreInstitutionsAsync(
+        IEnumerable<InstitutionCredential> credentials, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var existing = (await db.Institutions.Select(i => i.ItemId).ToListAsync(cancellationToken)).ToHashSet();
+
+        var added = 0;
+        foreach (var credential in credentials)
+        {
+            if (string.IsNullOrEmpty(credential.ItemId) || string.IsNullOrEmpty(credential.AccessToken)
+                || !existing.Add(credential.ItemId))
+                continue;
+
+            db.Institutions.Add(new Institution
+            {
+                ItemId = credential.ItemId,
+                AccessToken = credential.AccessToken,
+                Name = credential.Name,
+                RefreshStatus = WorkStatus.Pending,
+                NextAttemptAtUtc = null, // due now — the next refresh refills accounts/balances
+                CreatedAtUtc = clock.UtcNow
+            });
+            added++;
+        }
+
+        if (added > 0)
+            await db.SaveChangesAsync(cancellationToken);
+        return added;
     }
 
     public async Task RemoveInstitutionAsync(Guid institutionId, CancellationToken cancellationToken)

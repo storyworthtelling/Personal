@@ -16,16 +16,18 @@ public partial class PlaidLinkPage : ContentPage
 {
     private readonly IPlaidClient plaid;
     private readonly AccountService accounts;
+    private readonly VaultSync vaultSync;
     private readonly ILogger<PlaidLinkPage> logger;
 
     private string? linkToken;
     private bool finishing;
 
-    public PlaidLinkPage(IPlaidClient plaid, AccountService accounts, ILogger<PlaidLinkPage> logger)
+    public PlaidLinkPage(IPlaidClient plaid, AccountService accounts, VaultSync vaultSync, ILogger<PlaidLinkPage> logger)
     {
         InitializeComponent();
         this.plaid = plaid;
         this.accounts = accounts;
+        this.vaultSync = vaultSync;
         this.logger = logger;
         LinkWebView.Navigating += OnWebViewNavigating;
         LinkWebView.Navigated += OnWebViewNavigated;
@@ -104,6 +106,11 @@ public partial class PlaidLinkPage : ContentPage
             var name = result.InstitutionName ?? access.InstitutionName ?? "New account";
             await accounts.AddInstitutionAsync(access.ItemId, access.AccessToken, name, CancellationToken.None);
             logger.LogInformation("Connect: connected institution {Institution}.", name);
+
+            // Back up the new bank's access token to the encrypted vault so a later reset can restore it
+            // without re-linking. Best-effort — the connection already works locally.
+            try { await vaultSync.PublishAsync(CancellationToken.None); }
+            catch { /* Best-effort backup. */ }
 
             // Kick an immediate refresh so balances appear without waiting for the daily cycle.
             RefreshWorker.RunNow(global::Android.App.Application.Context!);

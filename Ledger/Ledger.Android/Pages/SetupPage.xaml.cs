@@ -14,16 +14,18 @@ public partial class SetupPage : ContentPage
 {
     private readonly AccountService accounts;
     private readonly IPlaidClient plaid;
+    private readonly VaultSync vaultSync;
 
     private List<InstitutionRow> rows = [];
     private InstitutionRow? pendingRemoval;
     private IDispatcherTimer? undoTimer;
 
-    public SetupPage(AccountService accounts, IPlaidClient plaid)
+    public SetupPage(AccountService accounts, IPlaidClient plaid, VaultSync vaultSync)
     {
         InitializeComponent();
         this.accounts = accounts;
         this.plaid = plaid;
+        this.vaultSync = vaultSync;
     }
 
     protected override async void OnAppearing()
@@ -33,6 +35,7 @@ public partial class SetupPage : ContentPage
         ClientIdEntry.Text = SettingsStore.PlaidClientId;
         SecretEntry.Text = SettingsStore.PlaidSecret;
         EnvironmentPicker.SelectedItem = SettingsStore.PlaidEnvironment;
+        VaultPassphraseEntry.Text = SettingsStore.VaultPassphrase;
 
         var migrationError = SettingsStore.LastMigrationError;
         MigrationErrorCard.IsVisible = !string.IsNullOrEmpty(migrationError);
@@ -83,8 +86,18 @@ public partial class SetupPage : ContentPage
         SettingsStore.PlaidClientId = ClientIdEntry.Text?.Trim() ?? string.Empty;
         SettingsStore.PlaidSecret = SecretEntry.Text?.Trim() ?? string.Empty;
         SettingsStore.PlaidEnvironment = (EnvironmentPicker.SelectedItem as string) ?? "sandbox";
+        SettingsStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
+        // Back up the Plaid credentials + connected banks to the encrypted Drive vault. Best-effort: the
+        // settings already work locally, so a failed publish (no passphrase/network/scope yet) is silent.
+        PublishToVault();
         // Success is a state change, not a toast (DESIGN.md §7): return to the list.
         Navigation.PopAsync();
+    }
+
+    private async void PublishToVault()
+    {
+        try { await vaultSync.PublishAsync(CancellationToken.None); }
+        catch { /* Best-effort: the vault picks the change up on the next successful publish. */ }
     }
 
     private async void OnConnectClicked(object? sender, EventArgs e)
@@ -151,6 +164,9 @@ public partial class SetupPage : ContentPage
             try { await plaid.RemoveItemAsync(row.AccessToken, CancellationToken.None); }
             catch { /* releasing at Plaid is best-effort; the local record still goes. */ }
             await accounts.RemoveInstitutionAsync(row.Id, CancellationToken.None);
+            // Keep the vault's backup in step with the removal.
+            try { await vaultSync.PublishAsync(CancellationToken.None); }
+            catch { /* Best-effort backup. */ }
         });
     }
 
