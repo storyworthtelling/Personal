@@ -718,19 +718,17 @@ public class AudioActivity : Activity
         try
         {
             using var database = MusicDatabase.Open(this);
+            // The scanner reports once per parallel batch, so render each callback rather than re-throttling.
             await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
             {
-                if (done == total || done % 25 == 0)
+                RunOnUiThread(() =>
                 {
-                    RunOnUiThread(() =>
+                    musicStatus = done >= total ? null : $"Scanning… {done} of {total}";
+                    if (side == 1)
                     {
-                        musicStatus = done >= total ? null : $"Scanning… {done} of {total}";
-                        if (side == 1)
-                        {
-                            RenderContent();
-                        }
-                    });
-                }
+                        RenderContent();
+                    }
+                });
             }, CancellationToken.None);
             LoadMusicCatalog();
             musicStatus = null;

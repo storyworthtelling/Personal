@@ -75,4 +75,63 @@ public class MusicCatalogCacheTests : IDisposable
 
         Assert.Equal(["Alpha", "Bravo"], catalog.Songs().Select(track => track.DisplayTitle).ToArray());
     }
+
+    [Fact]
+    public void VersionedUpsert_RoundTripsThroughLoadVersions()
+    {
+        cache.Upsert([
+            (Tr("1"), new MusicFileVersion(1000, 2048)),
+            (Tr("2"), new MusicFileVersion(3000, 4096)),
+        ]);
+
+        var versions = cache.LoadVersions();
+
+        Assert.Equal(new MusicFileVersion(1000, 2048), versions["1"]);
+        Assert.Equal(new MusicFileVersion(3000, 4096), versions["2"]);
+    }
+
+    [Fact]
+    public void VersionedUpsert_UpdatesSignatureOnReupsert()
+    {
+        cache.Upsert([(Tr("1"), new MusicFileVersion(1000, 2048))]);
+        cache.Upsert([(Tr("1"), new MusicFileVersion(5000, 9000))]);
+
+        Assert.Equal(new MusicFileVersion(5000, 9000), cache.LoadVersions()["1"]);
+    }
+
+    [Fact]
+    public void TrackOnlyUpsert_StoresZeroVersion()
+    {
+        cache.Upsert([Tr("1")]);
+
+        Assert.Equal(new MusicFileVersion(0, 0), cache.LoadVersions()["1"]);
+    }
+
+    [Fact]
+    public void Migration_AddsVersionColumnsToAPreexistingTracksTable()
+    {
+        // Simulate an older cache: a tracks table without the change-signature columns.
+        using (var legacy = connection.CreateCommand())
+        {
+            legacy.CommandText = "DROP TABLE tracks";
+            legacy.ExecuteNonQuery();
+        }
+
+        using (var legacy = connection.CreateCommand())
+        {
+            legacy.CommandText = """
+                CREATE TABLE tracks (
+                    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+                    album TEXT NOT NULL, albumArtist TEXT NOT NULL, trackNumber INTEGER NOT NULL,
+                    discNumber INTEGER NOT NULL, genre TEXT NOT NULL, durationTicks INTEGER NOT NULL, artRef TEXT)
+                """;
+            legacy.ExecuteNonQuery();
+        }
+
+        // Re-opening the cache over the legacy table must add the columns without losing rows.
+        var upgraded = new MusicCatalogCache(connection);
+        upgraded.Upsert([(Tr("1"), new MusicFileVersion(7000, 1234))]);
+
+        Assert.Equal(new MusicFileVersion(7000, 1234), upgraded.LoadVersions()["1"]);
+    }
 }
