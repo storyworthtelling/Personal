@@ -67,14 +67,15 @@ public sealed class ArchiveOptions
 {
     public const string SectionName = "Archive";
 
-    // Off by default, and it must stay that way until the Drive WRITE scope (drive.file) is registered on
-    // the OAuth consent screen and granted on the device. Defaulting this on would send every finished
-    // book into a stage whose only possible outcome is a permission error.
-    public bool Enabled { get; set; }
+    // Deliver the finished report to Google Drive beside the source manuscript, by DEFAULT (Canonizer's
+    // delivery model — the report simply appears in Drive next to the book). Delivery only actually runs
+    // when a Drive archive is wired with the full `drive` scope; until that scope is granted the upload
+    // fails gracefully and the review still finishes (the report stays on the device). Set false to keep
+    // the report on-device only.
+    public bool Enabled { get; set; } = true;
 
-    // Delete the local copies once the upload is confirmed. Separate from Enabled because archiving for
-    // safekeeping and reclaiming phone storage are different decisions: a book's rasters and PDFs run to
-    // hundreds of megabytes, but a user may still want them on the device.
+    // Delete the local copy of the report once the upload is confirmed. Separate from Enabled because
+    // delivering for access and reclaiming phone storage are different decisions.
     public bool FreeLocalCopies { get; set; }
 }
 
