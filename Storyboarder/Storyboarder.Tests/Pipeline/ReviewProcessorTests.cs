@@ -209,6 +209,79 @@ public class ReviewProcessorTests : IDisposable
         });
     }
 
+    // Seeds a follow-on draft of an existing project the way ProjectService.CreateNextDraftAsync does:
+    // same ProjectId, the next DraftNumber, and PreviousDraftId pointing at the draft it was made from.
+    private Guid SeedNextDraft(Guid previousId, string text)
+    {
+        using var context = database.NewContext();
+        var previous = context.Novels.Single(n => n.Id == previousId);
+        var draft = new Novel
+        {
+            Title = previous.Title, GoogleDocId = "doc",
+            ProjectId = previous.ProjectId, DraftNumber = previous.DraftNumber + 1, PreviousDraftId = previous.Id,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
+        context.Novels.Add(draft);
+        context.SaveChanges();
+        return draft.Id;
+    }
+
+    [Fact]
+    public async Task SecondDraft_UnchangedText_ReusesEverySceneImage()
+    {
+        const string text = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        var firstId = SeedManuscript(text);
+        await DriveToCompletion(NewProcessor());
+
+        // The second draft re-picks the identical document — every scene should reuse the prior render.
+        gemini.Invocations.Clear();
+        var secondId = SeedNextDraft(firstId, text);
+        await DriveToCompletion(NewProcessor());
+
+        gemini.Verify(g => g.GenerateSceneImage(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+            It.IsAny<double?>(), It.IsAny<CancellationToken>()), Times.Never());
+
+        using var context = database.NewContext();
+        var scenes = context.Scenes.Where(s => s.NovelId == secondId).OrderBy(s => s.Number).ToList();
+        Assert.True(scenes.Count >= 2);
+        Assert.All(scenes, s =>
+        {
+            Assert.Equal(WorkStatus.Completed, s.ImageStatus);
+            Assert.False(s.Changed);
+            Assert.NotNull(s.PreviousSceneId);
+            Assert.NotNull(s.ImagePath);
+            Assert.True(File.Exists(s.ImagePath));
+        });
+    }
+
+    [Fact]
+    public async Task SecondDraft_RerendersOnlyTheChangedScene()
+    {
+        const string first = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        // Scene 1 is byte-identical; scene 2 is reworded but shares most content words (a changed match).
+        const string second = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked loudly and waited in the cold.";
+        var firstId = SeedManuscript(first);
+        await DriveToCompletion(NewProcessor());
+
+        gemini.Invocations.Clear();
+        var secondId = SeedNextDraft(firstId, second);
+        await DriveToCompletion(NewProcessor());
+
+        // Exactly one fresh render — the changed scene. The unchanged scene reused its prior image.
+        gemini.Verify(g => g.GenerateSceneImage(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+            It.IsAny<double?>(), It.IsAny<CancellationToken>()), Times.Once());
+
+        using var context = database.NewContext();
+        var scenes = context.Scenes.Where(s => s.NovelId == secondId).OrderBy(s => s.Number).ToList();
+        var changed = scenes.Where(s => s.Changed).ToList();
+        Assert.Single(changed);
+        Assert.All(scenes, s => Assert.NotNull(s.PreviousSceneId));   // both matched a prior scene
+        Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
+    }
+
     [Fact]
     public async Task DesignBible_RendersSheetsForRecurringEntities()
     {

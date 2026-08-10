@@ -49,6 +49,7 @@ public sealed class ReviewProcessor : IPipelineStep
     private readonly TextChunker chunker = new();
     private readonly ChapterDetector chapterDetector = new();
     private readonly SceneDetector sceneDetector = new();
+    private readonly SceneMatcher sceneMatcher = new();
 
     // How many different moments of a scene the model is asked to illustrate before the image is left
     // unavailable. A mature scene may be refused; the report is never blocked over it.
@@ -410,8 +411,9 @@ public sealed class ReviewProcessor : IPipelineStep
                 .Select(c => new ChapterSpan(c.Number, c.Label, c.StartOffset, c.EndOffset))
                 .ToList();
 
-            foreach (var span in sceneDetector.Detect(source, chapters))
-                db.Scenes.Add(new Scene
+            var spans = sceneDetector.Detect(source, chapters);
+            var scenes = spans
+                .Select(span => new Scene
                 {
                     NovelId = novel.Id,
                     Number = span.Number,
@@ -419,9 +421,21 @@ public sealed class ReviewProcessor : IPipelineStep
                     ChapterLabel = span.ChapterLabel,
                     StartOffset = span.StartOffset,
                     EndOffset = span.EndOffset
-                });
+                })
+                .ToList();
+
+            // On a later draft, match these scenes against the previous draft's so an unchanged scene reuses
+            // its rendered image (the render loop then skips it) and a changed scene is marked for a fresh
+            // render + a before/after pair. A first draft skips this and renders every scene.
+            var reused = novel.PreviousDraftId is { } previousId
+                ? await CarryForwardScenes(db, novel, previousId, source, scenes, cancellationToken)
+                : 0;
+
+            db.Scenes.AddRange(scenes);
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Detected scenes for manuscript {NovelId}", novel.Id);
+            logger.LogInformation(
+                "Detected {Count} scenes for manuscript {NovelId} ({Reused} images reused from the previous draft)",
+                scenes.Count, novel.Id, reused);
             return ProcessResult.DidWork(novel.Id);
         }
 
@@ -528,6 +542,88 @@ public sealed class ReviewProcessor : IPipelineStep
             AllReferenceSheetsRendered: false, AllSceneImagesRendered: true)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
+    }
+
+    // Matches a later draft's freshly-detected scenes against the previous draft's (by text, via
+    // SceneMatcher) and stamps each with its cross-draft identity. An UNCHANGED scene reuses the previous
+    // draft's rendered image — copied into this draft's scene folder and marked Completed so the render loop
+    // skips it (or mirrored as unavailable when the previous image was itself unavailable). A CHANGED scene
+    // keeps its PreviousSceneId (for the before/after pair) but stays Pending so it re-renders. Returns how
+    // many images were carried forward. Best-effort: any copy failure just leaves the scene to re-render.
+    private async Task<int> CarryForwardScenes(
+        StoryboarderDbContext db, Novel novel, Guid previousDraftId, string source,
+        IReadOnlyList<Scene> scenes, CancellationToken cancellationToken)
+    {
+        var previousScenes = await db.Scenes
+            .Where(s => s.NovelId == previousDraftId)
+            .Select(s => new { s.Id, s.Number, s.StartOffset, s.EndOffset, s.ImagePath, s.ImagePrompt })
+            .ToListAsync(cancellationToken);
+        if (previousScenes.Count == 0)
+            return 0;
+
+        var previousSource = await db.SourceTexts
+            .Where(s => s.NovelId == previousDraftId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+
+        static string Slice(string text, int start, int end)
+        {
+            var from = Math.Clamp(start, 0, text.Length);
+            var to = Math.Clamp(end, from, text.Length);
+            return text[from..to];
+        }
+
+        var previousById = previousScenes.ToDictionary(p => p.Number);
+        var previousTexts = previousScenes
+            .Select(p => new SceneText(p.Number, Slice(previousSource, p.StartOffset, p.EndOffset)))
+            .ToList();
+        var currentTexts = scenes
+            .Select(s => new SceneText(s.Number, Slice(source, s.StartOffset, s.EndOffset)))
+            .ToList();
+
+        var matches = sceneMatcher.Match(previousTexts, currentTexts)
+            .ToDictionary(m => m.CurrentNumber);
+
+        var reused = 0;
+        foreach (var scene in scenes)
+        {
+            if (!matches.TryGetValue(scene.Number, out var match) || match.PreviousNumber is not { } prevNumber)
+                continue;   // a new scene — no counterpart, renders fresh
+
+            var prior = previousById[prevNumber];
+            scene.PreviousSceneId = prior.Id;
+            scene.Changed = match.Changed;
+            if (match.Changed)
+                continue;   // same beat, different words — re-render and pair before/after
+
+            // Unchanged: reuse the previous draft's image so nothing re-renders.
+            scene.ImagePrompt = prior.ImagePrompt;
+            scene.ImageStatus = WorkStatus.Completed;
+            if (prior.ImagePath is { } priorPath && imageStore.Exists(priorPath))
+            {
+                try
+                {
+                    scene.ImagePath = imageStore.Save($"{novel.Id}/scenes/scene-{scene.Number}.png", imageStore.Read(priorPath));
+                    reused++;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // The copy failed — fall back to re-rendering this scene rather than blocking.
+                    scene.ImageStatus = WorkStatus.Pending;
+                    scene.ImagePrompt = null;
+                    logger.LogWarning(ex, "Could not carry forward scene {Number} image for manuscript {NovelId}; will re-render",
+                        scene.Number, novel.Id);
+                }
+            }
+            else
+            {
+                // The previous image was unavailable; the unchanged text won't render any better, so mirror it.
+                scene.ImagePath = null;
+                scene.LastError = "Image unavailable: carried forward from the previous draft.";
+            }
+        }
+
+        return reused;
     }
 
     // The rendered reference sheets for recurring entities named in the scene text, capped so one render's
