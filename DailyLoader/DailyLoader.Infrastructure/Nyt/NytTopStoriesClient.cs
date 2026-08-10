@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using DailyLoader.Domain.Health;
 using DailyLoader.Domain.Interfaces;
 using DailyLoader.Domain.Models;
+using Storyworthtelling.Voice.Health;
 
 namespace DailyLoader.Infrastructure.Nyt;
 
@@ -11,11 +13,14 @@ public class NytTopStoriesClient : INytTopStoriesClient
 
     private readonly HttpClient httpClient;
     private readonly NytApiOptions options;
+    private readonly ICredentialHealthSink? healthSink;
 
-    public NytTopStoriesClient(HttpClient httpClient, IOptions<NytApiOptions> options)
+    public NytTopStoriesClient(
+        HttpClient httpClient, IOptions<NytApiOptions> options, ICredentialHealthSink? healthSink = null)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
+        this.healthSink = healthSink;
     }
 
     public async Task<IReadOnlyList<TopStory>> GetTopNewsStories(int count) =>
@@ -31,9 +36,14 @@ public class NytTopStoriesClient : INytTopStoriesClient
         var response = await httpClient.GetAsync(url);
 
         if (!response.IsSuccessStatusCode)
+        {
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, null))
+                healthSink?.MarkFailing(CredentialIds.NytApiKey, $"{(int)response.StatusCode} {response.StatusCode}");
             throw new HttpRequestException(
                 $"NYT Top Stories API failed: {(int)response.StatusCode} ({response.StatusCode})");
+        }
 
+        healthSink?.MarkOk(CredentialIds.NytApiKey);
         var json = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(json);
 

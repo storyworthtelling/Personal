@@ -16,6 +16,7 @@ using DailyLoader.Infrastructure.Remarkable;
 using DailyLoader.Android.Google;
 using PdfSharp.Fonts;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 using VoiceGoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
 using VoiceClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
@@ -71,6 +72,12 @@ public static class MauiProgram
         // which is required for SELinux to permit network access. SocketsHttpHandler
         // (the .NET default) opens raw sockets that SELinux blocks in Android app processes.
         static Xamarin.Android.Net.AndroidMessageHandler AndroidHandler() => new();
+
+        // Credential health: the NYT/reMarkable/Anthropic clients report Ok/Failing here (injected as
+        // ICredentialHealthSink), and the Settings page reads it back to hide a working key's field.
+        // Registered before the typed clients so ActivatorUtilities injects it into their optional parameter.
+        builder.Services.AddSingleton<CredentialHealthStore>();
+        builder.Services.AddSingleton<ICredentialHealthSink>(sp => sp.GetRequiredService<CredentialHealthStore>());
 
         builder.Services.AddHttpClient<INytCrosswordClient, NytCrosswordClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);

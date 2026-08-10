@@ -18,16 +18,30 @@
             </Border>
 
             <Label Text="API keys" Style="{StaticResource TitleLabel}" Margin="0,8,0,0" />
+            <Label Text="A working key stays put — it's backed up to the vault and restored automatically, so its field only appears when a key is missing or a call with it was just rejected."
+                   Style="{StaticResource SecondaryLabel}" />
 
-            <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" />
+            <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+            <Grid x:Name="ClaudeStatusRow" ColumnDefinitions="*,Auto" IsVisible="False">
+                <Label x:Name="ClaudeStatusLabel" Grid.Column="0" VerticalOptions="Center"
+                       Style="{StaticResource SecondaryLabel}" />
+                <Button x:Name="ClaudeReplaceButton" Grid.Column="1" Text="Replace"
+                        Style="{StaticResource QuietButton}" Clicked="OnReplaceClaudeClicked" />
+            </Grid>
             <Entry x:Name="ClaudeKeyEntry" Placeholder="sk-ant-..."
-                   Style="{StaticResource MonoEntry}" />
+                   Style="{StaticResource MonoEntry}" IsVisible="False" />
             <Label Text="Builds the design bible and storyboards the book. From console.anthropic.com."
                    Style="{StaticResource SecondaryLabel}" />
 
             <Label Text="Gemini API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+            <Grid x:Name="GeminiStatusRow" ColumnDefinitions="*,Auto" IsVisible="False">
+                <Label x:Name="GeminiStatusLabel" Grid.Column="0" VerticalOptions="Center"
+                       Style="{StaticResource SecondaryLabel}" />
+                <Button x:Name="GeminiReplaceButton" Grid.Column="1" Text="Replace"
+                        Style="{StaticResource QuietButton}" Clicked="OnReplaceGeminiClicked" />
+            </Grid>
             <Entry x:Name="GeminiKeyEntry" Placeholder="AIza..."
-                   Style="{StaticResource MonoEntry}" />
+                   Style="{StaticResource MonoEntry}" IsVisible="False" />
             <Label Text="Renders the panel images. From aistudio.google.com."
                    Style="{StaticResource SecondaryLabel}" />
 
@@ -37,8 +51,10 @@
             <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
                    Style="{StaticResource SecondaryLabel}" />
             <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Entry x:Name="VaultPassphraseEntry" IsPassword="True" Placeholder="Choose a passphrase"
+            <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
                    Style="{StaticResource MonoEntry}" />
+            <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
+                   Style="{StaticResource SecondaryLabel}" />
             <Label x:Name="VaultStatusLabel" Style="{StaticResource StatusLine}" />
 
             <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />

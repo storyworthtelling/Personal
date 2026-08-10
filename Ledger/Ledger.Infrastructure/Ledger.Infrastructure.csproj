@@ -12,6 +12,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Ledger.Domain\Ledger.Domain.csproj" />
+    <!-- Shared credential-health seam (ICredentialHealthSink) reported by the Plaid client. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
   </ItemGroup>
 
   <!-- Cross-target packages. -->

@@ -2,8 +2,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Storyboarder.Android.Google;
 using Storyboarder.Android.Platforms.Android;
+using Storyboarder.Domain.Health;
 using Storyboarder.Infrastructure.Services;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Health;
 
 namespace Storyboarder.Android.Pages;
 
@@ -20,8 +22,11 @@ public partial class SetupPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // Pre-fill the (usually hidden) entries so a save never wipes a stored key; ApplyCredentialFields
+        // then decides which fields to actually show based on each key's last-known health.
         ClaudeKeyEntry.Text = SettingsStore.ClaudeApiKey;
         GeminiKeyEntry.Text = SettingsStore.GeminiApiKey;
+        ApplyCredentialFields();
         VaultPassphraseEntry.Text = SettingsStore.VaultPassphrase;
         ArchiveSwitch.IsToggled = SettingsStore.ArchiveToDrive;
         FreeSpaceSwitch.IsToggled = SettingsStore.FreeLocalCopiesAfterArchive;
@@ -36,6 +41,57 @@ public partial class SetupPage : ContentPage
             MigrationErrorLabel.Text =
                 "The last app update couldn't finish updating your library, so work is paused. " +
                 "Restoring a recent backup usually fixes it. Details: " + migrationError;
+    }
+
+    // Shows each API-key field only when there's something to do: no key stored yet, or a live call with
+    // the stored key was just rejected. A working key collapses to a "Working ✓" line with a Replace button,
+    // so the screen stays quiet and the raw key isn't left on display (the vault keeps the backup).
+    private void ApplyCredentialFields()
+    {
+        var report = CredentialHealth();
+        ApplyCredentialField(
+            CredentialIds.Claude, report, SettingsStore.ClaudeApiKey,
+            ClaudeStatusRow, ClaudeStatusLabel, ClaudeReplaceButton, ClaudeKeyEntry);
+        ApplyCredentialField(
+            CredentialIds.Gemini, report, SettingsStore.GeminiApiKey,
+            GeminiStatusRow, GeminiStatusLabel, GeminiReplaceButton, GeminiKeyEntry);
+    }
+
+    private static CredentialHealthReport CredentialHealth() =>
+        IPlatformApplication.Current!.Services.GetRequiredService<CredentialHealthStore>().Load();
+
+    private void ApplyCredentialField(
+        string credentialId, CredentialHealthReport report, string storedValue,
+        Grid statusRow, Label statusLabel, Button replaceButton, Entry entry)
+    {
+        var state = CredentialFieldState.Decide(!string.IsNullOrEmpty(storedValue), report.Get(credentialId));
+        entry.IsVisible = state.ShowEntry;
+        // The status row carries either the "Working ✓ / Replace" affordance (entry hidden) or the failure
+        // warning that sits above the revealed entry. A brand-new "Not set" needs neither — the empty entry
+        // with its placeholder says it.
+        statusRow.IsVisible = !state.ShowEntry || state.IsWarning;
+        replaceButton.IsVisible = !state.ShowEntry;
+        statusLabel.Text = state.StatusText;
+        statusLabel.Style = LookupStyle(state.IsWarning ? "ErrorLabel" : "SecondaryLabel");
+    }
+
+    // Styles live in the app-wide merged dictionaries, which a page's own Resources indexer doesn't search;
+    // TryGetValue on the application resources walks the merged dictionaries.
+    private static Style? LookupStyle(string key) =>
+        Application.Current?.Resources.TryGetValue(key, out var value) == true ? value as Style : null;
+
+    private void OnReplaceClaudeClicked(object sender, EventArgs e) => RevealEntry(ClaudeStatusRow, ClaudeKeyEntry);
+
+    private void OnReplaceGeminiClicked(object sender, EventArgs e) => RevealEntry(GeminiStatusRow, GeminiKeyEntry);
+
+    // Deliberate rotation of a working key: hide the status row and open the entry (kept empty so the new
+    // value is typed fresh rather than edited over the old one).
+    private static void RevealEntry(Grid statusRow, Entry entry)
+    {
+        statusRow.IsVisible = false;
+        entry.Text = string.Empty;
+        entry.IsVisible = true;
+        entry.Focus();
     }
 
     private static ProjectBackupService BackupService() =>

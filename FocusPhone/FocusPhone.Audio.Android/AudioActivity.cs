@@ -397,10 +397,10 @@ public class AudioActivity : Activity
 
         // The secrets-vault passphrase (optional): set the same one as your other apps to back up and restore
         // your keys from Drive, encrypted. Persisted when you sign in.
+        // Shown in the clear (not a password field) so it can be read back and copied — it's the one secret
+        // that isn't kept in the vault, so being able to see it is what lets the owner set the same one everywhere.
         var passphrase = PaperUi.MonoField(this, "Secrets vault passphrase (optional)");
         passphrase.Text = VaultPassphraseStore.Passphrase;
-        passphrase.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationPassword;
-        passphrase.Typeface = PaperTheme.Mono(this);
         layout.AddView(passphrase);
 
         layout.AddView(PaperUi.PrimaryButton(this, "Sign in with Google", () =>

@@ -3,8 +3,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using DailyLoader.Domain.Health;
 using DailyLoader.Domain.Interfaces;
 using DailyLoader.Domain.Models;
+using Storyworthtelling.Voice.Health;
 
 namespace DailyLoader.Infrastructure.Handwriting;
 
@@ -30,15 +32,18 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
     private readonly HttpClient httpClient;
     private readonly AnthropicOptions options;
     private readonly ILogger<ClaudeVisionHandwritingExtractor> logger;
+    private readonly ICredentialHealthSink? healthSink;
 
     public ClaudeVisionHandwritingExtractor(
         HttpClient httpClient,
         IOptions<AnthropicOptions> options,
-        ILogger<ClaudeVisionHandwritingExtractor> logger)
+        ILogger<ClaudeVisionHandwritingExtractor> logger,
+        ICredentialHealthSink? healthSink = null)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
         this.logger = logger;
+        this.healthSink = healthSink;
     }
 
     public async Task<IReadOnlyList<ParsedNote>> Extract(byte[] annotatedPdf)
@@ -92,12 +97,15 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync();
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, body))
+                healthSink?.MarkFailing(CredentialIds.Anthropic, $"{(int)response.StatusCode} {response.StatusCode}");
             throw new HttpRequestException(
                 $"Anthropic request failed: {(int)response.StatusCode} ({response.StatusCode}): {body}",
                 inner: null,
                 response.StatusCode);
         }
 
+        healthSink?.MarkOk(CredentialIds.Anthropic);
         var json = await response.Content.ReadAsStringAsync();
         return ParseNotes(json);
     }
