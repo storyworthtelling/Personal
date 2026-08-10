@@ -15,6 +15,7 @@ using Ledger.Infrastructure.Services;
 using Ledger.Infrastructure.Time;
 using Ledger.Android.Google;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 using GoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
 using GoogleClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
@@ -66,6 +67,13 @@ public static class MauiProgram
         // The Plaid client routes through AndroidMessageHandler — SELinux blocks the raw sockets the
         // default SocketsHttpHandler opens in an Android app process.
         static Xamarin.Android.Net.AndroidMessageHandler AndroidHandler() => new();
+
+        // Credential health: the Plaid client reports Ok/Failing here (injected as ICredentialHealthSink),
+        // and the Settings page reads it back to hide the credential fields while they're working. Registered
+        // before the typed client so ActivatorUtilities injects it into the optional sink parameter.
+        builder.Services.AddSingleton<CredentialHealthStore>();
+        builder.Services.AddSingleton<ICredentialHealthSink>(sp => sp.GetRequiredService<CredentialHealthStore>());
+
         builder.Services.AddHttpClient<IPlaidClient, PlaidClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 

@@ -1,6 +1,8 @@
 using System.Globalization;
 using Microsoft.Extensions.Options;
+using DailyLoader.Domain.Health;
 using DailyLoader.Domain.Interfaces;
+using Storyworthtelling.Voice.Health;
 
 namespace DailyLoader.Infrastructure.Nyt;
 
@@ -10,11 +12,14 @@ public class NytCrosswordClient : INytCrosswordClient
 
     private readonly HttpClient httpClient;
     private readonly NytOptions options;
+    private readonly ICredentialHealthSink? healthSink;
 
-    public NytCrosswordClient(HttpClient httpClient, IOptions<NytOptions> options)
+    public NytCrosswordClient(
+        HttpClient httpClient, IOptions<NytOptions> options, ICredentialHealthSink? healthSink = null)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
+        this.healthSink = healthSink;
     }
 
     public Task<byte[]> DownloadDailyPuzzle(DateOnly date) =>
@@ -35,11 +40,17 @@ public class NytCrosswordClient : INytCrosswordClient
         var response = await httpClient.SendAsync(request);
 
         if (!response.IsSuccessStatusCode)
+        {
+            // The crossword download is cookie-authenticated, so a 401/403 is the NYT-S cookie being rejected.
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, null))
+                healthSink?.MarkFailing(CredentialIds.NytCookie, $"{(int)response.StatusCode} {response.StatusCode}");
             throw new HttpRequestException(
                 $"NYT crossword download failed with status {(int)response.StatusCode} ({response.StatusCode}) for {url}",
                 inner: null,
                 response.StatusCode);
+        }
 
+        healthSink?.MarkOk(CredentialIds.NytCookie);
         return await response.Content.ReadAsByteArrayAsync();
     }
 }

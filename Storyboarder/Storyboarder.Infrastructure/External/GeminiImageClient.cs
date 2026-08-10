@@ -3,9 +3,11 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.External;
+using Storyboarder.Domain.Health;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
+using Storyworthtelling.Voice.Health;
 
 namespace Storyboarder.Infrastructure.External;
 
@@ -18,11 +20,14 @@ public sealed class GeminiImageClient : IGeminiImageClient
 
     private readonly HttpClient httpClient;
     private readonly GeminiOptions options;
+    private readonly ICredentialHealthSink? healthSink;
 
-    public GeminiImageClient(HttpClient httpClient, IOptions<GeminiOptions> options)
+    public GeminiImageClient(
+        HttpClient httpClient, IOptions<GeminiOptions> options, ICredentialHealthSink? healthSink = null)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
+        this.healthSink = healthSink;
     }
 
     public Task<byte[]> GenerateReferenceSheet(string description, string artStyle, CancellationToken cancellationToken)
@@ -109,7 +114,15 @@ public sealed class GeminiImageClient : IGeminiImageClient
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
+        {
+            // Only a credential rejection flags the key; throttling/5xx/network are transient and left alone.
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, body))
+                healthSink?.MarkFailing(CredentialIds.Gemini, $"{(int)response.StatusCode} {response.StatusCode}");
             throw ToException(response, body);
+        }
+
+        // A 2xx means the key authenticated — clear any prior failure even if the content was then blocked.
+        healthSink?.MarkOk(CredentialIds.Gemini);
 
         var image = TryExtractImage(body);
         if (image is not null)

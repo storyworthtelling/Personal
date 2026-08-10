@@ -17,6 +17,7 @@ using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Infrastructure.Time;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 using GoogleCredential = global::Google.Apis.Auth.OAuth2.GoogleCredential;
 using GoogleClientInitializer = global::Google.Apis.Services.BaseClientService.Initializer;
@@ -90,6 +91,12 @@ public static class MauiProgram
         // The default 100s HttpClient timeout is shorter than a large Claude generation or a slow Gemini
         // render; both would abort mid-flight. Claude responses are streamed so the connection stays warm,
         // but a generous ceiling still guards against a genuinely stuck request.
+        // Credential health: the API clients report Ok/Failing here (injected as ICredentialHealthSink),
+        // and the Settings page reads the report back to hide a working key's field. Registered before the
+        // typed clients so ActivatorUtilities injects it into their optional sink parameter.
+        builder.Services.AddSingleton<CredentialHealthStore>();
+        builder.Services.AddSingleton<ICredentialHealthSink>(sp => sp.GetRequiredService<CredentialHealthStore>());
+
         builder.Services.AddHttpClient<IClaudeAnalysisClient, ClaudeAnalysisClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(10))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);

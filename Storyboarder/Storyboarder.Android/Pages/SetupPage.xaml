@@ -18,16 +18,30 @@
             </Border>
 
             <Label Text="API keys" Style="{StaticResource TitleLabel}" Margin="0,8,0,0" />
+            <Label Text="A working key stays put — it's backed up to the vault and restored automatically, so its field only appears when a key is missing or a call with it was just rejected."
+                   Style="{StaticResource SecondaryLabel}" />
 
-            <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" />
+            <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+            <Grid x:Name="ClaudeStatusRow" ColumnDefinitions="*,Auto" IsVisible="False">
+                <Label x:Name="ClaudeStatusLabel" Grid.Column="0" VerticalOptions="Center"
+                       Style="{StaticResource SecondaryLabel}" />
+                <Button x:Name="ClaudeReplaceButton" Grid.Column="1" Text="Replace"
+                        Style="{StaticResource QuietButton}" Clicked="OnReplaceClaudeClicked" />
+            </Grid>
             <Entry x:Name="ClaudeKeyEntry" Placeholder="sk-ant-..."
-                   Style="{StaticResource MonoEntry}" />
+                   Style="{StaticResource MonoEntry}" IsVisible="False" />
             <Label Text="Builds the design bible and storyboards the book. From console.anthropic.com."
                    Style="{StaticResource SecondaryLabel}" />
 
             <Label Text="Gemini API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
+            <Grid x:Name="GeminiStatusRow" ColumnDefinitions="*,Auto" IsVisible="False">
+                <Label x:Name="GeminiStatusLabel" Grid.Column="0" VerticalOptions="Center"
+                       Style="{StaticResource SecondaryLabel}" />
+                <Button x:Name="GeminiReplaceButton" Grid.Column="1" Text="Replace"
+                        Style="{StaticResource QuietButton}" Clicked="OnReplaceGeminiClicked" />
+            </Grid>
             <Entry x:Name="GeminiKeyEntry" Placeholder="AIza..."
-                   Style="{StaticResource MonoEntry}" />
+                   Style="{StaticResource MonoEntry}" IsVisible="False" />
             <Label Text="Renders the panel images. From aistudio.google.com."
                    Style="{StaticResource SecondaryLabel}" />
 

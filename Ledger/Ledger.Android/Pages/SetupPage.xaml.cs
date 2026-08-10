@@ -4,9 +4,11 @@ using Microsoft.Maui.ApplicationModel.DataTransfer;
 using Microsoft.Maui.Storage;
 using Ledger.Android.Google;
 using Ledger.Domain.External;
+using Ledger.Domain.Health;
 using Ledger.Domain.Model;
 using Ledger.Domain.Time;
 using Ledger.Infrastructure.Services;
+using Storyworthtelling.Voice.Health;
 
 namespace Ledger.Android.Pages;
 
@@ -32,8 +34,11 @@ public partial class SetupPage : ContentPage
     {
         base.OnAppearing();
 
+        // Pre-fill the (usually hidden) credential entries so a save never wipes them; ApplyPlaidCredentialField
+        // then decides whether to show them based on the credentials' last-known health.
         ClientIdEntry.Text = SettingsStore.PlaidClientId;
         SecretEntry.Text = SettingsStore.PlaidSecret;
+        ApplyPlaidCredentialField();
         EnvironmentPicker.SelectedItem = SettingsStore.PlaidEnvironment;
         VaultPassphraseEntry.Text = SettingsStore.VaultPassphrase;
 
@@ -46,6 +51,40 @@ public partial class SetupPage : ContentPage
         VoiceStatusLabel.Text = string.IsNullOrEmpty(SettingsStore.GoogleAccountEmail)
             ? string.Empty
             : $"Signed in as {SettingsStore.GoogleAccountEmail}.";
+    }
+
+    // Shows the Plaid client id/secret fields only when there's something to do: no credentials stored yet,
+    // or Plaid just rejected them. Working credentials collapse to a "Working ✓" line with a Replace button,
+    // so the screen stays quiet and the secret isn't left on display (the vault keeps the backup).
+    private void ApplyPlaidCredentialField()
+    {
+        var isSet = !string.IsNullOrEmpty(SettingsStore.PlaidClientId) &&
+                    !string.IsNullOrEmpty(SettingsStore.PlaidSecret);
+        var state = CredentialFieldState.Decide(isSet, CredentialHealth().Get(CredentialIds.Plaid));
+        PlaidCredentialFields.IsVisible = state.ShowEntry;
+        PlaidStatusRow.IsVisible = !state.ShowEntry || state.IsWarning;
+        PlaidReplaceButton.IsVisible = !state.ShowEntry;
+        PlaidStatusLabel.Text = state.StatusText;
+        PlaidStatusLabel.Style = LookupStyle(state.IsWarning ? "ErrorLabel" : "SecondaryLabel");
+    }
+
+    private static CredentialHealthReport CredentialHealth() =>
+        IPlatformApplication.Current!.Services.GetRequiredService<CredentialHealthStore>().Load();
+
+    // Styles live in the app-wide merged dictionaries, which a page's own Resources indexer doesn't search;
+    // TryGetValue on the application resources walks the merged dictionaries.
+    private static Style? LookupStyle(string key) =>
+        Application.Current?.Resources.TryGetValue(key, out var value) == true ? value as Style : null;
+
+    // Deliberate rotation of working credentials: hide the status row and open the fields (kept empty so the
+    // new values are typed fresh rather than edited over the old ones).
+    private void OnReplacePlaidClicked(object? sender, EventArgs e)
+    {
+        PlaidStatusRow.IsVisible = false;
+        ClientIdEntry.Text = string.Empty;
+        SecretEntry.Text = string.Empty;
+        PlaidCredentialFields.IsVisible = true;
+        ClientIdEntry.Focus();
     }
 
     // Opens the system Google account picker and requests read-only Drive consent, so Ledger can read the

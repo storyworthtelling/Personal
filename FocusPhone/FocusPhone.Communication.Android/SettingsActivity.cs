@@ -6,6 +6,7 @@ using Android.Widget;
 using FocusPhone.Domain.Design;
 using FocusPhone.Ui;
 using FocusPhone.Ui.Voice;
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Communication;
@@ -107,8 +108,36 @@ public class SettingsActivity : Activity
         password.Text = account.GmailAppPassword;
         password.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationPassword;
         password.Typeface = PaperTheme.Mono(this); // setting InputType resets the typeface
-        AddFieldGroup(layout, "App password", password,
-            "Create one at myaccount.google.com/apppasswords.");
+
+        // Show the app-password field only when it's missing or Gmail just rejected it. A working password
+        // collapses to a status line with a Replace button — it's backed up to the vault and restored
+        // automatically, so there's no need to keep it (a real secret) on display. The field object is always
+        // created so Save reads its pre-filled value back even while the field is hidden.
+        const string passwordHelper = "Create one at myaccount.google.com/apppasswords.";
+        var passwordContainer = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        layout.AddView(passwordContainer, Spaced(0, 0));
+        void ShowPasswordField(string helper)
+        {
+            passwordContainer.RemoveAllViews();
+            AddFieldGroup(passwordContainer, "App password", password, helper);
+        }
+        void ShowPasswordStatus(string statusText)
+        {
+            passwordContainer.RemoveAllViews();
+            AddCredentialStatus(passwordContainer, "App password", statusText, () =>
+            {
+                password.Text = string.Empty;
+                ShowPasswordField(passwordHelper);
+                password.RequestFocus();
+            });
+        }
+        var passwordState = CredentialFieldState.Decide(
+            !string.IsNullOrEmpty(account.GmailAppPassword),
+            new CredentialHealthStore().Load().Get(CredentialIds.GmailAppPassword));
+        if (passwordState.ShowEntry)
+            ShowPasswordField(passwordState.IsWarning ? passwordState.StatusText : passwordHelper);
+        else
+            ShowPasswordStatus(passwordState.StatusText);
 
         var enableMessages = PaperUi.SecondaryButton(this, "Enable message sync (notification access)", () =>
             StartActivity(new Intent(Android.Provider.Settings.ActionNotificationListenerSettings)));
@@ -184,6 +213,24 @@ public class SettingsActivity : Activity
         {
             layout.AddView(PaperUi.Secondary(this, helper), Spaced(0, DesignTokens.Space.X4));
         }
+    }
+
+    // The collapsed form of a healthy credential: the same field label, then a status line ("Working ✓")
+    // with a Replace button that swaps the real field back in for a deliberate rotation.
+    private void AddCredentialStatus(LinearLayout layout, string label, string statusText, Action onReplace)
+    {
+        var labelView = PaperUi.Secondary(this, label);
+        labelView.TextSize = DesignTokens.TypeSp.Label;
+        labelView.Typeface = PaperTheme.SansSemibold(this);
+        labelView.SetTextColor(PaperTheme.Ink);
+        layout.AddView(labelView, Spaced(0, DesignTokens.Space.X1));
+
+        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+        row.AddView(PaperUi.Secondary(this, statusText),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        row.AddView(PaperUi.QuietButton(this, "Replace", onReplace));
+        layout.AddView(row, Spaced(0, DesignTokens.Space.X4));
     }
 
     private LinearLayout.LayoutParams Spaced(int topDp, int bottomDp) =>

@@ -4,8 +4,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Ledger.Domain.External;
+using Ledger.Domain.Health;
 using Ledger.Domain.Pipeline;
 using Ledger.Infrastructure.Configuration;
+using Storyworthtelling.Voice.Health;
 
 namespace Ledger.Infrastructure.External;
 
@@ -17,11 +19,14 @@ public sealed class PlaidClient : IPlaidClient
 {
     private readonly HttpClient httpClient;
     private readonly IOptions<PlaidOptions> options;
+    private readonly ICredentialHealthSink? healthSink;
 
-    public PlaidClient(HttpClient httpClient, IOptions<PlaidOptions> options)
+    public PlaidClient(
+        HttpClient httpClient, IOptions<PlaidOptions> options, ICredentialHealthSink? healthSink = null)
     {
         this.httpClient = httpClient;
         this.options = options;
+        this.healthSink = healthSink;
     }
 
     public async Task<PlaidLinkToken> CreateLinkTokenAsync(CancellationToken cancellationToken)
@@ -237,17 +242,25 @@ public sealed class PlaidClient : IPlaidClient
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
-            throw ToException(response.StatusCode, body);
+        {
+            var (code, message) = ParseError(body);
+            // Only a rejection of the client_id/secret flags the Plaid credentials; an item/token problem
+            // or a throttle is not the shared credentials' fault and is left for the per-institution path.
+            if (PlaidFailure.IsCredentialRejection(code))
+                healthSink?.MarkFailing(CredentialIds.Plaid, code ?? ((int)response.StatusCode).ToString());
+            throw ToException(response.StatusCode, code, message);
+        }
 
+        // A successful call means the client_id/secret authenticated — clear any prior credentials failure.
+        healthSink?.MarkOk(CredentialIds.Plaid);
         return JsonDocument.Parse(body);
     }
 
     // Plaid returns HTTP 429 with error_code RATE_LIMIT_EXCEEDED when throttled; classify it as a
     // transient rate-limit so the worker reschedules. Everything else is a descriptive hard failure
     // that preserves Plaid's error_code/error_message body for diagnosis.
-    private static Exception ToException(HttpStatusCode status, string body)
+    private static Exception ToException(HttpStatusCode status, string? code, string? message)
     {
-        var (code, message) = ParseError(body);
         if (status == HttpStatusCode.TooManyRequests || code == "RATE_LIMIT_EXCEEDED")
             return new RateLimitException($"Plaid rate limited: {(int)status} ({code}): {message}");
 

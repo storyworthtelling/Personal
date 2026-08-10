@@ -18,12 +18,23 @@
             </Border>
 
             <Label Text="Plaid credentials" Style="{StaticResource TitleLabel}" Margin="0,8,0,0" />
+            <Label Text="Working credentials stay put — they're backed up to the vault and restored automatically, so these fields only appear when they're missing or Plaid just rejected them."
+                   Style="{StaticResource SecondaryLabel}" />
 
-            <Label Text="Client ID" Style="{StaticResource FieldLabel}" />
-            <Entry x:Name="ClientIdEntry" Placeholder="6f1a…" Style="{StaticResource MonoEntry}" />
+            <Grid x:Name="PlaidStatusRow" ColumnDefinitions="*,Auto" IsVisible="False" Margin="0,4,0,0">
+                <Label x:Name="PlaidStatusLabel" Grid.Column="0" VerticalOptions="Center"
+                       Style="{StaticResource SecondaryLabel}" />
+                <Button x:Name="PlaidReplaceButton" Grid.Column="1" Text="Replace"
+                        Style="{StaticResource QuietButton}" Clicked="OnReplacePlaidClicked" />
+            </Grid>
 
-            <Label Text="Secret" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Entry x:Name="SecretEntry" Placeholder="••••••••" IsPassword="True" Style="{StaticResource MonoEntry}" />
+            <VerticalStackLayout x:Name="PlaidCredentialFields" Spacing="14" IsVisible="False">
+                <Label Text="Client ID" Style="{StaticResource FieldLabel}" />
+                <Entry x:Name="ClientIdEntry" Placeholder="6f1a…" Style="{StaticResource MonoEntry}" />
+
+                <Label Text="Secret" Style="{StaticResource FieldLabel}" />
+                <Entry x:Name="SecretEntry" Placeholder="••••••••" IsPassword="True" Style="{StaticResource MonoEntry}" />
+            </VerticalStackLayout>
 
             <Label Text="Environment" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
             <Picker x:Name="EnvironmentPicker">

@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Options;
+using DailyLoader.Domain.Health;
+using Storyworthtelling.Voice.Health;
 
 namespace DailyLoader.Infrastructure.Remarkable;
 
@@ -11,15 +13,18 @@ public class RemarkableAuthService : IRemarkableAuthProvider
 
     private readonly HttpClient httpClient;
     private readonly RemarkableOptions options;
+    private readonly ICredentialHealthSink? healthSink;
     private readonly SemaphoreSlim refreshLock = new(1, 1);
 
     private string? userToken;
     private DateTimeOffset tokenExpiry = DateTimeOffset.MinValue;
 
-    public RemarkableAuthService(HttpClient httpClient, IOptions<RemarkableOptions> options)
+    public RemarkableAuthService(
+        HttpClient httpClient, IOptions<RemarkableOptions> options, ICredentialHealthSink? healthSink = null)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
+        this.healthSink = healthSink;
     }
 
     public async Task<string> GetUserToken()
@@ -50,11 +55,17 @@ public class RemarkableAuthService : IRemarkableAuthProvider
         var response = await httpClient.SendAsync(request);
 
         if (!response.IsSuccessStatusCode)
+        {
+            // The device token is the credential exchanged here, so a 401/403 is that token being rejected.
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, null))
+                healthSink?.MarkFailing(CredentialIds.Remarkable, $"{(int)response.StatusCode} {response.StatusCode}");
             throw new HttpRequestException(
                 $"Failed to obtain reMarkable user token: {(int)response.StatusCode} ({response.StatusCode})",
                 inner: null,
                 response.StatusCode);
+        }
 
+        healthSink?.MarkOk(CredentialIds.Remarkable);
         var raw = await response.Content.ReadAsStringAsync();
         var token = raw.Trim().Trim('"');
         var (_, expiry) = JwtPayload.Parse(token);

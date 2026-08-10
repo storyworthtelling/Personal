@@ -7,6 +7,7 @@ using FocusPhone.Domain.Design;
 using FocusPhone.Domain.Unlock;
 using FocusPhone.Ui;
 using FocusPhone.Ui.Voice;
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Launcher;
@@ -211,6 +212,26 @@ public class UnlockActivity : Activity
         var input = PaperUi.MonoField(this, "GitHub token with repo read access");
         input.Text = new UpdateSettingsStore(this).GitHubToken;
 
+        // Show the token field only when it's missing or GitHub just rejected it; a working token collapses to
+        // a status line with Replace — it's backed up to the vault and restored automatically. Both views are
+        // built and toggled by visibility so Replace needn't rebuild the dialog, and Save reads input.Text
+        // whether or not the field is visible.
+        var tokenState = CredentialFieldState.Decide(
+            !string.IsNullOrEmpty(input.Text),
+            new CredentialHealthStore().Load().Get(CredentialIds.GitHubUpdateToken));
+        var tokenStatusRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        tokenStatusRow.SetGravity(GravityFlags.CenterVertical);
+        tokenStatusRow.AddView(PaperUi.Secondary(this, "Update token: " + tokenState.StatusText),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        tokenStatusRow.AddView(PaperUi.SecondaryButton(this, "Replace", () =>
+        {
+            input.Text = string.Empty;
+            input.Visibility = ViewStates.Visible;
+            tokenStatusRow.Visibility = ViewStates.Gone;
+        }));
+        input.Visibility = tokenState.ShowEntry ? ViewStates.Visible : ViewStates.Gone;
+        tokenStatusRow.Visibility = tokenState.ShowEntry ? ViewStates.Gone : ViewStates.Visible;
+
         // The secrets-vault passphrase lives with the other admin secret: it encrypts the shared Drive file
         // that backs up the update token (and every app's keys) so a factory reset can restore them.
         // Shown in the clear (not a password field) so it can be read back and copied — it's the one secret
@@ -222,6 +243,7 @@ public class UnlockActivity : Activity
         fields.SetPadding(
             PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X4),
             PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), 0);
+        fields.AddView(tokenStatusRow);
         fields.AddView(input);
         fields.AddView(passphrase);
 

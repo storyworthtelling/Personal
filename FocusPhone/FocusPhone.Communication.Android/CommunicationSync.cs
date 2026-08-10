@@ -1,6 +1,7 @@
 using Android.Content;
 using FocusPhone.Domain.Timeline;
 using FocusPhone.Infrastructure.Email;
+using FocusPhone.Ui.Voice;
 
 namespace FocusPhone.Communication;
 
@@ -65,7 +66,20 @@ public static class CommunicationSync
                 : now - ReconcileWindow;
 
         var client = new GmailClient(account.GmailAddress!, account.GmailAppPassword!);
-        var items = client.FetchRecentAsync(since).GetAwaiter().GetResult();
+        var health = new CredentialHealthStore();
+        IReadOnlyList<TimelineItem> items;
+        try
+        {
+            items = client.FetchRecentAsync(since).GetAwaiter().GetResult();
+            // A completed authenticated fetch clears any prior app-password failure.
+            health.MarkOk(CredentialIds.GmailAppPassword);
+        }
+        catch (MailKit.Security.AuthenticationException ex)
+        {
+            // Only an auth rejection flags the app password; connect/network failures are transient.
+            health.MarkFailing(CredentialIds.GmailAppPassword, ex.Message);
+            throw;
+        }
 
         using var database = TimelineDatabase.Open(context);
         if (reconcile)

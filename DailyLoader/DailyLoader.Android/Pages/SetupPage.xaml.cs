@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
+using DailyLoader.Domain.Health;
+using Storyworthtelling.Voice.Health;
 
 namespace DailyLoader.Android.Pages;
 
@@ -15,15 +17,76 @@ public partial class SetupPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // Pre-fill the (usually hidden) key entries so a save never wipes a stored key; ApplyCredentialFields
+        // then decides which fields to actually show based on each key's last-known health.
         NytCookieEntry.Text = CredentialStore.NytSessionCookie;
         NytApiKeyEntry.Text = CredentialStore.NytApiKey;
         RemarkableTokenEntry.Text = CredentialStore.RemarkableDeviceToken;
         AnthropicKeyEntry.Text = CredentialStore.AnthropicApiKey;
+        ApplyCredentialFields();
         CalendarMappingEditor.Text = CredentialStore.CalendarMappingJson;
         VaultPassphraseEntry.Text = CredentialStore.VaultPassphrase;
         GoogleStatusLabel.Text = CredentialStore.IsGoogleConfigured
             ? $"Signed in as {CredentialStore.GoogleAccountEmail} ✓"
             : "Not signed in";
+    }
+
+    // Shows each key field only when there's something to do: no key stored yet, or a live call with the
+    // stored key was just rejected. A working key collapses to a "Working ✓" line with a Replace button, so
+    // the screen stays quiet and the raw key isn't left on display (the vault keeps the backup).
+    private void ApplyCredentialFields()
+    {
+        var report = CredentialHealth();
+        ApplyCredentialField(CredentialIds.NytCookie, report, CredentialStore.NytSessionCookie,
+            NytCookieStatusRow, NytCookieStatusLabel, NytCookieReplaceButton, NytCookieFields);
+        ApplyCredentialField(CredentialIds.NytApiKey, report, CredentialStore.NytApiKey,
+            NytApiKeyStatusRow, NytApiKeyStatusLabel, NytApiKeyReplaceButton, NytApiKeyFields);
+        ApplyCredentialField(CredentialIds.Remarkable, report, CredentialStore.RemarkableDeviceToken,
+            RemarkableStatusRow, RemarkableStatusLabel, RemarkableReplaceButton, RemarkableFields);
+        ApplyCredentialField(CredentialIds.Anthropic, report, CredentialStore.AnthropicApiKey,
+            AnthropicStatusRow, AnthropicStatusLabel, AnthropicReplaceButton, AnthropicFields);
+    }
+
+    private static CredentialHealthReport CredentialHealth() =>
+        IPlatformApplication.Current!.Services.GetRequiredService<CredentialHealthStore>().Load();
+
+    private void ApplyCredentialField(
+        string credentialId, CredentialHealthReport report, string storedValue,
+        Grid statusRow, Label statusLabel, Button replaceButton, View fields)
+    {
+        var state = CredentialFieldState.Decide(!string.IsNullOrEmpty(storedValue), report.Get(credentialId));
+        fields.IsVisible = state.ShowEntry;
+        statusRow.IsVisible = !state.ShowEntry || state.IsWarning;
+        replaceButton.IsVisible = !state.ShowEntry;
+        statusLabel.Text = state.StatusText;
+        statusLabel.Style = LookupStyle(state.IsWarning ? "ErrorLabel" : "SecondaryLabel");
+    }
+
+    // Styles live in the app-wide merged dictionaries, which a page's own Resources indexer doesn't search;
+    // TryGetValue on the application resources walks the merged dictionaries.
+    private static Style? LookupStyle(string key) =>
+        Application.Current?.Resources.TryGetValue(key, out var value) == true ? value as Style : null;
+
+    private void OnReplaceNytCookieClicked(object sender, EventArgs e) =>
+        RevealEntry(NytCookieStatusRow, NytCookieFields, NytCookieEntry);
+
+    private void OnReplaceNytApiKeyClicked(object sender, EventArgs e) =>
+        RevealEntry(NytApiKeyStatusRow, NytApiKeyFields, NytApiKeyEntry);
+
+    private void OnReplaceRemarkableClicked(object sender, EventArgs e) =>
+        RevealEntry(RemarkableStatusRow, RemarkableFields, RemarkableTokenEntry);
+
+    private void OnReplaceAnthropicClicked(object sender, EventArgs e) =>
+        RevealEntry(AnthropicStatusRow, AnthropicFields, AnthropicKeyEntry);
+
+    // Deliberate rotation of a working key: hide the status row and open the field (kept empty so the new
+    // value is typed fresh rather than edited over the old one).
+    private static void RevealEntry(Grid statusRow, View fields, Entry entry)
+    {
+        statusRow.IsVisible = false;
+        entry.Text = string.Empty;
+        fields.IsVisible = true;
+        entry.Focus();
     }
 
     private async void OnSaveClicked(object sender, EventArgs e)

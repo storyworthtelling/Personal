@@ -42,8 +42,11 @@ public class GitHubReleaseClient
         var response = await http.SendAsync(request);
         if (!response.IsSuccessStatusCode)
         {
+            // Carry the status code on the exception so the caller can tell a rejected token (401/403) from a
+            // transient failure and record the update token's health accordingly.
             throw new HttpRequestException(
-                $"Fetching the latest release of {repo} failed with {(int)response.StatusCode} {response.StatusCode}.");
+                $"Fetching the latest release of {repo} failed with {(int)response.StatusCode} {response.StatusCode}.",
+                inner: null, response.StatusCode);
         }
 
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

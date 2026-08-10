@@ -7,9 +7,11 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
+using Storyboarder.Domain.Health;
 using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
+using Storyworthtelling.Voice.Health;
 
 namespace Storyboarder.Infrastructure.External;
 
@@ -212,11 +214,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
+    private readonly ICredentialHealthSink? healthSink;
 
-    public ClaudeAnalysisClient(HttpClient httpClient, IOptions<ClaudeOptions> options)
+    public ClaudeAnalysisClient(
+        HttpClient httpClient, IOptions<ClaudeOptions> options, ICredentialHealthSink? healthSink = null)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
+        this.healthSink = healthSink;
     }
 
     public async Task<DesignBibleFragment> ExtractEntities(string chunkText, CancellationToken cancellationToken)
@@ -545,10 +550,16 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            // Only a credential rejection flags the key; throttling/5xx/network are transient and left alone.
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, body))
+                healthSink?.MarkFailing(CredentialIds.Claude, $"{(int)response.StatusCode} {response.StatusCode}");
             throw ToException(response, body);
         }
 
-        return await ReadStreamedText(response, effectiveMaxTokens, cancellationToken);
+        var text = await ReadStreamedText(response, effectiveMaxTokens, cancellationToken);
+        // A successful authenticated call clears any prior failure on this key.
+        healthSink?.MarkOk(CredentialIds.Claude);
+        return text;
     }
 
     // Accumulates the assistant's text from an Anthropic Messages streaming response. Only text_delta

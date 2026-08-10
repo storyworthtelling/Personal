@@ -4,6 +4,8 @@ using Android.Content.PM;
 using Android.Util;
 using AndroidX.Work;
 using FocusPhone.Infrastructure.Updates;
+using FocusPhone.Ui.Voice;
+using Storyworthtelling.Voice.Health;
 
 namespace FocusPhone.Launcher;
 
@@ -49,7 +51,21 @@ public static class UpdateService
 
         using var http = new HttpClient();
         var client = new GitHubReleaseClient(http, Repo, token);
-        var release = await client.GetLatestReleaseAsync();
+        var health = new CredentialHealthStore();
+        ReleaseInfo release;
+        try
+        {
+            release = await client.GetLatestReleaseAsync();
+            // A successful release fetch clears any prior update-token failure.
+            health.MarkOk(CredentialIds.GitHubUpdateToken);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is { } status &&
+            AuthFailure.IsHttpCredentialRejection((int)status, null))
+        {
+            // Only a rejected token (401/403) flags the credential; a transient failure retries silently.
+            health.MarkFailing(CredentialIds.GitHubUpdateToken, $"{(int)ex.StatusCode} {ex.StatusCode}");
+            throw;
+        }
 
         var installed = context.PackageManager!
             .GetPackageInfo(context.PackageName!, (PackageInfoFlags)0)!
