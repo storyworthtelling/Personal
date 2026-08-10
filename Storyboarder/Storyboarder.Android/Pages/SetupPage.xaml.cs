@@ -108,7 +108,7 @@ public partial class SetupPage : ContentPage
 
         try
         {
-            var suggestedName = $"storyboarder-backup-{DateTime.Now:yyyyMMdd-HHmm}.zip";
+            var suggestedName = $"canonizer-backup-{DateTime.Now:yyyyMMdd-HHmm}.zip";
             var uri = await SafFilePicker.CreateDocumentAsync(activity, "application/zip", suggestedName);
             if (uri is null)
             {
@@ -228,7 +228,7 @@ public partial class SetupPage : ContentPage
         }
         else if (action == "Share")
         {
-            await ShareText("storyboarder-status.txt", report, "Storyboarder status snapshot");
+            await ShareText("canonizer-status.txt", report, "Canonizer status snapshot");
         }
     }
 
@@ -262,7 +262,7 @@ public partial class SetupPage : ContentPage
                 .AppendLine("===== PIPELINE LOG =====").AppendLine().AppendLine(ReadOrEmpty(PipelineLogPath)).AppendLine()
                 .AppendLine("===== CRASH LOG =====").AppendLine().AppendLine(ReadOrEmpty(CrashLogPath))
                 .ToString();
-            await ShareText($"storyboarder-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.txt", bundle, "Storyboarder diagnostics");
+            await ShareText($"canonizer-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.txt", bundle, "Canonizer diagnostics");
         }
         catch (Exception ex)
         {

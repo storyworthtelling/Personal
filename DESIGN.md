@@ -148,7 +148,7 @@ All pages (including front matter) carry the §6 grain over `Paper`.
 
 ## 10. Launcher icon family
 
-Android adaptive icons, generated exclusively by `Tools/IconStudio` (never hand-edited): flat `Paper` background layer; one `Ink` line glyph (stroke ≈ 3.5% of the canvas) centered in the 66/108 safe zone with exactly one `Accent` detail. Glyphs: clock (Launcher) · lens (Camera) · waveform (Audio) · speech (Communication) · panel grid (Storyboarder) · folded sheet (DailyLoader). Regenerate: `dotnet run --project Tools/IconStudio -- --repo-root .`
+Android adaptive icons, generated exclusively by `Tools/IconStudio` (never hand-edited): flat `Paper` background layer; one `Ink` line glyph (stroke ≈ 3.5% of the canvas) centered in the 66/108 safe zone with exactly one `Accent` detail. Glyphs: clock (Launcher) · lens (Camera) · waveform (Audio) · speech (Communication) · red pen nib (Canonizer) · folded sheet (DailyLoader) · ledger marks (Ledger). Regenerate: `dotnet run --project Tools/IconStudio -- --repo-root .`
 
 ## 11. Voice, copy & formats
 

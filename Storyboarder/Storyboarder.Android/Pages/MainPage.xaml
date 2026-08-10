@@ -2,11 +2,11 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Storyboarder.Android.Pages.MainPage"
-             Title="Storyboarder">
+             Title="Canonizer">
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="{StaticResource ScreenPadding}" RowSpacing="12">
 
         <VerticalStackLayout Grid.Row="0" Spacing="2">
-            <Label Text="Your graphic novels"
+            <Label Text="Your manuscripts"
                    Style="{StaticResource DisplayLabel}" />
             <!-- A situational greeting written in the owner's voice when a profile exists; otherwise the
                  neutral fallback set in code. Kept a quiet secondary line so it never competes with the
