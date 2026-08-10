@@ -708,11 +708,20 @@ public sealed class ReviewProcessor : IPipelineStep
 
             try
             {
+                // Thread the running story-state through the map in reading order: each chunk is analyzed
+                // with the story-so-far and returns it updated, so continuity and setup/payoff survive the
+                // chunk-by-chunk read. The accumulated state feeds the consolidation (and cross-draft
+                // reconciliation) as the continuity summary.
                 var notes = await claude.AnalyzeChapter(
-                    chunk.Text, chunk.ChapterLabel, castNames, cancellationToken);
+                    chunk.Text, chunk.ChapterLabel, castNames, novel.ContinuitySummary, cancellationToken);
                 unit.NotesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
                 unit.Status = WorkStatus.Completed;
                 unit.LastError = null;
+                if (!string.IsNullOrWhiteSpace(notes.RunningState))
+                {
+                    novel.ContinuitySummary = notes.RunningState;
+                    Touch(novel);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

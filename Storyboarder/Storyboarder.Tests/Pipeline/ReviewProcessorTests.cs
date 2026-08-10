@@ -42,8 +42,8 @@ public class ReviewProcessorTests : IDisposable
 
         // The first chapter-analysis call is rate-limited; the worker must reschedule and succeed on retry.
         claude.Setup(c => c.AnalyzeChapter(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, string chapterLabel, IReadOnlyList<string> _, CancellationToken _) =>
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string chapterLabel, IReadOnlyList<string> _, string _, CancellationToken _) =>
             {
                 chapterAnalysisCalls++;
                 return chapterAnalysisCalls == 1
@@ -52,7 +52,10 @@ public class ReviewProcessorTests : IDisposable
                         chapterLabel,
                         ["Hero"], ["Hero walks to the castle"], ["Hero resolves to enter"], [], [], [], ["Vivid setting"], [],
                         ["\"He felt the cold.\" — cut the filter"], ["Filter words recur"], ["Hero sounds like Villain"],
-                        ["The hero knocks | opens the confrontation | earns its place"]));
+                        ["The hero knocks | opens the confrontation | earns its place"])
+                    {
+                        RunningState = $"Story so far through {chapterLabel}: the hero reached the castle."
+                    });
             });
 
         claude.Setup(c => c.ConsolidateAnalysis(
@@ -287,6 +290,19 @@ public class ReviewProcessorTests : IDisposable
         Assert.Single(changed);
         Assert.All(scenes, s => Assert.NotNull(s.PreviousSceneId));   // both matched a prior scene
         Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
+    }
+
+    [Fact]
+    public async Task Map_ThreadsRunningStoryStateIntoContinuitySummary()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == id);
+        // The map step carried the model's running state onto the manuscript for the consolidation to use.
+        Assert.False(string.IsNullOrWhiteSpace(novel.ContinuitySummary));
+        Assert.Contains("the hero reached the castle", novel.ContinuitySummary);
     }
 
     [Fact]

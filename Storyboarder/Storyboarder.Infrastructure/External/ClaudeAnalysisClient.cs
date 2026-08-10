@@ -61,12 +61,17 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "You are a developmental editor analyzing ONE excerpt of a novel manuscript to help the author " +
         "revise toward publication. Use the KNOWN CAST names consistently when they appear. LOCATION IN " +
         "THE BOOK names the chapter(s) this excerpt covers — every observation you make is about that " +
-        "part of the book, so keep each one specific enough to be found there again. Read the " +
-        "excerpt and record concise, concrete, accurate observations. Respond with ONLY a JSON object: " +
+        "part of the book, so keep each one specific enough to be found there again. STORY SO FAR is a " +
+        "running summary of everything before this excerpt — use it to judge continuity, timeline, and " +
+        "whether setups planted earlier pay off here. Read the excerpt and record concise, concrete, " +
+        "accurate observations. Respond with ONLY a JSON object: " +
         "{\"charactersPresent\":[string],\"keyEvents\":[string],\"characterBeats\":[string]," +
         "\"setupsAndPayoffs\":[string],\"possibleInconsistencies\":[string],\"factualClaims\":[string]," +
         "\"notableStrengths\":[string],\"notableWeaknesses\":[string],\"lineEditCandidates\":[string]," +
-        "\"proseObservations\":[string],\"dialogueObservations\":[string],\"sceneBeats\":[string]}. " +
+        "\"proseObservations\":[string],\"dialogueObservations\":[string],\"sceneBeats\":[string]," +
+        "\"runningState\":string}. runningState = the UPDATED story-so-far after this excerpt: extend STORY " +
+        "SO FAR with this excerpt's plot developments, the current state of each character, open questions, " +
+        "and planted-but-unpaid setups — a few tight paragraphs, cumulative, so the next excerpt inherits it. " +
         "characterBeats = decisions, " +
         "changes, or motivation shifts; setupsAndPayoffs = planted elements or promises (note if paid " +
         "off here); factualClaims = checkable real-world statements that may need fact-checking; " +
@@ -245,11 +250,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     public async Task<ChapterNotes> AnalyzeChapter(
         string chapterText, string chapterLabel, IReadOnlyList<string> characterNames,
-        CancellationToken cancellationToken)
+        string priorRunningState, CancellationToken cancellationToken)
     {
         var cast = characterNames.Count == 0 ? "(none identified yet)" : string.Join(", ", characterNames);
         var location = string.IsNullOrWhiteSpace(chapterLabel) ? "(unknown)" : chapterLabel;
-        var userContent = $"LOCATION IN THE BOOK: {location}\n\nKNOWN CAST: {cast}\n\nEXCERPT:\n{chapterText}";
+        var storySoFar = string.IsNullOrWhiteSpace(priorRunningState) ? "(this is the beginning)" : priorRunningState;
+        var userContent =
+            $"LOCATION IN THE BOOK: {location}\n\nKNOWN CAST: {cast}\n\n" +
+            $"STORY SO FAR (running state up to this excerpt):\n{storySoFar}\n\nEXCERPT:\n{chapterText}";
 
         // Fast tier: one call per chunk, recording observations against a fixed JSON contract. The
         // judgement calls — synthesising these notes into a report — stay on the strong model.
@@ -258,8 +266,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             model: options.FastModel);
         var json = JsonResponse.ExtractObject(reply);
         // The chapter is known exactly from the chunk's offsets, so it is stamped on here rather than
-        // trusted to the model — even a reply that failed to parse still carries where it came from.
-        var located = ChapterNotes.Empty with { Chapter = chapterLabel };
+        // trusted to the model — even a reply that failed to parse still carries where it came from, and
+        // keeps the prior running state so a parse failure doesn't wipe the story-so-far.
+        var located = ChapterNotes.Empty with { Chapter = chapterLabel, RunningState = priorRunningState };
         if (json is null)
             return located;
 
@@ -273,7 +282,12 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             dto.SetupsAndPayoffs ?? [], dto.PossibleInconsistencies ?? [], dto.FactualClaims ?? [],
             dto.NotableStrengths ?? [], dto.NotableWeaknesses ?? [],
             dto.LineEditCandidates ?? [], dto.ProseObservations ?? [],
-            dto.DialogueObservations ?? [], dto.SceneBeats ?? []);
+            dto.DialogueObservations ?? [], dto.SceneBeats ?? [])
+        {
+            // The updated story-so-far the model returns, threaded to the next chunk. Falls back to the prior
+            // state if the model omitted it, so the running summary never regresses to empty mid-book.
+            RunningState = string.IsNullOrWhiteSpace(dto.RunningState) ? priorRunningState : dto.RunningState!
+        };
     }
 
     public async Task<BookAnalysisResult> ConsolidateAnalysis(
@@ -640,6 +654,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? ProseObservations { get; set; }
         public List<string>? DialogueObservations { get; set; }
         public List<string>? SceneBeats { get; set; }
+        public string? RunningState { get; set; }
     }
 
     private sealed class ReconciliationDto

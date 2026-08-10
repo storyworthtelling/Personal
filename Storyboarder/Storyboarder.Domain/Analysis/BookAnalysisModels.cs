@@ -30,6 +30,13 @@ public sealed record ChapterNotes(
     IReadOnlyList<string> DialogueObservations,
     IReadOnlyList<string> SceneBeats)
 {
+    // A cumulative "story so far" the map call carries chapter-to-chapter: the running plot state, open
+    // threads, and planted-but-unpaid setups as of the end of this chunk, built from the prior chunk's state
+    // plus this chunk. It gives the consolidation (and cross-draft reconciliation) long-range continuity for
+    // setup/payoff and for contradictions a fix in one chapter creates in a distant one. Init-only with an
+    // empty default so callers that don't thread it (and reports stored before it existed) are unaffected.
+    public string RunningState { get; init; } = string.Empty;
+
     public static ChapterNotes Empty { get; } = new(
         string.Empty,
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),

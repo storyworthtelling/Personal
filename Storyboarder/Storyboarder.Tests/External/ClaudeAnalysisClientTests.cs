@@ -125,7 +125,7 @@ public class ClaudeAnalysisClientTests
         handler.EnqueueOk(Reply("{}"));
 
         await client.ExtractEntities("excerpt", CancellationToken.None);
-        await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
+        await client.AnalyzeChapter("excerpt", "Chapter 1", [], string.Empty, CancellationToken.None);
 
         Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[0]);
         Assert.Contains("\"model\":\"test-fast-model\"", handler.RequestBodies[1]);
@@ -189,6 +189,32 @@ public class ClaudeAnalysisClientTests
 
         Assert.Equal(VoiceConsistency.Empty, result); // one chapter gives nothing to compare against
         Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_ParsesRunningState_AndSendsThePriorStateInThePrompt()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"keyEvents\":[\"the gate opens\"],\"runningState\":\"The hero has entered the castle.\"}"));
+
+        var notes = await client.AnalyzeChapter(
+            "excerpt", "Chapter 2", [], "Previously: the hero set out.", CancellationToken.None);
+
+        Assert.Equal("The hero has entered the castle.", notes.RunningState);
+        Assert.Contains("Previously: the hero set out.", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_MissingRunningState_KeepsThePriorState()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"keyEvents\":[\"the gate opens\"]}"));
+
+        var notes = await client.AnalyzeChapter(
+            "excerpt", "Chapter 2", [], "the story so far", CancellationToken.None);
+
+        // A reply that omits runningState must not wipe the running summary mid-book.
+        Assert.Equal("the story so far", notes.RunningState);
     }
 
     [Fact]
@@ -292,7 +318,7 @@ public class ClaudeAnalysisClientTests
             "\"possibleInconsistencies\":[\"Eye color changes\"],\"factualClaims\":[\"Paris is in France\"]," +
             "\"notableStrengths\":[\"Vivid prose\"],\"notableWeaknesses\":[\"Slow open\"]}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapter 3", ["Alice"], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 3", ["Alice"], string.Empty, CancellationToken.None);
 
         Assert.Contains("Alice", notes.CharactersPresent);
         Assert.Equal("Eye color changes", Assert.Single(notes.PossibleInconsistencies));
@@ -306,7 +332,7 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 1", [], string.Empty, CancellationToken.None);
 
         Assert.Empty(notes.CharactersPresent);
         Assert.Empty(notes.NotableStrengths);
@@ -318,7 +344,7 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"keyEvents\":[\"The gate opens\"]}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapters 7–8", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapters 7–8", [], string.Empty, CancellationToken.None);
 
         // The chapter is known exactly from the chunk's offsets, so it is stamped on by the client —
         // never left to the model — and it also rides along as context for the observations.
@@ -332,7 +358,7 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("I'm afraid I can't help with that."));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapter 4", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 4", [], string.Empty, CancellationToken.None);
 
         Assert.Equal("Chapter 4", notes.Chapter);
         Assert.Empty(notes.KeyEvents);
@@ -466,7 +492,7 @@ public class ClaudeAnalysisClientTests
             "\"proseObservations\":[\"Filter words recur\"],\"dialogueObservations\":[\"Alice and Bob sound alike\"]," +
             "\"sceneBeats\":[\"Alice waits | stalls the confrontation | does no work\"]}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapter 2", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 2", [], string.Empty, CancellationToken.None);
 
         Assert.Single(notes.LineEditCandidates);
         Assert.Single(notes.ProseObservations);
