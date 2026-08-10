@@ -38,6 +38,8 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
+    <!-- PdfPig reads PDF content streams (not something to hand-roll); RTF and ePub are pure-BCL. -->
+    <PackageReference Include="PdfPig" Version="0.1.10" />
     <PackageReference Include="PDFsharp" Version="6.1.1" />
     <PackageReference Include="SkiaSharp" Version="3.119.4" />
   </ItemGroup>
