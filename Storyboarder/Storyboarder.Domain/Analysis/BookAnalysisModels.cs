@@ -190,6 +190,19 @@ public sealed record BookAnalysisResult(
     // folded in the same way. Defaults to Empty so a report stored before this existed re-renders fine.
     public VoiceConsistency VoiceConsistency { get; init; } = VoiceConsistency.Empty;
 
+    // The inferred genre and the word-count range publishers expect for it, and the manuscript's actual
+    // word count, so the length read is framed against the genre norm. All default-empty for old reports.
+    public string Genre { get; init; } = string.Empty;
+    public string WordCountRange { get; init; } = string.Empty;
+    public int WordCount { get; init; }
+
+    // Tension per chapter (0 = calm, 1 = peak), rendered as a small chart so a saggy stretch is visible
+    // at a glance.
+    public IReadOnlyList<ChapterTension> PacingCurve { get; init; } = Array.Empty<ChapterTension>();
+
+    // The candid state-of-the-draft that closes the report.
+    public Verdict Verdict { get; init; } = Verdict.Empty;
+
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
         Array.Empty<Finding>(), Array.Empty<Finding>(), Array.Empty<Finding>(), Array.Empty<Finding>(),
@@ -207,6 +220,22 @@ public sealed record BookAnalysisResult(
 
     public BookAnalysisResult WithVoiceConsistency(VoiceConsistency voice) =>
         this with { VoiceConsistency = voice };
+
+    public BookAnalysisResult WithWordCount(int wordCount) =>
+        this with { WordCount = wordCount };
+}
+
+// One chapter's dramatic tension, 0 (calm) to 1 (peak), for the pacing chart.
+public sealed record ChapterTension(string Chapter, double Tension);
+
+// The candid state-of-the-draft that closes the report: what is working best, what is most broken, and
+// the single thing this draft most needs before the next revision.
+public sealed record Verdict(
+    IReadOnlyList<string> Strengths,
+    IReadOnlyList<string> Problems,
+    string MostNeeds)
+{
+    public static Verdict Empty { get; } = new(Array.Empty<string>(), Array.Empty<string>(), string.Empty);
 }
 
 // The authorial-voice-consistency read: a short characterization of the book's dominant voice, and the

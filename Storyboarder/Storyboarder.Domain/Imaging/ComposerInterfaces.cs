@@ -21,8 +21,16 @@ public interface IVolumePdfComposer
     byte[] Compose(IReadOnlyList<byte[]> pageImages, int dpi);
 }
 
-// Renders the consolidated revision report into a single, image-and-text PDF.
+// One scene's supporting evidence in the report: the wordless image (null when the model couldn't render
+// one), cited as "Ch. N · Scene M", with the scene's purpose and verdict from the craft read.
+public sealed record SceneEvidence(string Citation, string Purpose, string Verdict, byte[]? Image);
+
+// Renders the consolidated revision report — the star product — into a single image-and-text PDF, placing
+// each scene's wordless evidence image beside its notes.
 public interface IAnalysisPdfComposer
 {
-    byte[] Compose(Storyboarder.Domain.Analysis.BookAnalysisResult analysis, string title);
+    byte[] Compose(
+        Storyboarder.Domain.Analysis.BookAnalysisResult analysis,
+        string title,
+        IReadOnlyList<SceneEvidence> scenes);
 }

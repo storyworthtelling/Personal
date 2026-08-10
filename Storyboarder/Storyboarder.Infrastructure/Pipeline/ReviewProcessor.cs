@@ -724,8 +724,11 @@ public sealed class ReviewProcessor : IPipelineStep
                 var voice = analysis.VoiceJson is null
                     ? VoiceConsistency.Empty
                     : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive) ?? VoiceConsistency.Empty;
-                var pdf = analysisPdfComposer.Compose(
-                    report.WithCraft(craft).WithVoiceConsistency(voice), novel.Title);
+
+                var wordCount = await WordCount(db, novel.Id, cancellationToken);
+                var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
+                var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount);
+                var pdf = analysisPdfComposer.Compose(folded, novel.Title, scenes);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -990,6 +993,46 @@ public sealed class ReviewProcessor : IPipelineStep
         logger.LogWarning("{Unit} attempt {Attempts}/{Max} failed ({Kind}); retrying after {NextAttempt:u}: {Error}",
             unit.GetType().Name, unit.Attempts, rateLimits.MaxAttempts,
             transient ? "rate limit" : "error", unit.NextAttemptAtUtc, exception.Message);
+    }
+
+    // The manuscript's word count, so the report can frame length against the genre norm.
+    private static async Task<int> WordCount(StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var text = await db.SourceTexts
+            .Where(s => s.NovelId == novelId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(text))
+            return 0;
+        return text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+    }
+
+    // Builds each scene's evidence for the report: the rendered image (if any), cited "Ch. N · Scene M",
+    // paired by reading order with the craft read's scene-by-scene note for its purpose and verdict.
+    private async Task<IReadOnlyList<SceneEvidence>> GatherSceneEvidence(
+        StoryboarderDbContext db, Guid novelId, IReadOnlyList<SceneBeat> sceneBreakdown, CancellationToken cancellationToken)
+    {
+        var scenes = await db.Scenes
+            .Where(s => s.NovelId == novelId)
+            .OrderBy(s => s.Number)
+            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath })
+            .ToListAsync(cancellationToken);
+
+        var evidence = new List<SceneEvidence>(scenes.Count);
+        for (var i = 0; i < scenes.Count; i++)
+        {
+            var scene = scenes[i];
+            var citation = string.IsNullOrWhiteSpace(scene.ChapterLabel)
+                ? $"Scene {scene.Number}"
+                : $"{scene.ChapterLabel} · Scene {scene.Number}";
+            var beat = i < sceneBreakdown.Count ? sceneBreakdown[i] : null;
+            var image = scene.ImagePath is not null && imageStore.Exists(scene.ImagePath)
+                ? imageStore.Read(scene.ImagePath)
+                : null;
+            evidence.Add(new SceneEvidence(
+                citation, beat?.Purpose ?? string.Empty, beat?.Verdict ?? string.Empty, image));
+        }
+        return evidence;
     }
 
     private async Task<DesignBible> LoadBible(StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)

@@ -91,14 +91,17 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "author preparing a novel for publication. You are given per-chunk notes gathered across the " +
         "whole manuscript in reading order, plus the cast. Each note carries the chapter it was taken " +
         "from. Synthesize the WHOLE book (do not merely concatenate the notes); " +
-        "be accurate, fair, specific, and constructive. Respond with ONLY a JSON object: " +
-        "{\"logline\":string,\"synopsis\":string,\"characters\":[{\"name\":string,\"role\":string," +
+        "be accurate, fair, specific, and constructive. Judge the draft QUALITATIVELY — never assign a " +
+        "numeric score or grade. Respond with ONLY a JSON object: " +
+        "{\"logline\":string,\"synopsis\":string,\"genre\":string,\"wordCountRange\":string," +
+        "\"characters\":[{\"name\":string,\"role\":string," +
         "\"arcSummary\":string,\"relationships\":[string]}],\"themes\":[string],\"plotHoles\":[FINDING]," +
-        "\"inconsistencies\":[FINDING],\"inaccuracies\":[FINDING],\"pacingNotes\":[FINDING],\"reviews\":" +
+        "\"inconsistencies\":[FINDING],\"inaccuracies\":[FINDING],\"pacingNotes\":[FINDING]," +
+        "\"pacingCurve\":[{\"chapter\":string,\"tension\":number}],\"reviews\":" +
         "[{\"perspective\":string,\"assessment\":string,\"strengths\":[string],\"weaknesses\":[string]," +
         "\"recommendation\":string}],\"revisionPlan\":[{\"priority\":string,\"chapter\":string," +
-        "\"issue\":string,\"suggestedFix\":string}],\"comparableTitles\":[string]," +
-        "\"marketPositioning\":string}. " +
+        "\"issue\":string,\"suggestedFix\":string}]," +
+        "\"verdict\":{\"strengths\":[string],\"problems\":[string],\"mostNeeds\":string}}. " +
         // Every finding has to be findable: an observation the author can't locate in the manuscript
         // costs them a re-read to act on. The chapter is already on the notes, so it only has to be
         // carried through rather than worked out.
@@ -106,10 +109,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "observation came from (\"Chapter 7\", \"Chapters 7–8\"), naming the EARLIEST chapter involved " +
         "when an observation spans several, and use \"\" only when the notes carry no chapter at all. " +
         "Set \"chapter\" on each revisionPlan item the same way. " +
-        "Provide AT LEAST THREE reviews from DISTINCT, fair perspectives (e.g. developmental editor, " +
-        "target-genre reader, literary critic, acquiring agent) — differing but honest, each with real " +
-        "strengths and weaknesses. Order revisionPlan HIGHEST-IMPACT FIRST and set priority to " +
-        "\"High\", \"Medium\", or \"Low\". Use [] when none. No prose outside the JSON.";
+        "genre: infer the book's genre. wordCountRange: the word-count range publishers expect for that " +
+        "genre (e.g. \"90,000–120,000\"). " +
+        "pacingCurve: one entry PER CHAPTER in reading order with tension from 0.0 (calm) to 1.0 (peak), so " +
+        "a saggy stretch is visible; copy the chapter label from the notes. " +
+        "Provide AT LEAST FOUR reviews from DISTINCT, fair perspectives — a DEVELOPMENTAL EDITOR (structure, " +
+        "arcs, stakes), the TARGET-GENRE READER (where they're gripped, bored, confused, moved), the SKEPTIC " +
+        "(the harshest fair read), and an AGENT & ACQUIRING EDITOR (is it sellable, is it ready, where it " +
+        "sits in the market, and a readiness read: early draft / revision / near-submittable) — differing " +
+        "but honest, each with real strengths and weaknesses. " +
+        "Order revisionPlan HIGHEST-IMPACT FIRST and set priority to \"Must\", \"Should\", or \"Consider\". " +
+        "verdict: the candid state of the draft — biggest strengths, biggest problems, and the single thing " +
+        "this draft most needs before the next revision. Use [] when none. No prose outside the JSON.";
 
     private const string CraftConsolidationInstruction =
         "You are a line editor and craft critic producing the CRAFT half of a REVISION REPORT for an " +
@@ -294,7 +305,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             // The craft sections come from their own call (ConsolidateCraft) and are folded in by the
             // caller; this half of the report leaves them empty rather than half-answering them.
             CraftReport.Empty.LineEdits, CraftReport.Empty.ProseNotes,
-            CraftReport.Empty.DialogueNotes, CraftReport.Empty.SceneBreakdown);
+            CraftReport.Empty.DialogueNotes, CraftReport.Empty.SceneBreakdown)
+        {
+            Genre = dto.Genre ?? string.Empty,
+            WordCountRange = dto.WordCountRange ?? string.Empty,
+            PacingCurve = (dto.PacingCurve ?? [])
+                .Where(t => !string.IsNullOrWhiteSpace(t.Chapter))
+                .Select(t => new ChapterTension(t.Chapter!, Math.Clamp(t.Tension, 0, 1)))
+                .ToList(),
+            Verdict = dto.Verdict is null
+                ? Verdict.Empty
+                : new Verdict(dto.Verdict.Strengths ?? [], dto.Verdict.Problems ?? [], dto.Verdict.MostNeeds ?? string.Empty)
+        };
     }
 
     public async Task<CraftReport> ConsolidateCraft(
@@ -593,6 +615,23 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<RevisionItemDto>? RevisionPlan { get; set; }
         public List<string>? ComparableTitles { get; set; }
         public string? MarketPositioning { get; set; }
+        public string? Genre { get; set; }
+        public string? WordCountRange { get; set; }
+        public List<ChapterTensionDto>? PacingCurve { get; set; }
+        public VerdictDto? Verdict { get; set; }
+    }
+
+    private sealed class ChapterTensionDto
+    {
+        public string? Chapter { get; set; }
+        public double Tension { get; set; }
+    }
+
+    private sealed class VerdictDto
+    {
+        public List<string>? Strengths { get; set; }
+        public List<string>? Problems { get; set; }
+        public string? MostNeeds { get; set; }
     }
 
     private sealed class CraftReportDto
