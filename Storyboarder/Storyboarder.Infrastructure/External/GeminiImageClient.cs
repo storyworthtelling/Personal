@@ -4,16 +4,17 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Health;
-using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
 using Storyworthtelling.Voice.Health;
 
 namespace Storyboarder.Infrastructure.External;
 
-// Image generation via the Gemini (Generative Language) API. Uses an image-capable model that
-// accepts reference images, so character/setting reference sheets can be supplied on every panel
-// render to keep appearance consistent. RESOURCE_EXHAUSTED / 429 surface as RateLimitException.
+// Image generation via the Gemini (Generative Language) API. Uses an image-capable model that accepts
+// reference images, so character/setting reference sheets can be supplied on every scene render to keep
+// appearance consistent — coherence is part of the fidelity check. RESOURCE_EXHAUSTED / 429 surface as
+// RateLimitException; a content refusal surfaces as ImageContentBlockedException so the worker can retry
+// a different moment of the scene, then leave the image unavailable rather than blocking the report.
 public sealed class GeminiImageClient : IGeminiImageClient
 {
     private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -39,23 +40,34 @@ public sealed class GeminiImageClient : IGeminiImageClient
             "subtle height scale of evenly-spaced tick marks behind them; for a place, an average-height " +
             "human figure standing in it for scale. " +
             "Single subject, consistent canonical appearance, no text or lettering.";
-        return Generate(prompt, referenceImages: [], aspectRatio: null, relaxedCategories: [], cancellationToken);
+        return Generate(prompt, referenceImages: [], aspectRatio: null, cancellationToken);
     }
 
-    public Task<byte[]> GeneratePanel(
+    public Task<byte[]> GenerateSceneImage(
         string visualPrompt, string artStyle, IReadOnlyList<byte[]> referenceImages,
-        double? aspectRatio, CancellationToken cancellationToken) =>
-        GeneratePanel(visualPrompt, artStyle, referenceImages, aspectRatio, relaxedCategories: [], cancellationToken);
-
-    public Task<byte[]> GeneratePanel(
-        string visualPrompt, string artStyle, IReadOnlyList<byte[]> referenceImages,
-        double? aspectRatio, IReadOnlyCollection<string> relaxedCategories, CancellationToken cancellationToken)
+        double? aspectRatio, CancellationToken cancellationToken)
     {
-        var prompt = PanelImagePrompt.Build(artStyle, visualPrompt, referenceImages.Count > 0);
-        return Generate(prompt, referenceImages, aspectRatio, relaxedCategories, cancellationToken);
+        var prompt = BuildSceneImagePrompt(artStyle, visualPrompt, referenceImages.Count > 0);
+        return Generate(prompt, referenceImages, aspectRatio, cancellationToken);
     }
 
-    // The aspect ratios gemini-2.5-flash-image accepts; the requested panel aspect is snapped to the
+    // The wordless evidence image for a scene: one illustration of the beat, in the book's derived style,
+    // with no lettering (it is the moment the prose is measured against, not a comic panel).
+    private static string BuildSceneImagePrompt(string artStyle, string visualPrompt, bool hasReferences)
+    {
+        var referenceClause = hasReferences
+            ? "Match the supplied reference images for any recurring characters or settings so they stay " +
+              "recognizable across scenes. "
+            : string.Empty;
+        return
+            $"A single wordless illustration in this style: {artStyle}. " +
+            $"Depict this moment: {visualPrompt}. " +
+            referenceClause +
+            "Full color, portrait orientation. Absolutely no text, letters, words, captions, speech " +
+            "balloons, or signage anywhere in the image.";
+    }
+
+    // The aspect ratios gemini-2.5-flash-image accepts; the requested slot aspect is snapped to the
     // nearest so the request never carries an unsupported value.
     private static readonly (string Label, double Ratio)[] SupportedAspectRatios =
     {
@@ -68,7 +80,7 @@ public sealed class GeminiImageClient : IGeminiImageClient
 
     private async Task<byte[]> Generate(
         string prompt, IReadOnlyList<byte[]> referenceImages, double? aspectRatio,
-        IReadOnlyCollection<string> relaxedCategories, CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
         var parts = new JsonArray { new JsonObject { ["text"] = prompt } };
         foreach (var referenceImage in referenceImages)
@@ -82,8 +94,8 @@ public sealed class GeminiImageClient : IGeminiImageClient
             });
 
         var generationConfig = new JsonObject { ["responseModalities"] = new JsonArray("IMAGE") };
-        // Ask the model to frame the image at the panel's aspect ratio, so it fills the slot rather than
-        // being letterboxed onto shaded paper when composed.
+        // Ask the model to frame the image at the slot's aspect ratio, so it fills the slot rather than
+        // being letterboxed onto shaded paper when placed in the report.
         if (aspectRatio is { } ratio)
             generationConfig["imageConfig"] = new JsonObject { ["aspectRatio"] = NearestAspectRatio(ratio) };
 
@@ -92,17 +104,6 @@ public sealed class GeminiImageClient : IGeminiImageClient
             ["contents"] = new JsonArray(new JsonObject { ["parts"] = parts }),
             ["generationConfig"] = generationConfig
         };
-
-        // safetySettings is emitted ONLY for an approved re-render (relaxedCategories non-empty), and
-        // then only for the flagged categories. Omitting it entirely keeps the default render at
-        // Google's default thresholds — the app never lowers them on the normal path.
-        if (relaxedCategories.Count > 0)
-        {
-            var safetySettings = new JsonArray();
-            foreach (var category in relaxedCategories)
-                safetySettings.Add(new JsonObject { ["category"] = category, ["threshold"] = "BLOCK_NONE" });
-            payload["safetySettings"] = safetySettings;
-        }
 
         var url = $"{BaseUrl}/{options.Model}:generateContent?key={Uri.EscapeDataString(options.ApiKey)}";
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
@@ -128,9 +129,9 @@ public sealed class GeminiImageClient : IGeminiImageClient
         if (image is not null)
             return image;
 
-        // No image came back. A deliberate content block (safety or prohibited) is surfaced as a typed
-        // exception the worker can branch on; anything else (a text-only "sorry", an empty candidate)
-        // stays an InvalidOperationException as before.
+        // No image came back. A deliberate content block is surfaced as a typed exception so the worker
+        // can retry a different moment of the scene; anything else (a text-only "sorry", an empty
+        // candidate) stays an InvalidOperationException.
         var block = ClassifyBlock(body);
         if (block is not null)
             throw block;
@@ -234,20 +235,11 @@ public sealed class GeminiImageClient : IGeminiImageClient
         return null;
     }
 
-    // The adjustable Gemini harm categories. When a SAFETY block names no specific category we relax
-    // all of them on the approved re-render, since only the user-approved single call is affected.
-    private static readonly string[] AdjustableCategories =
-    {
-        "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH",
-        "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"
-    };
-
-    // Reads a no-image response for a deliberate content block and classifies it. A SAFETY block is
-    // adjustable — the flagged categories are collected so only those get relaxed on re-render. An
-    // IMAGE_SAFETY block is Gemini's non-configurable image-output filter: not adjustable, but recoverable
-    // by rephrasing, so it's Filtered (degrade the panel, keep the book). Every other reason
-    // (prohibited/copyrighted content, recitation, blocklist, PII) is a hard, book-cancelling block.
-    // Returns null when the response carries no block signal (a plain text-only reply).
+    // Reads a no-image response for a deliberate content block and classifies it. Canonizer never relaxes
+    // safety thresholds or asks the user to approve a render — on any block the worker simply retries a
+    // different moment of the scene and, failing that, leaves the image unavailable — so the reason is
+    // recorded for logging but the categories no longer matter. Returns null when the response carries no
+    // block signal (a plain text-only reply).
     private static ImageContentBlockedException? ClassifyBlock(string responseJson)
     {
         using var document = JsonDocument.Parse(responseJson);
@@ -260,8 +252,7 @@ public sealed class GeminiImageClient : IGeminiImageClient
         {
             return promptReason == "SAFETY"
                 ? new ImageContentBlockedException(
-                    $"Gemini blocked the prompt on safety grounds: {responseJson}",
-                    ImageBlockReason.Safety, CollectFlaggedCategories(feedback))
+                    $"Gemini blocked the prompt on safety grounds: {responseJson}", ImageBlockReason.Safety)
                 : new ImageContentBlockedException(
                     $"Gemini blocked the prompt as {promptReason}: {responseJson}", ImageBlockReason.Prohibited);
         }
@@ -277,47 +268,19 @@ public sealed class GeminiImageClient : IGeminiImageClient
 
             if (finishReason == "SAFETY")
                 return new ImageContentBlockedException(
-                    $"Gemini blocked the image on safety grounds: {responseJson}",
-                    ImageBlockReason.Safety, CollectFlaggedCategories(candidate));
+                    $"Gemini blocked the image on safety grounds: {responseJson}", ImageBlockReason.Safety);
 
-            // IMAGE_SAFETY is Gemini's non-configurable image-output filter — recoverable by rephrasing,
-            // so it degrades the panel rather than cancelling the book.
+            // IMAGE_SAFETY is Gemini's non-configurable image-output filter — recoverable by rephrasing.
             if (finishReason == "IMAGE_SAFETY")
                 return new ImageContentBlockedException(
                     $"Gemini refused the image as {finishReason}: {responseJson}", ImageBlockReason.Filtered);
 
-            // PROHIBITED_CONTENT, RECITATION, SPII, BLOCKLIST — hard content blocks, not adjustable.
+            // PROHIBITED_CONTENT, RECITATION, SPII, BLOCKLIST — hard content blocks.
             if (finishReason is "PROHIBITED_CONTENT" or "RECITATION" or "SPII" or "BLOCKLIST")
                 return new ImageContentBlockedException(
                     $"Gemini refused the image as {finishReason}: {responseJson}", ImageBlockReason.Prohibited);
         }
 
         return null;
-    }
-
-    // The HARM_CATEGORY_* names a SAFETY block flagged — those marked blocked, else those above a low
-    // probability. Falls back to all adjustable categories when the ratings don't pinpoint one.
-    private static IReadOnlyList<string> CollectFlaggedCategories(JsonElement container)
-    {
-        if (!container.TryGetProperty("safetyRatings", out var ratings) || ratings.ValueKind != JsonValueKind.Array)
-            return AdjustableCategories;
-
-        var flagged = new List<string>();
-        foreach (var rating in ratings.EnumerateArray())
-        {
-            if (rating.TryGetProperty("category", out var categoryProperty) &&
-                categoryProperty.GetString() is { Length: > 0 } category)
-            {
-                var blocked = rating.TryGetProperty("blocked", out var blockedProperty) &&
-                              blockedProperty.ValueKind == JsonValueKind.True;
-                var probability = rating.TryGetProperty("probability", out var probabilityProperty)
-                    ? probabilityProperty.GetString()
-                    : null;
-                if (blocked || probability is "MEDIUM" or "HIGH")
-                    flagged.Add(category);
-            }
-        }
-
-        return flagged.Count > 0 ? flagged : AdjustableCategories;
     }
 }

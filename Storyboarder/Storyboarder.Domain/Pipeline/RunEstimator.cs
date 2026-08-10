@@ -1,41 +1,37 @@
 namespace Storyboarder.Domain.Pipeline;
 
-// What a conversion is expected to cost before it is started, so a book that would take three weeks of
-// daily quota isn't discovered three weeks in.
+// What a review is expected to cost before it is started, so a book that would take days of daily quota
+// isn't discovered part-way through.
 public sealed record RunEstimate(
     int Chunks,
     int ClaudeCalls,
-    int Panels,
+    int Scenes,
     int ImageCalls,
     TimeSpan Duration,
     // Which provider's quota sets the duration, so the sentence can say what to raise to go faster.
     string LimitingFactor);
 
-// Projects the size and duration of a conversion from the manuscript's length.
+// Projects the size and duration of a review from the manuscript's length.
 //
-// The counts come from the pipeline's own arithmetic (chunk size, storyboard window size), so they are
-// exact given the text. The panel count cannot be — only storyboarding knows how many beats a book has —
-// so it is extrapolated from the owner's own converted novel and is explicitly an approximation.
+// The chunk and Claude-call counts come from the pipeline's own arithmetic, so they are exact given the
+// text. The scene count cannot be — only scene detection knows how many scenes a book has — so it is
+// extrapolated from an average scene length and is explicitly an approximation.
 //
 // Duration is deliberately derived from the configured RATE LIMITS rather than from how long a call takes:
-// on a real book the run is not compute-bound, it is quota-bound. The owner's last novel needed 2162 panel
-// renders against a default ceiling of 100 image calls a day — three weeks of wall-clock that no estimate
-// based on per-call latency would ever have revealed.
+// on a real book the run is quota-bound, not compute-bound.
 public static class RunEstimator
 {
-    // One panel per this many characters of manuscript, taken from the owner's converted novel: ~432K
-    // characters (9 chunks at the 48K target) became 2162 panels. A rough anchor, not a law — a
-    // dialogue-heavy book yields more panels per character than a descriptive one.
-    private const int CharactersPerPanel = 200;
+    // One evidence image per this many characters of manuscript — an average scene length. A rough anchor
+    // (a ~150K-word novel of ~750K characters lands around 250 scenes), not a law.
+    private const int CharactersPerScene = 3000;
 
-    // Claude calls that are not per-chunk: the two report consolidations (story half and craft half).
-    private const int FixedClaudeCalls = 2;
+    // Claude calls that are not per-chunk: the two report consolidations (story half and craft half) plus
+    // the voice-consistency read.
+    private const int FixedClaudeCalls = 3;
 
     public static RunEstimate Estimate(
         int characterCount,
-        bool reportOnly,
         int chunkChars,
-        int storyboardWindowChars,
         int claudeCallsPerDay,
         int imageCallsPerDay,
         int referenceSheets)
@@ -45,13 +41,12 @@ public static class RunEstimator
 
         var chunks = DivideUp(characterCount, chunkChars);
 
-        // Per chunk: one entity extraction and one set of analysis notes. Storyboarding runs on much
-        // smaller windows, one Claude call each, and a report-only draft skips it entirely.
-        var storyboardWindows = reportOnly ? 0 : DivideUp(characterCount, storyboardWindowChars);
-        var claudeCalls = (chunks * 2) + storyboardWindows + FixedClaudeCalls;
+        // Per chunk: one entity extraction and one set of analysis notes, plus the fixed reduce calls.
+        var claudeCalls = (chunks * 2) + FixedClaudeCalls;
 
-        var panels = reportOnly ? 0 : DivideUp(characterCount, CharactersPerPanel);
-        var imageCalls = reportOnly ? 0 : panels + referenceSheets;
+        // One wordless evidence image per scene, plus the recurring-entity reference sheets.
+        var scenes = DivideUp(characterCount, CharactersPerScene);
+        var imageCalls = scenes + referenceSheets;
 
         // Whichever provider's daily ceiling takes longest to drain sets the wall-clock.
         var claudeDays = Ratio(claudeCalls, claudeCallsPerDay);
@@ -59,7 +54,7 @@ public static class RunEstimator
         var limiting = imageDays >= claudeDays ? "image generation" : "text generation";
         var duration = TimeSpan.FromDays(Math.Max(claudeDays, imageDays));
 
-        return new RunEstimate(chunks, claudeCalls, panels, imageCalls, duration, limiting);
+        return new RunEstimate(chunks, claudeCalls, scenes, imageCalls, duration, limiting);
     }
 
     private static int DivideUp(int total, int per) =>

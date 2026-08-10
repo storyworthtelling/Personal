@@ -14,29 +14,15 @@ public enum FindingChange
 // reworded-but-same issue reads as one resolved plus one new rather than being silently paired.
 public sealed record DiffFinding(FindingChange Change, string Category, string Chapter, string Detail);
 
-// One panel the new draft has to re-illustrate: the stretch of manuscript it sits on changed, so the
-// previous draft's render can't be carried forward. Carries the panel's reading position and its new
-// image, plus the previous draft's panel that occupied the same position — the "before" for a
-// side-by-side — when one exists (null once panels have been added or removed above it).
-public sealed record PanelChange(
-    int VolumeNumber,
-    int PageNumber,
-    int PanelNumber,
-    string? NewImagePath,
-    string? PreviousImagePath);
-
 // What changed between a draft and the draft it was made from: the report findings resolved and newly
-// raised, and the panels whose source text moved. Every other panel the pipeline reuses, so
-// ReusablePanelCount is how much of the previous illustration carries forward untouched. A first draft
-// (no predecessor) diffs to None.
+// raised. A first draft (no predecessor) diffs to None. (Before/after scene-image pairs and full
+// cross-draft finding history are the Phase 2 draft-loop investment; this carries the finding diff.)
 public sealed record DraftDiff(
     Guid DraftId,
     Guid? PreviousDraftId,
     IReadOnlyList<DiffFinding> ResolvedFindings,
-    IReadOnlyList<DiffFinding> NewFindings,
-    IReadOnlyList<PanelChange> ChangedPanels,
-    int ReusablePanelCount)
+    IReadOnlyList<DiffFinding> NewFindings)
 {
     public static DraftDiff None(Guid draftId) =>
-        new(draftId, null, [], [], [], 0);
+        new(draftId, null, [], []);
 }

@@ -14,9 +14,7 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
     public DbSet<Chunk> Chunks => Set<Chunk>();
     public DbSet<Chapter> Chapters => Set<Chapter>();
     public DbSet<DesignRef> DesignRefs => Set<DesignRef>();
-    public DbSet<Volume> Volumes => Set<Volume>();
-    public DbSet<Page> Pages => Set<Page>();
-    public DbSet<Panel> Panels => Set<Panel>();
+    public DbSet<Scene> Scenes => Set<Scene>();
     public DbSet<ChunkAnalysis> ChunkAnalyses => Set<ChunkAnalysis>();
     public DbSet<BookAnalysis> BookAnalyses => Set<BookAnalysis>();
 
@@ -38,7 +36,6 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.Property(novel => novel.Stage).HasConversion<int>();
             entity.Property(novel => novel.RateLimitedUntilUtc).HasConversion(NullableTicksConverter);
             entity.Property(novel => novel.ArchivedAtUtc).HasConversion(NullableTicksConverter);
-            entity.Property(novel => novel.BatchSubmittedAtUtc).HasConversion(NullableTicksConverter);
             entity.Property(novel => novel.CreatedAtUtc).HasConversion(TicksConverter);
             entity.Property(novel => novel.UpdatedAtUtc).HasConversion(TicksConverter);
             entity.HasOne(novel => novel.Source)
@@ -57,9 +54,9 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
                 .WithOne()
                 .HasForeignKey(reference => reference.NovelId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasMany(novel => novel.Volumes)
+            entity.HasMany(novel => novel.Scenes)
                 .WithOne()
-                .HasForeignKey(volume => volume.NovelId)
+                .HasForeignKey(scene => scene.NovelId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(novel => novel.ChunkAnalyses)
                 .WithOne()
@@ -100,37 +97,13 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.HasIndex(reference => new { reference.ReferenceSheetStatus, reference.NextAttemptAtUtc });
         });
 
-        model.Entity<Volume>(entity =>
+        model.Entity<Scene>(entity =>
         {
-            entity.HasKey(volume => volume.Id);
-            entity.Property(volume => volume.PdfStatus).HasConversion<int>();
-            entity.Property(volume => volume.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
-            entity.HasMany(volume => volume.Pages)
-                .WithOne()
-                .HasForeignKey(page => page.VolumeId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(volume => new { volume.PdfStatus, volume.NextAttemptAtUtc });
-        });
-
-        model.Entity<Page>(entity =>
-        {
-            entity.HasKey(page => page.Id);
-            entity.Property(page => page.CompositionStatus).HasConversion<int>();
-            entity.HasMany(page => page.Panels)
-                .WithOne()
-                .HasForeignKey(panel => panel.PageId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(page => page.CompositionStatus);
-        });
-
-        model.Entity<Panel>(entity =>
-        {
-            entity.HasKey(panel => panel.Id);
-            entity.Property(panel => panel.Status).HasConversion<int>();
-            entity.Property(panel => panel.ShotType).HasConversion<int>();
-            entity.Property(panel => panel.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
-            entity.Property(panel => panel.BatchSubmittedAtUtc).HasConversion(NullableTicksConverter);
-            entity.HasIndex(panel => new { panel.Status, panel.NextAttemptAtUtc });
+            entity.HasKey(scene => scene.Id);
+            entity.Property(scene => scene.ImageStatus).HasConversion<int>();
+            entity.Property(scene => scene.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
+            entity.HasIndex(scene => new { scene.NovelId, scene.Number });
+            entity.HasIndex(scene => new { scene.ImageStatus, scene.NextAttemptAtUtc });
         });
 
         model.Entity<ChunkAnalysis>(entity =>

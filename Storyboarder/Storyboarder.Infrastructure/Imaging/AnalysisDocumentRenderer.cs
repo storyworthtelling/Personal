@@ -180,25 +180,6 @@ public sealed class AnalysisDocumentRenderer
             }
         }
 
-        if (analysis.FactChecks is { Count: > 0 })
-        {
-            writer.Heading("Fact checks", h2, Ink, ruled: true);
-            writer.Paragraph(
-                "Real-world statements the manuscript makes, put to a web search. Invented people, places " +
-                "and history are not checked — only claims about the actual world.",
-                bodyItalic, Muted);
-            foreach (var check in analysis.FactChecks)
-            {
-                writer.Bullet(Join(check.Chapter, check.Claim), body, Ink);
-                // The verdict leads so a scan down the page finds the problems; the note explains it.
-                var verdict = string.IsNullOrWhiteSpace(check.Verdict) ? "Unverified" : check.Verdict;
-                writer.Paragraph(
-                    string.IsNullOrWhiteSpace(check.Note) ? verdict : $"{verdict} — {check.Note}",
-                    bodyItalic, Muted);
-                writer.Gap(8f);
-            }
-        }
-
         if (analysis.Reviews is { Count: > 0 })
         {
             writer.Heading("Reviews (differing perspectives)", h2, Ink, ruled: true);

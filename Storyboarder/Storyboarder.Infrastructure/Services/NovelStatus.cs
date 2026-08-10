@@ -2,22 +2,10 @@ namespace Storyboarder.Infrastructure.Services;
 
 public sealed record PhaseProgress(int Done, int Total);
 
-// A panel parked awaiting the user's decision after a safety block, for the review UI. Categories are
-// the flagged HARM_CATEGORY_* names that would be relaxed on an approved re-render.
-public sealed record BlockedPanel(
-    Guid PanelId, int PanelNumber, string VisualPrompt, string? Dialogue, string? Caption,
-    IReadOnlyList<string> Categories, string? Reason);
-
-public sealed record VolumeStatus(int Number, string Title, bool PdfReady, bool Failed = false);
-
-// The prohibited/IP-blocked panel a Cancelled novel is stuck on, surfaced so the user can rework its
-// art direction and resume. Reason is the provider's block message; VisualPrompt is what gets reworked.
-public sealed record ProhibitedPanel(Guid PanelId, int PanelNumber, string VisualPrompt, string? Reason);
-
-// A read model summarizing a novel's progress for the status page / API. Every long-running stage
+// A read model summarizing a manuscript's review progress for the status page. Every long-running stage
 // carries a Done/Total so the card can say what the worker is on and how much of it is left:
-// Chunks + ReferenceSheets cover the design-bible stage, Storyboard the storyboarding stage,
-// Panels/Pages/Volumes the render-and-bind stages, and AnalysisNotes the map step of the report.
+// Chunks + ReferenceSheets cover the design-bible stage, SceneImages the per-scene evidence images, and
+// AnalysisNotes the map step of the report.
 public sealed record NovelStatus(
     Guid Id,
     string Title,
@@ -25,32 +13,17 @@ public sealed record NovelStatus(
     string? LastError,
     PhaseProgress Chunks,
     PhaseProgress ReferenceSheets,
-    PhaseProgress Storyboard,
-    PhaseProgress Panels,
-    PhaseProgress Pages,
-    PhaseProgress Volumes,
-    IReadOnlyList<VolumeStatus> VolumeList,
+    PhaseProgress SceneImages,
     PhaseProgress AnalysisNotes,
     PhaseProgress Analysis,
     bool AnalysisReady,
-    string? CoverThumbPath = null,
-    // True only when the pipeline has genuinely stalled and needs the user (a storyboard window that
-    // exhausted its retry budget, or one or more panels safety-blocked and waiting on the user's OK).
-    // A transient error the worker is still auto-retrying leaves this false, so the card doesn't cry
-    // wolf while it self-heals.
+    // True only when the pipeline has genuinely stalled and needs the user. A transient error the worker
+    // is still auto-retrying leaves this false, so the card doesn't cry wolf while it self-heals.
     bool NeedsAttention = false,
-    // Panels safety-blocked mid-render and parked until the user approves relaxing the flagged category
-    // (or skips them). Non-zero means the book can't finalize until the user reviews them.
-    int PendingApprovals = 0,
-    // Panels refused as prohibited/IP content even after the prompt was restaged. These carry no
-    // adjustable harm category, so relaxing thresholds cannot help and the approve/skip sheet has nothing
-    // to offer — they need the art direction reworked instead, which is a different action on the card.
-    int ProhibitedPanels = 0,
-    // What this conversion is projected to cost, surfaced only while it is still cheap to abandon (before
-    // any panel has been rendered). Once rendering starts the real counts are better information than a
-    // projection, so this goes null. Null also when the manuscript hasn't been ingested yet.
+    // What this review is projected to cost, surfaced only while it is still cheap to abandon (before any
+    // scene image has been rendered). Null once rendering starts or before the manuscript is ingested.
     Domain.Pipeline.RunEstimate? Estimate = null,
-    // When a provider rate limit last deferred this novel, the (future) UTC instant it expects to try
+    // When a provider rate limit last deferred this manuscript, the (future) UTC instant it expects to try
     // again — set only when still in the future, so the card can say "resumes ~3:47 pm" in local time.
     DateTimeOffset? RateLimitedUntilUtc = null,
     // Which draft of its project this is (1 for a first/only draft), and whether it has a predecessor to
