@@ -147,7 +147,7 @@ public class ProjectServiceTests : IDisposable
         var story = BookAnalysisResult.Empty with
         {
             Logline = "A hero's tale",
-            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")]
+            PlotHoles = [new ReportFinding("Chapter 1", "The gate opens unexplained")]
         };
         var craft = new CraftReport([new LineEdit("Chapter 1", "He felt cold.", "The cold came.", "Filtered.")], [], [], []);
 
@@ -176,14 +176,14 @@ public class ProjectServiceTests : IDisposable
     {
         var previousReport = BookAnalysisResult.Empty with
         {
-            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")],
-            Inconsistencies = [new Finding("Chapter 2", "Eye colour shifts")]
+            PlotHoles = [new ReportFinding("Chapter 1", "The gate opens unexplained")],
+            Inconsistencies = [new ReportFinding("Chapter 2", "Eye colour shifts")]
         };
         var currentReport = BookAnalysisResult.Empty with
         {
             // The gate hole is resolved; the eye-colour issue persists; a new pacing note appears.
-            Inconsistencies = [new Finding("Chapter 2", "Eye colour shifts")],
-            PacingNotes = [new Finding("Chapter 5", "The middle sags")]
+            Inconsistencies = [new ReportFinding("Chapter 2", "Eye colour shifts")],
+            PacingNotes = [new ReportFinding("Chapter 5", "The middle sags")]
         };
 
         var previousId = SeedReport(previousReport);
@@ -202,7 +202,7 @@ public class ProjectServiceTests : IDisposable
     [Fact]
     public async Task GetDraftDiff_OfAFirstDraft_IsEmpty()
     {
-        var id = SeedReport(BookAnalysisResult.Empty with { PlotHoles = [new Finding("Chapter 1", "A hole")] });
+        var id = SeedReport(BookAnalysisResult.Empty with { PlotHoles = [new ReportFinding("Chapter 1", "A hole")] });
 
         var diff = await NewService().GetDraftDiffAsync(id, CancellationToken.None);
 

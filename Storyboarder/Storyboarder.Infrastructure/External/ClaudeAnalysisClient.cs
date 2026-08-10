@@ -607,10 +607,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         // Findings are read as the domain type, not a DTO: its converter already tolerates both the
         // {"chapter","detail"} object asked for and a bare string (which is what a model that skims
         // the instruction returns, and what every report stored before citations existed contains).
-        public List<Finding>? PlotHoles { get; set; }
-        public List<Finding>? Inconsistencies { get; set; }
-        public List<Finding>? Inaccuracies { get; set; }
-        public List<Finding>? PacingNotes { get; set; }
+        public List<ReportFinding>?PlotHoles { get; set; }
+        public List<ReportFinding>?Inconsistencies { get; set; }
+        public List<ReportFinding>?Inaccuracies { get; set; }
+        public List<ReportFinding>?PacingNotes { get; set; }
         public List<ReviewDto>? Reviews { get; set; }
         public List<RevisionItemDto>? RevisionPlan { get; set; }
         public List<string>? ComparableTitles { get; set; }

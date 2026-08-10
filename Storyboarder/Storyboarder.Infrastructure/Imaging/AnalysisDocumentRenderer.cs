@@ -347,7 +347,7 @@ public sealed class AnalysisDocumentRenderer
 
     // A section of findings. Each bullet leads with the chapter it was drawn from, which is the first
     // thing the author needs in order to act on it.
-    private static void Section(PageWriter writer, string heading, IReadOnlyList<Finding>? items, SKFont body, SKFont h2)
+    private static void Section(PageWriter writer, string heading, IReadOnlyList<ReportFinding>? items, SKFont body, SKFont h2)
     {
         if (items is not { Count: > 0 })
             return;

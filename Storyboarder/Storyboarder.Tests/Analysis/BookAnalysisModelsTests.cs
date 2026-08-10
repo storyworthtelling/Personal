@@ -9,9 +9,9 @@ public class BookAnalysisModelsTests
     private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
     [Fact]
-    public void Finding_ReadsTheCitedObjectForm()
+    public void ReportFinding_ReadsTheCitedObjectForm()
     {
-        var finding = JsonSerializer.Deserialize<Finding>(
+        var finding = JsonSerializer.Deserialize<ReportFinding>(
             "{\"chapter\":\"Chapter 7\",\"detail\":\"The key is never found.\"}", Options)!;
 
         Assert.Equal("Chapter 7", finding.Chapter);
@@ -19,20 +19,20 @@ public class BookAnalysisModelsTests
     }
 
     [Fact]
-    public void Finding_ReadsABareString_SoOlderReportsStillLoad()
+    public void ReportFinding_ReadsABareString_SoOlderReportsStillLoad()
     {
         // Every report consolidated before chapter citations existed stored its findings as plain
         // strings. Re-rendering one of those must not throw — it simply has nothing to cite.
-        var finding = JsonSerializer.Deserialize<Finding>("\"The key is never found.\"", Options)!;
+        var finding = JsonSerializer.Deserialize<ReportFinding>("\"The key is never found.\"", Options)!;
 
         Assert.Equal(string.Empty, finding.Chapter);
         Assert.Equal("The key is never found.", finding.Detail);
     }
 
     [Fact]
-    public void Finding_IgnoresUnknownAndNonStringProperties()
+    public void ReportFinding_IgnoresUnknownAndNonStringProperties()
     {
-        var finding = JsonSerializer.Deserialize<Finding>(
+        var finding = JsonSerializer.Deserialize<ReportFinding>(
             "{\"chapter\":\"Chapter 2\",\"severity\":3,\"tags\":[\"a\"],\"detail\":\"Eye colour shifts.\"}", Options)!;
 
         Assert.Equal("Chapter 2", finding.Chapter);
@@ -40,19 +40,19 @@ public class BookAnalysisModelsTests
     }
 
     [Fact]
-    public void Finding_RoundTrips()
+    public void ReportFinding_RoundTrips()
     {
-        var original = new Finding("Chapters 7–8", "The middle sags.");
+        var original = new ReportFinding("Chapters 7–8", "The middle sags.");
 
-        var restored = JsonSerializer.Deserialize<Finding>(JsonSerializer.Serialize(original, Options), Options);
+        var restored = JsonSerializer.Deserialize<ReportFinding>(JsonSerializer.Serialize(original, Options), Options);
 
         Assert.Equal(original, restored);
     }
 
     [Fact]
-    public void Finding_RejectsAShapeItCannotRead()
+    public void ReportFinding_RejectsAShapeItCannotRead()
     {
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<Finding>("[1,2]", Options));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ReportFinding>("[1,2]", Options));
     }
 
     [Fact]

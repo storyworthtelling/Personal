@@ -93,7 +93,7 @@ public partial class ReportPage : ContentPage
         }
     }
 
-    private void Findings(string title, IReadOnlyList<Finding> findings)
+    private void Findings(string title, IReadOnlyList<ReportFinding> findings)
     {
         if (findings.Count == 0)
             return;

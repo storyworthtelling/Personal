@@ -365,7 +365,7 @@ public sealed class ProjectService
         var report = JsonSerializer.Deserialize<BookAnalysisResult>(json, JsonResponse.CaseInsensitive)
                      ?? BookAnalysisResult.Empty;
         var findings = new List<(string, string, string)>();
-        void Add(string category, IReadOnlyList<Finding> items)
+        void Add(string category, IReadOnlyList<ReportFinding> items)
         {
             foreach (var f in items)
                 findings.Add((category, f.Chapter, f.Detail));

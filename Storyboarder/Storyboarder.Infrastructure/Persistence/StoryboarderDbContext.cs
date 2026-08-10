@@ -17,6 +17,7 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
     public DbSet<Scene> Scenes => Set<Scene>();
     public DbSet<ChunkAnalysis> ChunkAnalyses => Set<ChunkAnalysis>();
     public DbSet<BookAnalysis> BookAnalyses => Set<BookAnalysis>();
+    public DbSet<Finding> Findings => Set<Finding>();
 
     // SQLite has no native DateTimeOffset, and the provider cannot translate comparisons on the
     // default TEXT mapping. Storing UTC ticks as integers makes the worker's "due units" time
@@ -57,6 +58,10 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.HasMany(novel => novel.Scenes)
                 .WithOne()
                 .HasForeignKey(scene => scene.NovelId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(novel => novel.Findings)
+                .WithOne()
+                .HasForeignKey(finding => finding.NovelId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(novel => novel.ChunkAnalyses)
                 .WithOne()
@@ -120,6 +125,17 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.HasKey(analysis => analysis.Id);
             entity.Property(analysis => analysis.PdfStatus).HasConversion<int>();
             entity.HasIndex(analysis => analysis.NovelId).IsUnique();
+        });
+
+        model.Entity<Finding>(entity =>
+        {
+            entity.HasKey(finding => finding.Id);
+            entity.Property(finding => finding.Category).HasConversion<int>();
+            entity.Property(finding => finding.Status).HasConversion<int>();
+            entity.Property(finding => finding.CreatedAtUtc).HasConversion(TicksConverter);
+            // Loading a draft's findings for its report, and walking a thread's whole life across the project.
+            entity.HasIndex(finding => finding.NovelId);
+            entity.HasIndex(finding => new { finding.ProjectId, finding.ThreadId });
         });
     }
 }
