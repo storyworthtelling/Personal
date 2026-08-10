@@ -32,6 +32,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("CraftJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("FindingsReconciled")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("NovelId")
                         .HasColumnType("TEXT");
 

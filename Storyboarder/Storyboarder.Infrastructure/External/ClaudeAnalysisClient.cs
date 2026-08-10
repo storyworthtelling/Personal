@@ -165,6 +165,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "how to bring it into line. Report AT MOST 20 divergences, the clearest ones, and use [] when the " +
         "voice is consistent throughout. No prose outside the JSON.";
 
+    private const string ReconciliationInstruction =
+        "You are reconciling a manuscript's revision findings ACROSS DRAFTS. You are given the PRIOR draft's " +
+        "findings (each with a stable id, category, chapter, and text) and the CURRENT draft's findings (each " +
+        "with a numeric index). For each CURRENT finding, decide whether it is the SAME underlying issue as one " +
+        "of the prior findings — the same plot hole, inconsistency, inaccuracy, or pacing problem — even if the " +
+        "wording, phrasing, or chapter citation has moved between drafts, or whether it is a genuinely NEW " +
+        "issue. Match CONSERVATIVELY: only when it is really the same issue, not merely a similar topic or the " +
+        "same chapter. Respond with ONLY a JSON object: {\"matches\":[{\"index\":int,\"threadId\":string|null}]}. " +
+        "index: the current finding's index. threadId: the id of the prior finding it is the same issue as, or " +
+        "null when it is new. Include exactly one entry per current finding, and never map two current findings " +
+        "to the same prior id. No prose outside the JSON.";
+
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
     private readonly ICredentialHealthSink? healthSink;
@@ -377,6 +389,39 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 .Select(d => new VoiceDivergence(
                     d.Chapter ?? string.Empty, d.Excerpt!, d.Divergence ?? string.Empty, d.Suggestion ?? string.Empty))
                 .ToList());
+    }
+
+    public async Task<FindingReconciliation> ReconcileFindings(
+        IReadOnlyList<PriorFinding> priorThreads, IReadOnlyList<CandidateFinding> candidates,
+        CancellationToken cancellationToken)
+    {
+        if (candidates.Count == 0)
+            return FindingReconciliation.Empty;
+
+        // With nothing to match against, every finding is new — no call to spend.
+        if (priorThreads.Count == 0)
+            return new FindingReconciliation(candidates.Select(c => new FindingMatch(c.Index, null)).ToList());
+
+        var priorJson = JsonSerializer.Serialize(
+            priorThreads.Select(p => new { id = p.ThreadId, category = p.Category.ToString(), chapter = p.Chapter, detail = p.Detail }),
+            JsonResponse.CaseInsensitive);
+        var currentJson = JsonSerializer.Serialize(
+            candidates.Select(c => new { index = c.Index, category = c.Category.ToString(), chapter = c.Chapter, detail = c.Detail }),
+            JsonResponse.CaseInsensitive);
+        var userContent = $"PRIOR FINDINGS (JSON):\n{priorJson}\n\nCURRENT FINDINGS (JSON):\n{currentJson}";
+
+        var reply = await SendMessage(ReconciliationInstruction, userContent, cancellationToken, options.AnalysisMaxTokens);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return FindingReconciliation.Empty;
+
+        var dto = JsonResponse.Deserialize<ReconciliationDto>(json);
+        if (dto?.Matches is null)
+            return FindingReconciliation.Empty;
+
+        return new FindingReconciliation(dto.Matches
+            .Select(m => new FindingMatch(m.Index, Guid.TryParse(m.ThreadId, out var threadId) ? threadId : null))
+            .ToList());
     }
 
     // model selects the tier: null means the strong default. Only the mechanical per-chunk calls pass the
@@ -595,6 +640,17 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? ProseObservations { get; set; }
         public List<string>? DialogueObservations { get; set; }
         public List<string>? SceneBeats { get; set; }
+    }
+
+    private sealed class ReconciliationDto
+    {
+        public List<MatchDto>? Matches { get; set; }
+    }
+
+    private sealed class MatchDto
+    {
+        public int Index { get; set; }
+        public string? ThreadId { get; set; }
     }
 
     private sealed class BookAnalysisDto

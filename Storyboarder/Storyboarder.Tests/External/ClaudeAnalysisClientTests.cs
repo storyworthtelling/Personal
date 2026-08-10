@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.Analysis;
+using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
@@ -188,6 +189,57 @@ public class ClaudeAnalysisClientTests
 
         Assert.Equal(VoiceConsistency.Empty, result); // one chapter gives nothing to compare against
         Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task ReconcileFindings_ParsesMatchesAndNulls()
+    {
+        var (client, handler) = Create();
+        var thread = Guid.NewGuid();
+        handler.EnqueueOk(Reply(
+            "{\"matches\":[{\"index\":0,\"threadId\":\"" + thread + "\"}," +
+            "{\"index\":1,\"threadId\":null}," +
+            "{\"index\":2,\"threadId\":\"not-a-guid\"}]}"));
+
+        var prior = new[] { new PriorFinding(thread, FindingCategory.PlotHole, "Chapter 1", "The gate", 1, true) };
+        var candidates = new[]
+        {
+            new CandidateFinding(0, FindingCategory.PlotHole, "Chapter 1", "The gate still opens"),
+            new CandidateFinding(1, FindingCategory.Pacing, "Chapter 5", "New sag"),
+            new CandidateFinding(2, FindingCategory.Inaccuracy, "Chapter 2", "Wrong date")
+        };
+
+        var result = await client.ReconcileFindings(prior, candidates, CancellationToken.None);
+
+        Assert.Equal(thread, result.Matches.Single(m => m.Index == 0).ThreadId);
+        Assert.Null(result.Matches.Single(m => m.Index == 1).ThreadId);
+        Assert.Null(result.Matches.Single(m => m.Index == 2).ThreadId);   // unparseable id → treated as new
+    }
+
+    [Fact]
+    public async Task ReconcileFindings_WithNoPriorThreads_SkipsTheCall_AndReturnsAllNew()
+    {
+        var (client, handler) = Create(); // nothing queued: a call would throw "no response"
+
+        var candidates = new[] { new CandidateFinding(0, FindingCategory.PlotHole, "Chapter 1", "A hole") };
+        var result = await client.ReconcileFindings([], candidates, CancellationToken.None);
+
+        Assert.Null(Assert.Single(result.Matches).ThreadId);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task ReconcileFindings_BlankReply_DegradesToEmpty()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("not json at all"));
+
+        var prior = new[] { new PriorFinding(Guid.NewGuid(), FindingCategory.PlotHole, "Chapter 1", "The gate", 1, true) };
+        var candidates = new[] { new CandidateFinding(0, FindingCategory.PlotHole, "Chapter 1", "The gate") };
+
+        var result = await client.ReconcileFindings(prior, candidates, CancellationToken.None);
+
+        Assert.Empty(result.Matches);   // FindingReconciler then treats every candidate as new
     }
 
     [Fact]

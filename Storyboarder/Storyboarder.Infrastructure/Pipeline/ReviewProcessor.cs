@@ -50,6 +50,7 @@ public sealed class ReviewProcessor : IPipelineStep
     private readonly ChapterDetector chapterDetector = new();
     private readonly SceneDetector sceneDetector = new();
     private readonly SceneMatcher sceneMatcher = new();
+    private readonly FindingReconciler findingReconciler = new();
 
     // How many different moments of a scene the model is asked to illustrate before the image is left
     // unavailable. A mature scene may be refused; the report is never blocked over it.
@@ -807,6 +808,49 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2d) Reconcile findings across drafts: give this draft's consolidated findings a durable identity by
+        // matching them against the prior draft's threads (a Claude call on a later draft; deterministic for a
+        // first draft), so a finding can be tracked opened → carried → fixed → regressed. Its own resumable
+        // step, gated by FindingsReconciled so the (billed) match runs once even when there are zero findings.
+        if (!analysis.FindingsReconciled)
+        {
+            var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
+                         ?? BookAnalysisResult.Empty;
+            var candidates = ToCandidateFindings(report);
+
+            ReconciliationOutcome outcome;
+            if (novel.PreviousDraftId is { } previousDraftId)
+            {
+                if (!claudeLimiter.TryAcquire())
+                    return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+                var priorThreads = await LoadPriorThreads(db, novel.ProjectId, previousDraftId, cancellationToken);
+                try
+                {
+                    var reconciliation = await claude.ReconcileFindings(priorThreads, candidates, cancellationToken);
+                    outcome = findingReconciler.Reconcile(
+                        novel.Id, novel.ProjectId, novel.DraftNumber, priorThreads, candidates, reconciliation);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                }
+            }
+            else
+            {
+                outcome = findingReconciler.ReconcileFirstDraft(novel.Id, novel.ProjectId, novel.DraftNumber, candidates);
+            }
+
+            foreach (var occurrence in outcome.Occurrences)
+                occurrence.CreatedAtUtc = now;
+            db.Findings.AddRange(outcome.Occurrences);
+            analysis.FindingsReconciled = true;
+            novel.LastError = null;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 3) Render: compose the report PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
@@ -1101,6 +1145,53 @@ public sealed class ReviewProcessor : IPipelineStep
         if (string.IsNullOrWhiteSpace(text))
             return 0;
         return text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+    }
+
+    // Flattens the consolidated report's four story-integrity finding lists into reconciliation candidates,
+    // stamping each with its now-first-class category and a stable index (its position in this combined list,
+    // which is how the model refers back to it).
+    private static IReadOnlyList<CandidateFinding> ToCandidateFindings(BookAnalysisResult report)
+    {
+        var candidates = new List<CandidateFinding>();
+        void Add(FindingCategory category, IReadOnlyList<ReportFinding> findings)
+        {
+            foreach (var finding in findings)
+                candidates.Add(new CandidateFinding(candidates.Count, category, finding.Chapter, finding.Detail));
+        }
+
+        Add(FindingCategory.PlotHole, report.PlotHoles);
+        Add(FindingCategory.Inconsistency, report.Inconsistencies);
+        Add(FindingCategory.Inaccuracy, report.Inaccuracies);
+        Add(FindingCategory.Pacing, report.PacingNotes);
+        return candidates;
+    }
+
+    // Builds the prior finding threads the reconciliation matches against: every thread ever seen in the
+    // project (so a fixed issue that reappears reads as a regression), represented by its most recent
+    // occurrence's text, and flagged OpenInPreviousDraft when it had an occurrence in the draft this one was
+    // made from (an unmatched open thread is what "resolved this draft" means).
+    private async Task<IReadOnlyList<PriorFinding>> LoadPriorThreads(
+        StoryboarderDbContext db, Guid projectId, Guid previousDraftId, CancellationToken cancellationToken)
+    {
+        var occurrences = await db.Findings
+            .Where(f => f.ProjectId == projectId)
+            .Select(f => new
+            {
+                f.ThreadId, f.NovelId, f.Category, f.Chapter, f.Detail, f.FirstDraftNumber, f.CreatedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        return occurrences
+            .GroupBy(f => f.ThreadId)
+            .Select(thread =>
+            {
+                var latest = thread.OrderBy(f => f.CreatedAtUtc).Last();
+                return new PriorFinding(
+                    thread.Key, latest.Category, latest.Chapter, latest.Detail,
+                    FirstDraftNumber: thread.Min(f => f.FirstDraftNumber),
+                    OpenInPreviousDraft: thread.Any(f => f.NovelId == previousDraftId));
+            })
+            .ToList();
     }
 
     // Builds each scene's evidence for the report: the rendered image (if any), cited "Ch. N · Scene M",
