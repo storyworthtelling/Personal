@@ -5,7 +5,7 @@
     <UseMaui>true</UseMaui>
     <RootNamespace>Storyboarder.Android</RootNamespace>
     <ApplicationId>com.storyworthtelling.storyboarder</ApplicationId>
-    <ApplicationTitle>Storyboarder</ApplicationTitle>
+    <ApplicationTitle>Canonizer</ApplicationTitle>
     <!-- yyyyMMddHHmm overflows Android's int32 versionCode limit; the last year digit keeps the
          9-digit result in range (matches DailyLoader). -->
     <_VersionYearDigit>$([MSBuild]::Modulo($([System.DateTime]::UtcNow.Year), 10))</_VersionYearDigit>

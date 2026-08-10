@@ -71,6 +71,17 @@ public static class SettingsStore
         set => Preferences.Set(nameof(LastMigrationError), value);
     }
 
+    // One-time gate for the Canonizer schema reset. The pivot collapsed the whole migration history into a
+    // single new baseline, so a device upgraded in place still holds the old storyboarder.db stamped with
+    // migration ids the new baseline doesn't know — Migrate() would try to create tables that already exist
+    // and fail. The brief accepts no old data preserved, so the migration runner drops the legacy database
+    // once (EnsureDeleted) before the first Migrate, then sets this so it never runs again.
+    public static bool CanonizerSchemaReset
+    {
+        get => Preferences.Get(nameof(CanonizerSchemaReset), false);
+        set => Preferences.Set(nameof(CanonizerSchemaReset), value);
+    }
+
     // "Delivered — 2h ago" style summary for the library footer (DESIGN.md §11).
     public static string LastRunSummary =>
         string.IsNullOrEmpty(LastRunOutcome) || LastRunAtUtc == DateTime.MinValue

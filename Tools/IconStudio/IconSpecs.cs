@@ -26,7 +26,7 @@ public static class IconSpecs
         // resource prefix at Platforms/Android/Resources — the active prefix stays the .NET-for-Android
         // default (`Resources`). Emitting here is what actually gets the mipmaps packaged (see the two heads'
         // csproj comments and CLAUDE.md); the launcher icon is then wired via [Application(Icon=...)].
-        new("Storyboarder", "Storyboarder/Storyboarder.Android/Resources", "appicon", true, Glyphs.PanelGrid),
+        new("Canonizer", "Storyboarder/Storyboarder.Android/Resources", "appicon", true, Glyphs.PenNib),
         new("DailyLoader", "DailyLoader/DailyLoader.Android/Resources", "ic_launcher", true, Glyphs.FoldedPaper),
         new("Ledger", "Ledger/Ledger.Android/Resources", "appicon", true, Glyphs.Ledger),
     ];

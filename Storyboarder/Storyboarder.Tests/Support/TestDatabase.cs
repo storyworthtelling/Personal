@@ -6,7 +6,7 @@ namespace Storyboarder.Tests.Support;
 
 // A throwaway SQLite database held in memory for the lifetime of one test. The connection stays
 // open so the schema persists across the DbContext instances a test creates. Implements
-// IDbContextFactory so it can be handed straight to the GraphicNovelProcessor.
+// IDbContextFactory so it can be handed straight to the ReviewProcessor.
 public sealed class TestDatabase : IDbContextFactory<StoryboarderDbContext>, IDisposable
 {
     private readonly SqliteConnection connection;

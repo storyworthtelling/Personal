@@ -185,14 +185,23 @@ public sealed record BookAnalysisResult(
     IReadOnlyList<DialogueNote> DialogueNotes,
     IReadOnlyList<SceneBeat> SceneBreakdown)
 {
-    // Verified factual claims. Arrives from its own call (the checks need web search, which the other
-    // reduce calls must not have) and is folded in the same way the craft half is.
-    public IReadOnlyList<FactCheck> FactChecks { get; init; } = Array.Empty<FactCheck>();
-
     // Where the author's own prose drifts from the book's dominant authorial voice. Arrives from its own
     // call (it needs actual prose samples per chapter, not the notes the other reduces work from) and is
     // folded in the same way. Defaults to Empty so a report stored before this existed re-renders fine.
     public VoiceConsistency VoiceConsistency { get; init; } = VoiceConsistency.Empty;
+
+    // The inferred genre and the word-count range publishers expect for it, and the manuscript's actual
+    // word count, so the length read is framed against the genre norm. All default-empty for old reports.
+    public string Genre { get; init; } = string.Empty;
+    public string WordCountRange { get; init; } = string.Empty;
+    public int WordCount { get; init; }
+
+    // Tension per chapter (0 = calm, 1 = peak), rendered as a small chart so a saggy stretch is visible
+    // at a glance.
+    public IReadOnlyList<ChapterTension> PacingCurve { get; init; } = Array.Empty<ChapterTension>();
+
+    // The candid state-of-the-draft that closes the report.
+    public Verdict Verdict { get; init; } = Verdict.Empty;
 
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
@@ -209,11 +218,24 @@ public sealed record BookAnalysisResult(
         SceneBreakdown = craft.SceneBreakdown
     };
 
-    public BookAnalysisResult WithFactChecks(IReadOnlyList<FactCheck> checks) =>
-        this with { FactChecks = checks };
-
     public BookAnalysisResult WithVoiceConsistency(VoiceConsistency voice) =>
         this with { VoiceConsistency = voice };
+
+    public BookAnalysisResult WithWordCount(int wordCount) =>
+        this with { WordCount = wordCount };
+}
+
+// One chapter's dramatic tension, 0 (calm) to 1 (peak), for the pacing chart.
+public sealed record ChapterTension(string Chapter, double Tension);
+
+// The candid state-of-the-draft that closes the report: what is working best, what is most broken, and
+// the single thing this draft most needs before the next revision.
+public sealed record Verdict(
+    IReadOnlyList<string> Strengths,
+    IReadOnlyList<string> Problems,
+    string MostNeeds)
+{
+    public static Verdict Empty { get; } = new(Array.Empty<string>(), Array.Empty<string>(), string.Empty);
 }
 
 // The authorial-voice-consistency read: a short characterization of the book's dominant voice, and the
@@ -232,9 +254,3 @@ public sealed record VoiceDivergence(string Chapter, string Excerpt, string Dive
 // A representative prose sample from one chapter, fed to the voice-consistency read so the model judges
 // the actual writing rather than a summary of it.
 public sealed record ChapterSample(string Chapter, string Excerpt);
-
-// One checkable real-world statement from the manuscript, put to a web search. Verdict is the model's
-// call after searching; Note carries what it found. Chapter is copied from the note the claim came from
-// so the author can find the sentence. A claim the search couldn't settle is reported as unverified
-// rather than guessed at — a confidently wrong "incorrect" would send the author chasing a non-problem.
-public sealed record FactCheck(string Claim, string Verdict, string Note, string Chapter);

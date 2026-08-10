@@ -13,20 +13,18 @@ public class StoryboarderDbContextTests : IDisposable
 
     private static Novel SampleNovel()
     {
-        var novel = new Novel { Title = "Test Novel", GoogleDocId = "doc-1", Stage = ProjectStage.Storyboarding };
+        var novel = new Novel { Title = "Test Novel", GoogleDocId = "doc-1", Stage = ProjectStage.RenderingSceneImages };
         novel.Source = new SourceText { NovelId = novel.Id, FullText = "Once upon a time.", CharacterCount = 17 };
         novel.Chunks.Add(new Chunk { NovelId = novel.Id, Ordinal = 0, Text = "Once upon a time." });
         novel.DesignRefs.Add(new DesignRef
         {
             NovelId = novel.Id, Kind = ReferenceKind.Character, Name = "Alice", CanonicalDescription = "short"
         });
-
-        var volume = new Volume { NovelId = novel.Id, Number = 1, Title = "Volume One" };
-        var page = new Page { VolumeId = volume.Id, ChapterNumber = 1, PageNumber = 1 };
-        page.Panels.Add(new Panel { PageId = page.Id, PanelNumber = 1, VisualPrompt = "Alice wakes." });
-        volume.Pages.Add(page);
-        novel.Volumes.Add(volume);
-
+        novel.Scenes.Add(new Scene
+        {
+            NovelId = novel.Id, Number = 1, ChapterNumber = 1, ChapterLabel = "Chapter 1",
+            StartOffset = 0, EndOffset = 17, ImageStatus = WorkStatus.Completed, ImagePath = "/tmp/scene-1.png"
+        });
         novel.ChunkAnalyses.Add(new ChunkAnalysis
         {
             NovelId = novel.Id, Ordinal = 0, Status = WorkStatus.Completed, NotesJson = "{}"
@@ -54,18 +52,18 @@ public class StoryboarderDbContextTests : IDisposable
                 .Include(n => n.Source)
                 .Include(n => n.Chunks)
                 .Include(n => n.DesignRefs)
-                .Include(n => n.Volumes).ThenInclude(v => v.Pages).ThenInclude(p => p.Panels)
+                .Include(n => n.Scenes)
                 .Include(n => n.ChunkAnalyses)
                 .Include(n => n.Analysis)
                 .Single();
 
             Assert.Equal("Test Novel", loaded.Title);
-            Assert.Equal(ProjectStage.Storyboarding, loaded.Stage);
+            Assert.Equal(ProjectStage.RenderingSceneImages, loaded.Stage);
             Assert.Equal(17, loaded.Source!.CharacterCount);
             Assert.Single(loaded.Chunks);
             Assert.Equal(ReferenceKind.Character, Assert.Single(loaded.DesignRefs).Kind);
-            var panel = Assert.Single(Assert.Single(Assert.Single(loaded.Volumes).Pages).Panels);
-            Assert.Equal("Alice wakes.", panel.VisualPrompt);
+            var scene = Assert.Single(loaded.Scenes);
+            Assert.Equal("/tmp/scene-1.png", scene.ImagePath);
             Assert.Equal(0, Assert.Single(loaded.ChunkAnalyses).Ordinal);
             Assert.Equal("/tmp/a.pdf", loaded.Analysis!.PdfPath);
         }
@@ -92,9 +90,7 @@ public class StoryboarderDbContextTests : IDisposable
             Assert.Empty(context.Novels);
             Assert.Empty(context.Chunks);
             Assert.Empty(context.DesignRefs);
-            Assert.Empty(context.Volumes);
-            Assert.Empty(context.Pages);
-            Assert.Empty(context.Panels);
+            Assert.Empty(context.Scenes);
             Assert.Empty(context.SourceTexts);
             Assert.Empty(context.ChunkAnalyses);
             Assert.Empty(context.BookAnalyses);
@@ -105,19 +101,15 @@ public class StoryboarderDbContextTests : IDisposable
     public void DueUnitsQuery_ReturnsPendingAndElapsedRetries_Only()
     {
         var now = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
-        var page = new Page();
-        page.Panels.AddRange(
-        [
-            new Panel { PageId = page.Id, PanelNumber = 1, Status = WorkStatus.Pending },
-            new Panel { PageId = page.Id, PanelNumber = 2, Status = WorkStatus.Completed },
-            new Panel { PageId = page.Id, PanelNumber = 3, Status = WorkStatus.NeedsRetry, NextAttemptAtUtc = now.AddMinutes(-1) },
-            new Panel { PageId = page.Id, PanelNumber = 4, Status = WorkStatus.NeedsRetry, NextAttemptAtUtc = now.AddMinutes(5) },
-            new Panel { PageId = page.Id, PanelNumber = 5, Status = WorkStatus.Failed }
-        ]);
-        var volume = new Volume { Number = 1 };
-        volume.Pages.Add(page);
         var novel = new Novel { Title = "N" };
-        novel.Volumes.Add(volume);
+        novel.Scenes.AddRange(
+        [
+            new Scene { NovelId = novel.Id, Number = 1, ImageStatus = WorkStatus.Pending },
+            new Scene { NovelId = novel.Id, Number = 2, ImageStatus = WorkStatus.Completed },
+            new Scene { NovelId = novel.Id, Number = 3, ImageStatus = WorkStatus.NeedsRetry, NextAttemptAtUtc = now.AddMinutes(-1) },
+            new Scene { NovelId = novel.Id, Number = 4, ImageStatus = WorkStatus.NeedsRetry, NextAttemptAtUtc = now.AddMinutes(5) },
+            new Scene { NovelId = novel.Id, Number = 5, ImageStatus = WorkStatus.Failed }
+        ]);
 
         using (var context = database.NewContext())
         {
@@ -127,11 +119,11 @@ public class StoryboarderDbContextTests : IDisposable
 
         using (var context = database.NewContext())
         {
-            var due = context.Panels
-                .Where(p => p.Status == WorkStatus.Pending ||
-                            (p.Status == WorkStatus.NeedsRetry && p.NextAttemptAtUtc <= now))
-                .OrderBy(p => p.PanelNumber)
-                .Select(p => p.PanelNumber)
+            var due = context.Scenes
+                .Where(s => s.ImageStatus == WorkStatus.Pending ||
+                            (s.ImageStatus == WorkStatus.NeedsRetry && s.NextAttemptAtUtc <= now))
+                .OrderBy(s => s.Number)
+                .Select(s => s.Number)
                 .ToList();
 
             Assert.Equal([1, 3], due);

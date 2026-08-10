@@ -87,6 +87,14 @@ public static class DesignTokens
         public const float AccentRuleGap = 24f;
         public const float CoverTitle = 72f;
         public const float CoverMedallionSize = 160f;
+
+        // The per-scene evidence image block in the report: portrait (it sits in a column beside the
+        // prose), letterboxed on shaded paper.
+        public const float SceneImageWidth = 560f;
+        public const float SceneImageHeight = 747f;
+
+        // The tension-over-chapters pacing chart.
+        public const float PacingChartHeight = 220f;
     }
 
     /// <summary>Calm functional motion: two durations, decelerate curves, no haptics.</summary>

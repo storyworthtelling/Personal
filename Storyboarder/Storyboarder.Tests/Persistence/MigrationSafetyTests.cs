@@ -1,19 +1,17 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.Extensions.DependencyInjection;
 using Storyboarder.Domain.Model;
 using Storyboarder.Infrastructure.Persistence;
 using Xunit;
 
 namespace Storyboarder.Tests.Persistence;
 
-// Guards the update path: applying the newest EF migration over a database populated by the previous
-// release must never wipe an in-flight conversion. If a future migration is destructive, this fails.
+// Guards the schema: the migrations must build the whole current model, and the model must not have
+// drifted from the migration snapshot. (The Canonizer pivot is a clean-slate schema — no old graphic-novel
+// data is carried across the upgrade — so this no longer asserts cross-release data preservation.)
 public class MigrationSafetyTests : IDisposable
 {
-    private readonly string dir = Path.Combine(Path.GetTempPath(), "storyboarder-migrations", Guid.NewGuid().ToString("N"));
+    private readonly string dir = Path.Combine(Path.GetTempPath(), "canonizer-migrations", Guid.NewGuid().ToString("N"));
 
     public MigrationSafetyTests() => Directory.CreateDirectory(dir);
 
@@ -28,48 +26,45 @@ public class MigrationSafetyTests : IDisposable
         new DbContextOptionsBuilder<StoryboarderDbContext>().UseSqlite($"Data Source={dbPath}").Options;
 
     [Fact]
-    public void UpgradingToLatestMigration_PreservesExistingProgress()
+    public void Migrations_BuildTheSchema_AndModelHasNoPendingChanges()
     {
-        var dbPath = Path.Combine(dir, "storyboarder.db");
+        var dbPath = Path.Combine(dir, "canonizer.db");
         var options = Options(dbPath);
 
-        var migrations = new StoryboarderDbContext(options).Database.GetMigrations().ToList();
-        Assert.True(migrations.Count >= 2, "Need at least two migrations to exercise an upgrade.");
-        var previousRelease = migrations[^2];
-
-        var novelId = Guid.NewGuid();
         using (var db = new StoryboarderDbContext(options))
         {
-            // Bring the schema up to the previous release, then seed a mid-flight conversion with raw
-            // SQL. Seeding via the EF model would include columns a later migration adds (the one under
-            // test), which don't exist at this schema yet; raw SQL matches the previous schema exactly.
-            db.GetInfrastructure().GetRequiredService<IMigrator>().Migrate(previousRelease);
-            var ticks = DateTimeOffset.UtcNow.UtcTicks;
-            // LastError is nullable and omitted, so it defaults to NULL — this also sidesteps having to
-            // bind a DBNull parameter, which the provider can't map.
-            db.Database.ExecuteSqlRaw(
-                "INSERT INTO Novels (Id, Title, GoogleDocId, GoogleDocName, ArtStyle, Stage, " +
-                "DesignBibleConsolidated, StoryboardCursor, ContinuitySummary, CreatedAtUtc, UpdatedAtUtc) " +
-                "VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10})",
-                novelId, "Month-long book", "doc", "", ArtStyles.Default,
-                (int)ProjectStage.RenderingImages, 0, 0, "", ticks, ticks);
-            db.Database.ExecuteSqlRaw(
-                "INSERT INTO SourceTexts (Id, NovelId, FullText, CharacterCount) VALUES ({0}, {1}, {2}, {3})",
-                Guid.NewGuid(), novelId, "half-converted manuscript", 25);
+            db.Database.Migrate();
+            // The model matches the migration snapshot — no property or relationship has drifted.
+            Assert.False(db.Database.HasPendingModelChanges(), "The model has changes not captured in a migration.");
         }
         SqliteConnection.ClearAllPools();
 
-        // Apply the newest migration, exactly as MainApplication does on the first launch after an update.
+        // The migrated schema round-trips a manuscript with a scene and a report.
+        var manuscriptId = Guid.NewGuid();
         using (var db = new StoryboarderDbContext(options))
-            db.Database.Migrate();
+        {
+            var now = DateTimeOffset.UtcNow;
+            var novel = new Novel
+            {
+                Id = manuscriptId, Title = "Quest", GoogleDocId = "doc", ArtStyle = ArtStyles.Default,
+                Stage = ProjectStage.RenderingSceneImages, ProjectId = manuscriptId,
+                CreatedAtUtc = now, UpdatedAtUtc = now
+            };
+            novel.Source = new SourceText { NovelId = manuscriptId, FullText = "text", CharacterCount = 4 };
+            novel.Scenes.Add(new Scene { NovelId = manuscriptId, Number = 1, ImageStatus = WorkStatus.Pending });
+            novel.Analysis = new BookAnalysis { NovelId = manuscriptId, PdfStatus = WorkStatus.Pending };
+            db.Novels.Add(novel);
+            db.SaveChanges();
+        }
         SqliteConnection.ClearAllPools();
 
         using (var db = new StoryboarderDbContext(options))
         {
             var novel = Assert.Single(db.Novels.ToList());
-            Assert.Equal(novelId, novel.Id);
-            Assert.Equal(ProjectStage.RenderingImages, novel.Stage);
-            Assert.Equal("half-converted manuscript", db.SourceTexts.Single().FullText);
+            Assert.Equal(manuscriptId, novel.Id);
+            Assert.Equal(ProjectStage.RenderingSceneImages, novel.Stage);
+            Assert.Single(db.Scenes.ToList());
+            Assert.Equal("text", db.SourceTexts.Single().FullText);
         }
     }
 }

@@ -23,11 +23,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
     private const string AnthropicVersion = "2023-06-01";
 
-    // Anthropic's hosted web-search tool, used only by the fact-check call. The versioned type string
-    // is the API's identifier for it; if the tool is ever renamed this is the one place to change.
-    private const string WebSearchToolType = "web_search_20250305";
-    private const int WebSearchMaxUses = 8;
-
     private const string ExtractionInstruction =
         "You are a visual-development analyst preparing a graphic-novel design bible. Your list becomes the " +
         "illustrator's reference sheets, so any character or place you omit gets drawn from scratch and " +
@@ -45,54 +40,22 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "\"settings\":[{\"name\":string,\"description\":string,\"scale\":string,\"aliases\":[string]}]}. " +
         "Use [] when none are present, and \"\" for an unknown scale. No prose outside the JSON.";
 
-    private const string StoryboardInstruction =
-        "You are a comics writer adapting a novel into a graphic novel. Using the supplied design bible " +
-        "for consistency, break the provided passage into volumes, pages, and panels — but be " +
-        "ECONOMICAL. This graphic novel is a comprehension aid: draw only the beats a reader needs to " +
-        "follow WHAT happens, WHO does it, and WHERE it happens. Each panel must carry a distinct, " +
-        "load-bearing action; SKIP transitional, in-between, establishing-only, and reaction-only " +
-        "moments that don't advance the action, and skip a beat already clear from an adjacent panel. " +
-        "Prefer the fewest panels that keep the action legible over a dense shot-by-shot breakdown. " +
-        "Aim for 1 to 4 panels per page (never more than 6), and give a pivotal " +
-        "beat its own page. For each panel give a vivid visual prompt that captures a SPECIFIC MOMENT " +
-        "OF ONGOING ACTION — the characters caught mid-gesture or mid-movement, interacting with each " +
-        "other and the setting — with an explicit shot type or camera angle (e.g. wide establishing " +
-        "shot, low-angle close-up, over-the-shoulder); avoid static, posed, portrait, or " +
-        "looking-at-camera framing. Respect the relative scale of the entities given in the design " +
-        "bible. Put no lettering in the art; give any dialogue and caption to be typeset separately, " +
-        "and the names of design-bible entities present. Give each panel a shotType of \"standard\", " +
-        "\"wide\" (a full-width establishing/landscape shot), or \"splash\" (a full-page moment reserved " +
-        "for a genuinely pivotal beat — use sparingly). Maintain continuity with the running summary. " +
-        "Set dialogueKind to \"thought\" only when the dialogue is a character's unspoken interior " +
-        "thought (it letters as a thought balloon); otherwise \"speech\". Set sfx to a short onomatopoeia " +
-        "for a prominent sound in the panel (e.g. \"CRASH\", \"BOOM\", \"KNOCK\") in the book's language, " +
-        "or null when there is no notable sound — which is most panels. " +
-        "Mark scene boundaries: set newScene to true on a panel that BEGINS A NEW SCENE — a change of " +
-        "location, a jump in time, or a distinct dramatic unit — and false on a panel that continues the " +
-        "current scene. The very first panel of the passage begins a scene. These groupings are used to " +
-        "render panels efficiently, so place them at genuine story boundaries. " +
-        "Respond with ONLY a JSON object: " +
-        "{\"continuitySummary\":string,\"volumes\":[{\"number\":int,\"title\":string,\"pages\":" +
-        "[{\"chapterNumber\":int,\"panels\":[{\"visualPrompt\":string,\"dialogue\":string|null," +
-        "\"caption\":string|null,\"referenceNames\":[string],\"shotType\":\"standard\"|\"wide\"|\"splash\"," +
-        "\"dialogueKind\":\"speech\"|\"thought\",\"sfx\":string|null,\"newScene\":bool}]}]}]}." +
-        " No prose outside the JSON.";
-
     private const string ArtStyleInstruction =
-        "You are an art director choosing the visual style for a graphic-novel adaptation. From the prose " +
-        "sample and the cast below, infer the book's genre, tone, period and setting, then describe ONE " +
-        "cohesive illustration style for the WHOLE book — medium, rendering, linework, colour palette, " +
-        "lighting and mood — in a single vivid sentence a comics illustrator could follow consistently. " +
-        "Respond with ONLY a JSON object: {\"artStyle\":string}. No prose outside the JSON.";
+        "You are an art director choosing the visual style for illustrated evidence images of a novel's " +
+        "scenes. From the prose sample and the cast below, infer the book's genre, tone, period and " +
+        "setting, then describe ONE cohesive illustration style for the WHOLE book — medium, rendering, " +
+        "linework, colour palette, lighting and mood — in a single vivid sentence an illustrator could " +
+        "follow consistently. Respond with ONLY a JSON object: {\"artStyle\":string}. No prose outside the JSON.";
 
-    private const string CoverConceptInstruction =
-        "You are a comic-book cover artist. From the chapter excerpt below, describe ONE iconic cover " +
-        "illustration for this volume that captures the section's mood, atmosphere and central imagery — a " +
-        "single arresting composition, as a graphic-novel cover would frame it. CRITICAL: give away NO " +
-        "twists, reveals, deaths, or endings — evoke the feeling and the setting, never a spoiler; when in " +
-        "doubt, stay with the opening mood. Do NOT put any lettering, title, or text in the image; the book " +
-        "and chapter names are added separately. Keep the whole book's established art style. Respond with " +
-        "ONLY the visual description as plain text — no preamble, no quotes, no JSON.";
+    private const string SceneImageInstruction =
+        "You are a visual-development artist illustrating ONE scene of a novel for a fidelity check: the " +
+        "image will be placed beside the prose to test whether the scene's key beat lands visually AS " +
+        "WRITTEN. From the scene text and the cast/settings below, choose the scene's EMOTIONAL PEAK — the " +
+        "single most important dramatic moment — and describe one wordless illustration of it: who is " +
+        "present, what they are doing, where, and the mood, grounded in the details the prose actually " +
+        "gives. Depict a SPECIFIC moment of action or feeling, not a posed portrait. If a list of MOMENTS " +
+        "TO AVOID is given, choose a DIFFERENT beat of the same scene. Put NO lettering, text, or speech " +
+        "in the image. Respond with ONLY the visual description as plain text — no preamble, no quotes, no JSON.";
 
     private const string ChapterAnalysisInstruction =
         "You are a developmental editor analyzing ONE excerpt of a novel manuscript to help the author " +
@@ -128,14 +91,17 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "author preparing a novel for publication. You are given per-chunk notes gathered across the " +
         "whole manuscript in reading order, plus the cast. Each note carries the chapter it was taken " +
         "from. Synthesize the WHOLE book (do not merely concatenate the notes); " +
-        "be accurate, fair, specific, and constructive. Respond with ONLY a JSON object: " +
-        "{\"logline\":string,\"synopsis\":string,\"characters\":[{\"name\":string,\"role\":string," +
+        "be accurate, fair, specific, and constructive. Judge the draft QUALITATIVELY — never assign a " +
+        "numeric score or grade. Respond with ONLY a JSON object: " +
+        "{\"logline\":string,\"synopsis\":string,\"genre\":string,\"wordCountRange\":string," +
+        "\"characters\":[{\"name\":string,\"role\":string," +
         "\"arcSummary\":string,\"relationships\":[string]}],\"themes\":[string],\"plotHoles\":[FINDING]," +
-        "\"inconsistencies\":[FINDING],\"inaccuracies\":[FINDING],\"pacingNotes\":[FINDING],\"reviews\":" +
+        "\"inconsistencies\":[FINDING],\"inaccuracies\":[FINDING],\"pacingNotes\":[FINDING]," +
+        "\"pacingCurve\":[{\"chapter\":string,\"tension\":number}],\"reviews\":" +
         "[{\"perspective\":string,\"assessment\":string,\"strengths\":[string],\"weaknesses\":[string]," +
         "\"recommendation\":string}],\"revisionPlan\":[{\"priority\":string,\"chapter\":string," +
-        "\"issue\":string,\"suggestedFix\":string}],\"comparableTitles\":[string]," +
-        "\"marketPositioning\":string}. " +
+        "\"issue\":string,\"suggestedFix\":string}]," +
+        "\"verdict\":{\"strengths\":[string],\"problems\":[string],\"mostNeeds\":string}}. " +
         // Every finding has to be findable: an observation the author can't locate in the manuscript
         // costs them a re-read to act on. The chapter is already on the notes, so it only has to be
         // carried through rather than worked out.
@@ -143,10 +109,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "observation came from (\"Chapter 7\", \"Chapters 7–8\"), naming the EARLIEST chapter involved " +
         "when an observation spans several, and use \"\" only when the notes carry no chapter at all. " +
         "Set \"chapter\" on each revisionPlan item the same way. " +
-        "Provide AT LEAST THREE reviews from DISTINCT, fair perspectives (e.g. developmental editor, " +
-        "target-genre reader, literary critic, acquiring agent) — differing but honest, each with real " +
-        "strengths and weaknesses. Order revisionPlan HIGHEST-IMPACT FIRST and set priority to " +
-        "\"High\", \"Medium\", or \"Low\". Use [] when none. No prose outside the JSON.";
+        "genre: infer the book's genre. wordCountRange: the word-count range publishers expect for that " +
+        "genre (e.g. \"90,000–120,000\"). " +
+        "pacingCurve: one entry PER CHAPTER in reading order with tension from 0.0 (calm) to 1.0 (peak), so " +
+        "a saggy stretch is visible; copy the chapter label from the notes. " +
+        "Provide AT LEAST FOUR reviews from DISTINCT, fair perspectives — a DEVELOPMENTAL EDITOR (structure, " +
+        "arcs, stakes), the TARGET-GENRE READER (where they're gripped, bored, confused, moved), the SKEPTIC " +
+        "(the harshest fair read), and an AGENT & ACQUIRING EDITOR (is it sellable, is it ready, where it " +
+        "sits in the market, and a readiness read: early draft / revision / near-submittable) — differing " +
+        "but honest, each with real strengths and weaknesses. " +
+        "Order revisionPlan HIGHEST-IMPACT FIRST and set priority to \"Must\", \"Should\", or \"Consider\". " +
+        "verdict: the candid state of the draft — biggest strengths, biggest problems, and the single thing " +
+        "this draft most needs before the next revision. Use [] when none. No prose outside the JSON.";
 
     private const string CraftConsolidationInstruction =
         "You are a line editor and craft critic producing the CRAFT half of a REVISION REPORT for an " +
@@ -174,19 +148,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "Every \"chapter\" is copied from the note the item came from; \"\" only when the notes carry " +
         "none. Use [] when none. No prose outside the JSON.";
 
-    private const string FactCheckInstruction =
-        "You are a fact-checker for a novel heading toward publication. You are given the checkable " +
-        "real-world statements the manuscript makes, each with the chapter it came from. SEARCH THE WEB to " +
-        "verify each one, then report what you found. Respond with ONLY a JSON object: " +
-        "{\"checks\":[{\"claim\":string,\"verdict\":string,\"note\":string,\"chapter\":string}]}. " +
-        "verdict is EXACTLY one of \"Correct\", \"Incorrect\", \"Partly correct\", or \"Unverified\". Use " +
-        "\"Unverified\" whenever the search does not settle it — a confident \"Incorrect\" on something you " +
-        "could not actually check sends the author chasing a problem that isn't there. note says what you " +
-        "found and, for anything not Correct, what the accurate version is. Copy \"chapter\" from the claim " +
-        "you were given. Judge only real-world accuracy: invented places, people and history in a work of " +
-        "fiction are not errors, so leave them out entirely rather than reporting them as Incorrect. " +
-        "Report at most 30 checks, the ones that most matter. No prose outside the JSON.";
-
     private const string VoiceConsistencyInstruction =
         "You are a developmental editor assessing a manuscript's VOICE CONSISTENCY for an author preparing " +
         "it for publication. You are given a representative prose sample from each chapter, each tagged " +
@@ -203,14 +164,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "sample so the author can find it. divergence: how it departs from the dominant voice. suggestion: " +
         "how to bring it into line. Report AT MOST 20 divergences, the clearest ones, and use [] when the " +
         "voice is consistent throughout. No prose outside the JSON.";
-
-    private const string ImplyInstruction =
-        "You are a comics director revising a single panel's visual prompt. The image model refused to " +
-        "draw it because some element is too explicit to depict. Rewrite the prompt so that same beat is " +
-        "IMPLIED rather than shown: turn the camera away, cut to reaction or aftermath, obscure the " +
-        "explicit element with foreground/shadow/framing, or move it just off-panel — while keeping the " +
-        "mood, characters, and story moment intact. Keep it a single vivid panel description with no " +
-        "lettering. Respond with ONLY the rewritten visual prompt as plain text — no preamble, no quotes.";
 
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
@@ -258,51 +211,24 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return dto?.ArtStyle?.Trim() ?? string.Empty;
     }
 
-    public async Task<string> DescribeVolumeCover(
-        string novelTitle, string chapterTitle, string chapterExcerpt, string artStyle,
-        CancellationToken cancellationToken)
-    {
-        var userContent =
-            $"NOVEL: {novelTitle}\nCHAPTER/VOLUME: {chapterTitle}\nART STYLE: {artStyle}\n\nCHAPTER EXCERPT:\n{chapterExcerpt}";
-
-        // Best-effort: a spoiler-free cover is a nicety, so any empty/failed reply just yields an empty
-        // concept and the caller falls back to the plain typographic cover.
-        var reply = await SendMessage(CoverConceptInstruction, userContent, cancellationToken);
-        return reply.Trim();
-    }
-
-    public async Task<StoryboardSegment> Storyboard(
-        string textWindow, string continuitySummary, DesignBible bible, string artStyle,
+    public async Task<string> DescribeSceneImage(
+        string sceneText, DesignBible bible, string artStyle, IReadOnlyList<string> avoidMoments,
         CancellationToken cancellationToken)
     {
         var bibleJson = JsonSerializer.Serialize(bible, JsonResponse.CaseInsensitive);
-        // The art style and design bible are identical for every window of a novel, so they go in a
-        // cached block: consecutive windows and any retries then bill this as a cache read (~0.1x)
-        // rather than re-sending the whole bible at full input price on every call.
-        var cachedContext =
-            $"ART STYLE (apply to every visual prompt): {artStyle}\n\n" +
-            $"DESIGN BIBLE (JSON):\n{bibleJson}";
+        var avoid = avoidMoments.Count == 0
+            ? "(none)"
+            : string.Join("\n", avoidMoments.Select(m => $"- {m}"));
         var userContent =
-            $"CONTINUITY SO FAR:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(none yet)" : continuitySummary)}\n\n" +
-            $"PASSAGE TO ADAPT:\n{textWindow}";
+            $"ART STYLE: {artStyle}\n\n" +
+            $"CAST & SETTINGS (JSON):\n{bibleJson}\n\n" +
+            $"MOMENTS TO AVOID:\n{avoid}\n\n" +
+            $"SCENE:\n{sceneText}";
 
-        var reply = await SendMessage(
-            StoryboardInstruction, userContent, cancellationToken,
-            maxTokens: options.StoryboardMaxTokens, cachedContext: cachedContext);
-        var json = JsonResponse.ExtractObject(reply)
-            ?? throw new InvalidOperationException("Claude storyboard reply did not contain a JSON object.");
-
-        var dto = JsonResponse.Deserialize<StoryboardDto>(json)
-            ?? throw new InvalidOperationException("Claude storyboard reply could not be parsed.");
-
-        var volumes = (dto.Volumes ?? [])
-            .Select(v => new VolumeDraft(
-                v.Number,
-                v.Title ?? string.Empty,
-                (v.Pages ?? []).Select(MapPage).ToList()))
-            .ToList();
-
-        return new StoryboardSegment(volumes, dto.ContinuitySummary ?? string.Empty);
+        // Best-effort: a wordless prompt is nice to have, so any empty/failed reply yields an empty prompt
+        // and the caller leaves the scene without an image rather than blocking the report.
+        var reply = await SendMessage(SceneImageInstruction, userContent, cancellationToken);
+        return reply.Trim();
     }
 
     public async Task<ChapterNotes> AnalyzeChapter(
@@ -379,7 +305,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             // The craft sections come from their own call (ConsolidateCraft) and are folded in by the
             // caller; this half of the report leaves them empty rather than half-answering them.
             CraftReport.Empty.LineEdits, CraftReport.Empty.ProseNotes,
-            CraftReport.Empty.DialogueNotes, CraftReport.Empty.SceneBreakdown);
+            CraftReport.Empty.DialogueNotes, CraftReport.Empty.SceneBreakdown)
+        {
+            Genre = dto.Genre ?? string.Empty,
+            WordCountRange = dto.WordCountRange ?? string.Empty,
+            PacingCurve = (dto.PacingCurve ?? [])
+                .Where(t => !string.IsNullOrWhiteSpace(t.Chapter))
+                .Select(t => new ChapterTension(t.Chapter!, Math.Clamp(t.Tension, 0, 1)))
+                .ToList(),
+            Verdict = dto.Verdict is null
+                ? Verdict.Empty
+                : new Verdict(dto.Verdict.Strengths ?? [], dto.Verdict.Problems ?? [], dto.Verdict.MostNeeds ?? string.Empty)
+        };
     }
 
     public async Task<CraftReport> ConsolidateCraft(
@@ -415,38 +352,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 s.Purpose ?? string.Empty, s.Verdict ?? string.Empty)).ToList());
     }
 
-    public async Task<IReadOnlyList<FactCheck>> CheckFacts(
-        IReadOnlyList<ChapterNotes> notes, CancellationToken cancellationToken)
-    {
-        // Only the claims, each tagged with where it came from. Sending the whole notes payload would
-        // bury the task and invite the model to fact-check the fiction itself.
-        var claims = notes
-            .SelectMany(n => n.FactualClaims.Select(claim => new { chapter = n.Chapter, claim }))
-            .Where(c => !string.IsNullOrWhiteSpace(c.claim))
-            .ToList();
-
-        // Nothing checkable in the whole book is a normal outcome for some fiction — don't spend a call
-        // (or a search) to confirm an empty list.
-        if (claims.Count == 0)
-            return Array.Empty<FactCheck>();
-
-        var userContent = "CLAIMS TO CHECK (JSON):\n" + JsonSerializer.Serialize(claims, JsonResponse.CaseInsensitive);
-
-        var reply = await SendMessage(
-            FactCheckInstruction, userContent, cancellationToken, options.AnalysisMaxTokens, webSearch: true);
-        var json = JsonResponse.ExtractObject(reply);
-        if (json is null)
-            return Array.Empty<FactCheck>();
-
-        var dto = JsonResponse.Deserialize<FactCheckReplyDto>(json);
-        return (dto?.Checks ?? [])
-            .Where(c => !string.IsNullOrWhiteSpace(c.Claim))
-            .Select(c => new FactCheck(
-                c.Claim!, string.IsNullOrWhiteSpace(c.Verdict) ? "Unverified" : c.Verdict!,
-                c.Note ?? string.Empty, c.Chapter ?? string.Empty))
-            .ToList();
-    }
-
     public async Task<VoiceConsistency> AssessVoiceConsistency(
         IReadOnlyList<ChapterSample> samples, CancellationToken cancellationToken)
     {
@@ -474,20 +379,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 .ToList());
     }
 
-    public async Task<string> RewritePromptToImply(string visualPrompt, CancellationToken cancellationToken)
-    {
-        var reply = await SendMessage(ImplyInstruction, visualPrompt, cancellationToken);
-        var rewritten = reply.Trim();
-        // Fall back to the original prompt if the model returned nothing usable, so the caller always
-        // has a prompt to try rather than an empty one.
-        return string.IsNullOrWhiteSpace(rewritten) ? visualPrompt : rewritten;
-    }
-
     // model selects the tier: null means the strong default. Only the mechanical per-chunk calls pass the
     // fast one — see ClaudeOptions.FastModel for why those two and not the rest.
     private async Task<string> SendMessage(
         string instruction, string userText, CancellationToken cancellationToken,
-        int? maxTokens = null, string? cachedContext = null, string? model = null, bool webSearch = false)
+        int? maxTokens = null, string? cachedContext = null, string? model = null)
     {
         // Invariant, reused context (the design bible) is cached as its own block so repeated calls
         // within the cache window bill it as a cache read instead of full input. Both blocks share one
@@ -516,22 +412,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             }
         };
 
-        // Serialized through a node so the optional server-side tool can be attached without a second
-        // payload shape. Property names are already snake_case on the anonymous type, so they survive
-        // as written.
         var requestBody = JsonSerializer.SerializeToNode(payload)!.AsObject();
-        if (webSearch)
-        {
-            // Anthropic's hosted web-search tool: the search runs server-side and the model keeps
-            // generating, so the existing text accumulation needs no special handling. Capped because
-            // each search bills, and the fact-check has a bounded list of claims to settle.
-            requestBody["tools"] = new JsonArray(new JsonObject
-            {
-                ["type"] = WebSearchToolType,
-                ["name"] = "web_search",
-                ["max_uses"] = WebSearchMaxUses
-            });
-        }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
         request.Headers.Add("x-api-key", options.ApiKey);
@@ -681,30 +562,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             .Select(e => new EntityMention(e.Name!, e.Description ?? string.Empty, e.Scale ?? string.Empty, e.Aliases ?? []))
             .ToList();
 
-    private static PageDraft MapPage(PageDto page) =>
-        new(page.ChapterNumber,
-            (page.Panels ?? [])
-                .Select(p => new PanelDraft(
-                    p.VisualPrompt ?? string.Empty, p.Dialogue, p.Caption, p.ReferenceNames ?? [],
-                    ParseShot(p.ShotType), ParseDialogueKind(p.DialogueKind),
-                    string.IsNullOrWhiteSpace(p.Sfx) ? null : p.Sfx!.Trim(), p.NewScene))
-                .ToList());
-
-    // Maps the model's dialogueKind string to the enum, defaulting to Speech for anything unrecognized or
-    // absent (an older reply, a typo) — so a missing value simply letters as a normal spoken balloon.
-    private static DialogueKind ParseDialogueKind(string? kind) =>
-        kind?.Trim().ToLowerInvariant() == "thought" ? DialogueKind.Thought : DialogueKind.Speech;
-
-    // Maps the model's shotType string to the enum, defaulting to Standard for anything unrecognized or
-    // absent (an older reply, a typo, or a shot vocabulary we don't lay out specially) — so a missing or
-    // odd value simply lays the panel out normally rather than failing the parse.
-    private static ShotType ParseShot(string? shot) => shot?.Trim().ToLowerInvariant() switch
-    {
-        "wide" => ShotType.Wide,
-        "splash" => ShotType.Splash,
-        _ => ShotType.Standard
-    };
-
     private sealed class FragmentDto
     {
         public List<EntityDto>? Characters { get; set; }
@@ -722,37 +579,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private sealed class ArtStyleDto
     {
         public string? ArtStyle { get; set; }
-    }
-
-    private sealed class StoryboardDto
-    {
-        public string? ContinuitySummary { get; set; }
-        public List<VolumeDto>? Volumes { get; set; }
-    }
-
-    private sealed class VolumeDto
-    {
-        public int Number { get; set; }
-        public string? Title { get; set; }
-        public List<PageDto>? Pages { get; set; }
-    }
-
-    private sealed class PageDto
-    {
-        public int ChapterNumber { get; set; }
-        public List<PanelDto>? Panels { get; set; }
-    }
-
-    private sealed class PanelDto
-    {
-        public string? VisualPrompt { get; set; }
-        public string? Dialogue { get; set; }
-        public string? Caption { get; set; }
-        public List<string>? ReferenceNames { get; set; }
-        public string? ShotType { get; set; }
-        public string? DialogueKind { get; set; }
-        public string? Sfx { get; set; }
-        public bool NewScene { get; set; }
     }
 
     private sealed class ChapterNotesDto
@@ -789,6 +615,23 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<RevisionItemDto>? RevisionPlan { get; set; }
         public List<string>? ComparableTitles { get; set; }
         public string? MarketPositioning { get; set; }
+        public string? Genre { get; set; }
+        public string? WordCountRange { get; set; }
+        public List<ChapterTensionDto>? PacingCurve { get; set; }
+        public VerdictDto? Verdict { get; set; }
+    }
+
+    private sealed class ChapterTensionDto
+    {
+        public string? Chapter { get; set; }
+        public double Tension { get; set; }
+    }
+
+    private sealed class VerdictDto
+    {
+        public List<string>? Strengths { get; set; }
+        public List<string>? Problems { get; set; }
+        public string? MostNeeds { get; set; }
     }
 
     private sealed class CraftReportDto
@@ -856,11 +699,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? SuggestedFix { get; set; }
     }
 
-    private sealed class FactCheckReplyDto
-    {
-        public List<FactCheckDto>? Checks { get; set; }
-    }
-
     private sealed class VoiceConsistencyDto
     {
         public string? DominantVoice { get; set; }
@@ -873,13 +711,5 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Excerpt { get; set; }
         public string? Divergence { get; set; }
         public string? Suggestion { get; set; }
-    }
-
-    private sealed class FactCheckDto
-    {
-        public string? Claim { get; set; }
-        public string? Verdict { get; set; }
-        public string? Note { get; set; }
-        public string? Chapter { get; set; }
     }
 }

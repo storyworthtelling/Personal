@@ -32,9 +32,6 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("CraftJson")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("FactChecksJson")
-                        .HasColumnType("TEXT");
-
                     b.Property<Guid>("NovelId")
                         .HasColumnType("TEXT");
 
@@ -247,12 +244,6 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("BatchJobId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<long?>("BatchSubmittedAtUtc")
-                        .HasColumnType("INTEGER");
-
                     b.Property<bool>("ChaptersDetected")
                         .HasColumnType("INTEGER");
 
@@ -289,19 +280,10 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<long?>("RateLimitedUntilUtc")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("ReportOnly")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int>("Stage")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("StoryboardAttempts")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("StoryboardCursor")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("StoryboardWindowIndex")
+                    b.Property<int>("StageAttempts")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Title")
@@ -323,7 +305,7 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.ToTable("Novels");
                 });
 
-            modelBuilder.Entity("Storyboarder.Domain.Model.Page", b =>
+            modelBuilder.Entity("Storyboarder.Domain.Model.Scene", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -331,124 +313,48 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.Property<int>("Attempts")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ChapterLabel")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ChapterNumber")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("ComposedImagePath")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("CompositionStatus")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("LastError")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("PageNumber")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("ThumbImagePath")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("VolumeId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompositionStatus");
-
-                    b.HasIndex("VolumeId");
-
-                    b.ToTable("Pages");
-                });
-
-            modelBuilder.Entity("Storyboarder.Domain.Model.Panel", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("ApprovedForRelaxedRender")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("BatchAttempted")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("BatchJobId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<long?>("BatchSubmittedAtUtc")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("BlockedCategoriesJson")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Caption")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Dialogue")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("DialogueKind")
+                    b.Property<int>("EndOffset")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ImagePath")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("LastError")
+                    b.Property<string>("ImagePrompt")
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("NewScene")
+                    b.Property<int>("ImageStatus")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("NextAttemptAtUtc")
                         .HasColumnType("INTEGER");
 
-                    b.Property<Guid>("PageId")
+                    b.Property<Guid>("NovelId")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("PanelNumber")
+                    b.Property<int>("Number")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("PromptRewrittenForSafety")
+                    b.Property<int>("StartOffset")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("ReferenceNamesJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Sfx")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ShotType")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("Skipped")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SourceEndOffset")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SourceStartOffset")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("VisualPrompt")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PageId");
+                    b.HasIndex("ImageStatus", "NextAttemptAtUtc");
 
-                    b.HasIndex("Status", "NextAttemptAtUtc");
+                    b.HasIndex("NovelId", "Number");
 
-                    b.ToTable("Panels");
+                    b.ToTable("Scenes");
                 });
 
             modelBuilder.Entity("Storyboarder.Domain.Model.SourceText", b =>
@@ -473,52 +379,6 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("SourceTexts");
-                });
-
-            modelBuilder.Entity("Storyboarder.Domain.Model.Volume", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ArchivedDriveFileId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("LastError")
-                        .HasColumnType("TEXT");
-
-                    b.Property<long?>("NextAttemptAtUtc")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid>("NovelId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("Number")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("PdfPageCursor")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("PdfPath")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("PdfStatus")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NovelId");
-
-                    b.HasIndex("PdfStatus", "NextAttemptAtUtc");
-
-                    b.ToTable("Volumes");
                 });
 
             modelBuilder.Entity("Storyboarder.Domain.Model.BookAnalysis", b =>
@@ -566,20 +426,11 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Storyboarder.Domain.Model.Page", b =>
+            modelBuilder.Entity("Storyboarder.Domain.Model.Scene", b =>
                 {
-                    b.HasOne("Storyboarder.Domain.Model.Volume", null)
-                        .WithMany("Pages")
-                        .HasForeignKey("VolumeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Storyboarder.Domain.Model.Panel", b =>
-                {
-                    b.HasOne("Storyboarder.Domain.Model.Page", null)
-                        .WithMany("Panels")
-                        .HasForeignKey("PageId")
+                    b.HasOne("Storyboarder.Domain.Model.Novel", null)
+                        .WithMany("Scenes")
+                        .HasForeignKey("NovelId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -589,15 +440,6 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.HasOne("Storyboarder.Domain.Model.Novel", null)
                         .WithOne("Source")
                         .HasForeignKey("Storyboarder.Domain.Model.SourceText", "NovelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Storyboarder.Domain.Model.Volume", b =>
-                {
-                    b.HasOne("Storyboarder.Domain.Model.Novel", null)
-                        .WithMany("Volumes")
-                        .HasForeignKey("NovelId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -614,19 +456,9 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.Navigation("DesignRefs");
 
+                    b.Navigation("Scenes");
+
                     b.Navigation("Source");
-
-                    b.Navigation("Volumes");
-                });
-
-            modelBuilder.Entity("Storyboarder.Domain.Model.Page", b =>
-                {
-                    b.Navigation("Panels");
-                });
-
-            modelBuilder.Entity("Storyboarder.Domain.Model.Volume", b =>
-                {
-                    b.Navigation("Pages");
                 });
 #pragma warning restore 612, 618
         }

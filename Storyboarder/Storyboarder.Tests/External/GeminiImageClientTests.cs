@@ -66,14 +66,14 @@ public class GeminiImageClientTests
     }
 
     [Fact]
-    public async Task GeneratePanel_AttachesReferenceImagesAsInlineData()
+    public async Task SceneImage_AttachesReferenceImagesAsInlineData()
     {
         var (client, handler) = Create();
         handler.EnqueueOk(ImageReply(PngBytes));
         byte[] refA = [1, 1, 1];
         byte[] refB = [2, 2, 2];
 
-        await client.GeneratePanel("knight fights dragon", "noir", [refA, refB], aspectRatio: null, CancellationToken.None);
+        await client.GenerateSceneImage("knight fights dragon", "noir", [refA, refB], aspectRatio: null, CancellationToken.None);
 
         Assert.Equal(2, Count(handler.RequestBodies[0], "inlineData"));
         Assert.Contains(Convert.ToBase64String(refA), handler.RequestBodies[0]);
@@ -154,11 +154,11 @@ public class GeminiImageClientTests
             "{\"category\":\"HARM_CATEGORY_DANGEROUS_CONTENT\",\"probability\":\"HIGH\",\"blocked\":true}]}]}");
 
         var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
-            client.GeneratePanel("a brutal duel", "noir", [], aspectRatio: null, CancellationToken.None));
+            client.GenerateSceneImage("a brutal duel", "noir", [], aspectRatio: null, CancellationToken.None));
 
+        // Any block just means "retry a different moment, else leave the image unavailable" — Canonizer
+        // never relaxes a category, so the block reason is what matters, not the flagged categories.
         Assert.Equal(ImageBlockReason.Safety, ex.Reason);
-        // Only the category that actually tripped is carried, so only it gets relaxed on re-render.
-        Assert.Equal(new[] { "HARM_CATEGORY_DANGEROUS_CONTENT" }, ex.Categories);
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public class GeminiImageClientTests
         handler.EnqueueOk("{\"candidates\":[{\"finishReason\":\"IMAGE_SAFETY\"}]}");
 
         var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
-            client.GeneratePanel("a brutal beat", "noir", [], aspectRatio: null, CancellationToken.None));
+            client.GenerateSceneImage("a brutal beat", "noir", [], aspectRatio: null, CancellationToken.None));
 
         // IMAGE_SAFETY is Gemini's non-configurable image-output filter, not an IP/recitation block — it's
         // recoverable by rephrasing, so it's Filtered (degrade the panel) rather than Prohibited (cancel).
@@ -183,7 +183,7 @@ public class GeminiImageClientTests
         handler.EnqueueOk("{\"candidates\":[{\"finishReason\":\"PROHIBITED_CONTENT\"}]}");
 
         var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
-            client.GeneratePanel("a recognizable trademarked hero", "noir", [], aspectRatio: null, CancellationToken.None));
+            client.GenerateSceneImage("a recognizable trademarked hero", "noir", [], aspectRatio: null, CancellationToken.None));
 
         Assert.Equal(ImageBlockReason.Prohibited, ex.Reason);
         Assert.Empty(ex.Categories);
@@ -196,49 +196,31 @@ public class GeminiImageClientTests
         handler.EnqueueOk("{\"promptFeedback\":{\"blockReason\":\"BLOCKLIST\"}}");
 
         var ex = await Assert.ThrowsAsync<ImageContentBlockedException>(() =>
-            client.GeneratePanel("x", "noir", [], aspectRatio: null, CancellationToken.None));
+            client.GenerateSceneImage("x", "noir", [], aspectRatio: null, CancellationToken.None));
 
         Assert.Equal(ImageBlockReason.Prohibited, ex.Reason);
     }
 
     [Fact]
-    public async Task RelaxedRender_EmitsSafetySettings_ForOnlyTheGivenCategories()
+    public async Task Render_NeverEmitsSafetySettings()
     {
         var (client, handler) = Create();
         handler.EnqueueOk(ImageReply(PngBytes));
 
-        var image = await client.GeneratePanel(
-            "a brutal duel", "noir", [], aspectRatio: null, ["HARM_CATEGORY_DANGEROUS_CONTENT"], CancellationToken.None);
+        await client.GenerateSceneImage("a quiet scene", "noir", [], aspectRatio: null, CancellationToken.None);
 
-        Assert.Equal(PngBytes, image);
-        var body = handler.RequestBodies[0];
-        Assert.Contains("safetySettings", body);
-        Assert.Contains("HARM_CATEGORY_DANGEROUS_CONTENT", body);
-        Assert.Contains("BLOCK_NONE", body);
-        // The category that did not trip is not mentioned, so its default threshold is untouched.
-        Assert.DoesNotContain("HARM_CATEGORY_SEXUALLY_EXPLICIT", body);
-    }
-
-    [Fact]
-    public async Task DefaultRender_OmitsSafetySettingsEntirely()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(ImageReply(PngBytes));
-
-        await client.GeneratePanel("a quiet scene", "noir", [], aspectRatio: null, CancellationToken.None);
-
-        // The normal path never lowers thresholds — no safetySettings block is sent at all.
+        // Canonizer never lowers thresholds or asks the user to approve a render — no safetySettings block.
         Assert.DoesNotContain("safetySettings", handler.RequestBodies[0]);
     }
 
     [Fact]
-    public async Task Panel_WithAspectRatio_RequestsNearestSupportedRatio()
+    public async Task SceneImage_WithAspectRatio_RequestsNearestSupportedRatio()
     {
         var (client, handler) = Create();
         handler.EnqueueOk(ImageReply(PngBytes));
 
         // 1.3 is closest to 4:3 (1.333) among the supported ratios.
-        await client.GeneratePanel("a wide vista", "noir", [], aspectRatio: 1.3, CancellationToken.None);
+        await client.GenerateSceneImage("a wide vista", "noir", [], aspectRatio: 1.3, CancellationToken.None);
 
         var body = handler.RequestBodies[0];
         Assert.Contains("imageConfig", body);
@@ -246,12 +228,12 @@ public class GeminiImageClientTests
     }
 
     [Fact]
-    public async Task Panel_WithoutAspectRatio_OmitsImageConfig()
+    public async Task SceneImage_WithoutAspectRatio_OmitsImageConfig()
     {
         var (client, handler) = Create();
         handler.EnqueueOk(ImageReply(PngBytes));
 
-        await client.GeneratePanel("a scene", "noir", [], aspectRatio: null, CancellationToken.None);
+        await client.GenerateSceneImage("a scene", "noir", [], aspectRatio: null, CancellationToken.None);
 
         Assert.DoesNotContain("imageConfig", handler.RequestBodies[0]);
     }

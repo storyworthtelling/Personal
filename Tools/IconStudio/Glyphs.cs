@@ -3,7 +3,7 @@ using SkiaSharp;
 namespace IconStudio;
 
 /// <summary>
-/// The six ink line-art glyphs, each with exactly one terracotta detail
+/// The seven ink line-art glyphs, each with exactly one terracotta detail
 /// (DESIGN.md §8). Every painter draws on a normalized square canvas of the
 /// given size, keeping content inside the central adaptive-icon safe zone.
 /// </summary>
@@ -95,27 +95,33 @@ public static class Glyphs
         canvas.DrawCircle(c, c - s * 0.03f, s * 0.035f, accent);
     }
 
-    /// <summary>Storyboarder: comic panel grid, one terracotta panel.</summary>
-    public static void PanelGrid(SKCanvas canvas, float s)
+    /// <summary>Canonizer: a proofreader's red pen — an ink nib with a terracotta ink bead at the tip.</summary>
+    public static void PenNib(SKCanvas canvas, float s)
     {
         using var ink = InkStroke(s);
         using var accent = AccentFill();
         var c = s / 2;
-        var half = s * 0.24f;
-        var gap = s * 0.045f;
-        var radius = s * 0.02f;
 
-        var left = c - half;
-        var top = c - half;
-        var cellW = (2 * half - gap) / 2;
-        // An asymmetric comic grid: tall left panel, two stacked right panels.
-        var leftPanel = new SKRect(left, top, left + cellW, top + 2 * half);
-        var rightTop = new SKRect(left + cellW + gap, top, left + 2 * half, top + cellW);
-        var rightBottom = new SKRect(left + cellW + gap, top + cellW + gap, left + 2 * half, top + 2 * half);
+        // The nib body: a downward-pointing shape with a flat, rounded shoulder at top
+        // tapering to the writing point. Vertical extent is centered in the safe zone.
+        var shoulderY = c - 0.20f * s;
+        var tipY = c + 0.23f * s;
+        var halfW = 0.15f * s;
 
-        canvas.DrawRoundRect(leftPanel, radius, radius, ink);
-        canvas.DrawRoundRect(rightTop, radius, radius, accent);
-        canvas.DrawRoundRect(rightBottom, radius, radius, ink);
+        using var body = new SKPath();
+        body.MoveTo(c - halfW, shoulderY);
+        body.LineTo(c + halfW, shoulderY);
+        body.LineTo(c, tipY);
+        body.Close();
+        canvas.DrawPath(body, ink);
+
+        // The central slit running down the nib from below the breather hole to just above the point.
+        canvas.DrawLine(c, c - 0.05f * s, c, c + 0.14f * s, ink);
+        // The breather hole near the top of the nib.
+        canvas.DrawCircle(c, c - 0.10f * s, 0.03f * s, ink);
+
+        // The one terracotta detail: a bead of ink pooled at the writing point.
+        canvas.DrawCircle(c, c + 0.17f * s, 0.04f * s, accent);
     }
 
     /// <summary>Ledger: four ink ledger strokes struck through by the terracotta fifth mark.</summary>

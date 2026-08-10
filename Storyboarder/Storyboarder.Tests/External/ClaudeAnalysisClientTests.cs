@@ -80,24 +80,6 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
-    public async Task DescribeVolumeCover_ReturnsConcept_AndPromptForbidsSpoilersAndLettering()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply("A lone rider crests a moonlit ridge, cloak snapping in the wind."));
-
-        var concept = await client.DescribeVolumeCover(
-            "My Novel", "The Long Road", "excerpt text", "noir ink wash", CancellationToken.None);
-
-        Assert.Contains("lone rider", concept);
-        var body = handler.RequestBodies[0];
-        Assert.Contains("cover", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("twists", body, StringComparison.OrdinalIgnoreCase);   // spoiler-free
-        Assert.Contains("lettering", body, StringComparison.OrdinalIgnoreCase); // no text baked into the art
-        // Owner-visible art, so it runs on the strong model, not the cheap tier.
-        Assert.Contains("\"model\":\"test-model\"", body);
-    }
-
-    [Fact]
     public async Task ExtractEntities_PromptDemandsExhaustiveCoverage()
     {
         // The whole point of extraction is reference-sheet coverage: every character (including minor and
@@ -116,23 +98,6 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
-    public async Task Storyboard_PromptSteersPanelDensityAndAction()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
-
-        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
-
-        var body = handler.RequestBodies[0];
-        Assert.Contains("panels per page", body);
-        Assert.Contains("ONGOING ACTION", body);
-        // Steered to be economical: only load-bearing beats, skipping transitional/in-between panels
-        // (fewer panels = less render cost and wall-clock).
-        Assert.Contains("ECONOMICAL", body);
-        Assert.Contains("SKIP transitional", body);
-    }
-
-    [Fact]
     public async Task ExtractEntities_SendsApiKeyVersionAndCachedSystemPrompt()
     {
         var (client, handler) = Create();
@@ -145,70 +110,6 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("2023-06-01", Assert.Single(request.Headers.GetValues("anthropic-version")));
         Assert.Contains("cache_control", handler.RequestBodies[0]);
         Assert.Contains("ephemeral", handler.RequestBodies[0]);
-    }
-
-    private static ChapterNotes NotesWithClaims(string chapter, params string[] claims) =>
-        ChapterNotes.Empty with { Chapter = chapter, FactualClaims = claims };
-
-    [Fact]
-    public async Task CheckFacts_GrantsWebSearch_AndSendsOnlyTheClaims()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply(
-            "{\"checks\":[{\"claim\":\"Paris is the capital of Spain\",\"verdict\":\"Incorrect\"," +
-            "\"note\":\"Paris is the capital of France; Madrid is Spain's.\",\"chapter\":\"Chapter 3\"}]}"));
-
-        var checks = await client.CheckFacts(
-            [NotesWithClaims("Chapter 3", "Paris is the capital of Spain")], CancellationToken.None);
-
-        var check = Assert.Single(checks);
-        Assert.Equal("Incorrect", check.Verdict);
-        Assert.Equal("Chapter 3", check.Chapter);
-
-        var body = handler.RequestBodies[0];
-        // The hosted search tool is granted for this call — it is the only one that gets it.
-        Assert.Contains("web_search", body);
-        Assert.Contains("tools", body);
-        Assert.Contains("Paris is the capital of Spain", body);
-    }
-
-    [Fact]
-    public async Task OtherCalls_AreNotGivenASearchTool()
-    {
-        // The rest of the report must reason from the manuscript alone, not from what the web says a book
-        // like this should contain.
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
-
-        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
-
-        Assert.DoesNotContain("web_search", handler.RequestBodies[0]);
-    }
-
-    [Fact]
-    public async Task CheckFacts_WithNoClaims_MakesNoCallAtAll()
-    {
-        // Fiction that asserts nothing checkable is a normal outcome; confirming an empty list isn't worth
-        // a billed request, let alone a web search.
-        var (client, handler) = Create();
-
-        var checks = await client.CheckFacts([ChapterNotes.Empty], CancellationToken.None);
-
-        Assert.Empty(checks);
-        Assert.Empty(handler.Requests);
-    }
-
-    [Fact]
-    public async Task CheckFacts_MissingVerdict_DefaultsToUnverified()
-    {
-        // Never present an unchecked claim as settled — that would send the author after a non-problem.
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply("{\"checks\":[{\"claim\":\"The tower is 90m tall\",\"chapter\":\"Chapter 2\"}]}"));
-
-        var checks = await client.CheckFacts(
-            [NotesWithClaims("Chapter 2", "The tower is 90m tall")], CancellationToken.None);
-
-        Assert.Equal("Unverified", Assert.Single(checks).Verdict);
     }
 
     [Fact]
@@ -232,17 +133,14 @@ public class ClaudeAnalysisClientTests
     [Fact]
     public async Task JudgementCalls_StayOnTheStrongModel()
     {
-        // Adapting prose into panels and synthesising the whole manuscript are the calls whose quality the
-        // owner actually sees, so they must not be downgraded to save pennies.
+        // Synthesising the whole manuscript into the report is a call whose quality the owner actually
+        // sees, so it must not be downgraded to save pennies.
         var (client, handler) = Create();
-        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
         handler.EnqueueOk(Reply("{}"));
 
-        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
         await client.ConsolidateAnalysis("Title", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
 
         Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[0]);
-        Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[1]);
     }
 
     [Fact]
@@ -256,28 +154,6 @@ public class ClaudeAnalysisClientTests
         var fragment = await client.ExtractEntities("excerpt", CancellationToken.None);
 
         Assert.Equal("Bob", Assert.Single(fragment.Characters).Name);
-    }
-
-    [Fact]
-    public async Task Storyboard_ParsesVolumesPagesAndPanels()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply(
-            "{\"continuitySummary\":\"Alice arrived.\",\"volumes\":[{\"number\":1,\"title\":\"Beginnings\"," +
-            "\"pages\":[{\"chapterNumber\":1,\"panels\":[{\"visualPrompt\":\"Alice at the gate\"," +
-            "\"dialogue\":\"Hello?\",\"caption\":null,\"referenceNames\":[\"Alice\"]}]}]}]}"));
-
-        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
-
-        Assert.Equal("Alice arrived.", segment.ContinuitySummary);
-        var volume = Assert.Single(segment.Volumes);
-        Assert.Equal("Beginnings", volume.Title);
-        var panel = Assert.Single(Assert.Single(volume.Pages).Panels);
-        Assert.Equal("Alice at the gate", panel.VisualPrompt);
-        Assert.Equal("Hello?", panel.Dialogue);
-        Assert.Contains("Alice", panel.ReferenceNames);
-        // No shotType in the reply → Standard, so an older model reply lays out exactly as before.
-        Assert.Equal(Storyboarder.Domain.Model.ShotType.Standard, panel.Shot);
     }
 
     [Fact]
@@ -337,66 +213,21 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
-    public async Task Storyboard_ParsesShotType_AndDefaultsUnknownToStandard()
+    public async Task DescribeSceneImage_ReturnsPlainPrompt_AndPassesMomentsToAvoid()
     {
         var (client, handler) = Create();
-        handler.EnqueueOk(Reply(
-            "{\"continuitySummary\":\"x\",\"volumes\":[{\"number\":1,\"title\":\"V\",\"pages\":[{\"chapterNumber\":1,\"panels\":[" +
-            "{\"visualPrompt\":\"a\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"shotType\":\"splash\"}," +
-            "{\"visualPrompt\":\"b\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"shotType\":\"WIDE\"}," +
-            "{\"visualPrompt\":\"c\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"shotType\":\"telephoto\"}" +
-            "]}]}]}"));
+        handler.EnqueueOk(Reply("A knight kneels in the rain before a shattered gate."));
 
-        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+        var prompt = await client.DescribeSceneImage(
+            "scene text", new DesignBible([], []), "noir ink wash",
+            ["A knight standing at the gate"], CancellationToken.None);
 
-        var panels = Assert.Single(Assert.Single(segment.Volumes).Pages).Panels;
-        Assert.Equal(Storyboarder.Domain.Model.ShotType.Splash, panels[0].Shot);
-        Assert.Equal(Storyboarder.Domain.Model.ShotType.Wide, panels[1].Shot);   // case-insensitive
-        Assert.Equal(Storyboarder.Domain.Model.ShotType.Standard, panels[2].Shot); // unknown → Standard
-    }
-
-    [Fact]
-    public async Task Storyboard_ParsesDialogueKindAndSfx_DefaultingToSpokenNoSfx()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply(
-            "{\"continuitySummary\":\"x\",\"volumes\":[{\"number\":1,\"title\":\"V\",\"pages\":[{\"chapterNumber\":1,\"panels\":[" +
-            "{\"visualPrompt\":\"a\",\"dialogue\":\"Maybe I should run.\",\"caption\":null,\"referenceNames\":[]," +
-            "\"dialogueKind\":\"thought\",\"sfx\":null}," +
-            "{\"visualPrompt\":\"b\",\"dialogue\":\"Stop!\",\"caption\":null,\"referenceNames\":[],\"sfx\":\"  crash  \"}," +
-            "{\"visualPrompt\":\"c\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"dialogueKind\":\"whispered\"}" +
-            "]}]}]}"));
-
-        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
-        var panels = Assert.Single(Assert.Single(segment.Volumes).Pages).Panels;
-
-        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Thought, panels[0].DialogueKind);
-        Assert.Null(panels[0].Sfx);
-        // Absent dialogueKind → Speech; sfx is trimmed.
-        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Speech, panels[1].DialogueKind);
-        Assert.Equal("crash", panels[1].Sfx);
-        // An unrecognized dialogueKind falls back to Speech, like an unknown shot falls back to Standard.
-        Assert.Equal(Storyboarder.Domain.Model.DialogueKind.Speech, panels[2].DialogueKind);
-    }
-
-    [Fact]
-    public async Task Storyboard_ParsesNewSceneMarkers_DefaultingFalse()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply(
-            "{\"continuitySummary\":\"x\",\"volumes\":[{\"number\":1,\"title\":\"V\",\"pages\":[{\"chapterNumber\":1,\"panels\":[" +
-            "{\"visualPrompt\":\"a\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"newScene\":true}," +
-            "{\"visualPrompt\":\"b\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[],\"newScene\":false}," +
-            "{\"visualPrompt\":\"c\",\"dialogue\":null,\"caption\":null,\"referenceNames\":[]}" +
-            "]}]}]}"));
-
-        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
-        var panels = Assert.Single(Assert.Single(segment.Volumes).Pages).Panels;
-
-        Assert.True(panels[0].NewScene);
-        Assert.False(panels[1].NewScene);
-        // Absent newScene → false (no boundary), so an omitting model reply groups panels as before.
-        Assert.False(panels[2].NewScene);
+        Assert.Equal("A knight kneels in the rain before a shattered gate.", prompt);
+        var body = handler.RequestBodies[0];
+        // The refused moment is sent so the model picks a different beat, and the image must be wordless.
+        Assert.Contains("A knight standing at the gate", body);
+        Assert.Contains("EMOTIONAL PEAK", body);
+        Assert.Contains("NO lettering", body);
     }
 
     [Fact]
@@ -614,24 +445,6 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
-    public async Task Storyboard_UsesStoryboardMaxTokens_NotDefault()
-    {
-        var handler = new FakeHttpMessageHandler();
-        var options = Options.Create(new ClaudeOptions
-        {
-            ApiKey = "test-key", Model = "test-model", MaxTokens = 256, StoryboardMaxTokens = 32000
-        });
-        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
-        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
-
-        await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
-
-        // A full panel breakdown of a chunk is the heaviest output the pipeline produces, so the
-        // storyboard call must request its own large budget rather than the small default MaxTokens.
-        Assert.Contains("\"max_tokens\":32000", handler.RequestBodies[0]);
-    }
-
-    [Fact]
     public async Task MaxTokensStopReason_ThrowsTruncatedResponse_NotSilentPartialBody()
     {
         var (client, handler) = Create();
@@ -696,15 +509,16 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         // A real stream delivers the JSON in pieces across many text_delta events.
         handler.Enqueue(HttpStatusCode.OK, Sse(
-            ("content_block_delta", Delta("{\"continuitySummary\":\"Ali")),
-            ("content_block_delta", Delta("ce arrived.\",\"volumes\":")),
-            ("content_block_delta", Delta("[]}")),
+            ("content_block_delta", Delta("{\"logline\":\"Ali")),
+            ("content_block_delta", Delta("ce quests.\",\"synopsis\":")),
+            ("content_block_delta", Delta("\"She grows up.\"}")),
             ("message_stop", "{\"type\":\"message_stop\"}")), "text/event-stream");
 
-        var segment = await client.Storyboard("passage", "", new DesignBible([], []), "noir", CancellationToken.None);
+        var report = await client.ConsolidateAnalysis(
+            "Quest", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
 
-        Assert.Equal("Alice arrived.", segment.ContinuitySummary);
-        Assert.Empty(segment.Volumes);
+        Assert.Equal("Alice quests.", report.Logline);
+        Assert.Equal("She grows up.", report.Synopsis);
     }
 
     [Fact]
@@ -718,59 +532,4 @@ public class ClaudeAnalysisClientTests
         await Assert.ThrowsAsync<RateLimitException>(() => client.ExtractEntities("x", CancellationToken.None));
     }
 
-    [Fact]
-    public async Task RewritePromptToImply_ReturnsRestagedPrompt()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply("The lovers embrace; the camera drifts to the rain-streaked window."));
-
-        var reworked = await client.RewritePromptToImply(
-            "an explicit love scene", CancellationToken.None);
-
-        Assert.Equal("The lovers embrace; the camera drifts to the rain-streaked window.", reworked);
-        // The restage instruction is sent as the (cached) system prompt.
-        Assert.Contains("IMPLIED", handler.RequestBodies[0]);
-    }
-
-    [Fact]
-    public async Task RewritePromptToImply_FallsBackToOriginal_WhenModelReturnsNothing()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply("   "));
-
-        var reworked = await client.RewritePromptToImply("original prompt", CancellationToken.None);
-
-        Assert.Equal("original prompt", reworked);
-    }
-
-    [Fact]
-    public async Task Storyboard_CachesArtStyleAndBibleSeparatelyFromThePassage()
-    {
-        var (client, handler) = Create();
-        handler.EnqueueOk(Reply("{\"continuitySummary\":\"\",\"volumes\":[]}"));
-
-        await client.Storyboard(
-            "PASSAGE: the hero walks to the gate", "prior events",
-            new DesignBible([], []), "watercolour noir", CancellationToken.None);
-
-        var body = handler.RequestBodies[0];
-        // Two cached blocks: the static instruction and the per-novel art style + design bible, so
-        // repeated windows/retries bill the bible as a cache read rather than full input every call.
-        Assert.Equal(2, CountOccurrences(body, "cache_control"));
-        Assert.Contains("watercolour noir", body);
-        Assert.Contains("DESIGN BIBLE", body);
-        // The varying passage rides in the uncached user message.
-        Assert.Contains("the hero walks to the gate", body);
-    }
-
-    private static int CountOccurrences(string haystack, string needle)
-    {
-        int count = 0, index = 0;
-        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += needle.Length;
-        }
-        return count;
-    }
 }

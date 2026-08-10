@@ -59,8 +59,6 @@ public static class MauiProgram
             _ => new LiveOptions<GeminiOptions>(() => new GeminiOptions { ApiKey = SettingsStore.GeminiApiKey }));
         builder.Services.AddSingleton<IOptions<RateLimitOptions>>(
             _ => new LiveOptions<RateLimitOptions>(() => new RateLimitOptions()));
-        builder.Services.AddSingleton<IOptions<PageLayoutOptions>>(
-            _ => new LiveOptions<PageLayoutOptions>(() => new PageLayoutOptions()));
         // Read live from Preferences like the keys are, so switching archiving on takes effect on the
         // next worker cycle without a restart.
         builder.Services.AddSingleton<IOptions<ArchiveOptions>>(
@@ -103,13 +101,6 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IGeminiImageClient, GeminiImageClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
-        // The batch client submits/polls jobs (short calls). Batch mode is on by default now (reference
-        // sheets go through the Files API, so a real book stays under the inline ceiling); the first live
-        // run confirms the REST envelope, degrading safely to synchronous rendering on any mismatch (see
-        // GeminiBatchImageClient / BATCHING.md).
-        builder.Services.AddHttpClient<IGeminiBatchClient, GeminiBatchImageClient>()
-            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
-            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         // The owner's-voice client. Its key is the same Claude key, read live from Preferences so it
         // tracks the Settings page like every other credential. Short calls (a distilled profile, a
         // one-sentence message), so a 2-minute ceiling is ample.
@@ -121,14 +112,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<IGoogleDocsClient, GoogleDocsClient>();
         builder.Services.AddSingleton<IClock, SystemClock>();
         builder.Services.AddSingleton<IImageStore, FileSystemImageStore>();
-        builder.Services.AddSingleton<IPageComposer, SkiaPageComposer>();
         builder.Services.AddSingleton<IVolumePdfComposer, PdfVolumeComposer>();
         builder.Services.AddSingleton<AnalysisDocumentRenderer>();
         builder.Services.AddSingleton<IAnalysisPdfComposer, AnalysisPdfComposer>();
 
         // Pipeline + application services.
-        builder.Services.AddSingleton<GraphicNovelProcessor>();
-        builder.Services.AddSingleton<IPipelineStep>(sp => sp.GetRequiredService<GraphicNovelProcessor>());
+        builder.Services.AddSingleton<ReviewProcessor>();
+        builder.Services.AddSingleton<IPipelineStep>(sp => sp.GetRequiredService<ReviewProcessor>());
         builder.Services.AddSingleton<PipelineRunner>();
         builder.Services.AddScoped<ProjectService>();
         builder.Services.AddSingleton<ProjectBackupService>();
