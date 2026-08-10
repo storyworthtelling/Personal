@@ -4,9 +4,12 @@ namespace FocusPhone.Audio.Google;
 
 /// <summary>
 /// A random-access read-only <see cref="Stream"/> over a Drive file, backed by HTTP
-/// Range GETs against <c>files/{id}?alt=media</c>. Lets TagLibSharp (and, later,
-/// playback) seek and read headers without downloading whole files. Reads are
-/// synchronous because the tag reader is; the transport is AndroidMessageHandler.
+/// Range GETs against <c>files/{id}?alt=media</c>. Lets TagLibSharp seek and read
+/// headers without downloading whole files. TagLibSharp reads synchronously, but the
+/// transport is <c>AndroidMessageHandler</c>, which only implements <c>SendAsync</c>
+/// (its synchronous <c>Send</c> throws <see cref="NotSupportedException"/>); so we call
+/// the async send and block. That is safe here because the scanner drives these reads
+/// on <c>Task.Run</c> pool threads with no captured synchronization context.
 /// </summary>
 public sealed class DriveSeekableStream : Stream
 {
@@ -50,7 +53,9 @@ public sealed class DriveSeekableStream : Stream
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Headers.Range = new RangeHeaderValue(position, last);
 
-        using var response = http.Send(request);
+        using var response = http
+            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead)
+            .GetAwaiter().GetResult();
         response.EnsureSuccessStatusCode();
         using var content = response.Content.ReadAsStream();
 
