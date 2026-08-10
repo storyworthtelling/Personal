@@ -213,6 +213,24 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task DescribeSceneImage_ReturnsPlainPrompt_AndPassesMomentsToAvoid()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("A knight kneels in the rain before a shattered gate."));
+
+        var prompt = await client.DescribeSceneImage(
+            "scene text", new DesignBible([], []), "noir ink wash",
+            ["A knight standing at the gate"], CancellationToken.None);
+
+        Assert.Equal("A knight kneels in the rain before a shattered gate.", prompt);
+        var body = handler.RequestBodies[0];
+        // The refused moment is sent so the model picks a different beat, and the image must be wordless.
+        Assert.Contains("A knight standing at the gate", body);
+        Assert.Contains("EMOTIONAL PEAK", body);
+        Assert.Contains("NO lettering", body);
+    }
+
+    [Fact]
     public async Task AnalyzeChapter_ParsesNotes_ToleratingProse()
     {
         var (client, handler) = Create();

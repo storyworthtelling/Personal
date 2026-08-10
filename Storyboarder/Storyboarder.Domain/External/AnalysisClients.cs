@@ -18,6 +18,18 @@ public interface IClaudeAnalysisClient
         DesignBible bible,
         CancellationToken cancellationToken);
 
+    // Describes ONE wordless illustration of a scene's emotional peak — the beat the prose is measured
+    // against in the fidelity check. Given the scene's text and the cast/settings, it returns a plain-text
+    // visual prompt for the image model (no lettering). Best-effort: empty when it can't be derived, so a
+    // scene image is never blocked on art direction. `avoidMoments` names beats already tried and refused,
+    // so a retry can target a different moment of the same scene.
+    Task<string> DescribeSceneImage(
+        string sceneText,
+        DesignBible bible,
+        string artStyle,
+        IReadOnlyList<string> avoidMoments,
+        CancellationToken cancellationToken);
+
     // Literary-analysis "map": observations for one manuscript chunk (character beats, events,
     // possible inconsistencies, checkable claims, strengths/weaknesses) anchored to the known cast.
     // chapterLabel names the chapter(s) the chunk covers ("Chapter 7", "Chapters 7–8"); it is given to

@@ -47,6 +47,16 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "linework, colour palette, lighting and mood — in a single vivid sentence an illustrator could " +
         "follow consistently. Respond with ONLY a JSON object: {\"artStyle\":string}. No prose outside the JSON.";
 
+    private const string SceneImageInstruction =
+        "You are a visual-development artist illustrating ONE scene of a novel for a fidelity check: the " +
+        "image will be placed beside the prose to test whether the scene's key beat lands visually AS " +
+        "WRITTEN. From the scene text and the cast/settings below, choose the scene's EMOTIONAL PEAK — the " +
+        "single most important dramatic moment — and describe one wordless illustration of it: who is " +
+        "present, what they are doing, where, and the mood, grounded in the details the prose actually " +
+        "gives. Depict a SPECIFIC moment of action or feeling, not a posed portrait. If a list of MOMENTS " +
+        "TO AVOID is given, choose a DIFFERENT beat of the same scene. Put NO lettering, text, or speech " +
+        "in the image. Respond with ONLY the visual description as plain text — no preamble, no quotes, no JSON.";
+
     private const string ChapterAnalysisInstruction =
         "You are a developmental editor analyzing ONE excerpt of a novel manuscript to help the author " +
         "revise toward publication. Use the KNOWN CAST names consistently when they appear. LOCATION IN " +
@@ -188,6 +198,26 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             return string.Empty;
         var dto = JsonResponse.Deserialize<ArtStyleDto>(json);
         return dto?.ArtStyle?.Trim() ?? string.Empty;
+    }
+
+    public async Task<string> DescribeSceneImage(
+        string sceneText, DesignBible bible, string artStyle, IReadOnlyList<string> avoidMoments,
+        CancellationToken cancellationToken)
+    {
+        var bibleJson = JsonSerializer.Serialize(bible, JsonResponse.CaseInsensitive);
+        var avoid = avoidMoments.Count == 0
+            ? "(none)"
+            : string.Join("\n", avoidMoments.Select(m => $"- {m}"));
+        var userContent =
+            $"ART STYLE: {artStyle}\n\n" +
+            $"CAST & SETTINGS (JSON):\n{bibleJson}\n\n" +
+            $"MOMENTS TO AVOID:\n{avoid}\n\n" +
+            $"SCENE:\n{sceneText}";
+
+        // Best-effort: a wordless prompt is nice to have, so any empty/failed reply yields an empty prompt
+        // and the caller leaves the scene without an image rather than blocking the report.
+        var reply = await SendMessage(SceneImageInstruction, userContent, cancellationToken);
+        return reply.Trim();
     }
 
     public async Task<ChapterNotes> AnalyzeChapter(

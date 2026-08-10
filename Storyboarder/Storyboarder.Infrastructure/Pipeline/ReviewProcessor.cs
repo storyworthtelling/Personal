@@ -48,6 +48,17 @@ public sealed class ReviewProcessor : IPipelineStep
 
     private readonly TextChunker chunker = new();
     private readonly ChapterDetector chapterDetector = new();
+    private readonly SceneDetector sceneDetector = new();
+
+    // How many different moments of a scene the model is asked to illustrate before the image is left
+    // unavailable. A mature scene may be refused; the report is never blocked over it.
+    private const int MaxSceneImageAttempts = 5;
+
+    // Evidence images are portrait (they sit in a column beside the prose in the report).
+    private const double PortraitAspectRatio = 3.0 / 4;
+
+    // At most this many reference sheets are attached to one scene render, to keep the request small.
+    private const int MaxSceneReferenceSheets = 6;
 
     // How much opening prose the art-style derivation sees — enough to read the genre, voice and setting
     // without paying for the whole book on a one-off, best-effort call.
@@ -377,22 +388,167 @@ public sealed class ReviewProcessor : IPipelineStep
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    // Renders one wordless evidence image per scene. Scene rows are created by scene detection (wired in a
-    // following step); until scenes exist this stage has nothing to do and advances straight to the report,
-    // so the report composes with no per-scene images (a valid, if evidence-light, review).
+    // Detects scenes (once), then renders one wordless evidence image per scene — the moment the prose is
+    // measured against. A scene the model refuses even after retrying different moments is left with no
+    // image (never blocking the report). Advances when every scene has an image or has given up on one.
     private async Task<ProcessResult> RenderSceneImages(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
         var now = clock.UtcNow;
 
-        if (await PendingWork(db.Scenes.Where(s => s.NovelId == novel.Id), s => s.ImageStatus, s => s.NextAttemptAtUtc, now)
-                is { } wait)
-            return wait == TimeSpan.MinValue ? ProcessResult.Idle : ProcessResult.Waiting(wait, novel.Id);
+        var source = await db.SourceTexts
+            .Where(s => s.NovelId == novel.Id)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+
+        // 0) Seed the scenes once, from the detected chapters + source text.
+        if (!await db.Scenes.AnyAsync(s => s.NovelId == novel.Id, cancellationToken))
+        {
+            var chapters = (await db.Chapters
+                    .Where(c => c.NovelId == novel.Id)
+                    .OrderBy(c => c.Number)
+                    .ToListAsync(cancellationToken))
+                .Select(c => new ChapterSpan(c.Number, c.Label, c.StartOffset, c.EndOffset))
+                .ToList();
+
+            foreach (var span in sceneDetector.Detect(source, chapters))
+                db.Scenes.Add(new Scene
+                {
+                    NovelId = novel.Id,
+                    Number = span.Number,
+                    ChapterNumber = span.ChapterNumber,
+                    ChapterLabel = span.ChapterLabel,
+                    StartOffset = span.StartOffset,
+                    EndOffset = span.EndOffset
+                });
+            await db.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Detected scenes for manuscript {NovelId}", novel.Id);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 1) Render one pending/due scene image.
+        var scene = await db.Scenes
+            .Where(s => s.NovelId == novel.Id &&
+                        (s.ImageStatus == WorkStatus.Pending ||
+                         (s.ImageStatus == WorkStatus.NeedsRetry && s.NextAttemptAtUtc <= now)))
+            .OrderBy(s => s.Number)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (scene is not null)
+        {
+            var start = Math.Clamp(scene.StartOffset, 0, source.Length);
+            var end = Math.Clamp(scene.EndOffset, start, source.Length);
+            var sceneText = source[start..end];
+
+            // 1a) Derive the wordless image prompt (a Claude call). On a retry after a refusal, the refused
+            // prompt is remembered on LastError and passed as a moment to avoid so a different beat is tried.
+            if (string.IsNullOrWhiteSpace(scene.ImagePrompt))
+            {
+                if (!claudeLimiter.TryAcquire())
+                    return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+                try
+                {
+                    var bible = await LoadBible(db, novel.Id, cancellationToken);
+                    var avoid = string.IsNullOrWhiteSpace(scene.LastError) ? Array.Empty<string>() : [scene.LastError];
+                    scene.ImagePrompt = await claude.DescribeSceneImage(sceneText, bible, novel.ArtStyle, avoid, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    ScheduleRetry(scene, ex, novel);
+                    await db.SaveChangesAsync(cancellationToken);
+                    return ProcessResult.DidWork(novel.Id);
+                }
+
+                // No prompt could be derived: leave the scene without an image rather than blocking.
+                if (string.IsNullOrWhiteSpace(scene.ImagePrompt))
+                {
+                    scene.ImageStatus = WorkStatus.Completed;
+                    scene.ImagePath = null;
+                    scene.LastError = "Image unavailable: no image prompt could be derived.";
+                }
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+            }
+
+            // 1b) Render the image (a Gemini call), supplying reference sheets for any recurring entity
+            // named in the scene so characters/places stay on-model.
+            if (!geminiLimiter.TryAcquire())
+                return ProcessResult.Waiting(geminiLimiter.TimeUntilNext(), novel.Id);
+
+            try
+            {
+                var references = await LoadSceneReferenceImages(db, novel.Id, sceneText, cancellationToken);
+                var image = await gemini.GenerateSceneImage(
+                    scene.ImagePrompt, novel.ArtStyle, references, PortraitAspectRatio, cancellationToken);
+                scene.ImagePath = imageStore.Save($"{novel.Id}/scenes/scene-{scene.Number}.png", image);
+                scene.ImageStatus = WorkStatus.Completed;
+                scene.LastError = null;
+            }
+            catch (ImageContentBlockedException blocked)
+            {
+                // The model refused this moment. Retry a DIFFERENT moment (remembering the refused prompt as
+                // one to avoid), up to a cap — after which the scene is left without an image, never blocked.
+                scene.Attempts++;
+                if (scene.Attempts >= MaxSceneImageAttempts)
+                {
+                    scene.ImageStatus = WorkStatus.Completed;
+                    scene.ImagePath = null;
+                    scene.LastError = "Image unavailable: the model refused every attempted moment.";
+                    logger.LogWarning("Scene {Number} of manuscript {NovelId} left without an image after {Attempts} refusals: {Reason}",
+                        scene.Number, novel.Id, scene.Attempts, blocked.Reason);
+                }
+                else
+                {
+                    scene.LastError = scene.ImagePrompt;   // fed back as a moment to avoid on the retry
+                    scene.ImagePrompt = null;              // re-derive a different beat next cycle
+                    scene.NextAttemptAtUtc = null;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                ScheduleRetry(scene, ex, novel);
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 2) No scene is pending/due. If any are waiting on a transient retry, wait for the soonest;
+        // otherwise every scene has an image or has given up on one — advance. (A scene left Failed by an
+        // exhausted transient retry counts as "image unavailable", not a blocker.)
+        var pendingRetries = await db.Scenes
+            .Where(s => s.NovelId == novel.Id && s.ImageStatus == WorkStatus.NeedsRetry)
+            .Select(s => s.NextAttemptAtUtc)
+            .ToListAsync(cancellationToken);
+        if (pendingRetries.Count > 0)
+            return ProcessResult.Waiting((pendingRetries.Min() ?? now) - now, novel.Id);
 
         SetStage(novel, ProjectStateMachine.NextStage(new PipelineProgress(
             novel.Stage, SourceIngested: false, AllChunksAnalyzed: false, BibleConsolidated: false,
             AllReferenceSheetsRendered: false, AllSceneImagesRendered: true)));
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
+    }
+
+    // The rendered reference sheets for recurring entities named in the scene text, capped so one render's
+    // payload stays small. Matched by entity name appearing in the prose (a light heuristic — scenes don't
+    // carry an explicit cast list).
+    private async Task<IReadOnlyList<byte[]>> LoadSceneReferenceImages(
+        StoryboarderDbContext db, Guid novelId, string sceneText, CancellationToken cancellationToken)
+    {
+        var sheets = await db.DesignRefs
+            .Where(r => r.NovelId == novelId && r.ReferenceImagePath != null)
+            .Select(r => new { r.Name, r.ReferenceImagePath })
+            .ToListAsync(cancellationToken);
+
+        return sheets
+            .Where(s => !string.IsNullOrWhiteSpace(s.Name) &&
+                        sceneText.Contains(s.Name, StringComparison.OrdinalIgnoreCase))
+            .Take(MaxSceneReferenceSheets)
+            .Select(s => s.ReferenceImagePath!)
+            .Where(imageStore.Exists)
+            .Select(imageStore.Read)
+            .ToList();
     }
 
     private async Task<ProcessResult> ComposeAnalysis(StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)

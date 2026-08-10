@@ -83,7 +83,17 @@ public class ReviewProcessorTests : IDisposable
                 It.IsAny<IReadOnlyList<ChapterSample>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(VoiceConsistency.Empty);
 
+        claude.Setup(c => c.DescribeSceneImage(
+                It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("A knight stands before a grey castle gate at dusk.");
+
         gemini.Setup(g => g.GenerateReferenceSheet(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => SampleImages.Png());
+
+        gemini.Setup(g => g.GenerateSceneImage(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+                It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
     }
 
@@ -180,6 +190,23 @@ public class ReviewProcessorTests : IDisposable
         Assert.All(
             context.ChunkAnalyses.Where(a => a.NovelId == id).ToList(),
             a => Assert.Equal(WorkStatus.Completed, a.Status));
+    }
+
+    [Fact]
+    public async Task Scenes_AreDetected_AndGetEvidenceImages()
+    {
+        var id = SeedManuscript("The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        using var context = database.NewContext();
+        var scenes = context.Scenes.Where(s => s.NovelId == id).OrderBy(s => s.Number).ToList();
+        Assert.True(scenes.Count >= 2, "expected the divider to split the manuscript into scenes");
+        Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
+        Assert.All(scenes, s =>
+        {
+            Assert.NotNull(s.ImagePath);
+            Assert.True(File.Exists(s.ImagePath));
+        });
     }
 
     [Fact]
