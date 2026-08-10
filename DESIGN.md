@@ -1,6 +1,6 @@
 # DESIGN.md — the Paper & Ink design bible
 
-This file is the single source of truth for the visual and UX design of every project in this repository: FocusPhone (all four heads), Storyboarder (app and generated PDFs), DailyLoader, and anything built here in the future. Code does not carry design opinions of its own; it carries tokens that mirror this document. **No color or type-size literal may appear outside a project's registered token files** (§16) — leak-guard tests enforce this.
+This file is the single source of truth for the visual and UX design of every project in this repository: FocusPhone (all four heads), Canonizer (app and generated report PDFs), Ledger, DailyLoader, and anything built here in the future. Code does not carry design opinions of its own; it carries tokens that mirror this document. **No color or type-size literal may appear outside a project's registered token files** (§16) — leak-guard tests enforce this.
 
 ## 1. Principles
 
@@ -122,7 +122,7 @@ Line height: 1.35 for body/reading, 1.2 for headings. Sizes never invented ad ho
 | **App-tray folder** | The swipe-up tray auto-sorts apps into a fixed set of category folders (Finance, Travel & Transit, Shopping, Food & Dining, Health & Fitness, Utilities & Tools, Productivity, Media, Smart Home). Each folder is a textless `Ink` line glyph (§8), hidden while empty, tapping it opens a sub-grid; the folder name rides as the content description. Apps keep their own icons. The owner's own non-FocusPhone apps and any unsorted apps sit loose at the tray root, the folders between them. Long-press an app for a Paper menu (§7 action sheet): file it into a folder — reaching empty/hidden folders too — or block it (undo-first). |
 | Empty state | Centered, Serif Italic, `InkMuted`, an invitation. |
 | Screen header | Every screen opens with an in-page `Display` Serif title, like a chapter heading. Nav bars stay minimal. |
-| Phase chip | Hairline-bordered pill (radius 10), Label type: "panels 12 of 40". Active phase `Ink`, finished phases `InkMuted`, problems get the error chip (accent border + `AccentDeep` text). |
+| Phase chip | Hairline-bordered pill (radius 10), Label type: "scenes 12 of 40". Active phase `Ink`, finished phases `InkMuted`, problems get the error chip (accent border + `AccentDeep` text). |
 
 **Success is an inline state change.** The screen shows the new truth (status line updates, the row disappears, the list gains the item). Success toasts and success alerts are banned; failures may still surface visibly, worded per §11.
 
@@ -167,12 +167,12 @@ One noun per concept, everywhere (screens, PDFs, notifications, code comments):
 
 | Term | Meaning (never a synonym) |
 |---|---|
-| project | A novel being processed in Storyboarder (UI word; "novel" acceptable in prose) |
-| volume | One output comic PDF |
-| page / panel | Comic page; one framed image on it |
-| reference sheet | Character/location visual reference |
-| design bible | Claude's style guide for a novel (in-app sense) |
-| analysis report | The revision-notes PDF |
+| project | A manuscript being reviewed in Canonizer (UI word; "manuscript" acceptable in prose) |
+| scene | One detected span of the manuscript; gets one wordless evidence image |
+| evidence image | The single wordless image per scene (a fidelity check, not the product) |
+| reference sheet | Character/location visual reference (keeps evidence images consistent) |
+| design bible | Claude's style guide for a manuscript (in-app sense) |
+| report | The revision report PDF — Canonizer's star product |
 | admin mode | FocusPhone's unlocked maintenance state (never "settings" or "escape hatch") |
 | block / unblock | App suppression on FocusPhone (never "ban"/"disable") |
 | cutover | The irreversible device lockdown step |
@@ -208,7 +208,7 @@ Only these files may contain color hex or type-size literals:
 | Project | Token files |
 |---|---|
 | FocusPhone | `FocusPhone.Domain/Design/DesignTokens.cs`; `FocusPhone.Ui.Android/Resources/values/colors.xml`, `themes.xml`; generated icon/grain/medallion resources; tile drawables; anim XMLs (durations only) |
-| Storyboarder | `Storyboarder.Domain/Design/DesignTokens.cs`; `Storyboarder.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
+| Canonizer | `Storyboarder.Domain/Design/DesignTokens.cs`; `Storyboarder.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources (paths keep the internal `Storyboarder.*` identity) |
 | DailyLoader | `DailyLoader.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
 | Ledger | `Ledger.Domain/Design/DesignTokens.cs`; `Ledger.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
