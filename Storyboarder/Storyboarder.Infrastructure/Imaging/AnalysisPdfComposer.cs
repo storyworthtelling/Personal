@@ -18,9 +18,9 @@ public sealed class AnalysisPdfComposer : IAnalysisPdfComposer
         this.renderer = renderer;
     }
 
-    public byte[] Compose(BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes)
+    public byte[] Compose(BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes, DraftReview review)
     {
-        var pages = renderer.Render(analysis, title, scenes);
+        var pages = renderer.Render(analysis, title, scenes, review);
         return pdfComposer.Compose(pages, DesignTokens.Pdf.PrintDpi);
     }
 }

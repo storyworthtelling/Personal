@@ -1,28 +1,37 @@
+using Storyboarder.Domain.Model;
+
 namespace Storyboarder.Domain.Analysis;
 
-// Whether a finding appeared or disappeared between two drafts.
+// How a finding thread changed between a draft and the one before it.
 public enum FindingChange
 {
-    Resolved,
-    New
+    Resolved,   // open in the previous draft, gone now
+    New,        // first appears this draft
+    Regressed   // was present, then fixed, and has reappeared
 }
 
-// One revision-report finding that changed between a draft and the one before it, tagged with the
-// report section it came from (plot holes, inconsistencies, inaccuracies, pacing) and the chapter it
-// cites. "Resolved" means the previous draft raised it and the new one no longer does; "New" is the
-// reverse. Findings are matched on their detail text alone — the honest, explainable definition — so a
-// reworded-but-same issue reads as one resolved plus one new rather than being silently paired.
-public sealed record DiffFinding(FindingChange Change, string Category, string Chapter, string Detail);
+// One revision-report finding that changed between a draft and the one before it, tagged with the story-
+// integrity category it belongs to and the chapter it cites. Matched across drafts by the finding's stable
+// ThreadId (assigned by the reconciliation), not by its text — so a reworded-but-same issue reads as
+// carried, not as one resolved plus one new.
+public sealed record DiffFinding(FindingChange Change, FindingCategory Category, string Chapter, string Detail);
 
-// What changed between a draft and the draft it was made from: the report findings resolved and newly
-// raised. A first draft (no predecessor) diffs to None. (Before/after scene-image pairs and full
-// cross-draft finding history are the Phase 2 draft-loop investment; this carries the finding diff.)
+// A scene that changed between drafts, paired with the previous draft's evidence image and the new one, so
+// the author can see how the illustration shifted (the comprehension probe). Either image may be null when
+// that draft's render was unavailable.
+public sealed record DiffScenePair(string Citation, byte[]? PreviousImage, byte[]? NewImage);
+
+// What changed between a draft and the draft it was made from: the report findings resolved, newly raised,
+// and regressed (by finding identity), and the scenes that changed with their before/after evidence images.
+// A first draft (no predecessor) diffs to None.
 public sealed record DraftDiff(
     Guid DraftId,
     Guid? PreviousDraftId,
     IReadOnlyList<DiffFinding> ResolvedFindings,
-    IReadOnlyList<DiffFinding> NewFindings)
+    IReadOnlyList<DiffFinding> NewFindings,
+    IReadOnlyList<DiffFinding> RegressedFindings,
+    IReadOnlyList<DiffScenePair> ChangedScenes)
 {
     public static DraftDiff None(Guid draftId) =>
-        new(draftId, null, [], []);
+        new(draftId, null, [], [], [], []);
 }

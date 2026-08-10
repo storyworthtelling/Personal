@@ -876,8 +876,9 @@ public sealed class ReviewProcessor : IPipelineStep
 
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
+                var review = await BuildDraftReview(db, novel, cancellationToken);
                 var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount);
-                var pdf = analysisPdfComposer.Compose(folded, novel.Title, scenes);
+                var pdf = analysisPdfComposer.Compose(folded, novel.Title, scenes, review);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -1201,6 +1202,38 @@ public sealed class ReviewProcessor : IPipelineStep
                     OpenInPreviousDraft: thread.Any(f => f.NovelId == previousDraftId));
             })
             .ToList();
+    }
+
+    // Builds the cross-draft review the report renders with: this draft's persisted findings (with the
+    // status the reconciliation gave them) and the findings resolved since the previous draft (its threads
+    // that no current finding claims). A first draft has no history, so it renders without status marks.
+    private static async Task<DraftReview> BuildDraftReview(
+        StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var findings = (await db.Findings
+                .Where(f => f.NovelId == novel.Id)
+                .Select(f => new { f.Category, f.Chapter, f.Detail, f.Status })
+                .ToListAsync(cancellationToken))
+            .Select(f => new ReportFindingView(f.Category, f.Chapter, f.Detail, f.Status))
+            .ToList();
+
+        if (novel.PreviousDraftId is not { } previousId)
+            return new DraftReview(novel.DraftNumber, findings, Array.Empty<ReportFindingView>());
+
+        var currentThreadIds = (await db.Findings
+                .Where(f => f.NovelId == novel.Id)
+                .Select(f => f.ThreadId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+        var resolved = (await db.Findings
+                .Where(f => f.NovelId == previousId)
+                .Select(f => new { f.ThreadId, f.Category, f.Chapter, f.Detail })
+                .ToListAsync(cancellationToken))
+            .Where(f => !currentThreadIds.Contains(f.ThreadId))
+            .Select(f => new ReportFindingView(f.Category, f.Chapter, f.Detail, FindingStatus.Carried))
+            .ToList();
+
+        return new DraftReview(novel.DraftNumber, findings, resolved);
     }
 
     // Builds each scene's evidence for the report: the rendered image (if any), cited "Ch. N · Scene M",
