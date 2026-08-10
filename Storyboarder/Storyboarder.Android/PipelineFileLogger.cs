@@ -91,7 +91,7 @@ public sealed class PipelineFileLogger : ILoggerProvider, ILogger
         catch { }
     }
 
-    // Trim the namespace so lines read "GraphicNovelProcessor" rather than the full type name.
+    // Trim the namespace so lines read "ReviewProcessor" rather than the full type name.
     private static string ShortCategory(string categoryName)
     {
         var lastDot = categoryName.LastIndexOf('.');

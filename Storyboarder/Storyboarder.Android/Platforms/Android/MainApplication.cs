@@ -55,6 +55,17 @@ public class MainApplication : MauiApplication
             var factory = IPlatformApplication.Current!.Services
                 .GetRequiredService<IDbContextFactory<StoryboarderDbContext>>();
             using var db = factory.CreateDbContext();
+
+            // The Canonizer pivot collapsed the migration history into a single new baseline. A device that
+            // upgraded in place still holds the old storyboarder.db stamped with the pre-pivot migration ids,
+            // which the new baseline can't build on — Migrate() would try to create tables that already
+            // exist. The brief keeps no old data, so drop the legacy database once, then migrate fresh.
+            if (!SettingsStore.CanonizerSchemaReset)
+            {
+                db.Database.EnsureDeleted();
+                SettingsStore.CanonizerSchemaReset = true;
+            }
+
             db.Database.Migrate();
             SettingsStore.LastMigrationError = string.Empty;
         }

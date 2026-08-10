@@ -2,9 +2,9 @@ using Storyboarder.Domain.Analysis;
 
 namespace Storyboarder.Android.Pages;
 
-// Shows what the last revision moved: the findings the report resolved and newly raised, and the panels
-// whose source text changed — each paired old-vs-new so the author can see how the illustration shifted
-// (the comprehension probe). Built from the DraftDiff already loaded via ProjectService.
+// Shows what the last revision moved: the report findings it resolved and newly raised. Built from the
+// DraftDiff already loaded via ProjectService. (Before/after scene-image pairs are the Phase 2 draft-loop
+// investment; this carries the finding diff.)
 public partial class DraftDiffPage : ContentPage
 {
     public DraftDiffPage(string title, int draftNumber, DraftDiff diff)
@@ -16,70 +16,16 @@ public partial class DraftDiffPage : ContentPage
     private void Build(string title, int draftNumber, DraftDiff diff)
     {
         Heading($"{title} — draft {draftNumber} vs {draftNumber - 1}", isDisplay: true);
-        Paragraph($"{diff.ChangedPanels.Count} panel(s) re-illustrated · {diff.ReusablePanelCount} carried forward");
+
+        var resolved = diff.ResolvedFindings.Count;
+        var raised = diff.NewFindings.Count;
+        Paragraph($"{resolved} finding(s) resolved · {raised} newly raised");
 
         Findings("Findings resolved", "✓ ", diff.ResolvedFindings);
         Findings("New findings", "• ", diff.NewFindings);
 
-        if (diff.ChangedPanels.Count > 0)
-        {
-            Heading("Changed panels");
-            foreach (var panel in diff.ChangedPanels)
-                Content.Add(PanelComparison(panel));
-        }
-    }
-
-    // A card pairing the previous draft's render (left) with the new one (right) for one changed panel.
-    private View PanelComparison(PanelChange panel)
-    {
-        var grid = new Grid
-        {
-            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
-            ColumnSpacing = 8
-        };
-        grid.Add(Side("Before", panel.PreviousImagePath), 0);
-        grid.Add(Side("After", panel.NewImagePath), 1);
-
-        var caption = new Label
-        {
-            Text = $"Volume {panel.VolumeNumber} · page {panel.PageNumber} · panel {panel.PanelNumber}",
-            Style = (Style)Application.Current!.Resources["SecondaryLabel"]
-        };
-
-        return new Border
-        {
-            Style = (Style)Application.Current!.Resources["HairlineCard"],
-            Margin = new Thickness(0, 6, 0, 0),
-            Content = new VerticalStackLayout { Spacing = 4, Children = { caption, grid } }
-        };
-    }
-
-    // One side of a before/after pair: the render, or a note when there's nothing to show (a brand-new
-    // panel has no "before"; a panel not yet re-rendered has no "after").
-    private View Side(string label, string? imagePath)
-    {
-        var heading = new Label
-        {
-            Text = label,
-            Style = (Style)Application.Current!.Resources["FieldLabel"]
-        };
-
-        View body = imagePath is not null && System.IO.File.Exists(imagePath)
-            ? new Border
-            {
-                Stroke = (Color)Application.Current!.Resources["Hairline"],
-                StrokeThickness = 1,
-                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 },
-                Padding = 0,
-                Content = new Image { Source = ImageSource.FromFile(imagePath), Aspect = Aspect.AspectFit }
-            }
-            : new Label
-            {
-                Text = label == "Before" ? "(new panel)" : "(not yet rendered)",
-                Style = (Style)Application.Current!.Resources["StatusLine"]
-            };
-
-        return new VerticalStackLayout { Spacing = 4, Children = { heading, body } };
+        if (resolved == 0 && raised == 0)
+            Paragraph("No findings changed between these drafts.");
     }
 
     private void Findings(string title, string bullet, IReadOnlyList<DiffFinding> findings)

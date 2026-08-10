@@ -232,24 +232,6 @@ public partial class SetupPage : ContentPage
         }
     }
 
-    // A focused capture of the panels a content filter stopped — including the exact prompt sent to
-    // Gemini — so a prohibited/IP block can be diagnosed and its art direction reworked. Shared as a file
-    // (never copied to the clipboard) so a long provider response can't trip the Binder size limit.
-    private async void OnBlockedPanelReportClicked(object sender, EventArgs e)
-    {
-        try
-        {
-            using var scope = IPlatformApplication.Current!.Services.CreateScope();
-            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
-            var report = await projects.BuildBlockedPanelReportAsync(CancellationToken.None);
-            await ShareText($"storyboarder-blocked-panels-{DateTime.Now:yyyyMMdd-HHmm}.txt", report, "Storyboarder blocked panels");
-        }
-        catch (Exception ex)
-        {
-            await DisplayAlert("Blocked panel report", "Couldn't build the report: " + ex.Message, "OK");
-        }
-    }
-
     // Bundles the status snapshot + both logs into one shareable file — so the crash log comes along
     // even when there's no crash to show on its own.
     private async void OnExportDiagnosticsClicked(object sender, EventArgs e)

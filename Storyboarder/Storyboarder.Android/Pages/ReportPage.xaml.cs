@@ -16,6 +16,14 @@ public partial class ReportPage : ContentPage
     {
         Heading(title, isDisplay: true);
 
+        var frame = new List<string>();
+        if (!string.IsNullOrWhiteSpace(report.Genre))
+            frame.Add(report.Genre);
+        if (report.WordCount > 0)
+            frame.Add($"{report.WordCount:N0} words{(string.IsNullOrWhiteSpace(report.WordCountRange) ? "" : $" (genre norm {report.WordCountRange})")}");
+        if (frame.Count > 0)
+            Paragraph(string.Join(" · ", frame));
+
         if (!string.IsNullOrWhiteSpace(report.Logline))
             Paragraph(report.Logline);
         if (!string.IsNullOrWhiteSpace(report.Synopsis))
@@ -48,9 +56,6 @@ public partial class ReportPage : ContentPage
         Section("Scene by scene", report.SceneBreakdown,
             s => $"{Chapter(s.Chapter)}{s.Scene}", s => $"{s.Purpose} — {s.Verdict}");
 
-        Section("Fact checks", report.FactChecks,
-            f => $"{f.Claim} — {f.Verdict}", f => $"{f.Note}{(string.IsNullOrWhiteSpace(f.Chapter) ? "" : $" ({f.Chapter})")}");
-
         if (!string.IsNullOrWhiteSpace(report.VoiceConsistency.DominantVoice))
         {
             Heading("Authorial voice");
@@ -59,11 +64,17 @@ public partial class ReportPage : ContentPage
         Section("Voice drift", report.VoiceConsistency.Divergences,
             v => $"{Chapter(v.Chapter)}“{v.Excerpt}”", v => $"{v.Divergence} — {v.Suggestion}");
 
-        Bullets("Comparable titles", report.ComparableTitles);
-        if (!string.IsNullOrWhiteSpace(report.MarketPositioning))
+        // The candid state-of-the-draft that closes the report.
+        var verdict = report.Verdict;
+        if (verdict.Strengths.Count > 0 || verdict.Problems.Count > 0 || !string.IsNullOrWhiteSpace(verdict.MostNeeds))
         {
-            Heading("Market positioning");
-            Paragraph(report.MarketPositioning);
+            Bullets("Biggest strengths", verdict.Strengths);
+            Bullets("Biggest problems", verdict.Problems);
+            if (!string.IsNullOrWhiteSpace(verdict.MostNeeds))
+            {
+                Heading("What this draft most needs");
+                Paragraph(verdict.MostNeeds);
+            }
         }
     }
 
