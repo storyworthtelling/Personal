@@ -302,7 +302,7 @@ public sealed class ProjectService
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var stored = await db.BookAnalyses
             .Where(a => a.NovelId == novelId)
-            .Select(a => new { a.ConsolidatedJson, a.CraftJson })
+            .Select(a => new { a.ConsolidatedJson, a.CraftJson, a.ExpansionJson })
             .FirstOrDefaultAsync(cancellationToken);
         if (stored?.ConsolidatedJson is null)
             return null;
@@ -312,8 +312,11 @@ public sealed class ProjectService
         var craft = stored.CraftJson is null
             ? CraftReport.Empty
             : JsonSerializer.Deserialize<CraftReport>(stored.CraftJson, JsonResponse.CaseInsensitive) ?? CraftReport.Empty;
+        var expansion = stored.ExpansionJson is null
+            ? ExpansionReport.Empty
+            : JsonSerializer.Deserialize<ExpansionReport>(stored.ExpansionJson, JsonResponse.CaseInsensitive) ?? ExpansionReport.Empty;
 
-        return report.WithCraft(craft);
+        return report.WithCraft(craft).WithExpansion(expansion);
     }
 
     // What a draft changed against the one it was made from: the revision-report findings it resolved

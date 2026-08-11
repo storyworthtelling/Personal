@@ -860,6 +860,34 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2e) The additive expansion read (Phase 3): scenes/beats to add, show-vs-tell, length vs genre norm.
+        // Its own resumable step, own column, billed once — like the craft/voice halves.
+        if (analysis.ExpansionJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var notes = await LoadChapterNotes(db, novel.Id, cancellationToken);
+            var wordCount = await WordCount(db, novel.Id, cancellationToken);
+            var genre = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)?.Genre
+                        ?? string.Empty;
+
+            try
+            {
+                var expansion = await claude.ProposeExpansion(novel.Title, notes, novel.ContinuitySummary, wordCount, genre, cancellationToken);
+                analysis.ExpansionJson = JsonSerializer.Serialize(expansion, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 3) Render: compose the report PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
@@ -873,11 +901,14 @@ public sealed class ReviewProcessor : IPipelineStep
                 var voice = analysis.VoiceJson is null
                     ? VoiceConsistency.Empty
                     : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive) ?? VoiceConsistency.Empty;
+                var expansion = analysis.ExpansionJson is null
+                    ? ExpansionReport.Empty
+                    : JsonSerializer.Deserialize<ExpansionReport>(analysis.ExpansionJson, JsonResponse.CaseInsensitive) ?? ExpansionReport.Empty;
 
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
-                var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount);
+                var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount).WithExpansion(expansion);
                 var pdf = analysisPdfComposer.Compose(folded, novel.Title, scenes, review);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;

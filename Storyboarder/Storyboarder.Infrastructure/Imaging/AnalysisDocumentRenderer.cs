@@ -63,14 +63,22 @@ public sealed class AnalysisDocumentRenderer
         writer.Heading(reportTitle, h1, Ink, ruled: true);
         writer.Paragraph("Revision report — a candid second read to help you revise toward publication.", bodyItalic, Muted);
 
-        // Genre + length, framed against the genre norm.
-        if (!string.IsNullOrWhiteSpace(analysis.Genre) || analysis.WordCount > 0)
+        // Genre + length, framed against the genre norm. The expansion read's length note is preferred when
+        // present — it says how far short the draft runs (the owner's headline need) — else the plain frame.
+        var lengthNote = analysis.Expansion.Length.Note;
+        if (!string.IsNullOrWhiteSpace(analysis.Genre) || analysis.WordCount > 0 || !string.IsNullOrWhiteSpace(lengthNote))
         {
-            var lengthText = analysis.WordCount > 0 ? $"{analysis.WordCount:N0} words" : string.Empty;
-            if (!string.IsNullOrWhiteSpace(analysis.WordCountRange))
-                lengthText = string.IsNullOrEmpty(lengthText)
-                    ? $"genre norm {analysis.WordCountRange}"
-                    : $"{lengthText} (genre norm {analysis.WordCountRange})";
+            string lengthText;
+            if (!string.IsNullOrWhiteSpace(lengthNote))
+                lengthText = lengthNote;
+            else
+            {
+                lengthText = analysis.WordCount > 0 ? $"{analysis.WordCount:N0} words" : string.Empty;
+                if (!string.IsNullOrWhiteSpace(analysis.WordCountRange))
+                    lengthText = string.IsNullOrEmpty(lengthText)
+                        ? $"genre norm {analysis.WordCountRange}"
+                        : $"{lengthText} (genre norm {analysis.WordCountRange})";
+            }
             writer.Paragraph(Join(analysis.Genre, lengthText), bodyBold, Ink);
         }
         writer.Gap(20f);
@@ -179,13 +187,19 @@ public sealed class AnalysisDocumentRenderer
             }
         }
 
+        // Show vs tell, both ends of the pendulum: summaries that could become scenes (the additive lever)
+        // and over-shown passages to tighten.
+        RenderShowVsTell(writer, analysis.Expansion.ShowVsTell, body, bodyBold, bodyItalic, h2);
+
         RenderVoiceConsistency(writer, analysis.VoiceConsistency, body, bodyBold, bodyItalic, h2);
         RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3);
 
         // The scene-by-scene walk: each scene's evidence image above its notes — the fidelity check.
         RenderScenes(writer, scenes, body, bodyItalic, h2);
 
-        // What to do next: the revision plan grouped by impact tier.
+        // What to do next: first the scenes to ADD (the additive engine — the owner writes short), then the
+        // revision plan, both grouped by impact tier.
+        RenderScenesToAdd(writer, analysis.Expansion.ScenesToAdd, body, bodyItalic, h2, h3);
         RenderRevisionPlan(writer, analysis.RevisionPlan, body, h2, h3);
 
         // The candid state of the draft, last.
@@ -283,6 +297,91 @@ public sealed class AnalysisDocumentRenderer
                 writer.Paragraph($"Recommendation: {review.Recommendation}", bodyItalic, Muted);
             writer.Gap(12f);
         }
+    }
+
+    // The additive engine (Phase 3): scenes and beats to ADD, ranked by the same Must/Should/Consider impact
+    // tiers as the revision plan. Pointers only — the intro is explicit that these are the author's to write.
+    private static void RenderScenesToAdd(
+        PageWriter writer, IReadOnlyList<SceneAddition> additions, SKFont body, SKFont bodyItalic, SKFont h2, SKFont h3)
+    {
+        if (additions is not { Count: > 0 })
+            return;
+
+        writer.Heading("Scenes to add", h2, Ink, ruled: true);
+        writer.Paragraph(
+            "Where the book could grow — beats that happen off-page, scenes that would deepen a character or " +
+            "raise the stakes. These are pointers to write yourself, never drafted scenes.",
+            bodyItalic, Muted);
+
+        bool Matches(SceneAddition item, string tier) =>
+            string.Equals((item.Priority ?? string.Empty).Trim(), tier, StringComparison.OrdinalIgnoreCase);
+
+        void Render(SceneAddition addition)
+        {
+            writer.Bullet(Join(KindLabel(addition.Kind), addition.Location, addition.Missing), body, Ink);
+            if (!string.IsNullOrWhiteSpace(addition.Why))
+                writer.Paragraph(addition.Why, bodyItalic, Muted);
+        }
+
+        foreach (var tier in Tiers)
+        {
+            var items = additions.Where(a => Matches(a, tier)).ToList();
+            if (items.Count == 0)
+                continue;
+            writer.Heading(tier, h3, Accent);
+            foreach (var item in items)
+                Render(item);
+            writer.Gap(10f);
+        }
+
+        var other = additions.Where(a => !Tiers.Any(t => Matches(a, t))).ToList();
+        if (other.Count > 0)
+        {
+            writer.Heading("Consider", h3, Accent);
+            foreach (var item in other)
+                Render(item);
+        }
+        writer.Gap(18f);
+    }
+
+    private static string KindLabel(AdditionKind kind) => kind switch
+    {
+        AdditionKind.MissingBeat => "Missing beat",
+        AdditionKind.CharacterDeepening => "Character",
+        AdditionKind.TensionStakes => "Tension & stakes",
+        AdditionKind.ThemeDeepening => "Theme",
+        _ => "Add"
+    };
+
+    // Show vs tell, both ends of the pendulum: passages TOLD in summary that could become dramatized scenes
+    // (the main lever for adding words), and OVER-shown passages that run long. Diagnosis only — the excerpt
+    // is quoted so the author can find it, the suggestion is a pointer, not a rewrite.
+    private static void RenderShowVsTell(
+        PageWriter writer, IReadOnlyList<ShowTellNote> notes, SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
+    {
+        if (notes is not { Count: > 0 })
+            return;
+
+        writer.Heading("Show vs tell", h2, Ink, ruled: true);
+
+        void RenderGroup(string heading, ShowTellDirection direction)
+        {
+            var group = notes.Where(n => n.Direction == direction).ToList();
+            if (group.Count == 0)
+                return;
+            writer.Paragraph(heading, bodyBold, Ink);
+            foreach (var note in group)
+            {
+                writer.Bullet(Join(note.Chapter, Quoted(note.Excerpt)), bodyItalic, Ink);
+                if (!string.IsNullOrWhiteSpace(note.Suggestion))
+                    writer.Paragraph(note.Suggestion, body, Ink);
+            }
+            writer.Gap(8f);
+        }
+
+        RenderGroup("Summarized — could become a scene:", ShowTellDirection.Dramatize);
+        RenderGroup("Over-shown — could be tightened:", ShowTellDirection.Tighten);
+        writer.Gap(10f);
     }
 
     // The revision plan grouped by impact tier: Must, then Should, then Consider (anything else last).

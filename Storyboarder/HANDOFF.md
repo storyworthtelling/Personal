@@ -30,7 +30,7 @@ dotnet --version     # expect 10.0.x
 dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj -p:StoryboarderTfms=net10.0
 ```
 
-**Baseline: 258 passing, 0 failing** (Phase 2 landed). Run this before every commit. Never commit a red
+**Baseline: 268 passing, 0 failing** (Phase 3 landed). Run this before every commit. Never commit a red
 suite. `dotnet ef` is installed but not on PATH in a fresh container — `export PATH="$PATH:$HOME/.dotnet/tools"`
 before `dotnet ef migrations add …`.
 
@@ -113,6 +113,27 @@ Schema changes landed via two follow-on migrations (`Phase2FindingsAndSceneHisto
 `Phase2FindingsReconciledFlag`). Pure logic is unit-tested; the Android head (DraftDiffPage) is
 compile-checked in CI, not built in the Phase-2 session (build it first thing, same as Phase 1).
 
+## 3c. What Phase 3 delivered (the expansion engine)
+
+Phase 3 (§6 of the brief) makes the report **additive** — the owner's drafts run short, so it surfaces
+what to *add*, never drafted prose (nudge-never-write):
+
+- **`ExpansionReport`** (`Domain/Analysis/BookAnalysisModels.cs`) folded into the report via
+  `WithExpansion`: ranked `SceneAddition`s (`AdditionKind`, Must/Should/Consider), two-sided
+  `ShowTellNote`s (`ShowTellDirection` Dramatize/Tighten), and a `LengthAssessment`.
+- **`ProposeExpansion`** Claude call (strong tier) from the per-chunk notes + running state + measured word
+  count + genre; the map call now also gathers `SummarizedMoments`/`ThinSpots`/`OffPageEvents`. A resumable
+  `ComposeAnalysis` step gated by `BookAnalysis.ExpansionJson`. Graceful-empty (still emits the measured
+  length line on a blank reply).
+- **Pure `LengthGap.Describe`** frames the word count against the genre norm (short / within / over).
+- **Report surface:** the frame opens with the length line; new "Show vs tell" and "Scenes to add"
+  sections (the latter grouped by tier, ahead of the revision plan); mirrored in `ReportPage`.
+
+Schema landed via the `Phase3Expansion` migration. Additions are per-draft (regenerated each draft). Pure
+logic + client parsing are unit-tested; the renderer is exercised end-to-end by the pipeline test (raster
+output can't be asserted at the pixel level). The Android head (`ReportPage`) is compile-checked in CI, not
+built in-session.
+
 ## 4. Traps that still apply
 
 **`ProjectStage`/`WorkStatus` persist as integers.** Append new values to the end of the enum, never
@@ -136,8 +157,10 @@ feature.
 
 - **Phase 2 ✅ (done):** first-class `Finding` rows + stable IDs + cross-draft history + regression
   detection + before/after **scene**-image pairs + running story-state. See §3b.
-- **Phase 3 (next):** the expansion engine ("Scenes to add", show-vs-tell leverage, thin-spot flags,
-  genre-norm length targets) — the additive feedback that closes the word-count gap.
+- **Phase 3 ✅ (done):** the expansion engine ("Scenes to add", show-vs-tell leverage, thin-spot flags,
+  genre-norm length targets) — the additive feedback that closes the word-count gap. See §3c.
+- **Phase 4 (next):** shared bidirectional **reMarkable** delivery library + vault-restored pairing —
+  deliver the report to a "Canonizer" folder to read + annotate by hand.
 - **Phase 4:** shared bidirectional **reMarkable** delivery + vault-restored pairing.
 - **Phase 5:** series awareness.
 - **Also deferred:** the image-vs-prose **vision** fidelity pass (Phase 1's fidelity gap is a

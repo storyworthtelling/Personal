@@ -10,6 +10,7 @@ using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
+using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
 using Xunit;
 
@@ -92,6 +93,17 @@ public class ReviewProcessorTests : IDisposable
                 It.IsAny<IReadOnlyList<PriorFinding>>(), It.IsAny<IReadOnlyList<CandidateFinding>>(), It.IsAny<CancellationToken>()))
             .Returns((IReadOnlyList<PriorFinding> _, IReadOnlyList<CandidateFinding> candidates, CancellationToken _) =>
                 Task.FromResult(new FindingReconciliation(candidates.Select(c => new FindingMatch(c.Index, null)).ToList())));
+
+        // Default expansion read: a small additive suggestion + a genre range, so the folded report exercises
+        // the "Scenes to add"/"Show vs tell"/length path.
+        claude.Setup(c => c.ProposeExpansion(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(),
+                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, IReadOnlyList<ChapterNotes> _, string _, int wordCount, string _, CancellationToken _) =>
+                Task.FromResult(new ExpansionReport(
+                    [new SceneAddition(AdditionKind.CharacterDeepening, "Chapter 1", "the reader never sees her grieve", "the loss lands flat", "Should")],
+                    [new ShowTellNote("Chapter 1", "Years passed.", ShowTellDirection.Dramatize, "this leap could be a scene")],
+                    new LengthAssessment(wordCount, 90_000, 100_000, LengthGap.Describe(wordCount, 90_000, 100_000)))));
 
         claude.Setup(c => c.DescribeSceneImage(
                 It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
@@ -290,6 +302,29 @@ public class ReviewProcessorTests : IDisposable
         Assert.Single(changed);
         Assert.All(scenes, s => Assert.NotNull(s.PreviousSceneId));   // both matched a prior scene
         Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
+    }
+
+    [Fact]
+    public async Task Review_PersistsTheExpansionRead_AndFoldsItIntoTheReport()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using (var context = database.NewContext())
+        {
+            var analysis = context.BookAnalyses.Single(a => a.NovelId == id);
+            Assert.False(string.IsNullOrEmpty(analysis.ExpansionJson));   // the additive step ran and persisted
+            Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);       // the folded report still composed
+        }
+
+        // The in-app read path folds the expansion in too.
+        var projects = new ProjectService(database, new Mock<IGoogleDocsClient>().Object,
+            new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
+            clock, Options.Create(new RateLimitOptions()));
+        var report = await projects.GetReportAsync(id, CancellationToken.None);
+        Assert.NotNull(report);
+        Assert.NotEmpty(report!.Expansion.ScenesToAdd);
+        Assert.False(string.IsNullOrWhiteSpace(report.Expansion.Length.Note));
     }
 
     [Fact]

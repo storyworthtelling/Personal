@@ -69,6 +69,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "\"setupsAndPayoffs\":[string],\"possibleInconsistencies\":[string],\"factualClaims\":[string]," +
         "\"notableStrengths\":[string],\"notableWeaknesses\":[string],\"lineEditCandidates\":[string]," +
         "\"proseObservations\":[string],\"dialogueObservations\":[string],\"sceneBeats\":[string]," +
+        "\"summarizedMoments\":[string],\"thinSpots\":[string],\"offPageEvents\":[string]," +
         "\"runningState\":string}. runningState = the UPDATED story-so-far after this excerpt: extend STORY " +
         "SO FAR with this excerpt's plot developments, the current state of each character, open questions, " +
         "and planted-but-unpaid setups — a few tight paragraphs, cumulative, so the next excerpt inherits it. " +
@@ -88,6 +89,12 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "on-the-nose exchanges, and exposition dumped into speech — name the speakers; sceneBeats = one " +
         "line per SCENE in reading order, in the form \"<what happens> | <what it accomplishes for the " +
         "book> | <does it earn its place>\". " +
+        // The raw material for the additive read (the author's drafts run short). Gathered here while the
+        // prose is in front of the model; the expansion reduce turns it into scenes-to-add and show-vs-tell.
+        "summarizedMoments = passages TOLD in summary that could become dramatized SCENES (the main lever " +
+        "for adding words) — quote or name each; thinSpots = beats that run rushed or over-compressed and " +
+        "could be expanded; offPageEvents = important turns that happen OFF the page (referred to but never " +
+        "shown), which may deserve their own scene. " +
         "Use [] when none are present. Give AT MOST 12 items in each list, the most significant ones. " +
         "No prose outside the JSON.";
 
@@ -181,6 +188,27 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "index: the current finding's index. threadId: the id of the prior finding it is the same issue as, or " +
         "null when it is new. Include exactly one entry per current finding, and never map two current findings " +
         "to the same prior id. No prose outside the JSON.";
+
+    private const string ExpansionInstruction =
+        "You are a developmental editor helping an author whose early drafts run SHORT. Your job here is " +
+        "ADDITIVE: find what the book is missing and where it could grow. You are given the per-chunk notes " +
+        "(each chunk's summarized moments, off-page events, thin spots, character beats, and setups), a " +
+        "running story-state, the manuscript's actual WORD COUNT, and its GENRE. You NUDGE, you never write: " +
+        "every suggestion is a POINTER the author acts on themselves — never drafted prose, never an example " +
+        "scene, never sample lines. Respond with ONLY a JSON object: " +
+        "{\"scenesToAdd\":[{\"kind\":string,\"location\":string,\"missing\":string,\"why\":string," +
+        "\"priority\":string}],\"showVsTell\":[{\"chapter\":string,\"excerpt\":string,\"direction\":string," +
+        "\"suggestion\":string}],\"targetLow\":number,\"targetHigh\":number}. " +
+        "scenesToAdd = the scenes/beats to ADD, ranked most-impactful first. kind is one of " +
+        "\"MissingBeat\" (a turn that happens off-page), \"CharacterDeepening\", \"TensionStakes\", or " +
+        "\"ThemeDeepening\". location says where it belongs (\"Chapter 4\", \"after Chapter 7\"). missing = " +
+        "what the reader never gets to see. why = the impact of adding it. priority is one of \"Must\", " +
+        "\"Should\", \"Consider\". showVsTell = show-vs-tell notes on BOTH ends: direction \"Dramatize\" for a " +
+        "SUMMARIZED passage that could become a shown scene (the main lever for adding words) or \"Tighten\" " +
+        "for an OVER-shown passage that runs long; quote the excerpt VERBATIM and give a pointer, not a " +
+        "rewrite. targetLow/targetHigh = the typical published word-count range for this genre (integers; use " +
+        "0/0 if you can't judge it). Give AT MOST 15 scenesToAdd and 15 showVsTell, the most significant, and " +
+        "use [] when there are none. No prose outside the JSON.";
 
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
@@ -286,7 +314,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         {
             // The updated story-so-far the model returns, threaded to the next chunk. Falls back to the prior
             // state if the model omitted it, so the running summary never regresses to empty mid-book.
-            RunningState = string.IsNullOrWhiteSpace(dto.RunningState) ? priorRunningState : dto.RunningState!
+            RunningState = string.IsNullOrWhiteSpace(dto.RunningState) ? priorRunningState : dto.RunningState!,
+            // The raw material for the expansion engine, carried through to the additive reduce.
+            SummarizedMoments = dto.SummarizedMoments ?? [],
+            ThinSpots = dto.ThinSpots ?? [],
+            OffPageEvents = dto.OffPageEvents ?? []
         };
     }
 
@@ -436,6 +468,71 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return new FindingReconciliation(dto.Matches
             .Select(m => new FindingMatch(m.Index, Guid.TryParse(m.ThreadId, out var threadId) ? threadId : null))
             .ToList());
+    }
+
+    public async Task<ExpansionReport> ProposeExpansion(
+        string title, IReadOnlyList<ChapterNotes> notes, string continuitySummary, int wordCount, string genre,
+        CancellationToken cancellationToken)
+    {
+        var notesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
+        var userContent =
+            $"TITLE: {title}\n\n" +
+            $"GENRE: {(string.IsNullOrWhiteSpace(genre) ? "(not inferred)" : genre)}\n\n" +
+            $"WORD COUNT: {wordCount}\n\n" +
+            $"STORY STATE:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(none)" : continuitySummary)}\n\n" +
+            $"PER-CHUNK NOTES (JSON array, in reading order):\n{notesJson}";
+
+        // The length line is measured, not model-dependent, so it is produced even when the reply is
+        // unusable — only the additions and the genre range degrade away.
+        var noAdditions = new ExpansionReport(
+            Array.Empty<SceneAddition>(), Array.Empty<ShowTellNote>(),
+            new LengthAssessment(wordCount, 0, 0, LengthGap.Describe(wordCount, 0, 0)));
+
+        var reply = await SendMessage(ExpansionInstruction, userContent, cancellationToken, options.AnalysisMaxTokens);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return noAdditions;
+
+        var dto = JsonResponse.Deserialize<ExpansionDto>(json);
+        if (dto is null)
+            return noAdditions;
+
+        var scenes = (dto.ScenesToAdd ?? [])
+            .Where(s => !string.IsNullOrWhiteSpace(s.Missing))
+            .Select(s => new SceneAddition(
+                ParseAdditionKind(s.Kind), s.Location ?? string.Empty, s.Missing!, s.Why ?? string.Empty,
+                NormalizePriority(s.Priority)))
+            .ToList();
+        var showTell = (dto.ShowVsTell ?? [])
+            .Where(n => !string.IsNullOrWhiteSpace(n.Excerpt))
+            .Select(n => new ShowTellNote(
+                n.Chapter ?? string.Empty, n.Excerpt!, ParseShowTellDirection(n.Direction), n.Suggestion ?? string.Empty))
+            .ToList();
+
+        // The count is measured, not trusted to the model; the model supplies the genre range and the pure
+        // LengthGap turns it into the framing line.
+        var low = Math.Max(0, dto.TargetLow);
+        var high = Math.Max(0, dto.TargetHigh);
+        var length = new LengthAssessment(wordCount, low, high, LengthGap.Describe(wordCount, low, high));
+
+        return new ExpansionReport(scenes, showTell, length);
+    }
+
+    private static AdditionKind ParseAdditionKind(string? kind) =>
+        Enum.TryParse<AdditionKind>(kind, ignoreCase: true, out var parsed) ? parsed : AdditionKind.MissingBeat;
+
+    private static ShowTellDirection ParseShowTellDirection(string? direction) =>
+        Enum.TryParse<ShowTellDirection>(direction, ignoreCase: true, out var parsed) ? parsed : ShowTellDirection.Dramatize;
+
+    // Snap a free-text priority to the three impact tiers the report groups by; anything unrecognized is the
+    // lowest tier so a stray value can't masquerade as urgent.
+    private static string NormalizePriority(string? priority)
+    {
+        var value = priority?.Trim() ?? string.Empty;
+        foreach (var tier in new[] { "Must", "Should", "Consider" })
+            if (string.Equals(value, tier, StringComparison.OrdinalIgnoreCase))
+                return tier;
+        return "Consider";
     }
 
     // model selects the tier: null means the strong default. Only the mechanical per-chunk calls pass the
@@ -654,6 +751,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? ProseObservations { get; set; }
         public List<string>? DialogueObservations { get; set; }
         public List<string>? SceneBeats { get; set; }
+        public List<string>? SummarizedMoments { get; set; }
+        public List<string>? ThinSpots { get; set; }
+        public List<string>? OffPageEvents { get; set; }
         public string? RunningState { get; set; }
     }
 
@@ -666,6 +766,31 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     {
         public int Index { get; set; }
         public string? ThreadId { get; set; }
+    }
+
+    private sealed class ExpansionDto
+    {
+        public List<SceneAdditionDto>? ScenesToAdd { get; set; }
+        public List<ShowTellDto>? ShowVsTell { get; set; }
+        public int TargetLow { get; set; }
+        public int TargetHigh { get; set; }
+    }
+
+    private sealed class SceneAdditionDto
+    {
+        public string? Kind { get; set; }
+        public string? Location { get; set; }
+        public string? Missing { get; set; }
+        public string? Why { get; set; }
+        public string? Priority { get; set; }
+    }
+
+    private sealed class ShowTellDto
+    {
+        public string? Chapter { get; set; }
+        public string? Excerpt { get; set; }
+        public string? Direction { get; set; }
+        public string? Suggestion { get; set; }
     }
 
     private sealed class BookAnalysisDto

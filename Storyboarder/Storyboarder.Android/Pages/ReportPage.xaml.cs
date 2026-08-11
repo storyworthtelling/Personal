@@ -19,7 +19,11 @@ public partial class ReportPage : ContentPage
         var frame = new List<string>();
         if (!string.IsNullOrWhiteSpace(report.Genre))
             frame.Add(report.Genre);
-        if (report.WordCount > 0)
+        // Prefer the expansion read's length note (how far short the draft runs) over the plain count.
+        var lengthNote = report.Expansion.Length.Note;
+        if (!string.IsNullOrWhiteSpace(lengthNote))
+            frame.Add(lengthNote);
+        else if (report.WordCount > 0)
             frame.Add($"{report.WordCount:N0} words{(string.IsNullOrWhiteSpace(report.WordCountRange) ? "" : $" (genre norm {report.WordCountRange})")}");
         if (frame.Count > 0)
             Paragraph(string.Join(" · ", frame));
@@ -46,6 +50,14 @@ public partial class ReportPage : ContentPage
 
         Section("Reviews", report.Reviews,
             r => r.Perspective, r => r.Assessment);
+
+        // The additive engine: scenes to add + show-vs-tell (both ends). Pointers only, never drafted prose.
+        Section("Scenes to add", report.Expansion.ScenesToAdd,
+            a => $"[{a.Priority}] {KindLabel(a.Kind)}{(string.IsNullOrWhiteSpace(a.Location) ? "" : $" · {a.Location}")}: {a.Missing}",
+            a => a.Why);
+        Section("Show vs tell", report.Expansion.ShowVsTell,
+            n => $"[{(n.Direction == ShowTellDirection.Dramatize ? "dramatize" : "tighten")}] {Chapter(n.Chapter)}“{n.Excerpt}”",
+            n => n.Suggestion);
 
         Section("Line edits", report.LineEdits,
             l => $"{Chapter(l.Chapter)}“{l.Excerpt}”", l => $"{l.Suggestion} — {l.Reason}");
@@ -121,6 +133,15 @@ public partial class ReportPage : ContentPage
 
     private void Paragraph(string text) =>
         Content.Add(new Label { Text = text, Style = (Style)Application.Current!.Resources["StatusLine"] });
+
+    private static string KindLabel(AdditionKind kind) => kind switch
+    {
+        AdditionKind.MissingBeat => "Missing beat",
+        AdditionKind.CharacterDeepening => "Character",
+        AdditionKind.TensionStakes => "Tension & stakes",
+        AdditionKind.ThemeDeepening => "Theme",
+        _ => "Add"
+    };
 
     private static string Chapter(string chapter) =>
         string.IsNullOrWhiteSpace(chapter) ? string.Empty : $"[{chapter}] ";

@@ -218,6 +218,64 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task AnalyzeChapter_ParsesTheExpansionRawSignals()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"summarizedMoments\":[\"the war is summarized in a paragraph\"]," +
+            "\"thinSpots\":[\"the reunion runs rushed\"]," +
+            "\"offPageEvents\":[\"the duel happens off-page\"]}"));
+
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 4", [], string.Empty, CancellationToken.None);
+
+        Assert.Equal("the war is summarized in a paragraph", Assert.Single(notes.SummarizedMoments));
+        Assert.Equal("the reunion runs rushed", Assert.Single(notes.ThinSpots));
+        Assert.Equal("the duel happens off-page", Assert.Single(notes.OffPageEvents));
+    }
+
+    [Fact]
+    public async Task ProposeExpansion_ParsesAdditionsShowTellAndLength()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"scenesToAdd\":[{\"kind\":\"CharacterDeepening\",\"location\":\"Chapter 4\"," +
+            "\"missing\":\"the reader never sees her grieve\",\"why\":\"the loss lands flat\",\"priority\":\"Must\"}," +
+            "{\"kind\":\"nonsense\",\"location\":\"\",\"missing\":\"\",\"why\":\"\",\"priority\":\"urgent\"}]," +
+            "\"showVsTell\":[{\"chapter\":\"Chapter 2\",\"excerpt\":\"Years passed.\",\"direction\":\"Dramatize\"," +
+            "\"suggestion\":\"this leap could be a scene\"}]," +
+            "\"targetLow\":90000,\"targetHigh\":100000}"));
+
+        var result = await client.ProposeExpansion("Title", [ChapterNotes.Empty], "", wordCount: 72_000, genre: "epic fantasy", CancellationToken.None);
+
+        var add = Assert.Single(result.ScenesToAdd);   // the empty-missing addition is dropped
+        Assert.Equal(AdditionKind.CharacterDeepening, add.Kind);
+        Assert.Equal("Must", add.Priority);
+        Assert.Equal("the reader never sees her grieve", add.Missing);
+
+        var note = Assert.Single(result.ShowVsTell);
+        Assert.Equal(ShowTellDirection.Dramatize, note.Direction);
+        Assert.Equal("Years passed.", note.Excerpt);
+
+        Assert.Equal(72_000, result.Length.WordCount);
+        Assert.Equal(90_000, result.Length.TargetLow);
+        Assert.Contains("short", result.Length.Note, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProposeExpansion_BlankReply_DegradesToEmpty()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("no json here"));
+
+        var result = await client.ProposeExpansion("Title", [ChapterNotes.Empty], "", 72_000, "epic fantasy", CancellationToken.None);
+
+        Assert.Empty(result.ScenesToAdd);
+        Assert.Empty(result.ShowVsTell);
+        // Even on a blank reply, the measured length line is still produced (the range just degrades away).
+        Assert.Equal(72_000, result.Length.WordCount);
+    }
+
+    [Fact]
     public async Task ReconcileFindings_ParsesMatchesAndNulls()
     {
         var (client, handler) = Create();

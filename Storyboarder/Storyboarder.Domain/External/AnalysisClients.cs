@@ -83,6 +83,20 @@ public interface IClaudeAnalysisClient
         IReadOnlyList<PriorFinding> priorThreads,
         IReadOnlyList<CandidateFinding> candidates,
         CancellationToken cancellationToken);
+
+    // The additive read (Phase 3): from the per-chunk notes (their summarized moments, off-page events, thin
+    // spots, character beats, and setups), the running story-state, the manuscript's actual word count, and
+    // the inferred genre, propose the scenes/beats to ADD (ranked by impact), the two-sided show-vs-tell
+    // notes (dramatize the summarized, tighten the over-shown), and the genre-norm length range. It NUDGES,
+    // never writes — pointers only, never drafted prose. Best-effort: a blank/partial reply degrades to
+    // ExpansionReport.Empty so the additive read never blocks the rest of the report.
+    Task<ExpansionReport> ProposeExpansion(
+        string title,
+        IReadOnlyList<ChapterNotes> notes,
+        string continuitySummary,
+        int wordCount,
+        string genre,
+        CancellationToken cancellationToken);
 }
 
 // Image generation via Gemini. Reference sheets are generated once per recurring design-bible entity,

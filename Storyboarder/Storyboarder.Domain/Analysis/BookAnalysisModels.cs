@@ -37,6 +37,14 @@ public sealed record ChapterNotes(
     // empty default so callers that don't thread it (and reports stored before it existed) are unaffected.
     public string RunningState { get; init; } = string.Empty;
 
+    // The raw material for the expansion engine (Phase 3), gathered here while the actual prose is in front
+    // of the model: SummarizedMoments = told-not-shown passages that could become scenes (the show-vs-tell
+    // lever); ThinSpots = rushed/over-compressed beats ("runs rushed"); OffPageEvents = turns that happen
+    // off-page (candidate missing beats). Init-only/empty so older notes and callers are unaffected.
+    public IReadOnlyList<string> SummarizedMoments { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> ThinSpots { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> OffPageEvents { get; init; } = Array.Empty<string>();
+
     public static ChapterNotes Empty { get; } = new(
         string.Empty,
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
@@ -210,6 +218,11 @@ public sealed record BookAnalysisResult(
     // The candid state-of-the-draft that closes the report.
     public Verdict Verdict { get; init; } = Verdict.Empty;
 
+    // The additive read (Phase 3): scenes/beats to ADD, the two-sided show-vs-tell notes, and the length
+    // against the genre norm. Its own resumable call, folded in with WithExpansion like the craft/voice
+    // halves. Defaults to Empty so a report stored before this existed re-renders fine.
+    public ExpansionReport Expansion { get; init; } = ExpansionReport.Empty;
+
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
         Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(),
@@ -230,6 +243,58 @@ public sealed record BookAnalysisResult(
 
     public BookAnalysisResult WithWordCount(int wordCount) =>
         this with { WordCount = wordCount };
+
+    public BookAnalysisResult WithExpansion(ExpansionReport expansion) =>
+        this with { Expansion = expansion };
+}
+
+// The additive read — Canonizer's expansion engine (Phase 3). Because early drafts run short, this surfaces
+// scenes and beats to ADD (never drafted prose — pointers only), the two-sided show-vs-tell notes (the main
+// lever for adding words), and the manuscript's length against its genre norm. Its own Claude call and DB
+// column, folded into the report at render like the craft/voice halves.
+public sealed record ExpansionReport(
+    IReadOnlyList<SceneAddition> ScenesToAdd,
+    IReadOnlyList<ShowTellNote> ShowVsTell,
+    LengthAssessment Length)
+{
+    public static ExpansionReport Empty { get; } =
+        new(Array.Empty<SceneAddition>(), Array.Empty<ShowTellNote>(), LengthAssessment.Empty);
+}
+
+// The kind of scene a proposal would add. MissingBeat = a turn that happens off-page; CharacterDeepening = a
+// scene that would deepen a character; TensionStakes = a scene that would raise tension/stakes;
+// ThemeDeepening = a scene that would develop a thin theme. Persisted as a string in JSON (tolerant parse).
+public enum AdditionKind
+{
+    MissingBeat,
+    CharacterDeepening,
+    TensionStakes,
+    ThemeDeepening
+}
+
+// One nudge to ADD a scene — a pointer, never drafted prose or an example scene (the nudge-never-write
+// principle). Location cites where it belongs ("Chapter 4", "after Ch. 7 · Scene 2"); Missing is what the
+// reader never gets to see; Why is the impact; Priority reuses the Must/Should/Consider impact tier.
+public sealed record SceneAddition(AdditionKind Kind, string Location, string Missing, string Why, string Priority);
+
+// Which end of the show-vs-tell pendulum a note is on: Dramatize a summarized passage that could become a
+// shown scene (the additive lever), or Tighten an over-shown passage.
+public enum ShowTellDirection
+{
+    Dramatize,
+    Tighten
+}
+
+// One show-vs-tell note, both ends of the pendulum. Chapter locates it; Excerpt quotes the prose verbatim so
+// the author can find it; Suggestion is a pointer ("this summary could be a scene" / "this runs long"), never
+// a rewrite.
+public sealed record ShowTellNote(string Chapter, string Excerpt, ShowTellDirection Direction, string Suggestion);
+
+// The manuscript's length against its genre norm. WordCount is the real count (computed deterministically);
+// TargetLow/TargetHigh are the model's genre-norm range; Note is the plain-language framing (LengthGap).
+public sealed record LengthAssessment(int WordCount, int TargetLow, int TargetHigh, string Note)
+{
+    public static LengthAssessment Empty { get; } = new(0, 0, 0, string.Empty);
 }
 
 // One chapter's dramatic tension, 0 (calm) to 1 (peak), for the pacing chart.
