@@ -93,6 +93,17 @@ public class ReviewProcessorTests : IDisposable
             .Returns((IReadOnlyList<PriorFinding> _, IReadOnlyList<CandidateFinding> candidates, CancellationToken _) =>
                 Task.FromResult(new FindingReconciliation(candidates.Select(c => new FindingMatch(c.Index, null)).ToList())));
 
+        // Default expansion read: a small additive suggestion + a genre range, so the folded report exercises
+        // the "Scenes to add"/"Show vs tell"/length path.
+        claude.Setup(c => c.ProposeExpansion(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(),
+                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, IReadOnlyList<ChapterNotes> _, string _, int wordCount, string _, CancellationToken _) =>
+                Task.FromResult(new ExpansionReport(
+                    [new SceneAddition(AdditionKind.CharacterDeepening, "Chapter 1", "the reader never sees her grieve", "the loss lands flat", "Should")],
+                    [new ShowTellNote("Chapter 1", "Years passed.", ShowTellDirection.Dramatize, "this leap could be a scene")],
+                    new LengthAssessment(wordCount, 90_000, 100_000, LengthGap.Describe(wordCount, 90_000, 100_000)))));
+
         claude.Setup(c => c.DescribeSceneImage(
                 It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
                 It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
