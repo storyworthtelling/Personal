@@ -247,6 +247,10 @@ public class BookAnalysis
     // persisted separately and folded in at render. Null until it runs.
     public string? VoiceJson { get; set; }
 
+    // The additive expansion read (Phase 3: scenes to add, show-vs-tell, length vs genre norm), serialized as
+    // an ExpansionReport. Its own resumable call and column, folded in at render. Null until it runs.
+    public string? ExpansionJson { get; set; }
+
     // Set once this draft's consolidated findings have been reconciled against the prior draft's threads and
     // persisted as Finding rows, so the (billed) reconciliation call runs exactly once — even for a draft
     // that produced zero findings, where no rows exist to signal completion.
