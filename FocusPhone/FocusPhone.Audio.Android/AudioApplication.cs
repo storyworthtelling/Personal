@@ -21,5 +21,9 @@ public class AudioApplication : Application
     {
         base.OnCreate();
         CrashReporter.Install(this, "Audio");
+
+        // The rolling, reviewable log of non-fatal playback/queue failures (and a
+        // copy of each crash), on top of the one-shot CrashReporter above.
+        AudioDiagnostics.Install(this);
     }
 }
