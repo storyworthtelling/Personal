@@ -56,6 +56,33 @@ public class BookAnalysisModelsTests
     }
 
     [Fact]
+    public void SeriesContinuity_RoundTripsAndFoldsIntoTheReport()
+    {
+        var series = new SeriesContinuity(
+            "Book One",
+            [new SeriesBreak("Chapter 3", "The hero had grey eyes", "Here they are green")],
+            [new CarriedThread("The missing heir was never found", "Ignored")]);
+
+        var restored = JsonSerializer.Deserialize<SeriesContinuity>(JsonSerializer.Serialize(series, Options), Options)!;
+        Assert.Equal("Book One", restored.PriorBookTitle);
+        Assert.Equal(series.Breaks[0], Assert.Single(restored.Breaks));
+        Assert.Equal(series.CarriedThreads[0], Assert.Single(restored.CarriedThreads));
+        Assert.True(restored.HasContent);
+
+        var merged = (BookAnalysisResult.Empty with { Logline = "A sequel." }).WithSeriesContinuity(series);
+        Assert.Equal("A sequel.", merged.Logline);
+        Assert.Same(series, merged.SeriesContinuity);
+    }
+
+    [Fact]
+    public void SeriesContinuity_Empty_HasNoContent()
+    {
+        Assert.False(SeriesContinuity.Empty.HasContent);
+        // A report with no series read defaults to the empty continuity, so no series section renders.
+        Assert.False(BookAnalysisResult.Empty.SeriesContinuity.HasContent);
+    }
+
+    [Fact]
     public void WithCraft_FoldsTheSecondReduceCallIntoTheReport()
     {
         var craft = new CraftReport(

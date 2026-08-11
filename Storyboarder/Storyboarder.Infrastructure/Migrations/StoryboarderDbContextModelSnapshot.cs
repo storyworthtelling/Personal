@@ -50,6 +50,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("PdfStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("SeriesContinuityJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("VoiceJson")
                         .HasColumnType("TEXT");
 
@@ -324,6 +327,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("LastError")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("PreviousBookId")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("PreviousDraftId")
                         .HasColumnType("TEXT");
 
@@ -331,6 +337,12 @@ namespace Storyboarder.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<long?>("RateLimitedUntilUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("SeriesId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SeriesSequence")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Stage")
@@ -354,6 +366,8 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.HasIndex("Stage");
 
                     b.HasIndex("ProjectId", "DraftNumber");
+
+                    b.HasIndex("SeriesId", "SeriesSequence");
 
                     b.ToTable("Novels");
                 });

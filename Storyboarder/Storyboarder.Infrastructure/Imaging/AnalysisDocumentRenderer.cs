@@ -192,6 +192,11 @@ public sealed class AnalysisDocumentRenderer
         RenderShowVsTell(writer, analysis.Expansion.ShowVsTell, body, bodyBold, bodyItalic, h2);
 
         RenderVoiceConsistency(writer, analysis.VoiceConsistency, body, bodyBold, bodyItalic, h2);
+
+        // Series continuity (Phase 5): on a sequel, where this book contradicts the prior book's canon and how it
+        // handles the prior book's open threads. Silent for a standalone book or a clean sequel.
+        RenderSeriesContinuity(writer, analysis.SeriesContinuity, body, bodyBold, bodyItalic, h2);
+
         RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3);
 
         // The scene-by-scene walk: each scene's evidence image above its notes — the fidelity check.
@@ -266,6 +271,45 @@ public sealed class AnalysisDocumentRenderer
                     writer.Paragraph(divergence.Suggestion, bodyItalic, Muted);
                 writer.Gap(8f);
             }
+        }
+    }
+
+    // The cross-book continuity read (Phase 5): contradictions of the prior book's established canon, and the
+    // status of the prior book's carried-over open threads. Rendered only when there is something to say — a
+    // standalone book or a clean sequel is silent (quiet by default).
+    private static void RenderSeriesContinuity(
+        PageWriter writer, SeriesContinuity series, SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
+    {
+        if (!series.HasContent)
+            return;
+
+        writer.Heading("Series continuity", h2, Ink, ruled: true);
+        var against = string.IsNullOrWhiteSpace(series.PriorBookTitle)
+            ? "the previous book"
+            : $"“{series.PriorBookTitle}”";
+        writer.Paragraph(
+            $"How this book holds together with {against} — where it clashes with what was established, and " +
+            "what it does with the threads the previous book left open.",
+            bodyItalic, Muted);
+
+        if (series.Breaks is { Count: > 0 })
+        {
+            writer.Paragraph("Contradicts the previous book:", bodyBold, Ink);
+            foreach (var brk in series.Breaks)
+            {
+                writer.Bullet(Join(brk.Chapter, brk.Contradiction), body, Ink);
+                if (!string.IsNullOrWhiteSpace(brk.Established))
+                    writer.Paragraph($"Previously established: {brk.Established}", bodyItalic, Muted);
+                writer.Gap(8f);
+            }
+        }
+
+        if (series.CarriedThreads is { Count: > 0 })
+        {
+            writer.Paragraph("Threads carried from the previous book:", bodyBold, Ink);
+            foreach (var thread in series.CarriedThreads)
+                writer.Bullet(Join(thread.Status, thread.Established), body, Ink);
+            writer.Gap(12f);
         }
     }
 

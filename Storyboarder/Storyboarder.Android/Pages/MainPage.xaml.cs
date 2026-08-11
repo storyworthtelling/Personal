@@ -129,6 +129,10 @@ public partial class MainPage : ContentPage
         if (status.HasPreviousDraft)
             buttons.Add(DiffAction);
 
+        // Series: start the NEXT BOOK (a new manuscript that continues this one), so the pipeline reuses this
+        // book's canon for the cross-book continuity read and returning-character look.
+        buttons.Add(NextBookAction);
+
         var isActive = status.Stage is not ("Completed" or "Failed" or "Cancelled");
         if (isActive)
         {
@@ -144,6 +148,7 @@ public partial class MainPage : ContentPage
             case OpenReportPdfAction: await ShareReportPdf(status); break;
             case ReadReportAction: await OpenReport(status); break;
             case NewDraftAction: await StartNewDraft(status); break;
+            case NextBookAction: await StartNextBook(status); break;
             case DiffAction: await ShowDraftDiff(status); break;
             case RetryAction: await RetryProject(status); break;
             case StopAction: await StopProject(status); break;
@@ -154,6 +159,7 @@ public partial class MainPage : ContentPage
     private const string StopAction = "Stop review";
     private const string DeleteAction = "Delete manuscript";
     private const string NewDraftAction = "New draft (re-pick doc)";
+    private const string NextBookAction = "Start next book (new manuscript)";
     private const string DiffAction = "What changed since last draft";
     private const string OpenReportPdfAction = "Open the report PDF";
     private const string ReadReportAction = "Read report in app";
@@ -203,6 +209,17 @@ public partial class MainPage : ContentPage
         var page = IPlatformApplication.Current!.Services.GetRequiredService<NewProjectPage>();
         page.PreviousDraftId = status.Id;
         page.PreviousTitle = status.Title;
+        await Navigation.PushAsync(page);
+    }
+
+    // Starts the next book of a series: opens the Drive picker in "next book" mode, so the doc the user picks
+    // becomes a NEW book (its own project) linked to this one, and the pipeline reuses this book's canon
+    // (ProjectService.CreateNextBookAsync).
+    private async Task StartNextBook(NovelStatus status)
+    {
+        var page = IPlatformApplication.Current!.Services.GetRequiredService<NewProjectPage>();
+        page.PreviousBookId = status.Id;
+        page.PreviousBookTitle = status.Title;
         await Navigation.PushAsync(page);
     }
 
@@ -303,6 +320,10 @@ public partial class MainPage : ContentPage
                 "Cancelled" => "Stopped by you.",
                 _ => s.Stage,
             };
+
+            // A book in a series wears a "Book N" badge at the head of its status line.
+            if (s.InSeries)
+                summary = $"Book {s.SeriesSequence} · {summary}";
 
             // Before the scene images render, say what the run is projected to cost.
             if (s.Estimate is { } estimate && estimate.Scenes > 0)

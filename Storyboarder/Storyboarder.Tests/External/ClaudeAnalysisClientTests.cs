@@ -276,6 +276,52 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task AssessSeriesContinuity_ParsesBreaksAndCarriedThreads()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"breaks\":[{\"chapter\":\"Chapter 1\",\"established\":\"grey eyes\",\"contradiction\":\"now green\"}," +
+            "{\"chapter\":\"Chapter 2\",\"established\":\"x\",\"contradiction\":\"   \"}]," +
+            "\"carriedThreads\":[{\"established\":\"the gate mechanism\",\"status\":\"contradicted\"}," +
+            "{\"established\":\"the missing heir\",\"status\":\"whoknows\"}," +
+            "{\"established\":\"   \",\"status\":\"Addressed\"}]}"));
+
+        var canon = new SeriesCanon("Book One",
+            [new CanonEntity("Hero", "grey eyes")], [], "the hero reached the castle",
+            [new ReportFinding("Chapter 3", "the gate mechanism")]);
+
+        var result = await client.AssessSeriesContinuity(
+            "Book Two", canon, [ChapterNotes.Empty], "the hero rests", CancellationToken.None);
+
+        Assert.Equal("Book One", result.PriorBookTitle);
+        // The blank-contradiction break is dropped (nothing to report).
+        var brk = Assert.Single(result.Breaks);
+        Assert.Equal("Chapter 1", brk.Chapter);
+        Assert.Equal("now green", brk.Contradiction);
+        Assert.Equal("grey eyes", brk.Established);
+        // Two carried threads survive (the blank-established one is dropped); an unknown status normalizes to Ignored.
+        Assert.Equal(2, result.CarriedThreads.Count);
+        Assert.Equal("Contradicted", result.CarriedThreads[0].Status);
+        Assert.Equal("Ignored", result.CarriedThreads[1].Status);   // "whoknows" → the conservative still-open verdict
+        // The prior book's canon (its open thread) is sent so the model can judge it.
+        Assert.Contains("the gate mechanism", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task AssessSeriesContinuity_BlankReply_DegradesToEmpty_KeepingThePriorTitle()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("no json here"));
+
+        var canon = new SeriesCanon("Book One", [], [], "", []);
+        var result = await client.AssessSeriesContinuity(
+            "Book Two", canon, [ChapterNotes.Empty], "", CancellationToken.None);
+
+        Assert.Equal("Book One", result.PriorBookTitle);
+        Assert.False(result.HasContent);
+    }
+
+    [Fact]
     public async Task ReconcileFindings_ParsesMatchesAndNulls()
     {
         var (client, handler) = Create();

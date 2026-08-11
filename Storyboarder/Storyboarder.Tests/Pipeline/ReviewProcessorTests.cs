@@ -106,6 +106,14 @@ public class ReviewProcessorTests : IDisposable
                     [new ShowTellNote("Chapter 1", "Years passed.", ShowTellDirection.Dramatize, "this leap could be a scene")],
                     new LengthAssessment(wordCount, 90_000, 100_000, LengthGap.Describe(wordCount, 90_000, 100_000)))));
 
+        // Default cross-book continuity read: nothing to flag (a standalone book never calls this; a sequel with
+        // this default folds an empty — and therefore unrendered — series section). Tests that care set their own.
+        claude.Setup(c => c.AssessSeriesContinuity(
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, SeriesCanon canon, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+                Task.FromResult(SeriesContinuity.Empty with { PriorBookTitle = canon.PriorBookTitle }));
+
         claude.Setup(c => c.DescribeSceneImage(
                 It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
                 It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
@@ -434,6 +442,169 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(1, carried.FirstDraftNumber);          // open since draft 1
         // The other three findings had no match, so they are new threads this draft.
         Assert.Equal(3, check.Findings.Count(f => f.NovelId == secondId && f.Status == FindingStatus.New));
+    }
+
+    // Seeds book N+1 of a series the way ProjectService.CreateNextBookAsync does: a NEW project (its own
+    // draft chain) linked to the prior book via PreviousBookId, so the pipeline can reuse the prior book's canon.
+    private Guid SeedNextBook(Guid previousBookId, string text)
+    {
+        using var context = database.NewContext();
+        var previous = context.Novels.Single(n => n.Id == previousBookId);
+        var book = new Novel
+        {
+            Title = previous.Title, GoogleDocId = "doc-b2",
+            SeriesId = previous.SeriesId ?? previous.ProjectId,
+            PreviousBookId = previous.Id, SeriesSequence = 2,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        book.ProjectId = book.Id;
+        book.Source = new SourceText { NovelId = book.Id, FullText = text, CharacterCount = text.Length };
+        context.Novels.Add(book);
+        context.SaveChanges();
+        return book.Id;
+    }
+
+    [Fact]
+    public async Task SecondBook_ReusesReferenceImages_ForReturningEntities()
+    {
+        var firstId = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using (var ctx = database.NewContext())
+            Assert.NotEmpty(ctx.DesignRefs.Where(r => r.NovelId == firstId && r.ReferenceImagePath != null).ToList());
+
+        // Book two re-uses the same cast (Hero + Castle) as book one — both should reuse their prior sheets.
+        gemini.Invocations.Clear();
+        var secondId = SeedNextBook(firstId, "A short tale. The hero walked to the castle and knocked on the gate.");
+        await DriveToCompletion(NewProcessor());
+
+        gemini.Verify(g => g.GenerateReferenceSheet(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never());
+
+        using var check = database.NewContext();
+        var refs = check.DesignRefs.Where(r => r.NovelId == secondId && r.NeedsSheet).ToList();
+        Assert.NotEmpty(refs);
+        Assert.All(refs, r =>
+        {
+            Assert.Equal(WorkStatus.Completed, r.ReferenceSheetStatus);
+            Assert.NotNull(r.ReferenceImagePath);
+            Assert.True(File.Exists(r.ReferenceImagePath));
+        });
+    }
+
+    [Fact]
+    public async Task SecondBook_RendersAFreshSheet_ForANewEntity()
+    {
+        var firstId = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        // Book two keeps the Hero (returning) but introduces a Villain the prior book never had.
+        claude.Setup(c => c.ExtractEntities(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DesignBibleFragment(
+                [new EntityMention("Hero", "a brave knight in silver armor"),
+                 new EntityMention("Villain", "a cloaked sorcerer")],
+                [new EntityMention("Castle", "a grey stone fortress")]));
+
+        gemini.Invocations.Clear();
+        var secondId = SeedNextBook(firstId, "The hero met the villain at the castle.");
+        await DriveToCompletion(NewProcessor());
+
+        // Exactly one fresh sheet — the new Villain; Hero and Castle reused their prior images.
+        gemini.Verify(g => g.GenerateReferenceSheet(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once());
+
+        using var check = database.NewContext();
+        var refs = check.DesignRefs.Where(r => r.NovelId == secondId && r.NeedsSheet).ToList();
+        Assert.All(refs, r =>
+        {
+            Assert.Equal(WorkStatus.Completed, r.ReferenceSheetStatus);
+            Assert.True(File.Exists(r.ReferenceImagePath!));
+        });
+    }
+
+    [Fact]
+    public async Task StandaloneBook_SkipsTheSeriesContinuityRead()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        claude.Verify(c => c.AssessSeriesContinuity(
+            It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        using var context = database.NewContext();
+        Assert.Null(context.BookAnalyses.Single(a => a.NovelId == id).SeriesContinuityJson);
+    }
+
+    [Fact]
+    public async Task SecondBook_RunsTheSeriesContinuityRead_AndFoldsItIntoTheReport()
+    {
+        var firstId = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        // The sequel finds a contradiction of book one's canon and leaves one of its threads open.
+        claude.Setup(c => c.AssessSeriesContinuity(
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, SeriesCanon canon, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+                Task.FromResult(new SeriesContinuity(
+                    canon.PriorBookTitle,
+                    [new SeriesBreak("Chapter 1", "The hero's eyes were grey", "Now they are green")],
+                    [new CarriedThread("The gate's mechanism was never explained", "Ignored")])));
+
+        var secondId = SeedNextBook(firstId, "A short tale. The hero walked to the castle and knocked on the gate.");
+        await DriveToCompletion(NewProcessor());
+
+        claude.Verify(c => c.AssessSeriesContinuity(
+            It.IsAny<string>(), It.Is<SeriesCanon>(canon => canon.OpenThreads.Count > 0),
+            It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        using (var context = database.NewContext())
+        {
+            var analysis = context.BookAnalyses.Single(a => a.NovelId == secondId);
+            Assert.False(string.IsNullOrEmpty(analysis.SeriesContinuityJson));   // persisted
+            Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);              // the folded report still composed
+            Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == secondId).Stage);
+        }
+
+        // The in-app read path folds the series continuity in too.
+        var projects = new ProjectService(database, new Mock<IGoogleDocsClient>().Object,
+            new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
+            clock, Options.Create(new RateLimitOptions()));
+        var report = await projects.GetReportAsync(secondId, CancellationToken.None);
+        Assert.NotNull(report);
+        Assert.True(report!.SeriesContinuity.HasContent);
+        Assert.Single(report.SeriesContinuity.Breaks);
+        Assert.Single(report.SeriesContinuity.CarriedThreads);
+    }
+
+    [Fact]
+    public async Task SecondBook_StillCompletes_WhenTheContinuityReadKeepsFailing()
+    {
+        var firstId = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        claude.Setup(c => c.AssessSeriesContinuity(
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Claude is down"));
+
+        var secondId = SeedNextBook(firstId, "A short tale. The hero walked to the castle and knocked on the gate.");
+
+        // The report never reaches Completed while the continuity call keeps failing, but it must not crash the
+        // worker — it stays parked with a recorded error, resumable when the call recovers. Drive a bounded run.
+        var processor = NewProcessor();
+        for (var cycle = 0; cycle < 40; cycle++)
+        {
+            var result = await processor.ProcessNextAsync(CancellationToken.None);
+            if (result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+        }
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == secondId);
+        Assert.NotEqual(ProjectStage.Completed, novel.Stage);   // parked on the failing continuity call
+        Assert.NotNull(novel.LastError);
     }
 
     [Fact]

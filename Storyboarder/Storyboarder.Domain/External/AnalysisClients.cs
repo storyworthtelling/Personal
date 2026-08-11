@@ -97,6 +97,19 @@ public interface IClaudeAnalysisClient
         int wordCount,
         string genre,
         CancellationToken cancellationToken);
+
+    // The cross-book continuity read (Phase 5): given the prior book's established canon (its cast/settings, its
+    // final story state, and its open finding threads) and this book's per-chunk notes + story state, flag where
+    // this book contradicts that canon, and report whether each of the prior book's open threads is addressed,
+    // ignored, or contradicted. It NUDGES, never rewrites — pointers only. Best-effort: a blank/partial reply
+    // degrades to SeriesContinuity.Empty (keeping the prior book's title) so it never blocks the report. Runs
+    // only for a book linked to a prior one; a standalone book never calls it.
+    Task<SeriesContinuity> AssessSeriesContinuity(
+        string title,
+        SeriesCanon priorCanon,
+        IReadOnlyList<ChapterNotes> notes,
+        string continuitySummary,
+        CancellationToken cancellationToken);
 }
 
 // Image generation via Gemini. Reference sheets are generated once per recurring design-bible entity,

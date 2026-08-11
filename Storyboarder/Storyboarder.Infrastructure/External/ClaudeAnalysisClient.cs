@@ -210,6 +210,25 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "0/0 if you can't judge it). Give AT MOST 15 scenesToAdd and 15 showVsTell, the most significant, and " +
         "use [] when there are none. No prose outside the JSON.";
 
+    private const string SeriesContinuityInstruction =
+        "You are a continuity editor checking a novel that is a LATER BOOK in a series against the canon its " +
+        "PRIOR book established. You are given the prior book's canon — its cast and settings with the " +
+        "descriptions the prior book established, where its story stood at the end, and the unresolved problems " +
+        "it left open — and this book's per-chunk notes and running story state. Do TWO things. (1) Find " +
+        "CONTRADICTIONS: places where this book contradicts what the prior book established — a character " +
+        "described or behaving inconsistently with their canon, a place / world rule / timeline that clashes, a " +
+        "fact that cannot be true if the prior book's was. Be specific and CONSERVATIVE: a deliberate " +
+        "development, reveal, or change over time is NOT a contradiction — flag only genuine clashes. (2) For " +
+        "each of the prior book's OPEN THREADS, judge whether this book ADDRESSES it (resolves or meaningfully " +
+        "advances it), IGNORES it (never touches it), or CONTRADICTS it. You NUDGE, you never rewrite: point at " +
+        "the problem, never draft the fix. Respond with ONLY a JSON object: " +
+        "{\"breaks\":[{\"chapter\":string,\"established\":string,\"contradiction\":string}]," +
+        "\"carriedThreads\":[{\"established\":string,\"status\":string}]}. breaks: chapter = where in THIS book " +
+        "(\"Chapter 4\", \"\" if unknown); established = what the prior book set; contradiction = what this book " +
+        "says instead. carriedThreads: established = the prior open thread verbatim; status = one of " +
+        "\"Addressed\", \"Ignored\", \"Contradicted\". Give one carriedThreads entry per open thread provided. " +
+        "Use [] when there are no breaks. No prose outside the JSON.";
+
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
     private readonly ICredentialHealthSink? healthSink;
@@ -518,6 +537,54 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return new ExpansionReport(scenes, showTell, length);
     }
 
+    public async Task<SeriesContinuity> AssessSeriesContinuity(
+        string title, SeriesCanon priorCanon, IReadOnlyList<ChapterNotes> notes, string continuitySummary,
+        CancellationToken cancellationToken)
+    {
+        var canonJson = JsonSerializer.Serialize(priorCanon, JsonResponse.CaseInsensitive);
+        var notesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
+        var userContent =
+            $"THIS BOOK'S TITLE: {title}\n\n" +
+            $"PRIOR BOOK'S CANON (JSON):\n{canonJson}\n\n" +
+            $"THIS BOOK'S STORY STATE:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(none)" : continuitySummary)}\n\n" +
+            $"THIS BOOK'S PER-CHUNK NOTES (JSON array, in reading order):\n{notesJson}";
+
+        // Best-effort: a malformed or empty reply yields no breaks/threads (keeping the prior book's title), so
+        // the continuity read never blocks the report.
+        var empty = SeriesContinuity.Empty with { PriorBookTitle = priorCanon.PriorBookTitle };
+
+        var reply = await SendMessage(SeriesContinuityInstruction, userContent, cancellationToken, options.AnalysisMaxTokens);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+            return empty;
+
+        var dto = JsonResponse.Deserialize<SeriesContinuityDto>(json);
+        if (dto is null)
+            return empty;
+
+        var breaks = (dto.Breaks ?? [])
+            .Where(b => !string.IsNullOrWhiteSpace(b.Contradiction))
+            .Select(b => new SeriesBreak(b.Chapter ?? string.Empty, b.Established ?? string.Empty, b.Contradiction!))
+            .ToList();
+        var carried = (dto.CarriedThreads ?? [])
+            .Where(t => !string.IsNullOrWhiteSpace(t.Established))
+            .Select(t => new CarriedThread(t.Established!, NormalizeThreadStatus(t.Status)))
+            .ToList();
+
+        return new SeriesContinuity(priorCanon.PriorBookTitle, breaks, carried);
+    }
+
+    // Snap a carried-thread status to the three the report speaks; an unrecognized value reads as "Ignored"
+    // (the conservative "still an open problem" verdict), so a stray value can't quietly report it resolved.
+    private static string NormalizeThreadStatus(string? status)
+    {
+        var value = status?.Trim() ?? string.Empty;
+        foreach (var known in new[] { "Addressed", "Ignored", "Contradicted" })
+            if (string.Equals(value, known, StringComparison.OrdinalIgnoreCase))
+                return known;
+        return "Ignored";
+    }
+
     private static AdditionKind ParseAdditionKind(string? kind) =>
         Enum.TryParse<AdditionKind>(kind, ignoreCase: true, out var parsed) ? parsed : AdditionKind.MissingBeat;
 
@@ -791,6 +858,25 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Excerpt { get; set; }
         public string? Direction { get; set; }
         public string? Suggestion { get; set; }
+    }
+
+    private sealed class SeriesContinuityDto
+    {
+        public List<SeriesBreakDto>? Breaks { get; set; }
+        public List<CarriedThreadDto>? CarriedThreads { get; set; }
+    }
+
+    private sealed class SeriesBreakDto
+    {
+        public string? Chapter { get; set; }
+        public string? Established { get; set; }
+        public string? Contradiction { get; set; }
+    }
+
+    private sealed class CarriedThreadDto
+    {
+        public string? Established { get; set; }
+        public string? Status { get; set; }
     }
 
     private sealed class BookAnalysisDto

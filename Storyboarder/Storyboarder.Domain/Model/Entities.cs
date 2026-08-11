@@ -30,6 +30,17 @@ public class Novel
     public int DraftNumber { get; set; } = 1;
     public Guid? PreviousDraftId { get; set; }
 
+    // Series linkage (Phase 5). A "project" is one book (a group of drafts sharing ProjectId); a "series"
+    // groups multiple books. SeriesId is the series grouping key, denormalized onto every draft exactly as
+    // ProjectId is — null means a standalone book. PreviousBookId is the book-level analogue of
+    // PreviousDraftId: the specific prior-book DRAFT whose finished canon (design bible, continuity summary,
+    // open findings) this book reuses, resolved at link time to the prior book's latest-completed draft.
+    // SeriesSequence is this book's number in the series (1 = first), for the "Book N" badge. All three are
+    // carried onto later drafts of a linked book, so every draft of book 2 stays linked to book 1.
+    public Guid? SeriesId { get; set; }
+    public Guid? PreviousBookId { get; set; }
+    public int SeriesSequence { get; set; } = 1;
+
     // Set once the per-chunk extractions have been merged into canonical DesignRefs, so the merge
     // (which would otherwise reset reference-sheet state) runs exactly once.
     public bool DesignBibleConsolidated { get; set; }
@@ -267,6 +278,12 @@ public class BookAnalysis
     // was given up after its retry budget — so the best-effort target runs a bounded number of times and the
     // Archiving stage can advance. Parallel to ArchivedDriveFileId; the two delivery targets are independent.
     public bool DeliveredToRemarkable { get; set; }
+
+    // The cross-book continuity read (Phase 5), serialized as a SeriesContinuity: where this book contradicts
+    // the prior book's established canon, and the status of the prior book's carried-over open threads. Its own
+    // resumable call and column, folded in at render like the craft/voice/expansion halves. Null until it runs;
+    // it runs only for a book with a PreviousBookId — a standalone book leaves it null, so no section renders.
+    public string? SeriesContinuityJson { get; set; }
 }
 
 // One story-integrity finding, promoted to a first-class row in Phase 2 (it lived only inside the report

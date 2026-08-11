@@ -77,6 +77,9 @@ The report is a chapter-cited editorial read, consolidated by Claude from per-ch
 - **Scene by scene:** for each scene, the evidence image on top, then a **Fidelity gap / Craft /
   Purpose** block, cited `Ch. N · Scene M`. The *fidelity gap* is a prose-specification read (does
   the prose under-specify the beat?), not a vision comparison of the generated image.
+- **Series continuity** *(sequels only):* when a book is linked as book N of a series, a read that flags
+  where it contradicts the prior book's established canon (characters, world, timeline) and tracks how it
+  handles the threads the prior book left open. Silent for a standalone book or a clean sequel.
 - **Reviews:** five fair perspectives, including an *Agent & acquiring editor* commercial/readiness
   read.
 - **What to do:** a revision plan grouped **Must / Should / Consider**.
@@ -151,7 +154,12 @@ Debug builds sign with the default debug keystore.
 4. When the report is ready, it is delivered to Google Drive beside the manuscript as
    `<Title> — Draft N — Analysis.pdf`, with a quiet in-app note. Tap the manuscript to open/share or
    read the report in the app.
-5. **Optionally, to a reMarkable tablet:** register the tablet once in Settings (a one-time code from
+5. **Revising or continuing a book:** tap a manuscript card. *New draft (re-pick doc)* starts the next
+   draft of the same book — the report then diffs it against the previous draft (resolved / new / regressed
+   findings, before/after scene images). *Start next book (new manuscript)* begins book N+1 of a series,
+   linked to this one: the sequel reuses this book's cast for visual consistency and its canon for the
+   **Series continuity** read, and its card wears a *Book N* badge.
+6. **Optionally, to a reMarkable tablet:** register the tablet once in Settings (a one-time code from
    `my.remarkable.com/device/mobile/connect`) and turn on *Deliver to reMarkable* — the report then
    also lands in a **"Canonizer" folder** on the tablet to read and annotate by hand. Best-effort and
    independent of Drive; the pairing is shared with the other Storyworthtelling apps via the secrets

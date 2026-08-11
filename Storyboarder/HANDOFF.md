@@ -30,7 +30,7 @@ dotnet --version     # expect 10.0.x
 dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj -p:StoryboarderTfms=net10.0
 ```
 
-**Baseline: 271 passing, 0 failing** (Phase 4 landed) — plus `Storyworthtelling.Remarkable.Tests` (12) and
+**Baseline: 287 passing, 0 failing** (Phase 5 landed) — plus `Storyworthtelling.Remarkable.Tests` (12) and
 DailyLoader's suite. Run these before every commit. Never commit a red suite. `dotnet ef` is installed but
 not on PATH in a fresh container — `export PATH="$PATH:$HOME/.dotnet/tools"` before `dotnet ef migrations
 add …`. **DailyLoader's net9.0 tests can't RUN here** (only the .NET 10 runtime is present); they build
@@ -188,10 +188,12 @@ feature.
   genre-norm length targets) — the additive feedback that closes the word-count gap. See §3c.
 - **Phase 4 ✅ (done):** shared bidirectional **reMarkable** delivery library + vault-restored pairing —
   the report lands in a "Canonizer" folder to read + annotate by hand. See §3d.
-- **Phase 5 (next):** series awareness — link related books and reuse prior findings/entities for
-  cross-book continuity.
-- **Phase 4:** shared bidirectional **reMarkable** delivery + vault-restored pairing.
-- **Phase 5:** series awareness.
+- **Phase 5 ✅ (done):** series awareness — link related books (`SeriesId`/`PreviousBookId`/`SeriesSequence`
+  on `Novel`, `CreateNextBookAsync`) and reuse the prior book's canon: returning-entity reference-image reuse
+  (`CarryForwardSeriesEntities`), a resumable **Series continuity** read (`AssessSeriesContinuity` sub-step 2f
+  over a `SeriesCanon`, folded via `WithSeriesContinuity`, rendered silent-by-default), and the prior book's
+  open threads carried forward as tracked series-level threads. Android: "Start next book" card action +
+  "Book N" badge. **The 5-phase roadmap is complete.**
 - **Also deferred:** the image-vs-prose **vision** fidelity pass (Phase 1's fidelity gap is a
   prose-specification read, not a comparison of the generated image); owner-voice profile seeding
   (suite-wide pending).

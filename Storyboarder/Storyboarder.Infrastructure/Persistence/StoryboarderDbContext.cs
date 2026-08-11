@@ -74,6 +74,8 @@ public sealed class StoryboarderDbContext(DbContextOptions<StoryboarderDbContext
             entity.HasIndex(novel => novel.Stage);
             // Drafts of one book are listed together and newest-draft-first, so index the grouping key.
             entity.HasIndex(novel => new { novel.ProjectId, novel.DraftNumber });
+            // Books of one series are listed together and in order, so index the series grouping key.
+            entity.HasIndex(novel => new { novel.SeriesId, novel.SeriesSequence });
         });
 
         model.Entity<SourceText>(entity => entity.HasKey(source => source.Id));
