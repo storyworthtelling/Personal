@@ -82,7 +82,9 @@ public class ManageSubscriptionsActivity : Activity
 
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Add feed", ShowAddFeedDialog),
-            PaperUi.QuietButton(this, "Import OPML", ImportOpml)));
+            PaperUi.QuietButton(this, "Import OPML", ImportOpml),
+            PaperUi.QuietButton(this, "Diagnostics",
+                () => StartActivity(new Intent(this, typeof(AudioDiagnosticsActivity))))));
         return root;
     }
 

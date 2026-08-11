@@ -39,6 +39,7 @@ public class AudioActivity : Activity
     private PlaybackSettingsStore settingsStore = null!;
     private SubscriptionStore subscriptionStore = null!;
     private EpisodeCacheStore episodeCache = null!;
+    private QueueStore queueStore = null!;
     private PodcastLibrarySync librarySync = null!;
 
     private PlaybackSettingsSnapshot settings = PlaybackSettingsSnapshot.Empty();
@@ -80,6 +81,7 @@ public class AudioActivity : Activity
 
     private FrameLayout content = null!;
     private NowPlayingBar nowPlayingBar = null!;
+    private View podcastBottomBar = null!; // Shows/Queue/Manage/Speed — hidden on the music side
     private Handler? uiHandler;
     private Java.Lang.Runnable? ticker;
 
@@ -92,6 +94,8 @@ public class AudioActivity : Activity
         settingsStore = new PlaybackSettingsStore(this);
         subscriptionStore = new SubscriptionStore(this);
         episodeCache = new EpisodeCacheStore(this);
+        queueStore = new QueueStore(this);
+        queue.ReplaceWith(queueStore.Load()); // restore the queue built in a previous session (pruned to live episodes on render)
         librarySync = new PodcastLibrarySync(
             musicTokens.GetAccessToken, "FocusPhone.Audio",
             store, subscriptionStore, progressStore, settingsStore, new EqualizerStore(this));
@@ -271,11 +275,15 @@ public class AudioActivity : Activity
             onOpen: () => StartActivity(new Intent(this, typeof(NowPlayingActivity))));
         root.AddView(nowPlayingBar);
 
-        root.AddView(PaperUi.BottomBar(this,
+        // The podcast-only bar. Held in a field so RenderContent can hide it on the
+        // music side (its actions are all podcast-oriented); the now-playing bar
+        // above it stays shared for both sides.
+        podcastBottomBar = PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Shows", () => { side = 0; openFeedId = null; showingQueue = false; RenderContent(); }),
             PaperUi.QuietButton(this, "Queue", () => { side = 0; showingQueue = true; RenderContent(); }),
             PaperUi.QuietButton(this, "Manage", () => StartActivity(new Intent(this, typeof(ManageSubscriptionsActivity)))),
-            PaperUi.QuietButton(this, "Speed", ShowSpeedDialog)));
+            PaperUi.QuietButton(this, "Speed", ShowSpeedDialog));
+        root.AddView(podcastBottomBar);
         return root;
     }
 
@@ -373,6 +381,9 @@ public class AudioActivity : Activity
         var pane = side == 1 ? BuildMusicPane() : BuildPodcastsPane();
         content.AddView(pane, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        // The podcast bar (Shows/Queue/Manage/Speed) has no meaning on the music side.
+        podcastBottomBar.Visibility = side == 1 ? ViewStates.Gone : ViewStates.Visible;
     }
 
     private View BuildMusicPane()
@@ -822,20 +833,25 @@ public class AudioActivity : Activity
             position => ShowEpisodeActions(showEpisodes[position]));
     }
 
-    // Long-press an episode: mark just it, or clear everything older beneath it.
+    // Long-press an episode: queue it without playing, mark just it, or clear
+    // everything older beneath it. Tapping the row (not long-press) still plays.
     private void ShowEpisodeActions(Episode episode)
     {
         new AlertDialog.Builder(this)
             .SetTitle(episode.Title)!
-            .SetItems(new[] { "Mark played", "Mark older as played" }, (_, args) =>
+            .SetItems(new[] { "Add to queue", "Mark played", "Mark older as played" }, (_, args) =>
             {
-                if (args.Which == 0)
+                switch (args.Which)
                 {
-                    MarkDoneWithUndo(episode);
-                }
-                else
-                {
-                    MarkManyWithUndo(BulkListen.OlderInShow(episodes, episode), "Marked older played.");
+                    case 0:
+                        AddToQueueWithUndo(episode);
+                        break;
+                    case 1:
+                        MarkDoneWithUndo(episode);
+                        break;
+                    default:
+                        MarkManyWithUndo(BulkListen.OlderInShow(episodes, episode), "Marked older played.");
+                        break;
                 }
             })!
             .Show();
@@ -846,6 +862,7 @@ public class AudioActivity : Activity
         // Prune finished/unknown episodes so the display order matches queue indices.
         queue.ReplaceWith(queue.Items.Where(id =>
             !doneIds.Contains(id) && episodes.Any(episode => episode.Id == id)));
+        SaveQueue();
 
         var container = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
@@ -854,6 +871,11 @@ public class AudioActivity : Activity
         head.AddView(PaperUi.Heading(this, "Queue"),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         head.AddView(PaperUi.SecondaryButton(this, "Auto-arrange", ShowArrangeDialog));
+        if (queue.Count > 0)
+        {
+            head.AddView(PaperUi.QuietButton(this, "Clear", ClearQueueWithUndo));
+        }
+
         container.AddView(head);
 
         var queued = queue.Items
@@ -892,12 +914,12 @@ public class AudioActivity : Activity
 
         if (index > 0)
         {
-            row.AddView(PaperUi.QuietButton(this, "↑", () => { queue.Move(index, index - 1); RenderContent(); }));
+            row.AddView(PaperUi.QuietButton(this, "↑", () => { queue.Move(index, index - 1); SaveQueue(); RenderContent(); }));
         }
 
         if (index < total - 1)
         {
-            row.AddView(PaperUi.QuietButton(this, "↓", () => { queue.Move(index, index + 1); RenderContent(); }));
+            row.AddView(PaperUi.QuietButton(this, "↓", () => { queue.Move(index, index + 1); SaveQueue(); RenderContent(); }));
         }
 
         return row;
@@ -949,46 +971,113 @@ public class AudioActivity : Activity
         return when + " · " + PlaybackFormatting.TimeLeftAtSpeed(remaining, settings.For(episode.FeedId).Speed);
     }
 
+    // ---- Queue editing ----
+
+    private void SaveQueue() => queueStore.Save(queue.Export());
+
+    // Add to the queue without playing. Not destructive, but offered undo-first for
+    // reversible feedback, matching the mark-played idiom (DESIGN.md §7). A duplicate
+    // add is a no-op in PlaybackQueue, so undo only removes what this add introduced.
+    private void AddToQueueWithUndo(Episode episode)
+    {
+        var wasQueued = queue.Items.Contains(episode.Id);
+        queue.Add(episode.Id);
+        SaveQueue();
+        RenderContent();
+        if (wasQueued)
+        {
+            return; // already in the queue; nothing new to undo
+        }
+
+        UndoBar.Show(this, content, "Added to queue.", onUndo: () =>
+        {
+            queue.Remove(episode.Id);
+            SaveQueue();
+            RenderContent();
+        });
+    }
+
+    private void ClearQueueWithUndo()
+    {
+        if (queue.Count == 0)
+        {
+            return;
+        }
+
+        var snapshot = queue.Export();
+        queue.Clear();
+        SaveQueue();
+        RenderContent();
+        UndoBar.Show(this, content, "Cleared queue.", onUndo: () =>
+        {
+            queue.ReplaceWith(snapshot);
+            SaveQueue();
+            RenderContent();
+        });
+    }
+
     // ---- Playback ----
 
     private void EnqueueAndPlay(Episode episode)
     {
         queue.Add(episode.Id);
+        SaveQueue();
         PlayQueue(episode.Id);
         RenderContent();
     }
 
     private void PlayQueue(string startId)
     {
+        // The controller is built asynchronously on cold start; a tap before it
+        // connects can't play, so say so (the episode is already queued) rather
+        // than fail silently, and record it for later diagnosis.
         if (controller is null)
         {
+            AudioDiagnostics.LogWarning("Playback", "Play requested before the media controller was ready.");
+            Toast.MakeText(this, PodcastPlaybackDiagnostics.ControllerNotReady, ToastLength.Short)!.Show();
             return;
         }
 
         // Keep only playable, still-present episodes so start index and items align.
         queue.ReplaceWith(queue.Items.Where(id =>
             episodes.Any(episode => episode.Id == id && episode.AudioUrl is not null)));
+        SaveQueue();
 
         var ids = queue.Items;
         var index = ids.ToList().IndexOf(startId);
         if (index < 0)
         {
+            // The chosen episode has no playable enclosure (it was pruned above),
+            // so it can never start — tell the user which one instead of no-op.
+            var title = episodes.FirstOrDefault(episode => episode.Id == startId)?.Title;
+            AudioDiagnostics.LogWarning("Playback", $"Episode has no playable audio: id={startId}.");
+            Toast.MakeText(this, PodcastPlaybackDiagnostics.NoPlayableAudio(title), ToastLength.Short)!.Show();
             return;
         }
 
-        var items = ids.Select(id => BuildItem(episodes.First(episode => episode.Id == id))).ToList();
-        var startEpisode = episodes.First(episode => episode.Id == startId);
-        nowPlaying = startEpisode;
-        var showSettings = settings.For(startEpisode.FeedId);
-        var resume = new PlaybackProgressBook(progressStore.Load())
-            .ResumeWithRewind(startEpisode.Id, DateTimeOffset.Now);
-        var startMs = resume is { } point ? (long)point.TotalMilliseconds : 0L;
+        try
+        {
+            var items = ids.Select(id => BuildItem(episodes.First(episode => episode.Id == id))).ToList();
+            var startEpisode = episodes.First(episode => episode.Id == startId);
+            nowPlaying = startEpisode;
+            var showSettings = settings.For(startEpisode.FeedId);
+            var resume = new PlaybackProgressBook(progressStore.Load())
+                .ResumeWithRewind(startEpisode.Id, DateTimeOffset.Now);
+            var startMs = resume is { } point ? (long)point.TotalMilliseconds : 0L;
 
-        controller.SetMediaItems(items, index, startMs);
-        controller.SetPlaybackSpeed(showSettings.Speed);
-        controller.Prepare();
-        controller.Play();
-        SendSkipSilence(showSettings.SkipSilence);
+            controller.SetMediaItems(items, index, startMs);
+            controller.SetPlaybackSpeed(showSettings.Speed);
+            controller.Prepare();
+            controller.Play();
+            SendSkipSilence(showSettings.SkipSilence);
+        }
+        catch (Exception e)
+        {
+            // Never let a media-stack fault die silently — capture the stack trace
+            // to the rolling log and give the user a brief, honest message.
+            AudioDiagnostics.LogWarning("Playback", "Starting playback failed.", e);
+            Toast.MakeText(this, "Couldn't start playback — see Manage → Diagnostics.", ToastLength.Short)!.Show();
+        }
     }
 
     private static MediaItem BuildItem(Episode episode)
@@ -1058,13 +1147,33 @@ public class AudioActivity : Activity
     private void AutoArrange(QueueArrangement arrangement)
     {
         var strategy = EpisodeQueueStrategy.For(arrangement);
-        if (strategy is not null)
+        if (strategy is null)
         {
-            var unplayed = episodes.Where(episode => !doneIds.Contains(episode.Id)).ToList();
-            queue.ReplaceWith(strategy.Arrange(unplayed).Select(episode => episode.Id));
+            return;
         }
 
-        RenderContent();
+        try
+        {
+            var unplayed = episodes.Where(episode => !doneIds.Contains(episode.Id)).ToList();
+            if (unplayed.Count == 0)
+            {
+                // Nothing to arrange (feeds not fetched yet, or all caught up):
+                // say why and leave any existing queue intact rather than wiping it.
+                AudioDiagnostics.LogWarning("Queue",
+                    $"Auto-arrange ({arrangement}) found no unplayed episodes; refreshing={isRefreshing}.");
+                Toast.MakeText(this, PodcastPlaybackDiagnostics.NothingToQueue(isRefreshing), ToastLength.Short)!.Show();
+                return;
+            }
+
+            queue.ReplaceWith(strategy.Arrange(unplayed).Select(episode => episode.Id));
+            SaveQueue();
+            RenderContent(); // the filled queue is the confirmation (inline state change, DESIGN.md §5)
+        }
+        catch (Exception e)
+        {
+            AudioDiagnostics.LogWarning("Queue", $"Auto-arrange ({arrangement}) failed.", e);
+            Toast.MakeText(this, "Couldn't arrange the queue — see Manage → Diagnostics.", ToastLength.Short)!.Show();
+        }
     }
 
     // ---- Done state ----
