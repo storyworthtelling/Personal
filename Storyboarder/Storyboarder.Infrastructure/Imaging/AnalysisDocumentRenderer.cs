@@ -2,6 +2,7 @@ using SkiaSharp;
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.Design;
 using Storyboarder.Domain.Imaging;
+using Storyboarder.Domain.Model;
 
 namespace Storyboarder.Infrastructure.Imaging;
 
@@ -24,18 +25,20 @@ public sealed class AnalysisDocumentRenderer
 
     private readonly CoverPageRenderer covers = new();
 
-    public IReadOnlyList<byte[]> Render(BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes) =>
-        RenderReport(analysis, title, scenes).Pages;
+    public IReadOnlyList<byte[]> Render(
+        BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null) =>
+        RenderReport(analysis, title, scenes, review).Pages;
 
     /// <summary>
     /// Renders content pages first (recording each H2 section's page number),
     /// then prepends unnumbered front matter: cover + table of contents.
     /// Content folios stay 1..N, so the printed TOC needs no bookkeeping.
     /// </summary>
-    public AnalysisRenderResult RenderReport(BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes)
+    public AnalysisRenderResult RenderReport(
+        BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null)
     {
         var reportTitle = string.IsNullOrWhiteSpace(title) ? "Book Analysis" : title;
-        var content = RenderContent(analysis, reportTitle, scenes, out var tocEntries);
+        var content = RenderContent(analysis, reportTitle, scenes, review ?? DraftReview.FirstDraft, out var tocEntries);
 
         var pages = new List<byte[]> { covers.AnalysisCover(reportTitle) };
         var toc = covers.AnalysisToc(tocEntries);
@@ -45,7 +48,7 @@ public sealed class AnalysisDocumentRenderer
     }
 
     private IReadOnlyList<byte[]> RenderContent(
-        BookAnalysisResult analysis, string reportTitle, IReadOnlyList<SceneEvidence> scenes,
+        BookAnalysisResult analysis, string reportTitle, IReadOnlyList<SceneEvidence> scenes, DraftReview review,
         out IReadOnlyList<(string Title, int Page)> tocEntries)
     {
         using var body = new SKFont(EmbeddedTypefaces.SerifRegular, DesignTokens.Pdf.Body);
@@ -71,6 +74,23 @@ public sealed class AnalysisDocumentRenderer
             writer.Paragraph(Join(analysis.Genre, lengthText), bodyBold, Ink);
         }
         writer.Gap(20f);
+
+        // On a later draft, a top summary of what moved since the previous one, and the list of findings it
+        // resolved — the draft-over-draft read the revision loop turns on.
+        var statusByFinding = BuildStatusLookup(review);
+        if (review.DraftNumber > 1)
+        {
+            var newCount = review.Findings.Count(f => f.Status == FindingStatus.New);
+            var regressedCount = review.Findings.Count(f => f.Status == FindingStatus.Regressed);
+            writer.Heading($"Since draft {review.DraftNumber - 1}", h2, Ink, ruled: true);
+            writer.Paragraph(
+                $"{review.Resolved.Count} resolved · {newCount} new · {regressedCount} regressed. " +
+                "New and regressed findings are marked in place below.",
+                bodyItalic, Muted);
+            foreach (var resolved in review.Resolved)
+                writer.Bullet("Resolved — " + Join(resolved.Chapter, resolved.Detail), body, Muted);
+            writer.Gap(18f);
+        }
 
         if (!string.IsNullOrWhiteSpace(analysis.Logline))
         {
@@ -98,10 +118,11 @@ public sealed class AnalysisDocumentRenderer
             }
         }
 
-        // Story integrity — the top analytical priority.
-        Section(writer, "Plot holes", analysis.PlotHoles, body, h2);
-        Section(writer, "Inconsistencies", analysis.Inconsistencies, body, h2);
-        Section(writer, "Inaccuracies", analysis.Inaccuracies, body, h2);
+        // Story integrity — the top analytical priority. On a later draft each finding is marked with its
+        // cross-draft status ([new]/[carried]/[regressed]).
+        Section(writer, "Plot holes", FindingCategory.PlotHole, analysis.PlotHoles, statusByFinding, body, h2);
+        Section(writer, "Inconsistencies", FindingCategory.Inconsistency, analysis.Inconsistencies, statusByFinding, body, h2);
+        Section(writer, "Inaccuracies", FindingCategory.Inaccuracy, analysis.Inaccuracies, statusByFinding, body, h2);
 
         Section(writer, "Themes", analysis.Themes, body, h2);
 
@@ -115,7 +136,7 @@ public sealed class AnalysisDocumentRenderer
                 writer.PacingChart(analysis.PacingCurve);
             }
             foreach (var note in analysis.PacingNotes ?? [])
-                writer.Bullet(Join(note.Chapter, note.Detail), body, Ink);
+                writer.Bullet(Join(note.Chapter, note.Detail) + Tag(FindingCategory.Pacing, note.Detail, statusByFinding), body, Ink);
             writer.Gap(18f);
         }
 
@@ -346,16 +367,47 @@ public sealed class AnalysisDocumentRenderer
     }
 
     // A section of findings. Each bullet leads with the chapter it was drawn from, which is the first
-    // thing the author needs in order to act on it.
-    private static void Section(PageWriter writer, string heading, IReadOnlyList<Finding>? items, SKFont body, SKFont h2)
+    // thing the author needs in order to act on it, and (on a later draft) trails a cross-draft status tag.
+    private static void Section(
+        PageWriter writer, string heading, FindingCategory category, IReadOnlyList<ReportFinding>? items,
+        IReadOnlyDictionary<(FindingCategory, string), FindingStatus> statusByFinding, SKFont body, SKFont h2)
     {
         if (items is not { Count: > 0 })
             return;
         writer.Heading(heading, h2, Ink, ruled: true);
         foreach (var item in items)
-            writer.Bullet(Join(item.Chapter, item.Detail), body, Ink);
+            writer.Bullet(Join(item.Chapter, item.Detail) + Tag(category, item.Detail, statusByFinding), body, Ink);
         writer.Gap(18f);
     }
+
+    // Maps each of this draft's findings to its cross-draft status, keyed by category + normalized detail —
+    // the same text the finding rows were built from, so the match back to the report's finding lists is
+    // exact. Empty on a first draft (no tags to draw).
+    private static IReadOnlyDictionary<(FindingCategory, string), FindingStatus> BuildStatusLookup(DraftReview review)
+    {
+        var lookup = new Dictionary<(FindingCategory, string), FindingStatus>();
+        if (review.DraftNumber <= 1)
+            return lookup;
+        foreach (var finding in review.Findings)
+            lookup[(finding.Category, NormalizeDetail(finding.Detail))] = finding.Status;
+        return lookup;
+    }
+
+    // The inline status mark for one finding: only New and Regressed are called out (a carried finding needs
+    // no mark, and a first draft has no history), so the report highlights what actually moved.
+    private static string Tag(
+        FindingCategory category, string detail, IReadOnlyDictionary<(FindingCategory, string), FindingStatus> statusByFinding) =>
+        statusByFinding.TryGetValue((category, NormalizeDetail(detail)), out var status)
+            ? status switch
+            {
+                FindingStatus.New => "  [new]",
+                FindingStatus.Regressed => "  [regressed]",
+                _ => string.Empty
+            }
+            : string.Empty;
+
+    private static string NormalizeDetail(string detail) =>
+        string.Join(' ', detail.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
 
     // Joins the parts of one finding, dropping the empty ones: a model that skipped a field — or an
     // older report that never had it (no chapter citation, say) — must not render as a dangling dash.

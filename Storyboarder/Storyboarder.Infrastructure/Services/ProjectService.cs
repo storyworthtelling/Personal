@@ -326,55 +326,67 @@ public sealed class ProjectService
         if (draft?.PreviousDraftId is not Guid previousId)
             return DraftDiff.None(draftId);
 
-        var currentFindings = await LoadFindingsAsync(db, draftId, cancellationToken);
-        var previousFindings = await LoadFindingsAsync(db, previousId, cancellationToken);
+        var currentFindings = await db.Findings
+            .Where(f => f.NovelId == draftId)
+            .Select(f => new { f.ThreadId, f.Category, f.Chapter, f.Detail, f.Status })
+            .ToListAsync(cancellationToken);
 
-        // Findings match on their detail text alone (whitespace/case-normalized). Resolved = the
-        // previous draft raised it and this one doesn't; New = the reverse.
-        var currentKeys = currentFindings.Select(FindingKey).ToHashSet();
-        var previousKeys = previousFindings.Select(FindingKey).ToHashSet();
-        var resolved = previousFindings
-            .Where(f => !currentKeys.Contains(FindingKey(f)))
-            .Select(f => new DiffFinding(FindingChange.Resolved, f.Category, f.Chapter, f.Detail))
-            .ToList();
-        var added = currentFindings
-            .Where(f => !previousKeys.Contains(FindingKey(f)))
+        // Status is assigned by the reconciliation against the whole thread history: New = first appearance,
+        // Regressed = a previously-fixed issue returned. Resolved = a thread the previous draft still carried
+        // that no current finding claims (matched by identity, never by text).
+        var newFindings = currentFindings
+            .Where(f => f.Status == FindingStatus.New)
             .Select(f => new DiffFinding(FindingChange.New, f.Category, f.Chapter, f.Detail))
             .ToList();
+        var regressedFindings = currentFindings
+            .Where(f => f.Status == FindingStatus.Regressed)
+            .Select(f => new DiffFinding(FindingChange.Regressed, f.Category, f.Chapter, f.Detail))
+            .ToList();
+        var currentThreadIds = currentFindings.Select(f => f.ThreadId).ToHashSet();
+        var resolvedFindings = (await db.Findings
+                .Where(f => f.NovelId == previousId)
+                .Select(f => new { f.ThreadId, f.Category, f.Chapter, f.Detail })
+                .ToListAsync(cancellationToken))
+            .Where(f => !currentThreadIds.Contains(f.ThreadId))
+            .Select(f => new DiffFinding(FindingChange.Resolved, f.Category, f.Chapter, f.Detail))
+            .ToList();
 
-        return new DraftDiff(draftId, previousId, resolved, added);
+        var changedScenes = await LoadChangedScenePairsAsync(db, draftId, cancellationToken);
+
+        return new DraftDiff(draftId, previousId, resolvedFindings, newFindings, regressedFindings, changedScenes);
     }
 
-    // detail text, normalized so trivial whitespace/case differences don't read as a resolved-plus-new
-    // pair. The category is part of the key so the same sentence filed under two sections stays distinct.
-    private static string FindingKey((string Category, string Chapter, string Detail) f) =>
-        f.Category + " " + string.Join(' ', f.Detail.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
-
-    // Flattens a draft's consolidated report into (section, chapter, detail) triples across the four
-    // finding sections. Empty when the report hasn't been consolidated yet (an in-flight or art-only draft).
-    private static async Task<IReadOnlyList<(string Category, string Chapter, string Detail)>> LoadFindingsAsync(
-        StoryboarderDbContext db, Guid novelId, CancellationToken cancellationToken)
+    // The before/after evidence images for every scene that changed between this draft and the one before,
+    // in reading order. A scene is paired to its predecessor by PreviousSceneId (set at seed time by the
+    // cross-draft SceneMatcher); either image may be null when that draft's render was unavailable.
+    private async Task<IReadOnlyList<DiffScenePair>> LoadChangedScenePairsAsync(
+        StoryboarderDbContext db, Guid draftId, CancellationToken cancellationToken)
     {
-        var json = await db.BookAnalyses
-            .Where(a => a.NovelId == novelId)
-            .Select(a => a.ConsolidatedJson)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (string.IsNullOrEmpty(json))
+        var changed = await db.Scenes
+            .Where(s => s.NovelId == draftId && s.Changed && s.PreviousSceneId != null)
+            .OrderBy(s => s.Number)
+            .Select(s => new { s.Number, s.ChapterLabel, s.ImagePath, s.PreviousSceneId })
+            .ToListAsync(cancellationToken);
+        if (changed.Count == 0)
             return [];
 
-        var report = JsonSerializer.Deserialize<BookAnalysisResult>(json, JsonResponse.CaseInsensitive)
-                     ?? BookAnalysisResult.Empty;
-        var findings = new List<(string, string, string)>();
-        void Add(string category, IReadOnlyList<Finding> items)
-        {
-            foreach (var f in items)
-                findings.Add((category, f.Chapter, f.Detail));
-        }
-        Add("Plot holes", report.PlotHoles);
-        Add("Inconsistencies", report.Inconsistencies);
-        Add("Inaccuracies", report.Inaccuracies);
-        Add("Pacing", report.PacingNotes);
-        return findings;
+        var previousIds = changed.Select(s => s.PreviousSceneId!.Value).ToList();
+        var previousPaths = await db.Scenes
+            .Where(s => previousIds.Contains(s.Id))
+            .Select(s => new { s.Id, s.ImagePath })
+            .ToDictionaryAsync(s => s.Id, s => s.ImagePath, cancellationToken);
+
+        byte[]? Read(string? path) =>
+            path is not null && imageStore.Exists(path) ? imageStore.Read(path) : null;
+
+        return changed
+            .Select(s =>
+            {
+                var citation = string.IsNullOrWhiteSpace(s.ChapterLabel) ? $"Scene {s.Number}" : $"{s.ChapterLabel} · Scene {s.Number}";
+                previousPaths.TryGetValue(s.PreviousSceneId!.Value, out var priorPath);
+                return new DiffScenePair(citation, Read(priorPath), Read(s.ImagePath));
+            })
+            .ToList();
     }
 
     private static async Task<NovelStatus?> BuildStatus(

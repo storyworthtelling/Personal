@@ -23,7 +23,15 @@ public class StoryboarderDbContextTests : IDisposable
         novel.Scenes.Add(new Scene
         {
             NovelId = novel.Id, Number = 1, ChapterNumber = 1, ChapterLabel = "Chapter 1",
-            StartOffset = 0, EndOffset = 17, ImageStatus = WorkStatus.Completed, ImagePath = "/tmp/scene-1.png"
+            StartOffset = 0, EndOffset = 17, ImageStatus = WorkStatus.Completed, ImagePath = "/tmp/scene-1.png",
+            PreviousSceneId = Guid.NewGuid(), Changed = true
+        });
+        novel.Findings.Add(new Finding
+        {
+            NovelId = novel.Id, ProjectId = novel.Id, ThreadId = Guid.NewGuid(),
+            Category = FindingCategory.PlotHole, Chapter = "Chapter 1", Detail = "The gate opens unexplained",
+            Status = FindingStatus.Carried, FirstDraftNumber = 1,
+            CreatedAtUtc = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero)
         });
         novel.ChunkAnalyses.Add(new ChunkAnalysis
         {
@@ -54,6 +62,7 @@ public class StoryboarderDbContextTests : IDisposable
                 .Include(n => n.DesignRefs)
                 .Include(n => n.Scenes)
                 .Include(n => n.ChunkAnalyses)
+                .Include(n => n.Findings)
                 .Include(n => n.Analysis)
                 .Single();
 
@@ -64,6 +73,12 @@ public class StoryboarderDbContextTests : IDisposable
             Assert.Equal(ReferenceKind.Character, Assert.Single(loaded.DesignRefs).Kind);
             var scene = Assert.Single(loaded.Scenes);
             Assert.Equal("/tmp/scene-1.png", scene.ImagePath);
+            Assert.True(scene.Changed);
+            Assert.NotNull(scene.PreviousSceneId);
+            var finding = Assert.Single(loaded.Findings);
+            Assert.Equal(FindingCategory.PlotHole, finding.Category);
+            Assert.Equal(FindingStatus.Carried, finding.Status);
+            Assert.Equal("The gate opens unexplained", finding.Detail);
             Assert.Equal(0, Assert.Single(loaded.ChunkAnalyses).Ordinal);
             Assert.Equal("/tmp/a.pdf", loaded.Analysis!.PdfPath);
         }
@@ -94,6 +109,7 @@ public class StoryboarderDbContextTests : IDisposable
             Assert.Empty(context.SourceTexts);
             Assert.Empty(context.ChunkAnalyses);
             Assert.Empty(context.BookAnalyses);
+            Assert.Empty(context.Findings);
         }
     }
 

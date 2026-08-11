@@ -34,11 +34,14 @@ public interface IClaudeAnalysisClient
     // possible inconsistencies, checkable claims, strengths/weaknesses) anchored to the known cast.
     // chapterLabel names the chapter(s) the chunk covers ("Chapter 7", "Chapters 7–8"); it is given to
     // the model as context AND stamped onto the returned notes, so the consolidated report can cite a
-    // chapter for every finding. Pass an empty label when the chapters aren't known.
+    // chapter for every finding. Pass an empty label when the chapters aren't known. priorRunningState is
+    // the cumulative "story so far" from the preceding chunk (empty for the first); the returned notes carry
+    // it forward updated, so long-range continuity and setup/payoff survive the chunk-by-chunk map.
     Task<ChapterNotes> AnalyzeChapter(
         string chapterText,
         string chapterLabel,
         IReadOnlyList<string> characterNames,
+        string priorRunningState,
         CancellationToken cancellationToken);
 
     // Literary-analysis "reduce", story half: consolidates all chunk notes into the story report
@@ -68,6 +71,17 @@ public interface IClaudeAnalysisClient
     // work from). Returns the dominant-voice characterization plus the divergent passages.
     Task<VoiceConsistency> AssessVoiceConsistency(
         IReadOnlyList<ChapterSample> samples,
+        CancellationToken cancellationToken);
+
+    // Cross-draft finding reconciliation: given the prior draft's finding threads and this draft's freshly
+    // consolidated findings, decides which current finding is the SAME underlying issue as which prior
+    // thread — even after the wording, phrasing, or chapter has moved — so a finding keeps a stable identity
+    // across drafts. Returns one match per candidate (a prior ThreadId, or null when it is a new issue).
+    // Best-effort: a blank/partial reply degrades to "everything is new", so reconciliation never blocks
+    // the report. FindingReconciler applies these decisions to produce the persisted occurrence rows.
+    Task<FindingReconciliation> ReconcileFindings(
+        IReadOnlyList<PriorFinding> priorThreads,
+        IReadOnlyList<CandidateFinding> candidates,
         CancellationToken cancellationToken);
 }
 

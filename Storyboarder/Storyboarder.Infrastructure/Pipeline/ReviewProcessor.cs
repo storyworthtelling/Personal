@@ -49,6 +49,8 @@ public sealed class ReviewProcessor : IPipelineStep
     private readonly TextChunker chunker = new();
     private readonly ChapterDetector chapterDetector = new();
     private readonly SceneDetector sceneDetector = new();
+    private readonly SceneMatcher sceneMatcher = new();
+    private readonly FindingReconciler findingReconciler = new();
 
     // How many different moments of a scene the model is asked to illustrate before the image is left
     // unavailable. A mature scene may be refused; the report is never blocked over it.
@@ -410,8 +412,9 @@ public sealed class ReviewProcessor : IPipelineStep
                 .Select(c => new ChapterSpan(c.Number, c.Label, c.StartOffset, c.EndOffset))
                 .ToList();
 
-            foreach (var span in sceneDetector.Detect(source, chapters))
-                db.Scenes.Add(new Scene
+            var spans = sceneDetector.Detect(source, chapters);
+            var scenes = spans
+                .Select(span => new Scene
                 {
                     NovelId = novel.Id,
                     Number = span.Number,
@@ -419,9 +422,21 @@ public sealed class ReviewProcessor : IPipelineStep
                     ChapterLabel = span.ChapterLabel,
                     StartOffset = span.StartOffset,
                     EndOffset = span.EndOffset
-                });
+                })
+                .ToList();
+
+            // On a later draft, match these scenes against the previous draft's so an unchanged scene reuses
+            // its rendered image (the render loop then skips it) and a changed scene is marked for a fresh
+            // render + a before/after pair. A first draft skips this and renders every scene.
+            var reused = novel.PreviousDraftId is { } previousId
+                ? await CarryForwardScenes(db, novel, previousId, source, scenes, cancellationToken)
+                : 0;
+
+            db.Scenes.AddRange(scenes);
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Detected scenes for manuscript {NovelId}", novel.Id);
+            logger.LogInformation(
+                "Detected {Count} scenes for manuscript {NovelId} ({Reused} images reused from the previous draft)",
+                scenes.Count, novel.Id, reused);
             return ProcessResult.DidWork(novel.Id);
         }
 
@@ -530,6 +545,88 @@ public sealed class ReviewProcessor : IPipelineStep
         return ProcessResult.DidWork(novel.Id);
     }
 
+    // Matches a later draft's freshly-detected scenes against the previous draft's (by text, via
+    // SceneMatcher) and stamps each with its cross-draft identity. An UNCHANGED scene reuses the previous
+    // draft's rendered image — copied into this draft's scene folder and marked Completed so the render loop
+    // skips it (or mirrored as unavailable when the previous image was itself unavailable). A CHANGED scene
+    // keeps its PreviousSceneId (for the before/after pair) but stays Pending so it re-renders. Returns how
+    // many images were carried forward. Best-effort: any copy failure just leaves the scene to re-render.
+    private async Task<int> CarryForwardScenes(
+        StoryboarderDbContext db, Novel novel, Guid previousDraftId, string source,
+        IReadOnlyList<Scene> scenes, CancellationToken cancellationToken)
+    {
+        var previousScenes = await db.Scenes
+            .Where(s => s.NovelId == previousDraftId)
+            .Select(s => new { s.Id, s.Number, s.StartOffset, s.EndOffset, s.ImagePath, s.ImagePrompt })
+            .ToListAsync(cancellationToken);
+        if (previousScenes.Count == 0)
+            return 0;
+
+        var previousSource = await db.SourceTexts
+            .Where(s => s.NovelId == previousDraftId)
+            .Select(s => s.FullText)
+            .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+
+        static string Slice(string text, int start, int end)
+        {
+            var from = Math.Clamp(start, 0, text.Length);
+            var to = Math.Clamp(end, from, text.Length);
+            return text[from..to];
+        }
+
+        var previousById = previousScenes.ToDictionary(p => p.Number);
+        var previousTexts = previousScenes
+            .Select(p => new SceneText(p.Number, Slice(previousSource, p.StartOffset, p.EndOffset)))
+            .ToList();
+        var currentTexts = scenes
+            .Select(s => new SceneText(s.Number, Slice(source, s.StartOffset, s.EndOffset)))
+            .ToList();
+
+        var matches = sceneMatcher.Match(previousTexts, currentTexts)
+            .ToDictionary(m => m.CurrentNumber);
+
+        var reused = 0;
+        foreach (var scene in scenes)
+        {
+            if (!matches.TryGetValue(scene.Number, out var match) || match.PreviousNumber is not { } prevNumber)
+                continue;   // a new scene — no counterpart, renders fresh
+
+            var prior = previousById[prevNumber];
+            scene.PreviousSceneId = prior.Id;
+            scene.Changed = match.Changed;
+            if (match.Changed)
+                continue;   // same beat, different words — re-render and pair before/after
+
+            // Unchanged: reuse the previous draft's image so nothing re-renders.
+            scene.ImagePrompt = prior.ImagePrompt;
+            scene.ImageStatus = WorkStatus.Completed;
+            if (prior.ImagePath is { } priorPath && imageStore.Exists(priorPath))
+            {
+                try
+                {
+                    scene.ImagePath = imageStore.Save($"{novel.Id}/scenes/scene-{scene.Number}.png", imageStore.Read(priorPath));
+                    reused++;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // The copy failed — fall back to re-rendering this scene rather than blocking.
+                    scene.ImageStatus = WorkStatus.Pending;
+                    scene.ImagePrompt = null;
+                    logger.LogWarning(ex, "Could not carry forward scene {Number} image for manuscript {NovelId}; will re-render",
+                        scene.Number, novel.Id);
+                }
+            }
+            else
+            {
+                // The previous image was unavailable; the unchanged text won't render any better, so mirror it.
+                scene.ImagePath = null;
+                scene.LastError = "Image unavailable: carried forward from the previous draft.";
+            }
+        }
+
+        return reused;
+    }
+
     // The rendered reference sheets for recurring entities named in the scene text, capped so one render's
     // payload stays small. Matched by entity name appearing in the prose (a light heuristic — scenes don't
     // carry an explicit cast list).
@@ -611,11 +708,20 @@ public sealed class ReviewProcessor : IPipelineStep
 
             try
             {
+                // Thread the running story-state through the map in reading order: each chunk is analyzed
+                // with the story-so-far and returns it updated, so continuity and setup/payoff survive the
+                // chunk-by-chunk read. The accumulated state feeds the consolidation (and cross-draft
+                // reconciliation) as the continuity summary.
                 var notes = await claude.AnalyzeChapter(
-                    chunk.Text, chunk.ChapterLabel, castNames, cancellationToken);
+                    chunk.Text, chunk.ChapterLabel, castNames, novel.ContinuitySummary, cancellationToken);
                 unit.NotesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
                 unit.Status = WorkStatus.Completed;
                 unit.LastError = null;
+                if (!string.IsNullOrWhiteSpace(notes.RunningState))
+                {
+                    novel.ContinuitySummary = notes.RunningState;
+                    Touch(novel);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -711,6 +817,49 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2d) Reconcile findings across drafts: give this draft's consolidated findings a durable identity by
+        // matching them against the prior draft's threads (a Claude call on a later draft; deterministic for a
+        // first draft), so a finding can be tracked opened → carried → fixed → regressed. Its own resumable
+        // step, gated by FindingsReconciled so the (billed) match runs once even when there are zero findings.
+        if (!analysis.FindingsReconciled)
+        {
+            var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
+                         ?? BookAnalysisResult.Empty;
+            var candidates = ToCandidateFindings(report);
+
+            ReconciliationOutcome outcome;
+            if (novel.PreviousDraftId is { } previousDraftId)
+            {
+                if (!claudeLimiter.TryAcquire())
+                    return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+                var priorThreads = await LoadPriorThreads(db, novel.ProjectId, previousDraftId, cancellationToken);
+                try
+                {
+                    var reconciliation = await claude.ReconcileFindings(priorThreads, candidates, cancellationToken);
+                    outcome = findingReconciler.Reconcile(
+                        novel.Id, novel.ProjectId, novel.DraftNumber, priorThreads, candidates, reconciliation);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                }
+            }
+            else
+            {
+                outcome = findingReconciler.ReconcileFirstDraft(novel.Id, novel.ProjectId, novel.DraftNumber, candidates);
+            }
+
+            foreach (var occurrence in outcome.Occurrences)
+                occurrence.CreatedAtUtc = now;
+            db.Findings.AddRange(outcome.Occurrences);
+            analysis.FindingsReconciled = true;
+            novel.LastError = null;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 3) Render: compose the report PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
@@ -727,8 +876,9 @@ public sealed class ReviewProcessor : IPipelineStep
 
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
+                var review = await BuildDraftReview(db, novel, cancellationToken);
                 var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount);
-                var pdf = analysisPdfComposer.Compose(folded, novel.Title, scenes);
+                var pdf = analysisPdfComposer.Compose(folded, novel.Title, scenes, review);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -1005,6 +1155,85 @@ public sealed class ReviewProcessor : IPipelineStep
         if (string.IsNullOrWhiteSpace(text))
             return 0;
         return text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+    }
+
+    // Flattens the consolidated report's four story-integrity finding lists into reconciliation candidates,
+    // stamping each with its now-first-class category and a stable index (its position in this combined list,
+    // which is how the model refers back to it).
+    private static IReadOnlyList<CandidateFinding> ToCandidateFindings(BookAnalysisResult report)
+    {
+        var candidates = new List<CandidateFinding>();
+        void Add(FindingCategory category, IReadOnlyList<ReportFinding> findings)
+        {
+            foreach (var finding in findings)
+                candidates.Add(new CandidateFinding(candidates.Count, category, finding.Chapter, finding.Detail));
+        }
+
+        Add(FindingCategory.PlotHole, report.PlotHoles);
+        Add(FindingCategory.Inconsistency, report.Inconsistencies);
+        Add(FindingCategory.Inaccuracy, report.Inaccuracies);
+        Add(FindingCategory.Pacing, report.PacingNotes);
+        return candidates;
+    }
+
+    // Builds the prior finding threads the reconciliation matches against: every thread ever seen in the
+    // project (so a fixed issue that reappears reads as a regression), represented by its most recent
+    // occurrence's text, and flagged OpenInPreviousDraft when it had an occurrence in the draft this one was
+    // made from (an unmatched open thread is what "resolved this draft" means).
+    private async Task<IReadOnlyList<PriorFinding>> LoadPriorThreads(
+        StoryboarderDbContext db, Guid projectId, Guid previousDraftId, CancellationToken cancellationToken)
+    {
+        var occurrences = await db.Findings
+            .Where(f => f.ProjectId == projectId)
+            .Select(f => new
+            {
+                f.ThreadId, f.NovelId, f.Category, f.Chapter, f.Detail, f.FirstDraftNumber, f.CreatedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        return occurrences
+            .GroupBy(f => f.ThreadId)
+            .Select(thread =>
+            {
+                var latest = thread.OrderBy(f => f.CreatedAtUtc).Last();
+                return new PriorFinding(
+                    thread.Key, latest.Category, latest.Chapter, latest.Detail,
+                    FirstDraftNumber: thread.Min(f => f.FirstDraftNumber),
+                    OpenInPreviousDraft: thread.Any(f => f.NovelId == previousDraftId));
+            })
+            .ToList();
+    }
+
+    // Builds the cross-draft review the report renders with: this draft's persisted findings (with the
+    // status the reconciliation gave them) and the findings resolved since the previous draft (its threads
+    // that no current finding claims). A first draft has no history, so it renders without status marks.
+    private static async Task<DraftReview> BuildDraftReview(
+        StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var findings = (await db.Findings
+                .Where(f => f.NovelId == novel.Id)
+                .Select(f => new { f.Category, f.Chapter, f.Detail, f.Status })
+                .ToListAsync(cancellationToken))
+            .Select(f => new ReportFindingView(f.Category, f.Chapter, f.Detail, f.Status))
+            .ToList();
+
+        if (novel.PreviousDraftId is not { } previousId)
+            return new DraftReview(novel.DraftNumber, findings, Array.Empty<ReportFindingView>());
+
+        var currentThreadIds = (await db.Findings
+                .Where(f => f.NovelId == novel.Id)
+                .Select(f => f.ThreadId)
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+        var resolved = (await db.Findings
+                .Where(f => f.NovelId == previousId)
+                .Select(f => new { f.ThreadId, f.Category, f.Chapter, f.Detail })
+                .ToListAsync(cancellationToken))
+            .Where(f => !currentThreadIds.Contains(f.ThreadId))
+            .Select(f => new ReportFindingView(f.Category, f.Chapter, f.Detail, FindingStatus.Carried))
+            .ToList();
+
+        return new DraftReview(novel.DraftNumber, findings, resolved);
     }
 
     // Builds each scene's evidence for the report: the rendered image (if any), cited "Ch. N · Scene M",

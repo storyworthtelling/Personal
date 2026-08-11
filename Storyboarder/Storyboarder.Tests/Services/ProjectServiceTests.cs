@@ -147,7 +147,7 @@ public class ProjectServiceTests : IDisposable
         var story = BookAnalysisResult.Empty with
         {
             Logline = "A hero's tale",
-            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")]
+            PlotHoles = [new ReportFinding("Chapter 1", "The gate opens unexplained")]
         };
         var craft = new CraftReport([new LineEdit("Chapter 1", "He felt cold.", "The cold came.", "Filtered.")], [], [], []);
 
@@ -172,22 +172,25 @@ public class ProjectServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetDraftDiff_ReportsResolvedAndNewFindings()
+    public async Task GetDraftDiff_ReportsResolvedNewAndRegressed_ByThreadIdentity()
     {
-        var previousReport = BookAnalysisResult.Empty with
-        {
-            PlotHoles = [new Finding("Chapter 1", "The gate opens unexplained")],
-            Inconsistencies = [new Finding("Chapter 2", "Eye colour shifts")]
-        };
-        var currentReport = BookAnalysisResult.Empty with
-        {
-            // The gate hole is resolved; the eye-colour issue persists; a new pacing note appears.
-            Inconsistencies = [new Finding("Chapter 2", "Eye colour shifts")],
-            PacingNotes = [new Finding("Chapter 5", "The middle sags")]
-        };
+        // Findings are matched across drafts by their stable ThreadId, not by text.
+        var gateThread = Guid.NewGuid();      // resolved this draft
+        var eyeThread = Guid.NewGuid();       // carried forward
+        var dateThread = Guid.NewGuid();      // fixed earlier, now regressed
 
-        var previousId = SeedReport(previousReport);
-        var currentId = SeedReport(currentReport, previousDraftId: previousId, projectId: previousId);
+        var previousId = SeedDraftWithFindings(previousDraftId: null, draftNumber: 1,
+        [
+            (gateThread, FindingCategory.PlotHole, "Chapter 1", "The gate opens unexplained", FindingStatus.New),
+            (eyeThread, FindingCategory.Inconsistency, "Chapter 2", "Eye colour shifts", FindingStatus.Carried)
+        ]);
+        var currentId = SeedDraftWithFindings(previousDraftId: previousId, draftNumber: 2,
+        [
+            // The gate thread is gone (resolved); the eye thread carries; a new pacing thread; a regressed date.
+            (eyeThread, FindingCategory.Inconsistency, "Chapter 2", "Eye colour shifts, now green", FindingStatus.Carried),
+            (Guid.NewGuid(), FindingCategory.Pacing, "Chapter 5", "The middle sags", FindingStatus.New),
+            (dateThread, FindingCategory.Inaccuracy, "Chapter 3", "Wrong coronation date", FindingStatus.Regressed)
+        ]);
 
         var diff = await NewService().GetDraftDiffAsync(currentId, CancellationToken.None);
 
@@ -195,14 +198,35 @@ public class ProjectServiceTests : IDisposable
         Assert.Equal(previousId, diff.PreviousDraftId);
         Assert.Contains(diff.ResolvedFindings, f => f.Detail == "The gate opens unexplained");
         Assert.Contains(diff.NewFindings, f => f.Detail == "The middle sags");
-        Assert.DoesNotContain(diff.ResolvedFindings, f => f.Detail == "Eye colour shifts");
-        Assert.DoesNotContain(diff.NewFindings, f => f.Detail == "Eye colour shifts");
+        Assert.Contains(diff.RegressedFindings, f => f.Detail == "Wrong coronation date");
+        // The carried thread appears in none of the change lists — it's still open, unchanged in status.
+        Assert.DoesNotContain(diff.ResolvedFindings, f => f.Detail.StartsWith("Eye colour"));
+        Assert.DoesNotContain(diff.NewFindings, f => f.Detail.StartsWith("Eye colour"));
+    }
+
+    [Fact]
+    public async Task GetDraftDiff_IncludesBeforeAfterScenePairs_ForChangedScenes()
+    {
+        var prevSceneId = Guid.NewGuid();
+        var prevImage = imageStore.Save("prev/scene-1.png", [1, 2, 3]);
+        var previousId = SeedDraftWithScene(previousDraftId: null, sceneId: prevSceneId,
+            number: 1, changed: false, previousSceneId: null, imagePath: prevImage);
+
+        var newImage = imageStore.Save("cur/scene-1.png", [4, 5, 6]);
+        var currentId = SeedDraftWithScene(previousDraftId: previousId, sceneId: Guid.NewGuid(),
+            number: 1, changed: true, previousSceneId: prevSceneId, imagePath: newImage);
+
+        var diff = await NewService().GetDraftDiffAsync(currentId, CancellationToken.None);
+
+        var pair = Assert.Single(diff.ChangedScenes);
+        Assert.Equal(new byte[] { 1, 2, 3 }, pair.PreviousImage);   // the previous draft's render
+        Assert.Equal(new byte[] { 4, 5, 6 }, pair.NewImage);        // this draft's fresh render
     }
 
     [Fact]
     public async Task GetDraftDiff_OfAFirstDraft_IsEmpty()
     {
-        var id = SeedReport(BookAnalysisResult.Empty with { PlotHoles = [new Finding("Chapter 1", "A hole")] });
+        var id = SeedReport(BookAnalysisResult.Empty with { PlotHoles = [new ReportFinding("Chapter 1", "A hole")] });
 
         var diff = await NewService().GetDraftDiffAsync(id, CancellationToken.None);
 
@@ -297,6 +321,53 @@ public class ProjectServiceTests : IDisposable
             CraftJson = craft is null ? null : JsonSerializer.Serialize(craft),
             PdfStatus = WorkStatus.Completed
         };
+        context.Novels.Add(novel);
+        context.SaveChanges();
+        return novel.Id;
+    }
+
+    // Seeds a draft carrying persisted Finding rows (the identity model the diff now reads), so a diff test
+    // can set up thread identities and statuses directly. ProjectId follows the previous draft when given.
+    private Guid SeedDraftWithFindings(
+        Guid? previousDraftId, int draftNumber,
+        IReadOnlyList<(Guid ThreadId, FindingCategory Category, string Chapter, string Detail, FindingStatus Status)> findings)
+    {
+        using var context = database.NewContext();
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc", CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow,
+            PreviousDraftId = previousDraftId, DraftNumber = draftNumber
+        };
+        novel.ProjectId = previousDraftId ?? novel.Id;
+        foreach (var f in findings)
+            novel.Findings.Add(new Finding
+            {
+                NovelId = novel.Id, ProjectId = novel.ProjectId, ThreadId = f.ThreadId,
+                Category = f.Category, Chapter = f.Chapter, Detail = f.Detail, Status = f.Status,
+                FirstDraftNumber = 1, CreatedAtUtc = clock.UtcNow
+            });
+        context.Novels.Add(novel);
+        context.SaveChanges();
+        return novel.Id;
+    }
+
+    // Seeds a draft carrying one scene with its cross-draft linkage + image path, for the scene-pair diff.
+    private Guid SeedDraftWithScene(
+        Guid? previousDraftId, Guid sceneId, int number, bool changed, Guid? previousSceneId, string imagePath)
+    {
+        using var context = database.NewContext();
+        var novel = new Novel
+        {
+            Title = "Quest", GoogleDocId = "doc", CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow,
+            PreviousDraftId = previousDraftId, DraftNumber = previousDraftId is null ? 1 : 2
+        };
+        novel.ProjectId = previousDraftId ?? novel.Id;
+        novel.Scenes.Add(new Scene
+        {
+            Id = sceneId, NovelId = novel.Id, Number = number, ChapterNumber = 1, ChapterLabel = "Chapter 1",
+            Changed = changed, PreviousSceneId = previousSceneId,
+            ImageStatus = WorkStatus.Completed, ImagePath = imagePath
+        });
         context.Novels.Add(novel);
         context.SaveChanges();
         return novel.Id;

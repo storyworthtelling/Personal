@@ -30,6 +30,13 @@ public sealed record ChapterNotes(
     IReadOnlyList<string> DialogueObservations,
     IReadOnlyList<string> SceneBeats)
 {
+    // A cumulative "story so far" the map call carries chapter-to-chapter: the running plot state, open
+    // threads, and planted-but-unpaid setups as of the end of this chunk, built from the prior chunk's state
+    // plus this chunk. It gives the consolidation (and cross-draft reconciliation) long-range continuity for
+    // setup/payoff and for contradictions a fix in one chapter creates in a distant one. Init-only with an
+    // empty default so callers that don't thread it (and reports stored before it existed) are unaffected.
+    public string RunningState { get; init; } = string.Empty;
+
     public static ChapterNotes Empty { get; } = new(
         string.Empty,
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
@@ -44,21 +51,21 @@ public sealed record ChapterNotes(
 // Serialized as {"chapter":…,"detail":…}, but a bare JSON string is also accepted: that is the shape
 // every report consolidated before chapter citations existed was stored in, and re-rendering one of
 // those must not throw — it simply has nothing to cite.
-[JsonConverter(typeof(FindingJsonConverter))]
-public sealed record Finding(string Chapter, string Detail)
+[JsonConverter(typeof(ReportFindingJsonConverter))]
+public sealed record ReportFinding(string Chapter, string Detail)
 {
-    public static Finding Of(string detail) => new(string.Empty, detail);
+    public static ReportFinding Of(string detail) => new(string.Empty, detail);
 }
 
-public sealed class FindingJsonConverter : JsonConverter<Finding>
+public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
 {
     private const string ChapterProperty = "chapter";
     private const string DetailProperty = "detail";
 
-    public override Finding Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override ReportFinding Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.String)
-            return Finding.Of(reader.GetString() ?? string.Empty);
+            return ReportFinding.Of(reader.GetString() ?? string.Empty);
 
         if (reader.TokenType != JsonTokenType.StartObject)
             throw new JsonException(
@@ -69,7 +76,7 @@ public sealed class FindingJsonConverter : JsonConverter<Finding>
         while (reader.Read())
         {
             if (reader.TokenType == JsonTokenType.EndObject)
-                return new Finding(chapter, detail);
+                return new ReportFinding(chapter, detail);
             if (reader.TokenType != JsonTokenType.PropertyName)
                 continue;
 
@@ -87,7 +94,7 @@ public sealed class FindingJsonConverter : JsonConverter<Finding>
         throw new JsonException("A report finding object was not terminated.");
     }
 
-    public override void Write(Utf8JsonWriter writer, Finding value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, ReportFinding value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
         writer.WriteString(ChapterProperty, value.Chapter ?? string.Empty);
@@ -172,10 +179,10 @@ public sealed record BookAnalysisResult(
     string Synopsis,
     IReadOnlyList<CharacterProfile> Characters,
     IReadOnlyList<string> Themes,
-    IReadOnlyList<Finding> PlotHoles,
-    IReadOnlyList<Finding> Inconsistencies,
-    IReadOnlyList<Finding> Inaccuracies,
-    IReadOnlyList<Finding> PacingNotes,
+    IReadOnlyList<ReportFinding> PlotHoles,
+    IReadOnlyList<ReportFinding> Inconsistencies,
+    IReadOnlyList<ReportFinding> Inaccuracies,
+    IReadOnlyList<ReportFinding> PacingNotes,
     IReadOnlyList<Review> Reviews,
     IReadOnlyList<RevisionItem> RevisionPlan,
     IReadOnlyList<string> ComparableTitles,
@@ -205,7 +212,7 @@ public sealed record BookAnalysisResult(
 
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
-        Array.Empty<Finding>(), Array.Empty<Finding>(), Array.Empty<Finding>(), Array.Empty<Finding>(),
+        Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(),
         Array.Empty<Review>(), Array.Empty<RevisionItem>(), Array.Empty<string>(), string.Empty,
         Array.Empty<LineEdit>(), Array.Empty<ProseNote>(),
         Array.Empty<DialogueNote>(), Array.Empty<SceneBeat>());

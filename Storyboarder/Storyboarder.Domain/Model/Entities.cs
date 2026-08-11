@@ -69,6 +69,7 @@ public class Novel
     public List<Chapter> Chapters { get; set; } = [];
     public List<DesignRef> DesignRefs { get; set; } = [];
     public List<Scene> Scenes { get; set; } = [];
+    public List<Finding> Findings { get; set; } = [];
 
     // The per-chunk literary-analysis units (map step) and the consolidated revision-report record.
     public List<ChunkAnalysis> ChunkAnalyses { get; set; } = [];
@@ -200,6 +201,15 @@ public class Scene : IRetryable
     public int StartOffset { get; set; }
     public int EndOffset { get; set; }
 
+    // Cross-draft identity (Phase 2). When this draft was made from a previous one, PreviousSceneId points
+    // at the scene in that draft whose text this scene matched (null = a scene with no counterpart — new
+    // this draft). Changed says whether the matched scene's text actually moved: false means the text is
+    // unchanged, so the previous draft's rendered image is reused as-is (the image step skips it); true
+    // means it changed, so a fresh image is rendered and the diff shows a before/after pair. Both are set
+    // by SceneMatcher at seed time; on a first draft PreviousSceneId is null and Changed is false.
+    public Guid? PreviousSceneId { get; set; }
+    public bool Changed { get; set; }
+
     // The wordless-image prompt derived for this scene's emotional peak (the beat the prose is measured
     // against). Null until the image step has derived it.
     public string? ImagePrompt { get; set; }
@@ -237,10 +247,49 @@ public class BookAnalysis
     // persisted separately and folded in at render. Null until it runs.
     public string? VoiceJson { get; set; }
 
+    // Set once this draft's consolidated findings have been reconciled against the prior draft's threads and
+    // persisted as Finding rows, so the (billed) reconciliation call runs exactly once — even for a draft
+    // that produced zero findings, where no rows exist to signal completion.
+    public bool FindingsReconciled { get; set; }
+
     public WorkStatus PdfStatus { get; set; } = WorkStatus.Pending;
     public string? PdfPath { get; set; }
 
     // The Drive file id this report was archived to, once the Archiving stage has uploaded it. Set
     // together with clearing PdfPath: after archiving, Drive holds the copy.
     public string? ArchivedDriveFileId { get; set; }
+}
+
+// One story-integrity finding, promoted to a first-class row in Phase 2 (it lived only inside the report
+// JSON before, with no identity). Each row is one OCCURRENCE of an issue in one draft; ThreadId is the
+// issue's stable identity across every draft of the project, so "is this the same plot hole?" is
+// answerable even after the wording moves. The reconciliation step (Claude, applied by FindingReconciler)
+// assigns ThreadId and Status when it folds a draft's freshly-consolidated findings against the prior
+// draft's threads. "Fixed" is not stored — it is derived from a thread that has no occurrence in a draft.
+public class Finding
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    // The draft this occurrence belongs to, and the project (denormalized from the draft's ProjectId) so a
+    // thread's whole life can be queried without walking the draft chain.
+    public Guid NovelId { get; set; }
+    public Guid ProjectId { get; set; }
+
+    // The stable cross-draft identity: two occurrences with the same ThreadId are the same issue over time.
+    public Guid ThreadId { get; set; }
+
+    public FindingCategory Category { get; set; }
+
+    // The chapter citation and the observation text, carried over from the report's finding lists.
+    public string Chapter { get; set; } = string.Empty;
+    public string Detail { get; set; } = string.Empty;
+
+    // This occurrence's state relative to the thread's history (see FindingStatus).
+    public FindingStatus Status { get; set; }
+
+    // The draft number in which this thread first appeared — so the history read can say "open since
+    // draft 2" without re-deriving it from every occurrence.
+    public int FirstDraftNumber { get; set; }
+
+    public DateTimeOffset CreatedAtUtc { get; set; }
 }

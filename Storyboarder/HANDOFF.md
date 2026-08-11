@@ -30,7 +30,9 @@ dotnet --version     # expect 10.0.x
 dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj -p:StoryboarderTfms=net10.0
 ```
 
-**Baseline: 234 passing, 0 failing.** Run this before every commit. Never commit a red suite.
+**Baseline: 258 passing, 0 failing** (Phase 2 landed). Run this before every commit. Never commit a red
+suite. `dotnet ef` is installed but not on PATH in a fresh container — `export PATH="$PATH:$HOME/.dotnet/tools"`
+before `dotnet ef migrations add …`.
 
 The Android head needs the MAUI/Android workload + an Android SDK, neither present in a fresh
 container. Run `Storyboarder/scripts/setup-android-build.sh` once (installs the workload from nuget,
@@ -87,6 +89,30 @@ declined.
 - **Drive delivery** — the report lands beside the manuscript as `<Title> — Draft N — Analysis.pdf`
   by default (`ArchiveOptions.Enabled = true`), with one quiet in-app note.
 
+## 3b. What Phase 2 delivered (the revision loop)
+
+Phase 2 (§7 of the brief) makes Canonizer a revision partner across drafts:
+
+- **First-class `Finding` rows** with a stable `ThreadId` (the same issue over time), a first-class
+  `Category`, and a per-occurrence `Status` (New/Carried/Regressed — **Fixed is derived** from a thread's
+  absence in a draft). Persisted by a resumable `ComposeAnalysis` sub-step gated by
+  `BookAnalysis.FindingsReconciled`.
+- **Finding reconciliation** — a new `ReconcileFindings` Claude call matches a draft's findings to prior
+  threads even after the wording moves; the pure `FindingReconciler` (`Domain/Analysis`) applies the
+  decisions deterministically. A first draft opens every thread fresh (no call).
+- **Scene image reuse + before/after pairs** — the pure `SceneMatcher` (`Domain/Text`) pairs scenes across
+  drafts by normalized text; `RenderSceneImages` reuses an unchanged scene's image and re-renders only
+  changed/new scenes. `Scene.PreviousSceneId`/`Changed` carry the linkage.
+- **Running story-state** threaded chapter-to-chapter through the map call (`AnalyzeChapter`'s
+  `priorRunningState` + `ChapterNotes.RunningState` → `Novel.ContinuitySummary`).
+- **Diff surface** — `GetDraftDiffAsync` reports resolved/new/regressed by `ThreadId` + before/after scene
+  pairs; the report PDF adds a "Since draft N−1" summary + inline `[new]`/`[regressed]` tags (a `DraftReview`
+  the composer takes); `DraftDiffPage` renders the scene pairs.
+
+Schema changes landed via two follow-on migrations (`Phase2FindingsAndSceneHistory`,
+`Phase2FindingsReconciledFlag`). Pure logic is unit-tested; the Android head (DraftDiffPage) is
+compile-checked in CI, not built in the Phase-2 session (build it first thing, same as Phase 1).
+
 ## 4. Traps that still apply
 
 **`ProjectStage`/`WorkStatus` persist as integers.** Append new values to the end of the enum, never
@@ -108,10 +134,10 @@ feature.
 
 ## 5. Deferred to later phases
 
-- **Phase 2:** first-class `Finding` rows + stable IDs + cross-draft history + regression detection
-  + before/after **scene**-image pairs. (Phase 1 leaves findings as JSON and keeps the finding diff;
-  `DraftDiffPage` is findings-only for now.)
-- **Phase 3:** the expansion engine ("Scenes to add", show-vs-tell leverage, thin-spot flags).
+- **Phase 2 ✅ (done):** first-class `Finding` rows + stable IDs + cross-draft history + regression
+  detection + before/after **scene**-image pairs + running story-state. See §3b.
+- **Phase 3 (next):** the expansion engine ("Scenes to add", show-vs-tell leverage, thin-spot flags,
+  genre-norm length targets) — the additive feedback that closes the word-count gap.
 - **Phase 4:** shared bidirectional **reMarkable** delivery + vault-restored pairing.
 - **Phase 5:** series awareness.
 - **Also deferred:** the image-vs-prose **vision** fidelity pass (Phase 1's fidelity gap is a

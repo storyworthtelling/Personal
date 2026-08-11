@@ -42,8 +42,8 @@ public class ReviewProcessorTests : IDisposable
 
         // The first chapter-analysis call is rate-limited; the worker must reschedule and succeed on retry.
         claude.Setup(c => c.AnalyzeChapter(
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, string chapterLabel, IReadOnlyList<string> _, CancellationToken _) =>
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string chapterLabel, IReadOnlyList<string> _, string _, CancellationToken _) =>
             {
                 chapterAnalysisCalls++;
                 return chapterAnalysisCalls == 1
@@ -52,7 +52,10 @@ public class ReviewProcessorTests : IDisposable
                         chapterLabel,
                         ["Hero"], ["Hero walks to the castle"], ["Hero resolves to enter"], [], [], [], ["Vivid setting"], [],
                         ["\"He felt the cold.\" — cut the filter"], ["Filter words recur"], ["Hero sounds like Villain"],
-                        ["The hero knocks | opens the confrontation | earns its place"]));
+                        ["The hero knocks | opens the confrontation | earns its place"])
+                    {
+                        RunningState = $"Story so far through {chapterLabel}: the hero reached the castle."
+                    });
             });
 
         claude.Setup(c => c.ConsolidateAnalysis(
@@ -61,10 +64,10 @@ public class ReviewProcessorTests : IDisposable
                 "A hero reaches a castle.", "The hero journeys to the castle and knocks.",
                 [new CharacterProfile("Hero", "protagonist", "Grows from timid to resolute.", ["approaches: Castle"])],
                 ["perseverance"],
-                [new Finding("Chapter 1", "How did the gate open?")],
-                [new Finding("Chapter 1", "Eye colour shifts")],
-                [new Finding("Chapter 1", "Castle geography")],
-                [new Finding("Chapter 1", "Slow open")],
+                [new ReportFinding("Chapter 1", "How did the gate open?")],
+                [new ReportFinding("Chapter 1", "Eye colour shifts")],
+                [new ReportFinding("Chapter 1", "Castle geography")],
+                [new ReportFinding("Chapter 1", "Slow open")],
                 [new Review("developmental editor", "Promising but uneven.", ["Voice"], ["Pacing"], "Tighten the opening.")],
                 [new RevisionItem("High", "Chapter 1", "Sagging middle", "Cut a subplot.")],
                 ["Comparable Title"], "Upmarket fantasy for adult readers.",
@@ -82,6 +85,13 @@ public class ReviewProcessorTests : IDisposable
         claude.Setup(c => c.AssessVoiceConsistency(
                 It.IsAny<IReadOnlyList<ChapterSample>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(VoiceConsistency.Empty);
+
+        // Default reconciliation: treat every current finding as new (no prior-thread match). Tests that care
+        // about carry/regress set their own reconciliation.
+        claude.Setup(c => c.ReconcileFindings(
+                It.IsAny<IReadOnlyList<PriorFinding>>(), It.IsAny<IReadOnlyList<CandidateFinding>>(), It.IsAny<CancellationToken>()))
+            .Returns((IReadOnlyList<PriorFinding> _, IReadOnlyList<CandidateFinding> candidates, CancellationToken _) =>
+                Task.FromResult(new FindingReconciliation(candidates.Select(c => new FindingMatch(c.Index, null)).ToList())));
 
         claude.Setup(c => c.DescribeSceneImage(
                 It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
@@ -207,6 +217,142 @@ public class ReviewProcessorTests : IDisposable
             Assert.NotNull(s.ImagePath);
             Assert.True(File.Exists(s.ImagePath));
         });
+    }
+
+    // Seeds a follow-on draft of an existing project the way ProjectService.CreateNextDraftAsync does:
+    // same ProjectId, the next DraftNumber, and PreviousDraftId pointing at the draft it was made from.
+    private Guid SeedNextDraft(Guid previousId, string text)
+    {
+        using var context = database.NewContext();
+        var previous = context.Novels.Single(n => n.Id == previousId);
+        var draft = new Novel
+        {
+            Title = previous.Title, GoogleDocId = "doc",
+            ProjectId = previous.ProjectId, DraftNumber = previous.DraftNumber + 1, PreviousDraftId = previous.Id,
+            CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow
+        };
+        draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
+        context.Novels.Add(draft);
+        context.SaveChanges();
+        return draft.Id;
+    }
+
+    [Fact]
+    public async Task SecondDraft_UnchangedText_ReusesEverySceneImage()
+    {
+        const string text = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        var firstId = SeedManuscript(text);
+        await DriveToCompletion(NewProcessor());
+
+        // The second draft re-picks the identical document — every scene should reuse the prior render.
+        gemini.Invocations.Clear();
+        var secondId = SeedNextDraft(firstId, text);
+        await DriveToCompletion(NewProcessor());
+
+        gemini.Verify(g => g.GenerateSceneImage(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+            It.IsAny<double?>(), It.IsAny<CancellationToken>()), Times.Never());
+
+        using var context = database.NewContext();
+        var scenes = context.Scenes.Where(s => s.NovelId == secondId).OrderBy(s => s.Number).ToList();
+        Assert.True(scenes.Count >= 2);
+        Assert.All(scenes, s =>
+        {
+            Assert.Equal(WorkStatus.Completed, s.ImageStatus);
+            Assert.False(s.Changed);
+            Assert.NotNull(s.PreviousSceneId);
+            Assert.NotNull(s.ImagePath);
+            Assert.True(File.Exists(s.ImagePath));
+        });
+    }
+
+    [Fact]
+    public async Task SecondDraft_RerendersOnlyTheChangedScene()
+    {
+        const string first = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        // Scene 1 is byte-identical; scene 2 is reworded but shares most content words (a changed match).
+        const string second = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked loudly and waited in the cold.";
+        var firstId = SeedManuscript(first);
+        await DriveToCompletion(NewProcessor());
+
+        gemini.Invocations.Clear();
+        var secondId = SeedNextDraft(firstId, second);
+        await DriveToCompletion(NewProcessor());
+
+        // Exactly one fresh render — the changed scene. The unchanged scene reused its prior image.
+        gemini.Verify(g => g.GenerateSceneImage(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+            It.IsAny<double?>(), It.IsAny<CancellationToken>()), Times.Once());
+
+        using var context = database.NewContext();
+        var scenes = context.Scenes.Where(s => s.NovelId == secondId).OrderBy(s => s.Number).ToList();
+        var changed = scenes.Where(s => s.Changed).ToList();
+        Assert.Single(changed);
+        Assert.All(scenes, s => Assert.NotNull(s.PreviousSceneId));   // both matched a prior scene
+        Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
+    }
+
+    [Fact]
+    public async Task Map_ThreadsRunningStoryStateIntoContinuitySummary()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == id);
+        // The map step carried the model's running state onto the manuscript for the consolidation to use.
+        Assert.False(string.IsNullOrWhiteSpace(novel.ContinuitySummary));
+        Assert.Contains("the hero reached the castle", novel.ContinuitySummary);
+    }
+
+    [Fact]
+    public async Task FirstDraft_PersistsFindingsAsRows_AllNew()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using var context = database.NewContext();
+        var findings = context.Findings.Where(f => f.NovelId == id).ToList();
+        // The faked story-half returns one finding in each of the four categories.
+        Assert.Equal(4, findings.Count);
+        Assert.All(findings, f =>
+        {
+            Assert.Equal(FindingStatus.New, f.Status);
+            Assert.Equal(1, f.FirstDraftNumber);
+            Assert.NotEqual(Guid.Empty, f.ThreadId);
+        });
+        Assert.Contains(findings, f => f.Category == FindingCategory.PlotHole);
+        Assert.Contains(findings, f => f.Category == FindingCategory.Pacing);
+    }
+
+    [Fact]
+    public async Task SecondDraft_CarriesAMatchedFindingByThreadId()
+    {
+        var firstId = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        // The plot-hole thread from draft 1 (candidate index 0 in the reconciliation order).
+        Guid plotHoleThread;
+        using (var context = database.NewContext())
+            plotHoleThread = context.Findings.Single(f => f.NovelId == firstId && f.Category == FindingCategory.PlotHole).ThreadId;
+
+        // For draft 2, tell the reconciliation the plot hole is the same issue as draft 1's; the rest are new.
+        claude.Setup(c => c.ReconcileFindings(
+                It.IsAny<IReadOnlyList<PriorFinding>>(), It.IsAny<IReadOnlyList<CandidateFinding>>(), It.IsAny<CancellationToken>()))
+            .Returns((IReadOnlyList<PriorFinding> prior, IReadOnlyList<CandidateFinding> candidates, CancellationToken _) =>
+                Task.FromResult(new FindingReconciliation(
+                    candidates.Select(c => new FindingMatch(c.Index, c.Index == 0 ? plotHoleThread : (Guid?)null)).ToList())));
+
+        var secondId = SeedNextDraft(firstId, "A short tale. The hero walked to the castle and knocked on the gate.");
+        await DriveToCompletion(NewProcessor());
+
+        using var check = database.NewContext();
+        var carried = check.Findings.Single(f => f.NovelId == secondId && f.Category == FindingCategory.PlotHole);
+        Assert.Equal(plotHoleThread, carried.ThreadId);   // same identity across drafts
+        Assert.Equal(FindingStatus.Carried, carried.Status);
+        Assert.Equal(1, carried.FirstDraftNumber);          // open since draft 1
+        // The other three findings had no match, so they are new threads this draft.
+        Assert.Equal(3, check.Findings.Count(f => f.NovelId == secondId && f.Status == FindingStatus.New));
     }
 
     [Fact]

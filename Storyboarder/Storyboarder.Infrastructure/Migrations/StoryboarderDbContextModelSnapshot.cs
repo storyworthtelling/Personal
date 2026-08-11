@@ -32,6 +32,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<string>("CraftJson")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("FindingsReconciled")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid>("NovelId")
                         .HasColumnType("TEXT");
 
@@ -228,6 +231,50 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.ToTable("DesignRefs");
                 });
 
+            modelBuilder.Entity("Storyboarder.Domain.Model.Finding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Chapter")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FirstDraftNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("NovelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("ThreadId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NovelId");
+
+                    b.HasIndex("ProjectId", "ThreadId");
+
+                    b.ToTable("Findings");
+                });
+
             modelBuilder.Entity("Storyboarder.Domain.Model.Novel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -314,6 +361,9 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Property<int>("Attempts")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("Changed")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ChapterLabel")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -344,6 +394,9 @@ namespace Storyboarder.Infrastructure.Migrations
 
                     b.Property<int>("Number")
                         .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("PreviousSceneId")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("StartOffset")
                         .HasColumnType("INTEGER");
@@ -426,6 +479,15 @@ namespace Storyboarder.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Storyboarder.Domain.Model.Finding", b =>
+                {
+                    b.HasOne("Storyboarder.Domain.Model.Novel", null)
+                        .WithMany("Findings")
+                        .HasForeignKey("NovelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Storyboarder.Domain.Model.Scene", b =>
                 {
                     b.HasOne("Storyboarder.Domain.Model.Novel", null)
@@ -455,6 +517,8 @@ namespace Storyboarder.Infrastructure.Migrations
                     b.Navigation("Chunks");
 
                     b.Navigation("DesignRefs");
+
+                    b.Navigation("Findings");
 
                     b.Navigation("Scenes");
 

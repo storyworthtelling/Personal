@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Storyboarder.Domain.Analysis;
+using Storyboarder.Domain.Model;
 using Storyboarder.Domain.Pipeline;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
@@ -124,7 +125,7 @@ public class ClaudeAnalysisClientTests
         handler.EnqueueOk(Reply("{}"));
 
         await client.ExtractEntities("excerpt", CancellationToken.None);
-        await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
+        await client.AnalyzeChapter("excerpt", "Chapter 1", [], string.Empty, CancellationToken.None);
 
         Assert.Contains("\"model\":\"test-model\"", handler.RequestBodies[0]);
         Assert.Contains("\"model\":\"test-fast-model\"", handler.RequestBodies[1]);
@@ -191,6 +192,83 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task AnalyzeChapter_ParsesRunningState_AndSendsThePriorStateInThePrompt()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"keyEvents\":[\"the gate opens\"],\"runningState\":\"The hero has entered the castle.\"}"));
+
+        var notes = await client.AnalyzeChapter(
+            "excerpt", "Chapter 2", [], "Previously: the hero set out.", CancellationToken.None);
+
+        Assert.Equal("The hero has entered the castle.", notes.RunningState);
+        Assert.Contains("Previously: the hero set out.", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_MissingRunningState_KeepsThePriorState()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"keyEvents\":[\"the gate opens\"]}"));
+
+        var notes = await client.AnalyzeChapter(
+            "excerpt", "Chapter 2", [], "the story so far", CancellationToken.None);
+
+        // A reply that omits runningState must not wipe the running summary mid-book.
+        Assert.Equal("the story so far", notes.RunningState);
+    }
+
+    [Fact]
+    public async Task ReconcileFindings_ParsesMatchesAndNulls()
+    {
+        var (client, handler) = Create();
+        var thread = Guid.NewGuid();
+        handler.EnqueueOk(Reply(
+            "{\"matches\":[{\"index\":0,\"threadId\":\"" + thread + "\"}," +
+            "{\"index\":1,\"threadId\":null}," +
+            "{\"index\":2,\"threadId\":\"not-a-guid\"}]}"));
+
+        var prior = new[] { new PriorFinding(thread, FindingCategory.PlotHole, "Chapter 1", "The gate", 1, true) };
+        var candidates = new[]
+        {
+            new CandidateFinding(0, FindingCategory.PlotHole, "Chapter 1", "The gate still opens"),
+            new CandidateFinding(1, FindingCategory.Pacing, "Chapter 5", "New sag"),
+            new CandidateFinding(2, FindingCategory.Inaccuracy, "Chapter 2", "Wrong date")
+        };
+
+        var result = await client.ReconcileFindings(prior, candidates, CancellationToken.None);
+
+        Assert.Equal(thread, result.Matches.Single(m => m.Index == 0).ThreadId);
+        Assert.Null(result.Matches.Single(m => m.Index == 1).ThreadId);
+        Assert.Null(result.Matches.Single(m => m.Index == 2).ThreadId);   // unparseable id → treated as new
+    }
+
+    [Fact]
+    public async Task ReconcileFindings_WithNoPriorThreads_SkipsTheCall_AndReturnsAllNew()
+    {
+        var (client, handler) = Create(); // nothing queued: a call would throw "no response"
+
+        var candidates = new[] { new CandidateFinding(0, FindingCategory.PlotHole, "Chapter 1", "A hole") };
+        var result = await client.ReconcileFindings([], candidates, CancellationToken.None);
+
+        Assert.Null(Assert.Single(result.Matches).ThreadId);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task ReconcileFindings_BlankReply_DegradesToEmpty()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("not json at all"));
+
+        var prior = new[] { new PriorFinding(Guid.NewGuid(), FindingCategory.PlotHole, "Chapter 1", "The gate", 1, true) };
+        var candidates = new[] { new CandidateFinding(0, FindingCategory.PlotHole, "Chapter 1", "The gate") };
+
+        var result = await client.ReconcileFindings(prior, candidates, CancellationToken.None);
+
+        Assert.Empty(result.Matches);   // FindingReconciler then treats every candidate as new
+    }
+
+    [Fact]
     public async Task DeriveArtStyle_ParsesTheStyle()
     {
         var (client, handler) = Create();
@@ -240,7 +318,7 @@ public class ClaudeAnalysisClientTests
             "\"possibleInconsistencies\":[\"Eye color changes\"],\"factualClaims\":[\"Paris is in France\"]," +
             "\"notableStrengths\":[\"Vivid prose\"],\"notableWeaknesses\":[\"Slow open\"]}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapter 3", ["Alice"], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 3", ["Alice"], string.Empty, CancellationToken.None);
 
         Assert.Contains("Alice", notes.CharactersPresent);
         Assert.Equal("Eye color changes", Assert.Single(notes.PossibleInconsistencies));
@@ -254,7 +332,7 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapter 1", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 1", [], string.Empty, CancellationToken.None);
 
         Assert.Empty(notes.CharactersPresent);
         Assert.Empty(notes.NotableStrengths);
@@ -266,7 +344,7 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"keyEvents\":[\"The gate opens\"]}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapters 7–8", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapters 7–8", [], string.Empty, CancellationToken.None);
 
         // The chapter is known exactly from the chunk's offsets, so it is stamped on by the client —
         // never left to the model — and it also rides along as context for the observations.
@@ -280,7 +358,7 @@ public class ClaudeAnalysisClientTests
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("I'm afraid I can't help with that."));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapter 4", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 4", [], string.Empty, CancellationToken.None);
 
         Assert.Equal("Chapter 4", notes.Chapter);
         Assert.Empty(notes.KeyEvents);
@@ -414,7 +492,7 @@ public class ClaudeAnalysisClientTests
             "\"proseObservations\":[\"Filter words recur\"],\"dialogueObservations\":[\"Alice and Bob sound alike\"]," +
             "\"sceneBeats\":[\"Alice waits | stalls the confrontation | does no work\"]}"));
 
-        var notes = await client.AnalyzeChapter("excerpt", "Chapter 2", [], CancellationToken.None);
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 2", [], string.Empty, CancellationToken.None);
 
         Assert.Single(notes.LineEditCandidates);
         Assert.Single(notes.ProseObservations);

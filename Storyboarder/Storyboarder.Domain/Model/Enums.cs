@@ -36,3 +36,26 @@ public enum ReferenceKind
     Character,
     Setting
 }
+
+// The kind of story-integrity issue a Finding records. Was positional-only (which of the report's four
+// finding lists it sat in); Phase 2 makes it a first-class column so a finding is self-describing and can
+// be tracked by identity across drafts. Persisted as int — append new kinds to the end, never reorder.
+public enum FindingCategory
+{
+    PlotHole,
+    Inconsistency,
+    Inaccuracy,
+    Pacing
+}
+
+// A finding occurrence's state in the draft it belongs to, relative to its thread's history across the
+// project's drafts. New = the thread's first appearance; Carried = it was open in the previous draft and
+// still is; Regressed = it was present, then fixed (absent in a later draft), and has now reappeared.
+// "Fixed" is NOT a status here — it is derived from a thread that has no occurrence in a given draft.
+// Persisted as int — append-only.
+public enum FindingStatus
+{
+    New,
+    Carried,
+    Regressed
+}
