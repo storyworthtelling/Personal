@@ -16,12 +16,15 @@ public sealed class VaultSync
         this.vault = vault;
     }
 
-    // Writes the current Claude + Gemini keys into the vault, leaving every other app's section untouched.
+    // Writes the current Claude + Gemini keys and the reMarkable device token into the vault, leaving every
+    // other app's section untouched. The Remarkable section is shared with the other apps that deliver to the
+    // same tablet, so publishing the token here also lets them restore it.
     public Task<bool> PublishAsync(CancellationToken cancellationToken) =>
         vault.PublishAsync(v => v with
         {
             Claude = new ClaudeSecrets(SettingsStore.ClaudeApiKey),
-            Gemini = new GeminiSecrets(SettingsStore.GeminiApiKey)
+            Gemini = new GeminiSecrets(SettingsStore.GeminiApiKey),
+            Remarkable = new RemarkableSecrets(SettingsStore.RemarkableDeviceToken)
         }, cancellationToken);
 
     // Fills in any key this install is missing from the vault. Existing local keys win — restore never
@@ -36,5 +39,9 @@ public sealed class VaultSync
             SettingsStore.ClaudeApiKey = result.Vault.Claude.ApiKey;
         if (string.IsNullOrEmpty(SettingsStore.GeminiApiKey) && !string.IsNullOrEmpty(result.Vault.Gemini.ApiKey))
             SettingsStore.GeminiApiKey = result.Vault.Gemini.ApiKey;
+        // The reMarkable token may have been paired in a sibling app (e.g. DailyLoader) — restore it so
+        // Canonizer delivers without a separate pairing.
+        if (string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken) && !string.IsNullOrEmpty(result.Vault.Remarkable.DeviceToken))
+            SettingsStore.RemarkableDeviceToken = result.Vault.Remarkable.DeviceToken;
     }
 }

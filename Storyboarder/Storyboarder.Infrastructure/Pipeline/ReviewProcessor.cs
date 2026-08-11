@@ -12,6 +12,7 @@ using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Persistence;
+using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
 
 namespace Storyboarder.Infrastructure.Pipeline;
@@ -40,6 +41,10 @@ public sealed class ReviewProcessor : IPipelineStep
     // Null when the platform head supplies no Drive archive (and on any non-Android host). The archive
     // stage treats that exactly like archiving being switched off.
     private readonly IDriveArchive? driveArchive;
+
+    // The shared reMarkable delivery client. Null on a head that doesn't wire reMarkable (or without a
+    // device-code pairing); reMarkable delivery then simply doesn't run — the report still finishes.
+    private readonly IRemarkableClient? remarkable;
 
     // The owner's-voice learner + shared profile store. Both null on a head that wires no voice feature
     // (or on any non-Android host without a Claude key for it); voice refinement then simply doesn't run.
@@ -89,7 +94,8 @@ public sealed class ReviewProcessor : IPipelineStep
         ILogger<ReviewProcessor> logger,
         IDriveArchive? driveArchive = null,
         IVoiceClient? voiceClient = null,
-        IVoiceProfileStore? voiceStore = null)
+        IVoiceProfileStore? voiceStore = null,
+        IRemarkableClient? remarkable = null)
     {
         this.dbContextFactory = dbContextFactory;
         this.claude = claude;
@@ -100,6 +106,7 @@ public sealed class ReviewProcessor : IPipelineStep
         this.logger = logger;
         this.voiceClient = voiceClient;
         this.voiceStore = voiceStore;
+        this.remarkable = remarkable;
 
         rateLimits = rateLimitOptions.Value;
         archive = archiveOptions.Value;
@@ -934,12 +941,21 @@ public sealed class ReviewProcessor : IPipelineStep
     private async Task<ProcessResult> ArchiveOutputs(
         StoryboarderDbContext db, Novel novel, CancellationToken cancellationToken)
     {
-        if (!archive.Enabled || driveArchive is null)
-            return await FinishArchiving(db, novel, cancellationToken);
-
         var analysis = await db.BookAnalyses
             .FirstOrDefaultAsync(a => a.NovelId == novel.Id, cancellationToken);
-        var reportPending = analysis is { PdfStatus: WorkStatus.Completed, PdfPath: not null, ArchivedDriveFileId: null };
+        var reportReady = analysis is { PdfStatus: WorkStatus.Completed, PdfPath: not null };
+
+        // Deliver to the reMarkable tablet FIRST and independently of Drive, so it still runs before the
+        // Drive scope is granted (or when Drive is off). One unit of work per cycle, resumable, best-effort.
+        if (reportReady && archive.DeliverToRemarkable && remarkable is not null && !analysis!.DeliveredToRemarkable)
+        {
+            var remarkableResult = await DeliverToRemarkable(db, novel, analysis, cancellationToken);
+            if (remarkableResult is { } result)
+                return result;
+            // null = reMarkable settled (delivered or given up); fall through to the Drive target.
+        }
+
+        var reportPending = reportReady && archive.Enabled && driveArchive is not null && analysis!.ArchivedDriveFileId is null;
 
         if (!reportPending)
             return await FinishArchiving(db, novel, cancellationToken);
@@ -989,6 +1005,52 @@ public sealed class ReviewProcessor : IPipelineStep
                     "Manuscript {NovelId}: giving up on archiving after {Attempts} attempts; finishing anyway " +
                     "(the report remains on the device)", novel.Id, novel.StageAttempts);
                 return await FinishArchiving(db, novel, cancellationToken);
+            }
+
+            var delay = backoff.NextDelay(novel.StageAttempts - 1, (ex as RateLimitException)?.RetryAfter);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.Waiting(delay, novel.Id);
+        }
+    }
+
+    // Delivers the finished report to a "Canonizer" folder on the owner's reMarkable tablet. Best-effort and
+    // independent of Drive: a failure never blocks the review from finishing. Returns a ProcessResult to
+    // return (did work / waiting on a retry) while delivery is in flight, or null once it has SETTLED —
+    // delivered, or given up after the shared attempt budget — so the caller continues to the Drive target.
+    // Resumable: EnsureFolder is find-or-create, and DeliveredToRemarkable is set only on a full success (or
+    // a give-up), so a worker killed mid-upload simply re-attempts next cycle.
+    private async Task<ProcessResult?> DeliverToRemarkable(
+        StoryboarderDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var folderId = await remarkable!.EnsureFolder("Canonizer");
+            await remarkable.Upload(
+                $"{novel.Title} — Draft {novel.DraftNumber} — Analysis",
+                imageStore.Read(analysis.PdfPath!), folderId);
+
+            analysis.DeliveredToRemarkable = true;
+            novel.StageAttempts = 0;
+            novel.LastError = null;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Delivered the revision report of manuscript {NovelId} to reMarkable", novel.Id);
+            return ProcessResult.DidWork(novel.Id);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            novel.StageAttempts++;
+            novel.LastError = $"Could not deliver to reMarkable: {ex.Message}";
+            if (novel.StageAttempts >= rateLimits.MaxAttempts)
+            {
+                // Give up so the review can still finish (the report is on the device and, if enabled, Drive).
+                logger.LogWarning(ex,
+                    "Manuscript {NovelId}: giving up on reMarkable delivery after {Attempts} attempts; " +
+                    "continuing (the report remains available elsewhere)", novel.Id, novel.StageAttempts);
+                analysis.DeliveredToRemarkable = true;   // settled
+                novel.StageAttempts = 0;                 // hand a fresh budget to the Drive target
+                await db.SaveChangesAsync(cancellationToken);
+                return null;
             }
 
             var delay = backoff.NextDelay(novel.StageAttempts - 1, (ex as RateLimitException)?.RetryAfter);

@@ -44,6 +44,24 @@ public static class SettingsStore
         set => Preferences.Set(nameof(FreeLocalCopiesAfterArchive), value);
     }
 
+    // Also deliver the finished report to a "Canonizer" folder on the owner's reMarkable tablet. Off until
+    // the device is paired (RemarkableDeviceToken set); turning it on before then just sends every review
+    // through a stage that can only fail.
+    public static bool DeliverToRemarkable
+    {
+        get => Preferences.Get(nameof(DeliverToRemarkable), false);
+        set => Preferences.Set(nameof(DeliverToRemarkable), value);
+    }
+
+    // The long-lived reMarkable device token from the one-time device-code pairing. Backed up to the shared
+    // secrets vault (RemarkableSecrets) so a factory reset restores it without re-pairing, and shared with
+    // the other apps that deliver to the same tablet.
+    public static string RemarkableDeviceToken
+    {
+        get => Preferences.Get(nameof(RemarkableDeviceToken), string.Empty);
+        set => Preferences.Set(nameof(RemarkableDeviceToken), value);
+    }
+
     // The Google account chosen via the native picker; tokens are minted for it via AccountManager.
     public static string GoogleAccountEmail
     {

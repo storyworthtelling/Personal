@@ -13,6 +13,9 @@ on:
       # to it must rebuild Storyboarder too.
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Voice.Tests/**'
+      # The shared reMarkable delivery library also ships in the APK (Infrastructure references it).
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Remarkable.Tests/**'
       - '.github/workflows/build-storyboarder.yml'
 
 jobs:
@@ -38,6 +41,10 @@ jobs:
       # a change to it is verified in the same workflow that rebuilds Storyboarder.
       - name: Run voice tests
         run: dotnet test Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj
+
+      # The shared reMarkable delivery library also ships in the APK; its tests run here too.
+      - name: Run reMarkable tests
+        run: dotnet test Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj
 
   build:
     needs: test

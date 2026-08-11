@@ -77,6 +77,11 @@ public sealed class ArchiveOptions
     // Delete the local copy of the report once the upload is confirmed. Separate from Enabled because
     // delivering for access and reclaiming phone storage are different decisions.
     public bool FreeLocalCopies { get; set; }
+
+    // Also deliver the finished report to a "Canonizer" folder on the owner's reMarkable tablet (Phase 4),
+    // where it's read and annotated by hand. Off by default (it needs a device-code pairing); best-effort
+    // like the Drive upload — a reMarkable failure never blocks the review from finishing.
+    public bool DeliverToRemarkable { get; set; }
 }
 
 public sealed class StorageOptions
