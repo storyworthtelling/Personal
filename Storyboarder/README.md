@@ -151,6 +151,11 @@ Debug builds sign with the default debug keystore.
 4. When the report is ready, it is delivered to Google Drive beside the manuscript as
    `<Title> — Draft N — Analysis.pdf`, with a quiet in-app note. Tap the manuscript to open/share or
    read the report in the app.
+5. **Optionally, to a reMarkable tablet:** register the tablet once in Settings (a one-time code from
+   `my.remarkable.com/device/mobile/connect`) and turn on *Deliver to reMarkable* — the report then
+   also lands in a **"Canonizer" folder** on the tablet to read and annotate by hand. Best-effort and
+   independent of Drive; the pairing is shared with the other Storyworthtelling apps via the secrets
+   vault, so pairing once anywhere is enough.
 
 ## Notes & limits
 

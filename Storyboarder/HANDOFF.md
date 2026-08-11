@@ -30,9 +30,11 @@ dotnet --version     # expect 10.0.x
 dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj -p:StoryboarderTfms=net10.0
 ```
 
-**Baseline: 268 passing, 0 failing** (Phase 3 landed). Run this before every commit. Never commit a red
-suite. `dotnet ef` is installed but not on PATH in a fresh container — `export PATH="$PATH:$HOME/.dotnet/tools"`
-before `dotnet ef migrations add …`.
+**Baseline: 271 passing, 0 failing** (Phase 4 landed) — plus `Storyworthtelling.Remarkable.Tests` (12) and
+DailyLoader's suite. Run these before every commit. Never commit a red suite. `dotnet ef` is installed but
+not on PATH in a fresh container — `export PATH="$PATH:$HOME/.dotnet/tools"` before `dotnet ef migrations
+add …`. **DailyLoader's net9.0 tests can't RUN here** (only the .NET 10 runtime is present); they build
+clean and run in CI.
 
 The Android head needs the MAUI/Android workload + an Android SDK, neither present in a fresh
 container. Run `Storyboarder/scripts/setup-android-build.sh` once (installs the workload from nuget,
@@ -134,6 +136,31 @@ logic + client parsing are unit-tested; the renderer is exercised end-to-end by 
 output can't be asserted at the pixel level). The Android head (`ReportPage`) is compile-checked in CI, not
 built in-session.
 
+## 3d. What Phase 4 delivered (shared reMarkable delivery)
+
+Phase 4 (§8 of the brief) extracts DailyLoader's reMarkable code into a suite-shared library and delivers
+Canonizer's report to the tablet:
+
+- **`Storyworthtelling.Remarkable`** — a new shared library (repo root, net9.0;net10.0, mirrors
+  `Storyworthtelling.Voice`) owning the whole cloud path: `IRemarkableClient`/`RemarkableStorageClient`
+  (upload root + folder overload, `EnsureFolder`, list/download/trash), `RemarkableAuthService` (device
+  token → session JWT + health), `IRemarkableRegistration` (the device-code pairing), `RemarkableOptions`,
+  `RemarkableDoc`, `RemarkableCredentialId`.
+- **DailyLoader migrated onto it** — deleted its local `Remarkable/` copy, repointed namespaces, pairs via
+  `IRemarkableRegistration`. Its uploads stay at the account root (the root `Upload` overload), so its
+  behavior and tests are unchanged.
+- **Canonizer delivery** — the `Archiving` stage delivers the report to a **"Canonizer" folder** through
+  `IRemarkableClient` (optional ctor dep), as a **second, independent, best-effort target** that runs before
+  and independently of the Drive upload. `BookAnalysis.DeliveredToRemarkable` marks it settled (delivered or
+  given up) so a broken token can't wedge a review. Off by default (`ArchiveOptions.DeliverToRemarkable`,
+  needs a device-code pairing); the head has a Settings pairing section + toggle and vault publish/restore
+  of the token (shared with DailyLoader).
+
+Schema via the `Phase4RemarkableDelivery` migration. The reMarkable v2 path — especially the **folder wire
+format** — is reconstructed-not-verified; the tests pin the shape we send, the first live run verifies the
+cloud accepts it. The Android heads (Canonizer's `SetupPage`/DI, DailyLoader's) are compile-checked in CI,
+not built in-session.
+
 ## 4. Traps that still apply
 
 **`ProjectStage`/`WorkStatus` persist as integers.** Append new values to the end of the enum, never
@@ -159,8 +186,10 @@ feature.
   detection + before/after **scene**-image pairs + running story-state. See §3b.
 - **Phase 3 ✅ (done):** the expansion engine ("Scenes to add", show-vs-tell leverage, thin-spot flags,
   genre-norm length targets) — the additive feedback that closes the word-count gap. See §3c.
-- **Phase 4 (next):** shared bidirectional **reMarkable** delivery library + vault-restored pairing —
-  deliver the report to a "Canonizer" folder to read + annotate by hand.
+- **Phase 4 ✅ (done):** shared bidirectional **reMarkable** delivery library + vault-restored pairing —
+  the report lands in a "Canonizer" folder to read + annotate by hand. See §3d.
+- **Phase 5 (next):** series awareness — link related books and reuse prior findings/entities for
+  cross-book continuity.
 - **Phase 4:** shared bidirectional **reMarkable** delivery + vault-restored pairing.
 - **Phase 5:** series awareness.
 - **Also deferred:** the image-vs-prose **vision** fidelity pass (Phase 1's fidelity gap is a
