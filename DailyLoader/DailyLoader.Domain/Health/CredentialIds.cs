@@ -7,6 +7,8 @@ public static class CredentialIds
 {
     public const string NytApiKey = "nyt-api-key";
     public const string NytCookie = "nyt-cookie";
+    // Must equal Storyworthtelling.Remarkable.RemarkableCredentialId.Value — the shared library's client
+    // reports this credential's health, and the settings screen reads it back by this id.
     public const string Remarkable = "remarkable";
     public const string Anthropic = "anthropic";
 }

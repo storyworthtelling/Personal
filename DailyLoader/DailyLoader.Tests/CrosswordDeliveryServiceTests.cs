@@ -3,6 +3,7 @@ using Moq;
 using DailyLoader.Domain.Interfaces;
 using DailyLoader.Domain.Models;
 using DailyLoader.Infrastructure.Delivery;
+using Storyworthtelling.Remarkable;
 using Xunit;
 
 namespace DailyLoader.Tests;

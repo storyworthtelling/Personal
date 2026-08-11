@@ -17,7 +17,9 @@ public class RemarkableStorageClient : IRemarkableClient
         this.authProvider = authProvider;
     }
 
-    public async Task Upload(string title, byte[] pdfBytes, string? parentFolderId = null)
+    public Task Upload(string title, byte[] pdfBytes) => Upload(title, pdfBytes, null);
+
+    public async Task Upload(string title, byte[] pdfBytes, string? parentFolderId)
     {
         // The document metadata: file_name always, and parent only when delivering into a folder — an
         // empty/absent parent means the account root, so the root path is byte-identical to before.

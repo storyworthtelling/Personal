@@ -12,6 +12,7 @@
     <ProjectReference Include="..\DailyLoader.Domain\DailyLoader.Domain.csproj" />
     <!-- Shared credential-health seam (ICredentialHealthSink) reported by the NYT/reMarkable/Anthropic clients. -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
   </ItemGroup>
 
   <ItemGroup>

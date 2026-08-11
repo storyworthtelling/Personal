@@ -4,9 +4,12 @@ namespace Storyworthtelling.Remarkable;
 // download / trash (used by DailyLoader to locate and retire yesterday's documents).
 public interface IRemarkableClient
 {
-    // Uploads a PDF as a document. When parentFolderId is supplied the document lands in that folder
-    // (collection); null places it at the account root (the original behavior).
-    Task Upload(string title, byte[] pdfBytes, string? parentFolderId = null);
+    // Uploads a PDF as a document at the account root (the original behavior).
+    Task Upload(string title, byte[] pdfBytes);
+
+    // Uploads a PDF into a folder (collection) — parentFolderId from EnsureFolder — or at the root when it
+    // is null. A separate overload from the root one so existing callers and their mocks are unaffected.
+    Task Upload(string title, byte[] pdfBytes, string? parentFolderId);
 
     // Finds a folder (collection) with the given name at the account root, creating it if absent, and
     // returns its id — so a caller can deliver into a named folder. Mirrors IDriveArchive.EnsureFolder.

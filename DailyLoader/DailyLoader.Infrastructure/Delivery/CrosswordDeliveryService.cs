@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using DailyLoader.Domain.Interfaces;
 using DailyLoader.Domain.Models;
+using Storyworthtelling.Remarkable;
 
 namespace DailyLoader.Infrastructure.Delivery;
 

@@ -29,6 +29,7 @@
     <!-- Shared owner's-voice library: greet the owner in their voice on the delivery screen, reading the
          shared profile + Claude key from Drive (brings Google.Apis.Drive.v3/Auth transitively). -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
   </ItemGroup>
 
   <!-- The shared Paper & Ink fonts (aliases registered in MauiProgram). -->

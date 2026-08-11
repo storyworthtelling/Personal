@@ -170,32 +170,21 @@ public partial class SetupPage : ContentPage
 
         try
         {
-            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
-            var body = JsonSerializer.Serialize(new
-            {
-                code = code.Trim(),
-                deviceDesc = "mobile-android",
-                deviceID = Guid.NewGuid().ToString()
-            });
+            // Pair through the shared library instead of an inline POST.
+            var registration = IPlatformApplication.Current!.Services
+                .GetRequiredService<Storyworthtelling.Remarkable.IRemarkableRegistration>();
+            var token = await registration.Register(code);
 
-            using var request = new HttpRequestMessage(HttpMethod.Post,
-                "https://webapp-prod.cloud.remarkable.engineering/token/json/2/device/new");
-            request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-
-            var response = await http.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-            {
-                await DisplayAlert("Registration Failed",
-                    $"Server returned {(int)response.StatusCode}. Check your code and try again.", "OK");
-                return;
-            }
-
-            var token = (await response.Content.ReadAsStringAsync()).Trim().Trim('"');
             CredentialStore.RemarkableDeviceToken = token;
             RemarkableTokenEntry.Text = token;
             // Back up the freshly paired token so a later reset doesn't force re-registration.
             PublishToVault();
             await DisplayAlert("Registered!", "Device registered and token saved.", "OK");
+        }
+        catch (HttpRequestException ex)
+        {
+            await DisplayAlert("Registration Failed",
+                $"Server returned {(int?)ex.StatusCode}. Check your code and try again.", "OK");
         }
         catch (Exception ex)
         {
