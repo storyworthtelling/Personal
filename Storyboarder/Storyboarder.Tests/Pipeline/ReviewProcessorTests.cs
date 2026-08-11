@@ -10,6 +10,7 @@ using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
+using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
 using Xunit;
 
@@ -301,6 +302,29 @@ public class ReviewProcessorTests : IDisposable
         Assert.Single(changed);
         Assert.All(scenes, s => Assert.NotNull(s.PreviousSceneId));   // both matched a prior scene
         Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
+    }
+
+    [Fact]
+    public async Task Review_PersistsTheExpansionRead_AndFoldsItIntoTheReport()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using (var context = database.NewContext())
+        {
+            var analysis = context.BookAnalyses.Single(a => a.NovelId == id);
+            Assert.False(string.IsNullOrEmpty(analysis.ExpansionJson));   // the additive step ran and persisted
+            Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);       // the folded report still composed
+        }
+
+        // The in-app read path folds the expansion in too.
+        var projects = new ProjectService(database, new Mock<IGoogleDocsClient>().Object,
+            new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
+            clock, Options.Create(new RateLimitOptions()));
+        var report = await projects.GetReportAsync(id, CancellationToken.None);
+        Assert.NotNull(report);
+        Assert.NotEmpty(report!.Expansion.ScenesToAdd);
+        Assert.False(string.IsNullOrWhiteSpace(report.Expansion.Length.Note));
     }
 
     [Fact]
