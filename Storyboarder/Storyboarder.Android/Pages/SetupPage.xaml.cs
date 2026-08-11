@@ -390,6 +390,9 @@ public partial class SetupPage : ContentPage
         }
     }
 
+    private void OnFreeSpaceToggled(object? sender, ToggledEventArgs e) =>
+        SettingsStore.FreeLocalCopiesAfterArchive = e.Value;
+
     private void OnRemarkableToggled(object? sender, ToggledEventArgs e) =>
         SettingsStore.DeliverToRemarkable = e.Value;
 
