@@ -142,6 +142,113 @@ public class ProjectServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateNextBook_StartsANewProject_LinkedAsBookTwoOfASeries()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+
+        var service = NewService();
+        var bookOne = await service.CreateFromDocAsync("doc-1", "Book One.gdoc", "token", "Book One", "noir", CancellationToken.None);
+        var bookTwo = await service.CreateNextBookAsync(bookOne, "doc-2", "Book Two.gdoc", "token", "Book Two", null, CancellationToken.None);
+
+        Assert.NotNull(bookTwo);
+        using var context = database.NewContext();
+        var one = context.Novels.Single(n => n.Id == bookOne);
+        var two = context.Novels.Single(n => n.Id == bookTwo!.Value);
+
+        // A new book is its own project (a fresh draft chain), not another draft of book one.
+        Assert.Equal(two.Id, two.ProjectId);
+        Assert.NotEqual(one.ProjectId, two.ProjectId);
+        Assert.Equal(1, two.DraftNumber);
+        Assert.Null(two.PreviousDraftId);
+
+        // But it is linked into the series book one now heads.
+        Assert.NotNull(two.SeriesId);
+        Assert.Equal(one.SeriesId, two.SeriesId);
+        Assert.Equal(bookOne, two.PreviousBookId);   // book one's only (and latest) draft is the canon source
+        Assert.Equal(2, two.SeriesSequence);
+        Assert.Equal("Book Two", two.Title);
+        Assert.Equal("noir", two.ArtStyle);           // inherited from book one when not overridden
+    }
+
+    [Fact]
+    public async Task CreateNextBook_BackfillsTheSeriesOntoBookOnesDrafts()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+
+        var service = NewService();
+        var d1 = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+        var d2 = await service.CreateNextDraftAsync(d1, "doc-1b", "Book.gdoc", "token", null, null, CancellationToken.None);
+        var bookTwo = await service.CreateNextBookAsync(d2!.Value, "doc-2", "Book Two.gdoc", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        var first = context.Novels.Single(n => n.Id == d1);
+        var second = context.Novels.Single(n => n.Id == d2.Value);
+        var seriesId = context.Novels.Single(n => n.Id == bookTwo!.Value).SeriesId;
+
+        // Book one had no series; both its drafts are backfilled with the new series id at sequence 1.
+        Assert.Equal(seriesId, first.SeriesId);
+        Assert.Equal(seriesId, second.SeriesId);
+        Assert.Equal(1, first.SeriesSequence);
+        Assert.Equal(1, second.SeriesSequence);
+        Assert.Equal(first.ProjectId, seriesId);      // the series id is book one's project id
+    }
+
+    [Fact]
+    public async Task CreateNextBook_PointsAtThePriorBooksLatestCompletedDraft()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+
+        var service = NewService();
+        var d1 = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+        var d2 = await service.CreateNextDraftAsync(d1, "doc-1b", "Book.gdoc", "token", null, null, CancellationToken.None);
+        // Only draft 2 has finished; draft 1 is still mid-review.
+        using (var seed = database.NewContext())
+        {
+            seed.Novels.Single(n => n.Id == d2!.Value).Stage = ProjectStage.Completed;
+            seed.SaveChanges();
+        }
+
+        // The owner taps book one's (draft-1) card to start the sequel; canon comes from its latest COMPLETED draft.
+        var bookTwo = await service.CreateNextBookAsync(d1, "doc-2", "Book Two.gdoc", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        Assert.Equal(d2!.Value, context.Novels.Single(n => n.Id == bookTwo!.Value).PreviousBookId);
+    }
+
+    [Fact]
+    public async Task CreateNextBook_ReturnsNull_WhenThePriorBookIsMissing()
+    {
+        var result = await NewService().CreateNextBookAsync(
+            Guid.NewGuid(), "doc", "Book.gdoc", "token", null, null, CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task CreateNextDraft_CarriesTheSeriesLinkForward()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+
+        var service = NewService();
+        var bookOne = await service.CreateFromDocAsync("doc-1", "Book One.gdoc", "token", null, null, CancellationToken.None);
+        var bookTwoD1 = await service.CreateNextBookAsync(bookOne, "doc-2", "Book Two.gdoc", "token", null, null, CancellationToken.None);
+        // A second draft of book two must stay linked to book one.
+        var bookTwoD2 = await service.CreateNextDraftAsync(bookTwoD1!.Value, "doc-2b", "Book Two.gdoc", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        var d1 = context.Novels.Single(n => n.Id == bookTwoD1.Value);
+        var d2 = context.Novels.Single(n => n.Id == bookTwoD2!.Value);
+
+        Assert.Equal(d1.SeriesId, d2.SeriesId);
+        Assert.Equal(d1.PreviousBookId, d2.PreviousBookId);
+        Assert.Equal(d1.SeriesSequence, d2.SeriesSequence);
+        Assert.Equal(2, d2.SeriesSequence);   // still book two
+    }
+
+    [Fact]
     public async Task GetReport_FoldsStoryHalfWithCraft()
     {
         var story = BookAnalysisResult.Empty with
@@ -249,6 +356,40 @@ public class ProjectServiceTests : IDisposable
         Assert.NotNull(status);
         Assert.Equal(2, status!.DraftNumber);
         Assert.True(status.HasPreviousDraft);
+    }
+
+    [Fact]
+    public async Task GetStatus_SurfacesTheSeriesBadge_ForALinkedBook()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+        var service = NewService();
+        var bookOne = await service.CreateFromDocAsync("doc-1", "Book One.gdoc", "token", null, null, CancellationToken.None);
+        var bookTwo = await service.CreateNextBookAsync(bookOne, "doc-2", "Book Two.gdoc", "token", null, null, CancellationToken.None);
+
+        var twoStatus = await service.GetStatusAsync(bookTwo!.Value, CancellationToken.None);
+        var oneStatus = await service.GetStatusAsync(bookOne, CancellationToken.None);
+
+        Assert.NotNull(twoStatus);
+        Assert.True(twoStatus!.InSeries);
+        Assert.Equal(2, twoStatus.SeriesSequence);
+        // Book one was backfilled into the series it now heads.
+        Assert.True(oneStatus!.InSeries);
+        Assert.Equal(1, oneStatus.SeriesSequence);
+    }
+
+    [Fact]
+    public async Task GetStatus_HasNoSeriesBadge_ForAStandaloneBook()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+        var service = NewService();
+        var loneBook = await service.CreateFromDocAsync("doc-1", "Book.gdoc", "token", null, null, CancellationToken.None);
+
+        var status = await service.GetStatusAsync(loneBook, CancellationToken.None);
+
+        Assert.NotNull(status);
+        Assert.False(status!.InSeries);
     }
 
     [Fact]

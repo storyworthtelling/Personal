@@ -29,4 +29,8 @@ public sealed record NovelStatus(
     // Which draft of its project this is (1 for a first/only draft), and whether it has a predecessor to
     // diff against. Drives the card's draft badge and its "What changed" action.
     int DraftNumber = 1,
-    bool HasPreviousDraft = false);
+    bool HasPreviousDraft = false,
+    // Whether this book belongs to a series and, if so, its book number (1 = first). Drives the card's
+    // "Book N" badge (Phase 5). InSeries is false for a standalone book, where the sequence is meaningless.
+    bool InSeries = false,
+    int SeriesSequence = 1);

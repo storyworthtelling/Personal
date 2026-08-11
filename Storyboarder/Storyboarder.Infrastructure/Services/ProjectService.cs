@@ -99,11 +99,87 @@ public sealed class ProjectService
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
+        // Later drafts of a linked book stay linked to the prior book — carry the series fields forward.
+        draft.SeriesId = previous.SeriesId;
+        draft.PreviousBookId = previous.PreviousBookId;
+        draft.SeriesSequence = previous.SeriesSequence;
         draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
 
         db.Novels.Add(draft);
         await db.SaveChangesAsync(cancellationToken);
         return draft.Id;
+    }
+
+    // Starts book N of a series: the owner picks a fresh manuscript that continues an existing book, and gets a
+    // NEW project (its own draft chain) linked to the prior book. The link is what lets the pipeline reuse the
+    // prior book's canon — its design bible for visual consistency, its continuity summary and open findings for
+    // the cross-book continuity read. Unlike a next draft (same ProjectId), a next book gets ProjectId = its own
+    // Id, DraftNumber 1, and no PreviousDraftId — it is a new book, not a revision. Returns the new book's id, or
+    // null if the prior book's draft doesn't exist.
+    public async Task<Guid?> CreateNextBookAsync(
+        Guid previousBookDraftId, string fileId, string fileName, string accessToken,
+        string? title, string? artStyle, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var previous = await db.Novels.FirstOrDefaultAsync(n => n.Id == previousBookDraftId, cancellationToken);
+        if (previous is null)
+            return null;
+
+        // Establish the series id: the prior book's if it already belongs to a series, else its ProjectId
+        // becomes the series id — book one is now the first book of a new series, so backfill every one of its
+        // drafts with that id at sequence 1.
+        var seriesId = previous.SeriesId ?? previous.ProjectId;
+        if (previous.SeriesId is null)
+        {
+            var bookOneDrafts = await db.Novels
+                .Where(n => n.ProjectId == previous.ProjectId)
+                .ToListAsync(cancellationToken);
+            foreach (var draft in bookOneDrafts)
+            {
+                draft.SeriesId = seriesId;
+                draft.SeriesSequence = 1;
+            }
+        }
+
+        // The canon source is the prior book's latest-completed draft (fall back to its highest draft number if
+        // none has finished yet) — the most finished bible/continuity/findings the sequel can reuse.
+        var priorBookDrafts = await db.Novels
+            .Where(n => n.ProjectId == previous.ProjectId)
+            .Select(n => new { n.Id, n.DraftNumber, n.Stage })
+            .ToListAsync(cancellationToken);
+        var canonDraftId = (priorBookDrafts
+                .Where(n => n.Stage == ProjectStage.Completed)
+                .OrderByDescending(n => n.DraftNumber)
+                .FirstOrDefault()
+            ?? priorBookDrafts.OrderByDescending(n => n.DraftNumber).First()).Id;
+
+        // The next book number in the series. A DB query won't see the just-backfilled book-one drafts still in
+        // the change tracker, so a brand-new series reads no existing sequence and the sequel becomes book 2.
+        var highestSequence = await db.Novels
+            .Where(n => n.SeriesId == seriesId)
+            .MaxAsync(n => (int?)n.SeriesSequence, cancellationToken) ?? 1;
+
+        var text = await docs.FetchText(fileId, accessToken, cancellationToken);
+        var now = clock.UtcNow;
+        var book = new Novel
+        {
+            Title = string.IsNullOrWhiteSpace(title) ? previous.Title : title,
+            GoogleDocId = fileId,
+            GoogleDocName = fileName,
+            ArtStyle = string.IsNullOrWhiteSpace(artStyle) ? previous.ArtStyle : artStyle,
+            SeriesId = seriesId,
+            PreviousBookId = canonDraftId,
+            SeriesSequence = highestSequence + 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        // A new book starts its own draft chain: the project is identified by this book's own id.
+        book.ProjectId = book.Id;
+        book.Source = new SourceText { NovelId = book.Id, FullText = text, CharacterCount = text.Length };
+
+        db.Novels.Add(book);
+        await db.SaveChangesAsync(cancellationToken);
+        return book.Id;
     }
 
     // True while any novel is mid-conversion (not Completed/Failed/Cancelled). The Android head checks
@@ -302,7 +378,7 @@ public sealed class ProjectService
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var stored = await db.BookAnalyses
             .Where(a => a.NovelId == novelId)
-            .Select(a => new { a.ConsolidatedJson, a.CraftJson, a.ExpansionJson })
+            .Select(a => new { a.ConsolidatedJson, a.CraftJson, a.ExpansionJson, a.SeriesContinuityJson })
             .FirstOrDefaultAsync(cancellationToken);
         if (stored?.ConsolidatedJson is null)
             return null;
@@ -315,8 +391,11 @@ public sealed class ProjectService
         var expansion = stored.ExpansionJson is null
             ? ExpansionReport.Empty
             : JsonSerializer.Deserialize<ExpansionReport>(stored.ExpansionJson, JsonResponse.CaseInsensitive) ?? ExpansionReport.Empty;
+        var seriesContinuity = stored.SeriesContinuityJson is null
+            ? SeriesContinuity.Empty
+            : JsonSerializer.Deserialize<SeriesContinuity>(stored.SeriesContinuityJson, JsonResponse.CaseInsensitive) ?? SeriesContinuity.Empty;
 
-        return report.WithCraft(craft).WithExpansion(expansion);
+        return report.WithCraft(craft).WithExpansion(expansion).WithSeriesContinuity(seriesContinuity);
     }
 
     // What a draft changed against the one it was made from: the revision-report findings it resolved
@@ -447,7 +526,8 @@ public sealed class ProjectService
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
             chunks, sheets, sceneImages, analysisNotes, analysis, analysisReady, needsAttention,
             estimate, rateLimitedUntil,
-            novel.DraftNumber, novel.PreviousDraftId is not null);
+            novel.DraftNumber, novel.PreviousDraftId is not null,
+            novel.SeriesId is not null, novel.SeriesSequence);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

@@ -223,6 +223,12 @@ public sealed record BookAnalysisResult(
     // halves. Defaults to Empty so a report stored before this existed re-renders fine.
     public ExpansionReport Expansion { get; init; } = ExpansionReport.Empty;
 
+    // The cross-book continuity read (Phase 5): where this book contradicts the prior book's established canon
+    // and how it handles the prior book's open threads. Its own resumable call, folded in with
+    // WithSeriesContinuity. Empty for a standalone book (and for any report stored before this existed), so no
+    // series section renders.
+    public SeriesContinuity SeriesContinuity { get; init; } = SeriesContinuity.Empty;
+
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
         Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(),
@@ -246,6 +252,9 @@ public sealed record BookAnalysisResult(
 
     public BookAnalysisResult WithExpansion(ExpansionReport expansion) =>
         this with { Expansion = expansion };
+
+    public BookAnalysisResult WithSeriesContinuity(SeriesContinuity seriesContinuity) =>
+        this with { SeriesContinuity = seriesContinuity };
 }
 
 // The additive read — Canonizer's expansion engine (Phase 3). Because early drafts run short, this surfaces

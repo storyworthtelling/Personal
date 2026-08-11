@@ -20,6 +20,12 @@ public partial class NewProjectPage : ContentPage
     public Guid? PreviousDraftId { get; set; }
     public string? PreviousTitle { get; set; }
 
+    // Set by the caller before pushing this page to run it in "next book" mode: the picked doc becomes a NEW
+    // book (its own project) linked into the prior book's series (ProjectService.CreateNextBookAsync), so the
+    // pipeline reuses the prior book's canon. Null = not a series book. Mutually exclusive with PreviousDraftId.
+    public Guid? PreviousBookId { get; set; }
+    public string? PreviousBookTitle { get; set; }
+
     public NewProjectPage(DeviceAccountTokenProvider tokens, DriveDocsLister lister)
     {
         InitializeComponent();
@@ -31,7 +37,17 @@ public partial class NewProjectPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        if (PreviousDraftId is not null)
+        if (PreviousBookId is not null)
+        {
+            var label = string.IsNullOrWhiteSpace(PreviousBookTitle) ? "Next book" : $"Next book after “{PreviousBookTitle}”";
+            HeaderLabel.Text = label;
+            Title = "Next book";
+            CreateButton.Text = "Add book";
+            // Blank inherits the previous book's art style in the service, so a returning look stays consistent.
+            ArtStyleEntry.Text = string.Empty;
+            ArtStyleEntry.Placeholder = "Leave blank to keep the previous book's style";
+        }
+        else if (PreviousDraftId is not null)
         {
             var label = string.IsNullOrWhiteSpace(PreviousTitle) ? "New draft" : $"New draft of “{PreviousTitle}”";
             HeaderLabel.Text = label;
@@ -147,21 +163,33 @@ public partial class NewProjectPage : ContentPage
         if (selected is null)
             return;
 
+        var bookMode = PreviousBookId is not null;
         var draftMode = PreviousDraftId is not null;
-        // A new project defaults the style to the house default; a new draft leaves it blank so the
-        // service inherits the previous draft's style unless the user typed a replacement.
+        var inheritsStyle = bookMode || draftMode;
+        // A new project defaults the style to the house default; a new draft or next book leaves it blank so the
+        // service inherits the previous manuscript's style unless the user typed a replacement.
         var artStyle = string.IsNullOrWhiteSpace(ArtStyleEntry.Text)
-            ? (draftMode ? null : ArtStyles.Default)
+            ? (inheritsStyle ? null : ArtStyles.Default)
             : ArtStyleEntry.Text.Trim();
 
-        Busy(true, draftMode ? "Adding draft…" : "Creating project…");
+        Busy(true, bookMode ? "Adding book…" : draftMode ? "Adding draft…" : "Creating project…");
         try
         {
             var token = await tokens.GetAccessToken();
             using (var scope = IPlatformApplication.Current!.Services.CreateScope())
             {
                 var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
-                if (draftMode)
+                if (bookMode)
+                {
+                    var bookId = await projects.CreateNextBookAsync(
+                        PreviousBookId!.Value, selected.Id, selected.Name, token, null, artStyle, CancellationToken.None);
+                    if (bookId is null)
+                    {
+                        await DisplayAlert("Next book", "The previous book could no longer be found.", "OK");
+                        return;
+                    }
+                }
+                else if (draftMode)
                 {
                     var draftId = await projects.CreateNextDraftAsync(
                         PreviousDraftId!.Value, selected.Id, selected.Name, token, null, artStyle, CancellationToken.None);
@@ -189,7 +217,9 @@ public partial class NewProjectPage : ContentPage
         {
             await Clipboard.SetTextAsync(ex.ToString());
             await DisplayAlert(
-                draftMode ? "Could not add draft (copied to clipboard)" : "Could not create project (copied to clipboard)",
+                bookMode ? "Could not add book (copied to clipboard)"
+                    : draftMode ? "Could not add draft (copied to clipboard)"
+                    : "Could not create project (copied to clipboard)",
                 ex.Message, "OK");
         }
         finally

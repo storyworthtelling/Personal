@@ -362,10 +362,18 @@ public sealed class ReviewProcessor : IPipelineStep
         // With no recurrence signal to go on, draw everything.
         var chunkCount = fragments.Count;
 
+        var added = new List<DesignRef>(bible.Characters.Count + bible.Settings.Count);
         foreach (var character in bible.Characters)
-            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Character, character, chunkCount));
+            added.Add(NewDesignRef(novel.Id, ReferenceKind.Character, character, chunkCount));
         foreach (var setting in bible.Settings)
-            db.DesignRefs.Add(NewDesignRef(novel.Id, ReferenceKind.Setting, setting, chunkCount));
+            added.Add(NewDesignRef(novel.Id, ReferenceKind.Setting, setting, chunkCount));
+        db.DesignRefs.AddRange(added);
+
+        // On a sequel, a returning character/place reuses the prior book's rendered reference image so it stays
+        // visually on-model across books (the book-level mirror of CarryForwardScenes). Its own description is
+        // kept — the character may have evolved, and the continuity read compares the two.
+        if (novel.PreviousBookId is { } priorBookId)
+            await CarryForwardSeriesEntities(db, novel, priorBookId, added, cancellationToken);
 
         // Derive the art style from the manuscript (owner's decision: Claude derives it from prose +
         // genre), but only when the user didn't pick one — a custom style always wins. Best-effort and
@@ -634,6 +642,72 @@ public sealed class ReviewProcessor : IPipelineStep
         return reused;
     }
 
+    // Reuses the prior book's rendered reference images for this book's returning entities (Phase 5). Matched
+    // by name — the merged name, or any alias — against the prior book's design refs, scoped by kind. A match
+    // copies the prior image into this book's refs folder and marks the sheet Completed, so the render loop
+    // skips it: a returning character/place keeps its established look across books. Best-effort: any copy
+    // failure just leaves the entity to render fresh. Only entities that earn a sheet are considered. Returns
+    // how many images were carried forward.
+    private async Task<int> CarryForwardSeriesEntities(
+        StoryboarderDbContext db, Novel novel, Guid priorBookId,
+        IReadOnlyList<DesignRef> entities, CancellationToken cancellationToken)
+    {
+        var priorRefs = await db.DesignRefs
+            .Where(r => r.NovelId == priorBookId && r.ReferenceImagePath != null)
+            .Select(r => new { r.Kind, r.Name, r.AliasesJson, r.ReferenceImagePath })
+            .ToListAsync(cancellationToken);
+        if (priorRefs.Count == 0)
+            return 0;
+
+        // A (kind, lower-cased name-or-alias) → prior image path lookup, so a rename that kept an alias still matches.
+        var priorByName = new Dictionary<(ReferenceKind, string), string>();
+        foreach (var prior in priorRefs)
+        {
+            void Register(string? name)
+            {
+                if (!string.IsNullOrWhiteSpace(name))
+                    priorByName.TryAdd((prior.Kind, name.Trim().ToLowerInvariant()), prior.ReferenceImagePath!);
+            }
+            Register(prior.Name);
+            foreach (var alias in JsonSerializer.Deserialize<List<string>>(prior.AliasesJson) ?? [])
+                Register(alias);
+        }
+
+        var reused = 0;
+        foreach (var entity in entities.Where(e => e.NeedsSheet))
+        {
+            var names = new[] { entity.Name }
+                .Concat(JsonSerializer.Deserialize<List<string>>(entity.AliasesJson) ?? [])
+                .Select(n => n?.Trim().ToLowerInvariant())
+                .Where(n => !string.IsNullOrEmpty(n));
+            string? priorPath = null;
+            foreach (var name in names)
+                if (priorByName.TryGetValue((entity.Kind, name!), out priorPath))
+                    break;
+            if (priorPath is null || !imageStore.Exists(priorPath))
+                continue;
+
+            try
+            {
+                entity.ReferenceImagePath = imageStore.Save($"{novel.Id}/refs/{entity.Id}.png", imageStore.Read(priorPath));
+                entity.ReferenceSheetStatus = WorkStatus.Completed;
+                entity.LastError = null;
+                reused++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex,
+                    "Could not carry forward the reference image for '{Name}' (manuscript {NovelId}); will render fresh",
+                    entity.Name, novel.Id);
+            }
+        }
+
+        if (reused > 0)
+            logger.LogInformation(
+                "Carried forward {Reused} reference image(s) from the prior book (manuscript {NovelId})", reused, novel.Id);
+        return reused;
+    }
+
     // The rendered reference sheets for recurring entities named in the scene text, capped so one render's
     // payload stays small. Matched by entity name appearing in the prose (a light heuristic — scenes don't
     // carry an explicit cast list).
@@ -895,6 +969,35 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2f) Cross-book continuity read (Phase 5): only for a book linked to a prior one. Checks this book
+        // against the prior book's established canon and tracks its carried-over open threads. Its own resumable
+        // step + column, billed once — like the other reduce halves. A standalone book has no PreviousBookId, so
+        // it skips this entirely and the column stays null (no series section renders).
+        if (novel.PreviousBookId is { } priorBookId && analysis.SeriesContinuityJson is null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var canon = await LoadSeriesCanon(db, priorBookId, cancellationToken);
+            var notes = await LoadChapterNotes(db, novel.Id, cancellationToken);
+
+            try
+            {
+                var continuity = await claude.AssessSeriesContinuity(
+                    novel.Title, canon, notes, novel.ContinuitySummary, cancellationToken);
+                analysis.SeriesContinuityJson = JsonSerializer.Serialize(continuity, JsonResponse.CaseInsensitive);
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 3) Render: compose the report PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
@@ -911,11 +1014,15 @@ public sealed class ReviewProcessor : IPipelineStep
                 var expansion = analysis.ExpansionJson is null
                     ? ExpansionReport.Empty
                     : JsonSerializer.Deserialize<ExpansionReport>(analysis.ExpansionJson, JsonResponse.CaseInsensitive) ?? ExpansionReport.Empty;
+                var seriesContinuity = analysis.SeriesContinuityJson is null
+                    ? SeriesContinuity.Empty
+                    : JsonSerializer.Deserialize<SeriesContinuity>(analysis.SeriesContinuityJson, JsonResponse.CaseInsensitive) ?? SeriesContinuity.Empty;
 
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
-                var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount).WithExpansion(expansion);
+                var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount)
+                    .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity);
                 var pdf = analysisPdfComposer.Compose(folded, novel.Title, scenes, review);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
@@ -1293,6 +1400,55 @@ public sealed class ReviewProcessor : IPipelineStep
                     thread.Key, latest.Category, latest.Chapter, latest.Detail,
                     FirstDraftNumber: thread.Min(f => f.FirstDraftNumber),
                     OpenInPreviousDraft: thread.Any(f => f.NovelId == previousDraftId));
+            })
+            .ToList();
+    }
+
+    // Assembles the prior book's canon for the cross-book continuity read (Phase 5): its title, its design-bible
+    // cast/settings (name + established description), where its story stood (its continuity summary), and its
+    // still-open finding threads. priorBookId is the specific prior-book draft the sequel was linked to (the
+    // prior book's latest-completed draft, resolved at link time).
+    private async Task<SeriesCanon> LoadSeriesCanon(
+        StoryboarderDbContext db, Guid priorBookId, CancellationToken cancellationToken)
+    {
+        var prior = await db.Novels
+            .Where(n => n.Id == priorBookId)
+            .Select(n => new { n.Title, n.ProjectId, n.ContinuitySummary })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (prior is null)
+            return SeriesCanon.Empty;
+
+        var refs = await db.DesignRefs
+            .Where(r => r.NovelId == priorBookId)
+            .Select(r => new { r.Kind, r.Name, r.CanonicalDescription })
+            .ToListAsync(cancellationToken);
+        var cast = refs.Where(r => r.Kind == ReferenceKind.Character)
+            .Select(r => new CanonEntity(r.Name, r.CanonicalDescription)).ToList();
+        var settings = refs.Where(r => r.Kind == ReferenceKind.Setting)
+            .Select(r => new CanonEntity(r.Name, r.CanonicalDescription)).ToList();
+
+        var openThreads = await LoadOpenThreads(db, prior.ProjectId, priorBookId, cancellationToken);
+        return new SeriesCanon(prior.Title, cast, settings, prior.ContinuitySummary, openThreads);
+    }
+
+    // The prior book's still-open finding threads — a thread with an occurrence in the canon draft is unresolved
+    // (the inverse of the resolved-set logic in BuildDraftReview). Each is returned as its latest occurrence's
+    // text, so the continuity read can judge whether this book addresses, ignores, or contradicts it.
+    private static async Task<IReadOnlyList<ReportFinding>> LoadOpenThreads(
+        StoryboarderDbContext db, Guid priorProjectId, Guid canonDraftId, CancellationToken cancellationToken)
+    {
+        var occurrences = await db.Findings
+            .Where(f => f.ProjectId == priorProjectId)
+            .Select(f => new { f.ThreadId, f.NovelId, f.Chapter, f.Detail, f.CreatedAtUtc })
+            .ToListAsync(cancellationToken);
+
+        return occurrences
+            .GroupBy(f => f.ThreadId)
+            .Where(thread => thread.Any(f => f.NovelId == canonDraftId))   // open = present in the canon draft
+            .Select(thread =>
+            {
+                var latest = thread.OrderBy(f => f.CreatedAtUtc).Last();
+                return new ReportFinding(latest.Chapter, latest.Detail);
             })
             .ToList();
     }
