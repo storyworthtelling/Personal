@@ -12,6 +12,7 @@ using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
+using Storyworthtelling.Remarkable;
 using Xunit;
 
 namespace Storyboarder.Tests.Pipeline;
@@ -126,7 +127,8 @@ public class ReviewProcessorTests : IDisposable
             Directory.Delete(outputRoot, recursive: true);
     }
 
-    private ReviewProcessor NewProcessor() => new(
+    private ReviewProcessor NewProcessor(
+        ArchiveOptions? archiveOptions = null, IRemarkableClient? remarkable = null) => new(
         database,
         claude.Object,
         gemini.Object,
@@ -139,8 +141,9 @@ public class ReviewProcessorTests : IDisposable
             GeminiRequestsPerMinute = 1000, GeminiRequestsPerDay = 100000,
             BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
-        Options.Create(new ArchiveOptions()),
-        NullLogger<ReviewProcessor>.Instance);
+        Options.Create(archiveOptions ?? new ArchiveOptions()),
+        NullLogger<ReviewProcessor>.Instance,
+        remarkable: remarkable);
 
     private Guid SeedManuscript(string? fullText = null)
     {
@@ -302,6 +305,49 @@ public class ReviewProcessorTests : IDisposable
         Assert.Single(changed);
         Assert.All(scenes, s => Assert.NotNull(s.PreviousSceneId));   // both matched a prior scene
         Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
+    }
+
+    [Fact]
+    public async Task Review_DeliversToRemarkable_IntoTheCanonizerFolder_WhenEnabledAndPaired()
+    {
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.EnsureFolder("Canonizer")).ReturnsAsync("folder-id");
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        remarkable.Verify(r => r.EnsureFolder("Canonizer"), Times.Once);
+        remarkable.Verify(r => r.Upload(It.Is<string>(t => t.Contains("Analysis")), It.IsAny<byte[]>(), "folder-id"), Times.Once);
+
+        using var context = database.NewContext();
+        Assert.True(context.BookAnalyses.Single(a => a.NovelId == id).DeliveredToRemarkable);
+        Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
+    }
+
+    [Fact]
+    public async Task Review_DoesNotDeliverToRemarkable_WhenDisabled()
+    {
+        var remarkable = new Mock<IRemarkableClient>();
+        SeedManuscript();
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = false }, remarkable.Object));
+
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Review_StillCompletes_WhenRemarkableDeliveryKeepsFailing()
+    {
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.EnsureFolder(It.IsAny<string>()))
+            .ThrowsAsync(new HttpRequestException("reMarkable is down"));
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        using var context = database.NewContext();
+        // Delivery gave up after its budget, but the review still reached Completed (the report is on disk).
+        Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
+        Assert.True(context.BookAnalyses.Single(a => a.NovelId == id).DeliveredToRemarkable);   // settled
     }
 
     [Fact]

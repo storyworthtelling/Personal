@@ -1,4 +1,4 @@
-namespace DailyLoader.Infrastructure.Remarkable;
+namespace Storyworthtelling.Remarkable;
 
 public interface IRemarkableAuthProvider
 {

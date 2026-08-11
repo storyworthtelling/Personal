@@ -5,6 +5,7 @@ using DailyLoader.Domain.Models;
 using DailyLoader.Infrastructure.Calendar;
 using DailyLoader.Infrastructure.Handwriting;
 using DailyLoader.Infrastructure.Google;
+using Storyworthtelling.Remarkable;
 
 namespace DailyLoader.Infrastructure.Delivery;
 

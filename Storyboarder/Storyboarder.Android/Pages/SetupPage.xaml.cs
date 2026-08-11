@@ -32,6 +32,8 @@ public partial class SetupPage : ContentPage
         FreeSpaceSwitch.IsToggled = SettingsStore.FreeLocalCopiesAfterArchive;
         // Reclaiming space only means anything once the copies are safely elsewhere.
         FreeSpaceSwitch.IsEnabled = ArchiveSwitch.IsToggled;
+        RemarkableSwitch.IsToggled = SettingsStore.DeliverToRemarkable;
+        UpdateRemarkableStatus();
         UpdateGoogleStatus();
         SigningInfoLabel.Text = SigningInfoText();
 
@@ -390,4 +392,51 @@ public partial class SetupPage : ContentPage
 
     private void OnFreeSpaceToggled(object? sender, ToggledEventArgs e) =>
         SettingsStore.FreeLocalCopiesAfterArchive = e.Value;
+
+    private void OnRemarkableToggled(object? sender, ToggledEventArgs e) =>
+        SettingsStore.DeliverToRemarkable = e.Value;
+
+    // One-time device-code pairing via the shared library. Stores the returned device token and backs it up
+    // to the vault so a factory reset (or a sibling app) restores it without re-pairing.
+    private async void OnRegisterRemarkableClicked(object sender, EventArgs e)
+    {
+        var code = await DisplayPromptAsync(
+            "Register reMarkable",
+            "Visit my.remarkable.com/device/mobile/connect and enter the one-time code:",
+            placeholder: "e.g. abcdefgh");
+        if (string.IsNullOrWhiteSpace(code))
+            return;
+
+        try
+        {
+            var registration = IPlatformApplication.Current!.Services
+                .GetRequiredService<Storyworthtelling.Remarkable.IRemarkableRegistration>();
+            SettingsStore.RemarkableDeviceToken = await registration.Register(code);
+            UpdateRemarkableStatus();
+            PublishToVault();
+        }
+        catch (HttpRequestException ex)
+        {
+            await DisplayAlert("Registration failed",
+                $"The reMarkable cloud returned {(int?)ex.StatusCode}. Check the code and try again.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Registration failed", ex.Message, "OK");
+        }
+    }
+
+    // The reMarkable field/toggle mirror the credential-field pattern: once paired, the status collapses to a
+    // "Registered ✓" line and the delivery toggle is enabled; unpaired, the toggle is off and disabled.
+    private void UpdateRemarkableStatus()
+    {
+        var paired = !string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken);
+        RemarkableStatusLabel.Text = paired ? "Registered ✓" : "Not registered yet.";
+        RemarkableSwitch.IsEnabled = paired;
+        if (!paired && RemarkableSwitch.IsToggled)
+        {
+            RemarkableSwitch.IsToggled = false;
+            SettingsStore.DeliverToRemarkable = false;
+        }
+    }
 }

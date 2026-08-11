@@ -16,6 +16,7 @@ using Storyboarder.Infrastructure.Persistence;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Infrastructure.Time;
+using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
@@ -65,8 +66,13 @@ public static class MauiProgram
             _ => new LiveOptions<ArchiveOptions>(() => new ArchiveOptions
             {
                 Enabled = SettingsStore.ArchiveToDrive,
-                FreeLocalCopies = SettingsStore.FreeLocalCopiesAfterArchive
+                FreeLocalCopies = SettingsStore.FreeLocalCopiesAfterArchive,
+                DeliverToRemarkable = SettingsStore.DeliverToRemarkable
             }));
+        // The reMarkable device token from the one-time pairing, read live so a re-pair takes effect on the
+        // next worker cycle without a restart.
+        builder.Services.AddSingleton<IOptions<RemarkableOptions>>(
+            _ => new LiveOptions<RemarkableOptions>(() => new RemarkableOptions { DeviceToken = SettingsStore.RemarkableDeviceToken }));
         builder.Services.AddSingleton<IOptions<StorageOptions>>(
             _ => new LiveOptions<StorageOptions>(() => new StorageOptions
             {
@@ -106,6 +112,16 @@ public static class MauiProgram
         // one-sentence message), so a 2-minute ceiling is ample.
         builder.Services.AddHttpClient<IVoiceClient, VoiceClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(2))
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // The shared reMarkable delivery client (Phase 4): the auth service exchanges the paired device
+        // token for a session JWT (reporting its health), the storage client uploads the report into the
+        // "Canonizer" folder, and the registration client handles the one-time device-code pairing.
+        builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<IRemarkableRegistration, RemarkableRegistrationClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         // Infrastructure collaborators.

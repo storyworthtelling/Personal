@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace DailyLoader.Infrastructure.Remarkable;
+namespace Storyworthtelling.Remarkable;
 
 internal static class JwtPayload
 {

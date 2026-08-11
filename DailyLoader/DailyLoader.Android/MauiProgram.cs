@@ -12,8 +12,8 @@ using DailyLoader.Infrastructure.Google;
 using DailyLoader.Infrastructure.Handwriting;
 using DailyLoader.Infrastructure.Nyt;
 using DailyLoader.Infrastructure.Pdf;
-using DailyLoader.Infrastructure.Remarkable;
 using DailyLoader.Android.Google;
+using Storyworthtelling.Remarkable;
 using PdfSharp.Fonts;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
@@ -89,6 +89,9 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // The one-time device-code pairing, now via the shared library instead of an inline POST.
+        builder.Services.AddHttpClient<IRemarkableRegistration, RemarkableRegistrationClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         builder.Services.AddTransient<IPdfComposer, PdfComposer>();

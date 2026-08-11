@@ -1,10 +1,8 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using DailyLoader.Domain.Interfaces;
-using DailyLoader.Domain.Models;
 
-namespace DailyLoader.Infrastructure.Remarkable;
+namespace Storyworthtelling.Remarkable;
 
 public class RemarkableStorageClient : IRemarkableClient
 {
@@ -19,10 +17,15 @@ public class RemarkableStorageClient : IRemarkableClient
         this.authProvider = authProvider;
     }
 
-    public async Task Upload(string title, byte[] pdfBytes)
+    public Task Upload(string title, byte[] pdfBytes) => Upload(title, pdfBytes, null);
+
+    public async Task Upload(string title, byte[] pdfBytes, string? parentFolderId)
     {
-        var meta = Convert.ToBase64String(
-            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { file_name = title })));
+        // The document metadata: file_name always, and parent only when delivering into a folder — an
+        // empty/absent parent means the account root, so the root path is byte-identical to before.
+        var meta = string.IsNullOrEmpty(parentFolderId)
+            ? Base64Meta(new { file_name = title })
+            : Base64Meta(new { file_name = title, parent = parentFolderId });
 
         using var request = await CreateRequest(HttpMethod.Post, FilesUrl);
         request.Headers.Add("rm-meta", meta);
@@ -38,12 +41,37 @@ public class RemarkableStorageClient : IRemarkableClient
                 response.StatusCode);
     }
 
+    public async Task<string> EnsureFolder(string name)
+    {
+        // Reuse an existing folder of this name (so delivery doesn't spawn duplicate folders); otherwise
+        // create one. The collection wire format is reconstructed from the docs — a metadata-only POST with
+        // type=collection and no PDF body — and the first live run verifies the cloud accepts it.
+        var existing = await FindCollectionId(name);
+        if (existing is not null)
+            return existing;
+
+        var meta = Base64Meta(new { file_name = name, type = "collection" });
+        using var request = await CreateRequest(HttpMethod.Post, FilesUrl);
+        request.Headers.Add("rm-meta", meta);
+        request.Headers.Add("rm-source", "RoR-Browser");
+
+        var response = await httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException(
+                $"reMarkable folder create failed: {(int)response.StatusCode} ({response.StatusCode}) for '{name}'",
+                inner: null,
+                response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        return ReadCreatedId(body)
+            ?? throw new HttpRequestException($"reMarkable folder create for '{name}' returned no id.");
+    }
+
     public async Task<IReadOnlyList<RemarkableDoc>> ListRecent()
     {
-        // NOTE: the v2 read path is not exercised by the upload flow and needs verification
-        // against the live reMarkable cloud (see the read-back spike in the plan). The metadata
-        // listing is parsed tolerantly so a schema difference surfaces as an empty/partial list
-        // rather than a crash.
+        // NOTE: the v2 read path is not exercised by the upload flow and needs verification against the
+        // live reMarkable cloud. The metadata listing is parsed tolerantly so a schema difference surfaces
+        // as an empty/partial list rather than a crash.
         using var request = await CreateRequest(HttpMethod.Get, FilesUrl);
         var response = await httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)
@@ -53,7 +81,7 @@ public class RemarkableStorageClient : IRemarkableClient
                 response.StatusCode);
 
         var json = await response.Content.ReadAsStringAsync();
-        return ParseDocList(json);
+        return ParseEntries(json).Select(e => new RemarkableDoc { Id = e.Id, Title = e.Title, PdfBytes = [] }).ToList();
     }
 
     public async Task<RemarkableDoc?> DownloadByTitle(string title)
@@ -87,6 +115,9 @@ public class RemarkableStorageClient : IRemarkableClient
                 response.StatusCode);
     }
 
+    private static string Base64Meta(object metadata) =>
+        Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(metadata)));
+
     private async Task<HttpRequestMessage> CreateRequest(HttpMethod method, string url)
     {
         var userToken = await authProvider.GetUserToken();
@@ -95,34 +126,65 @@ public class RemarkableStorageClient : IRemarkableClient
         return request;
     }
 
-    // Tolerant parse: accepts either a bare array or an object wrapping an array, and reads
-    // id/title from the common reMarkable field names without assuming one exact schema.
-    private static List<RemarkableDoc> ParseDocList(string json)
+    // The id of an existing folder (collection) with this name, or null if none exists.
+    private async Task<string?> FindCollectionId(string name)
     {
-        var docs = new List<RemarkableDoc>();
+        using var request = await CreateRequest(HttpMethod.Get, FilesUrl);
+        var response = await httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException(
+                $"reMarkable list failed: {(int)response.StatusCode} ({response.StatusCode})",
+                inner: null,
+                response.StatusCode);
+
+        var json = await response.Content.ReadAsStringAsync();
+        return ParseEntries(json)
+            .FirstOrDefault(e => e.IsCollection && string.Equals(e.Title, name, StringComparison.OrdinalIgnoreCase))
+            ?.Id;
+    }
+
+    private sealed record Entry(string Id, string Title, bool IsCollection);
+
+    // Tolerant parse: accepts either a bare array or an object wrapping an array, reads id/title from the
+    // common reMarkable field names, and flags collections (folders) by their type field.
+    private static List<Entry> ParseEntries(string json)
+    {
+        var entries = new List<Entry>();
         if (string.IsNullOrWhiteSpace(json))
-            return docs;
+            return entries;
 
         using var parsed = JsonDocument.Parse(json);
         var root = parsed.RootElement;
         var array = root.ValueKind == JsonValueKind.Array
             ? root
-            : root.TryGetProperty("entries", out var entries) ? entries
-            : root.TryGetProperty("documents", out var documents) ? documents
+            : root.TryGetProperty("entries", out var e) ? e
+            : root.TryGetProperty("documents", out var d) ? d
             : default;
 
         if (array.ValueKind != JsonValueKind.Array)
-            return docs;
+            return entries;
 
         foreach (var item in array.EnumerateArray())
         {
             var id = ReadString(item, "id", "ID", "DocumentID");
             var title = ReadString(item, "file_name", "VissibleName", "visibleName", "name");
+            var type = ReadString(item, "type", "Type");
             if (id is not null && title is not null)
-                docs.Add(new RemarkableDoc { Id = id, Title = title, PdfBytes = [] });
+                entries.Add(new Entry(id, title, IsCollectionType(type)));
         }
 
-        return docs;
+        return entries;
+    }
+
+    private static bool IsCollectionType(string? type) =>
+        type is not null && type.Contains("collection", StringComparison.OrdinalIgnoreCase);
+
+    private static string? ReadCreatedId(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+        using var parsed = JsonDocument.Parse(json);
+        return ReadString(parsed.RootElement, "id", "ID", "DocumentID");
     }
 
     private static string? ReadString(JsonElement element, params string[] names)

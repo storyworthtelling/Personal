@@ -1,10 +1,8 @@
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.Options;
-using DailyLoader.Infrastructure.Remarkable;
-using Xunit;
 
-namespace DailyLoader.Tests.Remarkable;
+namespace Storyworthtelling.Remarkable.Tests;
 
 public class RemarkableAuthServiceTests
 {

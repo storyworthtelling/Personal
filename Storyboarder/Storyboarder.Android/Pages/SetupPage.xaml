@@ -94,6 +94,19 @@
 
             <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
 
+            <Label Text="Deliver to reMarkable" Style="{StaticResource TitleLabel}" />
+            <Label Text="Also send the finished report to a “Canonizer” folder on your reMarkable tablet, to read and annotate by hand. Register the tablet once with a one-time code from my.remarkable.com/device/mobile/connect."
+                   Style="{StaticResource SecondaryLabel}" />
+            <Button x:Name="RegisterRemarkableButton" Text="Register reMarkable"
+                    Clicked="OnRegisterRemarkableClicked" Style="{StaticResource SecondaryButton}" />
+            <Label x:Name="RemarkableStatusLabel" Style="{StaticResource StatusLine}" />
+            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                <Label Grid.Column="0" Text="Deliver reports to reMarkable" VerticalOptions="Center" />
+                <Switch Grid.Column="1" x:Name="RemarkableSwitch" Toggled="OnRemarkableToggled" />
+            </Grid>
+
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+
             <Label Text="Progress backup" Style="{StaticResource TitleLabel}" />
             <Label Text="Save your whole library — every conversion and rendered page — to a file you choose. If you reinstall the app or move to a new phone, restore the file to pick up a long conversion where you left off."
                    Style="{StaticResource SecondaryLabel}" />

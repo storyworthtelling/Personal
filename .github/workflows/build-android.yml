@@ -8,6 +8,9 @@ on:
       - 'DailyLoader/DailyLoader.Android/**'
       - 'DailyLoader/DailyLoader.Infrastructure/**'
       - 'DailyLoader/DailyLoader.Domain/**'
+      # Shared libraries that ship in the APK (referenced by Infrastructure/head), so a change rebuilds it.
+      - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Remarkable/**'
       - '.github/workflows/build-android.yml'
 
 jobs:

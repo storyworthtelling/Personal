@@ -1,4 +1,4 @@
-namespace DailyLoader.Domain.Models;
+namespace Storyworthtelling.Remarkable;
 
 // A document retrieved from the reMarkable cloud, flattened to PDF (annotations included
 // when the cloud can render them).

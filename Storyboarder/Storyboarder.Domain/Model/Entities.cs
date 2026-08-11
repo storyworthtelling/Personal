@@ -262,6 +262,11 @@ public class BookAnalysis
     // The Drive file id this report was archived to, once the Archiving stage has uploaded it. Set
     // together with clearing PdfPath: after archiving, Drive holds the copy.
     public string? ArchivedDriveFileId { get; set; }
+
+    // Set once reMarkable delivery has SETTLED (Phase 4) — either the report reached the tablet or delivery
+    // was given up after its retry budget — so the best-effort target runs a bounded number of times and the
+    // Archiving stage can advance. Parallel to ArchivedDriveFileId; the two delivery targets are independent.
+    public bool DeliveredToRemarkable { get; set; }
 }
 
 // One story-integrity finding, promoted to a first-class row in Phase 2 (it lived only inside the report
