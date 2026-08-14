@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using DailyLoader.Domain.Health;
 using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Secrets;
 
 namespace DailyLoader.Android.Pages;
 
@@ -98,25 +99,32 @@ public partial class SetupPage : ContentPage
         CredentialStore.CalendarMappingJson = CalendarMappingEditor.Text?.Trim() ?? string.Empty;
         CredentialStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
 
-        // Back up the credentials to the encrypted Drive vault. Best-effort: they already work locally, so a
-        // failed publish (no passphrase/network/scope yet) is silent.
-        PublishToVault();
+        // Back up the credentials to the encrypted Drive vault. They already work locally; a failed publish
+        // now surfaces (a silently-skipped backup is what left the vault empty after the cutover) instead of
+        // vanishing.
+        await PublishToVaultAsync();
         // Success is the state change: saving returns home (DESIGN.md §7).
         await Navigation.PopAsync();
     }
 
-    private static async void PublishToVault()
+    // Publishes and, only when a passphrase was set but the backup didn't land, tells the owner. A
+    // no-passphrase skip stays quiet (the app just isn't in the vault yet).
+    private async Task PublishToVaultAsync()
     {
+        SecretsVaultPublishResult result;
         try
         {
             var sync = IPlatformApplication.Current!.Services.GetService<VaultSync>();
-            if (sync is not null)
-                await sync.PublishAsync(CancellationToken.None);
+            if (sync is null)
+                return;
+            result = await sync.PublishAsync(CancellationToken.None);
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort: the vault picks the credentials up on the next successful save.
+            result = SecretsVaultPublishResult.WriteFailed(ex.Message);
         }
+        if (result.NeedsAttention)
+            await DisplayAlert("Vault backup didn't complete", result.Message, "OK");
     }
 
     private async void OnGoogleSignInClicked(object sender, EventArgs e)
@@ -178,7 +186,7 @@ public partial class SetupPage : ContentPage
             CredentialStore.RemarkableDeviceToken = token;
             RemarkableTokenEntry.Text = token;
             // Back up the freshly paired token so a later reset doesn't force re-registration.
-            PublishToVault();
+            await PublishToVaultAsync();
             await DisplayAlert("Registered!", "Device registered and token saved.", "OK");
         }
         catch (HttpRequestException ex)

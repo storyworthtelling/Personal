@@ -6,6 +6,7 @@ using Storyboarder.Domain.Health;
 using Storyboarder.Infrastructure.Services;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Secrets;
 
 namespace Storyboarder.Android.Pages;
 
@@ -353,26 +354,32 @@ public partial class SetupPage : ContentPage
         SettingsStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
         // Publish this app's keys (and, since the shared Claude key is entered here, the voice key) to the
         // encrypted Drive vault so every com.storyworthtelling app can back up and restore from one place.
-        // Best-effort: the keys already work locally, and a failed publish (no network/scope/passphrase yet)
-        // just means the vault picks them up on the next successful save.
-        PublishToVault();
+        // The keys already work locally; a failed publish now surfaces (a silently-skipped backup is what
+        // left the vault empty after the cutover) instead of vanishing.
+        await PublishToVaultAsync();
         // Success is the state change: saving returns to the library.
         await Navigation.PopAsync();
         await Navigation.PopAsync();
     }
 
-    private static async void PublishToVault()
+    // Publishes and, only when a passphrase was set but the backup didn't land, tells the owner. A
+    // no-passphrase skip stays quiet (the app just isn't in the vault yet).
+    private async Task PublishToVaultAsync()
     {
+        SecretsVaultPublishResult result;
         try
         {
             var sync = IPlatformApplication.Current!.Services.GetService<VaultSync>();
-            if (sync is not null)
-                await sync.PublishAsync(CancellationToken.None);
+            if (sync is null)
+                return;
+            result = await sync.PublishAsync(CancellationToken.None);
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort: the vault picks the keys up on the next successful save.
+            result = SecretsVaultPublishResult.WriteFailed(ex.Message);
         }
+        if (result.NeedsAttention)
+            await DisplayAlert("Vault backup didn't complete", result.Message, "OK");
     }
 
     // Both toggles save on change — the setting is read live by the worker, so there is nothing to confirm
@@ -413,7 +420,7 @@ public partial class SetupPage : ContentPage
                 .GetRequiredService<Storyworthtelling.Remarkable.IRemarkableRegistration>();
             SettingsStore.RemarkableDeviceToken = await registration.Register(code);
             UpdateRemarkableStatus();
-            PublishToVault();
+            await PublishToVaultAsync();
         }
         catch (HttpRequestException ex)
         {

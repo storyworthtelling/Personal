@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Ledger.Domain.Connect;
 using Ledger.Domain.External;
 using Ledger.Infrastructure.Services;
+using Storyworthtelling.Voice.Secrets;
 
 namespace Ledger.Android.Pages;
 
@@ -149,9 +150,13 @@ public partial class PlaidLinkPage : ContentPage
             logger.LogInformation("Connect: connected institution {Institution}.", name);
 
             // Back up the new bank's access token to the encrypted vault so a later reset can restore it
-            // without re-linking. Best-effort — the connection already works locally.
-            try { await vaultSync.PublishAsync(CancellationToken.None); }
-            catch { /* Best-effort backup. */ }
+            // without re-linking. The connection already works locally, but surface a failed backup so a
+            // silently un-saved token doesn't quietly force a re-link after the next reset.
+            SecretsVaultPublishResult backup;
+            try { backup = await vaultSync.PublishAsync(CancellationToken.None); }
+            catch (Exception ex) { backup = SecretsVaultPublishResult.WriteFailed(ex.Message); }
+            if (backup.NeedsAttention)
+                await DisplayAlert("Vault backup didn't complete", backup.Message, "OK");
 
             // Kick an immediate refresh so balances appear without waiting for the daily cycle.
             RefreshWorker.RunNow(global::Android.App.Application.Context!);
