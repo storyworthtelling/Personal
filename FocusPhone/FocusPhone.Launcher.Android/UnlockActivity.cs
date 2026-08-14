@@ -1,4 +1,5 @@
 using Android.App;
+using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -26,6 +27,8 @@ namespace FocusPhone.Launcher;
     Theme = "@style/Theme.FocusPhone.Paper")]
 public class UnlockActivity : Activity
 {
+    private const int InstallApkRequestCode = 4210;
+
     private readonly Handler handler = new(Looper.MainLooper!);
     private UnlockStore? store;
     private UnlockStateMachine? machine;
@@ -141,6 +144,8 @@ public class UnlockActivity : Activity
         AddBody("Session ends automatically after 60 minutes.");
         AddContentButton(PaperUi.SecondaryButton(this, "Unblock apps…", ShowBlockedApps));
         AddContentButton(PaperUi.SecondaryButton(this, "Set update token…", ShowUpdateTokenPrompt));
+        AddContentButton(PaperUi.SecondaryButton(this, "Install from GitHub now", InstallFromGitHubNow));
+        AddContentButton(PaperUi.SecondaryButton(this, "Install APK from Downloads…", PickApkToInstall));
 
         if (cutover!.IsRunning)
         {
@@ -205,6 +210,89 @@ public class UnlockActivity : Activity
                 Render();
             })!
             .Show();
+    }
+
+    // On-demand run of the GitHub update channel: pull the latest release now and
+    // install every owner app that's new or newer, instead of waiting for the
+    // 6-hour worker. force re-checks every asset (ignores the download-dedup
+    // cache) so it doubles as a manual retry.
+    private async void InstallFromGitHubNow()
+    {
+        inlineStatus = "Checking GitHub… new or updated apps install and appear in Apps.";
+        Render();
+        try
+        {
+            await UpdateService.CheckAndInstallAsync(this, force: true);
+            inlineStatus = "GitHub check complete.";
+        }
+        catch (Exception e)
+        {
+            inlineStatus = $"GitHub install failed: {e.Message}";
+        }
+        Render();
+    }
+
+    // Manual install path for the owner's own APKs (the sibling repo apps and the
+    // FocusPhone heads) dropped into Downloads — the replacement for the adb
+    // sideload once debugging is locked down. NoInstallUnknownSources stays on:
+    // this is a first-party, admin-gated, device-owner silent install, not the
+    // open system installer. A Storage Access Framework picker hands back a
+    // readable content URI, so no storage permission is needed under scoped
+    // storage.
+    private void PickApkToInstall()
+    {
+        var intent = new Intent(Intent.ActionOpenDocument);
+        intent.AddCategory(Intent.CategoryOpenable!);
+        intent.SetType("application/vnd.android.package-archive");
+        // Some document providers report a saved .apk as a generic octet-stream;
+        // accept both so the file the restricted browser downloaded is selectable.
+        intent.PutExtra(Intent.ExtraMimeTypes, new[]
+        {
+            "application/vnd.android.package-archive",
+            "application/octet-stream",
+        });
+        try
+        {
+            StartActivityForResult(intent, InstallApkRequestCode);
+        }
+        catch (Android.Content.ActivityNotFoundException)
+        {
+            inlineStatus = "No file picker is available to choose an APK.";
+            Render();
+        }
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Android.Content.Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == InstallApkRequestCode && resultCode == Result.Ok && data?.Data is { } uri)
+        {
+            InstallApkFromUri(uri);
+        }
+    }
+
+    private async void InstallApkFromUri(Android.Net.Uri uri)
+    {
+        // Success is a quiet state change (DESIGN.md §5): the app simply appears
+        // in the tray. Failures surface inline.
+        inlineStatus = "Installing… the app appears in Apps when it finishes.";
+        Render();
+        try
+        {
+            using var input = ContentResolver!.OpenInputStream(uri);
+            if (input is null)
+            {
+                inlineStatus = "Could not read the selected file.";
+                Render();
+                return;
+            }
+            await ApkInstaller.InstallAsync(this, input);
+        }
+        catch (Exception e)
+        {
+            inlineStatus = $"Install failed: {e.Message}";
+            Render();
+        }
     }
 
     private void ShowUpdateTokenPrompt()

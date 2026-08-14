@@ -3,7 +3,11 @@ using System.Text.RegularExpressions;
 
 namespace FocusPhone.Infrastructure.Updates;
 
-public record ReleaseAsset(string Name, string DownloadUrl);
+// Id is the GitHub asset id: stable per uploaded blob and re-minted whenever CI
+// replaces the file, so the update worker uses it to skip re-downloading an
+// unchanged APK (data-frugal on a phone) while still catching a fresh build.
+// Defaulted so callers/tests that don't supply it keep compiling.
+public record ReleaseAsset(string Name, string DownloadUrl, long Id = 0);
 
 public record ReleaseInfo(string TagName, IReadOnlyList<ReleaseAsset> ApkAssets)
 {
@@ -54,7 +58,8 @@ public class GitHubReleaseClient
         var apkAssets = root.GetProperty("assets").EnumerateArray()
             .Select(asset => new ReleaseAsset(
                 asset.GetProperty("name").GetString()!,
-                asset.GetProperty("browser_download_url").GetString()!))
+                asset.GetProperty("browser_download_url").GetString()!,
+                asset.TryGetProperty("id", out var id) ? id.GetInt64() : 0))
             .Where(asset => asset.Name.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
