@@ -144,6 +144,7 @@ public class UnlockActivity : Activity
         AddBody("Session ends automatically after 60 minutes.");
         AddContentButton(PaperUi.SecondaryButton(this, "Unblock apps…", ShowBlockedApps));
         AddContentButton(PaperUi.SecondaryButton(this, "Set update token…", ShowUpdateTokenPrompt));
+        AddContentButton(PaperUi.SecondaryButton(this, "Install from GitHub now", InstallFromGitHubNow));
         AddContentButton(PaperUi.SecondaryButton(this, "Install APK from Downloads…", PickApkToInstall));
 
         if (cutover!.IsRunning)
@@ -209,6 +210,26 @@ public class UnlockActivity : Activity
                 Render();
             })!
             .Show();
+    }
+
+    // On-demand run of the GitHub update channel: pull the latest release now and
+    // install every owner app that's new or newer, instead of waiting for the
+    // 6-hour worker. force re-checks every asset (ignores the download-dedup
+    // cache) so it doubles as a manual retry.
+    private async void InstallFromGitHubNow()
+    {
+        inlineStatus = "Checking GitHub… new or updated apps install and appear in Apps.";
+        Render();
+        try
+        {
+            await UpdateService.CheckAndInstallAsync(this, force: true);
+            inlineStatus = "GitHub check complete.";
+        }
+        catch (Exception e)
+        {
+            inlineStatus = $"GitHub install failed: {e.Message}";
+        }
+        Render();
     }
 
     // Manual install path for the owner's own APKs (the sibling repo apps and the

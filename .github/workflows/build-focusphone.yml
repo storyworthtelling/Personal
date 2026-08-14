@@ -34,9 +34,10 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    # actions: write lets the prune step delete artifacts from older runs.
+    # actions: write lets the prune step delete artifacts from older runs;
+    # contents: write lets the rolling-release step publish signed APKs.
     permissions:
-      contents: read
+      contents: write
       actions: write
     steps:
       - uses: actions/checkout@v4
@@ -116,6 +117,8 @@ jobs:
           for proj in Launcher Communication Camera Audio; do
             echo "::group::Publishing FocusPhone.$proj.Android"
             dotnet publish "FocusPhone.$proj.Android" -f net10.0-android -c Release \
+              -p:ApplicationVersion=${{ github.run_number }} \
+              -p:ApplicationDisplayVersion=0.1.${{ github.run_number }} \
               -p:AndroidPackageFormat=apk \
               -p:AndroidKeyStore=true \
               -p:AndroidSigningKeyStore=/tmp/focusphone.keystore \
@@ -187,3 +190,12 @@ jobs:
             FocusPhone/FocusPhone.Audio.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
+
+      # Publish the signed heads to the rolling "apps-latest" release the phone's
+      # update channel installs from. main only — feature-branch builds must never
+      # reach the device.
+      - name: Publish to rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/publish-rolling-release
+        with:
+          apks: FocusPhone/FocusPhone.*.Android/bin/Release/net10.0-android/publish/*-Signed.apk
