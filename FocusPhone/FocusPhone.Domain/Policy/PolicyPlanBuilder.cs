@@ -32,6 +32,16 @@ public static class PolicyPlanBuilder
         // kept runnable but never surfaced in the launcher.
         suspended.Remove(PolicyContext.PlayStorePackage);
 
+        // The cutover allowlist stays runnable: the curated third-party apps
+        // (GitHub, Gemini, Maps, reMarkable) plus the system browser they need
+        // for an OAuth Custom Tab sign-in. Removed from the suspend set here, and
+        // carried out as RunnablePackages below so a package already quarantined
+        // by the install watcher is actively released on the next policy pass —
+        // omitting it from the suspend set alone would not un-suspend it.
+        var runnable = new HashSet<string>(PolicyContext.AllowlistedPackages);
+        runnable.UnionWith(PolicyContext.LoginBrowserPackages);
+        suspended.ExceptWith(runnable);
+
         // READ_SMS and READ_CALL_LOG are hard-restricted: the installer only
         // whitelists them (un-restricts), so they still have to be granted. A
         // device-owner grant is the only reliable path — it needs no runtime
@@ -54,7 +64,9 @@ public static class PolicyPlanBuilder
         // (tile tints and message capture are unaffected); only the overlay UI is
         // blocked. Device-owner only, so this takes effect at provisioning.
         return new PolicyPlan(
-            restrictions, suspended, permissionGrants,
-            EnforceAutoTime: true, FamilyDnsHost, DisableStatusBar: true);
+            restrictions, suspended, runnable, permissionGrants,
+            EnforceAutoTime: true, FamilyDnsHost, DisableStatusBar: true,
+            LoginBrowser: new LoginBrowserPolicy(
+                PolicyContext.LoginBrowserPackage, PolicyContext.LoginBrowserUrlAllowlist));
     }
 }

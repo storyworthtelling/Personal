@@ -56,10 +56,11 @@ public class PolicyPlanBuilderTests
     [Fact]
     public void BrowserPackages_AreSuspended()
     {
-        var plan = PolicyPlanBuilder.Build(DefaultContext(browserPackages: ["com.android.chrome", "org.mozilla.firefox"]));
+        // Every browser except the login browser (kept for OAuth Custom Tabs).
+        var plan = PolicyPlanBuilder.Build(DefaultContext(browserPackages: ["org.mozilla.firefox", "com.brave.browser"]));
 
-        Assert.Contains("com.android.chrome", plan.SuspendedPackages);
         Assert.Contains("org.mozilla.firefox", plan.SuspendedPackages);
+        Assert.Contains("com.brave.browser", plan.SuspendedPackages);
     }
 
     [Fact]
@@ -94,6 +95,65 @@ public class PolicyPlanBuilderTests
         var plan = PolicyPlanBuilder.Build(DefaultContext(blockedPackages: ["com.android.vending"]));
 
         Assert.DoesNotContain("com.android.vending", plan.SuspendedPackages);
+    }
+
+    [Fact]
+    public void CutoverAllowlistedApps_AreNeverSuspended_EvenIfPreviouslyBlocked()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext(
+            blockedPackages: [PolicyContext.GitHubPackage, PolicyContext.MapsPackage]));
+
+        Assert.DoesNotContain(PolicyContext.GitHubPackage, plan.SuspendedPackages);
+        Assert.DoesNotContain(PolicyContext.GeminiPackage, plan.SuspendedPackages);
+        Assert.DoesNotContain(PolicyContext.MapsPackage, plan.SuspendedPackages);
+        Assert.DoesNotContain(PolicyContext.RemarkablePackage, plan.SuspendedPackages);
+    }
+
+    [Fact]
+    public void CutoverAllowlistedApps_AreCarriedAsRunnable_SoAQuarantinedAppIsReleased()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.Contains(PolicyContext.GitHubPackage, plan.RunnablePackages);
+        Assert.Contains(PolicyContext.GeminiPackage, plan.RunnablePackages);
+        Assert.Contains(PolicyContext.MapsPackage, plan.RunnablePackages);
+        Assert.Contains(PolicyContext.RemarkablePackage, plan.RunnablePackages);
+    }
+
+    [Fact]
+    public void LoginBrowser_IsNotSuspended_EvenThoughItIsABrowser()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext(
+            browserPackages: [PolicyContext.LoginBrowserPackage, "org.mozilla.firefox"]));
+
+        // The login browser stays runnable for OAuth Custom Tabs; other browsers
+        // are still suspended.
+        Assert.DoesNotContain(PolicyContext.LoginBrowserPackage, plan.SuspendedPackages);
+        Assert.Contains(PolicyContext.LoginBrowserPackage, plan.RunnablePackages);
+        Assert.Contains("org.mozilla.firefox", plan.SuspendedPackages);
+    }
+
+    [Fact]
+    public void LoginBrowser_IsLockedToTheIdentityProviderHosts()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.Equal(PolicyContext.LoginBrowserPackage, plan.LoginBrowser.Package);
+        // A representative host from each provider is on the allowlist.
+        Assert.Contains("accounts.google.com", plan.LoginBrowser.AllowedUrlPatterns);
+        Assert.Contains("github.com", plan.LoginBrowser.AllowedUrlPatterns);
+        Assert.Contains("remarkable.com", plan.LoginBrowser.AllowedUrlPatterns);
+    }
+
+    [Fact]
+    public void LoginBrowserAllowlist_KeepsGeneralBrowsingClosed()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        // Deliberately narrow: no bare google.com, so search and general browsing
+        // stay blocked when everything-else is denied by the "*" blocklist.
+        Assert.DoesNotContain("google.com", plan.LoginBrowser.AllowedUrlPatterns);
+        Assert.DoesNotContain("*", plan.LoginBrowser.AllowedUrlPatterns);
     }
 
     [Fact]

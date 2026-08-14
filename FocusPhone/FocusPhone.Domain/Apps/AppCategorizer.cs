@@ -41,6 +41,14 @@ public class AppCategorizer
         {
             return AppVerdict.Allowed;
         }
+        // Curated third-party apps the owner keeps through the cutover (GitHub,
+        // Gemini, Maps, reMarkable). Cleared here — ahead of the web/game/rating
+        // checks — so a package that handles web intents or resolves to an
+        // Unknown rating is not quarantined. An explicit block above still wins.
+        if (PolicyContext.AllowlistedPackages.Contains(app.PackageName))
+        {
+            return AppVerdict.Allowed;
+        }
         if (allowedPackages.Contains(app.PackageName))
         {
             return AppVerdict.Allowed;

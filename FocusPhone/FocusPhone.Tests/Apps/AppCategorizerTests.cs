@@ -126,6 +126,38 @@ public class AppCategorizerTests
     }
 
     [Fact]
+    public void CutoverAllowlistedApp_IsAllowed_DespiteUnknownRating()
+    {
+        // GitHub, Gemini, Maps, reMarkable are kept through the cutover: their
+        // Play rating is irrelevant and must not quarantine them.
+        var maps = CleanApp(FocusPhone.Domain.Policy.PolicyContext.MapsPackage);
+
+        Assert.Equal(AppVerdict.Allowed, categorizer.Categorize(maps, ContentRating.Unknown));
+    }
+
+    [Fact]
+    public void CutoverAllowlistedApp_IsAllowed_EvenIfHandlesWebIntents()
+    {
+        // An allowlisted app that registers a web intent filter (e.g. GitHub,
+        // Maps) would otherwise be blocked as browser-like; the allowlist clears it.
+        var github = new AppInfo(
+            FocusPhone.Domain.Policy.PolicyContext.GitHubPackage,
+            HandlesHttpViewIntents: true, IsCategoryGame: false);
+
+        Assert.Equal(AppVerdict.Allowed, categorizer.Categorize(github, ContentRating.Unknown));
+    }
+
+    [Fact]
+    public void CutoverAllowlistedApp_CanStillBeExplicitlyBlocked()
+    {
+        categorizer.Block(FocusPhone.Domain.Policy.PolicyContext.GeminiPackage);
+
+        Assert.Equal(AppVerdict.Blocked,
+            categorizer.Categorize(
+                CleanApp(FocusPhone.Domain.Policy.PolicyContext.GeminiPackage), ContentRating.Everyone));
+    }
+
+    [Fact]
     public void LookalikePackageOutsideOwnerPrefix_IsStillQuarantined()
     {
         // The prefix ends in a dot, so a namespace that merely starts with the

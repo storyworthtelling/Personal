@@ -1,6 +1,7 @@
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
+using Android.OS;
 using Android.Util;
 using FocusPhone.Domain.Policy;
 
@@ -92,6 +93,22 @@ public static class PolicyManager
             }
         }
 
+        // Actively un-suspend the cutover allowlist (curated apps + the login
+        // browser). Removing them from the suspend set is not enough: the install
+        // watcher may have already quarantined one, and nothing else releases it.
+        var toRelease = plan.RunnablePackages
+            .Where(p => IsInstalled(context, p))
+            .ToArray();
+        if (toRelease.Length > 0)
+        {
+            var failed = dpm.SetPackagesSuspended(admin, toRelease, false);
+            if (failed is { Length: > 0 })
+            {
+                Log.Warn(Tag, $"Could not un-suspend: {string.Join(", ", failed)}");
+            }
+        }
+
+        ApplyLoginBrowserConfig(context, dpm, admin, plan.LoginBrowser);
         GrantPermissions(dpm, admin, plan);
         PinHomeActivity(dpm, admin, context);
         PinRestrictedBrowser(dpm, admin, context);
@@ -136,6 +153,42 @@ public static class PolicyManager
             {
                 Log.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Locks the login browser (Chrome) to the identity-provider hosts via its
+    /// enterprise managed configuration: block every URL, allow only the auth
+    /// domains, and disable incognito. This is what makes "very limited use for
+    /// login" real — without it, the un-suspended browser is an open door (the
+    /// Custom Tab's "Open in Chrome" overflow and on-page links both reach the
+    /// open internet). Applied through the app-restrictions channel the device
+    /// owner already controls; a no-op until Chrome is installed.
+    /// </summary>
+    private static void ApplyLoginBrowserConfig(
+        Context context, DevicePolicyManager dpm, ComponentName admin, LoginBrowserPolicy login)
+    {
+        if (!IsInstalled(context, login.Package))
+        {
+            return;
+        }
+
+        var restrictions = new Bundle();
+        // "*" blocks everything; the allowlist carves the exceptions back out.
+        // Chrome gives the allowlist precedence over the blocklist.
+        restrictions.PutStringArray("URLBlocklist", ["*"]);
+        restrictions.PutStringArray("URLAllowlist", login.AllowedUrlPatterns.ToArray());
+        // 1 = incognito disabled, so the filter can't be sidestepped in a new
+        // incognito tab.
+        restrictions.PutInt("IncognitoModeAvailability", 1);
+
+        try
+        {
+            dpm.SetApplicationRestrictions(admin, login.Package, restrictions);
+        }
+        catch (Java.Lang.Exception e)
+        {
+            Log.Warn(Tag, $"Could not lock down the login browser {login.Package}: {e.Message}");
         }
     }
 
