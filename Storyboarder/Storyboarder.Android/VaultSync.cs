@@ -19,7 +19,7 @@ public sealed class VaultSync
     // Writes the current Claude + Gemini keys and the reMarkable device token into the vault, leaving every
     // other app's section untouched. The Remarkable section is shared with the other apps that deliver to the
     // same tablet, so publishing the token here also lets them restore it.
-    public Task<bool> PublishAsync(CancellationToken cancellationToken) =>
+    public Task<SecretsVaultPublishResult> PublishAsync(CancellationToken cancellationToken) =>
         vault.PublishAsync(v => v with
         {
             Claude = new ClaudeSecrets(SettingsStore.ClaudeApiKey),

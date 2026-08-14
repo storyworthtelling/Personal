@@ -9,6 +9,7 @@ using Ledger.Domain.Model;
 using Ledger.Domain.Time;
 using Ledger.Infrastructure.Services;
 using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Secrets;
 
 namespace Ledger.Android.Pages;
 
@@ -120,23 +121,29 @@ public partial class SetupPage : ContentPage
         NoAccountsLabel.IsVisible = rows.Count == 0;
     }
 
-    private void OnSaveClicked(object? sender, EventArgs e)
+    private async void OnSaveClicked(object? sender, EventArgs e)
     {
         SettingsStore.PlaidClientId = ClientIdEntry.Text?.Trim() ?? string.Empty;
         SettingsStore.PlaidSecret = SecretEntry.Text?.Trim() ?? string.Empty;
         SettingsStore.PlaidEnvironment = (EnvironmentPicker.SelectedItem as string) ?? "sandbox";
         SettingsStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
-        // Back up the Plaid credentials + connected banks to the encrypted Drive vault. Best-effort: the
-        // settings already work locally, so a failed publish (no passphrase/network/scope yet) is silent.
-        PublishToVault();
+        // Back up the Plaid credentials + connected banks to the encrypted Drive vault. The backup is
+        // optional — the settings already work locally — but a failure now surfaces instead of vanishing: a
+        // silently-skipped backup is exactly what left the vault empty after the cutover.
+        await PublishToVaultAsync();
         // Success is a state change, not a toast (DESIGN.md §7): return to the list.
-        Navigation.PopAsync();
+        await Navigation.PopAsync();
     }
 
-    private async void PublishToVault()
+    // Publishes and, only when a passphrase was set but the backup didn't land, tells the owner. A
+    // no-passphrase skip stays quiet (the app just isn't in the vault yet).
+    private async Task PublishToVaultAsync()
     {
-        try { await vaultSync.PublishAsync(CancellationToken.None); }
-        catch { /* Best-effort: the vault picks the change up on the next successful publish. */ }
+        SecretsVaultPublishResult result;
+        try { result = await vaultSync.PublishAsync(CancellationToken.None); }
+        catch (Exception ex) { result = SecretsVaultPublishResult.WriteFailed(ex.Message); }
+        if (result.NeedsAttention)
+            await DisplayAlert("Vault backup didn't complete", result.Message, "OK");
     }
 
     private async void OnConnectClicked(object? sender, EventArgs e)

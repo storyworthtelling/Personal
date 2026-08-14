@@ -20,8 +20,9 @@ public sealed class VaultSync
         this.accounts = accounts;
     }
 
-    // Writes the Plaid credentials + all bank access tokens into the vault, leaving other apps' sections alone.
-    public async Task<bool> PublishAsync(CancellationToken cancellationToken)
+    // Writes the Plaid credentials + all bank access tokens into the vault, leaving other apps' sections
+    // alone. Returns the publish outcome so the caller can surface a failed backup instead of hiding it.
+    public async Task<SecretsVaultPublishResult> PublishAsync(CancellationToken cancellationToken)
     {
         var credentials = await accounts.GetInstitutionCredentialsAsync(cancellationToken);
         var items = credentials

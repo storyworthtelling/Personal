@@ -31,20 +31,31 @@ public sealed class SecretsVaultService
             : store.LoadAsync(pass, cancellationToken);
     }
 
-    // Merges this app's section into the vault and saves it. Returns false (a no-op) when there is no
-    // passphrase, or when the existing vault can't be read — refusing to write in that case so a mistyped
-    // passphrase can't blow away the file. Returns true when the vault was written.
-    public async Task<bool> PublishAsync(Func<SecretsVault, SecretsVault> merge, CancellationToken cancellationToken)
+    // Merges this app's section into the vault and saves it, reporting the outcome instead of returning a
+    // bare bool. Skips quietly with no passphrase; refuses to write (VaultUnreadable) when the existing vault
+    // can't be read, so a mistyped passphrase can't blow away the file; and — the point of the hardening —
+    // converts a write failure (no `drive` scope, no network) into a WriteFailed result rather than an
+    // escaping exception, so the caller can surface it instead of the backup silently never happening.
+    public async Task<SecretsVaultPublishResult> PublishAsync(Func<SecretsVault, SecretsVault> merge, CancellationToken cancellationToken)
     {
         var pass = passphrase();
         if (string.IsNullOrEmpty(pass))
-            return false;
+            return SecretsVaultPublishResult.NoPassphrase;
 
         var result = await store.LoadAsync(pass, cancellationToken);
         if (result.Status is SecretsVaultStatus.WrongPassphrase or SecretsVaultStatus.Corrupt)
-            return false;
+            return SecretsVaultPublishResult.VaultUnreadable;
 
-        await store.SaveAsync(merge(result.Vault), pass, cancellationToken);
-        return true;
+        var merged = merge(result.Vault);
+        try
+        {
+            await store.SaveAsync(merged, pass, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return SecretsVaultPublishResult.WriteFailed(ex.Message);
+        }
+
+        return SecretsVaultPublishResult.Published;
     }
 }

@@ -17,6 +17,18 @@ public class SecretsVaultServiceTests
         }
     }
 
+    // A store whose write always throws, standing in for the real failure that left the cutover vault empty:
+    // a Drive write rejected because the full `drive` scope wasn't granted. Reads succeed so publish gets
+    // past the load and fails only at the write, which is the case the hardening must surface.
+    private sealed class WriteFailingStore : ISecretsVaultStore
+    {
+        public Task<SecretsVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken) =>
+            Task.FromResult(SecretsVaultLoadResult.Empty);
+
+        public Task SaveAsync(SecretsVault vault, string passphrase, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Drive returned 403 (insufficient scope).");
+    }
+
     private const string Pass = "vault-passphrase";
 
     [Fact]
@@ -25,8 +37,9 @@ public class SecretsVaultServiceTests
         var store = new DriveSecretsVaultStore(new InMemoryTextFile());
         var service = new SecretsVaultService(store, () => Pass);
 
-        var wrote = await service.PublishAsync(v => v with { Gemini = new GeminiSecrets("g-key") }, default);
-        Assert.True(wrote);
+        var published = await service.PublishAsync(v => v with { Gemini = new GeminiSecrets("g-key") }, default);
+        Assert.True(published.Succeeded);
+        Assert.False(published.NeedsAttention);
 
         var result = await service.LoadAsync(default);
         Assert.Equal(SecretsVaultStatus.Loaded, result.Status);
@@ -39,7 +52,11 @@ public class SecretsVaultServiceTests
         var store = new DriveSecretsVaultStore(new InMemoryTextFile());
         var service = new SecretsVaultService(store, () => null);
 
-        Assert.False(await service.PublishAsync(v => v with { Gemini = new GeminiSecrets("x") }, default));
+        var result = await service.PublishAsync(v => v with { Gemini = new GeminiSecrets("x") }, default);
+        Assert.Equal(SecretsVaultPublishStatus.NoPassphrase, result.Status);
+        Assert.False(result.Succeeded);
+        // No passphrase is a quiet, expected state — the app just isn't in the vault yet.
+        Assert.False(result.NeedsAttention);
         Assert.False(service.HasPassphrase);
         Assert.Equal(SecretsVaultStatus.Empty, (await service.LoadAsync(default)).Status);
     }
@@ -51,12 +68,30 @@ public class SecretsVaultServiceTests
         var real = new SecretsVaultService(new DriveSecretsVaultStore(file), () => "real-pass");
         await real.PublishAsync(v => v with { Claude = new ClaudeSecrets("keep-me") }, default);
 
-        // A different app with the wrong passphrase must not clobber the file.
+        // A different app with the wrong passphrase must not clobber the file — and must be told so.
         var wrong = new SecretsVaultService(new DriveSecretsVaultStore(file), () => "wrong-pass");
-        Assert.False(await wrong.PublishAsync(v => v with { Gemini = new GeminiSecrets("intruder") }, default));
+        var result = await wrong.PublishAsync(v => v with { Gemini = new GeminiSecrets("intruder") }, default);
+        Assert.Equal(SecretsVaultPublishStatus.VaultUnreadable, result.Status);
+        Assert.True(result.NeedsAttention);
+        Assert.NotEqual(string.Empty, result.Message);
 
-        var result = await real.LoadAsync(default);
-        Assert.Equal("keep-me", result.Vault.Claude.ApiKey);
-        Assert.Equal(string.Empty, result.Vault.Gemini.ApiKey);
+        var reload = await real.LoadAsync(default);
+        Assert.Equal("keep-me", reload.Vault.Claude.ApiKey);
+        Assert.Equal(string.Empty, reload.Vault.Gemini.ApiKey);
+    }
+
+    [Fact]
+    public async Task Publish_SurfacesWriteFailure_InsteadOfThrowing()
+    {
+        // The failure mode behind the empty cutover vault: a passphrase is set, the read succeeds, but the
+        // Drive write is rejected. It must come back as a value the caller can show — not an escaping exception.
+        var service = new SecretsVaultService(new WriteFailingStore(), () => Pass);
+
+        var result = await service.PublishAsync(v => v with { Nyt = new NytSecrets("cookie", "key") }, default);
+
+        Assert.Equal(SecretsVaultPublishStatus.WriteFailed, result.Status);
+        Assert.True(result.NeedsAttention);
+        Assert.False(result.Succeeded);
+        Assert.Contains("403", result.Message);
     }
 }

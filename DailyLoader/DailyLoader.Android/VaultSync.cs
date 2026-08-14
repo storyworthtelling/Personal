@@ -18,7 +18,7 @@ public sealed class VaultSync
     }
 
     // Writes DailyLoader's credentials into the vault, leaving every other app's section untouched.
-    public Task<bool> PublishAsync(CancellationToken cancellationToken) =>
+    public Task<SecretsVaultPublishResult> PublishAsync(CancellationToken cancellationToken) =>
         vault.PublishAsync(v => v with
         {
             Nyt = new NytSecrets(CredentialStore.NytSessionCookie, CredentialStore.NytApiKey),
