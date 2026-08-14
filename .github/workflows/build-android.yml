@@ -16,9 +16,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # actions: write lets the prune step delete artifacts from older runs.
+    # actions: write lets the prune step delete artifacts from older runs;
+    # contents: write lets the rolling-release step publish the signed APK.
     permissions:
-      contents: read
+      contents: write
       actions: write
     steps:
       - uses: actions/checkout@v4
@@ -85,3 +86,14 @@ jobs:
           path: DailyLoader/DailyLoader.Android/bin/Release/net9.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
+
+      # Publish the signed APK to the rolling "apps-latest" release the phone's
+      # update channel installs from. main only — feature-branch builds must never
+      # reach the device. No ApplicationVersion override here: DailyLoader already
+      # self-versions its versionCode from a UTC timestamp (monotonic), so the
+      # channel's per-app newer-than check works without run_number.
+      - name: Publish to rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/publish-rolling-release
+        with:
+          apks: DailyLoader/DailyLoader.Android/bin/Release/net9.0-android/publish/*-Signed.apk
