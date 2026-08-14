@@ -88,33 +88,8 @@ public static class UpdateService
                 throw new HttpRequestException(
                     $"Downloading {asset.Name} failed with {(int)response.StatusCode} {response.StatusCode}.");
             }
-            await InstallApkAsync(context, await response.Content.ReadAsStreamAsync());
+            await ApkInstaller.InstallAsync(context, await response.Content.ReadAsStreamAsync());
         }
-    }
-
-    private static async Task InstallApkAsync(Context context, Stream apk)
-    {
-        var installer = context.PackageManager!.PackageInstaller;
-        var sessionParams = new PackageInstaller.SessionParams(PackageInstallMode.FullInstall);
-        sessionParams.SetWhitelistedRestrictedPermissions(
-            [
-                Android.Manifest.Permission.ReadCallLog,
-                Android.Manifest.Permission.ReadSms,
-                Android.Manifest.Permission.WriteCallLog,
-            ]);
-
-        var sessionId = installer.CreateSession(sessionParams);
-        using var session = installer.OpenSession(sessionId);
-        using (var output = session.OpenWrite("focusphone.apk", 0, -1))
-        {
-            await apk.CopyToAsync(output);
-            session.Fsync(output);
-        }
-
-        var statusIntent = new Intent(context, typeof(InstallResultReceiver));
-        var pending = PendingIntent.GetBroadcast(
-            context, sessionId, statusIntent, PendingIntentFlags.Mutable)!;
-        session.Commit(pending.IntentSender);
     }
 }
 
