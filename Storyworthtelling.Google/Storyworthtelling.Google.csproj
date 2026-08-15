@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared Google broker (net10.0, pure .NET like the other Storyworthtelling.* libs): sign-in-once
+       account + per-app minimal scopes + Drive service construction (the closure every app's MauiProgram
+       duplicates today), plus the shared weather read. Calendar/Tasks client relocation and Health
+       Connect / Keep implementations are device/live-gated follow-ons; their seams are stubbed here. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Google</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
+  </ItemGroup>
+
+</Project>
