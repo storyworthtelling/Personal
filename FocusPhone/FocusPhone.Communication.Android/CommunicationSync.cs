@@ -26,11 +26,11 @@ public static class CommunicationSync
     // messages older than this are outside the snapshot and left untouched.
     private static readonly TimeSpan ReconcileWindow = TimeSpan.FromDays(30);
 
-    public static void RunIncremental(Context context) => Run(context, reconcile: false);
+    public static Task RunIncrementalAsync(Context context) => RunAsync(context, reconcile: false);
 
-    public static void RunReconcile(Context context) => Run(context, reconcile: true);
+    public static Task RunReconcileAsync(Context context) => RunAsync(context, reconcile: true);
 
-    private static void Run(Context context, bool reconcile)
+    private static async Task RunAsync(Context context, bool reconcile)
     {
         // A reconcile is the owner asking to be brought fully up to date, so make
         // sure the bridge is online and draining current texts. The periodic
@@ -56,21 +56,17 @@ public static class CommunicationSync
 
         var preferences = context.GetSharedPreferences(SyncPreferences, FileCreationMode.Private)!;
         var now = DateTimeOffset.UtcNow;
-        // A reconcile always fetches the full window so the snapshot is complete;
-        // an incremental sync resumes from the last success (falling back to the
-        // window on first run).
-        var since = reconcile
-            ? now - ReconcileWindow
-            : DateTimeOffset.TryParse(preferences.GetString(LastSyncKey, null), out var parsed)
-                ? parsed
-                : now - ReconcileWindow;
+        var lastSync = DateTimeOffset.TryParse(preferences.GetString(LastSyncKey, null), out var parsed)
+            ? parsed
+            : (DateTimeOffset?)null;
+        var since = EmailSyncWindow.Since(reconcile, lastSync, now, ReconcileWindow);
 
         var client = new GmailClient(account.GmailAddress!, account.GmailAppPassword!);
         var health = new CredentialHealthStore();
         IReadOnlyList<TimelineItem> items;
         try
         {
-            items = client.FetchRecentAsync(since).GetAwaiter().GetResult();
+            items = await client.FetchRecentAsync(since);
             // A completed authenticated fetch clears any prior app-password failure.
             health.MarkOk(CredentialIds.GmailAppPassword);
         }
