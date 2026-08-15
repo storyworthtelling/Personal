@@ -24,10 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 9
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android
@@ -41,7 +41,7 @@ jobs:
       - name: Build APK
         working-directory: DailyLoader
         run: >
-          dotnet publish DailyLoader.Android -f net9.0-android -c Release
+          dotnet publish DailyLoader.Android -f net10.0-android -c Release
           -p:AndroidKeyStore=true
           -p:AndroidSigningKeyStore=/tmp/dailyloader.keystore
           -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }}
@@ -57,8 +57,8 @@ jobs:
         run: |
           set +e
           echo "=== ICON+FONT CHECK ==="
-          APK=$(ls -1 DailyLoader.Android/bin/Release/net9.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(ls -1 DailyLoader.Android/bin/Release/net9.0-android/publish/*.apk 2>/dev/null | head -1)
+          APK=$(ls -1 DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls -1 DailyLoader.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
           echo "APK: $APK"
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
           [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
@@ -83,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Daily-Loader-Android
-          path: DailyLoader/DailyLoader.Android/bin/Release/net9.0-android/publish/*-Signed.apk
+          path: DailyLoader/DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
 
@@ -96,4 +96,4 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/publish-rolling-release
         with:
-          apks: DailyLoader/DailyLoader.Android/bin/Release/net9.0-android/publish/*-Signed.apk
+          apks: DailyLoader/DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk

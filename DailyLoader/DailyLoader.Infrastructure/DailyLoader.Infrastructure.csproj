@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Defaults to both TFMs for Visual Studio / CI. Pass -p:DailyLoaderTfms=net9.0 to build
+    <!-- Defaults to both TFMs for Visual Studio / CI. Pass -p:DailyLoaderTfms=net10.0 to build
          a single framework in environments without the Android workload installed. -->
-    <DailyLoaderTfms Condition="'$(DailyLoaderTfms)' == ''">net9.0;net9.0-android</DailyLoaderTfms>
+    <DailyLoaderTfms Condition="'$(DailyLoaderTfms)' == ''">net10.0;net10.0-android</DailyLoaderTfms>
     <TargetFrameworks>$(DailyLoaderTfms)</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -28,11 +28,11 @@
   </ItemGroup>
 
   <!-- Playwright requires native browser binaries — exclude from Android -->
-  <ItemGroup Condition="'$(TargetFramework)' != 'net9.0-android'">
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0-android'">
     <PackageReference Include="Microsoft.Playwright" Version="1.49.0" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0-android'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
     <Compile Remove="Nyt\PlaywrightPageFetcher.cs" />
   </ItemGroup>
 </Project>
