@@ -1,6 +1,4 @@
-using PdfSharp;
-using PdfSharp.Drawing;
-using PdfSharp.Pdf;
+using SkiaSharp;
 using DailyLoader.Domain.Interfaces;
 using DailyLoader.Domain.Models;
 
@@ -8,6 +6,7 @@ namespace DailyLoader.Infrastructure.Pdf;
 
 // Renders the daily calendar: page 1 is a five-column timeline (6 AM-10 PM) with a
 // handwriting region at the bottom; page 2 is a seven-day outlook of non-routine events.
+// Rendered with SkiaSharp via SkiaPageLayout.
 public class CalendarPdfComposer : ICalendarPdfComposer
 {
     private const int StartHour = 6;
@@ -17,6 +16,10 @@ public class CalendarPdfComposer : ICalendarPdfComposer
     private const double HeaderHeight = 18;
     private const double HandwritingReserve = 130;
 
+    // Event-box fills, kept as RGB components (as the PdfSharp version was) — not hex string literals.
+    private static readonly SKColor AllDayFill = new(230, 230, 245); // lavender
+    private static readonly SKColor TimedFill = new(225, 238, 225);  // green
+
     private static readonly PersonColumn[] Columns =
         [PersonColumn.Matt, PersonColumn.Ashley, PersonColumn.Gwen, PersonColumn.Eva, PersonColumn.Watch];
 
@@ -25,8 +28,7 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         IReadOnlyList<CalendarEvent> outlook,
         IReadOnlyList<ParsedNote> unreadableCarryovers)
     {
-        var doc = new PdfDocument();
-        var layout = new PdfLayout(doc, PageOrientation.Landscape);
+        using var layout = new SkiaPageLayout(landscape: true);
 
         DrawTimelinePage(layout, today);
         HandwritingRegion.Draw(layout, "Future events — write below:", unreadableCarryovers);
@@ -34,63 +36,59 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         layout.NewPage();
         DrawOutlookPage(layout, today.Date, outlook);
 
-        using var ms = new MemoryStream();
-        doc.Save(ms);
-        return ms.ToArray();
+        return layout.ToPdf();
     }
 
-    private static void DrawTimelinePage(PdfLayout layout, DayAgenda agenda)
+    private static void DrawTimelinePage(SkiaPageLayout layout, DayAgenda agenda)
     {
-        var titleFont  = new XFont("sans-serif", 16, XFontStyleEx.Bold);
-        var headerFont = new XFont("sans-serif", 11, XFontStyleEx.Bold);
-        var hourFont   = new XFont("sans-serif",  8, XFontStyleEx.Regular);
-        var eventFont  = new XFont("sans-serif",  8, XFontStyleEx.Regular);
+        var titleFont = SkiaPageLayout.Sans(16, bold: true);
+        var headerFont = SkiaPageLayout.Sans(11, bold: true);
+        var hourFont = SkiaPageLayout.Sans(8);
+        var eventFont = SkiaPageLayout.Sans(8);
 
         layout.DrawCentered(agenda.Date.ToDateTime(TimeOnly.MinValue).ToString("dddd, MMMM d, yyyy"), titleFont, 22);
 
         var gridTop = layout.Y;
-        var gridLeft = PdfLayout.Margin;
-        var gridRight = PdfLayout.Margin + layout.ContentWidth;
+        var gridLeft = SkiaPageLayout.Margin;
+        var gridRight = SkiaPageLayout.Margin + layout.ContentWidth;
         var colsLeft = gridLeft + HourGutter;
         var colWidth = (gridRight - colsLeft) / Columns.Length;
         var timelineTop = gridTop + HeaderHeight;
         var gridBottom = layout.BottomY - HandwritingReserve;
         var hourHeight = (gridBottom - timelineTop) / HourSpan;
 
-        var grayPen = new XPen(XColors.Gray, 0.5);
-        var linePen = new XPen(XColors.LightGray, 0.5);
-
         // Column headers.
         for (var i = 0; i < Columns.Length; i++)
-            layout.Gfx.DrawString(Columns[i].ToString(), headerFont, XBrushes.Black,
-                new XRect(colsLeft + i * colWidth, gridTop, colWidth, HeaderHeight), XStringFormats.Center);
+            layout.DrawText(Columns[i].ToString(), headerFont,
+                colsLeft + i * colWidth, gridTop, colWidth, HeaderHeight, TextAlign.Center);
 
         // Hour rows + labels.
         for (var h = 0; h <= HourSpan; h++)
         {
             var y = timelineTop + h * hourHeight;
-            layout.Gfx.DrawLine(linePen, colsLeft, y, gridRight, y);
+            layout.DrawLine(colsLeft, y, gridRight, y, SKColors.LightGray, 0.5f);
             if (h < HourSpan)
-                layout.Gfx.DrawString(FormatHour(StartHour + h), hourFont, XBrushes.Gray,
-                    new XRect(gridLeft, y + 1, HourGutter - 4, 12), XStringFormats.TopRight);
+                layout.DrawText(FormatHour(StartHour + h), hourFont,
+                    gridLeft, y + 1, HourGutter - 4, 12, TextAlign.TopRight, SKColors.Gray);
         }
 
         // Column separators.
         for (var i = 0; i <= Columns.Length; i++)
         {
             var x = colsLeft + i * colWidth;
-            layout.Gfx.DrawLine(grayPen, x, gridTop, x, gridBottom);
+            layout.DrawLine(x, gridTop, x, gridBottom, SKColors.Gray, 0.5f);
         }
-        layout.Gfx.DrawLine(grayPen, gridLeft, gridTop, gridLeft, gridBottom);
+        layout.DrawLine(gridLeft, gridTop, gridLeft, gridBottom, SKColors.Gray, 0.5f);
 
         // All-day events stack as strips at the top of their column.
         var allDayOffset = new double[Columns.Length];
         foreach (var e in agenda.Events.Where(e => e.IsAllDay))
         {
             var col = ColumnIndex(e.Column);
+            if (col < 0) continue;
             var x = colsLeft + col * colWidth;
             var y = timelineTop + allDayOffset[col];
-            DrawEventBox(layout, x + 1, y, colWidth - 2, 13, e.Title, eventFont, XColor.FromArgb(230, 230, 245));
+            DrawEventBox(layout, x + 1, y, colWidth - 2, 13, e.Title, eventFont, AllDayFill);
             allDayOffset[col] += 14;
         }
 
@@ -98,6 +96,7 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         foreach (var e in agenda.Events.Where(e => !e.IsAllDay))
         {
             var col = ColumnIndex(e.Column);
+            if (col < 0) continue;
             var startOffset = HoursFromStart(e.Start);
             var endOffset = HoursFromStart(e.End);
             if (endOffset <= 0 || startOffset >= HourSpan)
@@ -109,17 +108,17 @@ public class CalendarPdfComposer : ICalendarPdfComposer
             var y = timelineTop + startOffset * hourHeight;
             var height = Math.Max(11, (endOffset - startOffset) * hourHeight);
             var x = colsLeft + col * colWidth;
-            DrawEventBox(layout, x + 1, y, colWidth - 2, height, e.Title, eventFont, XColor.FromArgb(225, 238, 225));
+            DrawEventBox(layout, x + 1, y, colWidth - 2, height, e.Title, eventFont, TimedFill);
         }
 
         layout.MoveTo(gridBottom);
     }
 
-    private static void DrawOutlookPage(PdfLayout layout, DateOnly today, IReadOnlyList<CalendarEvent> outlook)
+    private static void DrawOutlookPage(SkiaPageLayout layout, DateOnly today, IReadOnlyList<CalendarEvent> outlook)
     {
-        var titleFont = new XFont("sans-serif", 16, XFontStyleEx.Bold);
-        var dayFont   = new XFont("sans-serif", 12, XFontStyleEx.Bold);
-        var itemFont  = new XFont("sans-serif", 11, XFontStyleEx.Regular);
+        var titleFont = SkiaPageLayout.Sans(16, bold: true);
+        var dayFont = SkiaPageLayout.Sans(12, bold: true);
+        var itemFont = SkiaPageLayout.Sans(11);
 
         layout.DrawCentered("7-Day Outlook", titleFont, 24);
         layout.Advance(6);
@@ -153,12 +152,11 @@ public class CalendarPdfComposer : ICalendarPdfComposer
     }
 
     private static void DrawEventBox(
-        PdfLayout layout, double x, double y, double width, double height, string title, XFont font, XColor fill)
+        SkiaPageLayout layout, double x, double y, double width, double height, string title, SKFont font, SKColor fill)
     {
-        layout.Gfx.DrawRectangle(new XSolidBrush(fill), x, y, width, height);
-        layout.Gfx.DrawRectangle(new XPen(XColors.Gray, 0.4), x, y, width, height);
-        layout.Gfx.DrawString(Truncate(layout.Gfx, title, font, width - 4), font, XBrushes.Black,
-            new XRect(x + 2, y + 1, width - 4, Math.Min(height, 12)), XStringFormats.TopLeft);
+        layout.DrawRect(x, y, width, height, stroke: SKColors.Gray, strokeWidth: 0.4f, fill: fill);
+        layout.DrawText(layout.Truncate(title, font, width - 4), font,
+            x + 2, y + 1, width - 4, Math.Min(height, 12), TextAlign.TopLeft);
     }
 
     private static int ColumnIndex(PersonColumn column) => Array.IndexOf(Columns, column);
@@ -171,16 +169,5 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         var period = hour24 < 12 ? "AM" : "PM";
         var hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
         return $"{hour12} {period}";
-    }
-
-    private static string Truncate(XGraphics gfx, string text, XFont font, double maxWidth)
-    {
-        if (gfx.MeasureString(text, font).Width <= maxWidth || text.Length == 0)
-            return text;
-
-        var trimmed = text;
-        while (trimmed.Length > 1 && gfx.MeasureString(trimmed + "…", font).Width > maxWidth)
-            trimmed = trimmed[..^1];
-        return trimmed + "…";
     }
 }

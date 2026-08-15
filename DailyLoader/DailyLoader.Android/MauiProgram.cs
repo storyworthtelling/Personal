@@ -14,7 +14,6 @@ using DailyLoader.Infrastructure.Nyt;
 using DailyLoader.Infrastructure.Pdf;
 using DailyLoader.Android.Google;
 using Storyworthtelling.Remarkable;
-using PdfSharp.Fonts;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
@@ -36,8 +35,9 @@ public static class MauiProgram
 
     public static MauiApp CreateMauiApp()
     {
-        GlobalFontSettings.FontResolver = AndroidFontResolver.Instance;
-
+        // The documents now render with SkiaSharp (embedded fonts via Storyworthtelling.Paper); PdfSharp is
+        // only used to merge the external crossword PDF and draw image-only pages, so no font resolver is
+        // registered anymore.
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>()
             .ConfigureFonts(fonts =>

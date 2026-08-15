@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging;
-using PdfSharp.Drawing;
-using PdfSharp.Pdf;
-using PdfSharp.Pdf.IO;
+using SkiaSharp;
 using DailyLoader.Domain.Interfaces;
 using DailyLoader.Domain.Models;
 
 namespace DailyLoader.Infrastructure.Pdf;
 
+// Renders the morning news pages with SkiaSharp (via SkiaPageLayout), then concatenates the external
+// crossword PDF after them with PdfMerger.
 public class PdfComposer : IPdfComposer
 {
     private readonly ILogger<PdfComposer> logger;
@@ -24,20 +24,19 @@ public class PdfComposer : IPdfComposer
 
     private byte[] GenerateNewsPages(IReadOnlyList<ArticleContent> articles)
     {
-        var doc = new PdfDocument();
-        var layout = new PdfLayout(doc);
+        using var layout = new SkiaPageLayout();
 
-        var h1Font    = new XFont("sans-serif", 22, XFontStyleEx.Bold);
-        var dateFont  = new XFont("sans-serif", 11, XFontStyleEx.Regular);
-        var artFont   = new XFont("sans-serif", 16, XFontStyleEx.Bold);
-        var metaFont  = new XFont("sans-serif",  9, XFontStyleEx.Italic);
-        var bodyFont  = new XFont("sans-serif", 11, XFontStyleEx.Regular);
+        var h1Font = SkiaPageLayout.Sans(22, bold: true);
+        var dateFont = SkiaPageLayout.Sans(11);
+        var artFont = SkiaPageLayout.Sans(16, bold: true);
+        var metaFont = SkiaPageLayout.Sans(9);   // was italic; no embedded sans italic (upright now)
+        var bodyFont = SkiaPageLayout.Sans(11);
 
         // Header
         layout.DrawCentered("The New York Times", h1Font, 28);
         layout.DrawCentered(DateTime.Today.ToString("MMMM d, yyyy"), dateFont, 18);
-        layout.Gfx.DrawLine(new XPen(XColors.Black, 1.5),
-            PdfLayout.Margin, layout.Y, PdfLayout.Margin + layout.ContentWidth, layout.Y);
+        layout.DrawLine(SkiaPageLayout.Margin, layout.Y,
+            SkiaPageLayout.Margin + layout.ContentWidth, layout.Y, SKColors.Black, 1.5f);
         layout.Advance(14);
 
         for (var i = 0; i < articles.Count; i++)
@@ -72,30 +71,30 @@ public class PdfComposer : IPdfComposer
             {
                 layout.Advance(8);
                 layout.NewPageIfNeeded(20);
-                layout.Gfx.DrawLine(new XPen(XColors.LightGray, 0.5),
-                    PdfLayout.Margin, layout.Y, PdfLayout.Margin + layout.ContentWidth, layout.Y);
+                layout.DrawLine(SkiaPageLayout.Margin, layout.Y,
+                    SkiaPageLayout.Margin + layout.ContentWidth, layout.Y, SKColors.LightGray, 0.5f);
                 layout.Advance(12);
             }
         }
 
-        using var ms = new MemoryStream();
-        doc.Save(ms);
-        return ms.ToArray();
+        return layout.ToPdf();
     }
 
-    private void TryDrawImage(PdfLayout layout, ImageBlock image, XFont captionFont)
+    private void TryDrawImage(SkiaPageLayout layout, ImageBlock image, SKFont captionFont)
     {
         try
         {
-            using var stream = new MemoryStream(image.ImageBytes, 0, image.ImageBytes.Length, false, true);
-            var xImg = XImage.FromStream(stream);
-            var imgW = Math.Min(xImg.PointWidth, layout.ContentWidth);
-            var imgH = xImg.PointHeight * imgW / xImg.PointWidth;
+            var (natW, natH) = SkiaPageLayout.ImageSizePoints(image.ImageBytes);
+            if (natW <= 0 || natH <= 0)
+                return;
+
+            var imgW = Math.Min(natW, layout.ContentWidth);
+            var imgH = natH * imgW / natW;
 
             logger.LogInformation("Drawing image {W}x{H}pt from {Bytes} bytes", imgW, imgH, image.ImageBytes.Length);
 
             layout.NewPageIfNeeded(imgH);
-            layout.Gfx.DrawImage(xImg, PdfLayout.Margin, layout.Y, imgW, imgH);
+            layout.DrawImage(image.ImageBytes, SkiaPageLayout.Margin, layout.Y, imgW, imgH);
             layout.Advance(imgH + 4);
 
             if (!string.IsNullOrEmpty(image.Caption))
