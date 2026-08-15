@@ -36,4 +36,18 @@ public class GoogleAccountBrokerTests
         Assert.NotNull(service);
         Assert.Equal("App", service.ApplicationName);
     }
+
+    [Fact]
+    public async Task CreatesCalendarAndTasksServicesFromTheBrokeredToken()
+    {
+        var broker = new GoogleAccountBroker("owner@example.com", (_, _) => Task.FromResult("access-token"), "App");
+
+        using var calendar = await broker.CreateCalendarServiceAsync(GoogleScopes.Calendar);
+        using var tasks = await broker.CreateTasksServiceAsync(GoogleScopes.Tasks);
+
+        Assert.NotNull(calendar);
+        Assert.NotNull(tasks);
+        Assert.Equal("App", calendar.ApplicationName);
+        Assert.Equal("App", tasks.ApplicationName);
+    }
 }

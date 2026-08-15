@@ -1,6 +1,8 @@
 using global::Google.Apis.Auth.OAuth2;
+using global::Google.Apis.Calendar.v3;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
+using global::Google.Apis.Tasks.v1;
 
 namespace Storyworthtelling.Google;
 
@@ -23,6 +25,12 @@ public interface IGoogleAccountBroker
     /// <summary>A Drive service authenticated for the requested scopes — the shared replacement for the
     /// per-app DriveFactory closures.</summary>
     Task<DriveService> CreateDriveServiceAsync(params string[] scopes);
+
+    /// <summary>A Calendar service authenticated for the requested scopes (e.g. the hub's day agenda).</summary>
+    Task<CalendarService> CreateCalendarServiceAsync(params string[] scopes);
+
+    /// <summary>A Tasks service authenticated for the requested scopes (e.g. the hub's checklist).</summary>
+    Task<TasksService> CreateTasksServiceAsync(params string[] scopes);
 }
 
 /// <summary>
@@ -51,13 +59,22 @@ public sealed class GoogleAccountBroker : IGoogleAccountBroker
     public Task<string> GetAccessTokenAsync(params string[] scopes) =>
         tokenForType(GoogleScopes.ToTokenType(scopes), CancellationToken.None);
 
-    public async Task<DriveService> CreateDriveServiceAsync(params string[] scopes)
+    public async Task<DriveService> CreateDriveServiceAsync(params string[] scopes) =>
+        new(await InitializerAsync(scopes));
+
+    public async Task<CalendarService> CreateCalendarServiceAsync(params string[] scopes) =>
+        new(await InitializerAsync(scopes));
+
+    public async Task<TasksService> CreateTasksServiceAsync(params string[] scopes) =>
+        new(await InitializerAsync(scopes));
+
+    private async Task<BaseClientService.Initializer> InitializerAsync(string[] scopes)
     {
         var token = await GetAccessTokenAsync(scopes);
-        return new DriveService(new BaseClientService.Initializer
+        return new BaseClientService.Initializer
         {
             HttpClientInitializer = GoogleCredential.FromAccessToken(token),
             ApplicationName = applicationName,
-        });
+        };
     }
 }
