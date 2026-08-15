@@ -8,6 +8,7 @@ using Android.OS;
 using Android.Views;
 using Android.Widget;
 using FocusPhone.Domain.Design;
+using FocusPhone.Domain.Time;
 using FocusPhone.Domain.Unlock;
 using FocusPhone.Ui;
 using FocusPhone.Ui.Voice;
@@ -281,6 +282,20 @@ public class LauncherSettingsActivity : Activity
     {
         AddGroupLabel("Updates");
         AddContentButton(PaperUi.SecondaryButton(this, "Install from GitHub now", InstallFromGitHubNow));
+
+        // Show whether the 6-hour channel is actually running and what it last did,
+        // so a silent failure (rejected token, signature-mismatched install) is visible.
+        var statusStore = new UpdateStatusStore(this);
+        var lastRun = statusStore.LastRunUtc;
+        if (lastRun is { } runUtc && statusStore.LastSummary is { } summary)
+        {
+            var when = RelativeTime.Format(runUtc.ToLocalTime(), DateTime.Now);
+            AddBody($"Last checked {when}: {summary}");
+        }
+        else
+        {
+            AddBody("The channel checks every 6 hours. It hasn't run yet on this phone.");
+        }
     }
 
     // On-demand run of the owner-app update channel: pull the latest release now and install every
@@ -293,8 +308,8 @@ public class LauncherSettingsActivity : Activity
         Render();
         try
         {
-            await UpdateService.CheckAndInstallAsync(this, force: true);
-            inlineStatus = "GitHub check complete.";
+            var result = await UpdateService.CheckAndInstallAsync(this, force: true);
+            inlineStatus = result.Summarize();
         }
         catch (Exception e)
         {
