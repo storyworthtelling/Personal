@@ -1,14 +1,13 @@
 using SkiaSharp;
-using Storyboarder.Domain.Design;
 
-namespace Storyboarder.Infrastructure.Imaging;
+namespace Storyworthtelling.Paper;
 
 // Draws an image into a destination rectangle, scaled to fit (letterboxed on shaded paper), centered, with
-// high-quality resampling. Lifted from the comic composer so the report's per-scene evidence images fill
-// their slot cleanly instead of stretching or cropping.
+// high-quality resampling. Used by the report's per-scene evidence images so they fill their slot cleanly
+// instead of stretching or cropping.
 public static class SkiaImageFit
 {
-    private static readonly SKColor PaperShade = SKColor.Parse(DesignTokens.PaperShade);
+    private static readonly SKColor PaperShade = SKColor.Parse(PaperColorTokens.PaperShade);
     private static readonly SKSamplingOptions HighQuality = new(SKCubicResampler.Mitchell);
 
     // Decodes and draws the PNG bytes fit inside dest. Returns false when the bytes can't be decoded (a

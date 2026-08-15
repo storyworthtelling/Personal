@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared paper-composition library (net10.0, pure .NET like Storyworthtelling.Voice/Remarkable):
+       the domain-free Skia+PdfSharp mechanics every app's page/report renderers stand on, plus the
+       device-adaptive colour model (Paper Pro colour / rM2 grayscale / screen RGB). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Paper</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PDFsharp" Version="6.1.1" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
+
+  <!-- The shared Paper & Ink fonts, embedded for the Skia renderers (identical on the desktop test
+       TFM and on device, exactly as Storyboarder.Infrastructure embedded them before extraction). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\Fonts\SourceSerif4-*.ttf;..\Fonts\SourceSans3-*.ttf"
+                      Link="Fonts\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

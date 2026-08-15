@@ -1,11 +1,11 @@
 using SkiaSharp;
 
-namespace Storyboarder.Infrastructure.Imaging;
+namespace Storyworthtelling.Paper;
 
 // Shared word-wrap for Skia text drawing: greedily packs words onto lines that fit maxWidth,
-// hard-placing any single word that is itself wider than the box. Used by the comic page composer
-// and the analysis-document renderer so both wrap text identically.
-internal static class SkiaText
+// hard-placing any single word that is itself wider than the box. Used by every app's page/report
+// renderers so they wrap text identically.
+public static class SkiaText
 {
     public static List<string> Wrap(SKFont font, string text, float maxWidth)
     {

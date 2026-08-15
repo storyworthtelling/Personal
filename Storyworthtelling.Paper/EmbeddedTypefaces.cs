@@ -1,7 +1,7 @@
 using System.Reflection;
 using SkiaSharp;
 
-namespace Storyboarder.Infrastructure.Imaging;
+namespace Storyworthtelling.Paper;
 
 /// <summary>
 /// The Paper &amp; Ink font families for the Skia renderers, loaded once from

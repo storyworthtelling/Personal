@@ -1,6 +1,7 @@
 using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.Design;
 using Storyboarder.Domain.Imaging;
+using Storyworthtelling.Paper;
 
 namespace Storyboarder.Infrastructure.Imaging;
 

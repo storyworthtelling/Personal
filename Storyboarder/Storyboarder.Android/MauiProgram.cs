@@ -16,6 +16,7 @@ using Storyboarder.Infrastructure.Persistence;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Infrastructure.Time;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;

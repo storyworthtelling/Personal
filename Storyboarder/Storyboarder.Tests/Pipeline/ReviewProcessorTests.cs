@@ -12,6 +12,7 @@ using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Xunit;
 
