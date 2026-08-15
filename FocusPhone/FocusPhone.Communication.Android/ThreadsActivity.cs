@@ -268,14 +268,19 @@ public class ThreadsActivity : Activity
     // Full reload: re-read the live call/SMS tail and the first cache page, then
     // rebuild the list. All I/O and merging happen off the UI thread so the
     // screen never blocks (the ANR the owner was hitting); only the final bind
-    // touches views.
-    private void ReloadThreads()
+    // touches views. preserveScroll keeps the list's current position across the
+    // rebind (e.g. after a manual sync) instead of snapping back to the top.
+    private void ReloadThreads(bool preserveScroll = false)
     {
         var generation = ++loadGeneration;
         loading = true;
         SetStatus("Loading…");
         emptyView!.Text = ""; // Suppress the empty message until the load resolves.
         var titleSeed = allRows.ToDictionary(row => row.ContactKey, row => row.Title);
+
+        // Snapshot the scroll position on the UI thread before the background load.
+        var savedPosition = preserveScroll ? threadList?.FirstVisiblePosition ?? 0 : 0;
+        var savedTop = preserveScroll && threadList?.GetChildAt(0) is { } firstChild ? firstChild.Top : 0;
 
         System.Threading.Tasks.Task.Run(() =>
         {
@@ -298,6 +303,10 @@ public class ThreadsActivity : Activity
                 BindRows(filterField?.Text ?? "");
                 UpdateEmptyState();
                 ClearStatus();
+                if (preserveScroll && savedPosition > 0)
+                {
+                    threadList?.SetSelectionFromTop(savedPosition, savedTop);
+                }
             });
         });
     }
@@ -453,12 +462,12 @@ public class ThreadsActivity : Activity
         syncButton!.Enabled = false;
         SetStatus("Syncing…");
 
-        System.Threading.Tasks.Task.Run(() =>
+        System.Threading.Tasks.Task.Run(async () =>
         {
             var ok = true;
             try
             {
-                CommunicationSync.RunReconcile(this);
+                await CommunicationSync.RunReconcileAsync(this);
             }
             catch (Exception e)
             {
@@ -472,7 +481,9 @@ public class ThreadsActivity : Activity
                 syncButton!.Enabled = true;
                 if (ok)
                 {
-                    ReloadThreads(); // Reflect the freshly reconciled cache; clears status.
+                    // Reflect the freshly reconciled cache; clears status. Keep the owner's place in the
+                    // list so a sync doesn't jerk them back to the top (DESIGN.md: quiet state change).
+                    ReloadThreads(preserveScroll: true);
                 }
                 else
                 {

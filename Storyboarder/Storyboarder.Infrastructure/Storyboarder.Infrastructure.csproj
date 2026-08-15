@@ -16,7 +16,7 @@
          it so situational messaging can be written in the owner's voice. Referencing it here ships the
          voice DLL in the Android APK and gives the pipeline the client + profile store. -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
-    <!-- The shared reMarkable delivery library (net9.0;net10.0, pure .NET): the Archiving stage delivers
+    <!-- The shared reMarkable delivery library (net10.0, pure .NET): the Archiving stage delivers
          the report to a "Canonizer" folder on the tablet through it. Ships in the APK like the voice lib. -->
     <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
   </ItemGroup>

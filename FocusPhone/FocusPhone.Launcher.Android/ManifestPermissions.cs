@@ -12,3 +12,13 @@ using Android;
 // RestrictedBrowserActivity hosts the device's only WebView; without INTERNET
 // every page load fails at the network layer with net::ERR_CACHE_MISS.
 [assembly: UsesPermission(Manifest.Permission.Internet)]
+
+// The non-admin Settings panel (LauncherSettingsActivity) toggles the radios and
+// force-closes a misbehaving app: reading/changing Wi-Fi state, enabling/disabling
+// Bluetooth, and killing an app's background processes.
+[assembly: UsesPermission(Manifest.Permission.AccessWifiState)]
+[assembly: UsesPermission(Manifest.Permission.ChangeWifiState)]
+[assembly: UsesPermission(Manifest.Permission.Bluetooth)]
+[assembly: UsesPermission(Manifest.Permission.BluetoothAdmin)]
+[assembly: UsesPermission(Manifest.Permission.BluetoothConnect)]
+[assembly: UsesPermission(Manifest.Permission.KillBackgroundProcesses)]

@@ -116,6 +116,37 @@ public class CrosswordDeliveryServiceTests
     }
 
     [Fact]
+    public async Task DeliverDailyPuzzle_UploadsTitleNamedMorningBriefNotCrossword()
+    {
+        var date = new DateOnly(2025, 4, 14);
+        nytClient.Setup(c => c.DownloadDailyPuzzle(date)).ReturnsAsync([1]);
+        topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([]);
+        topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([]);
+        pdfComposer.Setup(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>())).Returns([9]);
+
+        await CreateService().DeliverDailyPuzzle(date);
+
+        remarkableClient.Verify(c => c.Upload(
+            It.Is<string>(t => t.Contains("Morning Brief") && !t.Contains("Crossword")),
+            It.IsAny<byte[]>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeliverBonusPuzzle_UploadsTitleWithoutCrosswordWording()
+    {
+        var date = new DateOnly(2025, 6, 1);
+        nytClient.Setup(c => c.DownloadBonusPuzzle(date)).ReturnsAsync([1]);
+
+        await CreateService().DeliverBonusPuzzle(date);
+
+        remarkableClient.Verify(c => c.Upload(
+            It.Is<string>(t => !t.Contains("Crossword")),
+            It.IsAny<byte[]>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task DeliverDailyPuzzle_StillDeliversCrosswordWhenNewsFetchFails()
     {
         var date = new DateOnly(2025, 4, 14);

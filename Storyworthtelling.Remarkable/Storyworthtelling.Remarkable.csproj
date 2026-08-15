@@ -5,14 +5,13 @@
     documents to the owner's reMarkable tablet (DailyLoader, Canonizer, …). It owns the whole cloud path:
     one-time device-code registration, device-token → per-session-JWT exchange, and document upload / list /
     download / trash. Pure .NET (HttpClient + System.Text.Json), no MAUI/Android APIs, so any Android head
-    references it directly and the desktop test builds compile it without the Android workload. Multi-targeted
-    net9.0;net10.0 because the heads are on different runtimes (DailyLoader is net9.0-android; the rest
-    net10.0-android) — each consumer picks the matching asset. Microsoft.Extensions.Options is pinned to 9.0.0
-    so the one version works for both TFMs (only the stable IOptions surface is used). References
-    Storyworthtelling.Voice for the shared credential-health seam.
+    references it directly and the desktop test builds compile it without the Android workload. Targets
+    net10.0 — every head is now on net10.0-android. Microsoft.Extensions.Options stays at 9.0.0 (fully
+    net10-compatible; only the stable IOptions surface is used) to keep one Extensions version across the
+    whole repo. References Storyworthtelling.Voice for the shared credential-health seam.
   -->
   <PropertyGroup>
-    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Storyworthtelling.Remarkable</RootNamespace>

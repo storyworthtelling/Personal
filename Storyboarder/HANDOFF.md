@@ -33,8 +33,8 @@ dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj -p:Storybo
 **Baseline: 287 passing, 0 failing** (Phase 5 landed) — plus `Storyworthtelling.Remarkable.Tests` (12) and
 DailyLoader's suite. Run these before every commit. Never commit a red suite. `dotnet ef` is installed but
 not on PATH in a fresh container — `export PATH="$PATH:$HOME/.dotnet/tools"` before `dotnet ef migrations
-add …`. **DailyLoader's net9.0 tests can't RUN here** (only the .NET 10 runtime is present); they build
-clean and run in CI.
+add …`. DailyLoader is now on .NET 10 like the rest of the repo, so its tests build and run here directly
+(`-p:DailyLoaderTfms=net10.0` to skip the Android head).
 
 The Android head needs the MAUI/Android workload + an Android SDK, neither present in a fresh
 container. Run `Storyboarder/scripts/setup-android-build.sh` once (installs the workload from nuget,
@@ -141,7 +141,7 @@ built in-session.
 Phase 4 (§8 of the brief) extracts DailyLoader's reMarkable code into a suite-shared library and delivers
 Canonizer's report to the tablet:
 
-- **`Storyworthtelling.Remarkable`** — a new shared library (repo root, net9.0;net10.0, mirrors
+- **`Storyworthtelling.Remarkable`** — a new shared library (repo root, net10.0, mirrors
   `Storyworthtelling.Voice`) owning the whole cloud path: `IRemarkableClient`/`RemarkableStorageClient`
   (upload root + folder overload, `EnsureFolder`, list/download/trash), `RemarkableAuthService` (device
   token → session JWT + health), `IRemarkableRegistration` (the device-code pairing), `RemarkableOptions`,

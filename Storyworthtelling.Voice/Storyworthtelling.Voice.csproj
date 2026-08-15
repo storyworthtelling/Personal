@@ -5,13 +5,12 @@
     Ledger, FocusPhone, …). It learns a voice profile from documents the owner uploads and composes
     situational UI messages in that voice. Pure .NET (HttpClient + System.Text.Json + Google Drive), no
     MAUI/Android APIs, so any Android head can reference it directly and the desktop test builds compile it
-    without the Android workload. Multi-targeted net9.0;net10.0 because the heads are on different runtimes
-    (DailyLoader is net9.0-android; the rest net10.0-android) — each consumer picks the matching asset. The
-    Extensions packages are pinned to 9.0.0 so the one version works for both TFMs (only the stable
-    IOptions/ILogger surface is used); Google.Apis is netstandard2.0 and version-agnostic here.
+    without the Android workload. Targets net10.0 — every head is now on net10.0-android. The Extensions
+    packages stay at 9.0.0 (fully net10-compatible; only the stable IOptions/ILogger surface is used) to keep
+    one Extensions version across the whole repo; Google.Apis is netstandard2.0 and version-agnostic here.
   -->
   <PropertyGroup>
-    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Storyworthtelling.Voice</RootNamespace>

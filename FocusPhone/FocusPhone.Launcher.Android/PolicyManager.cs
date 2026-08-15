@@ -116,6 +116,17 @@ public static class PolicyManager
     }
 
     /// <summary>
+    /// Restarts the device. Only a device owner may reboot without user
+    /// interaction, and only when there is no ongoing call (the platform throws
+    /// otherwise) — callers surface that as an inline status.
+    /// </summary>
+    public static void Reboot(Context context)
+    {
+        var dpm = (DevicePolicyManager)context.GetSystemService(Context.DevicePolicyService)!;
+        dpm.Reboot(AdminComponent(context));
+    }
+
+    /// <summary>
     /// Cutover finalization: irreversibly (short of a recovery-mode factory
     /// reset) disables debugging. Callable only from an active admin session.
     /// </summary>

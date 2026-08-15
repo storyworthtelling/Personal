@@ -155,10 +155,11 @@ public class HomeActivity : Activity
             PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X8));
 
         // The drawn analog face (DESIGN.md §11): no digital time on the home
-        // screen. Long-pressing the clock opens admin — its hub dot is the
-        // only mark for that gesture.
+        // screen. Long-pressing the clock opens the everyday Settings panel — its
+        // hub dot is the only mark for that gesture; Admin (the 72-hour gate) now
+        // lives behind a row inside Settings, so the home screen stays blank.
         clockView = new PaperClockView(this);
-        clockView.LongClick += (_, _) => StartActivity(new Intent(this, typeof(UnlockActivity)));
+        clockView.LongClick += (_, _) => StartActivity(new Intent(this, typeof(LauncherSettingsActivity)));
         var clockSize = PaperTheme.Dp(this, 176);
         root.AddView(clockView, new LinearLayout.LayoutParams(clockSize, clockSize)
         {

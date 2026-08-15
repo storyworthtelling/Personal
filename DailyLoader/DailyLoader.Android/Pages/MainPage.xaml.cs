@@ -54,7 +54,7 @@ public partial class MainPage : ContentPage
         {
             await voiceOptions.RefreshAsync(CancellationToken.None);
             message = await voice.ComposeAsync(
-                new MessageRequest("welcome", "the owner is checking their crossword delivery", HighVisibility: true),
+                new MessageRequest("welcome", "the owner is checking their morning brief", HighVisibility: true),
                 fallback: string.Empty, CancellationToken.None);
         }
         catch
@@ -96,7 +96,7 @@ public partial class MainPage : ContentPage
         DeliveryFileLogger.Clear();
         DeliverNowButton.IsEnabled = false;
         // Loading is words (DESIGN.md §5).
-        StatusLabel.Text = "Delivering — fetching today's crossword…";
+        StatusLabel.Text = "Delivering — fetching today's brief…";
 
         try
         {

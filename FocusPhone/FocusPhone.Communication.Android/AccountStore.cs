@@ -99,13 +99,16 @@ public class EmailSyncWorker : Worker
     {
         try
         {
+            // A WorkManager Worker.DoWork runs synchronously on its own background executor thread, so
+            // bridging the async sync here (rather than inside CommunicationSync) keeps the blocking at the
+            // true sync/async boundary while the UI's Sync button awaits it properly.
             if (InputData.GetBoolean(ReconcileKey, false))
             {
-                CommunicationSync.RunReconcile(ApplicationContext);
+                CommunicationSync.RunReconcileAsync(ApplicationContext).GetAwaiter().GetResult();
             }
             else
             {
-                CommunicationSync.RunIncremental(ApplicationContext);
+                CommunicationSync.RunIncrementalAsync(ApplicationContext).GetAwaiter().GetResult();
             }
             return Result.InvokeSuccess();
         }
