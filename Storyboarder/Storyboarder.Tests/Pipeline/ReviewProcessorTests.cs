@@ -316,16 +316,17 @@ public class ReviewProcessorTests : IDisposable
     }
 
     [Fact]
-    public async Task Review_DeliversToRemarkable_IntoTheCanonizerFolder_WhenEnabledAndPaired()
+    public async Task Review_DeliversToRemarkable_AtTheRoot_WhenEnabledAndPaired()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.EnsureFolder("Canonizer")).ReturnsAsync("folder-id");
 
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
 
-        remarkable.Verify(r => r.EnsureFolder("Canonizer"), Times.Once);
-        remarkable.Verify(r => r.Upload(It.Is<string>(t => t.Contains("Analysis")), It.IsAny<byte[]>(), "folder-id"), Times.Once);
+        // Delivery rides the proven root path DailyLoader uses (the "Canonizer" folder path relied on a
+        // reMarkable wire format never verified against the live cloud, and silently delivered nothing).
+        remarkable.Verify(r => r.Upload(It.Is<string>(t => t.Contains("Analysis")), It.IsAny<byte[]>()), Times.Once);
+        remarkable.Verify(r => r.EnsureFolder(It.IsAny<string>()), Times.Never);
 
         using var context = database.NewContext();
         Assert.True(context.BookAnalyses.Single(a => a.NovelId == id).DeliveredToRemarkable);
@@ -339,14 +340,14 @@ public class ReviewProcessorTests : IDisposable
         SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = false }, remarkable.Object));
 
-        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>()), Times.Never);
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Never);
     }
 
     [Fact]
     public async Task Review_StillCompletes_WhenRemarkableDeliveryKeepsFailing()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.EnsureFolder(It.IsAny<string>()))
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()))
             .ThrowsAsync(new HttpRequestException("reMarkable is down"));
 
         var id = SeedManuscript();
