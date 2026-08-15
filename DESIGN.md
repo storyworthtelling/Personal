@@ -211,7 +211,26 @@ Only these files may contain color hex or type-size literals:
 | Canonizer | `Storyboarder.Domain/Design/DesignTokens.cs`; `Storyboarder.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources (paths keep the internal `Storyboarder.*` identity) |
 | DailyLoader | `DailyLoader.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
 | Ledger | `Ledger.Domain/Design/DesignTokens.cs`; `Ledger.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
+| Shared: Paper | `Storyworthtelling.Paper/PaperColorTokens.cs` (the shared composition library's tokens + colour-e-ink palette — §17) |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
 | Branding | `/Branding/owner.png` (image, owner-supplied) |
 
 Parity between C# and XAML/xml token files is asserted by unit tests; a change to this bible is a change to those files and their tests, in the same commit.
+
+## 17. Device-adaptive colour (Paper Pro / rM2 / screen)
+
+The base palette is monochrome-plus-one-accent (§1: light only, one accent, one meaning). The shared **`Storyworthtelling.Paper`** library adds a **device-adaptive** layer on top — one document, described in semantic colour *roles*, rendered for whichever surface it is bound for. This is additive: it never changes the base Paper / Ink / accent values.
+
+**The four calm colour-e-ink hues** (approved P3 mockup — for the reMarkable Paper Pro and the screen/Drive PDF). Chosen low-saturation on purpose: the Paper Pro's Kaleido e-ink can't show vivid colour, and *calm is the acceptance test*.
+
+| Role | Colour | Grayscale (rM2) | Non-colour cue |
+|---|---|---|---|
+| Accent — active / current | `#C2542F` terracotta | `#5E5E5E` | heaviest / solid stroke, filled |
+| Problem — regression | `#7A4E63` plum | `#464646` | solid-fill chip, ● |
+| Prior — structure / prior draft | `#4E6273` slate | `#767676` | dashed stroke |
+| New — positive / resolved | `#6E7A53` sage | `#8C8C8C` | outlined chip, ✓ |
+| Caution — consider | `#B08A3E` ochre | `#A2A2A2` | dotted stroke, ▲ |
+
+**Grayscale-safety rule.** The rM2 greys are a deliberate ramp (`#46 → #A2`), **not** the naive luminance of each hue (several of which would collide) — so the five roles stay separable after desaturation. And no meaning is carried by hue alone: every role also carries a non-colour cue (weight, dash, fill, marker).
+
+**Device profiles.** A `DeviceColorProfile` selects the palette variant at render time: **Paper Pro** (colour on warm e-ink), **rM2** (the grey ramp on grey e-ink), **Screen** (full colour on the paper cream — the Drive PDF and in-app view). The colour profiles share the hues; only the grayscale profile recolours to the ramp. Grounds shift per device (Paper Pro `#F4EFE3`, rM2 `#ECEAE4`, Screen the paper cream). All values live in `PaperColorTokens.cs`; `PaperPalette.Resolve(role, profile)` is the only way above the tokens to get a colour.
