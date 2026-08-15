@@ -216,20 +216,38 @@ public partial class SetupPage : ContentPage
         });
     }
 
-    private async void OnShareLogClicked(object? sender, EventArgs e)
+    private static string RefreshLogPath => Path.Combine(FileSystem.AppDataDirectory, "refresh.log");
+    private static string CrashLogPath => Path.Combine(FileSystem.AppDataDirectory, "crash.log");
+
+    // Bundles the refresh log + the crash log into one shareable file — so the crash log comes along even
+    // when there's no crash to view on its own, and a stalled refresh or a silent crash can be diagnosed
+    // off-device. Mirrors Canonizer's export bundle (the suite-wide diagnostics shape).
+    private async void OnShareDiagnosticsClicked(object? sender, EventArgs e)
     {
-        var path = Path.Combine(FileSystem.AppDataDirectory, "refresh.log");
-        if (!File.Exists(path))
+        if (!File.Exists(RefreshLogPath) && !File.Exists(CrashLogPath))
         {
-            DiagnosticsStatusLabel.Text = "No refresh log yet — connect an account and refresh first.";
+            DiagnosticsStatusLabel.Text = "No diagnostics yet — connect an account and refresh first.";
             return;
         }
-        await Share.RequestAsync(new ShareFileRequest
+
+        try
         {
-            Title = "Ledger refresh log",
-            File = new ShareFile(path)
-        });
+            var bundle = new System.Text.StringBuilder()
+                .AppendLine("===== REFRESH LOG =====").AppendLine().AppendLine(ReadOrEmpty(RefreshLogPath)).AppendLine()
+                .AppendLine("===== CRASH LOG =====").AppendLine().AppendLine(ReadOrEmpty(CrashLogPath))
+                .ToString();
+            var path = Path.Combine(FileSystem.CacheDirectory, $"ledger-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.txt");
+            await File.WriteAllTextAsync(path, bundle);
+            await Share.RequestAsync(new ShareFileRequest { Title = "Ledger diagnostics", File = new ShareFile(path) });
+        }
+        catch (Exception ex)
+        {
+            DiagnosticsStatusLabel.Text = "Couldn't export diagnostics: " + ex.Message;
+        }
     }
+
+    private static string ReadOrEmpty(string path) =>
+        File.Exists(path) ? File.ReadAllText(path) : "(none)";
 
     public sealed class InstitutionRow
     {

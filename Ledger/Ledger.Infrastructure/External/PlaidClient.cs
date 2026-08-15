@@ -95,6 +95,28 @@ public sealed class PlaidClient : IPlaidClient
         return null;
     }
 
+    public async Task<PlaidLinkResult?> PollLinkResultAsync(
+        string linkToken, int maxAttempts, BackoffScheduler backoff,
+        Func<TimeSpan, CancellationToken, Task>? delay = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (maxAttempts < 1)
+            throw new ArgumentOutOfRangeException(nameof(maxAttempts), "At least one attempt is required.");
+
+        var wait = delay ?? ((d, ct) => Task.Delay(d, ct));
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await GetLinkResultAsync(linkToken, cancellationToken);
+            if (result is not null)
+                return result;
+            // No token yet — wait out the propagation lag before the next read, but never after the last.
+            if (attempt < maxAttempts - 1)
+                await wait(backoff.NextDelay(attempt), cancellationToken);
+        }
+        return null;
+    }
+
     public async Task<PlaidItemAccess> ExchangePublicTokenAsync(string publicToken, CancellationToken cancellationToken)
     {
         var opts = options.Value;

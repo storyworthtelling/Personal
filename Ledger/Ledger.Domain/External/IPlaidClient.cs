@@ -1,3 +1,5 @@
+using Ledger.Domain.Pipeline;
+
 namespace Ledger.Domain.External;
 
 // Access to the Plaid aggregator API. The connect flow (link token → hosted Link → token exchange)
@@ -14,6 +16,18 @@ public interface IPlaidClient
     // Reads a Hosted Link session's result (/link/token/get). Returns the public_token + chosen
     // institution once the user has finished connecting, or null while the session is still open.
     Task<PlaidLinkResult?> GetLinkResultAsync(string linkToken, CancellationToken cancellationToken);
+
+    // Polls /link/token/get until the Hosted Link session yields a public_token or the attempt budget
+    // is spent. Plaid populates item_add_results a short, variable time AFTER the OAuth redirect returns
+    // — pronounced for app-to-app OAuth banks like Chase, where a single read the instant the owner
+    // switches back sees an empty session and the institution is silently never persisted. Retries up to
+    // maxAttempts with exponential backoff, returning the result the moment it appears (issuing no further
+    // reads), or null if the session never completes in the budget. delay is the wait between attempts —
+    // injectable so tests run without real time; null uses Task.Delay.
+    Task<PlaidLinkResult?> PollLinkResultAsync(
+        string linkToken, int maxAttempts, BackoffScheduler backoff,
+        Func<TimeSpan, CancellationToken, Task>? delay = null,
+        CancellationToken cancellationToken = default);
 
     // Exchanges the public_token produced when the user finishes Link for the durable access_token.
     Task<PlaidItemAccess> ExchangePublicTokenAsync(string publicToken, CancellationToken cancellationToken);

@@ -3,6 +3,7 @@ using Android.Content.PM;
 using Microsoft.Extensions.Logging;
 using Ledger.Domain.Connect;
 using Ledger.Domain.External;
+using Ledger.Domain.Pipeline;
 using Ledger.Infrastructure.Services;
 using Storyworthtelling.Voice.Secrets;
 
@@ -27,6 +28,13 @@ public partial class PlaidLinkPage : ContentPage
     private readonly VaultSync vaultSync;
     private readonly ILogger<PlaidLinkPage> logger;
 
+    // Plaid populates the Hosted Link session's public_token a few seconds after the OAuth redirect
+    // returns (worst with app-to-app banks like Chase). Poll a short window with exponential backoff so
+    // the connection lands without the owner having to guess when to tap — ~1+2+4+8+8s across six reads.
+    private const int ConnectPollAttempts = 6;
+    private static BackoffScheduler ConnectPollBackoff() =>
+        new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(8));
+
     private string? linkToken;
     private string? hostedLinkUrl;
     private bool opened;
@@ -45,7 +53,14 @@ public partial class PlaidLinkPage : ContentPage
     {
         base.OnAppearing();
         if (linkToken is not null)
-            return; // already prepared; returning from the browser must not recreate the token or reopen the tab
+        {
+            // Returning from the browser: the token is already prepared (don't recreate it or reopen the
+            // tab). Auto-detect the completed session — the owner shouldn't have to tap Done or guess when
+            // Plaid has caught up. Done stays a manual retry for the case this poll returns empty.
+            if (opened && !finishing)
+                await TryFinishAsync(auto: true);
+            return;
+        }
 
         // On the FocusPhone the device-owner policy suspends every real browser and pins FocusPhone's own
         // single-domain WebView as the default http/https handler. Opening Plaid Link there dead-ends (a
@@ -117,7 +132,12 @@ public partial class PlaidLinkPage : ContentPage
         }
     }
 
-    private async void OnDoneClicked(object? sender, EventArgs e)
+    private async void OnDoneClicked(object? sender, EventArgs e) => await TryFinishAsync(auto: false);
+
+    // Reads the completed Link session and records the institution. Shared by the automatic poll on
+    // return from the browser (auto: true) and the Done button as a manual retry (auto: false). Polls
+    // /link/token/get with backoff so Chase's post-OAuth propagation lag no longer drops the connection.
+    private async Task TryFinishAsync(bool auto)
     {
         if (finishing || linkToken is null)
             return;
@@ -130,15 +150,23 @@ public partial class PlaidLinkPage : ContentPage
 
         finishing = true;
         DoneButton.IsEnabled = false;
-        StatusLabel.Text = "Finishing up…";
+        StatusLabel.Text = auto ? "Checking for your connection…" : "Finishing up…";
 
         try
         {
-            var result = await plaid.GetLinkResultAsync(linkToken, CancellationToken.None);
+            logger.LogInformation(
+                "Connect: polling for the completed Link session (auto={Auto}, maxAttempts={Attempts}).",
+                auto, ConnectPollAttempts);
+            var result = await plaid.PollLinkResultAsync(
+                linkToken, ConnectPollAttempts, ConnectPollBackoff(), delay: null, CancellationToken.None);
             if (result is null)
             {
-                logger.LogInformation("Connect: no completed Link session yet; waiting for the user to finish.");
-                StatusLabel.Text = "Finish connecting in the browser, then tap Done.";
+                logger.LogInformation(
+                    "Connect: no completed Link session after {Attempts} attempts; awaiting a retry.",
+                    ConnectPollAttempts);
+                StatusLabel.Text =
+                    "Couldn't find your connection yet. Finish signing in in the browser, then tap Done to " +
+                    "retry — or try connecting on a different phone.";
                 DoneButton.IsEnabled = true;
                 finishing = false;
                 return;
@@ -147,7 +175,9 @@ public partial class PlaidLinkPage : ContentPage
             var access = await plaid.ExchangePublicTokenAsync(result.PublicToken, CancellationToken.None);
             var name = result.InstitutionName ?? access.InstitutionName ?? "New account";
             await accounts.AddInstitutionAsync(access.ItemId, access.AccessToken, name, CancellationToken.None);
-            logger.LogInformation("Connect: connected institution {Institution}.", name);
+            // A single login can carry several cards (e.g. a Chase login covers both the Amazon and United
+            // cards). They arrive as separate accounts under this one Item on the next refresh.
+            logger.LogInformation("Connect: connected institution {Institution}; refreshing its accounts.", name);
 
             // Back up the new bank's access token to the encrypted vault so a later reset can restore it
             // without re-linking. The connection already works locally, but surface a failed backup so a

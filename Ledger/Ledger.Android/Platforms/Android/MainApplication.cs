@@ -37,6 +37,14 @@ public class MainApplication : MauiApplication
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             CrashLogger.Log(args.ExceptionObject?.ToString() ?? "(no details)");
 
+        // A faulted Task nobody awaited (e.g. a fire-and-forget background refresh) otherwise vanishes;
+        // capture it so a silent failure still lands in the crash log. Mark it observed so it can't escalate.
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            CrashLogger.Log($"Unobserved task exception:\n{args.Exception}");
+            args.SetObserved();
+        };
+
         base.OnCreate();
 
         // Apply EF Core migrations once at process start (the process is created for WorkManager jobs

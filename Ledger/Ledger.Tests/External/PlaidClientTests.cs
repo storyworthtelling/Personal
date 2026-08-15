@@ -259,6 +259,51 @@ public class PlaidClientTests
     }
 
     [Fact]
+    public async Task PollLinkResult_ReturnsToken_AsSoonAsTheSessionBecomesReady()
+    {
+        var (client, handler) = Create();
+        // Plaid populates item_add_results a short, variable time AFTER the OAuth redirect returns
+        // (pronounced for app-to-app OAuth banks like Chase), so the first reads see an empty session
+        // and only a later one carries the public_token.
+        handler.EnqueueOk("""{ "link_sessions": [] }""");
+        handler.EnqueueOk("""{ "link_sessions": [] }""");
+        handler.EnqueueOk("""
+        {
+          "link_sessions": [
+            { "results": { "item_add_results": [
+              { "public_token": "public-sandbox-99", "institution": { "name": "Chase" } } ] } }
+          ]
+        }
+        """);
+
+        var result = await client.PollLinkResultAsync(
+            "link-sandbox-abc", maxAttempts: 6,
+            new BackoffScheduler(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(8)),
+            delay: (_, _) => Task.CompletedTask, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("public-sandbox-99", result!.PublicToken);
+        Assert.Equal("Chase", result.InstitutionName);
+        Assert.Equal(3, handler.Requests.Count); // stopped polling the instant the token appeared
+    }
+
+    [Fact]
+    public async Task PollLinkResult_ReturnsNull_WhenSessionNeverCompletesWithinBudget()
+    {
+        var (client, handler) = Create();
+        for (var i = 0; i < 4; i++)
+            handler.EnqueueOk("""{ "link_sessions": [] }""");
+
+        var result = await client.PollLinkResultAsync(
+            "link-sandbox-abc", maxAttempts: 4,
+            new BackoffScheduler(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(8)),
+            delay: (_, _) => Task.CompletedTask, CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.Equal(4, handler.Requests.Count); // exactly the attempt budget, never more
+    }
+
+    [Fact]
     public async Task CreateLinkToken_ParsesHostedLinkUrl_RequestsTransactionsAndLiabilities()
     {
         var (client, handler) = Create();

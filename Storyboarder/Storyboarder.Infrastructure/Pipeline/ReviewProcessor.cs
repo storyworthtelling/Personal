@@ -1120,28 +1120,30 @@ public sealed class ReviewProcessor : IPipelineStep
         }
     }
 
-    // Delivers the finished report to a "Canonizer" folder on the owner's reMarkable tablet. Best-effort and
-    // independent of Drive: a failure never blocks the review from finishing. Returns a ProcessResult to
-    // return (did work / waiting on a retry) while delivery is in flight, or null once it has SETTLED —
-    // delivered, or given up after the shared attempt budget — so the caller continues to the Drive target.
-    // Resumable: EnsureFolder is find-or-create, and DeliveredToRemarkable is set only on a full success (or
-    // a give-up), so a worker killed mid-upload simply re-attempts next cycle.
+    // Delivers the finished report to the ROOT of the owner's reMarkable tablet — the same proven path
+    // DailyLoader's daily delivery uses. (It previously uploaded into a "Canonizer" collection via
+    // EnsureFolder + a folder-parented upload, but that folder/collection wire format was reconstructed and
+    // never verified against the live cloud; it silently delivered nothing. Root delivery is the fix.)
+    // Best-effort and independent of Drive: a failure never blocks the review from finishing. Returns a
+    // ProcessResult to return (did work / waiting on a retry) while delivery is in flight, or null once it
+    // has SETTLED — delivered, or given up after the shared attempt budget — so the caller continues to the
+    // Drive target. Resumable: DeliveredToRemarkable is set only on a full success (or a give-up), so a
+    // worker killed mid-upload simply re-attempts next cycle.
     private async Task<ProcessResult?> DeliverToRemarkable(
         StoryboarderDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
     {
         try
         {
-            var folderId = await remarkable!.EnsureFolder("Canonizer");
-            await remarkable.Upload(
+            await remarkable!.Upload(
                 $"{novel.Title} — Draft {novel.DraftNumber} — Analysis",
-                imageStore.Read(analysis.PdfPath!), folderId);
+                imageStore.Read(analysis.PdfPath!));
 
             analysis.DeliveredToRemarkable = true;
             novel.StageAttempts = 0;
             novel.LastError = null;
             Touch(novel);
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Delivered the revision report of manuscript {NovelId} to reMarkable", novel.Id);
+            logger.LogInformation("Delivered the revision report of manuscript {NovelId} to the reMarkable root", novel.Id);
             return ProcessResult.DidWork(novel.Id);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -1151,9 +1153,11 @@ public sealed class ReviewProcessor : IPipelineStep
             if (novel.StageAttempts >= rateLimits.MaxAttempts)
             {
                 // Give up so the review can still finish (the report is on the device and, if enabled, Drive).
+                // Nothing reached the tablet — logged distinctly from a success so diagnostics show the gap.
                 logger.LogWarning(ex,
-                    "Manuscript {NovelId}: giving up on reMarkable delivery after {Attempts} attempts; " +
-                    "continuing (the report remains available elsewhere)", novel.Id, novel.StageAttempts);
+                    "Manuscript {NovelId}: giving up on reMarkable delivery after {Attempts} attempts; nothing " +
+                    "was delivered to the tablet, continuing (the report remains available elsewhere)",
+                    novel.Id, novel.StageAttempts);
                 analysis.DeliveredToRemarkable = true;   // settled
                 novel.StageAttempts = 0;                 // hand a fresh budget to the Drive target
                 await db.SaveChangesAsync(cancellationToken);
