@@ -40,7 +40,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
-    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.9.1.3" />
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+    <!-- Pin to resolve a Work.Runtime 2.10.2 transitive conflict under .NET 10 MAUI: AndroidX.Core
+         wants Concurrent.Futures >=1.3.0.1 while Concurrent.Futures.Ktx caps it <1.2.1 (NuGet NU1107).
+         Matches the pin Storyboarder/Ledger already carry. -->
+    <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" Version="1.3.0.1" />
   </ItemGroup>
 
   <!-- Preserve PDFsharp from the Release IL trimmer — uses reflection internally -->
