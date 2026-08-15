@@ -143,7 +143,13 @@ public static class MauiProgram
         // Android-side Google helpers consumed by the New Project page.
         builder.Services.AddSingleton<DeviceAccountTokenProvider>();
         builder.Services.AddSingleton<DriveDocsLister>();
-        builder.Services.AddSingleton<IDriveArchive, DeviceAccountDriveArchive>();
+        builder.Services.AddSingleton<IPaperDriveArchive, DeviceAccountDriveArchive>();
+
+        // The unified delivery seam: compose the reMarkable transport (root upload) and the Drive archive so
+        // the pipeline delivers through one interface. Either may be absent — PaperDelivery reports that via
+        // its capability flags and the archive stage skips that target.
+        builder.Services.AddSingleton<IPaperDelivery>(sp =>
+            new PaperDelivery(sp.GetService<IRemarkableClient>(), sp.GetService<IPaperDriveArchive>()));
 
         // Owner's-voice Drive files, each ONE JSON file found by name and reached with the device-account
         // token (full `drive` scope, shared across every com.storyworthtelling app) the same way the archive

@@ -39,9 +39,12 @@ public static class PaperColorTokens
     public const string GrayOchre = "#A2A2A2";  // lightest
 
     // ---- Device grounds (paper colour per profile) ----
+    // The suite is Paper & Ink even on screen, so the Drive PDF / in-app ground is the paper cream, not
+    // stark white (the mockup's white frame was only to distinguish the profiles visually). The two e-ink
+    // grounds shift warmer/greyer for their panels.
     public const string PaperProGround = "#F4EFE3"; // warm colour e-ink
     public const string Rm2Ground = "#ECEAE4";      // grayscale e-ink
-    public const string ScreenGround = "#FFFFFF";   // Drive PDF / in-app
+    public const string ScreenGround = Paper;       // Drive PDF / in-app — the paper cream
 
     /// <summary>Paper grain: deterministic seeded ink noise (DESIGN.md §6). Identical inputs → identical bytes.</summary>
     public static class Grain

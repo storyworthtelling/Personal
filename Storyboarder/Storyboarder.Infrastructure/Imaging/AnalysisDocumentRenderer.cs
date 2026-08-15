@@ -19,10 +19,15 @@ public sealed record AnalysisRenderResult(
 
 public sealed class AnalysisDocumentRenderer
 {
-    private static readonly SKColor Paper = SKColor.Parse(DesignTokens.Paper);
-    private static readonly SKColor Ink = SKColor.Parse(DesignTokens.Ink);
-    private static readonly SKColor Accent = SKColor.Parse(DesignTokens.Accent);
-    private static readonly SKColor Muted = SKColor.Parse(DesignTokens.InkMuted);
+    // Colours resolved through the shared Paper palette. The report renders at the Screen profile (its
+    // primary targets are the Drive PDF and the in-app view); PaperPalette is now the single source of these
+    // hues, so the same document can be re-rendered at the Paper Pro / rM2 profiles when per-destination
+    // colour rendering is wired and verified on device.
+    private const DeviceColorProfile Profile = DeviceColorProfile.Screen;
+    private static readonly SKColor Paper = PaperPalette.Resolve(PaperRole.Ground, Profile);
+    private static readonly SKColor Ink = PaperPalette.Resolve(PaperRole.Ink, Profile);
+    private static readonly SKColor Accent = PaperPalette.Resolve(PaperRole.Active, Profile);
+    private static readonly SKColor Muted = PaperPalette.Resolve(PaperRole.InkMuted, Profile);
 
     private readonly CoverPageRenderer covers = new();
 
@@ -653,7 +658,7 @@ public sealed class AnalysisDocumentRenderer
             if (!SkiaImageFit.Draw(canvas, png, dest))
             {
                 // Undecodable bytes: leave a shaded slot rather than crashing the whole report.
-                using var shade = new SKPaint { Color = SKColor.Parse(DesignTokens.PaperShade), IsAntialias = false };
+                using var shade = new SKPaint { Color = SKColor.Parse(PaperColorTokens.PaperShade), IsAntialias = false };
                 canvas.DrawRect(dest, shade);
             }
             y += height + 8f;

@@ -34,6 +34,9 @@ public enum PaperRole
     /// <summary>Secondary text.</summary>
     InkSoft,
 
+    /// <summary>Muted text — captions, folios, the quietest labels.</summary>
+    InkMuted,
+
     /// <summary>Hairlines / faint dividers.</summary>
     Hairline,
 

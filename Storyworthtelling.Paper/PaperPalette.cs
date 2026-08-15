@@ -25,6 +25,7 @@ public static class PaperPalette
             }),
             PaperRole.Ink => Parse(PaperColorTokens.Ink),
             PaperRole.InkSoft => Parse(PaperColorTokens.InkSoft),
+            PaperRole.InkMuted => Parse(PaperColorTokens.InkMuted),
             PaperRole.Hairline => Parse(PaperColorTokens.Hairline),
             PaperRole.Active => Parse(grayscale ? PaperColorTokens.GrayAccent : PaperColorTokens.Accent),
             PaperRole.Prior => Parse(grayscale ? PaperColorTokens.GraySlate : PaperColorTokens.Slate),

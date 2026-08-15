@@ -1,7 +1,7 @@
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
-using Storyboarder.Domain.External;
+using Storyworthtelling.Paper;
 using DriveFile = global::Google.Apis.Drive.v3.Data.File;
 
 namespace Storyboarder.Android.Google;
@@ -13,7 +13,7 @@ namespace Storyboarder.Android.Google;
 // Requires the drive.file WRITE scope (see DeviceAccountTokenProvider.TokenScope). Until that scope is
 // registered on the OAuth consent screen and granted, archiving stays switched off and every upload here
 // would fail with a permission error.
-public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens) : IDriveArchive
+public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens) : IPaperDriveArchive
 {
     private const string FolderMime = "application/vnd.google-apps.folder";
 

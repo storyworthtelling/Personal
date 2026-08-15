@@ -47,7 +47,8 @@ public class PaperPaletteTests
         var rm2 = PaperPalette.Resolve(PaperRole.Ground, DeviceColorProfile.Rm2);
         var screen = PaperPalette.Resolve(PaperRole.Ground, DeviceColorProfile.Screen);
 
-        Assert.Equal(SKColors.White, screen);
+        // The suite is Paper & Ink even on screen, so the screen ground is the paper cream, not white.
+        Assert.Equal(SKColor.Parse(PaperColorTokens.Paper), screen);
         Assert.NotEqual(paperPro, screen);
         Assert.NotEqual(paperPro, rm2);
         Assert.NotEqual(rm2, screen);

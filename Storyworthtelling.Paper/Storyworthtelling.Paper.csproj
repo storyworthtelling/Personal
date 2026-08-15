@@ -15,6 +15,12 @@
     <PackageReference Include="SkiaSharp" Version="3.119.4" />
   </ItemGroup>
 
+  <!-- The reMarkable transport is already its own shared library; the unified IPaperDelivery seam
+       composes it (root upload) with the Drive archive so every app delivers the same way. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
+  </ItemGroup>
+
   <!-- The shared Paper & Ink fonts, embedded for the Skia renderers (identical on the desktop test
        TFM and on device, exactly as Storyboarder.Infrastructure embedded them before extraction). -->
   <ItemGroup>
