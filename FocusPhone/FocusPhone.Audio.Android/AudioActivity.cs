@@ -136,12 +136,16 @@ public class AudioActivity : Activity
 
             var access = new SecretsVaultAccess(musicTokens.GetAccessToken, "FocusPhone.Audio");
             var result = await access.Service.LoadAsync(System.Threading.CancellationToken.None);
-            if (result.Status == SecretsVaultStatus.Loaded
-                && !string.IsNullOrEmpty(result.Vault.Music.FolderId)
-                && string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId))
+            if (result.Status == SecretsVaultStatus.Loaded)
             {
-                MusicSettingsStore.MusicFolderId = result.Vault.Music.FolderId;
-                RunOnUiThread(() => { RenderContent(); _ = ScanAsync(); });
+                // Drive-by-ID (#13): pick up the ids persisted for the shared files.
+                FocusPhone.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
+                if (!string.IsNullOrEmpty(result.Vault.Music.FolderId)
+                    && string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId))
+                {
+                    MusicSettingsStore.MusicFolderId = result.Vault.Music.FolderId;
+                    RunOnUiThread(() => { RenderContent(); _ = ScanAsync(); });
+                }
             }
         }
         catch

@@ -59,7 +59,8 @@ public sealed class PodcastLibrarySync
             });
         };
 
-        store = new DriveAudioLibraryStore(new DriveTextFile(driveFactory, DriveAudioLibraryStore.FileName));
+        store = new DriveAudioLibraryStore(new DriveTextFile(
+            driveFactory, DriveAudioLibraryStore.FileName, FocusPhone.Ui.Voice.SharedDriveFileIds.Store));
     }
 
     /// <summary>The current on-device library, read straight from the stores.</summary>

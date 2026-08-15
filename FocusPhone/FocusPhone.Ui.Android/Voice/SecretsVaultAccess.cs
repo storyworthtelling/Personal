@@ -30,7 +30,8 @@ public sealed class SecretsVaultAccess
             });
         };
 
-        var store = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName));
+        var store = new DriveSecretsVaultStore(new DriveTextFile(
+            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         Service = new SecretsVaultService(store, () => VaultPassphraseStore.Passphrase);
     }
 

@@ -81,6 +81,9 @@ public class ThreadsActivity : Activity
             if (result.Status != SecretsVaultStatus.Loaded)
                 return;
 
+            // Drive-by-ID (#13): pick up the ids persisted for the shared files.
+            FocusPhone.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
+
             var gmail = result.Vault.Gmail;
             if (string.IsNullOrEmpty(account.GmailAddress) && !string.IsNullOrEmpty(gmail.Address))
                 account.GmailAddress = gmail.Address;

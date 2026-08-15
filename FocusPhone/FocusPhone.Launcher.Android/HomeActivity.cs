@@ -67,8 +67,13 @@ public class HomeActivity : Activity
 
             var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "FocusPhone.Launcher");
             var result = await access.Service.LoadAsync(System.Threading.CancellationToken.None);
-            if (result.Status == SecretsVaultStatus.Loaded && !string.IsNullOrEmpty(result.Vault.GitHubUpdateToken))
-                settings.GitHubToken = result.Vault.GitHubUpdateToken;
+            if (result.Status == SecretsVaultStatus.Loaded)
+            {
+                // Drive-by-ID (#13): pick up the ids the apps persisted for the shared files.
+                FocusPhone.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
+                if (!string.IsNullOrEmpty(result.Vault.GitHubUpdateToken))
+                    settings.GitHubToken = result.Vault.GitHubUpdateToken;
+            }
         }
         catch
         {
