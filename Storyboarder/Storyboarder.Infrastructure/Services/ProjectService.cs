@@ -6,6 +6,7 @@ using Storyboarder.Domain.Analysis;
 using Storyboarder.Domain.External;
 using Storyboarder.Domain.Imaging;
 using Storyboarder.Domain.Model;
+using Storyboarder.Domain.Text;
 using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
@@ -49,7 +50,7 @@ public sealed class ProjectService
         var now = clock.UtcNow;
         var novel = new Novel
         {
-            Title = string.IsNullOrWhiteSpace(title) ? fileName : title,
+            Title = string.IsNullOrWhiteSpace(title) ? ManuscriptTitle.FromFileName(fileName) : title,
             GoogleDocId = fileId,
             GoogleDocName = fileName,
             ArtStyle = string.IsNullOrWhiteSpace(artStyle) ? ArtStyles.Default : artStyle,
@@ -68,8 +69,9 @@ public sealed class ProjectService
     // Adds the next draft to an existing project: the owner re-picks a doc (the revised manuscript) and
     // gets a fresh conversion that shares the previous draft's ProjectId. Carrying PreviousDraftId is
     // what lets the pipeline reuse the panels whose source text didn't move and the diff report show what
-    // changed. Art style and title default to the previous draft's unless overridden. Returns the new
-    // draft's id, or null if the previous draft doesn't exist.
+    // changed. Art style defaults to the previous draft's unless overridden; the title comes from the newly
+    // picked manuscript's own name (each draft is titled from its own file). Returns the new draft's id, or
+    // null if the previous draft doesn't exist.
     public async Task<Guid?> CreateNextDraftAsync(
         Guid previousDraftId, string fileId, string fileName, string accessToken,
         string? title, string? artStyle, CancellationToken cancellationToken)
@@ -89,7 +91,7 @@ public sealed class ProjectService
         var now = clock.UtcNow;
         var draft = new Novel
         {
-            Title = string.IsNullOrWhiteSpace(title) ? previous.Title : title,
+            Title = string.IsNullOrWhiteSpace(title) ? ManuscriptTitle.FromFileName(fileName) : title,
             GoogleDocId = fileId,
             GoogleDocName = fileName,
             ArtStyle = string.IsNullOrWhiteSpace(artStyle) ? previous.ArtStyle : artStyle,
@@ -163,7 +165,8 @@ public sealed class ProjectService
         var now = clock.UtcNow;
         var book = new Novel
         {
-            Title = string.IsNullOrWhiteSpace(title) ? previous.Title : title,
+            // A sequel is titled from its own manuscript, never the prior book's title.
+            Title = string.IsNullOrWhiteSpace(title) ? ManuscriptTitle.FromFileName(fileName) : title,
             GoogleDocId = fileId,
             GoogleDocName = fileName,
             ArtStyle = string.IsNullOrWhiteSpace(artStyle) ? previous.ArtStyle : artStyle,

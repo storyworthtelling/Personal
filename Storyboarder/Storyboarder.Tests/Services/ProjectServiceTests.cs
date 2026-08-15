@@ -113,8 +113,42 @@ public class ProjectServiceTests : IDisposable
         Assert.Equal(2, second.DraftNumber);
         Assert.Equal(firstId, second.PreviousDraftId);
         Assert.Equal("Second, revised draft.", context.SourceTexts.Single(s => s.NovelId == second.Id).FullText);
-        Assert.Equal("My Book", second.Title);
+        // The draft is titled from its own picked manuscript (extension stripped), not the prior draft's title.
+        Assert.Equal("Book-v2", second.Title);
         Assert.Equal("noir", second.ArtStyle);
+    }
+
+    [Fact]
+    public async Task CreateNextDraft_TitlesFromItsOwnManuscript_NotThePreviousDraft()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+
+        var service = NewService();
+        var firstId = await service.CreateFromDocAsync("doc-1", "The First Cut.gdoc", "token", null, null, CancellationToken.None);
+        // Null title (what the UI always passes) must fall back to the newly picked file's name, not "The First Cut".
+        var secondId = await service.CreateNextDraftAsync(firstId, "doc-2", "The Second Pass.docx", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        Assert.Equal("The Second Pass", context.Novels.Single(n => n.Id == secondId!.Value).Title);
+    }
+
+    [Fact]
+    public async Task CreateNextBook_TitlesFromItsOwnManuscript_NotThePriorBook()
+    {
+        docs.Setup(d => d.FetchText(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("text");
+
+        var service = NewService();
+        var bookOne = await service.CreateFromDocAsync("doc-1", "Gathering Storm.gdoc", "token", null, null, CancellationToken.None);
+        // The real UI passes null here — the sequel must be titled from its own manuscript, not book one's.
+        var bookTwo = await service.CreateNextBookAsync(bookOne, "doc-2", "Breaking Dawn.docx", "token", null, null, CancellationToken.None);
+
+        using var context = database.NewContext();
+        var one = context.Novels.Single(n => n.Id == bookOne);
+        var two = context.Novels.Single(n => n.Id == bookTwo!.Value);
+        Assert.Equal("Gathering Storm", one.Title);
+        Assert.Equal("Breaking Dawn", two.Title);
     }
 
     [Fact]
