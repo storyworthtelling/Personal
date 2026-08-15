@@ -1,10 +1,10 @@
 # DailyLoader
 
-An Android (MAUI) app that delivers the NYT crossword (plus a daily brief) to a
-reMarkable tablet every morning, and reads hand-written notes back into Google
-Calendar/Tasks. Credentials are entered in-app on the Settings page.
+An Android (MAUI) app that delivers a morning brief (top news plus the NYT
+crossword) to a reMarkable tablet every morning, and reads hand-written notes
+back into Google Calendar/Tasks. Credentials are entered in-app on the Settings page.
 
-- Tests: `dotnet test DailyLoader/DailyLoader.Tests/DailyLoader.Tests.csproj -p:DailyLoaderTfms=net9.0`
+- Tests: `dotnet test DailyLoader/DailyLoader.Tests/DailyLoader.Tests.csproj -p:DailyLoaderTfms=net10.0`
 - APK builds in CI via `.github/workflows/build-android.yml`
 - UI follows the repo-wide Paper & Ink design bible (`DESIGN.md` at the repo
   root); tokens live in `DailyLoader.Android/Resources/Styles/DesignTokens.xaml`

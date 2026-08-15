@@ -12,6 +12,8 @@ public class DeliveryWorker : Worker
         : base(context, parameters)
     {
     }
+    // Persisted WorkManager unique-work identity — deliberately kept as-is through the
+    // "morning brief" rename; changing it would orphan the scheduled work or double-schedule.
     private const string WorkName = "crossword-delivery";
 
     public override Result DoWork()

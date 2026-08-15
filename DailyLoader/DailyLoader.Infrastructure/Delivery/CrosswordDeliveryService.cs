@@ -13,8 +13,8 @@ public class CrosswordDeliveryService(
     IPdfComposer pdfComposer,
     ILogger<CrosswordDeliveryService> logger)
 {
-    // Returns a human-readable summary of what was delivered, e.g. "8 articles + crossword"
-    // or "crossword only — <reason>" so callers can surface it to the user.
+    // Returns a human-readable summary of what was delivered, e.g. "8 articles + puzzle"
+    // or "puzzle only — <reason>" so callers can surface it to the user.
     public async Task<string> DeliverDailyPuzzle(DateOnly date)
     {
         logger.LogInformation("Downloading daily crossword for {Date}", date);
@@ -22,7 +22,8 @@ public class CrosswordDeliveryService(
 
         var (finalBytes, newsStatus) = await TryComposeWithNews(crosswordBytes, date);
 
-        var title = $"NYT Crossword {date:yyyy-MM-dd}";
+        // The delivered document is the morning brief (news + puzzle), not "the crossword".
+        var title = $"Morning Brief {date:yyyy-MM-dd}";
         logger.LogInformation("Uploading to reMarkable: {Title} ({NewsStatus})", title, newsStatus);
         await remarkableClient.Upload(title, finalBytes);
 
@@ -34,7 +35,7 @@ public class CrosswordDeliveryService(
         logger.LogInformation("Downloading bonus crossword for {Date}", date);
         var pdfBytes = await nytClient.DownloadBonusPuzzle(date);
 
-        var title = $"NYT Bonus Crossword {date:MMMM yyyy}";
+        var title = $"Bonus Puzzle — {date:MMMM yyyy}";
         logger.LogInformation("Uploading to reMarkable: {Title}", title);
         await remarkableClient.Upload(title, pdfBytes);
     }
@@ -55,11 +56,11 @@ public class CrosswordDeliveryService(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Top Stories API failed for {Date}", date);
-            return (crosswordBytes, $"crossword only — news API error: {ex.Message}");
+            return (crosswordBytes, $"puzzle only — news API error: {ex.Message}");
         }
 
         if (allStories.Count == 0)
-            return (crosswordBytes, "crossword only — no stories returned by API");
+            return (crosswordBytes, "puzzle only — no stories returned by API");
 
         var articles = new List<ArticleContent>();
         foreach (var story in allStories)
@@ -85,13 +86,13 @@ public class CrosswordDeliveryService(
         }
 
         if (articles.Count == 0)
-            return (crosswordBytes, "crossword only — all articles failed and abstracts were empty");
+            return (crosswordBytes, "puzzle only — all articles failed and abstracts were empty");
 
         try
         {
             logger.LogInformation("Composing {Count} articles with crossword for {Date}", articles.Count, date);
             var composed = pdfComposer.Compose(articles, crosswordBytes);
-            return (composed, $"{articles.Count} article(s) + crossword");
+            return (composed, $"{articles.Count} article(s) + puzzle");
         }
         catch (Exception ex)
         {
