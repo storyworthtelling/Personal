@@ -1,4 +1,5 @@
 using Ledger.Infrastructure.Services;
+using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
 
 namespace Ledger.Android;
@@ -13,11 +14,13 @@ public sealed class VaultSync
 {
     private readonly SecretsVaultService vault;
     private readonly AccountService accounts;
+    private readonly InMemoryDriveFileIdStore fileIdStore;
 
-    public VaultSync(SecretsVaultService vault, AccountService accounts)
+    public VaultSync(SecretsVaultService vault, AccountService accounts, InMemoryDriveFileIdStore fileIdStore)
     {
         this.vault = vault;
         this.accounts = accounts;
+        this.fileIdStore = fileIdStore;
     }
 
     // Writes the Plaid credentials + all bank access tokens into the vault, leaving other apps' sections
@@ -37,8 +40,19 @@ public sealed class VaultSync
                 SettingsStore.PlaidEnvironment)
             {
                 Items = items
-            }
+            },
+            // Fold this session's captured Drive file ids into the shared map (id wins per name).
+            DriveFileIds = MergeIds(v.DriveFileIds, fileIdStore.Snapshot())
         }, cancellationToken);
+    }
+
+    private static IReadOnlyDictionary<string, string> MergeIds(
+        IReadOnlyDictionary<string, string> existing, IReadOnlyDictionary<string, string> captured)
+    {
+        var merged = new Dictionary<string, string>(existing);
+        foreach (var (name, id) in captured)
+            merged[name] = id;
+        return merged;
     }
 
     // Fills in the Plaid credentials this install is missing and re-creates any bank the database doesn't
@@ -48,6 +62,10 @@ public sealed class VaultSync
         var result = await vault.LoadAsync(cancellationToken);
         if (result.Status != SecretsVaultStatus.Loaded)
             return;
+
+        // Seed the Drive-by-ID cache so well-known files resolve by remembered id (surviving a rename).
+        foreach (var (name, id) in result.Vault.DriveFileIds)
+            fileIdStore.Set(name, id);
 
         var plaid = result.Vault.Plaid;
         if (string.IsNullOrEmpty(SettingsStore.PlaidClientId) && !string.IsNullOrEmpty(plaid.ClientId))
