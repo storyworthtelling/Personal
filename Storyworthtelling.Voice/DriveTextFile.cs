@@ -1,3 +1,4 @@
+using Google;
 using Google.Apis.Drive.v3;
 using DriveData = Google.Apis.Drive.v3.Data;
 
@@ -18,10 +19,18 @@ public sealed class DriveTextFile : IDriveTextFile
     private readonly Func<CancellationToken, Task<DriveService>> serviceFactory;
     private readonly string fileName;
 
-    public DriveTextFile(Func<CancellationToken, Task<DriveService>> serviceFactory, string fileName)
+    // Optional stable-id cache (thread #13): resolve the file by its remembered Drive id first, so the owner
+    // can MOVE it in Drive without breaking the app. Null keeps the original name-only behaviour.
+    private readonly IDriveFileIdStore? fileIdStore;
+
+    public DriveTextFile(
+        Func<CancellationToken, Task<DriveService>> serviceFactory,
+        string fileName,
+        IDriveFileIdStore? fileIdStore = null)
     {
         this.serviceFactory = serviceFactory;
         this.fileName = fileName;
+        this.fileIdStore = fileIdStore;
     }
 
     public async Task<string?> ReadAsync(CancellationToken cancellationToken)
@@ -61,11 +70,39 @@ public sealed class DriveTextFile : IDriveTextFile
 
     private async Task<string?> FindId(DriveService service, CancellationToken cancellationToken)
     {
+        // 1) Prefer a remembered id, so a file the owner moved is still found where it now lives.
+        var remembered = fileIdStore?.Get(fileName);
+        if (remembered is not null && await StillExists(service, remembered, cancellationToken))
+            return remembered;
+
+        // 2) Fall back to the well-known-name search (the original behaviour).
         var list = service.Files.List();
         list.Q = $"name='{fileName}' and trashed=false";
         list.Fields = "files(id)";
         list.PageSize = 1;
         var found = await list.ExecuteAsync(cancellationToken);
-        return found.Files is { Count: > 0 } ? found.Files[0].Id : null;
+        var id = found.Files is { Count: > 0 } ? found.Files[0].Id : null;
+
+        // 3) Capture / re-capture the id so the next resolution skips the search and survives a move.
+        if (id is not null)
+            fileIdStore?.Set(fileName, id);
+        return id;
+    }
+
+    // A remembered id is only usable if the file still exists and isn't trashed; otherwise the caller
+    // re-resolves by name (self-healing). A 404 means the id is gone — treat it as "resolve by name".
+    private static async Task<bool> StillExists(DriveService service, string id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var get = service.Files.Get(id);
+            get.Fields = "id,trashed";
+            var file = await get.ExecuteAsync(cancellationToken);
+            return file is not null && file.Trashed != true;
+        }
+        catch (GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
     }
 }
