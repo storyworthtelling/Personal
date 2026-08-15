@@ -201,7 +201,8 @@ public static class PaperUi
     /// button recipes so no new tokens are needed: the active side is inked in
     /// Accent, the inactive side muted. Calls back with the selected index.
     /// </summary>
-    public static LinearLayout SegmentedToggle(Context context, string leftLabel, string rightLabel, Action<int> onSelect)
+    public static LinearLayout SegmentedToggle(
+        Context context, string leftLabel, string rightLabel, Action<int> onSelect, int initialIndex = 0)
     {
         var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
         Button left = null!;
@@ -225,7 +226,9 @@ public static class PaperUi
             MarginStart = PaperTheme.Dp(context, DesignTokens.Space.X2),
         });
 
-        Paint(0);
+        // Paint the starting selection without firing onSelect — a toggle should reflect the current
+        // state on open (e.g. a radio that is already off) without acting on it.
+        Paint(initialIndex);
         return row;
     }
 
