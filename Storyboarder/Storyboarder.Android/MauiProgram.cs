@@ -170,15 +170,20 @@ public static class MauiProgram
                 });
             };
         }
+        // Drive-by-ID (#13): a shared, vault-seeded cache of well-known-file-name -> stable Drive id, so a
+        // renamed/moved file is still found by id. VaultSync seeds it on restore and snapshots it on publish.
+        builder.Services.AddSingleton<InMemoryDriveFileIdStore>();
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
-            new DriveVoiceProfileStore(new DriveTextFile(DriveFactory(sp), DriveVoiceProfileStore.FileName)));
+            new DriveVoiceProfileStore(new DriveTextFile(
+                DriveFactory(sp), DriveVoiceProfileStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
         // the owner's passphrase (SettingsStore.VaultPassphrase). Storyboarder both publishes its own keys to
         // it (VaultSync) and, being the app the shared Claude key is entered in, sources the voice key from it
         // (VaultVoiceConfigStore) so there is a single source of truth in place of the old plaintext config.
         builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
-            new DriveSecretsVaultStore(new DriveTextFile(DriveFactory(sp), DriveSecretsVaultStore.FileName)));
+            new DriveSecretsVaultStore(new DriveTextFile(
+                DriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase));
         builder.Services.AddSingleton<VaultSync>();
