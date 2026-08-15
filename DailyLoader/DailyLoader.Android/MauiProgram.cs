@@ -132,15 +132,20 @@ public static class MauiProgram
                 });
             };
         }
+        // Drive-by-ID (#13): shared, vault-seeded cache of well-known-file-name -> stable Drive id so a
+        // renamed/moved file is still found by id. VaultSync seeds it on restore, snapshots it on publish.
+        builder.Services.AddSingleton<InMemoryDriveFileIdStore>();
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
-            new DriveVoiceProfileStore(new DriveTextFile(VoiceDriveFactory(sp), DriveVoiceProfileStore.FileName)));
+            new DriveVoiceProfileStore(new DriveTextFile(
+                VoiceDriveFactory(sp), DriveVoiceProfileStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
         // the owner's passphrase (CredentialStore.VaultPassphrase). DailyLoader publishes its own credentials
         // to it (VaultSync) and sources the shared Claude voice key from it, so secrets live in one place
         // (in place of the old plaintext voice config).
         builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
-            new DriveSecretsVaultStore(new DriveTextFile(VoiceDriveFactory(sp), DriveSecretsVaultStore.FileName)));
+            new DriveSecretsVaultStore(new DriveTextFile(
+                VoiceDriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
         builder.Services.AddSingleton<VaultSync>();
