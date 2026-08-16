@@ -1,236 +1,312 @@
 # DESIGN.md — the Paper & Ink design bible
 
-This file is the single source of truth for the visual and UX design of every project in this repository: FocusPhone (all four heads), Canonizer (app and generated report PDFs), Ledger, DailyLoader, and anything built here in the future. Code does not carry design opinions of its own; it carries tokens that mirror this document. **No color or type-size literal may appear outside a project's registered token files** (§16) — leak-guard tests enforce this.
+This file is the single source of truth for the visual and UX design of every project in this repository: FocusPhone / Flyleaf (all heads), Canonizer, Ledger, DailyLoader, and anything built here in the future. Code does not carry design opinions of its own; it carries tokens that mirror this document. **No color or type-size literal may appear outside a project's registered token files** (§19) — leak-guard tests enforce this.
+
+Reorganized in the P4 design-system expansion: **foundations → materials → color → controls → patterns**. American English throughout (color, gray, favor, organize).
+
+---
 
 ## 1. Principles
 
-1. **Paper & ink.** Every surface is warm paper; everything on it is soft ink. The apps should feel like well-made stationery, not software.
-2. **Light only.** There is no dark mode, by decision. Night comfort is the system's job (Android Night Light / Bedtime mode); we build nothing custom.
-3. **One accent, one meaning.** Terracotta appears only where something needs attention or action. Never decoration.
-4. **Typography does the hierarchy.** Size, weight, and family carry structure; color does not. Serif reads, sans operates, mono is for machine text.
-5. **Quiet by default.** Fewer words, sentence case, generous space. Success is silent state change; only problems speak up.
-6. **Act, don't ask.** Actions happen immediately with a window to undo — confirmation dialogs are not part of this language.
-7. **The books are part of the system.** Generated PDFs follow this bible exactly as the apps do.
+1. **Colored media on paper.** Every surface is warm paper; everything on it is made with real drawing media — ink, colored pencil, marker, highlighter, watercolor. The apps should feel like well-made stationery worked by hand, not software.
+2. **Calm lives in the journey.** Restraint is spent on flow, density, and quiet interactions — not on withholding color. Color may be lively as long as it reads as art supplies on paper. Noisy, naggy, cluttered, or input-hungry screens fail the acceptance test; a warm palette does not.
+3. **Light only.** One visual world, by decision. There is no dark mode; night comfort is the OS's job (Android Night Light / Bedtime). Every color is defined for light only.
+4. **Color carries meaning by role.** Color is assigned to semantic **roles** (action, positive, resolved, reference, caution, problem, in-progress), never decoration. A role resolves to a lively value on screen and a muted, grayscale-safe value in documents (§3). (This supersedes the old "one accent, one meaning" rule; terracotta is retired.)
+5. **Typography does the hierarchy.** Size, weight, and family carry structure. Serif reads, sans operates, mono is machine text, and a calligraphy hand is the owner's voice.
+6. **Quiet by default.** Fewer words, sentence case, generous space. Success is a silent inline state change; only problems speak up. No toasts, ever.
+7. **Act, don't ask.** Actions happen immediately with a window to undo — confirmation dialogs are not part of this language. There is no destructive button; destructive acts are undo-first.
+8. **The books are part of the system.** Each app is a book with a painted cover; generated PDFs follow this bible exactly as the apps do.
 
-## 2. Palette
+---
 
-### Base
+## 2. Materials
+
+Four drawing media, each assigned a **job** so the metaphor is systematic, not decorative. Rendered **procedurally in Skia** by one shared engine in `Storyworthtelling.Paper` (extends the paper-grain approach), consumed identically by the native Android and MAUI heads. Intensity is calibrated **per material**; texture is **always on** (no opt-out) but capped so it never fails contrast (§17). Textures are baked to cached bitmaps/shaders once per size+token and reused — never regenerated per frame; **60fps scroll is a merge gate**.
+
+| Material | Job | Rendering |
+|---|---|---|
+| **Paper** | The ground of every screen — one consistent warm cream, same color *and* grain everywhere. | Seeded monochrome grain, ~2.4%, on `Paper` grounds only. |
+| **Watercolor** | Grounds & covers: book covers, app icons, hero/section-header washes, empty-state and loading grounds. Never behind body text. | Soft multi-stop radial washes; baked for hero surfaces (hybrid with procedural grain). |
+| **Highlighter** | Attention / active / selected. A translucent band (25–35%) behind full-strength ink that **adopts the functional hue** of what it marks. May sit over any surface, opacity-tuned so ink over it clears AA. | Translucent wash tier (T1) of the relevant role. |
+| **Colored pencil** | Semantic marks: chips, ticks, finding tags, margin notes, in-app icon strokes. The hand-drawn "this means something" material. | Grainy stroke/fill of the role's mark tier (T3). |
+| **Marker** | Emphasis: heading underlines (full-width, gently curved, rising from the left), tab labels, tags. Never the heading text itself. | Near-solid streaked stroke of the role's mark tier. |
+
+Every material carries slight texture/imperfection — including functional controls — but texture behind text is capped (§17) and glyph strokes stay legible at 16dp.
+
+---
+
+## 3. Color — the role model
+
+Color is a set of **roles**, each named semantically (so a later re-tint never renames a token). Every role carries **five tiers**:
+
+| Tier | Name | Use |
+|---|---|---|
+| T1 | wash | highlighter / translucent selection |
+| T2 | fill | soft fills, chart areas |
+| T3 | mark | pencil strokes, chips, glyph signal |
+| T4 | text | text-on-paper (meets AA) |
+| T5 | deep | small text / dense contexts (AA at any size) |
+
+Each role resolves through a **profile**: **App** (lively, on-screen) and **Document** (muted, for reMarkable/PDF — the §16 grayscale-safe set). One document surface variant renders grayscale (rM2); the color e-ink (Paper Pro) and screen-PDF variants share the muted hues. The role table below shows the App value; the muted Document set and the separable rM2 gray ramp are generated alongside it.
+
+### Roles (App profile — proposal values; final are OKLCH-generated, §19)
+
+| Role | Meaning | mark (T3) | text (T4) | deep (T5) |
+|---|---|---|---|---|
+| **Action** | pine — primary action / commit, active | `#347052` | `#2C6346` | `#235A3E` |
+| **Positive** | leaf — good news / success | `#5F8A34` | `#4E7328` | `#3B5820` |
+| **Resolved** | gray — a settled / closed delta | `#8C8578` | `#6B6559` | `#4C4840` |
+| **Reference** | slate-blue — prior draft / context / structure | `#47638A` | `#354C6C` | `#25374E` |
+| **Caution** | ochre — a "consider" / soft heads-up | `#C09A34` | `#8C6C1C` | `#6A5115` |
+| **Problem** | rose — regression / contradiction / blocked | `#BE5560` | `#9A3D47` | `#6E2931` |
+| **In-progress** | teal — currently working / running | `#2E8086` | `#256268` | `#1E4C50` |
+
+Fills (T2): action `#7FAB8E` · positive `#A0C07E` · resolved `#C9C4B6` · reference `#93A5C0` · caution `#E2CD86` · problem `#E0A6AC` · in-progress `#86B7BC`. Washes (T1) are the mark hue at 24–32% alpha.
+
+Terracotta is **retired everywhere** — including documents, where the old "active" accent becomes a **muted pine**; report rules, bullets, and covers regenerate accordingly.
+
+### Neutrals & the two inks
 
 | Token | Hex | Role |
 |---|---|---|
-| `Paper` | `#FAF8F2` | The background of everything: windows, pages, PDF pages |
-| `Ink` | `#3A3A33` | Primary text, icons, panel borders |
-| `InkMuted` | `#8A8578` | Secondary text, metadata, timestamps, folio titles |
-| `Accent` | `#C2542F` | Terracotta. Primary actions, attention, active/error states |
+| `Paper` | `#FAF8F2` | The ground of everything |
+| `PaperBright` | `#FFFFFF` | Cards that lift, primary-button text |
+| `PaperDeep` | `#F1EBDD` | Inset panels, explainer cards, mono fields, overlay haze |
+| `PaperShade` | `#E9E1CF` | Slider tracks, letterbox fill |
+| `Hairline` | `#E3DCC9` | Borders, dividers |
+| `Ink` | `#33322B` | Body & UI text, glyphs |
+| `InkSoft` | `#6B6759` | Tertiary text for long runs |
+| `InkMuted` | `#8A8578` | Secondary text, metadata (≥14sp) |
+| `InkBlue` | `#2C3E5E` | "The pen": signatures, editorial marks, and the color of the voice |
 
-### Extended (derived)
+**Ink-black** reads the body and UI. **Ink-blue** is the pen. The owner's voice is set in a **calligraphy hand** (Pinyon Script, §4) colored ink-blue.
 
-| Token | Hex | Role |
-|---|---|---|
-| `PaperBright` | `#FFFFFF` | Cards that need lift, dialogue balloons, primary-button text |
-| `PaperDeep` | `#F1EBDD` | Caption boxes, inset panels, mono/key input fields, explainer cards |
-| `PaperShade` | `#E9E1CF` | Pressed states, letterbox fill behind scaled art |
-| `Hairline` | `#E3DCC9` | Borders, dividers, card strokes |
-| `InkSoft` | `#6B6759` | Tertiary text where InkMuted is too faint for long runs |
-| `AccentDeep` | `#9C4023` | Pressed accent; accent-colored text below 16sp/px |
+### Identity hues
 
-### Semantic states — no new hues
+Each app (book) has a **signature identity hue**, kept as a **separate set** from the semantic roles so a tab or accent never reads as "caution." Each app's identity is **sampled from its painted cover art** during its phase, not fixed here. Identity hues color the binder tabs (§10) and per-app accents.
 
-| State | Recipe |
-|---|---|
-| Warning / needs setup | Ink text on a `PaperDeep` card with a 3dp `Accent` left rule |
-| Error / destructive | `Accent` text (≥ Body size) or `AccentDeep` (smaller); destructive buttons are accent-outlined, never filled |
-| Progress / active | `Accent` indicator or tint on paper; status line in `InkMuted` |
-| Success | Quiet inline state change — no green exists in this system, and no toasts |
+### Contrast (binding)
 
-### Contrast (WCAG, computed)
+Body text ≥ **AA (4.5:1)**; UI/large text ≥ **3:1** — computed against the **darkest textured pixel** and **behind highlighter washes**, not the flat token. A role tier that fails is darkened to its `deep` tier. The contrast table is **generated and build-failing** (§19). Colorblind redundancy is not required on screen (single known user); documents keep their non-color cues (§16) regardless.
 
-| Pair | Ratio | Verdict |
-|---|---|---|
-| Ink on Paper | 10.79:1 | AAA body text |
-| InkSoft on Paper | 5.33:1 | AA body text |
-| InkMuted on Paper | 3.46:1 | Large/secondary text only (≥14sp) |
-| Accent on Paper | 4.30:1 | UI components & large text; use AccentDeep for small text |
-| AccentDeep on Paper | 6.24:1 | AA at any size |
-| PaperBright on Accent | 4.56:1 | AA — primary button text |
-| Ink on PaperDeep | 9.64:1 | AAA |
+---
 
-## 3. Typography
+## 4. Typography
 
-Three families, committed as static TTFs in `/Fonts` (OFL; see `Fonts/LICENSES.md`):
+Four families, committed as static fonts in `/Fonts` (OFL; see `Fonts/LICENSES.md`):
 
-- **Source Serif 4** (Regular, SemiBold, Italic) — headings, reading text, PDF body, captions, folios, screen headers. The literary voice.
-- **Source Sans 3** (Regular, SemiBold) — UI controls, labels, list rows, comic lettering. The working voice.
-- **Cascadia Code** (Regular) — machine text: API keys, SHA-1s, URLs, file paths, countdowns. Anything the user copies or a machine produced.
+- **Source Serif 4** (Regular, SemiBold, **Black**) — headings, reading text, PDF body, covers. The literary voice. (Black is new: it anchors the reworked display sizes.)
+- **Source Sans 3** (Regular, SemiBold) — UI controls, labels, list rows. The working voice.
+- **Cascadia Code** (Regular) — machine text: keys, SHA-1s, URLs, paths, figures, countdowns.
+- **Pinyon Script** (Regular) — a copperplate **calligraphy** hand, colored ink-blue, used **only** for the owner's voice messages.
 
-### Type scale
+### Type scale (reworked — bigger, more contrast at the top)
 
-| Token | Family/weight | Android sp | MAUI | Analysis PDF px | Use |
-|---|---|---|---|---|---|
-| `Display` | Serif SemiBold | 34 | 34 | 58 (H1) | Screen headers, page titles |
-| `Title` | Serif SemiBold | 24 | 24 | 40 (H2) | Section heads |
-| `Heading` | Serif SemiBold | 18 | 18 | 32 (H3) | Card titles, sub-heads |
-| `Body` | Sans Regular (UI) / Serif Regular (reading & PDF body) | 16 | 16 | 30 | Default text |
-| `Secondary` | Sans Regular | 14 | 14 | 26 | Supporting text, status lines |
-| `Label` | Sans SemiBold | 13 | 13 | 22 | Field labels, buttons, chips |
-| `Mono` | Cascadia Regular | 14 | 14 | 24 | Technical strings |
-| `Countdown` | Cascadia Regular | 40 | — | — | Unlock timer, cutover countdown |
+| Token | Family/weight | Android sp | Analysis PDF px | Use |
+|---|---|---|---|---|
+| `Display` | Serif **Black** | 44 | 72 | Screen headers, chapter openings |
+| `Title` | Serif SemiBold | 28 | 46 | Section heads |
+| `Heading` | Serif SemiBold | 18 | 32 | Card titles, sub-heads |
+| `Body` | Sans Regular (UI) / Serif Regular (reading) | 16 | 30 | Default text |
+| `Secondary` | Sans Regular | 14 | 26 | Supporting text, status lines |
+| `Label` | Sans SemiBold | 13 | 22 | Field labels, buttons, chips, tab labels |
+| `Mono` | Cascadia Regular | 14 | 24 | Technical strings, figures |
+| `Voice` | Pinyon Script | ~26 | — | The owner's voice, in ink-blue |
+| `Countdown` | Cascadia Regular | 40 | — | Cutover / unlock timer |
+| `CoverTitle` | Serif SemiBold | 72 | — | Book/report covers |
 
-Comic-specific: `Lettering` Sans Regular 17px, `Caption` Serif Italic 16px, `Folio` Serif Regular 18px, `CoverTitle` Serif SemiBold 72px.
+Headings are ink-black Serif with a **full-width marker underline** (a gently curved stroke rising from the left, in the section's functional or identity hue). Body reading stays at 16. Line height 1.35 for reading, 1.2 for headings. Sizes are never invented ad hoc.
 
-Line height: 1.35 for body/reading, 1.2 for headings. Sizes never invented ad hoc.
+---
 
-## 4. Spacing & shape
+## 5. Spacing & shape
 
 - **Spacing scale (dp/px):** 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96.
-- **Airy by default:** screen edges are 24dp; list rows may inset 16. Whitespace is the primary separator — hairlines appear only where scanning demands them (list rows, section rules); boxes only where grouping demands them.
-- **Corner radius:** soft-cornered stationery, 10–16, never pills. Inputs 12; buttons 12; cards 12; dialogue balloons 14; captions 10.
-- **Strokes:** hairline 1dp (UI) / 1.5px (PDF); comic panel border 2px Ink.
-- **Touch targets:** minimum 48dp, strictly; list rows 56dp.
+- **Airy by default, just fuller.** Screen edges 24dp; whitespace is the primary separator. Working screens may carry more content than the Flyleaf home, but the 24dp edges and whitespace-first rule hold. Hairlines only where scanning demands (list rows, tables); boxes only where grouping demands.
+- **Corner radius:** soft-cornered stationery, 10–16, **never pills**. Inputs/buttons/cards 12; the switch is a **rounded rectangle** track, not a stadium.
+- **Strokes:** hairline 1dp (UI) / 1.5px (PDF).
+- **Touch targets:** minimum 48dp, strictly; list rows 56dp. Refined controls (switch, checkbox) keep small visuals with a padded ≥48dp hit-area.
+- **No shadows, ever.** Paper does not cast digital shadow. Overlays separate by a dimmed **PaperDeep haze** + hairline (§7), not elevation.
 
-## 5. Motion & feedback
+---
 
-- **Two durations only:** `Quick` 150ms (state changes, tint fades, inline status appearing) and `Standard` 200ms (screen transitions, undo bar entry). Decelerate curves (`decelerate` interpolator / `Easing.CubicOut`). Nothing springs, bounces, or overshoots — paper doesn't bounce.
-- **Screen transitions are horizontal page-slides**, like turning a page. Native heads implement it (`OverrideActivityTransition` + the `paper_slide_*` animations); MAUI heads accept the platform's navigation transition where custom transitions would mean fighting the framework.
-- **No haptics.** Anywhere we control vibration, it is off.
-- **Loading is words, not ornaments.** A quiet `InkMuted` Secondary sentence is the primary signal: "Composing page 12 of 40…", "Loading My Drive…". A small accent spinner appears only when duration is genuinely unknown. Never a skeleton screen.
+## 6. Motion & feedback
 
-## 6. Materiality — paper grain
+- **Three durations:** `Quick` 150ms (state changes, tint fades, toggle slide, inline status), `Standard` 200ms (screen transitions, accordion expand, dog-ear entry), `Ink` 320ms (watercolor bloom / ink-spread on hero moments & overlays only). Decelerate curves; nothing springs or bounces.
+- **Screen transitions** are a horizontal page-slide with a **subtle page-curl** at the leading edge. Switching binder-tab areas also uses the page-curl (every navigation is a page turn). The frameless cover-art load screen hands off to content with a page-curl.
+- **Reduced-motion** drops the big movers (slides, curl, watercolor bloom, ambient drift) and keeps only small opacity fades and instant state change. Animated texture freezes.
+- **No haptics, no sound**, anywhere we control them — including all new controls.
+- **Loading is words.** A quiet `Secondary` status sentence in the **In-progress (teal)** hue is the primary signal ("Composing page 12 of 40…"); a determinate meter shows a known count. The spinner is **retired** — unknown duration is a sentence, not an ornament.
 
-- Every window background and every generated PDF page carries a **subtle ink grain**: deterministic seeded monochrome noise, 256px tile, ink at ~2.4% opacity (alpha 6/255), roughly 1 in 6 pixels.
-- Grain lives on `Paper` backgrounds only — never on `PaperBright` cards, balloons, buttons, or inputs (their cleanliness is the contrast).
-- One algorithm, one seed (see `Grain` tokens); IconStudio emits the app tiles, `PaperGrain` draws it in the Skia renderers. Regenerating is always byte-identical.
+---
 
 ## 7. Components
 
 | Component | Recipe |
 |---|---|
-| Primary button | `Accent` fill, `PaperBright` text, Label type, radius 12, padding 16×10. One per screen at most. Pressed: `AccentDeep`. |
-| Secondary button | `Paper` fill, 1dp `Hairline` border, `Ink` text, radius 12. |
-| Quiet button | No fill, no border, `InkMuted` text; tertiary actions. |
-| Destructive button | `Paper` fill, 1dp `Accent` border, `Accent` text. |
-| **Pinned bottom bar** | Primary actions live in a bar fixed to the screen bottom regardless of scroll: 1dp `Hairline` top rule, paper/grain background, 24×12 padding. Content scrolls above it. |
-| Text field | `PaperBright` fill, 1dp `Hairline` border, radius 12. Mono variant: `PaperDeep` fill, Cascadia. |
-| Field group | Label above the input; helper text (Secondary, InkMuted) below. |
-| Warning card | `PaperDeep` fill, 3dp `Accent` left rule, radius 12. |
-| Hairline card | `PaperBright` fill, 1dp `Hairline` border, radius 12, padding 16. |
-| List row | 56dp min height; Sans 16 `Ink` + Sans 14 `InkMuted`; hairline divider. |
-| **Undo row** | The confirmation replacement: the action happens immediately, then an inline bar appears — Secondary `Ink` message ("Blocked Maps.") + Quiet "Undo" — and dismisses itself after 6 s. Never a dialog. |
-| **Inline countdown** | For the rare irreversible act (finalize cutover): a Cascadia countdown ("0:10…") with a Secondary "Cancel" beside it; executes only when a visible countdown expires. Leaving the screen cancels it. |
-| **Status line** | The loading/progress voice: one Secondary `InkMuted` sentence, updated in place. |
-| **Gesture hint** | Icon-only affordance for hidden gestures: a small `InkMuted` line glyph (chevron/handle for swipe-up; the clock's hub dot marks the long-press). No text. |
-| **App-tray folder** | The swipe-up tray auto-sorts apps into a fixed set of category folders (Finance, Travel & Transit, Shopping, Food & Dining, Health & Fitness, Utilities & Tools, Productivity, Media, Smart Home). Each folder is a textless `Ink` line glyph (§8), hidden while empty, tapping it opens a sub-grid; the folder name rides as the content description. Apps keep their own icons. The owner's own non-FocusPhone apps and any unsorted apps sit loose at the tray root, the folders between them. Long-press an app for a Paper menu (§7 action sheet): file it into a folder — reaching empty/hidden folders too — or block it (undo-first). |
-| Empty state | Centered, Serif Italic, `InkMuted`, an invitation. |
-| Screen header | Every screen opens with an in-page `Display` Serif title, like a chapter heading. Nav bars stay minimal. |
-| Phase chip | Hairline-bordered pill (radius 10), Label type: "scenes 12 of 40". Active phase `Ink`, finished phases `InkMuted`, problems get the error chip (accent border + `AccentDeep` text). |
+| **Primary button** | Marker-textured **Action (pine)** fill, `PaperBright` text, Label type, radius 12, padding 18×11. One per screen. In-flight: the button disables and a status line (In-progress hue) reports; no in-button spinner. |
+| **Secondary button** | Pencil **outline** on paper, `Ink` text, radius 12. |
+| **Quiet button** | No fill/border, `InkMuted` text; tertiary actions. |
+| **Destructive** | *None.* Destructive acts happen immediately with an undo dog-ear (§13); truly irreversible acts use the inline countdown. |
+| **Pinned bottom action bar** | Appears only when a screen has a primary action. Up to two — primary (marker-pine, right) + optional secondary (outline); a quiet Cancel may sit left. Never two primaries. 1dp hairline top rule, paper ground. |
+| **Switch** | Rounded-rect track: `PaperShade` off, **functional-hue** on; ink-line paper knob, no shadow. |
+| **Checkbox / radio** | Hairline at rest; functional-hue on. Indeterminate renders as a **circle** (vs the square check). ≥48dp hit-area. |
+| **Segmented control** | Within-area view switch; selected shows the **highlighter wash** of the functional hue. |
+| **Chips** | Four defined types: **filter/choice** (toggle, highlighter wash on), **input/removable** (× to remove), **status/read-only** (no tap target, exempt from 48dp), **assist/action**. |
+| **Stepper** | ±, disabled at bounds, long-press to repeat; value in mono. |
+| **Slider** | Range (two-thumb) supported; filled portion is a colored-**pencil** track; value bubble on the thumb while dragging. |
+| **Text field** | `PaperBright` fill, 1dp `Hairline`, radius 12. Focus = 2dp **Action** border, no glow. Mono variant: `PaperDeep` + Cascadia. Required fields carry a **faint identity-tinted fill**. Multiline auto-grows. Validation on blur, then live. Two secret variants: **masked** (dots + reveal) and **clear-secret** (mono, always visible, no clipboard block — the vault passphrase). |
+| **Picker** | Inline-**accordion**: the field expands in place (no overlay, no dialog). |
+| **Flip date picker** | Single-date, split-flap style: three flip columns (Month / Day / Year), flip up/down. |
+| **Search field** | Leading lens glyph, clear affordance, inline results, empty-state invitation. |
+| **Cards** | Five types: **warning** (`PaperDeep`, 3dp Action left rule), **explainer** (`PaperDeep`), **hairline** (`PaperBright` + 1dp hairline), **cover** (watercolor ground + title), **stat** (a single mono figure + label). |
+| **List rows & tables** | 56dp rows (Sans 16 `Ink` + Sans 14 `InkMuted`), hairline dividers, no zebra. Real tables where truly tabular (header row, aligned columns, horizontal scroll). Figures in Cascadia mono, right-aligned, tabular; negatives/deltas take the functional hue. Rows expand via the one inline-accordion pattern. |
+| **Action card** | Long-press → a **centered** paper card over a **PaperDeep haze** scrim (tap-out dismisses), animated in with the Ink reveal. Item actions only; never a confirm dialog. |
+| **Undo dog-ear** | The confirmation replacement: the act happens, then an inline **dog-ear** bar appears (functional-hue notice, §13), holds **10s**, then settles. Never a dialog, never a toast. |
+| **Inline countdown** | For the rare irreversible act: a Cascadia countdown + Cancel; executes only when the visible countdown expires; leaving cancels it. |
+| **Status line** | The loading/progress voice: one `Secondary` sentence in the In-progress hue, updated in place. |
+| **Empty state** | Centered `Serif` italic invitation on plain paper + the primary action. (The frameless cover art is the *loading* screen, not the empty one.) |
+| **Screen header** | Every screen opens with an in-page `Display` Serif title + full-width marker underline; **stays pinned**. No standing top app bar. |
+| **Phase chip** | Hairline pill (radius 10), Label type: "scenes 12 of 40". Active `Ink`, finished `InkMuted`, problems take the Problem chip. |
 
-**Success is an inline state change.** The screen shows the new truth (status line updates, the row disappears, the list gains the item). Success toasts and success alerts are banned; failures may still surface visibly, worded per §11.
+**Success is an inline state change.** The screen shows the new truth. Toasts and success alerts are banned; failures surface inline where they happen, worded per §14.
 
-## 8. Iconography
+---
 
-In-app glyphs are single-style **ink line icons**: 2dp stroke, geometric, no fills. `Accent` appears only as a live signal (a tile with an active notification, the one terracotta detail in each launcher icon). No second icon style, ever.
+## 8. The state matrix
 
-## 9. Generated PDF specifications
+One rule set for every interactive element.
 
-All pages (including front matter) carry the §6 grain over `Paper`.
-
-### Comic volumes (2048 × 3072 px, 2:3; declared 300 DPI ≈ 6.8 × 10.2 in for print)
-
-- **Cover page (new, page 0):** novel title in `CoverTitle` Serif, short terracotta rule, "Volume N" + volume title in Serif, the owner's medallion (§13) near the foot. No folio.
-- Content pages: margins side 128, top 128, bottom 232 (104px folio band); gutter 48; 4px `Ink` panel borders; `PaperShade` letterbox behind off-ratio art (minimized by requesting the panel's aspect ratio from the image model). Panel art is drawn with high-quality (Mitchell cubic) resampling.
-- Dialogue balloons: `PaperBright`, 3px Ink stroke, radius 28, Sans 34. Captions: `PaperDeep`, radius 20, Serif Italic 32.
-- Folio band: running volume title bottom-left `InkMuted`, page number bottom-right `Ink`, Serif 36.
-
-### Analysis reports (1240 × 1754 px; declared 150 DPI = true A4)
-
-- **Front matter (new, unnumbered):** a cover (title, "Revision report" in Serif Italic muted, terracotta rule, medallion) and a **Contents** page listing each section with its page number. Front matter carries no footer; content pages keep folios 1..N, so printed numbers match the TOC with no bookkeeping.
-- Content: margins 110/100/130; body Serif 30 `Ink`; H1 58/H2 40/H3 32 Serif SemiBold; 2px terracotta rule under H1/H2; terracotta bullets; footer = running title left (Sans 22 `InkMuted`), page number right (Serif 22 `Ink`).
-
-## 10. Launcher icon family
-
-Android adaptive icons, generated exclusively by `Tools/IconStudio` (never hand-edited): flat `Paper` background layer; one `Ink` line glyph (stroke ≈ 3.5% of the canvas) centered in the 66/108 safe zone with exactly one `Accent` detail. Glyphs: clock (Launcher) · lens (Camera) · waveform (Audio) · speech (Communication) · red pen nib (Canonizer) · folded sheet (DailyLoader) · ledger marks (Ledger). Regenerate: `dotnet run --project Tools/IconStudio -- --repo-root .`
-
-## 11. Voice, copy & formats
-
-- Sentence case everywhere, including buttons. No emoji, no ⚠ glyphs.
-- **Time is 12-hour with an analog sensibility**: "7:42 pm" (lowercase, no leading zero) wherever digital time must appear; the FocusPhone home shows a drawn analog face and no digital time at all.
-- **List timestamps are relative**: "just now" → "5m ago" → "2h ago" → "yesterday" → "Tuesday" → "Jun 30" → "Jun 30, 2025" (`RelativeTime` helpers).
-- **Error template (binding):** *what happened* + *what to do next*. "Gemini rejected the key. Check it in Settings." Never a bare "failed".
-- **Numbers & units:** counts as "12 of 40"; durations as "42 min"; interpuncts (·) join metadata; em-dashes (—) join clause-level status ("Delivered — 2h ago").
-- **Notifications:** title = the outcome ("Crossword delivered"), body = next step if any; one line; sentence case; never the app name as a prefix.
-- Empty states are invitations; destructive copy states the consequence plainly.
-- **Owner's voice — how it applies.** Copy splits in two. **Static labels, buttons, status lines, and error templates stay quiet-neutral and minimalist** per the rules above — they are never sent to a model, so they stay fast, predictable, and identical across apps. **Situational messaging** — a welcome greeting, a "nothing to show yet" line, a book-complete note: copy generated for a specific moment — is written *in the owner's voice*, composed live from a shared voice profile learned from the documents the owner uploads. The shared **`Storyworthtelling.Voice`** library owns this (see CLAUDE.md): every com.storyworthtelling app calls `VoicedMessenger` with a **neutral fallback**, and the rules are binding on the fallback: a voiced message must be *composed fresh each time*, must **degrade silently to the neutral fallback** whenever no profile has been learned yet or a call fails (never a spinner, never an error, never a half-written line), and must still obey every format rule above (sentence case, no emoji, 12-hour time, the error template). The voice profile learns *how* the owner writes — tone, register, cadence — not subject matter. The earlier plan of learning from Google Drive via a claude.ai connector is superseded: the voice is learned from in-app uploads using the app's own Claude key, so no external authorization is involved. (Live in Storyboarder; rollout to the other apps and a shared-scope profile file are pending — see CLAUDE.md.)
-
-## 12. Terminology glossary
-
-One noun per concept, everywhere (screens, PDFs, notifications, code comments):
-
-| Term | Meaning (never a synonym) |
+| State | Treatment |
 |---|---|
-| project | A manuscript being reviewed in Canonizer (UI word; "manuscript" acceptable in prose) |
-| scene | One detected span of the manuscript; gets one wordless evidence image |
-| evidence image | The single wordless image per scene (a fidelity check, not the product) |
-| reference sheet | Character/location visual reference (keeps evidence images consistent) |
-| design bible | Claude's style guide for a manuscript (in-app sense) |
-| report | The revision report PDF — Canonizer's star product |
-| admin mode | FocusPhone's unlocked maintenance state (never "settings" or "escape hatch") |
-| block / unblock | App suppression on FocusPhone (never "ban"/"disable") |
-| cutover | The irreversible device lockdown step |
-| deliver | DailyLoader's daily push to the reMarkable |
-| thread | One contact's merged conversation |
-| tile / tray | Home-screen app icon; the swipe-up app list |
-| feed / episode | Podcast RSS source; one item |
+| Rest | Hairline border, paper fill, ink text |
+| Pressed *(hover folds in on pointer surfaces)* | Inset-paper: subtle inner hairline, texture lifts briefly — no color change (Quick 150) |
+| Selected / active | Highlighter wash of the functional hue, behind full-strength ink |
+| On / checked | Functional-hue fill (default Action pine) |
+| Indeterminate | A circle mark (vs the square check), functional hue |
+| Read-only | Shown, not editable; no caret, not dimmed |
+| Disabled | Desaturate + dim (~45%); never silently removed from the DOM |
+| Loading | Status sentence in the In-progress hue; determinate meter when known (spinner retired) |
+| Error | Problem-rose border + helper text that states the fix |
+| Success | Inline state change — the row updates; no toast, no banner |
 
-## 13. Branding
+The **custom focus ring is dropped**; the platform/TalkBack focus indicator is retained for switch-access.
 
-The owner's mark is a **circular medallion**: the owner's Google profile image, circle-masked with a 1dp `Hairline` ring. Until the real image is provided, IconStudio generates a placeholder — Serif monogram on paper with one terracotta dot.
+---
 
-- Appears on: generated PDF covers (volume + analysis) and the settings screens of all three apps. Nowhere else; the design is the brand.
-- **Swap path:** replace `/Branding/owner.png` with the real photo (square, ≥512px), run `dotnet run --project Tools/IconStudio -- --repo-root .`, rebuild. IconStudio circle-masks and rings whatever it finds there; it never overwrites an existing `Branding/owner.png`.
+## 9. Navigation & the app frame
 
-## 14. Accessibility (binding)
+- **Binder tabs.** In-app navigation lives on **right-edge divider tabs**, like a school notebook. Icon + short label, **color-coded per area** from the identity set. A **page-edge line** runs down the right; inactive tabs are clipped at that line and point out toward the screen edge; the **active tab is page-colored and open on the page side (no left border)**, blending to the page at the seam without crossing into content. Tabs never overlap content controls (reserved gutter); the strip scrolls if there are many. Aim ≤5 areas.
+- **The frame.** Pinned Serif header (top) · binder tabs (right, always) · action bar (bottom, only when a screen has a primary action). Content scrolls in the well between; the frame stays thin (hairlines, no fills) so it reads airy.
+- **Working landing.** Apps open onto a working "now" view (not a blank hub). The shared *pattern* (not a fixed component) always carries: the in-page Serif header, a "now" status block (display-only), the binder tabs, and a reachable primary action.
+- **Back** = system back + OS edge-swipe (reads as sliding the page back). **Overflow** is inline-only — no kebab menu; item actions come from the long-press action card.
 
-- **Font-scale resilience:** every screen must survive Android font scaling at 1.3× with no clipped text or broken layout (sp/scalable units everywhere).
-- **Touch targets:** 48dp minimum, strictly — including gesture hints and chips' tap areas (chips that don't tap are exempt).
-- Contrast per §2; `InkMuted` never below 14sp; technical strings selectable (plus explicit copy actions for the sanctioned ones).
+---
 
-## 15. Future-project defaults
+## 10. Iconography
 
-- **New MAUI app:** copy `Storyboarder.Android/Resources/Styles/DesignTokens.xaml` + the `ConfigureFonts` block; adopt the pinned-bottom-bar Grid pattern and in-page headers.
-- **New native Android head:** reference `FocusPhone.Ui.Android` or copy its pattern.
-- **Angular (when it exists):** SCSS token map, same names, rem scale (Body 1rem … Display 2.125rem), fonts via `@font-face`, `font-display: swap`.
-- Every new project registers its token files in §16 and ships a leak-guard test from day one.
+In-app glyphs are single-style **colored-pencil line icons**: pencil-textured 2dp strokes, geometric, no fills, capped for legibility at 16dp. Three sizes — **16 / 20 / 24** — inside ≥48dp targets. Ink by default; a **live/active** glyph takes the relevant **functional hue** (no single fixed accent). One shared set, generated and governed by `Tools/IconStudio`.
 
-## 16. Token-file registry (leak-guard allowlist)
+---
 
-Only these files may contain color hex or type-size literals:
+## 11. Generated PDF & e-ink documents
+
+Documents render through the **Document (muted)** profile and carry **grain only** — no pencil/marker/watercolor texture in report bodies (print legibility + e-ink limits). The old terracotta rules/bullets/covers regenerate to **muted pine**. Non-color cues (dash/dot/fill/marker per role) are retained so meaning survives grayscale. All page specs (margins, folios, cover, contents) are otherwise unchanged from the prior bible; only the palette and the accent color move.
+
+---
+
+## 12. Launcher icons & covers
+
+Each app is a **book with a painted cover**. The launcher icon follows the approved **Flyleaf hero template**: a watercolor ground, the ex-libris composition, real-paper texture, and the maker's mark — **no single accent detail** (color comes from the ground and glyph). Each app gets **bespoke painted cover art**; generation is **hybrid** (baked watercolor wash + procedural grain + vector glyph via IconStudio). Until an app's art is dropped in, IconStudio produces a **plain signature wash + glyph** fallback so a build is never icon-less. The maker's mark appears on PDF/report covers, settings screens, and the app-open (frameless cover) load screen — nowhere else.
+
+---
+
+## 13. Notifications
+
+Two markers, taking their cue from the Mockup 01 icon direction:
+
+- **Bookmark (out-of-app / launcher).** A ribbon bound at the spine that sticks out the **top** of the book near the left spine, **squared** end, in the functional hue — the launcher's "this app has a notification" marker.
+- **Dog-ear (in-app).** A real **folded page corner** (top-right): a cream flap folded down revealing a **functional-hue** notice triangle behind it, with a crease line and a highlight along the fold. Marks a waiting item and is the form the undo bar takes. **One dog-ear, no count** (presence, not quantity). It appears with a quiet fold-in (Quick 150) and never buzzes.
+
+Push stays almost silent (§1): only new comms earn a buzz; everything else waits as a quiet dog-ear/bookmark or arrives on the reMarkable.
+
+---
+
+## 14. Voice, copy & formats
+
+- **American English**, sentence case everywhere (including buttons). No emoji, no ⚠ glyphs.
+- **Time is 12-hour** with an analog sensibility ("7:42 pm"); the home shows a drawn analog face.
+- **List timestamps are relative** ("just now" → "5m ago" → "2h ago" → "yesterday" → "Tuesday" → "Jun 30").
+- **Error template (binding):** *what happened* + *what to do next*.
+- **Numbers & units:** counts "12 of 40"; durations "42 min"; interpuncts (·) join metadata; em-dashes (—) join clause-level status.
+- **Toggles name the thing, not the verb** ("Listening Genius", not "Enable Listening Genius").
+- **Owner's voice.** Functional labels/buttons/status/errors stay **static-neutral** (never sent to a model). **Situational messaging** — welcome, empty-state invitations, book-complete notes, and error copy — may be **voiced** in the owner's voice, set in the calligraphy hand, but must **degrade silently to the neutral fallback** (and, for errors, to the §14 template — the voiced form never delays or replaces the fix). See `Storyworthtelling.Voice`.
+
+---
+
+## 15. Terminology glossary
+
+One noun per concept, everywhere:
+
+| Term | Meaning |
+|---|---|
+| project | A manuscript being reviewed in Canonizer |
+| scene · evidence image · reference sheet · report | (unchanged Canonizer nouns) |
+| admin mode · block/unblock · cutover · deliver · thread · tile/tray · feed/episode | (unchanged) |
+| **binder tab** | The right-edge divider navigation to an app area |
+| **dog-ear** | The in-app folded-corner marker: a waiting item / undo |
+| **bookmark** | The launcher ribbon marker: an app has a notification |
+| **cover** | An app's painted book cover (icon + hero art) |
+| **wash** | A watercolor ground |
+| **maker's mark** | The owner's signature emblem |
+| **flip picker** | The split-flap single-date control |
+| **identity hue** | An app's signature color, sampled from its cover (never a semantic role) |
+
+---
+
+## 16. Device-adaptive color (Document profile)
+
+The role model resolves per profile at render time. **App** = the lively §3 set (screens). **Document** = the muted set for reMarkable Paper Pro (color e-ink), rM2 (grayscale), and the screen/Drive PDF. The muted set keeps the deliberate, separable **rM2 gray ramp** so roles stay distinguishable after desaturation, and **every role carries a non-color cue** (weight, dash, fill, marker) so no document meaning depends on hue alone. Grounds shift per device. `PaperPalette.Resolve(role, tier, profile)` in `Storyworthtelling.Paper` is the only way above the tokens to get a color.
+
+---
+
+## 17. Accessibility (binding)
+
+- **Contrast:** AA per §3, verified against the worst-case textured/washed pixel; the table is generated and build-failing.
+- **Font-scale resilience:** every screen and **every new component** (binder tabs, tables, accordions, picker, flip calendar) must survive Android font scaling at **1.3×** with no clipping; texture fades if it would muddy at scale.
+- **Touch targets:** 48dp minimum, strictly (refined controls use a padded hit-area).
+- **Texture never muddies text or fine marks** beyond the contrast cap; glyphs stay legible at 16dp.
+- **Single owner:** colorblind redundancy is not required on screen; documents keep their non-color cues regardless. **LTR only** (English) — documented assumption; the binder tabs, page-slide, and back-swipe are not mirrored.
+- Technical strings are selectable (system long-press); sanctioned ones offer explicit copy.
+
+---
+
+## 18. Future-project defaults
+
+- **New MAUI app / native head:** adopt the shared `Storyworthtelling.Paper` tokens + the material engine, the pinned-header + binder-tab frame, and the pinned bottom action bar.
+- **Angular (when it exists):** an SCSS role-token map mirroring these names — deferred until Angular actually lands.
+- Every new project references the shared tokens (thin re-export, §19) and ships a leak-guard test from day one.
+
+---
+
+## 19. Token-file registry (leak-guard allowlist) & generation
+
+The palette is generated from **one OKLCH source spec** (roles × tiers × profiles) that emits the C#/XAML tokens, the WCAG contrast table, and the rM2 gray ramp. `Storyworthtelling.Paper` is **the design library**: the UI runtime sources color from it, not from per-app literals.
+
+Only these may contain color hex or type-size literals:
 
 | Project | Token files |
 |---|---|
-| FocusPhone | `FocusPhone.Domain/Design/DesignTokens.cs`; `FocusPhone.Ui.Android/Resources/values/colors.xml`, `themes.xml`; generated icon/grain/medallion resources; tile drawables; anim XMLs (durations only) |
-| Canonizer | `Storyboarder.Domain/Design/DesignTokens.cs`; `Storyboarder.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources (paths keep the internal `Storyboarder.*` identity) |
-| DailyLoader | `DailyLoader.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
-| Ledger | `Ledger.Domain/Design/DesignTokens.cs`; `Ledger.Android/Resources/Styles/DesignTokens.xaml`; generated icon/grain/medallion resources |
-| Shared: Paper | `Storyworthtelling.Paper/PaperColorTokens.cs` (the shared composition library's tokens + colour-e-ink palette — §17) |
+| Shared: Paper | The OKLCH **source spec** + generated `Storyworthtelling.Paper/PaperColorTokens.cs` (roles × tiers × App/Document profiles + gray ramp) |
+| Per-app | `*/Design/DesignTokens.cs` + `Resources/Styles/DesignTokens.xaml` — **thin generated re-exports** of the shared tokens (still leak-guard-scanned) |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
-| Branding | `/Branding/owner.png` (image, owner-supplied) |
+| Fonts | `/Fonts` — Source Serif 4 (incl. **Black**), Source Sans 3, Cascadia Code, **Pinyon Script** (all OFL) |
+| Branding | `/Branding/owner.png` (owner-supplied) |
 
-Parity between C# and XAML/xml token files is asserted by unit tests; a change to this bible is a change to those files and their tests, in the same commit.
+**Tests (build-failing):** the **contrast** table (all role×tier×profile ≥ AA vs the worst textured/washed pixel); **screen↔document role parity** (every role resolves in both profiles); **generated↔committed parity** (a fresh generator run equals the committed tokens); the **material-legibility** cap; and C#↔XAML parity. A change to this bible is a change to the source spec and the tests, in the same commit.
 
-## 17. Device-adaptive colour (Paper Pro / rM2 / screen)
+---
 
-The base palette is monochrome-plus-one-accent (§1: light only, one accent, one meaning). The shared **`Storyworthtelling.Paper`** library adds a **device-adaptive** layer on top — one document, described in semantic colour *roles*, rendered for whichever surface it is bound for. This is additive: it never changes the base Paper / Ink / accent values.
+## 20. Governance
 
-**The four calm colour-e-ink hues** (approved P3 mockup — for the reMarkable Paper Pro and the screen/Drive PDF). Chosen low-saturation on purpose: the Paper Pro's Kaleido e-ink can't show vivid colour, and *calm is the acceptance test*.
-
-| Role | Colour | Grayscale (rM2) | Non-colour cue |
-|---|---|---|---|
-| Accent — active / current | `#C2542F` terracotta | `#5E5E5E` | heaviest / solid stroke, filled |
-| Problem — regression | `#7A4E63` plum | `#464646` | solid-fill chip, ● |
-| Prior — structure / prior draft | `#4E6273` slate | `#767676` | dashed stroke |
-| New — positive / resolved | `#6E7A53` sage | `#8C8C8C` | outlined chip, ✓ |
-| Caution — consider | `#B08A3E` ochre | `#A2A2A2` | dotted stroke, ▲ |
-
-**Grayscale-safety rule.** The rM2 greys are a deliberate ramp (`#46 → #A2`), **not** the naive luminance of each hue (several of which would collide) — so the five roles stay separable after desaturation. And no meaning is carried by hue alone: every role also carries a non-colour cue (weight, dash, fill, marker).
-
-**Device profiles.** A `DeviceColorProfile` selects the palette variant at render time: **Paper Pro** (colour on warm e-ink), **rM2** (the grey ramp on grey e-ink), **Screen** (full colour on the paper cream — the Drive PDF and in-app view). The colour profiles share the hues; only the grayscale profile recolours to the ramp. Grounds shift per device (Paper Pro `#F4EFE3`, rM2 `#ECEAE4`, Screen the paper cream). All values live in `PaperColorTokens.cs`; `PaperPalette.Resolve(role, profile)` is the only way above the tokens to get a colour.
+Every real screen, icon, chart, and cover is **mocked up, shown, adjusted, and approved** before it is built (the §03 gate). Approving this bible locks the **vocabulary** — materials, color, controls, patterns — not the individual screens. Each existing app adopts the kit during **its own rebrand phase**, with its cover art and identity hue, so apps never half-change; **Flyleaf (P5)** is the pilot that proves the kit before the rest. The onboarding-guide artifacts are refreshed at each phase boundary.
