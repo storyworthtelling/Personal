@@ -12,6 +12,7 @@ using Storyboarder.Infrastructure.Imaging;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Tests.Support;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Xunit;
 
@@ -136,7 +137,8 @@ public class ReviewProcessorTests : IDisposable
     }
 
     private ReviewProcessor NewProcessor(
-        ArchiveOptions? archiveOptions = null, IRemarkableClient? remarkable = null) => new(
+        ArchiveOptions? archiveOptions = null, IRemarkableClient? remarkable = null,
+        IPaperDriveArchive? driveArchive = null) => new(
         database,
         claude.Object,
         gemini.Object,
@@ -151,7 +153,9 @@ public class ReviewProcessorTests : IDisposable
         }),
         Options.Create(archiveOptions ?? new ArchiveOptions()),
         NullLogger<ReviewProcessor>.Instance,
-        remarkable: remarkable);
+        delivery: remarkable is null && driveArchive is null
+            ? null
+            : new PaperDelivery(remarkable, driveArchive));
 
     private Guid SeedManuscript(string? fullText = null)
     {

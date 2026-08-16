@@ -1,6 +1,6 @@
-using Storyboarder.Infrastructure.Imaging;
+using Storyworthtelling.Paper;
 
-namespace Storyboarder.Tests.Imaging;
+namespace Storyworthtelling.Paper.Tests;
 
 public class EmbeddedTypefacesTests
 {

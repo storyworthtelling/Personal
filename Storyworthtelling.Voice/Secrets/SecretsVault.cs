@@ -27,6 +27,12 @@ public sealed record SecretsVault
 
     public MusicSecrets Music { get; init; } = new();
 
+    // Stable Drive file ids for the suite's well-known JSON files (voice profile/config, this vault, taste
+    // profile, audio library), keyed by file name. Lets those files be MOVED in Drive without breaking the
+    // apps (thread #13): the app resolves by remembered id first, falling back to a name search. Cross-app,
+    // not owned by any one section.
+    public IReadOnlyDictionary<string, string> DriveFileIds { get; init; } = new Dictionary<string, string>();
+
     public static SecretsVault Empty { get; } = new();
 }
 

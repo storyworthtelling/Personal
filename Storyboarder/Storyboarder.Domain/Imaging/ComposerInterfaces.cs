@@ -16,13 +16,6 @@ public interface IImageStore
     void Delete(string relativePath);
 }
 
-// Assembles ordered page images into a single PDF. dpi is the physical resolution each full-page
-// raster is declared at, so the PDF prints at the intended size rather than PdfSharp's default 96 DPI.
-public interface IVolumePdfComposer
-{
-    byte[] Compose(IReadOnlyList<byte[]> pageImages, int dpi);
-}
-
 // One scene's supporting evidence in the report: the wordless image (null when the model couldn't render
 // one), cited as "Ch. N · Scene M", with the scene's purpose and verdict from the craft read.
 public sealed record SceneEvidence(string Citation, string Purpose, string Verdict, byte[]? Image);

@@ -1,4 +1,4 @@
-using PdfSharp.Drawing;
+using SkiaSharp;
 using DailyLoader.Domain.Models;
 
 namespace DailyLoader.Infrastructure.Pdf;
@@ -10,10 +10,12 @@ internal static class HandwritingRegion
 {
     private const double MinRegionHeight = 90;
 
-    public static void Draw(PdfLayout layout, string prompt, IReadOnlyList<ParsedNote> carryovers)
+    public static void Draw(SkiaPageLayout layout, string prompt, IReadOnlyList<ParsedNote> carryovers)
     {
-        var labelFont = new XFont("sans-serif", 11, XFontStyleEx.Bold);
-        var noteFont = new XFont("sans-serif", 10, XFontStyleEx.Italic);
+        var labelFont = SkiaPageLayout.Sans(11, bold: true);
+        // The prior design used an italic sans for notes; the embedded font set has no sans italic, so this
+        // stays upright — a small, intentional deviation on secondary text.
+        var noteFont = SkiaPageLayout.Sans(10);
 
         // Ensure there is room for a usable region; otherwise start a fresh page.
         if (layout.BottomY - layout.Y < MinRegionHeight + 40)
@@ -29,13 +31,13 @@ internal static class HandwritingRegion
             layout.Advance(6);
         }
 
-        layout.Gfx.DrawString(prompt, labelFont, XBrushes.Black,
-            new XRect(PdfLayout.Margin, layout.Y, layout.ContentWidth, 16), XStringFormats.TopLeft);
+        layout.DrawText(prompt, labelFont,
+            SkiaPageLayout.Margin, layout.Y, layout.ContentWidth, 16, TextAlign.TopLeft);
         layout.Advance(18);
 
         var top = layout.Y;
         var height = layout.BottomY - top;
-        layout.Gfx.DrawRectangle(new XPen(XColors.Gray, 0.75),
-            PdfLayout.Margin, top, layout.ContentWidth, height);
+        layout.DrawRect(SkiaPageLayout.Margin, top, layout.ContentWidth, height,
+            stroke: SKColors.Gray, strokeWidth: 0.75f);
     }
 }

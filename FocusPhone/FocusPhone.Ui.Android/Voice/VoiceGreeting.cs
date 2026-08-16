@@ -33,11 +33,13 @@ public sealed class VoiceGreeting
         // The shared Claude key now lives in the encrypted secrets vault (the single source of truth, in
         // place of the old plaintext voice config). VaultVoiceConfigStore reads it back given this head's
         // passphrase; with no passphrase or no key it yields VoiceConfig.Empty and the greeting stays neutral.
-        var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName));
+        var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(
+            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
         var client = new VoiceClient(http, options);
-        messenger = new VoicedMessenger(new DriveVoiceProfileStore(new DriveTextFile(driveFactory, DriveVoiceProfileStore.FileName)), client);
+        messenger = new VoicedMessenger(new DriveVoiceProfileStore(new DriveTextFile(
+            driveFactory, DriveVoiceProfileStore.FileName, SharedDriveFileIds.Store)), client);
     }
 
     // Composes a greeting in the owner's voice for the occasion, or "" when it can't (no profile, no key,

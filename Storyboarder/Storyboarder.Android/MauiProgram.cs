@@ -16,6 +16,7 @@ using Storyboarder.Infrastructure.Persistence;
 using Storyboarder.Infrastructure.Pipeline;
 using Storyboarder.Infrastructure.Services;
 using Storyboarder.Infrastructure.Time;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
@@ -142,7 +143,13 @@ public static class MauiProgram
         // Android-side Google helpers consumed by the New Project page.
         builder.Services.AddSingleton<DeviceAccountTokenProvider>();
         builder.Services.AddSingleton<DriveDocsLister>();
-        builder.Services.AddSingleton<IDriveArchive, DeviceAccountDriveArchive>();
+        builder.Services.AddSingleton<IPaperDriveArchive, DeviceAccountDriveArchive>();
+
+        // The unified delivery seam: compose the reMarkable transport (root upload) and the Drive archive so
+        // the pipeline delivers through one interface. Either may be absent — PaperDelivery reports that via
+        // its capability flags and the archive stage skips that target.
+        builder.Services.AddSingleton<IPaperDelivery>(sp =>
+            new PaperDelivery(sp.GetService<IRemarkableClient>(), sp.GetService<IPaperDriveArchive>()));
 
         // Owner's-voice Drive files, each ONE JSON file found by name and reached with the device-account
         // token (full `drive` scope, shared across every com.storyworthtelling app) the same way the archive
@@ -163,15 +170,20 @@ public static class MauiProgram
                 });
             };
         }
+        // Drive-by-ID (#13): a shared, vault-seeded cache of well-known-file-name -> stable Drive id, so a
+        // renamed/moved file is still found by id. VaultSync seeds it on restore and snapshots it on publish.
+        builder.Services.AddSingleton<InMemoryDriveFileIdStore>();
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
-            new DriveVoiceProfileStore(new DriveTextFile(DriveFactory(sp), DriveVoiceProfileStore.FileName)));
+            new DriveVoiceProfileStore(new DriveTextFile(
+                DriveFactory(sp), DriveVoiceProfileStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
         // the owner's passphrase (SettingsStore.VaultPassphrase). Storyboarder both publishes its own keys to
         // it (VaultSync) and, being the app the shared Claude key is entered in, sources the voice key from it
         // (VaultVoiceConfigStore) so there is a single source of truth in place of the old plaintext config.
         builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
-            new DriveSecretsVaultStore(new DriveTextFile(DriveFactory(sp), DriveSecretsVaultStore.FileName)));
+            new DriveSecretsVaultStore(new DriveTextFile(
+                DriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase));
         builder.Services.AddSingleton<VaultSync>();

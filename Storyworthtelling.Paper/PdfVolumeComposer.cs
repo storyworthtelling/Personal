@@ -1,9 +1,8 @@
 using PdfSharp.Drawing;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.IO;
-using Storyboarder.Domain.Imaging;
 
-namespace Storyboarder.Infrastructure.Imaging;
+namespace Storyworthtelling.Paper;
 
 // Assembles ordered composed-page images into a single volume PDF, one page per image, drawn full
 // page. Draws images only (no text), so no font resolver is required.

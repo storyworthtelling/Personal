@@ -71,6 +71,28 @@ public class DriveSecretsVaultStoreTests
     }
 
     [Fact]
+    public async Task SaveThenLoad_RoundTripsDriveFileIds()
+    {
+        var file = new InMemoryTextFile();
+        var store = new DriveSecretsVaultStore(file);
+        var vault = SecretsVault.Empty with
+        {
+            DriveFileIds = new Dictionary<string, string>
+            {
+                ["storyworthtelling-voice.json"] = "id-voice",
+                ["storyworthtelling-secrets.json"] = "id-vault",
+            }
+        };
+
+        await store.SaveAsync(vault, Pass, default);
+        var result = await store.LoadAsync(Pass, default);
+
+        Assert.Equal(SecretsVaultStatus.Loaded, result.Status);
+        Assert.Equal("id-voice", result.Vault.DriveFileIds["storyworthtelling-voice.json"]);
+        Assert.Equal("id-vault", result.Vault.DriveFileIds["storyworthtelling-secrets.json"]);
+    }
+
+    [Fact]
     public async Task LoadAsync_ReturnsWrongPassphrase_WhenPassphraseIsWrong()
     {
         var store = new DriveSecretsVaultStore(new InMemoryTextFile());

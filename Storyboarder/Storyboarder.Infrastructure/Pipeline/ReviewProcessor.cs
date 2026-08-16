@@ -12,7 +12,7 @@ using Storyboarder.Domain.Time;
 using Storyboarder.Infrastructure.Configuration;
 using Storyboarder.Infrastructure.External;
 using Storyboarder.Infrastructure.Persistence;
-using Storyworthtelling.Remarkable;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Voice;
 
 namespace Storyboarder.Infrastructure.Pipeline;
@@ -38,13 +38,11 @@ public sealed class ReviewProcessor : IPipelineStep
     private readonly RateLimitOptions rateLimits;
     private readonly ArchiveOptions archive;
 
-    // Null when the platform head supplies no Drive archive (and on any non-Android host). The archive
-    // stage treats that exactly like archiving being switched off.
-    private readonly IDriveArchive? driveArchive;
-
-    // The shared reMarkable delivery client. Null on a head that doesn't wire reMarkable (or without a
-    // device-code pairing); reMarkable delivery then simply doesn't run — the report still finishes.
-    private readonly IRemarkableClient? remarkable;
+    // The unified delivery seam (Storyworthtelling.Paper): the reMarkable root upload and the Drive
+    // beside-source archive behind one interface, each independently available. Null on a head that wires no
+    // delivery (or any non-Android host); the archive stage then treats both targets as switched off and the
+    // report still finishes on disk. Capability flags say which transports are actually wired.
+    private readonly IPaperDelivery? delivery;
 
     // The owner's-voice learner + shared profile store. Both null on a head that wires no voice feature
     // (or on any non-Android host without a Claude key for it); voice refinement then simply doesn't run.
@@ -92,10 +90,9 @@ public sealed class ReviewProcessor : IPipelineStep
         IOptions<RateLimitOptions> rateLimitOptions,
         IOptions<ArchiveOptions> archiveOptions,
         ILogger<ReviewProcessor> logger,
-        IDriveArchive? driveArchive = null,
+        IPaperDelivery? delivery = null,
         IVoiceClient? voiceClient = null,
-        IVoiceProfileStore? voiceStore = null,
-        IRemarkableClient? remarkable = null)
+        IVoiceProfileStore? voiceStore = null)
     {
         this.dbContextFactory = dbContextFactory;
         this.claude = claude;
@@ -106,11 +103,10 @@ public sealed class ReviewProcessor : IPipelineStep
         this.logger = logger;
         this.voiceClient = voiceClient;
         this.voiceStore = voiceStore;
-        this.remarkable = remarkable;
+        this.delivery = delivery;
 
         rateLimits = rateLimitOptions.Value;
         archive = archiveOptions.Value;
-        this.driveArchive = driveArchive;
         claudeLimiter = new RequestRateLimiter(rateLimits.ClaudeRequestsPerMinute, rateLimits.ClaudeRequestsPerDay, clock);
         geminiLimiter = new RequestRateLimiter(rateLimits.GeminiRequestsPerMinute, rateLimits.GeminiRequestsPerDay, clock);
         backoff = new BackoffScheduler(
@@ -1054,7 +1050,7 @@ public sealed class ReviewProcessor : IPipelineStep
 
         // Deliver to the reMarkable tablet FIRST and independently of Drive, so it still runs before the
         // Drive scope is granted (or when Drive is off). One unit of work per cycle, resumable, best-effort.
-        if (reportReady && archive.DeliverToRemarkable && remarkable is not null && !analysis!.DeliveredToRemarkable)
+        if (reportReady && archive.DeliverToRemarkable && delivery is { CanDeliverToRemarkable: true } && !analysis!.DeliveredToRemarkable)
         {
             var remarkableResult = await DeliverToRemarkable(db, novel, analysis, cancellationToken);
             if (remarkableResult is { } result)
@@ -1062,7 +1058,7 @@ public sealed class ReviewProcessor : IPipelineStep
             // null = reMarkable settled (delivered or given up); fall through to the Drive target.
         }
 
-        var reportPending = reportReady && archive.Enabled && driveArchive is not null && analysis!.ArchivedDriveFileId is null;
+        var reportPending = reportReady && archive.Enabled && delivery is { CanArchiveToDrive: true } && analysis!.ArchivedDriveFileId is null;
 
         if (!reportPending)
             return await FinishArchiving(db, novel, cancellationToken);
@@ -1074,7 +1070,7 @@ public sealed class ReviewProcessor : IPipelineStep
             // archive to, which is a reason to skip rather than to fail.
             if (novel.ArchiveFolderId is null)
             {
-                var parent = await driveArchive.FindParentFolder(novel.GoogleDocId, cancellationToken);
+                var parent = await delivery!.FindDriveParentFolder(novel.GoogleDocId, cancellationToken);
                 if (parent is null)
                 {
                     logger.LogInformation(
@@ -1083,12 +1079,12 @@ public sealed class ReviewProcessor : IPipelineStep
                     return await FinishArchiving(db, novel, cancellationToken);
                 }
 
-                novel.ArchiveFolderId = await driveArchive.EnsureFolder(parent, novel.Title, cancellationToken);
+                novel.ArchiveFolderId = await delivery!.EnsureDriveFolder(parent, novel.Title, cancellationToken);
                 await db.SaveChangesAsync(cancellationToken);
                 return ProcessResult.DidWork(novel.Id);
             }
 
-            analysis!.ArchivedDriveFileId = await driveArchive.UploadFile(
+            analysis!.ArchivedDriveFileId = await delivery!.UploadDriveFile(
                 novel.ArchiveFolderId, $"{novel.Title} — Draft {novel.DraftNumber} — Analysis.pdf", "application/pdf",
                 imageStore.Read(analysis.PdfPath!), cancellationToken);
             logger.LogInformation("Archived the revision report of manuscript {NovelId} to Drive", novel.Id);
@@ -1134,9 +1130,9 @@ public sealed class ReviewProcessor : IPipelineStep
     {
         try
         {
-            await remarkable!.Upload(
+            await delivery!.DeliverToRemarkableRoot(
                 $"{novel.Title} — Draft {novel.DraftNumber} — Analysis",
-                imageStore.Read(analysis.PdfPath!));
+                imageStore.Read(analysis.PdfPath!), cancellationToken);
 
             analysis.DeliveredToRemarkable = true;
             novel.StageAttempts = 0;

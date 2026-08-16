@@ -1,7 +1,6 @@
 using SkiaSharp;
-using Storyboarder.Domain.Design;
 
-namespace Storyboarder.Infrastructure.Imaging;
+namespace Storyworthtelling.Paper;
 
 /// <summary>
 /// The paper grain for generated pages (DESIGN.md §6): the same seeded
@@ -21,17 +20,17 @@ public static class PaperGrain
 
     private static (SKBitmap, SKShader) Build()
     {
-        var size = DesignTokens.Grain.TileSize;
+        var size = PaperColorTokens.Grain.TileSize;
         var bitmap = new SKBitmap(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Unpremul));
-        var ink = SKColor.Parse(DesignTokens.Ink);
-        var state = DesignTokens.Grain.Seed;
+        var ink = SKColor.Parse(PaperColorTokens.Ink);
+        var state = PaperColorTokens.Grain.Seed;
         for (var y = 0; y < size; y++)
         {
             for (var x = 0; x < size; x++)
             {
                 state = XorShift(state);
-                bitmap.SetPixel(x, y, state % DesignTokens.Grain.Density == 0
-                    ? new SKColor(ink.Red, ink.Green, ink.Blue, (byte)DesignTokens.Grain.Alpha)
+                bitmap.SetPixel(x, y, state % PaperColorTokens.Grain.Density == 0
+                    ? new SKColor(ink.Red, ink.Green, ink.Blue, (byte)PaperColorTokens.Grain.Alpha)
                     : SKColors.Transparent);
             }
         }

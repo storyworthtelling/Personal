@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
 
 namespace DailyLoader.Android;
@@ -11,10 +12,12 @@ namespace DailyLoader.Android;
 public sealed class VaultSync
 {
     private readonly SecretsVaultService vault;
+    private readonly InMemoryDriveFileIdStore fileIdStore;
 
-    public VaultSync(SecretsVaultService vault)
+    public VaultSync(SecretsVaultService vault, InMemoryDriveFileIdStore fileIdStore)
     {
         this.vault = vault;
+        this.fileIdStore = fileIdStore;
     }
 
     // Writes DailyLoader's credentials into the vault, leaving every other app's section untouched.
@@ -23,8 +26,19 @@ public sealed class VaultSync
         {
             Nyt = new NytSecrets(CredentialStore.NytSessionCookie, CredentialStore.NytApiKey),
             Remarkable = new RemarkableSecrets(CredentialStore.RemarkableDeviceToken),
-            DailyLoader = new DailyLoaderSecrets(CredentialStore.AnthropicApiKey, CredentialStore.CalendarMappingJson)
+            DailyLoader = new DailyLoaderSecrets(CredentialStore.AnthropicApiKey, CredentialStore.CalendarMappingJson),
+            // Fold this session's captured Drive file ids into the shared map (id wins per name).
+            DriveFileIds = MergeIds(v.DriveFileIds, fileIdStore.Snapshot())
         }, cancellationToken);
+
+    private static IReadOnlyDictionary<string, string> MergeIds(
+        IReadOnlyDictionary<string, string> existing, IReadOnlyDictionary<string, string> captured)
+    {
+        var merged = new Dictionary<string, string>(existing);
+        foreach (var (name, id) in captured)
+            merged[name] = id;
+        return merged;
+    }
 
     // Fills in any credential this install is missing from the vault. Existing local values win — restore
     // never overwrites something the owner has already entered here.
@@ -35,6 +49,10 @@ public sealed class VaultSync
             return;
 
         var vaultData = result.Vault;
+        // Seed the Drive-by-ID cache so well-known files resolve by remembered id (surviving a rename).
+        foreach (var (name, id) in vaultData.DriveFileIds)
+            fileIdStore.Set(name, id);
+
         FillIfEmpty(CredentialStore.NytSessionCookie, vaultData.Nyt.SessionCookie, v => CredentialStore.NytSessionCookie = v);
         FillIfEmpty(CredentialStore.NytApiKey, vaultData.Nyt.ApiKey, v => CredentialStore.NytApiKey = v);
         FillIfEmpty(CredentialStore.RemarkableDeviceToken, vaultData.Remarkable.DeviceToken, v => CredentialStore.RemarkableDeviceToken = v);
