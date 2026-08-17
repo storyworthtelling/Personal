@@ -182,7 +182,7 @@ jobs:
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: FocusPhone-Android
+          name: Flyleaf-Android
           path: |
             FocusPhone/Flyleaf.Android/bin/Release/net10.0-android/publish/*-Signed.apk
             FocusPhone/FocusPhone.Communication.Android/bin/Release/net10.0-android/publish/*-Signed.apk
