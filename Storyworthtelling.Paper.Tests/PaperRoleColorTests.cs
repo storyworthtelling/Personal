@@ -117,6 +117,73 @@ public class PaperRoleColorTests
         }
     }
 
+    [Fact]
+    public void GeneratedPaletteMatchesCommittedTokens()
+    {
+        // The committed App tokens are the OKLCH generator's output; regenerate and assert equality so no
+        // one hand-edits them. Change the palette by changing PaletteSpec, then re-syncing the tokens.
+        var app = new Dictionary<(ColorRole, ColorTier), string>
+        {
+            [(ColorRole.Action, ColorTier.Mark)] = PaperColorTokens.ActionMark,
+            [(ColorRole.Action, ColorTier.Text)] = PaperColorTokens.ActionText,
+            [(ColorRole.Action, ColorTier.Deep)] = PaperColorTokens.ActionDeep,
+            [(ColorRole.Action, ColorTier.Fill)] = PaperColorTokens.ActionFill,
+            [(ColorRole.Positive, ColorTier.Mark)] = PaperColorTokens.PositiveMark,
+            [(ColorRole.Positive, ColorTier.Text)] = PaperColorTokens.PositiveText,
+            [(ColorRole.Positive, ColorTier.Deep)] = PaperColorTokens.PositiveDeep,
+            [(ColorRole.Positive, ColorTier.Fill)] = PaperColorTokens.PositiveFill,
+            [(ColorRole.Resolved, ColorTier.Mark)] = PaperColorTokens.ResolvedMark,
+            [(ColorRole.Resolved, ColorTier.Text)] = PaperColorTokens.ResolvedText,
+            [(ColorRole.Resolved, ColorTier.Deep)] = PaperColorTokens.ResolvedDeep,
+            [(ColorRole.Resolved, ColorTier.Fill)] = PaperColorTokens.ResolvedFill,
+            [(ColorRole.Reference, ColorTier.Mark)] = PaperColorTokens.ReferenceMark,
+            [(ColorRole.Reference, ColorTier.Text)] = PaperColorTokens.ReferenceText,
+            [(ColorRole.Reference, ColorTier.Deep)] = PaperColorTokens.ReferenceDeep,
+            [(ColorRole.Reference, ColorTier.Fill)] = PaperColorTokens.ReferenceFill,
+            [(ColorRole.Caution, ColorTier.Mark)] = PaperColorTokens.CautionMark,
+            [(ColorRole.Caution, ColorTier.Text)] = PaperColorTokens.CautionText,
+            [(ColorRole.Caution, ColorTier.Deep)] = PaperColorTokens.CautionDeep,
+            [(ColorRole.Caution, ColorTier.Fill)] = PaperColorTokens.CautionFill,
+            [(ColorRole.Problem, ColorTier.Mark)] = PaperColorTokens.ProblemMark,
+            [(ColorRole.Problem, ColorTier.Text)] = PaperColorTokens.ProblemText,
+            [(ColorRole.Problem, ColorTier.Deep)] = PaperColorTokens.ProblemDeep,
+            [(ColorRole.Problem, ColorTier.Fill)] = PaperColorTokens.ProblemFill,
+            [(ColorRole.InProgress, ColorTier.Mark)] = PaperColorTokens.ProgressMark,
+            [(ColorRole.InProgress, ColorTier.Text)] = PaperColorTokens.ProgressText,
+            [(ColorRole.InProgress, ColorTier.Deep)] = PaperColorTokens.ProgressDeep,
+            [(ColorRole.InProgress, ColorTier.Fill)] = PaperColorTokens.ProgressFill,
+        };
+
+        foreach (var (role, tier, hex) in PaletteSpec.Generate())
+            Assert.Equal(hex, app[(role, tier)]);
+
+        var doc = new Dictionary<ColorRole, string>
+        {
+            [ColorRole.Action] = PaperColorTokens.ActionDoc,
+            [ColorRole.Positive] = PaperColorTokens.PositiveDoc,
+            [ColorRole.Resolved] = PaperColorTokens.ResolvedDoc,
+            [ColorRole.Reference] = PaperColorTokens.ReferenceDoc,
+            [ColorRole.Caution] = PaperColorTokens.CautionDoc,
+            [ColorRole.Problem] = PaperColorTokens.ProblemDoc,
+            [ColorRole.InProgress] = PaperColorTokens.ProgressDoc,
+        };
+        var gray = new Dictionary<ColorRole, string>
+        {
+            [ColorRole.Action] = PaperColorTokens.ActionGray,
+            [ColorRole.Positive] = PaperColorTokens.PositiveGray,
+            [ColorRole.Resolved] = PaperColorTokens.ResolvedGray,
+            [ColorRole.Reference] = PaperColorTokens.ReferenceGray,
+            [ColorRole.Caution] = PaperColorTokens.CautionGray,
+            [ColorRole.Problem] = PaperColorTokens.ProblemGray,
+            [ColorRole.InProgress] = PaperColorTokens.ProgressGray,
+        };
+        foreach (var role in Roles)
+        {
+            Assert.Equal(PaletteSpec.DocHex(role), doc[role]);
+            Assert.Equal(PaletteSpec.GrayHex(role), gray[role]);
+        }
+    }
+
     // ---- WCAG helpers ----
     private static double Contrast(SKColor a, SKColor b)
     {

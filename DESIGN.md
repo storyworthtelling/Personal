@@ -49,19 +49,21 @@ Color is a set of **roles**, each named semantically (so a later re-tint never r
 
 Each role resolves through a **profile**: **App** (lively, on-screen) and **Document** (muted, for reMarkable/PDF — the §16 grayscale-safe set). One document surface variant renders grayscale (rM2); the color e-ink (Paper Pro) and screen-PDF variants share the muted hues. The role table below shows the App value; the muted Document set and the separable rM2 gray ramp are generated alongside it.
 
-### Roles (App profile — proposal values; final are OKLCH-generated, §19)
+### Roles (App profile — OKLCH-generated, §19)
+
+The values below are emitted from the OKLCH source spec (`PaletteSpec` + `Oklch`), which places every role on an even hue wheel and every tier on a shared perceptual-lightness ladder — so the family is coherent and the text/deep tiers meet AA by construction. A parity test regenerates and asserts these; to change the palette, change the spec.
 
 | Role | Meaning | mark (T3) | text (T4) | deep (T5) |
 |---|---|---|---|---|
-| **Action** | pine — primary action / commit, active | `#347052` | `#2C6346` | `#235A3E` |
-| **Positive** | leaf — good news / success | `#5F8A34` | `#4E7328` | `#3B5820` |
-| **Resolved** | gray — a settled / closed delta | `#8C8578` | `#6B6559` | `#4C4840` |
-| **Reference** | slate-blue — prior draft / context / structure | `#47638A` | `#354C6C` | `#25374E` |
-| **Caution** | ochre — a "consider" / soft heads-up | `#C09A34` | `#8C6C1C` | `#6A5115` |
-| **Problem** | rose — regression / contradiction / blocked | `#BE5560` | `#9A3D47` | `#6E2931` |
-| **In-progress** | teal — currently working / running | `#2E8086` | `#256268` | `#1E4C50` |
+| **Action** | pine — primary action / commit, active | `#38734A` | `#295E3A` | `#174025` |
+| **Positive** | leaf — good news / success | `#517025` | `#405B18` | `#293E08` |
+| **Resolved** | gray — a settled / closed delta | `#68645E` | `#54514B` | `#393632` |
+| **Reference** | slate-blue — prior draft / context / structure | `#4C6787` | `#3B536F` | `#26384E` |
+| **Caution** | ochre — a "consider" / soft heads-up | `#805F00` | `#694C00` | `#493200` |
+| **Problem** | rose — regression / contradiction / blocked | `#9E434B` | `#82333B` | `#5C1F26` |
+| **In-progress** | teal — currently working / running | `#18717C` | `#085C65` | `#003F46` |
 
-Fills (T2): action `#7FAB8E` · positive `#A0C07E` · resolved `#C9C4B6` · reference `#93A5C0` · caution `#E2CD86` · problem `#E0A6AC` · in-progress `#86B7BC`. Washes (T1) are the mark hue at 24–32% alpha.
+Fills (T2): action `#A5C8AD` · positive `#B1C69A` · resolved `#C0BDB9` · reference `#AEC0D5` · caution `#D0BB91` · problem `#E8ACAD` · in-progress `#9BC7CD`. Washes (T1) are the mark hue at the highlighter alpha (~30%). Filled primary buttons use the **deep** tier so `PaperBright` text clears AA.
 
 Terracotta is **retired everywhere** — including documents, where the old "active" accent becomes a **muted pine**; report rules, bullets, and covers regenerate accordingly.
 
@@ -297,7 +299,7 @@ Only these may contain color hex or type-size literals:
 
 | Project | Token files |
 |---|---|
-| Shared: Paper | The OKLCH **source spec** + generated `Storyworthtelling.Paper/PaperColorTokens.cs` (roles × tiers × App/Document profiles + gray ramp) |
+| Shared: Paper | The OKLCH **source spec** (`Storyworthtelling.Paper/PaletteSpec.cs` + `Oklch.cs`) and the generated `PaperColorTokens.cs` it emits (roles × tiers × App/Document profiles + gray ramp) |
 | Per-app | `*/Design/DesignTokens.cs` + `Resources/Styles/DesignTokens.xaml` — **thin generated re-exports** of the shared tokens (still leak-guard-scanned) |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
 | Fonts | `/Fonts` — Source Serif 4 (incl. **Black**), Source Sans 3, Cascadia Code, **Pinyon Script** (all OFL) |
