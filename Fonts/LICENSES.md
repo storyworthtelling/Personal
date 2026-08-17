@@ -8,6 +8,8 @@ The files are static (non-variable) TrueType instances as served by Google Fonts
 |---|---|---|---|
 | `SourceSerif4-Regular.ttf` | Source Serif 4 Regular | © 2014–2021 Adobe Systems Incorporated, with Reserved Font Name 'Source' | https://github.com/adobe-fonts/source-serif |
 | `SourceSerif4-Semibold.ttf` | Source Serif 4 SemiBold | © 2014–2021 Adobe Systems Incorporated, with Reserved Font Name 'Source' | https://github.com/adobe-fonts/source-serif |
+| `SourceSerif4-Black.ttf` | Source Serif 4 Black | © 2014–2021 Adobe Systems Incorporated, with Reserved Font Name 'Source' | https://github.com/adobe-fonts/source-serif |
+| `PinyonScript-Regular.ttf` | Pinyon Script Regular | © 2022 The Pinyon Script Project Authors | https://github.com/SorkinType/Pinyon |
 | `SourceSerif4-Italic.ttf` | Source Serif 4 Italic | © 2014–2021 Adobe Systems Incorporated, with Reserved Font Name 'Source' | https://github.com/adobe-fonts/source-serif |
 | `SourceSans3-Regular.ttf` | Source Sans 3 Regular | © 2023 Adobe, with Reserved Font Name 'Source' | https://github.com/adobe-fonts/source-sans |
 | `SourceSans3-Semibold.ttf` | Source Sans 3 SemiBold | © 2023 Adobe, with Reserved Font Name 'Source' | https://github.com/adobe-fonts/source-sans |
