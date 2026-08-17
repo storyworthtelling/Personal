@@ -1,6 +1,6 @@
 using Android.Content;
 using Android.Provider;
-using FocusPhone.Domain.Timeline;
+using Codex.Domain.Timeline;
 
 namespace FocusPhone.Communication;
 

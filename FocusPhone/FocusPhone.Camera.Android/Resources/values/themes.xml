@@ -2,7 +2,7 @@
 <resources>
     <!-- AppCompat variant of the Paper & Ink theme for the Camera head (its
          activity is an AppCompatActivity). Colors come from the shared
-         FocusPhone.Ui.Android resource merge. -->
+         Codex.Ui.Android resource merge. -->
     <style name="Theme.FocusPhone.Paper.AppCompat" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowBackground">@color/paper</item>
         <item name="colorAccent">@color/accent</item>

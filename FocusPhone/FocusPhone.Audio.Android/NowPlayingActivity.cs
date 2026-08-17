@@ -7,9 +7,9 @@ using Android.Widget;
 using AndroidX.Media3.Common;
 using AndroidX.Media3.Session;
 using MediaController = AndroidX.Media3.Session.MediaController;
-using FocusPhone.Domain.Design;
-using FocusPhone.Domain.Music;
-using FocusPhone.Ui;
+using Codex.Domain.Design;
+using Codex.Domain.Music;
+using Codex.Ui;
 
 namespace FocusPhone.Audio;
 

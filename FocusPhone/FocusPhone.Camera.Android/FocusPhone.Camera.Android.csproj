@@ -13,8 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FocusPhone.Domain\FocusPhone.Domain.csproj" />
-    <ProjectReference Include="..\FocusPhone.Ui.Android\FocusPhone.Ui.Android.csproj" />
+    <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
+    <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
   </ItemGroup>
 
   <ItemGroup>

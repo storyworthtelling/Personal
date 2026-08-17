@@ -13,9 +13,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FocusPhone.Domain\FocusPhone.Domain.csproj" />
-    <ProjectReference Include="..\FocusPhone.Infrastructure\FocusPhone.Infrastructure.csproj" />
-    <ProjectReference Include="..\FocusPhone.Ui.Android\FocusPhone.Ui.Android.csproj" />
+    <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
+    <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
+    <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
   </ItemGroup>
 
   <!-- In-app texting: reference the gmbridge binding only when its .aar has been
@@ -26,7 +26,7 @@
     <DefineConstants>$(DefineConstants);GMBRIDGE</DefineConstants>
   </PropertyGroup>
   <ItemGroup Condition="Exists('..\gmbridge\gmbridge.aar')">
-    <ProjectReference Include="..\FocusPhone.GmBridge.Binding\FocusPhone.GmBridge.Binding.csproj" />
+    <ProjectReference Include="..\Codex.GmBridge.Binding\Codex.GmBridge.Binding.csproj" />
   </ItemGroup>
 
   <ItemGroup>

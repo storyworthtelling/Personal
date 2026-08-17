@@ -13,9 +13,9 @@ using Google.MLKit.Vision.Documentscanner;
 using Xamarin.Google.MLKit.Vision.BarCode;
 using Xamarin.Google.MLKit.Vision.Barcode.Common;
 using Xamarin.Google.MLKit.Vision.Common;
-using FocusPhone.Domain.Design;
-using FocusPhone.Domain.Time;
-using FocusPhone.Ui;
+using Codex.Domain.Design;
+using Codex.Domain.Time;
+using Codex.Ui;
 
 namespace FocusPhone.Camera;
 

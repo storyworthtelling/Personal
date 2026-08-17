@@ -2,8 +2,8 @@ using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Http;
 using global::Google.Apis.Services;
-using FocusPhone.Domain.Audio;
-using FocusPhone.Infrastructure.Podcasts;
+using Codex.Domain.Audio;
+using Codex.Infrastructure.Podcasts;
 using Storyworthtelling.Voice;
 
 namespace FocusPhone.Audio;
@@ -60,7 +60,7 @@ public sealed class PodcastLibrarySync
         };
 
         store = new DriveAudioLibraryStore(new DriveTextFile(
-            driveFactory, DriveAudioLibraryStore.FileName, FocusPhone.Ui.Voice.SharedDriveFileIds.Store));
+            driveFactory, DriveAudioLibraryStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store));
     }
 
     /// <summary>The current on-device library, read straight from the stores.</summary>

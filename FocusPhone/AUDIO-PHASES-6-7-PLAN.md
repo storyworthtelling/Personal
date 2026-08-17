@@ -32,7 +32,7 @@ owner's notes — they're device-heavy and planned in detail closer to the time.
   degrades to neutral). The Taste Profile mirrors this shape exactly.
 - **Shared Claude key, entered once:** `VoiceConfig`/`DriveVoiceConfigStore`/`DriveVoiceOptions` — the key
   lives in one Drive file, written by Storyboarder's settings, read by every app. Listening Genius
-  **reuses this same key** (no new key screen). FocusPhone.Ui.Android already references
+  **reuses this same key** (no new key screen). Codex.Ui.Android already references
   `Storyworthtelling.Voice`.
 - **Drive text-file seam:** `IDriveTextFile`/`DriveTextFile` — the narrow Google glue the profile stores
   sit on. New stores sit on the same seam.
@@ -62,7 +62,7 @@ ListeningEventStore (rolling window, Drive or on-device) ────┘
                                      TasteProfile (Drive JSON) ──▶ Phase 7 consumers
 ```
 
-### Domain (`FocusPhone.Domain/Audio` or a new `.../Taste`)
+### Domain (`Codex.Domain/Audio` or a new `.../Taste`)
 
 - **`ListeningSignal`** (enum): `Completed`, `Skipped`, `Replayed`, `PlayedFromAlbum`, `PlayedFromShuffle`.
 - **`ListeningEvent`** (record): `TrackId`, `Genre`, `ArtistName`, `AlbumArtist`, `ListeningSignal`,
@@ -86,7 +86,7 @@ ListeningEventStore (rolling window, Drive or on-device) ────┘
 - **`ListeningKillSwitch`** / a guardrail helper: when off, `SignalDeriver` emits nothing and no profile is
   refined — passive learning fully stops. Pure, testable.
 
-### Infrastructure (`FocusPhone.Infrastructure`)
+### Infrastructure (`Codex.Infrastructure`)
 
 - **`ITasteProfileClient`** + **`TasteProfileClient`** (raw-HTTP Claude, mirroring `VoiceClient`; no SDK):
   `RefineAsync(TasteProfile existing, TasteEvidence evidence, CancellationToken)` → updated profile.
@@ -188,7 +188,7 @@ real device (and Phase 9 a car), so they come after the on-device Phase 6/7 logi
 ## Cross-cutting constraints
 
 - **TDD strictly** — Domain/Infrastructure tests before implementation; Android heads are thin, untested
-  adapters. Target `FocusPhone.Tests/FocusPhone.Tests.csproj`.
+  adapters. Target `Codex.Tests/Codex.Tests.csproj`.
 - **No new dependencies** — reuse the Voice library's raw-HTTP Claude approach (no SDK) and its Drive
   seam; no new packages.
 - **Design system** — no hex/type-size literals outside `DesignTokens.cs`; reuse `PaperUi` factories and

@@ -9,4 +9,4 @@ go mod tidy
 # tool directive records it so it survives `go mod tidy` and future builds.
 go get -tool golang.org/x/mobile/cmd/gobind
 gomobile bind -target=android -androidapi 34 -o gmbridge.aar .
-echo "Built gmbridge.aar — referenced by FocusPhone.GmBridge.Binding."
+echo "Built gmbridge.aar — referenced by Codex.GmBridge.Binding."

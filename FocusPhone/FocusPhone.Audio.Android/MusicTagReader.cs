@@ -1,5 +1,5 @@
-using FocusPhone.Domain.Music;
-using FocusPhone.Infrastructure.Music;
+using Codex.Domain.Music;
+using Codex.Infrastructure.Music;
 
 namespace FocusPhone.Audio;
 

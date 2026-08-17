@@ -3,11 +3,11 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
-using FocusPhone.Domain.Design;
-using FocusPhone.Domain.Time;
-using FocusPhone.Domain.Timeline;
-using FocusPhone.Infrastructure.Email;
-using FocusPhone.Ui;
+using Codex.Domain.Design;
+using Codex.Domain.Time;
+using Codex.Domain.Timeline;
+using Codex.Infrastructure.Email;
+using Codex.Ui;
 
 namespace FocusPhone.Communication;
 

@@ -1,7 +1,7 @@
 using Android.Content;
-using FocusPhone.Domain.Timeline;
-using FocusPhone.Infrastructure.Email;
-using FocusPhone.Ui.Voice;
+using Codex.Domain.Timeline;
+using Codex.Infrastructure.Email;
+using Codex.Ui.Voice;
 
 namespace FocusPhone.Communication;
 

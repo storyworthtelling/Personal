@@ -3,9 +3,9 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
-using FocusPhone.Domain.Design;
-using FocusPhone.Ui;
-using FocusPhone.Ui.Voice;
+using Codex.Domain.Design;
+using Codex.Ui;
+using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 
@@ -22,7 +22,7 @@ namespace FocusPhone.Communication;
     Theme = "@style/Theme.FocusPhone.Paper")]
 public class SettingsActivity : Activity
 {
-    private readonly FocusPhone.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
+    private readonly Codex.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
 
     // Opens the system Google account picker and requests read-only Drive consent, so the inbox can read
     // the shared owner's-voice profile. The picker result returns through OnActivityResult.
@@ -42,8 +42,8 @@ public class SettingsActivity : Activity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode == FocusPhone.Ui.Voice.VoiceGoogleAccount.RequestCode)
-            FocusPhone.Ui.Voice.VoiceGoogleAccount.HandleChooserResult(resultCode, data);
+        if (requestCode == Codex.Ui.Voice.VoiceGoogleAccount.RequestCode)
+            Codex.Ui.Voice.VoiceGoogleAccount.HandleChooserResult(resultCode, data);
     }
 
     // Publishes the Gmail address, app password, and Messages-for-Web session to this owner's encrypted
@@ -158,8 +158,8 @@ public class SettingsActivity : Activity
 
         // Sign in with Google (read-only Drive) so the inbox can greet the owner in their own voice,
         // reading the shared voice profile. Skipping it just keeps neutral copy.
-        var voiceStatus = PaperUi.Secondary(this, FocusPhone.Ui.Voice.VoiceGoogleAccount.IsSignedIn
-            ? $"Voiced greeting on, signed in as {FocusPhone.Ui.Voice.VoiceGoogleAccount.Email}."
+        var voiceStatus = PaperUi.Secondary(this, Codex.Ui.Voice.VoiceGoogleAccount.IsSignedIn
+            ? $"Voiced greeting on, signed in as {Codex.Ui.Voice.VoiceGoogleAccount.Email}."
             : "Sign in with Google to be greeted in your own voice — reads your shared voice profile, read-only.");
         var voiceSignIn = PaperUi.SecondaryButton(this, "Sign in with Google", () => _ = VoiceSignInAsync(voiceStatus));
         layout.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));

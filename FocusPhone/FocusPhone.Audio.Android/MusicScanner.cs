@@ -1,7 +1,7 @@
 using FocusPhone.Audio.Google;
-using FocusPhone.Domain.Music;
-using FocusPhone.Infrastructure.Music;
-using FocusPhone.Infrastructure.Storage;
+using Codex.Domain.Music;
+using Codex.Infrastructure.Music;
+using Codex.Infrastructure.Storage;
 
 namespace FocusPhone.Audio;
 
