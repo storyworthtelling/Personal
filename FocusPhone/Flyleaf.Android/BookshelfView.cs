@@ -296,24 +296,91 @@ public class BookshelfView : View
         using var metal = new Paint { AntiAlias = true };
         metal.SetShader(Linear(r.Left, 0, r.Right, 0, PaperTheme.Bronze, PaperTheme.BronzeDeep));
         canvas.DrawRoundRect(r, 2 * density, 2 * density, metal);
-        // Engraved glyph (a folder_* drawable) tinted deep bronze.
-        if (!string.IsNullOrEmpty(glyph))
+        if (string.IsNullOrEmpty(glyph))
         {
-            var id = Resources!.GetIdentifier(glyph, "drawable", Context!.PackageName);
-            if (id != 0)
+            return;
+        }
+
+        // The engraved glyph occupies a square near the bookend's top; three kinds of glyph id:
+        // a built-in "folder_*" drawable, an owner shelf's AI vector ("path:<d>"), or the offline
+        // pencil monogram ("mono:<letters>") — all engraved in deep bronze.
+        var s = r.Width() * 0.7f;
+        var gx = r.CenterX() - s / 2;
+        var gy = r.Top + 8 * density;
+        var glyphRect = new RectF(gx, gy, gx + s, gy + s);
+
+        if (glyph.StartsWith("path:", StringComparison.Ordinal))
+        {
+            DrawGlyphPath(canvas, glyph[5..], glyphRect);
+        }
+        else if (glyph.StartsWith("mono:", StringComparison.Ordinal))
+        {
+            DrawGlyphMonogram(canvas, glyph[5..], glyphRect);
+        }
+        else
+        {
+            DrawGlyphDrawable(canvas, glyph, glyphRect);
+        }
+    }
+
+    private void DrawGlyphDrawable(Canvas canvas, string glyph, RectF area)
+    {
+        var id = Resources!.GetIdentifier(glyph, "drawable", Context!.PackageName);
+        var drawable = id == 0 ? null : Context.GetDrawable(id);
+        if (drawable is null)
+        {
+            return;
+        }
+        drawable.SetBounds((int)area.Left, (int)area.Top, (int)area.Right, (int)area.Bottom);
+        drawable.SetTint(PaperTheme.BronzeDeep.ToArgb());
+        drawable.Draw(canvas);
+    }
+
+    private void DrawGlyphPath(Canvas canvas, string pathData, RectF area)
+    {
+        var subpaths = SvgGlyph.Parse(pathData);
+        if (subpaths is null)
+        {
+            return; // unparseable — leave the bookend plain
+        }
+        using var stroke = new Paint(PaintFlags.AntiAlias)
+        {
+            Color = PaperTheme.BronzeDeep,
+            StrokeWidth = 2 * density,
+            StrokeCap = Paint.Cap.Round,
+            StrokeJoin = Paint.Join.Round,
+        };
+        stroke.SetStyle(Paint.Style.Stroke);
+        foreach (var polyline in subpaths)
+        {
+            using var path = new Android.Graphics.Path();
+            for (var i = 0; i < polyline.Count; i++)
             {
-                var d = Context.GetDrawable(id);
-                if (d is not null)
+                var x = area.Left + polyline[i].X / SvgGlyph.ViewBox * area.Width();
+                var y = area.Top + polyline[i].Y / SvgGlyph.ViewBox * area.Height();
+                if (i == 0)
                 {
-                    var s = r.Width() * 0.7f;
-                    var gx = r.CenterX() - s / 2;
-                    var gy = r.Top + 8 * density;
-                    d.SetBounds((int)gx, (int)gy, (int)(gx + s), (int)(gy + s));
-                    d.SetTint(PaperTheme.BronzeDeep.ToArgb());
-                    d.Draw(canvas);
+                    path.MoveTo(x, y);
+                }
+                else
+                {
+                    path.LineTo(x, y);
                 }
             }
+            canvas.DrawPath(path, stroke);
         }
+    }
+
+    private void DrawGlyphMonogram(Canvas canvas, string letters, RectF area)
+    {
+        using var text = new Paint(PaintFlags.AntiAlias)
+        {
+            Color = PaperTheme.BronzeDeep,
+            TextAlign = Paint.Align.Center,
+            TextSize = area.Height() * 0.7f,
+        };
+        text.SetTypeface(PaperTheme.SerifSemibold(Context!));
+        canvas.DrawText(letters, area.CenterX(), area.CenterY() + text.TextSize / 3f, text);
     }
 
     // ---- Live layer (clock hands + bookmark tabs) ----

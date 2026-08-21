@@ -82,6 +82,11 @@ public class CategoryCatalog
         return new CategoryCatalog(categories.Select(c => c.Id == id ? c with { Name = trimmed } : c));
     }
 
+    /// <summary>Changes a shelf's bookend glyph id (used to upgrade a new shelf's monogram to its
+    /// AI-generated vector once it arrives); the name and order are unchanged. No-op if absent.</summary>
+    public CategoryCatalog WithGlyph(string id, string glyph) =>
+        new(categories.Select(c => c.Id == id ? c with { Glyph = glyph } : c));
+
     /// <summary>Removes a shelf (built-ins are removable too); its apps fall loose. No-op if absent.</summary>
     public CategoryCatalog WithRemoved(string id) =>
         new(categories.Where(c => c.Id != id));

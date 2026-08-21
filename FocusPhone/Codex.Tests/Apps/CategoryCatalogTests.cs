@@ -120,6 +120,18 @@ public class CategoryCatalogTests
     }
 
     [Fact]
+    public void WithGlyph_ChangesTheBookendGlyph_KeepsNameAndOrder()
+    {
+        var catalog = CategoryCatalog.Seed()
+            .WithAdded("Reading", "mono:R")
+            .WithGlyph("reading", "path:M10 10 L90 90 Z");
+
+        var reading = catalog.ById("reading")!;
+        Assert.Equal("path:M10 10 L90 90 Z", reading.Glyph);
+        Assert.Equal("Reading", reading.Name);
+    }
+
+    [Fact]
     public void WithRemoved_DropsAShelf_BuiltinsToo()
     {
         var catalog = CategoryCatalog.Seed().WithRemoved(CategoryCatalog.Finance);

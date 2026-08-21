@@ -7,6 +7,7 @@ using Android.Net.Wifi;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using Codex.Domain.Apps;
 using Codex.Domain.Design;
 using Codex.Domain.Time;
 using Codex.Domain.Unlock;
@@ -28,12 +29,15 @@ namespace Flyleaf;
 /// owner (or a radio can't be toggled), the action fails into an inline status
 /// sentence rather than throwing.
 ///
-/// Two controls from the approved mockup hit hard Android limits for a
-/// non-privileged device-owner app and are degraded per the approved
-/// "spike-first, drop/hide if unreliable" decision: a Wi-Fi hotspot has no
-/// public direct-toggle API, and there is no power-off API (only reboot), so the
-/// panel ships Wi-Fi + Bluetooth + Restart and omits the other two pending an
-/// on-device capability spike.
+/// Beyond the On/Off radio toggles, Connectivity offers scoped deep-links into the
+/// system panels for the actions with no first-party device-owner API — join a Wi-Fi
+/// network, pair a Bluetooth device, and name a hotspot — each opened as a specific
+/// Activity (which the lockdown permits) with an inline-status fallback when a panel
+/// isn't resolvable. Fully-editable hotspot SSID/password is system-privileged, so that
+/// one may show a read-only SSID under the lockdown — confirm on-device. There is still
+/// no power-off API (only reboot). This also adds the Shelves (#11) group: create /
+/// rename / reorder / remove the tray category shelves, a new shelf getting an AI-drawn
+/// bookend glyph (shared key) with a pencil-monogram fallback.
 /// </summary>
 [Activity(
     Label = "Settings",
@@ -42,6 +46,11 @@ namespace Flyleaf;
 public class LauncherSettingsActivity : Activity
 {
     private readonly Handler handler = new(Looper.MainLooper!);
+
+    // Used only to fetch a Google access token for the AI shelf-glyph (best-effort; degrades to the
+    // pencil monogram when there's no sign-in or key).
+    private readonly VoiceGoogleAccount voiceAccount = new();
+    private EditText? newShelfField;
 
     private LinearLayout? content;
     private LinearLayout? actionBarHost;
@@ -114,6 +123,7 @@ public class LauncherSettingsActivity : Activity
 
         RenderConnectivity();
         RenderApps();
+        RenderShelves();
         RenderUpdates();
         RenderPower();
         RenderVault();
@@ -175,6 +185,39 @@ public class LauncherSettingsActivity : Activity
                 Render();
             }
         });
+
+        // Joining a new Wi-Fi network, pairing a Bluetooth device, and naming a hotspot all need the
+        // system panels (no first-party device-owner API), so open the scoped settings screen for each.
+        // The lockdown blocks the general Settings/shade, but the launcher may start a specific panel.
+        AddContentButton(PaperUi.SecondaryButton(this, "Choose a Wi-Fi network…",
+            () => OpenSystemPanel(Android.Provider.Settings.ActionWifiSettings, "Wi-Fi settings")));
+        AddContentButton(PaperUi.SecondaryButton(this, "Pair a Bluetooth device…",
+            () => OpenSystemPanel(Android.Provider.Settings.ActionBluetoothSettings, "Bluetooth settings")));
+        // Fully-editable hotspot SSID/password is system-privileged; the tether panel is the reachable
+        // path (confirm on-device — it may show a read-only SSID under the lockdown).
+        AddContentButton(PaperUi.SecondaryButton(this, "Set up a hotspot (name + password)…",
+            () => OpenSystemPanel("android.settings.TETHER_SETTINGS", "hotspot settings",
+                fallback: Android.Provider.Settings.ActionWirelessSettings)));
+    }
+
+    // Opens a specific system settings panel by action; on a device where it isn't resolvable, tries an
+    // optional fallback action, then surfaces an inline status rather than throwing.
+    private void OpenSystemPanel(string action, string label, string? fallback = null)
+    {
+        try
+        {
+            StartActivity(new Intent(action).AddFlags(ActivityFlags.NewTask));
+        }
+        catch (Exception)
+        {
+            if (fallback is not null)
+            {
+                try { StartActivity(new Intent(fallback).AddFlags(ActivityFlags.NewTask)); return; }
+                catch (Exception) { /* fall through to the status */ }
+            }
+            inlineStatus = $"Couldn't open {label} on this device.";
+            Render();
+        }
     }
 
     // ---- Apps: force-close ----------------------------------------------------
@@ -381,6 +424,127 @@ public class LauncherSettingsActivity : Activity
         AddGroupLabel("Advanced");
         AddContentButton(PaperUi.SecondaryButton(this, "Admin (device-owner controls)…",
             () => StartActivity(new Intent(this, typeof(UnlockActivity)))));
+    }
+
+    // ---- Shelves (#11): create / rename / reorder / remove the tray categories -
+
+    private void RenderShelves()
+    {
+        AddGroupLabel("Shelves");
+        AddBody("The category shelves your apps sort onto. New shelves get an engraved glyph — " +
+            "AI-drawn from the name when a key's set, a pencil monogram otherwise.");
+
+        var catalog = new CategoryStore(this).Load();
+        var ids = catalog.Categories.Select(c => c.Id).ToList();
+        foreach (var category in catalog.Categories)
+        {
+            content!.AddView(BuildShelfRow(category, ids), Spaced(0, DesignTokens.Space.X1));
+        }
+
+        newShelfField = new EditText(this) { Hint = "New shelf name" };
+        newShelfField.SetTextColor(PaperTheme.Ink);
+        newShelfField.SetHintTextColor(PaperTheme.InkMuted);
+        newShelfField.Typeface = PaperTheme.SerifRegular(this);
+        content!.AddView(newShelfField, Spaced(DesignTokens.Space.X2, DesignTokens.Space.X1));
+        AddContentButton(PaperUi.SecondaryButton(this, "Add a shelf", () => AddShelf(newShelfField.Text)));
+    }
+
+    private View BuildShelfRow(Category category, List<string> orderedIds)
+    {
+        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+        row.AddView(PaperUi.QuietButton(this, category.Name, () => RenameShelf(category)),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        var index = orderedIds.IndexOf(category.Id);
+        if (index > 0)
+        {
+            row.AddView(PaperUi.QuietButton(this, "↑", () => MoveShelf(category.Id, -1)));
+        }
+        if (index < orderedIds.Count - 1)
+        {
+            row.AddView(PaperUi.QuietButton(this, "↓", () => MoveShelf(category.Id, +1)));
+        }
+        row.AddView(PaperUi.QuietButton(this, "Remove", () => RemoveShelf(category.Id)));
+        return row;
+    }
+
+    private void AddShelf(string? name)
+    {
+        var trimmed = (name ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+        {
+            inlineStatus = "Name the shelf first.";
+            Render();
+            return;
+        }
+        var store = new CategoryStore(this);
+        var catalog = store.Load().WithAdded(trimmed, ShelfGlyphMaker.Monogram(trimmed));
+        store.Save(catalog);
+        inlineStatus = null;
+        Render();
+        // The shelf shows immediately with its monogram; quietly upgrade to the AI glyph if one lands.
+        UpgradeShelfGlyphAsync(catalog.Categories[^1].Id, trimmed);
+    }
+
+    private async void UpgradeShelfGlyphAsync(string id, string name)
+    {
+        var glyph = await new ShelfGlyphMaker(voiceAccount.GetAccessToken).AiGlyphAsync(name, CancellationToken.None);
+        if (glyph is null || IsFinishing)
+        {
+            return;
+        }
+        var store = new CategoryStore(this);
+        var catalog = store.Load();
+        if (!catalog.Contains(id))
+        {
+            return; // the shelf was removed before the glyph arrived
+        }
+        store.Save(catalog.WithGlyph(id, glyph));
+        Render();
+    }
+
+    private void RenameShelf(Category category)
+    {
+        var field = new EditText(this) { Text = category.Name };
+        new AlertDialog.Builder(this)
+            .SetTitle($"Rename {category.Name}")!
+            .SetView(field)!
+            .SetPositiveButton("Rename", (_, _) =>
+            {
+                var name = field.Text?.Trim();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    var store = new CategoryStore(this);
+                    store.Save(store.Load().WithRenamed(category.Id, name));
+                    Render();
+                }
+            })!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    private void RemoveShelf(string id)
+    {
+        var store = new CategoryStore(this);
+        store.Save(store.Load().WithRemoved(id));
+        // Apps on the removed shelf fall loose in the tray automatically.
+        Render();
+    }
+
+    private void MoveShelf(string id, int delta)
+    {
+        var store = new CategoryStore(this);
+        var catalog = store.Load();
+        var ids = catalog.Categories.Select(c => c.Id).ToList();
+        var index = ids.IndexOf(id);
+        var target = index + delta;
+        if (index < 0 || target < 0 || target >= ids.Count)
+        {
+            return;
+        }
+        (ids[index], ids[target]) = (ids[target], ids[index]);
+        store.Save(catalog.Reordered(ids));
+        Render();
     }
 
     // ---- Shared building blocks ----------------------------------------------
