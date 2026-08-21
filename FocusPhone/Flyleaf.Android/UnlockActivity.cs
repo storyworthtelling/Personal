@@ -14,7 +14,7 @@ using Storyworthtelling.Voice.Secrets;
 namespace Flyleaf;
 
 /// <summary>
-/// The escape hatch. Requesting admin access starts a 72-hour countdown that
+/// The escape hatch. Requesting admin access starts a 6-hour countdown that
 /// is visible and cancellable; once it elapses, a 60-minute admin session can
 /// be opened. Undo-first everywhere (DESIGN.md §7): even the irreversible
 /// finalize-cutover runs as a visible 10-second inline countdown with Cancel —
@@ -111,7 +111,7 @@ public class UnlockActivity : Activity
         {
             case UnlockState.Locked:
                 AddHeader("Locked");
-                AddBody("Admin access requires a 72-hour delay. The countdown is visible and can be cancelled at any time.");
+                AddBody($"Admin access requires a {UnlockStateMachine.UnlockDelay.TotalHours:0}-hour delay. The countdown is visible and can be cancelled at any time.");
                 PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => Transition(machine.RequestUnlock)));
                 break;
 
@@ -145,7 +145,7 @@ public class UnlockActivity : Activity
         AddContentButton(PaperUi.SecondaryButton(this, "Unblock apps…", ShowBlockedApps));
         AddContentButton(PaperUi.SecondaryButton(this, "Set update token…", ShowUpdateTokenPrompt));
         // "Install from GitHub now" moved to the non-admin Settings panel (LauncherSettingsActivity) —
-        // installing the owner's own app updates shouldn't require the 72-hour admin gate.
+        // installing the owner's own app updates shouldn't require the 6-hour admin gate.
         AddContentButton(PaperUi.SecondaryButton(this, "Install APK from Downloads…", PickApkToInstall));
 
         if (cutover!.IsRunning)

@@ -30,7 +30,7 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(TimeSpan.FromHours(10));
+        clock.Advance(TimeSpan.FromHours(2));
 
         machine.CancelRequest();
 
@@ -42,7 +42,7 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(TimeSpan.FromHours(70));
+        clock.Advance(TimeSpan.FromHours(2));
         machine.CancelRequest();
 
         machine.RequestUnlock();
@@ -78,9 +78,9 @@ public class UnlockStateMachineTests
         var machine = NewMachine();
         machine.RequestUnlock();
 
-        clock.Advance(TimeSpan.FromHours(30));
+        clock.Advance(TimeSpan.FromHours(2));
 
-        Assert.Equal(TimeSpan.FromHours(42), machine.RemainingDelay);
+        Assert.Equal(UnlockStateMachine.UnlockDelay - TimeSpan.FromHours(2), machine.RemainingDelay);
     }
 
     [Fact]
@@ -165,13 +165,13 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(TimeSpan.FromHours(40));
+        clock.Advance(TimeSpan.FromHours(2));
         var persisted = machine.Export();
 
         var restored = new UnlockStateMachine(clock, persisted);
 
         Assert.Equal(UnlockState.Pending, restored.CurrentState);
-        Assert.Equal(TimeSpan.FromHours(32), restored.RemainingDelay);
+        Assert.Equal(UnlockStateMachine.UnlockDelay - TimeSpan.FromHours(2), restored.RemainingDelay);
     }
 
     [Fact]
@@ -179,10 +179,10 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(TimeSpan.FromHours(40));
+        clock.Advance(TimeSpan.FromHours(2));
 
         var restored = new UnlockStateMachine(clock, machine.Export());
-        clock.Advance(TimeSpan.FromHours(32));
+        clock.Advance(UnlockStateMachine.UnlockDelay - TimeSpan.FromHours(2));
 
         Assert.Equal(UnlockState.Ready, restored.CurrentState);
     }
@@ -192,17 +192,19 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(TimeSpan.FromHours(36));
+        clock.Advance(TimeSpan.FromHours(4));
         Assert.Equal(UnlockState.Pending, machine.CurrentState);
 
-        clock.Advance(TimeSpan.FromHours(-24));
+        // A backwards clock jump adds no progress and keeps the countdown paused (fail-closed).
+        clock.Advance(TimeSpan.FromHours(-2));
         Assert.Equal(UnlockState.Pending, machine.CurrentState);
 
-        clock.Advance(TimeSpan.FromHours(35));
+        // Forward again, resuming from the accumulated 4h — one minute short of the delay.
+        clock.Advance(UnlockStateMachine.UnlockDelay - TimeSpan.FromHours(4) - TimeSpan.FromMinutes(1));
         Assert.Equal(UnlockState.Pending, machine.CurrentState);
-        Assert.Equal(TimeSpan.FromHours(1), machine.RemainingDelay);
+        Assert.Equal(TimeSpan.FromMinutes(1), machine.RemainingDelay);
 
-        clock.Advance(TimeSpan.FromHours(1));
+        clock.Advance(TimeSpan.FromMinutes(1));
         Assert.Equal(UnlockState.Ready, machine.CurrentState);
     }
 

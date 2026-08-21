@@ -18,7 +18,7 @@ namespace Flyleaf;
 
 /// <summary>
 /// The everyday, non-admin settings panel — reached by long-pressing the home
-/// clock. It carries the quick device controls that shouldn't need the 72-hour
+/// clock. It carries the quick device controls that shouldn't need the 6-hour
 /// admin gate (radios, restart, install owner-app updates, the secrets-vault
 /// passphrase), and an Admin row that leads into the gated UnlockActivity for
 /// the escape-hatch controls.

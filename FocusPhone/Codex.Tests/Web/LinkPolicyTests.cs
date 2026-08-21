@@ -68,4 +68,22 @@ public class LinkPolicyTests
     {
         Assert.False(Policy.IsNavigationAllowed(U("https://co.uk/"), U("https://co.uk/page")));
     }
+
+    [Fact]
+    public void GoogleAuthHost_IsAllowedEvenCrossDomain_SoLoginsComplete()
+    {
+        // A "Sign in with Google" redirect from an app's site must be allowed to cross domains.
+        Assert.True(Policy.IsNavigationAllowed(
+            U("https://order.example.com/login"), U("https://accounts.google.com/o/oauth2/auth")));
+    }
+
+    [Fact]
+    public void SocialHost_IsBlocked_EvenFromItsOwnDomain()
+    {
+        // Explicit social block: not reachable even when the link's origin is that same site.
+        Assert.False(Policy.IsNavigationAllowed(
+            U("https://instagram.com/"), U("https://instagram.com/explore")));
+        Assert.False(Policy.IsNavigationAllowed(
+            U("https://news.example.com/"), U("https://www.facebook.com/somepage")));
+    }
 }

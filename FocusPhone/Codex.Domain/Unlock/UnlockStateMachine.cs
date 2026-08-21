@@ -1,15 +1,14 @@
 namespace Codex.Domain.Unlock;
 
 /// <summary>
-/// The 72-hour time-delay admin unlock. Progress accumulates only while the
-/// wall clock moves forward; a backwards clock jump pauses the countdown
-/// (fail-closed) and immediately ends an active admin session. All state is
-/// recomputed from persisted timestamps on every observation, so alarms and
-/// in-memory timers are never load-bearing.
+/// The time-delay admin unlock (a 6-hour cooldown, owner-chosen). Progress accumulates only
+/// while the wall clock moves forward; a backwards clock jump pauses the countdown (fail-closed)
+/// and immediately ends an active admin session. All state is recomputed from persisted timestamps
+/// on every observation, so alarms and in-memory timers are never load-bearing.
 /// </summary>
 public class UnlockStateMachine
 {
-    public static readonly TimeSpan UnlockDelay = TimeSpan.FromHours(72);
+    public static readonly TimeSpan UnlockDelay = TimeSpan.FromHours(6);
     public static readonly TimeSpan AdminDuration = TimeSpan.FromMinutes(60);
 
     private readonly IClock clock;
