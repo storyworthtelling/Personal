@@ -9,24 +9,45 @@ public class PolicyPlanBuilderTests
         bool finalized = false,
         IEnumerable<string>? browserPackages = null,
         IEnumerable<string>? otherHomePackages = null,
-        IEnumerable<string>? blockedPackages = null) =>
+        IEnumerable<string>? blockedPackages = null,
+        IEnumerable<string>? neverVisiblePackages = null) =>
         new(
             OwnPackages: PolicyContext.FocusPhonePackages,
             BrowserPackages: (browserPackages ?? ["com.android.chrome"]).ToHashSet(),
             OtherHomePackages: (otherHomePackages ?? ["com.google.android.apps.nexuslauncher"]).ToHashSet(),
             BlockedPackages: (blockedPackages ?? []).ToHashSet(),
-            DebuggingLockedDown: finalized);
+            DebuggingLockedDown: finalized,
+            NeverVisiblePackages: (neverVisiblePackages ?? []).ToHashSet());
 
     [Fact]
     public void Plan_IncludesCoreRestrictions()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext());
 
+        // Block escaping the lockdown; keep time automatic.
         Assert.Contains(AndroidUserRestrictions.NoSafeBoot, plan.UserRestrictions);
-        Assert.Contains(AndroidUserRestrictions.NoUninstallApps, plan.UserRestrictions);
-        Assert.Contains(AndroidUserRestrictions.NoInstallUnknownSources, plan.UserRestrictions);
         Assert.Contains(AndroidUserRestrictions.NoFactoryReset, plan.UserRestrictions);
         Assert.Contains(AndroidUserRestrictions.NoConfigDateTime, plan.UserRestrictions);
+    }
+
+    [Fact]
+    public void Plan_AllowsSideloadingAndUninstalling()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        // The owner may sideload a build and uninstall any app — these are NOT restricted.
+        Assert.DoesNotContain(AndroidUserRestrictions.NoInstallUnknownSources, plan.UserRestrictions);
+        Assert.DoesNotContain(AndroidUserRestrictions.NoUninstallApps, plan.UserRestrictions);
+    }
+
+    [Fact]
+    public void NeverVisiblePackages_AreSuspended_AndNotReleasedByTheAllowlist()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext(
+            neverVisiblePackages: ["com.tinder", "com.king.candycrushsaga"]));
+
+        Assert.Contains("com.tinder", plan.SuspendedPackages);
+        Assert.Contains("com.king.candycrushsaga", plan.SuspendedPackages);
     }
 
     [Fact]
@@ -134,35 +155,24 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
-    public void LoginBrowser_IsLockedToTheIdentityProviderHosts()
+    public void LoginBrowser_DoesNotBlockNonAllowlistedUrls_SoAppLoginsComplete()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext());
 
         Assert.Equal(PolicyContext.LoginBrowserPackage, plan.LoginBrowser.Package);
-        // A representative host from each provider is on the allowlist.
-        Assert.Contains("accounts.google.com", plan.LoginBrowser.AllowedUrlPatterns);
-        Assert.Contains("github.com", plan.LoginBrowser.AllowedUrlPatterns);
-        Assert.Contains("remarkable.com", plan.LoginBrowser.AllowedUrlPatterns);
+        // Locking Chrome to the allowlist broke real app logins (Chick-fil-A). The Custom Tab is
+        // left unrestricted; the general-browsing wall is enforced elsewhere.
+        Assert.False(plan.LoginBrowser.BlockNonAllowlisted);
     }
 
     [Fact]
-    public void LoginBrowserAllowlist_KeepsGeneralBrowsingClosed()
-    {
-        var plan = PolicyPlanBuilder.Build(DefaultContext());
-
-        // Deliberately narrow: no bare google.com, so search and general browsing
-        // stay blocked when everything-else is denied by the "*" blocklist.
-        Assert.DoesNotContain("google.com", plan.LoginBrowser.AllowedUrlPatterns);
-        Assert.DoesNotContain("*", plan.LoginBrowser.AllowedUrlPatterns);
-    }
-
-    [Fact]
-    public void Plan_EnforcesAutoTimeAndFamilyDns()
+    public void Plan_EnforcesAutoTimeAndTheFamilyFilterDns()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext());
 
         Assert.True(plan.EnforceAutoTime);
-        Assert.Equal("family.cloudflare-dns.com", plan.PrivateDnsHost);
+        // CleanBrowsing family filter — the DNS half of the adult/social block.
+        Assert.Equal("family-filter-dns.cleanbrowsing.org", plan.PrivateDnsHost);
     }
 
     [Fact]

@@ -11,9 +11,13 @@ public record PolicyPlan(
     LoginBrowserPolicy LoginBrowser);
 
 /// <summary>
-/// Chrome's managed configuration for the login-only browser: block every URL
-/// except <see cref="AllowedUrlPatterns"/> (the identity-provider hosts) and
-/// disable incognito, so neither the Custom Tab's "Open in Chrome" overflow nor
-/// a link on a sign-in page can reach the open internet.
+/// Chrome's managed configuration for the login browser. Incognito is always disabled. When
+/// <see cref="BlockNonAllowlisted"/> is true, every URL except <see cref="AllowedUrlPatterns"/>
+/// is blocked (the old lock-to-identity-hosts behavior). It is now <b>false</b>: locking Chrome to
+/// a tiny allowlist broke legitimate app logins (an OAuth Custom Tab redirects across the app's own
+/// and third-party auth hosts), so the login Custom Tab is left unrestricted and the general-browsing
+/// wall is enforced elsewhere instead — Chrome stays hidden and non-default, our RestrictedBrowser
+/// contains ordinary links to their origin, and the filtering DNS blocks adult/social network-wide.
 /// </summary>
-public record LoginBrowserPolicy(string Package, IReadOnlyList<string> AllowedUrlPatterns);
+public record LoginBrowserPolicy(
+    string Package, IReadOnlyList<string> AllowedUrlPatterns, bool BlockNonAllowlisted);

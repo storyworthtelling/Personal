@@ -10,7 +10,10 @@ public record PolicyContext(
     IReadOnlySet<string> BrowserPackages,
     IReadOnlySet<string> OtherHomePackages,
     IReadOnlySet<string> BlockedPackages,
-    bool DebuggingLockedDown)
+    bool DebuggingLockedDown,
+    // The never-visible categories (games / social / dating / gambling / short-form), hard-suspended
+    // and not reversible in Admin — computed by the head via HardBlock.Detect over installed apps.
+    IReadOnlySet<string> NeverVisiblePackages)
 {
     // Every first-party app the owner ships lives under this namespace. Anything
     // matching it is known-good: the categorizer clears it outright so a

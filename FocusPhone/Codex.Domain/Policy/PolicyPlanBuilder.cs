@@ -7,15 +7,18 @@ namespace Codex.Domain.Policy;
 /// </summary>
 public static class PolicyPlanBuilder
 {
-    public const string FamilyDnsHost = "family.cloudflare-dns.com";
+    // The enforced Private DNS host: CleanBrowsing's family filter, which blocks adult content
+    // (and proxies/VPN bypasses) network-wide — the DNS half of the adult/social block.
+    public const string FamilyDnsHost = "family-filter-dns.cleanbrowsing.org";
 
     public static PolicyPlan Build(PolicyContext context)
     {
+        // Block escaping the lockdown (safe-boot bypasses the launcher; factory-reset wipes it) and
+        // keep time automatic. Sideloading (unknown sources) and uninstalling apps are deliberately
+        // NOT restricted — the owner may sideload a build and remove any app.
         var restrictions = new HashSet<string>
         {
             AndroidUserRestrictions.NoSafeBoot,
-            AndroidUserRestrictions.NoUninstallApps,
-            AndroidUserRestrictions.NoInstallUnknownSources,
             AndroidUserRestrictions.NoFactoryReset,
             AndroidUserRestrictions.NoConfigDateTime,
         };
@@ -27,6 +30,9 @@ public static class PolicyPlanBuilder
         var suspended = new HashSet<string>(context.BrowserPackages);
         suspended.UnionWith(context.OtherHomePackages);
         suspended.UnionWith(context.BlockedPackages);
+        // The never-visible categories (games/social/dating/gambling/short-form) are hard-suspended
+        // and never released — not by the Admin blocklist, not by the allowlist below.
+        suspended.UnionWith(context.NeverVisiblePackages);
         suspended.ExceptWith(context.OwnPackages);
         // Suspending the Play Store would break background auto-updates; it is
         // kept runnable but never surfaced in the launcher.
@@ -66,7 +72,13 @@ public static class PolicyPlanBuilder
         return new PolicyPlan(
             restrictions, suspended, runnable, permissionGrants,
             EnforceAutoTime: true, FamilyDnsHost, DisableStatusBar: true,
+            // Do NOT lock Chrome to the allowlist: that blocked legitimate app logins (e.g. an
+            // OAuth Custom Tab redirecting through an app's own auth host). Logins run unrestricted;
+            // Chrome stays hidden + non-default, RestrictedBrowser contains ordinary links, and the
+            // filtering DNS blocks adult/social. The allowlist is kept for reference / a future
+            // re-tightening but not enforced (BlockNonAllowlisted: false).
             LoginBrowser: new LoginBrowserPolicy(
-                PolicyContext.LoginBrowserPackage, PolicyContext.LoginBrowserUrlAllowlist));
+                PolicyContext.LoginBrowserPackage, PolicyContext.LoginBrowserUrlAllowlist,
+                BlockNonAllowlisted: false));
     }
 }

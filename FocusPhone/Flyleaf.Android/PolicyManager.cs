@@ -39,7 +39,8 @@ public static class PolicyManager
             BrowserPackages: QueryBrowserPackages(context),
             OtherHomePackages: QueryOtherHomePackages(context),
             BlockedPackages: store.Load().BlockedPackages.ToHashSet(),
-            DebuggingLockedDown: store.DebuggingLockedDown);
+            DebuggingLockedDown: store.DebuggingLockedDown,
+            NeverVisiblePackages: QueryNeverVisiblePackages(context));
 
         Apply(context, PolicyPlanBuilder.Build(policyContext));
     }
@@ -185,13 +186,18 @@ public static class PolicyManager
         }
 
         var restrictions = new Bundle();
-        // "*" blocks everything; the allowlist carves the exceptions back out.
-        // Chrome gives the allowlist precedence over the blocklist.
-        restrictions.PutStringArray("URLBlocklist", ["*"]);
-        restrictions.PutStringArray("URLAllowlist", login.AllowedUrlPatterns.ToArray());
-        // 1 = incognito disabled, so the filter can't be sidestepped in a new
-        // incognito tab.
+        // Incognito is always disabled (1) so nothing sidesteps the managed config.
         restrictions.PutInt("IncognitoModeAvailability", 1);
+        if (login.BlockNonAllowlisted)
+        {
+            // The old lock-to-identity-hosts behavior: "*" blocks everything, the allowlist
+            // carves the exceptions back out (Chrome gives the allowlist precedence).
+            restrictions.PutStringArray("URLBlocklist", ["*"]);
+            restrictions.PutStringArray("URLAllowlist", login.AllowedUrlPatterns.ToArray());
+        }
+        // Otherwise (the default now): no URL filter, so an app's OAuth Custom Tab can complete its
+        // cross-domain login. Chrome is still hidden + non-default, our RestrictedBrowser contains
+        // ordinary links, and the filtering DNS blocks adult/social — so this is not a browsing door.
 
         try
         {
@@ -230,6 +236,21 @@ public static class PolicyManager
         var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse("https://example.com"));
         intent.AddCategory(Intent.CategoryBrowsable);
         return QueryPackages(context, intent);
+    }
+
+    // The never-visible categories (games / social / dating / gambling / short-form): every launchable
+    // app whose declared category or curated id falls in one, hard-suspended by the plan. The pure
+    // HardBlock rule is unit-tested; this only supplies the installed (package, category) facts.
+    private static IReadOnlySet<string> QueryNeverVisiblePackages(Context context)
+    {
+        var launcher = new Intent(Intent.ActionMain);
+        launcher.AddCategory(Intent.CategoryLauncher);
+        var installed = context.PackageManager!
+            .QueryIntentActivities(launcher, PackageInfoFlags.MatchAll)
+            .Select(r => (r.ActivityInfo!.PackageName!,
+                (int)(r.ActivityInfo.ApplicationInfo?.Category ?? ApplicationCategories.Undefined)))
+            .ToList();
+        return HardBlock.Detect(installed);
     }
 
     private static IReadOnlySet<string> QueryOtherHomePackages(Context context)
