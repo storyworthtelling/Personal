@@ -37,9 +37,14 @@ public class HomeActivity : Activity
     private FrameLayout? root;
     private Button? setDefaultLauncherButton;
 
-    // Kept for the vault-backed GitHub update-token restore below (the voiced hello itself moved
-    // to the load screen). Best-effort: no-ops until a Google account is signed in.
+    // The Google account is used for the vault-backed update-token restore and the cover-load
+    // voiced hello. Best-effort: both no-op until a Google account is signed in.
     private readonly Codex.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
+    private Codex.Ui.Voice.VoiceGreeting? greeting;
+
+    // The cover-load overlay is a cold-start moment only — shown once per process, not on every
+    // Home press (a launcher should return you to the shelf instantly).
+    private static bool coverShownThisProcess;
 
     private TimeTickReceiver? timeTickReceiver;
     private NotificationsChangedReceiver? notificationsReceiver;
@@ -54,6 +59,63 @@ public class HomeActivity : Activity
         SetContentView(BuildLayout());
         PolicyManager.ApplyCurrentPolicy(this);
         CrashReporter.ShowPendingCrash(this);
+        if (!coverShownThisProcess)
+        {
+            coverShownThisProcess = true;
+            ShowCoverLoad();
+        }
+    }
+
+    // The frameless cover-load moment: the Flyleaf cover full-bleed over the shelf with a
+    // time-aware voiced hello (hidden when there's no profile/key), then a gentle fade to the shelf.
+    private void ShowCoverLoad()
+    {
+        var overlay = new FrameLayout(this);
+        overlay.AddView(new CoverView(this), new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        var hello = PaperUi.Secondary(this, string.Empty);
+        hello.Gravity = GravityFlags.Center;
+        hello.SetTextColor(PaperTheme.Paper);
+        hello.Visibility = ViewStates.Invisible;
+        var pad = PaperTheme.Dp(this, DesignTokens.Space.X8);
+        hello.SetPadding(pad, 0, pad, 0);
+        overlay.AddView(hello, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+        {
+            Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal,
+            BottomMargin = PaperTheme.Dp(this, DesignTokens.Space.X8),
+        });
+
+        root!.AddView(overlay, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        greeting ??= new Codex.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "Flyleaf");
+        ComposeHelloThenFade(overlay, hello);
+    }
+
+    private async void ComposeHelloThenFade(FrameLayout overlay, TextView hello)
+    {
+        var timeContext = $"the owner just opened Flyleaf; it is {DateTime.Now:h:mm tt}";
+        var compose = greeting!.ComposeAsync("welcome", timeContext, CancellationToken.None);
+        var finished = await Task.WhenAny(compose, Task.Delay(2500));
+        var message = ReferenceEquals(finished, compose) && compose.IsCompletedSuccessfully ? compose.Result : string.Empty;
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            hello.Text = message;
+            hello.Visibility = ViewStates.Visible;
+            await Task.Delay(1400); // a beat to read it
+        }
+        else
+        {
+            await Task.Delay(700); // a brief cover beat, then reveal the shelf
+        }
+        if (IsFinishing)
+        {
+            return;
+        }
+        overlay.Animate()!.Alpha(0f)!.SetDuration(450)!
+            .WithEndAction(new Java.Lang.Runnable(() => (overlay.Parent as ViewGroup)?.RemoveView(overlay)))!.Start();
     }
 
     private void GoImmersive()
