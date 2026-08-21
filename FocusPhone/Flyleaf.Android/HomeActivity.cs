@@ -1,20 +1,24 @@
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
+using Android.Graphics.Drawables;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using Codex.Domain.Apps;
 using Codex.Domain.Design;
-using Codex.Domain.Time;
 using Codex.Ui;
-using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Secrets;
 
 namespace Flyleaf;
 
 /// <summary>
-/// The home screen: a clock header over six textless icon tiles on a
-/// paper-like background. A tile tints to the accent color while its app has
-/// an active notification. Swipe up opens the allowlisted app tray.
+/// The Flyleaf home: one continuous realistic bookcase (a scoped DESIGN.md §1/§5 exception).
+/// The top is the mantel-clock shelf over the six cover-out home books; scrolling down reveals
+/// the tray on the same shelf — the owner's sibling apps (cover-out), the category shelves
+/// (spine-out, bronze bookends), and the loose apps. Tap a book to open it; long-press for the
+/// Paper action card (Move to shelf / Feature on home / Block / Uninstall); long-press the clock
+/// for Settings. A book with a notification flies a bookmark tab. Fully immersive — no bars.
 /// </summary>
 [Activity(
     Label = "Flyleaf",
@@ -28,71 +32,79 @@ namespace Flyleaf;
     Categories = [Intent.CategoryHome, Intent.CategoryDefault])]
 public class HomeActivity : Activity
 {
-    private PaperClockView? clockView;
-    private TextView? dateView;
+    private BookshelfView? shelf;
+    private ShelfArt? art;
+    private FrameLayout? root;
     private Button? setDefaultLauncherButton;
 
-    // Owner's-voice greeting under the date, and a one-time sign-in so it can read the shared profile.
+    // Kept for the vault-backed GitHub update-token restore below (the voiced hello itself moved
+    // to the load screen). Best-effort: no-ops until a Google account is signed in.
     private readonly Codex.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
-    private Codex.Ui.Voice.VoiceGreeting? greeting;
-    private TextView? greetingView;
-    private Button? voiceSignInButton;
-    private readonly Dictionary<Tile, ImageView> tileViews = [];
+
     private TimeTickReceiver? timeTickReceiver;
     private NotificationsChangedReceiver? notificationsReceiver;
-    private GestureDetector? gestureDetector;
+    private readonly HashSet<string> notifiedPackages = [];
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
-        greeting = new Codex.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "Flyleaf");
+        GoImmersive();
         RestoreUpdateTokenFromVault();
         SetContentView(BuildLayout());
-        gestureDetector = new GestureDetector(this, new SwipeUpListener(OpenAppTray));
         PolicyManager.ApplyCurrentPolicy(this);
         CrashReporter.ShowPendingCrash(this);
     }
 
-    // After a reinstall or the cutover's factory reset, refill the GitHub update token from the encrypted
-    // Drive vault (needs the vault passphrase set + Google signed in), so the self-update channel keeps
-    // working without re-entering it in admin mode. Runs only when the token is missing locally.
-    private void RestoreUpdateTokenFromVault() => Task.Run(async () =>
+    private void GoImmersive()
     {
-        try
-        {
-            var settings = new UpdateSettingsStore(this);
-            if (!string.IsNullOrEmpty(settings.GitHubToken))
-                return; // already have a local token — never overwrite it
+        Window!.DecorView.SystemUiVisibility = (StatusBarVisibility)(
+            SystemUiFlags.LayoutStable | SystemUiFlags.LayoutHideNavigation | SystemUiFlags.LayoutFullscreen |
+            SystemUiFlags.HideNavigation | SystemUiFlags.Fullscreen | SystemUiFlags.ImmersiveSticky);
+    }
 
-            var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "Flyleaf");
-            var result = await access.Service.LoadAsync(System.Threading.CancellationToken.None);
-            if (result.Status == SecretsVaultStatus.Loaded)
-            {
-                // Drive-by-ID (#13): pick up the ids the apps persisted for the shared files.
-                Codex.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
-                if (!string.IsNullOrEmpty(result.Vault.GitHubUpdateToken))
-                    settings.GitHubToken = result.Vault.GitHubUpdateToken;
-            }
-        }
-        catch
+    private View BuildLayout()
+    {
+        art = new ShelfArt(this, () => notifiedPackages);
+        shelf = new BookshelfView(this, art)
         {
-            // Ignore: restore is a convenience; admin mode always re-enters the token manually.
-        }
-    });
+            ItemTapped = OnItemTapped,
+            ItemLongPressed = OnItemLongPressed,
+        };
+
+        var scroller = new ScrollView(this) { FillViewport = true };
+        scroller.SetBackgroundColor(PaperTheme.WalnutDeep);
+        scroller.AddView(shelf, new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        root = new FrameLayout(this);
+        root.AddView(scroller, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        // A quiet paper prompt over the shelf until Flyleaf holds the home role (ROLE_HOME can't be
+        // force-granted, so it opens the system Home-app picker). Vanishes once we're the default.
+        setDefaultLauncherButton = PaperUi.SecondaryButton(this, "Set Flyleaf as your home app", () =>
+            StartActivity(new Intent(Android.Provider.Settings.ActionHomeSettings)));
+        setDefaultLauncherButton.Visibility = ViewStates.Gone;
+        root.AddView(setDefaultLauncherButton, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
+        {
+            Gravity = GravityFlags.Center,
+        });
+        return root;
+    }
 
     protected override void OnResume()
     {
         base.OnResume();
+        ReloadScene();
         UpdateClock();
         UpdateSetDefaultLauncherButton();
-        UpdateVoiceGreeting();
         timeTickReceiver = new TimeTickReceiver(UpdateClock);
         RegisterReceiver(timeTickReceiver, new IntentFilter(Intent.ActionTimeTick));
-        notificationsReceiver = new NotificationsChangedReceiver(UpdateTileTints);
+        notificationsReceiver = new NotificationsChangedReceiver(OnNotificationsChanged);
         RegisterReceiver(notificationsReceiver,
-            new IntentFilter(TileNotificationListener.ActionNotificationsChanged),
-            ReceiverFlags.NotExported);
+            new IntentFilter(TileNotificationListener.ActionNotificationsChanged), ReceiverFlags.NotExported);
     }
 
     protected override void OnPause()
@@ -102,167 +114,155 @@ public class HomeActivity : Activity
         UnregisterReceiver(notificationsReceiver);
     }
 
-    public override bool DispatchTouchEvent(MotionEvent? e)
+    public override void OnWindowFocusChanged(bool hasFocus)
     {
-        if (e is not null)
+        base.OnWindowFocusChanged(hasFocus);
+        if (hasFocus)
         {
-            gestureDetector?.OnTouchEvent(e);
+            GoImmersive(); // re-hide the bars after a transient system UI reveal
         }
-        return base.DispatchTouchEvent(e);
     }
 
-    // Shows the sign-in button when there's no Google account yet, then composes the greeting once there
-    // is. Both stay quiet (hidden) when there's no shared profile/key or on any error.
-    private void UpdateVoiceGreeting()
+    private void ReloadScene()
     {
-        if (voiceSignInButton is not null)
-            voiceSignInButton.Visibility = Codex.Ui.Voice.VoiceGoogleAccount.IsSignedIn ? ViewStates.Gone : ViewStates.Visible;
-        if (Codex.Ui.Voice.VoiceGoogleAccount.IsSignedIn)
-            ShowGreetingAsync();
+        var catalog = new CategoryStore(this).Load();
+        var home = new HomeFeatureStore(this).Load();
+        var scene = new ShelfSceneBuilder(this).Build(catalog, home);
+        shelf!.SetScene(scene);
     }
 
-    private async void ShowGreetingAsync()
+    private void UpdateClock() => shelf?.SetTime(DateTime.Now.TimeOfDay);
+
+    private void OnNotificationsChanged(IReadOnlySet<string> packages)
     {
-        if (greeting is null || greetingView is null)
+        notifiedPackages.Clear();
+        notifiedPackages.UnionWith(packages);
+        shelf?.RefreshBookmarks();
+    }
+
+    // ---- Interactions ----
+
+    private void OnItemTapped(PlacedItem item)
+    {
+        if (item.Key == BookshelfLayout.ClockKey)
+        {
+            return; // the clock is glanced, not tapped; long-press opens Settings
+        }
+        var intent = PackageManager!.GetLaunchIntentForPackage(item.Key);
+        if (intent is not null)
+        {
+            StartActivity(intent);
+        }
+        else
+        {
+            Toast.MakeText(this, $"{art!.Label(item.Key)} isn't installed", ToastLength.Short)!.Show();
+        }
+    }
+
+    private void OnItemLongPressed(PlacedItem item)
+    {
+        if (item.Key == BookshelfLayout.ClockKey)
+        {
+            StartActivity(new Intent(this, typeof(LauncherSettingsActivity)));
             return;
-        var message = await greeting.ComposeAsync("welcome", "the owner is looking at their home screen", CancellationToken.None);
-        if (string.IsNullOrWhiteSpace(message))
-            return;
-        greetingView.Text = message;
-        greetingView.Visibility = ViewStates.Visible;
-    }
-
-    private async Task VoiceSignInAsync()
-    {
-        try
-        {
-            await voiceAccount.SignIn(this);
         }
-        catch
+        ShowAppMenu(item.Key);
+    }
+
+    private void ShowAppMenu(string package)
+    {
+        var label = art!.Label(package);
+        var actions = new List<(string Label, Action OnClick)>();
+        if (!IsRepoApp(package))
         {
-            // Cancelled or failed — leave the button up to try again.
+            actions.Add(("Move to shelf…", () => ShowShelfPicker(package, label)));
         }
-        UpdateVoiceGreeting();
+        actions.Add(("Feature on home", () => ShowFeaturePicker(package, label)));
+        actions.Add(("Block", () => BlockWithUndo(package, label)));
+        actions.Add(("Uninstall", () => StartActivity(
+            new Intent(Intent.ActionDelete, Android.Net.Uri.Parse("package:" + package)))));
+        ShowPaperMenu(label, actions);
     }
 
-    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    private void ShowShelfPicker(string package, string label)
     {
-        base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode == Codex.Ui.Voice.VoiceGoogleAccount.RequestCode)
-            Codex.Ui.Voice.VoiceGoogleAccount.HandleChooserResult(resultCode, data);
+        var catalog = new CategoryStore(this).Load();
+        var store = new AppFolderStore(this);
+        var actions = catalog.Categories
+            .Select(category => (category.Name, (Action)(() => { store.SetFolder(package, category.Id); ReloadScene(); })))
+            .ToList();
+        actions.Add(("None (loose)", () => { store.ClearFolder(package); ReloadScene(); }));
+        ShowPaperMenu($"Move {label} to…", actions);
     }
 
-    private View BuildLayout()
+    private void ShowFeaturePicker(string package, string label)
     {
-        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.SetPadding(
-            PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X16),
-            PaperTheme.Dp(this, DesignTokens.Space.X6), PaperTheme.Dp(this, DesignTokens.Space.X8));
+        var store = new HomeFeatureStore(this);
+        var home = store.Load();
+        var actions = home.Packages
+            .Select(featured => (art!.Label(featured), (Action)(() =>
+            {
+                store.Save(home.Replace(featured, package));
+                ReloadScene();
+            })))
+            .ToList();
+        ShowPaperMenu($"Feature {label} — replace which book?", actions);
+    }
 
-        // The drawn analog face (DESIGN.md §11): no digital time on the home
-        // screen. Long-pressing the clock opens the everyday Settings panel — its
-        // hub dot is the only mark for that gesture; Admin (the 72-hour gate) now
-        // lives behind a row inside Settings, so the home screen stays blank.
-        clockView = new PaperClockView(this);
-        clockView.LongClick += (_, _) => StartActivity(new Intent(this, typeof(LauncherSettingsActivity)));
-        var clockSize = PaperTheme.Dp(this, 176);
-        root.AddView(clockView, new LinearLayout.LayoutParams(clockSize, clockSize)
+    private void BlockWithUndo(string package, string label)
+    {
+        SetBlocked(package, blocked: true);
+        UndoBar.Show(this, root!, $"Blocked {label}.", onUndo: () => SetBlocked(package, blocked: false));
+    }
+
+    private void SetBlocked(string package, bool blocked)
+    {
+        var store = new BlocklistStore(this);
+        var categorizer = new AppCategorizer(store.Load());
+        if (blocked)
         {
-            Gravity = GravityFlags.CenterHorizontal,
-        });
-
-        dateView = PaperUi.Heading(this, "");
-        dateView.Typeface = PaperTheme.SerifRegular(this);
-        dateView.Gravity = GravityFlags.CenterHorizontal;
-        var dateParams = MatchWrap();
-        dateParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
-        root.AddView(dateView, dateParams);
-
-        // A greeting in the owner's voice under the date, hidden until composed (needs the shared profile
-        // + a signed-in Google account); and a one-time sign-in button that shows only until then.
-        greetingView = PaperUi.Secondary(this, string.Empty);
-        greetingView.Gravity = GravityFlags.CenterHorizontal;
-        greetingView.Visibility = ViewStates.Gone;
-        var greetingParams = MatchWrap();
-        greetingParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X2);
-        root.AddView(greetingView, greetingParams);
-
-        voiceSignInButton = PaperUi.SecondaryButton(this, "Sign in for a voiced hello", () => _ = VoiceSignInAsync());
-        voiceSignInButton.Visibility = ViewStates.Gone;
-        var voiceButtonParams = MatchWrap();
-        voiceButtonParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X2);
-        root.AddView(voiceSignInButton, voiceButtonParams);
-
-        // Shown only until FocusPhone is the default home app (before device-owner
-        // pinning). ROLE_HOME cannot be force-granted programmatically, so this
-        // opens the system Home-app picker.
-        setDefaultLauncherButton = PaperUi.SecondaryButton(this, "Set as default launcher", () =>
-            StartActivity(new Intent(Android.Provider.Settings.ActionHomeSettings)));
-        setDefaultLauncherButton.Visibility = ViewStates.Gone;
-        var buttonParams = MatchWrap();
-        buttonParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
-        root.AddView(setDefaultLauncherButton, buttonParams);
-
-        var grid = new GridLayout(this) { ColumnCount = 2, RowCount = 3 };
-        var gridParams = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0)
-        {
-            Weight = 1,
-            TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X8),
-        };
-        root.AddView(grid, gridParams);
-
-        foreach (var tile in Tile.All)
-        {
-            grid.AddView(BuildTileView(tile));
+            categorizer.Block(package);
         }
-
-        // Icon-only affordance for the swipe-up tray (DESIGN.md §7).
-        var hint = PaperUi.HintChevron(this, OpenAppTray);
-        var hintSize = PaperTheme.Dp(this, DesignTokens.Shape.TouchTargetDp);
-        root.AddView(hint, new LinearLayout.LayoutParams(hintSize, hintSize)
+        else
         {
-            Gravity = GravityFlags.CenterHorizontal,
-        });
-        return root;
+            categorizer.Unblock(package);
+        }
+        store.Save(categorizer.Export());
+        PolicyManager.ApplyCurrentPolicy(this);
+        ReloadScene();
     }
 
-    private View BuildTileView(Tile tile)
+    private static bool IsRepoApp(string package) =>
+        package.StartsWith(Codex.Domain.Policy.PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal)
+        && !Codex.Domain.Policy.PolicyContext.FocusPhonePackages.Contains(package);
+
+    // A Paper action sheet: a Serif title over left-aligned quiet buttons on a rounded paper card.
+    private void ShowPaperMenu(string title, IReadOnlyList<(string Label, Action OnClick)> actions)
     {
-        var icon = new ImageView(this) { ContentDescription = tile.Name };
-        var resourceId = Resources!.GetIdentifier(tile.IconResourceName, "drawable", PackageName);
-        icon.SetImageResource(resourceId);
-        icon.SetColorFilter(PaperTheme.Ink);
+        var dialog = new Dialog(this);
+        dialog.RequestWindowFeature((int)WindowFeatures.NoTitle);
+
+        var column = new LinearLayout(this) { Orientation = Orientation.Vertical };
         var pad = PaperTheme.Dp(this, DesignTokens.Space.X6);
-        icon.SetPadding(pad, pad, pad, pad);
+        column.SetPadding(pad, pad, pad, pad);
+        column.AddView(PaperUi.Heading(this, title));
 
-        icon.Click += (_, _) =>
+        foreach (var action in actions)
         {
-            var intent = tile.BuildLaunchIntent(this);
-            if (intent is not null)
+            var button = PaperUi.QuietButton(this, action.Label, () =>
             {
-                StartActivity(intent);
-            }
-            else
-            {
-                Toast.MakeText(this, $"{tile.Name} isn't installed", ToastLength.Short)!.Show();
-            }
-        };
+                dialog.Dismiss();
+                action.OnClick();
+            });
+            button.Gravity = GravityFlags.CenterVertical | GravityFlags.Start;
+            column.AddView(button, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+        }
 
-        var layoutParams = new GridLayout.LayoutParams(
-            GridLayout.InvokeSpec(GridLayout.Undefined, GridLayout.Fill, 1f),
-            GridLayout.InvokeSpec(GridLayout.Undefined, GridLayout.Fill, 1f))
-        {
-            Width = 0,
-            Height = 0,
-        };
-        icon.LayoutParameters = layoutParams;
-        tileViews[tile] = icon;
-        return icon;
+        dialog.SetContentView(column);
+        dialog.Window?.SetBackgroundDrawable(PaperUi.Fill(this, PaperTheme.Paper, DesignTokens.Shape.RadiusCard));
+        dialog.Show();
     }
-
-    private static LinearLayout.LayoutParams MatchWrap() =>
-        new(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
 
     private void UpdateSetDefaultLauncherButton()
     {
@@ -271,76 +271,101 @@ public class HomeActivity : Activity
             return;
         }
         var roleManager = GetSystemService(Context.RoleService) as Android.App.Roles.RoleManager;
-        var isDefaultLauncher = roleManager?.IsRoleHeld(Android.App.Roles.RoleManager.RoleHome) ?? false;
-        setDefaultLauncherButton.Visibility = isDefaultLauncher ? ViewStates.Gone : ViewStates.Visible;
+        var isDefault = roleManager?.IsRoleHeld(Android.App.Roles.RoleManager.RoleHome) ?? false;
+        setDefaultLauncherButton.Visibility = isDefault ? ViewStates.Gone : ViewStates.Visible;
     }
 
-    private void UpdateClock()
+    // After a reinstall or the cutover's factory reset, refill the GitHub update token from the
+    // encrypted Drive vault so the self-update channel keeps working. Runs only when it's missing.
+    private void RestoreUpdateTokenFromVault() => Task.Run(async () =>
     {
-        var now = DateTime.Now;
-        clockView!.SetTime(now.TimeOfDay);
-        dateView!.Text = TimeFormats.DateLong(now);
-    }
-
-    private void UpdateTileTints(IReadOnlySet<string> packagesWithNotifications)
-    {
-        foreach (var (tile, view) in tileViews)
+        try
         {
-            var lit = tile.NotificationPackages.Any(packagesWithNotifications.Contains);
-            view.SetColorFilter(lit ? PaperTheme.Accent : PaperTheme.Ink);
+            var settings = new UpdateSettingsStore(this);
+            if (!string.IsNullOrEmpty(settings.GitHubToken))
+            {
+                return;
+            }
+            var access = new Codex.Ui.Voice.SecretsVaultAccess(voiceAccount.GetAccessToken, "Flyleaf");
+            var result = await access.Service.LoadAsync(CancellationToken.None);
+            if (result.Status == SecretsVaultStatus.Loaded)
+            {
+                Codex.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
+                if (!string.IsNullOrEmpty(result.Vault.GitHubUpdateToken))
+                {
+                    settings.GitHubToken = result.Vault.GitHubUpdateToken;
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort; admin mode always re-enters the token manually.
+        }
+    });
+
+    // ---- The art the shelf paints through ----
+
+    private sealed class ShelfArt(Context context, Func<IReadOnlySet<string>> notifications) : IShelfArt
+    {
+        private readonly PackageManager packageManager = context.PackageManager!;
+        private readonly Dictionary<string, Drawable?> icons = [];
+        private readonly Dictionary<string, string> labels = [];
+
+        public Android.Graphics.Bitmap? Cover(string packageKey) => null; // bespoke painted covers land in the cover pass
+
+        public Drawable? Icon(string packageKey)
+        {
+            if (!icons.TryGetValue(packageKey, out var icon))
+            {
+                icons[packageKey] = icon = TryLoad(packageKey);
+            }
+            return icon;
+        }
+
+        public string Label(string packageKey)
+        {
+            if (!labels.TryGetValue(packageKey, out var label))
+            {
+                labels[packageKey] = label = TryLabel(packageKey);
+            }
+            return label;
+        }
+
+        public int Cloth(string packageKey) =>
+            Android.Graphics.Color.ParseColor(BookClothPalette.ForPackage(packageKey)).ToArgb();
+
+        public bool HasNotification(string packageKey) => notifications().Contains(packageKey);
+
+        private Drawable? TryLoad(string package)
+        {
+            try { return packageManager.GetApplicationIcon(package); }
+            catch (PackageManager.NameNotFoundException) { return null; }
+        }
+
+        private string TryLabel(string package)
+        {
+            try { return packageManager.GetApplicationLabel(packageManager.GetApplicationInfo(package, 0)); }
+            catch (PackageManager.NameNotFoundException) { return ShortName(package); }
+        }
+
+        private static string ShortName(string package)
+        {
+            var last = package.Split('.')[^1];
+            return last.Length == 0 ? package : char.ToUpperInvariant(last[0]) + last[1..];
         }
     }
 
-    private void OpenAppTray() => StartActivity(new Intent(this, typeof(AppTrayActivity)));
-
-    private class TimeTickReceiver : BroadcastReceiver
+    private class TimeTickReceiver(Action onTick) : BroadcastReceiver
     {
-        private readonly Action onTick;
-
-        public TimeTickReceiver(Action onTick)
-        {
-            this.onTick = onTick;
-        }
-
         public override void OnReceive(Context? context, Intent? intent) => onTick();
     }
 
-    private class NotificationsChangedReceiver : BroadcastReceiver
+    private class NotificationsChangedReceiver(Action<IReadOnlySet<string>> onChanged) : BroadcastReceiver
     {
-        private readonly Action<IReadOnlySet<string>> onChanged;
-
-        public NotificationsChangedReceiver(Action<IReadOnlySet<string>> onChanged)
-        {
-            this.onChanged = onChanged;
-        }
-
         public override void OnReceive(Context? context, Intent? intent)
         {
             var packages = intent?.GetStringArrayExtra(TileNotificationListener.ExtraPackages) ?? [];
             onChanged(packages.ToHashSet());
-        }
-    }
-
-    private class SwipeUpListener : GestureDetector.SimpleOnGestureListener
-    {
-        private const float MinimumDistance = 200f;
-        private const float MinimumVelocity = 800f;
-
-        private readonly Action onSwipeUp;
-
-        public SwipeUpListener(Action onSwipeUp)
-        {
-            this.onSwipeUp = onSwipeUp;
-        }
-
-        public override bool OnFling(MotionEvent? e1, MotionEvent e2, float velocityX, float velocityY)
-        {
-            if (e1 is not null && e1.GetY() - e2.GetY() > MinimumDistance && -velocityY > MinimumVelocity)
-            {
-                onSwipeUp();
-                return true;
-            }
-            return false;
         }
     }
 }

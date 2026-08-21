@@ -22,6 +22,18 @@ public static class PaperTheme
     public static readonly Color Accent = Color.ParseColor(DesignTokens.Accent);
     public static readonly Color AccentDeep = Color.ParseColor(DesignTokens.AccentDeep);
 
+    // Flyleaf's realistic bookshelf surface (a scoped DESIGN.md §1/§5 exception): warm identity
+    // and the walnut/firelight/bronze material tones, parsed once from the tokens.
+    public static readonly Color IdentityWarm = Color.ParseColor(DesignTokens.Identity.Warm);
+    public static readonly Color IdentityMark = Color.ParseColor(DesignTokens.Identity.Mark);
+    public static readonly Color IdentityDeep = Color.ParseColor(DesignTokens.Identity.Deep);
+    public static readonly Color Walnut = Color.ParseColor(DesignTokens.Shelf.Walnut);
+    public static readonly Color WalnutDeep = Color.ParseColor(DesignTokens.Shelf.WalnutDeep);
+    public static readonly Color WalnutLight = Color.ParseColor(DesignTokens.Shelf.WalnutLight);
+    public static readonly Color Firelight = Color.ParseColor(DesignTokens.Shelf.Firelight);
+    public static readonly Color Bronze = Color.ParseColor(DesignTokens.Shelf.Bronze);
+    public static readonly Color BronzeDeep = Color.ParseColor(DesignTokens.Shelf.BronzeDeep);
+
     private static Typeface? serifRegular;
     private static Typeface? serifSemibold;
     private static Typeface? serifItalic;
