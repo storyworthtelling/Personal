@@ -58,9 +58,9 @@ public class HomeActivity : Activity
 
     private void GoImmersive()
     {
-        Window!.DecorView.SystemUiVisibility = (StatusBarVisibility)(
+        Window!.DecorView.SystemUiFlags =
             SystemUiFlags.LayoutStable | SystemUiFlags.LayoutHideNavigation | SystemUiFlags.LayoutFullscreen |
-            SystemUiFlags.HideNavigation | SystemUiFlags.Fullscreen | SystemUiFlags.ImmersiveSticky);
+            SystemUiFlags.HideNavigation | SystemUiFlags.Fullscreen | SystemUiFlags.ImmersiveSticky;
     }
 
     private View BuildLayout()

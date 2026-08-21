@@ -394,7 +394,7 @@ public class BookshelfView : View
         var x = r.Right - w - 6 * density;
         var top = r.Top - 12 * density;
         using var ribbon = new Paint { AntiAlias = true, Color = PaperTheme.Accent };
-        using var path = new Path();
+        using var path = new Android.Graphics.Path();
         path.MoveTo(x, top);
         path.LineTo(x + w, top);
         path.LineTo(x + w, r.Top + 8 * density);
@@ -474,10 +474,10 @@ public class BookshelfView : View
 
     // Gradient helpers over the well-established int-color ctor overloads (Color → ARGB int).
     private static LinearGradient Linear(float x0, float y0, float x1, float y1, Color c0, Color c1) =>
-        new(x0, y0, x1, y1, c0.ToArgb(), c1.ToArgb(), Shader.TileMode.Clamp);
+        new(x0, y0, x1, y1, c0.ToArgb(), c1.ToArgb(), Shader.TileMode.Clamp!);
 
     private static RadialGradient Radial(float cx, float cy, float radius, Color c0, Color c1) =>
-        new(cx, cy, radius, c0.ToArgb(), c1.ToArgb(), Shader.TileMode.Clamp);
+        new(cx, cy, radius, c0.ToArgb(), c1.ToArgb(), Shader.TileMode.Clamp!);
 
     private sealed class TapListener(BookshelfView view) : GestureDetector.SimpleOnGestureListener
     {
