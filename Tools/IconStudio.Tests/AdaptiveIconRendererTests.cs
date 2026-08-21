@@ -21,7 +21,12 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal("#FAF8F2", Tokens.PaperHex);
         Assert.Equal("#3A3A33", Tokens.InkHex);
         Assert.Equal("#C2542F", Tokens.AccentHex);
+        Assert.Equal("#C9803A", Tokens.IdentityWarmHex);
     }
+
+    // A paper-background app (not Flyleaf, whose ground is the warm identity hue).
+    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Camera");
+    private static IconSpec FlyleafSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Launcher");
 
     [Fact]
     public void SpecsCoverAllApps()
@@ -58,13 +63,30 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void BackgroundXml_IsFlatPaper()
     {
-        var spec = IconSpecs.All[0];
+        var spec = PaperSpec;
         AdaptiveIconRenderer.Write(root, spec);
         var xml = File.ReadAllText(Path.Combine(
             root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
             "drawable", $"{spec.Name}_background.xml"));
         Assert.Contains(Tokens.PaperHex, xml);
         Assert.DoesNotContain("gradient", xml);
+    }
+
+    [Fact]
+    public void FlyleafBackground_IsTheWarmIdentityGround()
+    {
+        var spec = FlyleafSpec;
+        AdaptiveIconRenderer.Write(root, spec);
+        var xml = File.ReadAllText(Path.Combine(
+            root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
+            "drawable", $"{spec.Name}_background.xml"));
+        Assert.Contains(Tokens.IdentityWarmHex, xml);
+        Assert.DoesNotContain("gradient", xml);
+        // The foreground bookplate lays a cream cover over that ground.
+        using var legacy = SKBitmap.Decode(Path.Combine(
+            root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
+            "mipmap-xxxhdpi", $"{spec.Name}.png"));
+        Assert.Equal(Tokens.IdentityWarm, legacy.GetPixel(2, 2));
     }
 
     [Theory]
@@ -108,7 +130,7 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void LegacyIcons_SitOnPaper()
     {
-        var spec = IconSpecs.All[0];
+        var spec = PaperSpec;
         AdaptiveIconRenderer.Write(root, spec);
         var path = Path.Combine(root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
             "mipmap-xxxhdpi", $"{spec.Name}.png");
