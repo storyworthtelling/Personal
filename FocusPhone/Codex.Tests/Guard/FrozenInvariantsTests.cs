@@ -86,6 +86,30 @@ public class FrozenInvariantsTests
         Assert.Empty(skipped);
     }
 
+    // The device-owner binding is keyed to the admin RECEIVER's component name, and the
+    // notification-listener grant to the listener SERVICE's — both provisioned once (adb /
+    // QR) against the original names. The rename moved these classes to `namespace Flyleaf`,
+    // so their manifest `Name=` must stay the literal old component name, or an upgraded
+    // device silently loses device-owner control / notification access. This is exactly why
+    // those two classes are NOT renamed; the guard fails if either component name drifts.
+    [Fact]
+    public void DeviceAdminAndNotificationListenerComponentNamesAreFrozen()
+    {
+        var adminComponent = $"{PolicyContext.LauncherPackage}.FocusDeviceAdminReceiver";
+        var listenerComponent = $"{PolicyContext.LauncherPackage}.TileNotificationListener";
+
+        Assert.Equal(1, CountCsFilesDeclaring(adminComponent, "Name ="));
+        Assert.Equal(1, CountCsFilesDeclaring(listenerComponent, "Name ="));
+    }
+
+    private static int CountCsFilesDeclaring(string componentName, string attributeHint) =>
+        EnumerateRepoFiles("*.cs").Count(file =>
+        {
+            var source = File.ReadAllText(file);
+            return source.Contains($"\"{componentName}\"", StringComparison.Ordinal)
+                && source.Contains(attributeHint, StringComparison.Ordinal);
+        });
+
     // The heads sign with the one shared repo keystore, so they share a single
     // signature the update channel accepts across the suite. Asserted by capability
     // (shared keystore + alias driving a signed Android build), not by head name, so

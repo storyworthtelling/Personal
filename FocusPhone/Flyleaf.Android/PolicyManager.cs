@@ -14,7 +14,7 @@ namespace Flyleaf;
 /// </summary>
 public static class PolicyManager
 {
-    private const string Tag = "FocusPhonePolicy";
+    private const string Tag = "FlyleafPolicy";
 
     public static ComponentName AdminComponent(Context context) =>
         new(context, Java.Lang.Class.FromType(typeof(FocusDeviceAdminReceiver)));
