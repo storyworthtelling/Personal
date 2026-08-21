@@ -141,7 +141,7 @@ public class PackageWatcher
     }
 
     private static readonly IReadOnlySet<string> PolicyContextPackages =
-        Domain.Policy.PolicyContext.FocusPhonePackages;
+        Codex.Domain.Policy.PolicyContext.FocusPhonePackages;
 
     private class InstallCallback : LauncherApps.Callback
     {

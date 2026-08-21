@@ -40,7 +40,7 @@ public static class ContactNameResolver
             var number = cursor is not null && cursor.MoveToFirst() ? cursor.GetString(0) : null;
             return string.IsNullOrWhiteSpace(number)
                 ? null
-                : Domain.Timeline.ContactKeyNormalizer.NormalizePhone(number);
+                : Codex.Domain.Timeline.ContactKeyNormalizer.NormalizePhone(number);
         }
         catch (Java.Lang.SecurityException)
         {

@@ -161,7 +161,7 @@ public class EmailComposeActivity : Activity
         {
             try
             {
-                await new Infrastructure.Email.GmailClient(account.GmailAddress!, account.GmailAppPassword!)
+                await new Codex.Infrastructure.Email.GmailClient(account.GmailAddress!, account.GmailAppPassword!)
                     .SendAsync(to, subjectText, bodyText, cc: ccList, attachmentPaths: paths, inReplyTo: inReplyTo);
                 RunOnUiThread(() =>
                 {
