@@ -17,10 +17,10 @@ public sealed class AppCell(ResolveInfo app) : TrayCell
     public ResolveInfo App { get; } = app;
 }
 
-/// <summary>A category folder, drawn as its ink glyph on the paper background.</summary>
-public sealed class FolderCell(AppFolder folder) : TrayCell
+/// <summary>A category shelf, drawn as its ink glyph on the paper background.</summary>
+public sealed class FolderCell(Category category) : TrayCell
 {
-    public AppFolder Folder { get; } = folder;
+    public Category Category { get; } = category;
 }
 
 /// <summary>
@@ -60,11 +60,10 @@ public class TrayAdapter : BaseAdapter
                 view.ContentDescription = app.App.LoadLabel(packageManager).ToString();
                 break;
             case FolderCell folder:
-                var info = AppFolders.Info(folder.Folder);
-                var resourceId = context.Resources!.GetIdentifier(info.IconResourceName, "drawable", context.PackageName);
+                var resourceId = context.Resources!.GetIdentifier(folder.Category.Glyph, "drawable", context.PackageName);
                 view.SetImageResource(resourceId);
                 view.SetColorFilter(PaperTheme.Ink);
-                view.ContentDescription = info.DisplayName;
+                view.ContentDescription = folder.Category.Name;
                 break;
         }
         return view;

@@ -32,7 +32,10 @@ public class AppTrayActivity : Activity
     private readonly Dictionary<string, ResolveInfo> resolveByPackage = [];
     private TrayModel model = new(RepoApps: [], Folders: [], LooseApps: []);
     private List<TrayCell> cells = [];
-    private AppFolder? openFolder;
+    private Category? openFolder;
+    // Phase E: the nine built-in shelves seed the catalog. Phase D wires this to a persistent
+    // CategoryStore so the owner's #11 create / rename / reorder edits survive.
+    private readonly CategoryCatalog catalog = CategoryCatalog.Seed();
 
     private GridView? gridView;
     private TextView? headerView;
@@ -57,7 +60,7 @@ public class AppTrayActivity : Activity
                     }
                     break;
                 case FolderCell folder:
-                    openFolder = folder.Folder;
+                    openFolder = folder.Category;
                     Render();
                     break;
             }
@@ -141,10 +144,10 @@ public class AppTrayActivity : Activity
             trayApps.Add(new TrayApp(package, category));
         }
 
-        model = AppTrayLayout.Build(trayApps, new AppFolderStore(this).Load());
+        model = AppTrayLayout.Build(trayApps, new AppFolderStore(this).Load(), catalog);
 
-        // A folder we were viewing may have emptied out (its last app moved/blocked); fall back to root.
-        if (openFolder is not null && model.Folders.All(folder => folder.Folder != openFolder))
+        // A shelf we were viewing may have emptied out (its last app moved/blocked); fall back to root.
+        if (openFolder is { } viewing && model.Folders.All(folder => folder.Category.Id != viewing.Id))
         {
             openFolder = null;
         }
@@ -155,15 +158,15 @@ public class AppTrayActivity : Activity
     private void Render()
     {
         cells = BuildCells();
-        headerView!.Text = openFolder is null ? "Apps" : AppFolders.Info(openFolder.Value).DisplayName;
+        headerView!.Text = openFolder?.Name ?? "Apps";
         gridView!.Adapter = new TrayAdapter(this, cells);
     }
 
     private List<TrayCell> BuildCells()
     {
-        if (openFolder is not null)
+        if (openFolder is { } viewing)
         {
-            var folder = model.Folders.FirstOrDefault(f => f.Folder == openFolder);
+            var folder = model.Folders.FirstOrDefault(f => f.Category.Id == viewing.Id);
             if (folder is null)
             {
                 return [];
@@ -173,7 +176,7 @@ public class AppTrayActivity : Activity
 
         var rootCells = new List<TrayCell>();
         rootCells.AddRange(model.RepoApps.Select(AppCellFor));
-        rootCells.AddRange(model.Folders.Select(folder => (TrayCell)new FolderCell(folder.Folder)));
+        rootCells.AddRange(model.Folders.Select(folder => (TrayCell)new FolderCell(folder.Category)));
         rootCells.AddRange(model.LooseApps.Select(AppCellFor));
         return rootCells;
     }
@@ -223,10 +226,10 @@ public class AppTrayActivity : Activity
     private void ShowFolderPicker(string package, string label)
     {
         var store = new AppFolderStore(this);
-        var actions = AppFolders.All
-            .Select(info => (info.DisplayName, (Action)(() =>
+        var actions = catalog.Categories
+            .Select(category => (category.Name, (Action)(() =>
             {
-                store.SetFolder(package, info.Folder);
+                store.SetFolder(package, category.Id);
                 LoadApps();
             })))
             .ToList();

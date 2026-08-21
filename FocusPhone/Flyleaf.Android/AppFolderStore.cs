@@ -1,19 +1,21 @@
 using System.Text.Json;
 using Android.Content;
-using Codex.Domain.Apps;
 
 namespace Flyleaf;
 
 /// <summary>
-/// Persists the owner's per-app folder choices in this app's preferences as a
-/// package → folder-name map. Auto-sort is recomputed on every load, so only the
-/// overrides need to survive: an entry here is the owner having filed an app into
-/// a folder (or explicitly loosened it), and it wins over auto-placement.
+/// Persists the owner's per-app shelf choices as a package → category-id map. Auto-sort is
+/// recomputed on every load, so only the overrides need to survive: an entry here is the owner
+/// having filed an app onto a shelf (or explicitly loosened it), and it wins over auto-placement.
+/// The stored ids are <see cref="Codex.Domain.Apps.Category"/> ids; the built-in ids are the old
+/// AppFolder enum names, so a device that stored "Finance" keeps resolving with no migration.
+/// The preferences file name ("appFolders") is kept stable through the Codex/Flyleaf rename for
+/// the same reason. An id that no longer names a category in the catalog simply falls loose.
 /// </summary>
 public class AppFolderStore
 {
     private const string PreferencesName = "appFolders";
-    private const string OverridesKey = "overrides"; // JSON object: package -> AppFolder name
+    private const string OverridesKey = "overrides"; // JSON object: package -> category id
 
     private readonly ISharedPreferences preferences;
 
@@ -22,25 +24,14 @@ public class AppFolderStore
         preferences = context.GetSharedPreferences(PreferencesName, FileCreationMode.Private)!;
     }
 
-    /// <summary>The stored overrides, dropping any whose folder name no longer parses.</summary>
-    public IReadOnlyDictionary<string, AppFolder> Load()
-    {
-        var result = new Dictionary<string, AppFolder>();
-        foreach (var (package, name) in LoadRaw())
-        {
-            if (AppFolders.FromName(name) is { } folder)
-            {
-                result[package] = folder;
-            }
-        }
-        return result;
-    }
+    /// <summary>The stored overrides (package → category id). The catalog decides which ids still exist.</summary>
+    public IReadOnlyDictionary<string, string> Load() => LoadRaw();
 
-    /// <summary>Files a package into a folder (overriding auto-sort).</summary>
-    public void SetFolder(string packageName, AppFolder folder)
+    /// <summary>Files a package onto a shelf (overriding auto-sort).</summary>
+    public void SetFolder(string packageName, string categoryId)
     {
         var map = LoadRaw();
-        map[packageName] = folder.ToString();
+        map[packageName] = categoryId;
         Save(map);
     }
 
