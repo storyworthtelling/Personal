@@ -33,9 +33,9 @@ public class AppTrayActivity : Activity
     private TrayModel model = new(RepoApps: [], Folders: [], LooseApps: []);
     private List<TrayCell> cells = [];
     private Category? openFolder;
-    // Phase E: the nine built-in shelves seed the catalog. Phase D wires this to a persistent
-    // CategoryStore so the owner's #11 create / rename / reorder edits survive.
-    private readonly CategoryCatalog catalog = CategoryCatalog.Seed();
+    // The owner's category shelves (feature #11): the persisted catalog, or the nine built-in
+    // shelves on a fresh device. Loaded in OnCreate; the Settings shelf-maker (Phase D) writes it.
+    private CategoryCatalog catalog = CategoryCatalog.Seed();
 
     private GridView? gridView;
     private TextView? headerView;
@@ -45,6 +45,7 @@ public class AppTrayActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
+        catalog = new CategoryStore(this).Load();
         SetContentView(BuildLayout());
         LoadApps();
 
