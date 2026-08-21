@@ -1,12 +1,18 @@
 namespace Codex.Domain.Design;
 
 /// <summary>
-/// The Paper &amp; Ink design tokens, mirroring DESIGN.md at the repository root.
-/// This is the only place in FocusPhone (besides the Ui.Android resource files
-/// kept in parity by tests) where color and type-size literals may appear.
+/// The Paper &amp; Ink design tokens (P4 role model), mirroring DESIGN.md at the
+/// repository root. This is the only place in Codex (besides the Ui.Android
+/// resource files kept in parity by tests) where color and type-size literals may
+/// appear. The neutral + role values re-export Storyworthtelling.Paper's generated
+/// PaperColorTokens; PaperReExportParityTests asserts they stay in lockstep, so
+/// Paper remains the single source of truth without the pure Domain taking a
+/// runtime reference on its Skia-carrying assembly. Terracotta is retired — the app
+/// accent is now the Action role (pine).
 /// </summary>
 public static class DesignTokens
 {
+    // ---- Neutrals & the two inks ----
     public const string Paper = "#FAF8F2";
     public const string PaperBright = "#FFFFFF";
     public const string PaperDeep = "#F1EBDD";
@@ -15,8 +21,52 @@ public static class DesignTokens
     public const string Ink = "#3A3A33";
     public const string InkSoft = "#6B6759";
     public const string InkMuted = "#8A8578";
-    public const string Accent = "#C2542F";
-    public const string AccentDeep = "#9C4023";
+    public const string InkBlue = "#2C3E5E"; // "the pen": signatures, editorial marks, the owner's voice
+
+    // The app accent is the Action role (pine); terracotta is retired. Accent is the
+    // mark tier (buttons, marker underlines, active/selected); AccentDeep is the deep
+    // tier (pressed fill / accent text at any size). PaperBright text on Accent clears AA.
+    public const string Accent = ActionMark;
+    public const string AccentDeep = ActionDeep;
+
+    // ---- P4 role model (App profile) — re-exported from PaperColorTokens ----
+    // Each role carries fill (T2) · mark (T3) · text (T4) · deep (T5).
+    public const string ActionFill = "#A5C8AD"; public const string ActionMark = "#38734A"; public const string ActionText = "#295E3A"; public const string ActionDeep = "#174025";
+    public const string PositiveFill = "#B1C69A"; public const string PositiveMark = "#517025"; public const string PositiveText = "#405B18"; public const string PositiveDeep = "#293E08";
+    public const string ResolvedFill = "#C0BDB9"; public const string ResolvedMark = "#68645E"; public const string ResolvedText = "#54514B"; public const string ResolvedDeep = "#393632";
+    public const string ReferenceFill = "#AEC0D5"; public const string ReferenceMark = "#4C6787"; public const string ReferenceText = "#3B536F"; public const string ReferenceDeep = "#26384E";
+    public const string CautionFill = "#D0BB91"; public const string CautionMark = "#805F00"; public const string CautionText = "#694C00"; public const string CautionDeep = "#493200";
+    public const string ProblemFill = "#E8ACAD"; public const string ProblemMark = "#9E434B"; public const string ProblemText = "#82333B"; public const string ProblemDeep = "#5C1F26";
+    public const string ProgressFill = "#9BC7CD"; public const string ProgressMark = "#18717C"; public const string ProgressText = "#085C65"; public const string ProgressDeep = "#003F46";
+
+    /// <summary>
+    /// Flyleaf's signature identity hue — warm study amber (DESIGN.md §3 identity set,
+    /// kept separate from the semantic roles so a tab/accent never reads as "caution").
+    /// PROVISIONAL: to be finalized by sampling the painted Flyleaf cover and registering
+    /// it in the OKLCH source spec (deferred to the cover / Gemini-paint pass).
+    /// </summary>
+    public static class Identity
+    {
+        public const string Warm = "#C9803A";
+        public const string Mark = "#B4552F";
+        public const string Deep = "#8A4A22";
+    }
+
+    /// <summary>
+    /// Realistic-shelf material tones for the Flyleaf home + tray only — the scoped
+    /// DESIGN.md §1/§5 exception. These are imagery (a Skia-rendered bookcase), not tokened
+    /// UI text; they live here so no raw literal leaks the guard. PROVISIONAL pending the
+    /// on-device render.
+    /// </summary>
+    public static class Shelf
+    {
+        public const string Walnut = "#6B4A2E";
+        public const string WalnutDeep = "#3A2312";
+        public const string WalnutLight = "#9A6437";
+        public const string Firelight = "#EFB877";
+        public const string Bronze = "#7C6A3E";
+        public const string BronzeDeep = "#4A3E22";
+    }
 
     /// <summary>Type scale in Android scaled pixels (sp).</summary>
     public static class TypeSp
