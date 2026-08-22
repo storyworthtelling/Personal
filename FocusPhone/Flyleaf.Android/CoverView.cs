@@ -9,17 +9,45 @@ namespace Flyleaf;
 /// The Flyleaf book cover, drawn as structural vectors: the warm identity ground, an ex-libris
 /// bookplate (fine double-rule + corner flourishes), the "arch-into-study" illustration window,
 /// the lower title band ("FLYLEAF" / "STORYWORTHTELLING"), and an embossed maker's mark. The
-/// illustration window is a WASH PLACEHOLDER — the painted arch-into-study art is the gated
-/// Gemini-paint pass, dropped into this rectangle later. Shown full-bleed on the cover-load
-/// overlay; the anatomy here matches the approved mockup.
+/// illustration window holds the Gemini-painted arch-into-study cover art (committed drawable
+/// cover_flyleaf), center-cropped to fill; it falls back to a firelight wash only if the bitmap
+/// can't be decoded. Shown full-bleed on the cover-load overlay; the anatomy matches the approved mockup.
 /// </summary>
 public class CoverView : View
 {
     private readonly float density;
 
+    private static readonly Paint ImagePaint = new(PaintFlags.AntiAlias | PaintFlags.FilterBitmap);
+    private Bitmap? coverArt;
+    private bool coverLoaded;
+
     public CoverView(Context context) : base(context)
     {
         density = context.Resources!.DisplayMetrics!.Density;
+    }
+
+    // The Gemini-painted cover, decoded once and reused; null if it can't be decoded (low memory), in
+    // which case the window falls back to the firelight wash.
+    private Bitmap? CoverArt
+    {
+        get
+        {
+            if (!coverLoaded)
+            {
+                coverLoaded = true;
+                try { coverArt = BitmapFactory.DecodeResource(Resources, Resource.Drawable.cover_flyleaf); }
+                catch (Exception) { coverArt = null; }
+            }
+            return coverArt;
+        }
+    }
+
+    protected override void OnDetachedFromWindow()
+    {
+        base.OnDetachedFromWindow();
+        coverArt?.Recycle();
+        coverArt = null;
+        coverLoaded = false;
     }
 
     protected override void OnDraw(Canvas canvas)
@@ -89,27 +117,46 @@ public class CoverView : View
 
     private void DrawIllustrationPlaceholder(Canvas canvas, RectF window)
     {
-        using (var wash = new Paint { AntiAlias = true })
+        var art = CoverArt;
+        if (art is not null)
         {
+            // The Gemini-painted arch-into-study cover, center-cropped to fill the window.
+            canvas.Save();
+            canvas.ClipRect(window);
+            var src = SourceCropFor(art, window);
+            canvas.DrawBitmap(art, src, window, ImagePaint);
+            canvas.Restore();
+        }
+        else
+        {
+            // Fallback wash if the drawable can't be decoded (e.g. low memory).
+            using var wash = new Paint { AntiAlias = true };
             wash.SetShader(new RadialGradient(window.CenterX(), window.Bottom, window.Height(),
                 PaperTheme.Firelight.ToArgb(), PaperTheme.WalnutDeep.ToArgb(), Shader.TileMode.Clamp!));
             canvas.DrawRect(window, wash);
         }
-        // A faint arch outline to signal the composition the painted art will fill.
-        using var arch = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 90), StrokeWidth = 1.5f * density };
-        arch.SetStyle(Paint.Style.Stroke);
-        var a = Inset(window, 14 * density);
-        using var path = new Android.Graphics.Path();
-        var radius = a.Width() / 2f;
-        path.MoveTo(a.Left, a.Bottom);
-        path.LineTo(a.Left, a.Top + radius);
-        path.ArcTo(new RectF(a.Left, a.Top, a.Right, a.Top + 2 * radius), 180, 180);
-        path.LineTo(a.Right, a.Bottom);
-        canvas.DrawPath(path, arch);
         // Keyline around the window.
         using var edge = new Paint { AntiAlias = true, Color = PaperTheme.Ink, StrokeWidth = 1 * density };
         edge.SetStyle(Paint.Style.Stroke);
         canvas.DrawRect(window, edge);
+    }
+
+    // Center-crop: pick the source sub-rect of the painting whose aspect matches the window, so the art
+    // fills the window without distortion or letterboxing.
+    private static Rect SourceCropFor(Bitmap art, RectF window)
+    {
+        float bw = art.Width, bh = art.Height;
+        var windowAspect = window.Width() / window.Height();
+        var cropW = bw;
+        var cropH = bw / windowAspect;
+        if (cropH > bh)
+        {
+            cropH = bh;
+            cropW = bh * windowAspect;
+        }
+        var left = (bw - cropW) / 2f;
+        var top = (bh - cropH) / 2f;
+        return new Rect((int)left, (int)top, (int)(left + cropW), (int)(top + cropH));
     }
 
     private void DrawTitle(Canvas canvas, RectF plate, float top)
@@ -140,6 +187,4 @@ public class CoverView : View
     }
 
     private static RectF Inset(RectF r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
-
-    private static Color WithAlpha(Color color, int alpha) => new(color.R, color.G, color.B, (byte)alpha);
 }

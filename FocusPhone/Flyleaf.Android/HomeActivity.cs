@@ -373,10 +373,30 @@ public class HomeActivity : Activity
     private sealed class ShelfArt(Context context, Func<IReadOnlySet<string>> notifications) : IShelfArt
     {
         private readonly PackageManager packageManager = context.PackageManager!;
+        private readonly Android.Content.Res.Resources resources = context.Resources!;
         private readonly Dictionary<string, Drawable?> icons = [];
         private readonly Dictionary<string, string> labels = [];
+        private readonly Dictionary<string, Android.Graphics.Bitmap?> covers = [];
 
-        public Android.Graphics.Bitmap? Cover(string packageKey) => null; // bespoke painted covers land in the cover pass
+        // The bespoke painted covers (Gemini-painted, committed as drawables). Keyed by the alias package;
+        // the three app heads have no bespoke cover yet and fall back to the cloth binding.
+        private static readonly Dictionary<string, int> CoverResources = new()
+        {
+            [HomeFeatureSet.MapsPackage] = Resource.Drawable.cover_maps,
+            [HomeFeatureSet.DrivePackage] = Resource.Drawable.cover_drive,
+            [HomeFeatureSet.GoogleHomePackage] = Resource.Drawable.cover_googlehome,
+        };
+
+        public Android.Graphics.Bitmap? Cover(string packageKey)
+        {
+            if (!covers.TryGetValue(packageKey, out var cover))
+            {
+                covers[packageKey] = cover = CoverResources.TryGetValue(packageKey, out var resId)
+                    ? Android.Graphics.BitmapFactory.DecodeResource(resources, resId)
+                    : null;
+            }
+            return cover;
+        }
 
         public Drawable? Icon(string packageKey)
         {
