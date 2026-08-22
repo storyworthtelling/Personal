@@ -539,12 +539,16 @@ public class BookshelfView : View
 
     private static Color WithAlpha(Color color, int alpha) => new(color.R, color.G, color.B, (byte)alpha);
 
-    // Gradient helpers over the well-established int-color ctor overloads (Color → ARGB int).
+    // Pass Color structs directly so overload resolution binds the (Color, Color, TileMode) ctor.
+    // Color has no implicit int conversion, only the reverse (Color -> int), so an int/int call
+    // site here resolves to the (long, long, TileMode) wide-gamut ctor instead: a plain ARGB int
+    // widened to long isn't a valid Color.pack() long, and the native side throws trying to read
+    // a bogus embedded ColorSpace id out of it (IllegalArgumentException: Invalid ID: <n>).
     private static LinearGradient Linear(float x0, float y0, float x1, float y1, Color c0, Color c1) =>
-        new(x0, y0, x1, y1, c0.ToArgb(), c1.ToArgb(), Shader.TileMode.Clamp!);
+        new(x0, y0, x1, y1, c0, c1, Shader.TileMode.Clamp!);
 
     private static RadialGradient Radial(float cx, float cy, float radius, Color c0, Color c1) =>
-        new(cx, cy, radius, c0.ToArgb(), c1.ToArgb(), Shader.TileMode.Clamp!);
+        new(cx, cy, radius, c0, c1, Shader.TileMode.Clamp!);
 
     private sealed class TapListener(BookshelfView view) : GestureDetector.SimpleOnGestureListener
     {
