@@ -143,6 +143,7 @@ public class UnlockActivity : Activity
         AddHeader("Admin mode");
         AddBody("Session ends automatically after 60 minutes.");
         AddContentButton(PaperUi.SecondaryButton(this, "Unblock apps…", ShowBlockedApps));
+        AddContentButton(PaperUi.SecondaryButton(this, "Review policy log…", ShowPolicyLog));
         AddContentButton(PaperUi.SecondaryButton(this, "Set update token…", ShowUpdateTokenPrompt));
         // "Install from GitHub now" moved to the non-admin Settings panel (LauncherSettingsActivity) —
         // installing the owner's own app updates shouldn't require the 6-hour admin gate.
@@ -206,11 +207,45 @@ public class UnlockActivity : Activity
                 var categorizer = new AppCategorizer(data);
                 categorizer.Unblock(blocked[e.Which]);
                 blocklistStore.Save(categorizer.Export());
+                new PolicyAuditStore(this).Record(
+                    Codex.Domain.Policy.PolicyEventKind.AppUnblocked, $"Unblocked {blocked[e.Which]}");
                 PolicyManager.ApplyCurrentPolicy(this);
                 inlineStatus = $"Unblocked {blocked[e.Which]}.";
                 Render();
             })!
             .Show();
+    }
+
+    // The reviewable/exportable policy audit log: what the device-owner policy did and any failures,
+    // so a silent block (like Gemini being quarantined) is diagnosable instead of a mystery. The
+    // rolling record + newest-first format are the unit-tested PolicyAuditLog; this only shows it and
+    // hands the plain text to the system share sheet for export.
+    private void ShowPolicyLog()
+    {
+        var text = new PolicyAuditStore(this).Load().Format();
+        new AlertDialog.Builder(this)
+            .SetTitle("Policy log")!
+            .SetMessage(text)!
+            .SetPositiveButton("Export", (_, _) => ExportPolicyLog(text))!
+            .SetNegativeButton("Close", (_, _) => { })!
+            .Show();
+    }
+
+    private void ExportPolicyLog(string text)
+    {
+        var intent = new Intent(Intent.ActionSend);
+        intent.SetType("text/plain");
+        intent.PutExtra(Intent.ExtraSubject, "Flyleaf policy log");
+        intent.PutExtra(Intent.ExtraText, text);
+        try
+        {
+            StartActivity(Intent.CreateChooser(intent, "Export policy log"));
+        }
+        catch (Android.Content.ActivityNotFoundException)
+        {
+            inlineStatus = "No app is available to export the log.";
+            Render();
+        }
     }
 
     // Manual install path for the owner's own APKs (the sibling repo apps and the

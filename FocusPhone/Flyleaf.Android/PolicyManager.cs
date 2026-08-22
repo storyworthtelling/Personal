@@ -30,6 +30,8 @@ public static class PolicyManager
         if (!IsDeviceOwner(context))
         {
             Log.Warn(Tag, "Not device owner; policy not applied. This is expected during development.");
+            new PolicyAuditStore(context).Record(PolicyEventKind.NotDeviceOwner,
+                "Policy not applied: the app is not the device owner.");
             return;
         }
 
@@ -49,6 +51,7 @@ public static class PolicyManager
     {
         var dpm = (DevicePolicyManager)context.GetSystemService(Context.DevicePolicyService)!;
         var admin = AdminComponent(context);
+        var events = new List<PolicyEvent>();
 
         foreach (var restriction in plan.UserRestrictions)
         {
@@ -68,6 +71,7 @@ public static class PolicyManager
         if (!dpm.SetStatusBarDisabled(admin, plan.DisableStatusBar))
         {
             Log.Warn(Tag, "Could not disable the status bar; not permitted in the current state.");
+            events.Add(Event(PolicyEventKind.ConfigFailed, "Could not disable the status bar (not permitted in the current state)."));
         }
 
         try
@@ -80,6 +84,7 @@ public static class PolicyManager
             // application is retried on the next policy pass rather than failing
             // the whole lockdown.
             Log.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {e.Message}");
+            events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {e.Message}"));
         }
 
         var installed = plan.SuspendedPackages
@@ -91,6 +96,7 @@ public static class PolicyManager
             if (failed is { Length: > 0 })
             {
                 Log.Warn(Tag, $"Could not suspend: {string.Join(", ", failed)}");
+                events.Add(Event(PolicyEventKind.SuspendFailed, $"Could not suspend: {string.Join(", ", failed)}"));
             }
         }
 
@@ -106,15 +112,25 @@ public static class PolicyManager
             if (failed is { Length: > 0 })
             {
                 Log.Warn(Tag, $"Could not un-suspend: {string.Join(", ", failed)}");
+                events.Add(Event(PolicyEventKind.ReleaseFailed, $"Could not un-suspend (kept quarantined): {string.Join(", ", failed)}"));
             }
         }
 
-        ApplyLoginBrowserConfig(context, dpm, admin, plan.LoginBrowser);
-        GrantPermissions(dpm, admin, plan);
+        ApplyLoginBrowserConfig(context, dpm, admin, plan.LoginBrowser, events);
+        GrantPermissions(dpm, admin, plan, events);
         PinHomeActivity(dpm, admin, context);
         PinRestrictedBrowser(dpm, admin, context);
         Log.Info(Tag, $"Policy applied: {plan.UserRestrictions.Count} restrictions, {installed.Length} packages suspended, {plan.PermissionGrants.Count} permission grants.");
+
+        // A rolling audit line per pass; consecutive-identical lines collapse, so this records once
+        // and re-records only when the counts change (a newly suspended app, a resolved failure).
+        events.Add(Event(PolicyEventKind.Applied,
+            $"{plan.UserRestrictions.Count} restrictions · {installed.Length} suspended · {toRelease.Length} released · {plan.PermissionGrants.Count} grants"));
+        new PolicyAuditStore(context).Append(events);
     }
+
+    private static PolicyEvent Event(PolicyEventKind kind, string summary) =>
+        new(DateTimeOffset.UtcNow, kind, summary);
 
     /// <summary>
     /// Restarts the device. Only a device owner may reboot without user
@@ -135,6 +151,8 @@ public static class PolicyManager
     {
         var store = new BlocklistStore(context);
         store.DebuggingLockedDown = true;
+        new PolicyAuditStore(context).Record(PolicyEventKind.CutoverFinalized,
+            "Cutover finalized: debugging locked down irreversibly.");
         ApplyCurrentPolicy(context);
     }
 
@@ -145,7 +163,7 @@ public static class PolicyManager
     /// them on — with no runtime dialog, across silent reinstalls, and pinned so
     /// Android's unused-app auto-reset can't revoke them.
     /// </summary>
-    private static void GrantPermissions(DevicePolicyManager dpm, ComponentName admin, PolicyPlan plan)
+    private static void GrantPermissions(DevicePolicyManager dpm, ComponentName admin, PolicyPlan plan, List<PolicyEvent> events)
     {
         foreach (var grant in plan.PermissionGrants)
         {
@@ -159,11 +177,13 @@ public static class PolicyManager
                         PermissionGrantState.Granted))
                 {
                     Log.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet; will retry next policy pass.");
+                    events.Add(Event(PolicyEventKind.GrantFailed, $"Could not grant {grant.Permission} to {grant.Package} yet (will retry)."));
                 }
             }
             catch (Java.Lang.Exception e)
             {
                 Log.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}");
+                events.Add(Event(PolicyEventKind.GrantFailed, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}"));
             }
         }
     }
@@ -178,7 +198,7 @@ public static class PolicyManager
     /// owner already controls; a no-op until Chrome is installed.
     /// </summary>
     private static void ApplyLoginBrowserConfig(
-        Context context, DevicePolicyManager dpm, ComponentName admin, LoginBrowserPolicy login)
+        Context context, DevicePolicyManager dpm, ComponentName admin, LoginBrowserPolicy login, List<PolicyEvent> events)
     {
         if (!IsInstalled(context, login.Package))
         {
@@ -206,6 +226,7 @@ public static class PolicyManager
         catch (Java.Lang.Exception e)
         {
             Log.Warn(Tag, $"Could not lock down the login browser {login.Package}: {e.Message}");
+            events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not lock down the login browser {login.Package}: {e.Message}"));
         }
     }
 

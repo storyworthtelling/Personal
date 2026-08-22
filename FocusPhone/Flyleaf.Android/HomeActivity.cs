@@ -290,6 +290,9 @@ public class HomeActivity : Activity
             categorizer.Unblock(package);
         }
         store.Save(categorizer.Export());
+        new PolicyAuditStore(this).Record(
+            blocked ? Codex.Domain.Policy.PolicyEventKind.AppBlocked : Codex.Domain.Policy.PolicyEventKind.AppUnblocked,
+            $"{(blocked ? "Blocked" : "Unblocked")} {package}");
         PolicyManager.ApplyCurrentPolicy(this);
         ReloadScene();
     }
