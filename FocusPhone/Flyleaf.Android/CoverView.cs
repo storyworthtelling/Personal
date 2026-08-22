@@ -59,7 +59,7 @@ public class CoverView : View
         using (var ground = new Paint { AntiAlias = true })
         {
             ground.SetShader(new LinearGradient(0, 0, 0, h,
-                PaperTheme.IdentityWarm.ToArgb(), PaperTheme.IdentityDeep.ToArgb(), Shader.TileMode.Clamp!));
+                PaperTheme.IdentityWarm, PaperTheme.IdentityDeep, Shader.TileMode.Clamp!));
             canvas.DrawRect(0, 0, w, h, ground);
         }
 
@@ -132,7 +132,7 @@ public class CoverView : View
             // Fallback wash if the drawable can't be decoded (e.g. low memory).
             using var wash = new Paint { AntiAlias = true };
             wash.SetShader(new RadialGradient(window.CenterX(), window.Bottom, window.Height(),
-                PaperTheme.Firelight.ToArgb(), PaperTheme.WalnutDeep.ToArgb(), Shader.TileMode.Clamp!));
+                PaperTheme.Firelight, PaperTheme.WalnutDeep, Shader.TileMode.Clamp!));
             canvas.DrawRect(window, wash);
         }
         // Keyline around the window.
