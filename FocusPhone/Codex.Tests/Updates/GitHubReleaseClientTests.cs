@@ -7,14 +7,17 @@ public class GitHubReleaseClientTests
 {
     private const string LatestUrl = "https://api.github.com/repos/storyworthtelling/Personal/releases/latest";
 
+    // browser_download_url is deliberately the public github.com URL — the fixture proves the
+    // client does NOT use it (a token-authenticated GET of it 404s on a private repo) and instead
+    // derives the authenticated asset API URL from the repo + asset id.
     private const string SampleRelease = """
         {
           "tag_name": "focusphone-v1.4.0",
           "name": "FocusPhone 1.4.0",
           "assets": [
-            { "name": "Flyleaf.apk", "browser_download_url": "https://api.github.com/assets/1" },
-            { "name": "FocusPhone.Communication.apk", "browser_download_url": "https://api.github.com/assets/2" },
-            { "name": "checksums.txt", "browser_download_url": "https://api.github.com/assets/3" }
+            { "id": 11, "name": "Flyleaf.apk", "browser_download_url": "https://github.com/storyworthtelling/Personal/releases/download/apps-latest/Flyleaf.apk" },
+            { "id": 22, "name": "FocusPhone.Communication.apk", "browser_download_url": "https://github.com/storyworthtelling/Personal/releases/download/apps-latest/FocusPhone.Communication.apk" },
+            { "id": 33, "name": "checksums.txt", "browser_download_url": "https://github.com/storyworthtelling/Personal/releases/download/apps-latest/checksums.txt" }
           ]
         }
         """;
@@ -33,7 +36,22 @@ public class GitHubReleaseClientTests
         Assert.Equal("focusphone-v1.4.0", release.TagName);
         Assert.Equal(2, release.ApkAssets.Count);
         Assert.Contains(release.ApkAssets,
-            a => a.Name == "Flyleaf.apk" && a.DownloadUrl == "https://api.github.com/assets/1");
+            a => a.Name == "Flyleaf.apk" && a.Id == 11);
+    }
+
+    [Fact]
+    public async Task GetLatestRelease_DownloadUrlIsAuthenticatedAssetApiUrl()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(LatestUrl, SampleRelease);
+
+        var release = await NewClient(handler).GetLatestReleaseAsync();
+
+        // Must be the api.github.com asset endpoint (built from repo + id), not the public
+        // github.com browser_download_url, or the download 404s against the private repo.
+        Assert.Contains(release.ApkAssets,
+            a => a.Name == "Flyleaf.apk"
+                && a.DownloadUrl == "https://api.github.com/repos/storyworthtelling/Personal/releases/assets/11");
     }
 
     [Fact]

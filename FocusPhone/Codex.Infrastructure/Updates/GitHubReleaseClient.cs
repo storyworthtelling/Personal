@@ -7,6 +7,12 @@ namespace Codex.Infrastructure.Updates;
 // replaces the file, so the update worker uses it to skip re-downloading an
 // unchanged APK (data-frugal on a phone) while still catching a fresh build.
 // Defaulted so callers/tests that don't supply it keep compiling.
+//
+// DownloadUrl is the authenticated asset API endpoint
+// (https://api.github.com/repos/{repo}/releases/assets/{id}), NOT the public
+// browser_download_url: the repo is private, so a token-authenticated GET of the
+// browser URL returns 404. The asset API endpoint, fetched with a Bearer token and
+// Accept: application/octet-stream, redirects to the signed blob and downloads.
 public record ReleaseAsset(string Name, string DownloadUrl, long Id = 0);
 
 public record ReleaseInfo(string TagName, IReadOnlyList<ReleaseAsset> ApkAssets)
@@ -56,10 +62,16 @@ public class GitHubReleaseClient
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = json.RootElement;
         var apkAssets = root.GetProperty("assets").EnumerateArray()
-            .Select(asset => new ReleaseAsset(
-                asset.GetProperty("name").GetString()!,
-                asset.GetProperty("browser_download_url").GetString()!,
-                asset.TryGetProperty("id", out var id) ? id.GetInt64() : 0))
+            .Select(asset =>
+            {
+                var id = asset.TryGetProperty("id", out var idProp) ? idProp.GetInt64() : 0;
+                // Download through the authenticated asset API endpoint, not browser_download_url:
+                // the private repo returns 404 for a token-authenticated GET of the public URL.
+                return new ReleaseAsset(
+                    asset.GetProperty("name").GetString()!,
+                    $"https://api.github.com/repos/{repo}/releases/assets/{id}",
+                    id);
+            })
             .Where(asset => asset.Name.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
