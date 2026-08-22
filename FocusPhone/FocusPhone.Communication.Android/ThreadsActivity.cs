@@ -5,11 +5,11 @@ using Android.Content.PM;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
-using FocusPhone.Domain.Design;
-using FocusPhone.Domain.Time;
-using FocusPhone.Domain.Timeline;
-using FocusPhone.Ui;
-using FocusPhone.Ui.Voice;
+using Codex.Domain.Design;
+using Codex.Domain.Time;
+using Codex.Domain.Timeline;
+using Codex.Ui;
+using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Communication;
@@ -42,8 +42,8 @@ public class ThreadsActivity : Activity
     private Button? syncButton;
 
     // Owner's-voice greeting under the header (sign-in lives on the Settings screen).
-    private readonly FocusPhone.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
-    private FocusPhone.Ui.Voice.VoiceGreeting? greeting;
+    private readonly Codex.Ui.Voice.VoiceGoogleAccount voiceAccount = new();
+    private Codex.Ui.Voice.VoiceGreeting? greeting;
     private TextView? greetingView;
 
     // Accumulated inputs, only ever mutated on the UI thread once a background
@@ -82,7 +82,7 @@ public class ThreadsActivity : Activity
                 return;
 
             // Drive-by-ID (#13): pick up the ids persisted for the shared files.
-            FocusPhone.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
+            Codex.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
 
             var gmail = result.Vault.Gmail;
             if (string.IsNullOrEmpty(account.GmailAddress) && !string.IsNullOrEmpty(gmail.Address))
@@ -105,7 +105,7 @@ public class ThreadsActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
-        greeting = new FocusPhone.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "FocusPhone.Communication");
+        greeting = new Codex.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "FocusPhone.Communication");
         RestoreGmailFromVault();
         SetContentView(BuildLayout());
 
@@ -156,7 +156,7 @@ public class ThreadsActivity : Activity
     // profile + key exist; hidden otherwise. Best-effort, never throws.
     private async void ShowGreetingAsync()
     {
-        if (greeting is null || greetingView is null || !FocusPhone.Ui.Voice.VoiceGoogleAccount.IsSignedIn)
+        if (greeting is null || greetingView is null || !Codex.Ui.Voice.VoiceGoogleAccount.IsSignedIn)
             return;
         var message = await greeting.ComposeAsync("welcome", "the owner is opening their messages", CancellationToken.None);
         if (string.IsNullOrWhiteSpace(message))

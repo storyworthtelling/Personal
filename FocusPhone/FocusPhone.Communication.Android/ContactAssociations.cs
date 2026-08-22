@@ -1,7 +1,7 @@
 using Android.Content;
 using Android.Provider;
-using FocusPhone.Domain.Timeline;
-using FocusPhone.Infrastructure.Storage;
+using Codex.Domain.Timeline;
+using Codex.Infrastructure.Storage;
 
 namespace FocusPhone.Communication;
 

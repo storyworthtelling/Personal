@@ -4,10 +4,10 @@ using Android.OS;
 using Android.Views;
 using Android.Widget;
 using FocusPhone.Audio.Google;
-using FocusPhone.Domain.Audio;
-using FocusPhone.Domain.Design;
-using FocusPhone.Infrastructure.Podcasts;
-using FocusPhone.Ui;
+using Codex.Domain.Audio;
+using Codex.Domain.Design;
+using Codex.Infrastructure.Podcasts;
+using Codex.Ui;
 
 namespace FocusPhone.Audio;
 

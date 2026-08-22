@@ -3,8 +3,8 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
-using FocusPhone.Domain.Design;
-using FocusPhone.Ui;
+using Codex.Domain.Design;
+using Codex.Ui;
 
 namespace FocusPhone.Communication;
 
@@ -161,7 +161,7 @@ public class EmailComposeActivity : Activity
         {
             try
             {
-                await new Infrastructure.Email.GmailClient(account.GmailAddress!, account.GmailAppPassword!)
+                await new Codex.Infrastructure.Email.GmailClient(account.GmailAddress!, account.GmailAppPassword!)
                     .SendAsync(to, subjectText, bodyText, cc: ccList, attachmentPaths: paths, inReplyTo: inReplyTo);
                 RunOnUiThread(() =>
                 {

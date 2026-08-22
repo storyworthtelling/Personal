@@ -1,0 +1,201 @@
+name: Build Flyleaf APKs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'FocusPhone/Flyleaf.Android/**'
+      - 'FocusPhone/FocusPhone.Communication.Android/**'
+      - 'FocusPhone/FocusPhone.Camera.Android/**'
+      - 'FocusPhone/FocusPhone.Audio.Android/**'
+      - 'FocusPhone/Codex.Ui.Android/**'
+      - 'FocusPhone/Codex.Domain/**'
+      - 'FocusPhone/Codex.Infrastructure/**'
+      - 'FocusPhone/Codex.Tests/**'
+      - '.github/workflows/build-flyleaf.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android heads, which would require the Android workload.
+      - name: Run tests
+        run: dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    # actions: write lets the prune step delete artifacts from older runs;
+    # contents: write lets the rolling-release step publish signed APKs.
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # The FocusPhone heads are plain .NET-for-Android (not MAUI), so the lighter
+      # 'android' workload is sufficient. Unlike the local sandbox, the runner has
+      # network access, so the Camera app's ML Kit / Play-services bindings can
+      # download their .aar payloads from dl.google.com at build time.
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      # In-app texting: build the gomobile shim over libgm (gmbridge/bridge.go)
+      # into gmbridge.aar, which Codex.GmBridge.Binding turns into a C#
+      # binding the Communication head calls. Needs Go + the runner's Android NDK.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Build gmbridge.aar (gomobile)
+        working-directory: FocusPhone/gmbridge
+        run: |
+          set -e
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
+          echo "Using Android NDK at $ANDROID_NDK_HOME"
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          gomobile init || true
+          ./build.sh
+
+      # Prove the .aar binds to C# (isolated from the four heads while the bridge
+      # integration lands) — grep the log for "=== GMBRIDGE BINDING ===".
+      - name: GmBridge binding check
+        working-directory: FocusPhone
+        run: |
+          echo "=== GMBRIDGE BINDING ==="
+          dotnet build Codex.GmBridge.Binding -c Release
+          echo "=== END GMBRIDGE BINDING ==="
+
+      # Print the generated binding's public API so GmBridgeClient can be written
+      # against the real C# names — grep the log for "=== GMBRIDGE API ===".
+      - name: Dump GmBridge binding API
+        continue-on-error: true
+        working-directory: FocusPhone
+        run: |
+          echo "=== GMBRIDGE API ==="
+          echo "--- Java classes in gmbridge.aar ---"
+          if [ -f gmbridge/gmbridge.aar ]; then
+            mkdir -p /tmp/aar && unzip -o gmbridge/gmbridge.aar classes.jar -d /tmp/aar >/dev/null 2>&1 || true
+            [ -f /tmp/aar/classes.jar ] && unzip -l /tmp/aar/classes.jar | grep -iE 'gmbridge.*\.class' || echo "(no classes.jar)"
+          fi
+          echo "--- Generated C# binding ---"
+          find Codex.GmBridge.Binding/obj -path '*generated*' -name '*.cs' 2>/dev/null | while read -r f; do
+            echo "----- $f"
+            grep -nE 'namespace |public (sealed |partial |abstract )*(class|interface)|public .*\(.*\)' "$f" | head -80
+          done
+          echo "=== END GMBRIDGE API ==="
+
+      # All four heads sign with the one shared repo keystore so they carry a single
+      # signature — required for the device-owner silent-update channel to accept
+      # updates across the suite.
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/focusphone.keystore
+
+      - name: Build signed APKs
+        working-directory: FocusPhone
+        run: |
+          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android FocusPhone.Audio.Android; do
+            echo "::group::Publishing $proj"
+            dotnet publish "$proj" -f net10.0-android -c Release \
+              -p:ApplicationVersion=${{ github.run_number }} \
+              -p:ApplicationDisplayVersion=0.1.${{ github.run_number }} \
+              -p:AndroidPackageFormat=apk \
+              -p:AndroidKeyStore=true \
+              -p:AndroidSigningKeyStore=/tmp/focusphone.keystore \
+              -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }} \
+              -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }} \
+              -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
+            echo "::endgroup::"
+          done
+
+      # Prove the Paper & Ink launcher icons are packaged (same rationale as
+      # Storyboarder's ICON CHECK: don't trust "it built"). Print-only /
+      # non-fatal; grep the log for "=== ICON CHECK ===".
+      - name: ICON CHECK
+        continue-on-error: true
+        working-directory: FocusPhone
+        run: |
+          set +e
+          echo "=== ICON CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android FocusPhone.Audio.Android; do
+            APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+            [ -z "$APK" ] && APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+            echo "--- $proj: $APK"
+            "$AAPT2" dump badging "$APK" 2>/dev/null | grep -Ei 'application(-icon)?:' || echo "(no icon line)"
+            unzip -l "$APK" | grep -Ei 'mipmap.*appicon' | head -4 || echo "(no appicon entries)"
+          done
+          echo "=== END ICON CHECK ==="
+
+      # Fatal: prove the six shared fonts are packaged at the exact internal
+      # path PaperTheme.Load reads them from (assets/fonts/<name>.ttf). Counting
+      # ".ttf" is not enough — a Link separator bug can pack them under a wrong
+      # literal name (e.g. "assets/Assets\fonts\Foo.ttf") so Assets.Open fails
+      # and every head crashes on launch. A misfiled font must fail the build.
+      - name: FONT CHECK
+        working-directory: FocusPhone
+        run: |
+          set -e
+          echo "=== FONT CHECK ==="
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular"
+          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android FocusPhone.Audio.Android; do
+            APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+            [ -z "$APK" ] && APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+            echo "--- $proj: $APK"
+            ENTRIES=$(unzip -l "$APK")
+            for font in $FONTS; do
+              if ! echo "$ENTRIES" | grep -q "assets/fonts/$font.ttf"; then
+                echo "FAIL: $proj is missing assets/fonts/$font.ttf"
+                echo "$ENTRIES" | grep -i '\.ttf' || echo "(no .ttf entries at all)"
+                exit 1
+              fi
+            done
+            echo "ok: all six fonts at assets/fonts/"
+          done
+          echo "=== END FONT CHECK ==="
+
+      # Keep only the latest run's artifacts: delete artifacts from older runs of
+      # this workflow before uploading, which also frees storage so the upload succeeds.
+      - name: Prune old artifacts
+        uses: ./.github/actions/prune-old-artifacts
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Flyleaf-Android
+          path: |
+            FocusPhone/Flyleaf.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/FocusPhone.Communication.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/FocusPhone.Camera.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/FocusPhone.Audio.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      # Publish the signed heads to the rolling "apps-latest" release the phone's
+      # update channel installs from. main only — feature-branch builds must never
+      # reach the device.
+      - name: Publish to rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/publish-rolling-release
+        with:
+          apks: FocusPhone/FocusPhone.*.Android/bin/Release/net10.0-android/publish/*-Signed.apk

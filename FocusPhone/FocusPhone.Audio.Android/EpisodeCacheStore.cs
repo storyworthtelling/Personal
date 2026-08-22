@@ -1,6 +1,6 @@
 using Android.Content;
-using FocusPhone.Domain.Audio;
-using FocusPhone.Infrastructure.Podcasts;
+using Codex.Domain.Audio;
+using Codex.Infrastructure.Podcasts;
 
 namespace FocusPhone.Audio;
 

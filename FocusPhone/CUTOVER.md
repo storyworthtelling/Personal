@@ -52,7 +52,7 @@ irreversible, so it comes absolutely last.
    `READ_CALL_LOG` and `READ_SMS` for the Communication app:
 
    ```
-   adb install -g -r FocusPhone.Launcher.apk
+   adb install -g -r Flyleaf.apk
    adb install -g -r FocusPhone.Communication.apk
    adb install -g -r FocusPhone.Camera.apk
    adb install -g -r FocusPhone.Audio.apk

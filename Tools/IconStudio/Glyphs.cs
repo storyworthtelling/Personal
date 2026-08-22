@@ -174,4 +174,45 @@ public static class Glyphs
         canvas.DrawLine(left + s * 0.06f, c + s * 0.04f, right - s * 0.06f, c + s * 0.04f, ink);
         canvas.DrawLine(left + s * 0.06f, c + s * 0.14f, c + s * 0.04f, c + s * 0.14f, ink);
     }
+
+    /// <summary>Flyleaf: a cream ex-libris bookplate (arch-into-study window + title rule),
+    /// terracotta maker's mark. Drawn on the warm identity ground the icon spec sets.</summary>
+    public static void Bookplate(SKCanvas canvas, float s)
+    {
+        using var ink = InkStroke(s);
+        using var accent = AccentFill();
+        using var cream = new SKPaint { Style = SKPaintStyle.Fill, Color = Tokens.Paper, IsAntialias = true };
+        using var rule = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = s * 0.014f,
+            StrokeJoin = SKStrokeJoin.Round,
+            Color = Tokens.Ink,
+            IsAntialias = true,
+        };
+
+        // The cream plate (a book cover), portrait, centered in the safe zone with a warm margin.
+        var plate = new SKRect(s * 0.29f, s * 0.22f, s * 0.71f, s * 0.78f);
+        var r = s * 0.028f;
+        canvas.DrawRoundRect(plate, r, r, cream);
+
+        // A single fine ex-libris rule just inside the edge.
+        canvas.DrawRoundRect(Inset(plate, s * 0.035f), r * 0.6f, r * 0.6f, rule);
+
+        // The arch-into-study window (the hero motif): a rounded-top opening.
+        float archLeft = s * 0.375f, archRight = s * 0.625f, archTop = s * 0.31f, archBottom = s * 0.55f;
+        var archR = (archRight - archLeft) / 2f;
+        using var arch = new SKPath();
+        arch.MoveTo(archLeft, archBottom);
+        arch.LineTo(archLeft, archTop + archR);
+        arch.ArcTo(new SKRect(archLeft, archTop, archRight, archTop + 2 * archR), 180, 180, false);
+        arch.LineTo(archRight, archBottom);
+        canvas.DrawPath(arch, ink);
+
+        // The lower title band: a short rule with the terracotta maker's mark beneath it.
+        canvas.DrawLine(s * 0.40f, s * 0.63f, s * 0.60f, s * 0.63f, ink);
+        canvas.DrawCircle(s * 0.5f, s * 0.71f, s * 0.026f, accent);
+    }
+
+    private static SKRect Inset(SKRect r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
 }

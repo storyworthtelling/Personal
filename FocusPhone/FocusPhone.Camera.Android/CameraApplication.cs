@@ -1,6 +1,6 @@
 using Android.App;
 using Android.Runtime;
-using FocusPhone.Ui;
+using Codex.Ui;
 
 namespace FocusPhone.Camera;
 

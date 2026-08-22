@@ -1,6 +1,6 @@
 using Android.App;
 using Android.Service.Notification;
-using FocusPhone.Domain.Timeline;
+using Codex.Domain.Timeline;
 
 namespace FocusPhone.Communication;
 

@@ -12,7 +12,7 @@ public static class BrandAssets
 {
     private static readonly string[] GrainTargets =
     [
-        "FocusPhone/FocusPhone.Ui.Android/Resources/drawable-nodpi/paper_grain.png",
+        "FocusPhone/Codex.Ui.Android/Resources/drawable-nodpi/paper_grain.png",
         // MAUI heads use the plain `Resources/` prefix, not Platforms/Android/Resources — see IconSpecs.
         "Storyboarder/Storyboarder.Android/Resources/drawable-nodpi/paper_grain.png",
         "DailyLoader/DailyLoader.Android/Resources/drawable-nodpi/paper_grain.png",

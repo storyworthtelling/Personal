@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Android.Content;
-using FocusPhone.Domain.Timeline;
+using Codex.Domain.Timeline;
 
 namespace FocusPhone.Communication;
 
@@ -8,7 +8,7 @@ namespace FocusPhone.Communication;
 /// Wraps the gmbridge Messages-for-Web binding: pairs a Google account, keeps a
 /// session, streams incoming texts into the timeline cache, and sends replies.
 ///
-/// The bridge types come from FocusPhone.GmBridge.Binding, which only exists when
+/// The bridge types come from Codex.GmBridge.Binding, which only exists when
 /// gmbridge.aar has been built (CI always builds it first). When it hasn't, the
 /// GMBRIDGE constant is undefined and this compiles to a stub that reports
 /// "unavailable" so texting cleanly falls back to the Google Messages deep link.

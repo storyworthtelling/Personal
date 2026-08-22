@@ -2,7 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.Runtime;
-using FocusPhone.Domain.Diagnostics;
+using Codex.Domain.Diagnostics;
 
 namespace FocusPhone.Audio;
 

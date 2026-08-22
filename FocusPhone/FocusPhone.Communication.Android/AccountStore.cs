@@ -1,6 +1,6 @@
 using Android.Content;
 using AndroidX.Work;
-using FocusPhone.Infrastructure.Email;
+using Codex.Infrastructure.Email;
 
 namespace FocusPhone.Communication;
 

@@ -8,8 +8,8 @@ using AndroidX.Media3.ExoPlayer;
 using AndroidX.Media3.ExoPlayer.Source;
 using AndroidX.Media3.Session;
 using FocusPhone.Audio.Google;
-using FocusPhone.Domain.Audio;
-using FocusPhone.Domain.Music;
+using Codex.Domain.Audio;
+using Codex.Domain.Music;
 
 namespace FocusPhone.Audio;
 

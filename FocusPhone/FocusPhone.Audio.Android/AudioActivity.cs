@@ -7,14 +7,14 @@ using AndroidX.Media3.Common;
 using AndroidX.Media3.Session;
 using MediaController = AndroidX.Media3.Session.MediaController;
 using FocusPhone.Audio.Google;
-using FocusPhone.Domain.Audio;
-using FocusPhone.Domain.Design;
-using FocusPhone.Domain.Music;
-using FocusPhone.Domain.Time;
-using FocusPhone.Infrastructure.Music;
-using FocusPhone.Infrastructure.Podcasts;
-using FocusPhone.Ui;
-using FocusPhone.Ui.Voice;
+using Codex.Domain.Audio;
+using Codex.Domain.Design;
+using Codex.Domain.Music;
+using Codex.Domain.Time;
+using Codex.Infrastructure.Music;
+using Codex.Infrastructure.Podcasts;
+using Codex.Ui;
+using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Secrets;
 
 namespace FocusPhone.Audio;
@@ -70,7 +70,7 @@ public class AudioActivity : Activity
     private string? discoveryStatus;
 
     // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
-    private FocusPhone.Ui.Voice.VoiceGreeting? greeting;
+    private Codex.Ui.Voice.VoiceGreeting? greeting;
     private TextView? greetingView;
     private DriveMusicClient? driveClient;
     private MusicTagReader? tagReader;
@@ -115,7 +115,7 @@ public class AudioActivity : Activity
         fridayPicksStore = new FridayPicksStore(this);
         FridayPicksWorker.Schedule(this); // weekly "New for you"; no-ops until signed in
 
-        greeting = new FocusPhone.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "FocusPhone.Audio");
+        greeting = new Codex.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "FocusPhone.Audio");
         SetContentView(BuildLayout());
         ConnectController();
         ShowGreetingAsync();
@@ -139,7 +139,7 @@ public class AudioActivity : Activity
             if (result.Status == SecretsVaultStatus.Loaded)
             {
                 // Drive-by-ID (#13): pick up the ids persisted for the shared files.
-                FocusPhone.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
+                Codex.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
                 if (!string.IsNullOrEmpty(result.Vault.Music.FolderId)
                     && string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId))
                 {

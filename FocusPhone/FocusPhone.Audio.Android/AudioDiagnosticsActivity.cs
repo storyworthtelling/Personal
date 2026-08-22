@@ -3,8 +3,8 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
-using FocusPhone.Domain.Design;
-using FocusPhone.Ui;
+using Codex.Domain.Design;
+using Codex.Ui;
 
 namespace FocusPhone.Audio;
 

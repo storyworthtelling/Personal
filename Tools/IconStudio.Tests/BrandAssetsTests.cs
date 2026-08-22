@@ -67,7 +67,7 @@ public class BrandAssetsTests : IDisposable
 
         Assert.True(File.Exists(Path.Combine(root, "Branding", "owner.png")));
         Assert.True(File.Exists(Path.Combine(root, "Storyboarder", "Storyboarder.Infrastructure", "Resources", "owner.png")));
-        Assert.True(File.Exists(Path.Combine(root, "FocusPhone", "FocusPhone.Ui.Android", "Resources", "drawable-nodpi", "paper_grain.png")));
+        Assert.True(File.Exists(Path.Combine(root, "FocusPhone", "Codex.Ui.Android", "Resources", "drawable-nodpi", "paper_grain.png")));
         Assert.True(written.Count >= 7);
 
         // The medallion is circle-masked: corners transparent, center opaque, ring present.
