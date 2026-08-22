@@ -113,12 +113,26 @@ jobs:
 
       - name: Build signed APKs
         working-directory: FocusPhone
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
+          # versionCode is the workflow run_number. Renaming build-focusphone.yml ->
+          # build-flyleaf.yml reset that counter (the old workflow reached ~132; this
+          # one restarted near 1), so a bare run_number would look OLDER than the
+          # installed builds and be rejected by the device-owner update channel. Floor
+          # the code well above the old counter so versionCode stays monotonic across
+          # the rename for every head.
+          VERSION_CODE=$((100000 + RUN_NUMBER))
           for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android FocusPhone.Audio.Android; do
-            echo "::group::Publishing $proj"
+            # Flyleaf graduates from the 0.1 pilot to a 1.x major; the other heads stay 0.1.
+            case "$proj" in
+              Flyleaf.Android) DISPLAY_VERSION="1.0.$RUN_NUMBER" ;;
+              *)               DISPLAY_VERSION="0.1.$RUN_NUMBER" ;;
+            esac
+            echo "::group::Publishing $proj (versionCode $VERSION_CODE, version $DISPLAY_VERSION)"
             dotnet publish "$proj" -f net10.0-android -c Release \
-              -p:ApplicationVersion=${{ github.run_number }} \
-              -p:ApplicationDisplayVersion=0.1.${{ github.run_number }} \
+              -p:ApplicationVersion=$VERSION_CODE \
+              -p:ApplicationDisplayVersion=$DISPLAY_VERSION \
               -p:AndroidPackageFormat=apk \
               -p:AndroidKeyStore=true \
               -p:AndroidSigningKeyStore=/tmp/focusphone.keystore \
@@ -198,4 +212,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/publish-rolling-release
         with:
-          apks: FocusPhone/FocusPhone.*.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          # Flyleaf.Android is listed explicitly — the FocusPhone.*.Android glob does NOT
+          # match the renamed launcher head, which is why its APK was never reaching the release.
+          apks: |
+            FocusPhone/Flyleaf.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/FocusPhone.*.Android/bin/Release/net10.0-android/publish/*-Signed.apk
