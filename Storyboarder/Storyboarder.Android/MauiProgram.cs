@@ -172,7 +172,16 @@ public static class MauiProgram
         }
         // Drive-by-ID (#13): a shared, vault-seeded cache of well-known-file-name -> stable Drive id, so a
         // renamed/moved file is still found by id. VaultSync seeds it on restore and snapshots it on publish.
-        builder.Services.AddSingleton<InMemoryDriveFileIdStore>();
+        // Persist captured ids to local Preferences the moment they change (not only on the next vault
+        // publish), and seed from there at startup — so a file the owner renamed between sessions is still
+        // found by id instead of being re-created as a duplicate.
+        builder.Services.AddSingleton<InMemoryDriveFileIdStore>(_ =>
+        {
+            var seed = DriveFileIdMapCodec.Decode(
+                Microsoft.Maui.Storage.Preferences.Default.Get("driveFileIds", string.Empty));
+            return new InMemoryDriveFileIdStore(seed, map =>
+                Microsoft.Maui.Storage.Preferences.Default.Set("driveFileIds", DriveFileIdMapCodec.Encode(map)));
+        });
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
             new DriveVoiceProfileStore(new DriveTextFile(
                 DriveFactory(sp), DriveVoiceProfileStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
