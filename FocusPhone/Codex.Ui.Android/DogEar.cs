@@ -76,7 +76,7 @@ public static class DogEar
 
             // The triangular fold (top-right).
             using var underside = new Paint { AntiAlias = true, Color = PaperTheme.Accent };
-            using var tri = new Path();
+            using var tri = new Android.Graphics.Path();
             tri.MoveTo(w, 0);
             tri.LineTo(0, 0);
             tri.LineTo(w, h);
