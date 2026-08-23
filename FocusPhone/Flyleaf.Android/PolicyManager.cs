@@ -76,23 +76,19 @@ public static class PolicyManager
 
         try
         {
-            // Returns a result CODE (it does not throw for a non-serving host): 0 = set, 1 = failure
-            // setting, 2 = host not serving DoT. The old code ignored it, so a silent HOST_NOT_SERVING
-            // looked like success while the family DNS never applied (adult/SafeSearch went unenforced).
-            // Record the specific outcome so a real on-device failure is diagnosable, not a mystery.
-            // Result codes (android.app.admin.DevicePolicyManager): 0 = PRIVATE_DNS_SET_NO_ERROR,
-            // 1 = PRIVATE_DNS_SET_ERROR_FAILURE_SETTING, 2 = PRIVATE_DNS_SET_ERROR_HOST_NOT_SERVING.
-            const int privateDnsNoError = 0;
-            const int privateDnsHostNotServing = 2;
+            // Returns a PrivateDnsSet result (it does not throw for a non-serving host): NoError,
+            // ErrorFailureSetting, or ErrorHostNotServing. The old code ignored it, so a silent
+            // HostNotServing looked like success while the family DNS never applied (adult/SafeSearch
+            // went unenforced). Record the specific outcome so a real on-device failure is diagnosable.
             var result = dpm.SetGlobalPrivateDnsModeSpecifiedHost(admin, plan.PrivateDnsHost);
-            if (result != privateDnsNoError)
+            if (result != PrivateDnsSet.NoError)
             {
-                var reason = result == privateDnsHostNotServing
+                var reason = result == PrivateDnsSet.ErrorHostNotServing
                     ? "host is not serving DNS-over-TLS (unreachable now)"
                     : "the platform rejected the setting";
-                Log.Warn(Tag, $"Private DNS not set to {plan.PrivateDnsHost}: {reason} (code {result}).");
+                Log.Warn(Tag, $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result}).");
                 events.Add(Event(PolicyEventKind.ConfigFailed,
-                    $"Private DNS not set to {plan.PrivateDnsHost}: {reason} (code {result})."));
+                    $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result})."));
             }
         }
         catch (Java.Lang.Exception e)
