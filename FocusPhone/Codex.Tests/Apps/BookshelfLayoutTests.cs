@@ -15,6 +15,37 @@ public class BookshelfLayoutTests
         new(ShelfFace.CoverOut, keys.Select(Cover).ToList());
 
     [Fact]
+    public void HomeShelves_FillTheViewportEvenly_WhenViewportGiven_AndTrayStacksBelow()
+    {
+        const float viewport = 800f;
+        var scene = BookshelfLayout.Build(Width, M,
+        [
+            new ShelfSpec(ShelfFace.Clock, [], Home: true),
+            new ShelfSpec(ShelfFace.CoverOut, [Cover("com.a"), Cover("com.b")], Home: true),
+            new ShelfSpec(ShelfFace.CoverOut, [Cover("com.c"), Cover("com.d")], Home: true),
+            new ShelfSpec(ShelfFace.CoverOut, [Cover("com.e"), Cover("com.f")], Home: true),
+            new ShelfSpec(ShelfFace.SpineOut, [Spine("com.tray", SpineSizing.Size.Regular)]),
+        ], viewportHeight: viewport);
+
+        var home = scene.Shelves.Where(s => s.Home).ToList();
+        Assert.Equal(4, home.Count);
+        // Four equal bands: each home ledge sits at the bottom of its quarter of the viewport.
+        var band = viewport / 4f;
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.True(home[i].Home);
+            Assert.Equal((i + 1) * band, home[i].Ledge.Bottom, precision: 1);
+        }
+        // The tray shelf begins at/after the fold, not intruding into the home screen.
+        var tray = scene.Shelves.First(s => !s.Home);
+        Assert.True(tray.Ledge.Top >= viewport - 1, "tray intrudes into the home screen");
+        // Home covers are group-centered and bottom-rested on their band ledge.
+        var firstCovers = home[1].Items;
+        Assert.Equal(2, firstCovers.Count);
+        Assert.All(firstCovers, it => Assert.Equal(home[1].Ledge.Top, it.Rect.Bottom, precision: 1));
+    }
+
+    [Fact]
     public void Shelves_StackTopToBottom_WithoutOverlap()
     {
         var scene = BookshelfLayout.Build(Width, M,

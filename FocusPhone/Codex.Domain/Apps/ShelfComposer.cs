@@ -19,11 +19,15 @@ public static class ShelfComposer
             .Select(a => a.PackageName).ToList();
         var sizes = SpineSizing.Rank(usageByPackage, spinePackages);
 
-        var shelves = new List<ShelfSpec>
+        // The home is a fixed four-shelf face: the mantel clock on top, then the six featured books
+        // TWO PER SHELF across three shelves (owner's layout), so it maps onto the four-compartment
+        // painted home backdrop. All four are marked Home so the layout fills the first screen evenly.
+        var shelves = new List<ShelfSpec> { new(ShelfFace.Clock, [], Home: true) };
+        foreach (var pair in Chunk(home.Packages, 2))
         {
-            new(ShelfFace.Clock, []),
-            new(ShelfFace.CoverOut, home.Packages.Select(p => new ShelfEntry(p)).ToList()),
-        };
+            shelves.Add(new ShelfSpec(ShelfFace.CoverOut,
+                pair.Select(p => new ShelfEntry(p)).ToList(), Home: true));
+        }
 
         if (tray.RepoApps.Count > 0)
         {
@@ -47,5 +51,14 @@ public static class ShelfComposer
         }
 
         return shelves;
+    }
+
+    // Splits a list into fixed-size chunks (the last may be short), preserving order.
+    private static IEnumerable<IReadOnlyList<T>> Chunk<T>(IReadOnlyList<T> items, int size)
+    {
+        for (var i = 0; i < items.Count; i += size)
+        {
+            yield return items.Skip(i).Take(size).ToList();
+        }
     }
 }

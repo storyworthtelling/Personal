@@ -26,28 +26,114 @@ public static class BookshelfLayout
         _ => 1.00f,
     };
 
-    public static ShelfSceneLayout Build(float width, ShelfMetrics metrics, IReadOnlyList<ShelfSpec> shelves)
+    /// <summary>
+    /// Lays out the scene. When <paramref name="viewportHeight"/> &gt; 0, the leading run of
+    /// <see cref="ShelfSpec.Home"/> shelves (the mantel clock + the three cover-out home shelves) is
+    /// laid out to fill the first screen EVENLY — one equal band each — so it maps onto the
+    /// four-compartment painted home backdrop; the tray then stacks below the fold. With
+    /// <paramref name="viewportHeight"/> = 0 every shelf simply stacks (legacy / unit-test path).
+    /// </summary>
+    public static ShelfSceneLayout Build(
+        float width, ShelfMetrics metrics, IReadOnlyList<ShelfSpec> shelves, float viewportHeight = 0)
     {
         var placed = new List<PlacedShelf>();
         var contentLeft = metrics.SidePadding;
         var contentRight = width - metrics.SidePadding;
-        var y = metrics.ShelfGap;
 
-        foreach (var spec in shelves)
+        var homeCount = 0;
+        while (homeCount < shelves.Count && shelves[homeCount].Home)
         {
-            if (spec.Face == ShelfFace.Clock)
-            {
-                y = PlaceClock(width, metrics, placed, contentLeft, contentRight, y);
-                continue;
-            }
-            if (spec.Entries.Count == 0)
-            {
-                continue; // empty category/sibling/loose shelf auto-hides
-            }
-            y = PlaceBookRows(metrics, placed, spec, contentLeft, contentRight, y);
+            homeCount++;
         }
 
-        return new ShelfSceneLayout(placed, y);
+        float y;
+        if (viewportHeight > 0 && homeCount > 0)
+        {
+            PlaceHomeEven(width, viewportHeight, metrics, placed, contentLeft, contentRight,
+                shelves.Take(homeCount).ToList());
+            y = viewportHeight;
+        }
+        else
+        {
+            y = metrics.ShelfGap;
+            for (var i = 0; i < homeCount; i++)
+            {
+                y = PlaceStacked(width, metrics, placed, shelves[i], contentLeft, contentRight, y);
+            }
+        }
+
+        for (var i = homeCount; i < shelves.Count; i++)
+        {
+            y = PlaceStacked(width, metrics, placed, shelves[i], contentLeft, contentRight, y);
+        }
+
+        return new ShelfSceneLayout(placed, Math.Max(y, viewportHeight));
+    }
+
+    private static float PlaceStacked(
+        float width, ShelfMetrics metrics, List<PlacedShelf> placed, ShelfSpec spec,
+        float contentLeft, float contentRight, float y)
+    {
+        if (spec.Face == ShelfFace.Clock)
+        {
+            return PlaceClock(width, metrics, placed, contentLeft, contentRight, y);
+        }
+        if (spec.Entries.Count == 0)
+        {
+            return y; // empty category/sibling/loose shelf auto-hides
+        }
+        return PlaceBookRows(metrics, placed, spec, contentLeft, contentRight, y);
+    }
+
+    // The fixed four-shelf home face: each Home shelf gets an equal vertical band of the first screen,
+    // its item(s) bottom-rested on the band's ledge (clock centered), so it aligns with the painted
+    // bookcase backdrop's four equal compartments. Painter skips native ledges here (the backdrop draws them).
+    private static void PlaceHomeEven(
+        float width, float viewportHeight, ShelfMetrics metrics, List<PlacedShelf> placed,
+        float contentLeft, float contentRight, IReadOnlyList<ShelfSpec> homeShelves)
+    {
+        var bandHeight = viewportHeight / homeShelves.Count;
+        for (var i = 0; i < homeShelves.Count; i++)
+        {
+            var spec = homeShelves[i];
+            var bandTop = i * bandHeight;
+            var bandBottom = (i + 1) * bandHeight;
+            var ledge = new LayoutRect(contentLeft, bandBottom - metrics.LedgeThickness, contentRight, bandBottom);
+            var usable = bandHeight - metrics.LedgeThickness - metrics.ShelfGap;
+
+            if (spec.Face == ShelfFace.Clock)
+            {
+                var size = Math.Min(metrics.ClockSize, usable);
+                var clockLeft = (width - size) / 2f;
+                var clockTop = bandTop + (bandHeight - metrics.LedgeThickness - size) / 2f;
+                placed.Add(new PlacedShelf(
+                    ShelfFace.Clock, ledge, null, null, null,
+                    [new PlacedItem(ClockKey, ShelfFace.Clock, SpineSizing.Size.Regular,
+                        new LayoutRect(clockLeft, clockTop, clockLeft + size, clockTop + size))],
+                    Home: true));
+                continue;
+            }
+
+            var coverWidth = metrics.CoverWidth;
+            var coverHeight = coverWidth / metrics.CoverPortraitRatio;
+            if (coverHeight > usable)
+            {
+                coverHeight = usable;
+                coverWidth = coverHeight * metrics.CoverPortraitRatio;
+            }
+            var count = spec.Entries.Count;
+            var groupWidth = count * coverWidth + Math.Max(0, count - 1) * metrics.ItemGap;
+            var x = (width - groupWidth) / 2f;
+            var top = ledge.Top - coverHeight;
+            var items = new List<PlacedItem>(count);
+            foreach (var entry in spec.Entries)
+            {
+                items.Add(new PlacedItem(entry.Key, ShelfFace.CoverOut, entry.Size,
+                    new LayoutRect(x, top, x + coverWidth, ledge.Top)));
+                x += coverWidth + metrics.ItemGap;
+            }
+            placed.Add(new PlacedShelf(ShelfFace.CoverOut, ledge, null, null, null, items, Home: true));
+        }
     }
 
     private static float PlaceClock(
