@@ -198,6 +198,10 @@ public class LauncherSettingsActivity : Activity
         AddContentButton(PaperUi.SecondaryButton(this, "Set up a hotspot (name + password)…",
             () => OpenSystemPanel("android.settings.TETHER_SETTINGS", "hotspot settings",
                 fallback: Android.Provider.Settings.ActionWirelessSettings)));
+        // Airplane mode has no toggle API; the scoped panel is the reachable path (the shade that
+        // would normally toggle it is disabled under the lockdown).
+        AddContentButton(PaperUi.SecondaryButton(this, "Airplane mode…",
+            () => OpenSystemPanel(Android.Provider.Settings.ActionAirplaneModeSettings, "airplane-mode settings")));
     }
 
     // Opens a specific system settings panel by action; on a device where it isn't resolvable, tries an

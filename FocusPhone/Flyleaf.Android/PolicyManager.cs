@@ -76,15 +76,33 @@ public static class PolicyManager
 
         try
         {
-            dpm.SetGlobalPrivateDnsModeSpecifiedHost(admin, plan.PrivateDnsHost);
+            // Returns a result CODE (it does not throw for a non-serving host): 0 = set, 1 = failure
+            // setting, 2 = host not serving DoT. The old code ignored it, so a silent HOST_NOT_SERVING
+            // looked like success while the family DNS never applied (adult/SafeSearch went unenforced).
+            // Record the specific outcome so a real on-device failure is diagnosable, not a mystery.
+            // Result codes (android.app.admin.DevicePolicyManager): 0 = PRIVATE_DNS_SET_NO_ERROR,
+            // 1 = PRIVATE_DNS_SET_ERROR_FAILURE_SETTING, 2 = PRIVATE_DNS_SET_ERROR_HOST_NOT_SERVING.
+            const int privateDnsNoError = 0;
+            const int privateDnsHostNotServing = 2;
+            var result = dpm.SetGlobalPrivateDnsModeSpecifiedHost(admin, plan.PrivateDnsHost);
+            if (result != privateDnsNoError)
+            {
+                var reason = result == privateDnsHostNotServing
+                    ? "host is not serving DNS-over-TLS (unreachable now)"
+                    : "the platform rejected the setting";
+                Log.Warn(Tag, $"Private DNS not set to {plan.PrivateDnsHost}: {reason} (code {result}).");
+                events.Add(Event(PolicyEventKind.ConfigFailed,
+                    $"Private DNS not set to {plan.PrivateDnsHost}: {reason} (code {result})."));
+            }
         }
         catch (Java.Lang.Exception e)
         {
-            // Setting private DNS validates the resolver over the network; offline
-            // application is retried on the next policy pass rather than failing
-            // the whole lockdown.
-            Log.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {e.Message}");
-            events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {e.Message}"));
+            // A thrown exception (vs the result code above) is usually an invalid host or a transient
+            // state; retried on the next pass. Record the type when the message is blank so it's not a
+            // mystery (the earlier log showed an empty message).
+            var detail = string.IsNullOrEmpty(e.Message) ? e.GetType().Name : e.Message;
+            Log.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}");
+            events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}"));
         }
 
         var installed = plan.SuspendedPackages
@@ -100,12 +118,16 @@ public static class PolicyManager
             }
         }
 
-        // Actively un-suspend the cutover allowlist (curated apps + the login
-        // browser). Removing them from the suspend set is not enough: the install
-        // watcher may have already quarantined one, and nothing else releases it.
-        var toRelease = plan.RunnablePackages
-            .Where(p => IsInstalled(context, p))
-            .ToArray();
+        // Visibility IS runnability: actively un-suspend EVERY launchable app the plan doesn't
+        // suspend (plus the allowlisted login browser, which is hidden and so not launchable) —
+        // not merely leave them alone. A prior pass or the install watcher may have quarantined a
+        // visible app (this was why Gemini/Messages showed "blocked by your administrator"); nothing
+        // else releases it. Only the never-visible set + the owner's blocks stay suspended.
+        var release = new HashSet<string>(
+            PolicyReconciler.PackagesToRelease(QueryLaunchablePackages(context), plan.SuspendedPackages));
+        release.UnionWith(plan.RunnablePackages);
+        release.ExceptWith(plan.SuspendedPackages);
+        var toRelease = release.Where(p => IsInstalled(context, p)).ToArray();
         if (toRelease.Length > 0)
         {
             var failed = dpm.SetPackagesSuspended(admin, toRelease, false);
@@ -272,6 +294,19 @@ public static class PolicyManager
                 (int)(r.ActivityInfo.ApplicationInfo?.Category ?? ApplicationCategories.Undefined)))
             .ToList();
         return HardBlock.Detect(installed);
+    }
+
+    // Every package with a launcher entry — the apps the owner can see. Everything here that the plan
+    // does not suspend is actively released (visibility IS runnability).
+    private static IReadOnlyList<string> QueryLaunchablePackages(Context context)
+    {
+        var launcher = new Intent(Intent.ActionMain);
+        launcher.AddCategory(Intent.CategoryLauncher);
+        return context.PackageManager!
+            .QueryIntentActivities(launcher, PackageInfoFlags.MatchAll)
+            .Select(r => r.ActivityInfo!.PackageName!)
+            .Distinct()
+            .ToList();
     }
 
     private static IReadOnlySet<string> QueryOtherHomePackages(Context context)
