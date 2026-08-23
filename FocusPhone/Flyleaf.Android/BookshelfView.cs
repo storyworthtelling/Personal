@@ -342,7 +342,10 @@ public class BookshelfView : View
         text.SetTypeface(PaperTheme.SerifSemibold(Context!));
         // A dark halo so the serif title stays legible over ANY cloth colour (the old cream-on-light
         // spines read as blank — "no text visible").
-        text.SetShadowLayer(2.4f * density, 0, 0, PaperTheme.WalnutDeep.ToArgb());
+        // Pass the Color struct directly — never Color.ToArgb(). The int overload-resolves to
+        // SetShadowLayer(float,float,float,long), where the value is read as a wide-gamut ColorLong
+        // and Android rejects the non-RGB colorspace ("colorSpace must be an RGB color space").
+        text.SetShadowLayer(2.4f * density, 0, 0, PaperTheme.WalnutDeep);
 
         var top = spine.Top + 8 * density;
         var trimmed = Ellipsize(label, text, 0, bottomLimit - top);
