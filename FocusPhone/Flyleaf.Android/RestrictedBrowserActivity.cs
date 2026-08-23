@@ -71,11 +71,22 @@ public class RestrictedBrowserActivity : Activity
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         SetContentView(layout);
 
-        ConfigureWebView(webView, origin);
-        webView.LoadUrl(origin.ToString());
+        var policy = LinkPolicy.CreateDefault();
+        ConfigureWebView(webView, origin, policy);
+        // Gate the ARRIVAL url too, not just later navigations: ShouldOverrideUrlLoading fires only on
+        // subsequent loads, so a link that lands straight on a blocked social/adult domain (e.g.
+        // facebook.com) would otherwise load. Run it through the same gate first.
+        if (policy.IsNavigationAllowed(origin, origin))
+        {
+            webView.LoadUrl(origin.ToString());
+        }
+        else
+        {
+            ShowBlockedPage(origin.ToString());
+        }
     }
 
-    private void ConfigureWebView(WebView view, Uri origin)
+    private void ConfigureWebView(WebView view, Uri origin, LinkPolicy policy)
     {
         var settings = view.Settings;
         settings.JavaScriptEnabled = true;
@@ -87,7 +98,7 @@ public class RestrictedBrowserActivity : Activity
         settings.SetGeolocationEnabled(false);
 
         view.SetDownloadListener(new DownloadStartListener(this));
-        view.SetWebViewClient(new SameDomainWebViewClient(this, LinkPolicy.CreateDefault(), origin));
+        view.SetWebViewClient(new SameDomainWebViewClient(this, policy, origin));
     }
 
     public void ShowAddress(string url) => addressDisplay!.Text = url;

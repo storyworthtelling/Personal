@@ -10,13 +10,34 @@ namespace Storyworthtelling.Voice;
 public sealed class InMemoryDriveFileIdStore : IDriveFileIdStore
 {
     private readonly ConcurrentDictionary<string, string> ids;
+    private readonly Action<IReadOnlyDictionary<string, string>>? onChange;
 
-    public InMemoryDriveFileIdStore(IReadOnlyDictionary<string, string>? seed = null) =>
+    /// <param name="seed">Initial ids (e.g. from a local cache or the vault).</param>
+    /// <param name="onChange">
+    /// Fired with the full snapshot whenever a NEW or CHANGED id is captured, so an app can persist the
+    /// map eagerly (to local Preferences) rather than only on the next vault publish. This closes the gap
+    /// where an id captured in one session is lost on restart before a publish, so a file the owner
+    /// renamed between sessions was re-created as a duplicate. Best-effort; never called for a no-op Set.
+    /// </param>
+    public InMemoryDriveFileIdStore(
+        IReadOnlyDictionary<string, string>? seed = null,
+        Action<IReadOnlyDictionary<string, string>>? onChange = null)
+    {
         ids = seed is null ? new() : new(seed);
+        this.onChange = onChange;
+    }
 
     public string? Get(string fileName) => ids.TryGetValue(fileName, out var id) ? id : null;
 
-    public void Set(string fileName, string fileId) => ids[fileName] = fileId;
+    public void Set(string fileName, string fileId)
+    {
+        var changed = !ids.TryGetValue(fileName, out var existing) || existing != fileId;
+        ids[fileName] = fileId;
+        if (changed)
+        {
+            onChange?.Invoke(Snapshot());
+        }
+    }
 
     /// <summary>The current mapping, for persisting back into the vault's DriveFileIds section.</summary>
     public IReadOnlyDictionary<string, string> Snapshot() => new Dictionary<string, string>(ids);

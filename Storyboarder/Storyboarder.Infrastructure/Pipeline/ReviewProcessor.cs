@@ -1079,7 +1079,10 @@ public sealed class ReviewProcessor : IPipelineStep
                     return await FinishArchiving(db, novel, cancellationToken);
                 }
 
-                novel.ArchiveFolderId = await delivery!.EnsureDriveFolder(parent, novel.Title, cancellationToken);
+                // Archive BESIDE the manuscript — into its OWN Drive folder, not a fresh "<Title>"
+                // subfolder (owner: the old New-folder behaviour was always wrong). The report's file
+                // name already distinguishes it from the source and from other drafts.
+                novel.ArchiveFolderId = parent;
                 await db.SaveChangesAsync(cancellationToken);
                 return ProcessResult.DidWork(novel.Id);
             }

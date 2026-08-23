@@ -38,4 +38,30 @@ public class InMemoryDriveFileIdStoreTests
         store.Set("c.json", "id-c");
         Assert.False(snapshot.ContainsKey("c.json"));
     }
+
+    [Fact]
+    public void OnChange_FiresOnNewOrChangedId_NotOnANoOpSet()
+    {
+        var snapshots = new List<IReadOnlyDictionary<string, string>>();
+        var store = new InMemoryDriveFileIdStore(onChange: snapshots.Add);
+
+        store.Set("a.json", "id-a"); // new -> fires
+        store.Set("a.json", "id-a"); // unchanged -> no fire
+        store.Set("a.json", "id-a2"); // changed -> fires
+
+        Assert.Equal(2, snapshots.Count);
+        Assert.Equal("id-a2", snapshots[^1]["a.json"]);
+    }
+
+    [Fact]
+    public void MapCodec_RoundTrips_AndDecodesAbsentOrGarbledToEmpty()
+    {
+        var map = new Dictionary<string, string> { ["voice.json"] = "id-1", ["vault.json"] = "id-2" };
+        var decoded = DriveFileIdMapCodec.Decode(DriveFileIdMapCodec.Encode(map));
+
+        Assert.Equal("id-1", decoded["voice.json"]);
+        Assert.Equal("id-2", decoded["vault.json"]);
+        Assert.Empty(DriveFileIdMapCodec.Decode(null));
+        Assert.Empty(DriveFileIdMapCodec.Decode("{ not json"));
+    }
 }

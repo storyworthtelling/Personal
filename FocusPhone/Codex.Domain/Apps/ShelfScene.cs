@@ -33,7 +33,8 @@ public readonly record struct ShelfSpec(
     ShelfFace Face,
     IReadOnlyList<ShelfEntry> Entries,
     string? BookendGlyph = null,
-    string? BookendName = null);
+    string? BookendName = null,
+    bool Home = false);
 
 /// <summary>Sizing metrics for the shelf (all in canvas units), passed in so layout is testable.</summary>
 public readonly record struct ShelfMetrics(
@@ -52,7 +53,7 @@ public readonly record struct ShelfMetrics(
     public static ShelfMetrics Default { get; } = new(
         SidePadding: 20f,
         ShelfGap: 16f,
-        ItemGap: 12f,
+        ItemGap: 6f, // books sit close together, not spaced apart
         LedgeThickness: 10f,
         CoverWidth: 96f,
         CoverPortraitRatio: 0.68f,
@@ -78,7 +79,8 @@ public readonly record struct PlacedShelf(
     LayoutRect? Bookend,
     string? BookendGlyph,
     string? BookendName,
-    IReadOnlyList<PlacedItem> Items);
+    IReadOnlyList<PlacedItem> Items,
+    bool Home = false);
 
 /// <summary>The whole laid-out bookcase: every shelf placed, and the total scroll height.</summary>
 public readonly record struct ShelfSceneLayout(IReadOnlyList<PlacedShelf> Shelves, float TotalHeight);

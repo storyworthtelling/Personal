@@ -14,13 +14,21 @@ public class ShelfComposerTests
         new(new Category(id, name, glyph, 0, Builtin: true), apps.Select(App).ToList());
 
     [Fact]
-    public void ClockThenHome_LeadTheShelves()
+    public void ClockThenHome_LeadTheShelves_TwoBooksPerShelf_AllMarkedHome()
     {
         var shelves = ShelfComposer.Compose(Home, new TrayModel([], [], []), NoUsage);
 
+        // The clock plus three cover-out home shelves of two books each (six featured apps), all Home.
         Assert.Equal(ShelfFace.Clock, shelves[0].Face);
-        Assert.Equal(ShelfFace.CoverOut, shelves[1].Face);
-        Assert.Equal(Home.Packages, shelves[1].Entries.Select(e => e.Key));
+        Assert.True(shelves[0].Home);
+        var homeCoverShelves = shelves.Skip(1).Take(3).ToList();
+        Assert.All(homeCoverShelves, s =>
+        {
+            Assert.Equal(ShelfFace.CoverOut, s.Face);
+            Assert.True(s.Home);
+            Assert.True(s.Entries.Count <= 2);
+        });
+        Assert.Equal(Home.Packages, homeCoverShelves.SelectMany(s => s.Entries).Select(e => e.Key));
     }
 
     [Fact]
@@ -33,10 +41,13 @@ public class ShelfComposerTests
 
         var shelves = ShelfComposer.Compose(Home, tray, NoUsage);
 
+        // Clock, three home cover shelves (2 each), sibling, category, loose.
         Assert.Collection(shelves,
             s => Assert.Equal(ShelfFace.Clock, s.Face),
-            s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.Null(s.BookendName); },   // home
-            s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.Equal("com.storyworthtelling.ledger", s.Entries[0].Key); }, // sibling
+            s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.True(s.Home); },   // home 1
+            s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.True(s.Home); },   // home 2
+            s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.True(s.Home); },   // home 3
+            s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.False(s.Home); Assert.Equal("com.storyworthtelling.ledger", s.Entries[0].Key); }, // sibling
             s => { Assert.Equal(ShelfFace.SpineOut, s.Face); Assert.Equal("Finance", s.BookendName); }, // category
             s => { Assert.Equal(ShelfFace.SpineOut, s.Face); Assert.Null(s.BookendName); Assert.Equal("com.unknown.mystery", s.Entries[0].Key); }); // loose
     }
@@ -48,9 +59,9 @@ public class ShelfComposerTests
 
         var shelves = ShelfComposer.Compose(Home, tray, NoUsage);
 
-        // Clock, Home, one category — no sibling, no loose.
-        Assert.Equal(3, shelves.Count);
-        Assert.Equal(ShelfFace.SpineOut, shelves[2].Face);
+        // Clock, three home cover shelves, one category — no sibling, no loose.
+        Assert.Equal(5, shelves.Count);
+        Assert.Equal(ShelfFace.SpineOut, shelves[4].Face);
     }
 
     [Fact]
@@ -58,7 +69,7 @@ public class ShelfComposerTests
     {
         var tray = new TrayModel([], [Folder(CategoryCatalog.Travel, "Travel & Transit", "folder_travel", "com.waze")], []);
 
-        var category = ShelfComposer.Compose(Home, tray, NoUsage)[2];
+        var category = ShelfComposer.Compose(Home, tray, NoUsage)[4];
 
         Assert.Equal("folder_travel", category.BookendGlyph);
         Assert.Equal("Travel & Transit", category.BookendName);

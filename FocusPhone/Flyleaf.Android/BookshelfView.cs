@@ -30,6 +30,13 @@ public class BookshelfView : View
     private ShelfSceneLayout layout = new([], 0);
     private Bitmap? baked;
     private TimeSpan time;
+    private float viewportHeight;
+
+    // Painted wood assets (the "bake a painted bookcase" direction): the empty four-compartment home
+    // backdrop, and a walnut texture tiled as the tray's back wall. Loaded once, recycled on detach.
+    private Bitmap? homeBackdrop;
+    private Bitmap? woodTexture;
+    private static readonly Paint ImagePaint = new(PaintFlags.AntiAlias | PaintFlags.FilterBitmap);
 
     private readonly GestureDetector gesture;
 
@@ -66,13 +73,39 @@ public class BookshelfView : View
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
     {
         var width = MeasureSpec.GetSize(widthMeasureSpec);
-        if (width > 0 && (layout.Shelves.Count == 0 || Math.Abs(BakedWidth() - width) > 0.5f))
+        // We live inside a ScrollView, which measures us with an unbounded height — so the viewport
+        // (the first screen the home fills) is the immersive display height, not the measure spec.
+        var vh = Resources!.DisplayMetrics!.HeightPixels;
+        if (width > 0 && (layout.Shelves.Count == 0 || Math.Abs(BakedWidth() - width) > 0.5f
+            || Math.Abs(viewportHeight - vh) > 0.5f))
         {
-            layout = BookshelfLayout.Build(width, metrics, shelves);
+            viewportHeight = vh;
+            layout = BookshelfLayout.Build(width, metrics, shelves, viewportHeight);
             DropBaked();
         }
         var height = Math.Max((int)layout.TotalHeight, MeasureSpec.GetSize(heightMeasureSpec));
         SetMeasuredDimension(width, height);
+    }
+
+    // The bottom of the painted home region (the first screen). Zero when there are no home shelves
+    // (e.g. a unit-shaped scene), which falls the whole case back to the tray treatment.
+    private float HomeRegionBottom() =>
+        layout.Shelves.Any(s => s.Home) ? viewportHeight : 0f;
+
+    private Bitmap? HomeBackdrop => homeBackdrop ??= TryDecode(Resource.Drawable.shelf_bookcase_home);
+    private Bitmap? WoodTexture => woodTexture ??= TryDecode(Resource.Drawable.shelf_wood_texture);
+
+    private Bitmap? TryDecode(int resId)
+    {
+        try { return BitmapFactory.DecodeResource(Resources, resId); }
+        catch (Exception) { return null; }
+    }
+
+    protected override void OnDetachedFromWindow()
+    {
+        base.OnDetachedFromWindow();
+        homeBackdrop?.Recycle(); homeBackdrop = null;
+        woodTexture?.Recycle(); woodTexture = null;
     }
 
     public override bool OnTouchEvent(MotionEvent? e)
@@ -139,10 +172,13 @@ public class BookshelfView : View
     private void DrawScene(Canvas canvas)
     {
         DrawBackWall(canvas);
-        DrawFirelight(canvas);
         foreach (var shelf in layout.Shelves)
         {
-            DrawLedge(canvas, shelf.Ledge);
+            // Home ledges are painted into the backdrop; only the native tray draws its own boards.
+            if (!shelf.Home)
+            {
+                DrawLedge(canvas, shelf.Ledge);
+            }
             if (shelf.Bookend is { } bookend)
             {
                 DrawBookend(canvas, bookend, shelf.BookendGlyph);
@@ -161,27 +197,49 @@ public class BookshelfView : View
 
     private void DrawBackWall(Canvas canvas)
     {
-        using var paint = new Paint { AntiAlias = true };
-        paint.SetShader(Linear(0, 0, 0, Height, PaperTheme.WalnutDeep, PaperTheme.Walnut));
-        canvas.DrawRect(0, 0, Width, Height, paint);
+        var homeBottom = HomeRegionBottom();
 
-        // A little vertical grain: faint lighter streaks over the wall.
-        using var grain = new Paint { AntiAlias = true, StrokeWidth = density };
-        grain.Color = WithAlpha(PaperTheme.WalnutLight, 26);
-        for (var x = metrics.SidePadding; x < Width; x += 37 * density)
+        // Home region: the painted four-compartment bookcase backdrop, scaled to fill the first screen.
+        if (homeBottom > 0)
         {
-            canvas.DrawLine(x, 0, x + 6 * density, Height, grain);
+            if (HomeBackdrop is { } backdrop)
+            {
+                canvas.DrawBitmap(backdrop, null, new RectF(0, 0, Width, homeBottom), ImagePaint);
+            }
+            else
+            {
+                DrawGradientWall(canvas, 0, homeBottom);
+            }
+        }
+
+        // Tray region: the walnut wood texture tiled as the back wall (scaled so it fills the width and
+        // tiles down the scroll), replacing the old flat gradient.
+        if (Height > homeBottom)
+        {
+            if (WoodTexture is { } tex)
+            {
+                using var paint = new Paint { AntiAlias = true };
+                using var shader = new BitmapShader(tex, Shader.TileMode.Clamp!, Shader.TileMode.Repeat!);
+                var scale = Width / (float)tex.Width;
+                using var m = new Matrix();
+                m.SetScale(scale, scale);
+                m.PostTranslate(0, homeBottom);
+                shader.SetLocalMatrix(m);
+                paint.SetShader(shader);
+                canvas.DrawRect(0, homeBottom, Width, Height, paint);
+            }
+            else
+            {
+                DrawGradientWall(canvas, homeBottom, Height);
+            }
         }
     }
 
-    private void DrawFirelight(Canvas canvas)
+    private void DrawGradientWall(Canvas canvas, float top, float bottom)
     {
         using var paint = new Paint { AntiAlias = true };
-        var cx = metrics.SidePadding;
-        var cy = Height * 0.82f;
-        paint.SetShader(Radial(cx, cy, Height * 0.6f,
-            WithAlpha(PaperTheme.Firelight, 70), WithAlpha(PaperTheme.Firelight, 0)));
-        canvas.DrawRect(0, 0, Width, Height, paint);
+        paint.SetShader(Linear(0, top, 0, bottom, PaperTheme.WalnutDeep, PaperTheme.Walnut));
+        canvas.DrawRect(0, top, Width, bottom, paint);
     }
 
     private void DrawLedge(Canvas canvas, LayoutRect ledge)
@@ -277,36 +335,64 @@ public class BookshelfView : View
     {
         using var text = new Paint(PaintFlags.AntiAlias)
         {
-            Color = WithAlpha(PaperTheme.PaperBright, 235),
-            TextSize = Math.Min(spine.Width() * 0.5f, 13 * density),
+            Color = PaperTheme.PaperBright,
+            TextSize = Math.Min(spine.Width() * 0.64f, 13 * density),
+            TextAlign = Paint.Align.Left,
         };
         text.SetTypeface(PaperTheme.SerifSemibold(Context!));
-        text.TextAlign = Paint.Align.Center;
-        var trimmed = Ellipsize(label, text, spine.Top + 8 * density, bottomLimit);
+        // A dark halo so the serif title stays legible over ANY cloth colour (the old cream-on-light
+        // spines read as blank — "no text visible").
+        text.SetShadowLayer(2.4f * density, 0, 0, PaperTheme.WalnutDeep.ToArgb());
+
+        var top = spine.Top + 8 * density;
+        var trimmed = Ellipsize(label, text, 0, bottomLimit - top);
+
         canvas.Save();
-        // Rotate 90° clockwise about the spine center so the title reads downward.
-        canvas.Rotate(90, spine.CenterX(), spine.Top + 8 * density);
-        canvas.DrawText(trimmed, spine.Top + 8 * density, spine.CenterX() + text.TextSize / 3f, text);
+        // Translate to the spine's top-centre, rotate 90° CW: a left-aligned string then runs DOWN the
+        // spine, its baseline offset centring it across the spine's width.
+        canvas.Translate(spine.CenterX(), top);
+        canvas.Rotate(90);
+        canvas.DrawText(trimmed, 0, text.TextSize / 3f, text);
         canvas.Restore();
     }
 
     private void DrawBookend(Canvas canvas, LayoutRect rect, string? glyph)
     {
         var r = ToRectF(rect);
-        using var metal = new Paint { AntiAlias = true };
-        metal.SetShader(Linear(r.Left, 0, r.Right, 0, PaperTheme.Bronze, PaperTheme.BronzeDeep));
-        canvas.DrawRoundRect(r, 2 * density, 2 * density, metal);
+        // A cast-bronze bookend statue, not a thin book: an upright metal slab on a wider foot, with a
+        // vertical metal gradient, a bright top/left bevel and a dark bottom/right edge for relief, and
+        // a contact shadow so it sits ON the shelf. One per category shelf, carrying that shelf's glyph.
+        DrawContactShadow(canvas, rect);
+        var footHeight = 6 * density;
+        var foot = new RectF(r.Left - 3 * density, r.Bottom - footHeight, r.Right + 3 * density, r.Bottom);
+        using (var metal = new Paint { AntiAlias = true })
+        {
+            metal.SetShader(Linear(0, r.Top, 0, r.Bottom, PaperTheme.Bronze, PaperTheme.BronzeDeep));
+            canvas.DrawRoundRect(r, 3 * density, 3 * density, metal);
+            canvas.DrawRoundRect(foot, 2 * density, 2 * density, metal);
+        }
+        using (var hi = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.PaperBright, 150), StrokeWidth = 1.4f * density })
+        {
+            hi.SetStyle(Paint.Style.Stroke);
+            canvas.DrawLine(r.Left + 1.2f * density, r.Top + 1.2f * density, r.Right - 1.2f * density, r.Top + 1.2f * density, hi);
+            canvas.DrawLine(r.Left + 1.2f * density, r.Top + 1.2f * density, r.Left + 1.2f * density, r.Bottom, hi);
+        }
+        using (var lo = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.WalnutDeep, 150), StrokeWidth = 1.2f * density })
+        {
+            lo.SetStyle(Paint.Style.Stroke);
+            canvas.DrawLine(r.Right - 1f * density, r.Top + 2 * density, r.Right - 1f * density, r.Bottom, lo);
+        }
         if (string.IsNullOrEmpty(glyph))
         {
             return;
         }
 
-        // The engraved glyph occupies a square near the bookend's top; three kinds of glyph id:
-        // a built-in "folder_*" drawable, an owner shelf's AI vector ("path:<d>"), or the offline
-        // pencil monogram ("mono:<letters>") — all engraved in deep bronze.
-        var s = r.Width() * 0.7f;
+        // The shelf's glyph engraved as a raised bronze medallion, centered on the slab; three kinds of
+        // glyph id: a built-in "folder_*" drawable, an owner shelf's AI vector ("path:<d>"), or the
+        // offline pencil monogram ("mono:<letters>").
+        var s = r.Width() * 0.78f;
         var gx = r.CenterX() - s / 2;
-        var gy = r.Top + 8 * density;
+        var gy = r.CenterY() - s / 2;
         var glyphRect = new RectF(gx, gy, gx + s, gy + s);
 
         if (glyph.StartsWith("path:", StringComparison.Ordinal))

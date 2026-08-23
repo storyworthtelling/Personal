@@ -198,6 +198,10 @@ public class LauncherSettingsActivity : Activity
         AddContentButton(PaperUi.SecondaryButton(this, "Set up a hotspot (name + password)…",
             () => OpenSystemPanel("android.settings.TETHER_SETTINGS", "hotspot settings",
                 fallback: Android.Provider.Settings.ActionWirelessSettings)));
+        // Airplane mode has no toggle API; the scoped panel is the reachable path (the shade that
+        // would normally toggle it is disabled under the lockdown).
+        AddContentButton(PaperUi.SecondaryButton(this, "Airplane mode…",
+            () => OpenSystemPanel(Android.Provider.Settings.ActionAirplaneModeSettings, "airplane-mode settings")));
     }
 
     // Opens a specific system settings panel by action; on a device where it isn't resolvable, tries an
@@ -434,6 +438,17 @@ public class LauncherSettingsActivity : Activity
         AddBody("The category shelves your apps sort onto. New shelves get an engraved glyph — " +
             "AI-drawn from the name when a key's set, a pencil monogram otherwise.");
 
+        // The AI glyph reads the shared Claude key from the encrypted vault on Drive, which needs a Google
+        // sign-in. Without it there was no path to sign in, so the glyph stayed a monogram (P5-27).
+        if (Codex.Ui.Voice.VoiceGoogleAccount.IsSignedIn)
+        {
+            AddBody($"Signed in with Google as {Codex.Ui.Voice.VoiceGoogleAccount.Email} — AI glyphs enabled.");
+        }
+        else
+        {
+            AddContentButton(PaperUi.SecondaryButton(this, "Sign in with Google (for AI shelf glyphs)", SignInWithGoogle));
+        }
+
         var catalog = new CategoryStore(this).Load();
         var ids = catalog.Categories.Select(c => c.Id).ToList();
         foreach (var category in catalog.Categories)
@@ -466,6 +481,28 @@ public class LauncherSettingsActivity : Activity
         }
         row.AddView(PaperUi.QuietButton(this, "Remove", () => RemoveShelf(category.Id)));
         return row;
+    }
+
+    private async void SignInWithGoogle()
+    {
+        try
+        {
+            await voiceAccount.SignIn(this);
+            Recreate(); // rebuild the screen so the status updates and new glyphs can upgrade
+        }
+        catch (Exception)
+        {
+            // Best-effort: a cancelled or failed sign-in leaves the monogram fallback in place.
+        }
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Android.Content.Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == Codex.Ui.Voice.VoiceGoogleAccount.RequestCode)
+        {
+            Codex.Ui.Voice.VoiceGoogleAccount.HandleChooserResult(resultCode, data);
+        }
     }
 
     private void AddShelf(string? name)
