@@ -241,9 +241,34 @@ public class HomeActivity : Activity
         }
         actions.Add(("Feature on home", () => ShowFeaturePicker(package, label)));
         actions.Add(("Block", () => BlockWithUndo(package, label)));
-        actions.Add(("Uninstall", () => StartActivity(
-            new Intent(Intent.ActionDelete, Android.Net.Uri.Parse("package:" + package)))));
+        actions.Add(("Uninstall", () => UninstallApp(package)));
         ShowPaperMenu(label, actions);
+    }
+
+    // Routes to Android's own uninstall confirmation. The old ACTION_DELETE intent did nothing from the
+    // immersive home; ACTION_UNINSTALL_PACKAGE with NEW_TASK reliably raises the system uninstaller
+    // (the device owner no longer sets no_control_apps / no_uninstall_apps, so it's permitted).
+    private void UninstallApp(string package)
+    {
+        var uri = Android.Net.Uri.Parse("package:" + package);
+        var uninstall = new Intent(Intent.ActionUninstallPackage, uri);
+        uninstall.PutExtra(Intent.ExtraReturnResult, true);
+        uninstall.SetFlags(ActivityFlags.NewTask);
+        try
+        {
+            StartActivity(uninstall);
+        }
+        catch (Android.Content.ActivityNotFoundException)
+        {
+            try
+            {
+                StartActivity(new Intent(Intent.ActionDelete, uri).SetFlags(ActivityFlags.NewTask));
+            }
+            catch (Android.Content.ActivityNotFoundException)
+            {
+                // No uninstaller available (unusual); nothing more we can do from the launcher.
+            }
+        }
     }
 
     private void ShowShelfPicker(string package, string label)
@@ -274,7 +299,8 @@ public class HomeActivity : Activity
     private void BlockWithUndo(string package, string label)
     {
         SetBlocked(package, blocked: true);
-        UndoBar.Show(this, root!, $"Blocked {label}.", onUndo: () => SetBlocked(package, blocked: false));
+        // A folded page-corner (book metaphor), not a toast/bar: tap the dog-ear to turn back the block.
+        DogEar.Show(this, root!, $"Undo blocking {label}", onUndo: () => SetBlocked(package, blocked: false));
     }
 
     private void SetBlocked(string package, bool blocked)

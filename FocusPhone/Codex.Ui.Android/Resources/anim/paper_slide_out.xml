@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<translate xmlns:android="http://schemas.android.com/apk/res/android"
-    android:fromXDelta="0" android:toXDelta="-33%"
-    android:duration="200"
-    android:interpolator="@android:interpolator/decelerate_quad" />
+<!-- The outgoing page peels off the LEFT spine (DESIGN.md §5/§6): it hinges on its left edge and
+     swings away, dimming, to reveal the page underneath — a page-turn, not a flat wipe. A true GL
+     curl is a separate effort; this 2-D approximation reads as turning a page. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:interpolator/decelerate_quad">
+    <rotate android:fromDegrees="0" android:toDegrees="-11"
+        android:pivotX="0%" android:pivotY="50%" android:duration="240" />
+    <translate android:fromXDelta="0" android:toXDelta="-14%" android:duration="240" />
+    <alpha android:fromAlpha="1.0" android:toAlpha="0.35" android:duration="240" />
+</set>
