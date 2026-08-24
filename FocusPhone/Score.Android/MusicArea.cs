@@ -17,15 +17,15 @@ namespace Score;
 public sealed class MusicArea : ScoreArea
 {
     private readonly MusicLibrary library;
-    private readonly DiscoverArea discover;
     private MusicView view = MusicView.Menu;
 
-    public MusicArea(Activity host, MusicLibrary library, DiscoverArea discover) : base(host)
+    public MusicArea(Activity host, MusicLibrary library) : base(host)
     {
         this.library = library;
-        this.discover = discover;
         library.Changed += Invalidate;
     }
+
+    public override BinderArea Tab => new("Music", Resource.Drawable.area_music, PaperTheme.ScoreMark);
 
     public override bool GoBack()
     {
@@ -183,11 +183,8 @@ public sealed class MusicArea : ScoreArea
             case MusicView.Playlists:
                 return PaperUi.EmptyState(Host, "No playlists yet.");
 
-            case MusicView.Discovery:
-                return discover.BuildView();
-
             default:
-                var items = new[] { "Discovery", "Playlists", "Artists", "Albums", "Songs", "Genres" };
+                var items = new[] { "Playlists", "Artists", "Albums", "Songs", "Genres" };
                 return PaperUi.List(Host, [.. items.Select(item => new PaperListRow(item))], position =>
                 {
                     view = Enum.Parse<MusicView>(items[position]);
@@ -215,5 +212,4 @@ internal enum MusicView
     Albums,
     Songs,
     Genres,
-    Discovery,
 }

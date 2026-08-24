@@ -28,6 +28,8 @@ public sealed class DiscoverArea : ScoreArea
         library.Changed += Invalidate;
     }
 
+    public override BinderArea Tab => new("Discover", Resource.Drawable.area_discover, PaperTheme.ScoreMark);
+
     public override View BuildView()
     {
         var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };

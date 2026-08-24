@@ -63,6 +63,8 @@ public sealed class PodcastsArea : ScoreArea
         RestoreLibraryFromDrive();
     }
 
+    public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ScoreMark);
+
     public override View BuildView() => BuildPodcastsPane();
 
     /// <summary>The area's own actions. The shell hosts it under the now-playing bar.</summary>

@@ -1,4 +1,5 @@
 using Android.Views;
+using Codex.Ui;
 
 namespace Score;
 
@@ -21,6 +22,19 @@ public abstract class ScoreArea(Activity host)
     /// this is set rather than injected — the areas exist before the frame does.
     /// </summary>
     public FrameLayout Overlay { get; set; } = null!;
+
+    /// <summary>
+    /// How this area appears in the binder gutter (DESIGN.md §9): a short label, an
+    /// engraved glyph, and the hue it lights in. The area declares its own tab so the
+    /// shell never carries a table of who is who.
+    /// </summary>
+    public abstract BinderArea Tab { get; }
+
+    /// <summary>
+    /// The in-page title (§7). Usually the area's own name, but not always — Playing
+    /// is titled for the area, not for the track.
+    /// </summary>
+    public virtual string Title => Tab.Label;
 
     /// <summary>The area's content, built fresh on every render.</summary>
     public abstract View BuildView();

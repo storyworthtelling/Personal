@@ -32,7 +32,7 @@ public class ScoreActivity : Activity
     private ListeningLog listening = null!;
 
     private ScoreArea[] areas = [];
-    private int side; // 0 = podcasts, 1 = music
+    private int activeIndex;
 
     // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
     private Codex.Ui.Voice.VoiceGreeting? greeting;
@@ -40,11 +40,13 @@ public class ScoreActivity : Activity
 
     private FrameLayout content = null!;
     private FrameLayout bottomBarSlot = null!;
+    private BinderTabs binder = null!;
+    private LinearLayout headerSlot = null!;
     private NowPlayingBar nowPlayingBar = null!;
     private Handler? uiHandler;
     private Java.Lang.Runnable? ticker;
 
-    private ScoreArea Active => areas[side];
+    private ScoreArea Active => areas[activeIndex];
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -60,8 +62,9 @@ public class ScoreActivity : Activity
 
         areas =
         [
+            new MusicArea(this, musicLibrary),
             new PodcastsArea(this, playback, progressStore),
-            new MusicArea(this, musicLibrary, new DiscoverArea(this, musicLibrary)),
+            new DiscoverArea(this, musicLibrary),
         ];
         foreach (var area in areas)
         {
@@ -101,23 +104,23 @@ public class ScoreActivity : Activity
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
         var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
 
-        var header = PaperUi.PageHeader(this, "Score");
-        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(header);
+        // The page, and the binder gutter down its right edge. Everything above the
+        // now-playing bar lives inside the page; the tabs sit outside it, which is
+        // what stops them ever overlapping content (§9's reserved gutter).
+        var spread = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        var page = new LinearLayout(this) { Orientation = Orientation.Vertical };
+
+        // The header is rebuilt per area — each carries its own title and the stroke
+        // beneath it is in the area's hue.
+        headerSlot = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        headerSlot.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        page.AddView(headerSlot);
 
         // A greeting in the owner's voice, hidden until composed (and only when a shared profile exists).
         greetingView = PaperUi.Secondary(this, string.Empty);
         greetingView.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X4));
         greetingView.Visibility = ViewStates.Gone;
-        root.AddView(greetingView);
-
-        var toggle = PaperUi.SegmentedToggle(this, "Podcasts", "Music", index =>
-        {
-            side = index;
-            RenderContent();
-        });
-        toggle.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X4));
-        root.AddView(toggle);
+        page.AddView(greetingView);
 
         content = new FrameLayout(this);
         foreach (var area in areas)
@@ -126,7 +129,33 @@ public class ScoreActivity : Activity
         }
 
         content.SetPadding(edge, 0, edge, 0);
-        root.AddView(content, new LinearLayout.LayoutParams(
+        page.AddView(content, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        spread.AddView(page, new LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.MatchParent) { Weight = 1 });
+
+        binder = new BinderTabs(this);
+        binder.SetAreas(areas.Select(area => area.Tab), activeIndex);
+        binder.AreaSelected += index =>
+        {
+            // Tapping the tab you are on returns that area to its root, which is why
+            // this is not guarded on the index having changed.
+            if (index == activeIndex)
+            {
+                while (Active.GoBack())
+                {
+                }
+            }
+
+            activeIndex = index;
+            binder.SetActive(index);
+            RenderContent();
+        };
+        spread.AddView(binder, new LinearLayout.LayoutParams(
+            PaperTheme.Dp(this, BinderTabs.WidthDp), ViewGroup.LayoutParams.MatchParent));
+
+        root.AddView(spread, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         nowPlayingBar = new NowPlayingBar(this, playback.SkipBack, playback.TogglePlayPause, playback.SkipForward,
@@ -185,6 +214,9 @@ public class ScoreActivity : Activity
 
     private void RenderContent()
     {
+        headerSlot.RemoveAllViews();
+        headerSlot.AddView(PaperUi.ScreenHeader(this, Active.Title, Active.Tab.Hue));
+
         content.RemoveAllViews();
         content.AddView(Active.BuildView(), new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
