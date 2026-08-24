@@ -49,7 +49,7 @@ public class AudioActivity : Activity
     private IReadOnlySet<string> doneIds = new HashSet<string>();
     private readonly PlaybackQueue queue = new();
 
-    private MediaController? controller;
+    private ScorePlayback playback = null!;
     private Episode? nowPlaying;
 
     private int side; // 0 = podcasts, 1 = music
@@ -61,9 +61,7 @@ public class AudioActivity : Activity
     private readonly DeviceAccountTokenProvider musicTokens = new();
 
     // Listening Genius (Phase 6): passive on-device recording -> Drive-backed Taste Profile.
-    private ListeningEventStore listeningStore = null!;
-    private readonly MusicListeningRecorder listeningRecorder = new();
-    private Score.Google.MusicTasteService? tasteService;
+    private ListeningLog listening = null!;
 
     // Discovery (Phase 7): prompted playlists + the quiet weekly shelf.
     private FridayPicksStore fridayPicksStore = null!;
@@ -89,6 +87,7 @@ public class AudioActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
+        playback = new ScorePlayback(this);
         store = new PodcastStore(this);
         progressStore = new PlaybackProgressStore(this);
         settingsStore = new PlaybackSettingsStore(this);
@@ -109,15 +108,14 @@ public class AudioActivity : Activity
         tagReader = new MusicTagReader(Path.Combine(CacheDir!.AbsolutePath, "art"));
         LoadMusicCatalog();
 
-        listeningStore = new ListeningEventStore(this);
-        listeningRecorder.LearningEnabled = MusicSettingsStore.ListeningGeniusEnabled;
-        tasteService = new Score.Google.MusicTasteService(musicTokens.GetAccessToken, "Score");
+        listening = new ListeningLog(
+            this, new Score.Google.MusicTasteService(musicTokens.GetAccessToken, "Score"));
         fridayPicksStore = new FridayPicksStore(this);
         FridayPicksWorker.Schedule(this); // weekly "New for you"; no-ops until signed in
 
         greeting = new Codex.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "Score");
         SetContentView(BuildLayout());
-        ConnectController();
+        playback.Connect();
         ShowGreetingAsync();
         RestoreMusicFolderFromVault();
         CrashReporter.ShowPendingCrash(this);
@@ -275,7 +273,7 @@ public class AudioActivity : Activity
         root.AddView(content, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        nowPlayingBar = new NowPlayingBar(this, SkipBack, TogglePlayPause, SkipForward,
+        nowPlayingBar = new NowPlayingBar(this, playback.SkipBack, playback.TogglePlayPause, playback.SkipForward,
             onOpen: () => StartActivity(new Intent(this, typeof(NowPlayingActivity))));
         root.AddView(nowPlayingBar);
 
@@ -306,51 +304,17 @@ public class AudioActivity : Activity
         StopTicking();
 
         // Finalize whatever was mid-play, then fold the day's listening into the Taste Profile (throttled).
-        RecordListening(listeningRecorder.Stop());
-        MaybeRefreshTaste();
+        listening.Stop();
+        listening.MaybeRefreshTaste();
 
         // Mirror the podcast library to Drive on the way out — captures anything marked played this visit,
         // plus resume points the playback service saved, and subscription edits made in Manage.
         BackupLibraryToDrive();
     }
 
-    // ---- Listening Genius ----
-
-    private void RecordListening(IReadOnlyList<ListeningEvent> events)
-    {
-        if (events.Count > 0)
-        {
-            listeningStore.Append(events);
-        }
-    }
-
-    // Refreshes the Taste Profile at most once a day, off the UI thread; best-effort and never fatal.
-    private void MaybeRefreshTaste()
-    {
-        if (!MusicSettingsStore.ListeningGeniusEnabled || tasteService is null)
-        {
-            return;
-        }
-
-        var last = MusicSettingsStore.TasteLastRefreshUtc;
-        if (last is { } when && DateTimeOffset.UtcNow - when < TimeSpan.FromHours(20))
-        {
-            return;
-        }
-
-        var events = listeningStore.Load();
-        if (events.Count == 0)
-        {
-            return;
-        }
-
-        MusicSettingsStore.TasteLastRefreshUtc = DateTimeOffset.UtcNow;
-        _ = tasteService.RefreshAsync(events, CancellationToken.None);
-    }
-
     protected override void OnDestroy()
     {
-        controller?.Release();
+        playback.Release();
         base.OnDestroy();
     }
 
@@ -439,7 +403,7 @@ public class AudioActivity : Activity
         container.AddView(PaperUi.SecondaryButton(this, "Use all of My Drive", () => ChooseFolder("root")));
 
         var rows = driveFolders.Select(folder => new PaperListRow(folder.Name)).ToList();
-        var list = BuildList(rows, position => ChooseFolder(driveFolders![position].Id));
+        var list = PaperUi.List(this, rows, position => ChooseFolder(driveFolders![position].Id));
         container.AddView(list, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         return container;
@@ -512,7 +476,7 @@ public class AudioActivity : Activity
                 var artists = catalog.Artists();
                 return artists.Count == 0
                     ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : BuildList([.. artists.Select(artist => new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"))],
+                    : PaperUi.List(this, [.. artists.Select(artist => new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"))],
                         position => PlayTracks(catalog.TracksByArtist(artists[position].Name), 0),
                         position => PlayShuffled(catalog.TracksByArtist(artists[position].Name)));
 
@@ -520,7 +484,7 @@ public class AudioActivity : Activity
                 var albums = catalog.Albums();
                 return albums.Count == 0
                     ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : BuildList([.. albums.Select(album => new PaperListRow(album.Name, album.AlbumArtist))],
+                    : PaperUi.List(this, [.. albums.Select(album => new PaperListRow(album.Name, album.AlbumArtist))],
                         position => PlayTracks(catalog.TracksInAlbum(albums[position].AlbumArtist, albums[position].Name), 0),
                         position => PlayShuffled(catalog.TracksInAlbum(albums[position].AlbumArtist, albums[position].Name)));
 
@@ -528,7 +492,7 @@ public class AudioActivity : Activity
                 var songs = catalog.Songs();
                 return songs.Count == 0
                     ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : BuildList([.. songs.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist))],
+                    : PaperUi.List(this, [.. songs.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist))],
                         position => PlayTracks(songs, position),
                         position => PlaySmartMix(songs[position], catalog));
 
@@ -536,7 +500,7 @@ public class AudioActivity : Activity
                 var genres = catalog.Genres();
                 return genres.Count == 0
                     ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : BuildList([.. genres.Select(genre => new PaperListRow(genre))],
+                    : PaperUi.List(this, [.. genres.Select(genre => new PaperListRow(genre))],
                         position => PlayTracks(catalog.TracksInGenre(genres[position]), 0),
                         position => PlayShuffled(catalog.TracksInGenre(genres[position])));
 
@@ -548,7 +512,7 @@ public class AudioActivity : Activity
 
             default:
                 var items = new[] { "Discovery", "Playlists", "Artists", "Albums", "Songs", "Genres" };
-                return BuildList([.. items.Select(item => new PaperListRow(item))], position =>
+                return PaperUi.List(this, [.. items.Select(item => new PaperListRow(item))], position =>
                 {
                     musicView = Enum.Parse<MusicView>(items[position]);
                     RenderContent();
@@ -608,7 +572,7 @@ public class AudioActivity : Activity
 
     private async Task MakePlaylistAsync(string? seed, MusicCatalog catalog)
     {
-        if (string.IsNullOrWhiteSpace(seed) || tasteService is null)
+        if (string.IsNullOrWhiteSpace(seed) || listening.Taste is null)
         {
             return;
         }
@@ -616,7 +580,7 @@ public class AudioActivity : Activity
         discoveryStatus = "Building a playlist…";
         RenderContent();
 
-        var playlist = await tasteService.MakePlaylistAsync(
+        var playlist = await listening.Taste.MakePlaylistAsync(
             catalog.Songs(), new PlaylistRequest(seed.Trim()), CancellationToken.None);
         if (playlist.IsEmpty)
         {
@@ -637,10 +601,10 @@ public class AudioActivity : Activity
     {
         var enabled = !MusicSettingsStore.ListeningGeniusEnabled;
         MusicSettingsStore.ListeningGeniusEnabled = enabled;
-        listeningRecorder.LearningEnabled = enabled;
+        listening.LearningEnabled = enabled;
         if (!enabled)
         {
-            listeningStore.Clear(); // off means forget what was gathered, not just stop
+            listening.Clear(); // off means forget what was gathered, not just stop
         }
 
         RenderContent();
@@ -648,22 +612,19 @@ public class AudioActivity : Activity
 
     private void PlayTracks(IReadOnlyList<Track> tracks, int index, PlaybackLaunch launch = PlaybackLaunch.Album)
     {
-        if (controller is null || tracks.Count == 0)
+        if (playback.Controller is null || tracks.Count == 0)
         {
             return;
         }
 
         nowPlaying = null; // music, not a podcast episode
-        var items = tracks.Select(BuildTrackItem).ToList();
-        controller.SetMediaItems(items, index, 0L);
-        controller.SetPlaybackSpeed(1.0f);
-        controller.Prepare();
-        controller.Play();
-        SendSkipSilence(false); // skip-silence is a podcast setting; off for music
+        // Speed 1.0 and skip-silence off: both are podcast settings, and a track must
+        // not inherit them from whatever episode played last.
+        playback.Start(MediaKind.Music, tracks.Select(BuildTrackItem).ToList(), index, 0L, 1.0f, skipSilence: false);
 
         // Start a listening sitting for Genius; replay is judged against the saved progress book.
         var progress = new PlaybackProgressBook(progressStore.Load());
-        RecordListening(listeningRecorder.BeginSelection(tracks, index, launch, progress.IsComplete));
+        listening.BeginSelection(tracks, index, launch, progress.IsComplete);
     }
 
     private void PlayShuffled(IReadOnlyList<Track> tracks) =>
@@ -786,7 +747,7 @@ public class AudioActivity : Activity
         var rows = shelf
             .Select(show => new PaperListRow(show.Title, $"{show.UnplayedCount} unplayed"))
             .ToList();
-        return BuildList(rows,
+        return PaperUi.List(this, rows,
             position =>
             {
                 openFeedId = shelf[position].FeedId;
@@ -832,7 +793,7 @@ public class AudioActivity : Activity
         var rows = showEpisodes
             .Select(episode => new PaperListRow(episode.Title, EpisodeSubtitle(episode, progress)))
             .ToList();
-        return BuildList(rows,
+        return PaperUi.List(this, rows,
             position => EnqueueAndPlay(showEpisodes[position]),
             position => ShowEpisodeActions(showEpisodes[position]));
     }
@@ -929,34 +890,6 @@ public class AudioActivity : Activity
         return row;
     }
 
-    private ListView BuildList(IReadOnlyList<PaperListRow> rows, Action<int> onClick, Action<int>? onLongClick = null)
-    {
-        var list = new ListView(this);
-        PaperUi.StylePaperList(this, list);
-        list.Adapter = new PaperListAdapter(this, rows);
-        list.ItemClick += (_, e) =>
-        {
-            if (e.Position >= 0 && e.Position < rows.Count)
-            {
-                onClick(e.Position);
-            }
-        };
-        if (onLongClick is not null)
-        {
-            list.ItemLongClick += (_, e) =>
-            {
-                if (e.Position >= 0 && e.Position < rows.Count)
-                {
-                    onLongClick(e.Position);
-                }
-
-                e.Handled = true;
-            };
-        }
-
-        return list;
-    }
-
     private string EpisodeSubtitle(Episode episode, PlaybackProgressBook progress)
     {
         var when = RelativeTime.Format(episode.PublishedUtc.LocalDateTime, DateTime.Now);
@@ -1035,7 +968,7 @@ public class AudioActivity : Activity
         // The controller is built asynchronously on cold start; a tap before it
         // connects can't play, so say so (the episode is already queued) rather
         // than fail silently, and record it for later diagnosis.
-        if (controller is null)
+        if (playback.Controller is null)
         {
             AudioDiagnostics.LogWarning("Playback", "Play requested before the media controller was ready.");
             Toast.MakeText(this, PodcastPlaybackDiagnostics.ControllerNotReady, ToastLength.Short)!.Show();
@@ -1069,11 +1002,7 @@ public class AudioActivity : Activity
                 .ResumeWithRewind(startEpisode.Id, DateTimeOffset.Now);
             var startMs = resume is { } point ? (long)point.TotalMilliseconds : 0L;
 
-            controller.SetMediaItems(items, index, startMs);
-            controller.SetPlaybackSpeed(showSettings.Speed);
-            controller.Prepare();
-            controller.Play();
-            SendSkipSilence(showSettings.SkipSilence);
+            playback.Start(MediaKind.Podcast, items, index, startMs, showSettings.Speed, showSettings.SkipSilence);
         }
         catch (Exception e)
         {
@@ -1092,35 +1021,6 @@ public class AudioActivity : Activity
             .SetUri(episode.AudioUrl)!
             .SetMediaMetadata(metadata)!
             .Build()!;
-    }
-
-    private void SendSkipSilence(bool enabled)
-    {
-        var intent = new Intent(this, typeof(PlaybackService));
-        intent.SetAction(AudioPlaybackCommands.ActionSetSkipSilence);
-        intent.PutExtra(AudioPlaybackCommands.ExtraEnabled, enabled);
-        StartService(intent);
-    }
-
-    private void SkipBack() => controller?.SeekTo(Math.Max(0, (controller?.CurrentPosition ?? 0) - 30_000));
-
-    private void SkipForward() => controller?.SeekTo((controller?.CurrentPosition ?? 0) + 30_000);
-
-    private void TogglePlayPause()
-    {
-        if (controller is null)
-        {
-            return;
-        }
-
-        if (controller.IsPlaying)
-        {
-            controller.Pause();
-        }
-        else
-        {
-            controller.Play();
-        }
     }
 
     // ---- Queue arrangement ----
@@ -1359,9 +1259,9 @@ public class AudioActivity : Activity
 
     private void Tick()
     {
-        if (controller is not null)
+        if (playback.Controller is not null)
         {
-            nowPlayingBar.Update(controller.MediaMetadata?.Title?.ToString(), controller.IsPlaying);
+            nowPlayingBar.Update(playback.CurrentTitle, playback.IsPlaying);
             ObserveListening();
         }
 
@@ -1372,26 +1272,12 @@ public class AudioActivity : Activity
     // id changes into completed/skipped signals itself.
     private void ObserveListening()
     {
-        if (controller is null || nowPlaying is not null || controller.CurrentMediaItem is null)
+        if (playback.Kind != MediaKind.Music || playback.CurrentMediaId is null)
         {
             return;
         }
 
-        var mediaId = controller.CurrentMediaItem.MediaId;
-        var position = TimeSpan.FromMilliseconds(Math.Max(0, controller.CurrentPosition));
-        var durationMs = controller.Duration;
-        var duration = durationMs > 0 ? TimeSpan.FromMilliseconds(durationMs) : TimeSpan.Zero;
-        RecordListening(listeningRecorder.Observe(mediaId, position, duration));
-    }
-
-    private void ConnectController()
-    {
-        var token = new SessionToken(this, new ComponentName(this, Java.Lang.Class.FromType(typeof(PlaybackService))));
-        var future = new MediaController.Builder(this, token).BuildAsync();
-        future.AddListener(new Java.Lang.Runnable(() =>
-        {
-            controller = (MediaController)future.Get()!;
-        }), AndroidX.Core.Content.ContextCompat.GetMainExecutor(this));
+        listening.Observe(playback.CurrentMediaId, playback.Position, playback.Duration);
     }
 
     // ---- Speed dialog (per-show speed + skip-silence) ----
@@ -1449,8 +1335,7 @@ public class AudioActivity : Activity
             ? settings with { Default = updated }
             : settings.With(feedId, updated);
         settingsStore.Save(settings);
-        controller?.SetPlaybackSpeed(updated.Speed);
-        SendSkipSilence(updated.SkipSilence);
+        playback.ApplySettings(updated.Speed, updated.SkipSilence);
     }
 
     private static string SpeedLabel(float speed) => $"Speed {speed:0.0}×";

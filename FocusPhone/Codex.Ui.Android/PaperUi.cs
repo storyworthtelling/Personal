@@ -206,6 +206,45 @@ public static class PaperUi
         list.DividerHeight = PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp);
     }
 
+    /// <summary>
+    /// A styled paper list with its taps already wired — the pairing every screen
+    /// that shows rows was writing out by hand, including the bounds check that stops
+    /// a stale adapter position indexing past the rows it was built from.
+    ///
+    /// Long-press is optional and, when given, is marked handled: §9 gives long-press
+    /// to the action card, so a row must not also fire its tap.
+    /// </summary>
+    public static ListView List(
+        Context context, IReadOnlyList<PaperListRow> rows, Action<int> onClick, Action<int>? onLongClick = null)
+    {
+        var list = new ListView(context);
+        StylePaperList(context, list);
+        list.Adapter = new PaperListAdapter(context, rows);
+
+        list.ItemClick += (_, e) =>
+        {
+            if (e.Position >= 0 && e.Position < rows.Count)
+            {
+                onClick(e.Position);
+            }
+        };
+
+        if (onLongClick is not null)
+        {
+            list.ItemLongClick += (_, e) =>
+            {
+                if (e.Position >= 0 && e.Position < rows.Count)
+                {
+                    onLongClick(e.Position);
+                }
+
+                e.Handled = true;
+            };
+        }
+
+        return list;
+    }
+
     // ---- Structure ----
 
     /// <summary>
