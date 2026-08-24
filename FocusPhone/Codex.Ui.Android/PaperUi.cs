@@ -38,6 +38,13 @@ public static class PaperUi
         Text(context, text, DesignTokens.TypeSp.Mono, PaperTheme.Ink, PaperTheme.Mono(context));
 
     /// <summary>
+    /// Field labels, chips and tab labels (DESIGN.md §4): Sans SemiBold at the
+    /// smallest step. Muted by default — a label names a thing, it is not the thing.
+    /// </summary>
+    public static TextView Label(Context context, string text) =>
+        Text(context, text, DesignTokens.TypeSp.Label, PaperTheme.InkMuted, PaperTheme.SansSemibold(context));
+
+    /// <summary>
     /// The owner's voice: Pinyon Script in ink-blue (DESIGN.md §4 reserves the
     /// calligraphy hand for this and nothing else). Wraps, because a voiced line is
     /// prose rather than a label.
@@ -200,12 +207,37 @@ public static class PaperUi
 
     // ---- Structure ----
 
-    /// <summary>The in-page chapter-heading screen title (DESIGN.md §7).</summary>
+    /// <summary>
+    /// The in-page chapter-heading screen title (DESIGN.md §7), without its stroke.
+    /// Prefer <see cref="ScreenHeader"/> — §7 says every screen opens with the title
+    /// <i>and</i> a full-width marker underline; this is the bare title for the
+    /// places that compose their own.
+    /// </summary>
     public static TextView PageHeader(Context context, string title)
     {
         var view = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
         view.SetPadding(0, 0, 0, PaperTheme.Dp(context, DesignTokens.Space.X6));
         return view;
+    }
+
+    /// <summary>
+    /// How every screen opens (DESIGN.md §7): a Display Serif Black title with a
+    /// full-width marker underline in the area's hue, and nothing else. There is no
+    /// standing top app bar — the header <i>is</i> the chrome.
+    /// </summary>
+    public static LinearLayout ScreenHeader(Context context, string title, Color hue)
+    {
+        var column = new LinearLayout(context) { Orientation = Orientation.Vertical };
+
+        var text = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
+        column.AddView(text, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        column.AddView(new MarkerUnderline(context, hue), new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, PaperTheme.Dp(context, MarkerUnderline.HeightDp)));
+
+        column.SetPadding(0, 0, 0, PaperTheme.Dp(context, DesignTokens.Space.X3));
+        return column;
     }
 
     /// <summary>
