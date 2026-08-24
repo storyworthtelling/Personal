@@ -19,7 +19,7 @@ public class AdaptiveIconRendererTests : IDisposable
     public void PaletteMatchesTheDesignBible()
     {
         Assert.Equal("#FAF8F2", Tokens.PaperHex);
-        Assert.Equal("#3A3A33", Tokens.InkHex);
+        Assert.Equal("#33322B", Tokens.InkHex);
         Assert.Equal("#C2542F", Tokens.AccentHex);
         Assert.Equal("#C9803A", Tokens.IdentityWarmHex);
     }

@@ -9,7 +9,7 @@ namespace IconStudio;
 public static class Tokens
 {
     public const string PaperHex = "#FAF8F2";
-    public const string InkHex = "#3A3A33";
+    public const string InkHex = "#33322B";
     public const string AccentHex = "#C2542F";
     public const string HairlineHex = "#E3DCC9";
 

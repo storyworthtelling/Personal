@@ -15,7 +15,7 @@ public static class PaperColorTokens
     public const string PaperDeep = "#F1EBDD";
     public const string PaperShade = "#E9E1CF";
     public const string Hairline = "#E3DCC9";
-    public const string Ink = "#3A3A33";
+    public const string Ink = "#33322B";
     public const string InkSoft = "#6B6759";
     public const string InkMuted = "#8A8578";
     public const string Accent = "#C2542F";

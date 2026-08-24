@@ -11,7 +11,7 @@
     <Color x:Key="PaperDeep">#F1EBDD</Color>
     <Color x:Key="PaperShade">#E9E1CF</Color>
     <Color x:Key="Hairline">#E3DCC9</Color>
-    <Color x:Key="Ink">#3A3A33</Color>
+    <Color x:Key="Ink">#33322B</Color>
     <Color x:Key="InkSoft">#6B6759</Color>
     <Color x:Key="InkMuted">#8A8578</Color>
     <Color x:Key="Accent">#C2542F</Color>
