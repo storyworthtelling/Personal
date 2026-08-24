@@ -1,9 +1,5 @@
-using Android.App;
 using Android.Content;
 using Android.Views;
-using Android.Widget;
-using Codex.Domain.Audio;
-using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Ui;
 using Codex.Ui.Voice;

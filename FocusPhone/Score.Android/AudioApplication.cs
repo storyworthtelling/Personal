@@ -7,7 +7,7 @@ namespace Score;
 /// <summary>
 /// Application entry point. Score previously had none; it exists so
 /// the crash reporter is installed before the media stack starts in
-/// <c>AudioActivity.OnCreate</c>. Icon attributes mirror the other heads.
+/// <c>ScoreActivity.OnCreate</c>. Icon attributes mirror the other heads.
 /// </summary>
 [Application(Icon = "@mipmap/appicon", RoundIcon = "@mipmap/appicon_round")]
 public class AudioApplication : Application

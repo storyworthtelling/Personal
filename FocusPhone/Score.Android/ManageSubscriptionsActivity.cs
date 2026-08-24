@@ -233,7 +233,7 @@ public class ManageSubscriptionsActivity : Activity
             .Show();
     }
 
-    // Persisted; AudioActivity reloads subscriptions and refreshes feeds in OnResume, so
+    // Persisted; PodcastsArea reloads subscriptions and refreshes feeds on resume, so
     // popping back to it shows the shows and their fetching state.
     private void ReturnToHome() => Finish();
 

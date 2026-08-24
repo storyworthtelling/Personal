@@ -1,6 +1,4 @@
-using Android.App;
 using Codex.Domain.Music;
-using Codex.Infrastructure.Music;
 using Score.Google;
 
 namespace Score;

@@ -1,121 +1,110 @@
-using Android.App;
 using Android.Content;
-using Android.OS;
 using Android.Views;
-using Android.Widget;
 using AndroidX.Media3.Common;
-using AndroidX.Media3.Session;
-using Score.Google;
 using Codex.Domain.Audio;
 using Codex.Domain.Design;
 using Codex.Domain.Time;
 using Codex.Infrastructure.Podcasts;
 using Codex.Ui;
-using Codex.Ui.Voice;
+using Score.Google;
 
 namespace Score;
 
 /// <summary>
-/// Score's app shell: a Podcasts | Music toggle over a swappable content pane,
-/// with a shared now-playing bar. The podcast side is a per-show home (fully-read
-/// shows hidden) that drills into a show's episodes, plus a reorderable queue with
-/// three auto-arrange strategies and cross-show auto-continue. Music is a
-/// placeholder until the Drive-backed player lands.
+/// The podcast area: a per-show shelf that drills into a show's episodes, and a
+/// reorderable queue with three auto-arrange strategies and cross-show auto-continue.
+///
+/// It owns every podcast store and all the podcast state, including which episode is
+/// playing — the shell no longer knows what an episode is. The feed refresh runs on
+/// resume whether or not this area is showing, because a shelf that is stale when you
+/// finally switch to it is worse than a background fetch nobody watched.
 /// </summary>
-[Activity(
-    Label = "Score",
-    MainLauncher = true,
-    Exported = true,
-    Theme = "@style/Theme.FocusPhone.Paper")]
-[IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
-public class AudioActivity : Activity
+public sealed class PodcastsArea : ScoreArea
 {
-    private PodcastStore store = null!;
-    private PlaybackProgressStore progressStore = null!;
-    private PlaybackSettingsStore settingsStore = null!;
-    private SubscriptionStore subscriptionStore = null!;
-    private EpisodeCacheStore episodeCache = null!;
-    private QueueStore queueStore = null!;
-    private PodcastLibrarySync librarySync = null!;
+    private readonly ScorePlayback playback;
+    private readonly PodcastStore store;
+    private readonly PlaybackProgressStore progressStore;
+    private readonly PlaybackSettingsStore settingsStore;
+    private readonly SubscriptionStore subscriptionStore;
+    private readonly EpisodeCacheStore episodeCache;
+    private readonly QueueStore queueStore;
+    private readonly PodcastLibrarySync librarySync;
+    private readonly PlaybackQueue queue = new();
 
     private PlaybackSettingsSnapshot settings = PlaybackSettingsSnapshot.Empty();
     private SubscriptionList subscriptions = new();
     private List<Episode> episodes = [];
     private Dictionary<string, string> feedTitles = [];
     private IReadOnlySet<string> doneIds = new HashSet<string>();
-    private readonly PlaybackQueue queue = new();
 
-    private ScorePlayback playback = null!;
     private Episode? nowPlaying;
-
-    private int side; // 0 = podcasts, 1 = music
     private string? openFeedId;
     private bool showingQueue;
     private bool isRefreshing; // a feed refresh is in flight — the empty shelf says so instead of "nothing new"
 
-    // Music side (Phase 3: sign-in + scan + browse; playback lands in Phase 4).
-    private readonly DeviceAccountTokenProvider musicTokens = new();
-
-    // Listening Genius (Phase 6): passive on-device recording -> Drive-backed Taste Profile.
-    private ListeningLog listening = null!;
-    private MusicLibrary musicLibrary = null!;
-    private MusicArea music = null!;
-
-    // Discovery (Phase 7): prompted playlists + the quiet weekly shelf.
-
-    // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
-    private Codex.Ui.Voice.VoiceGreeting? greeting;
-    private TextView? greetingView;
-
-    private FrameLayout content = null!;
-    private NowPlayingBar nowPlayingBar = null!;
-    private View podcastBottomBar = null!; // Shows/Queue/Manage/Speed — hidden on the music side
-    private Handler? uiHandler;
-    private Java.Lang.Runnable? ticker;
-
-    protected override void OnCreate(Bundle? savedInstanceState)
+    public PodcastsArea(Activity host, ScorePlayback playback, PlaybackProgressStore progress) : base(host)
     {
-        base.OnCreate(savedInstanceState);
-        PaperTransitions.Apply(this);
-        playback = new ScorePlayback(this);
-        store = new PodcastStore(this);
-        progressStore = new PlaybackProgressStore(this);
-        settingsStore = new PlaybackSettingsStore(this);
-        subscriptionStore = new SubscriptionStore(this);
-        episodeCache = new EpisodeCacheStore(this);
-        queueStore = new QueueStore(this);
+        this.playback = playback;
+        progressStore = progress;
+        store = new PodcastStore(host);
+        settingsStore = new PlaybackSettingsStore(host);
+        subscriptionStore = new SubscriptionStore(host);
+        episodeCache = new EpisodeCacheStore(host);
+        queueStore = new QueueStore(host);
         queue.ReplaceWith(queueStore.Load()); // restore the queue built in a previous session (pruned to live episodes on render)
         librarySync = new PodcastLibrarySync(
-            musicTokens.GetAccessToken, "Score",
-            store, subscriptionStore, progressStore, settingsStore, new EqualizerStore(this));
+            new DeviceAccountTokenProvider().GetAccessToken, "Score",
+            store, subscriptionStore, progressStore, settingsStore, new EqualizerStore(host));
+
         settings = settingsStore.Load();
         subscriptions = new SubscriptionList(subscriptionStore.Load());
         MigrateLegacyFeedsIfNeeded();
         LoadCachedEpisodes(); // paint the shelf from the previous fetch before the network refresh
         RestoreLibraryFromDrive();
-
-        listening = new ListeningLog(
-            this, new Score.Google.MusicTasteService(musicTokens.GetAccessToken, "Score"));
-        musicLibrary = new MusicLibrary(this, musicTokens, playback, listening, progressStore);
-        musicLibrary.LoadCatalog();
-        music = new MusicArea(this, musicLibrary, new DiscoverArea(this, musicLibrary));
-        // The shell redraws only for the area that is showing — a scan finishing behind
-        // the podcast side should not rebuild the podcast side.
-        music.Changed += () => { if (side == 1) RenderContent(); };
-        FridayPicksWorker.Schedule(this); // weekly "New for you"; no-ops until signed in
-
-        greeting = new Codex.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "Score");
-        SetContentView(BuildLayout());
-        playback.Connect();
-        ShowGreetingAsync();
-        musicLibrary.RestoreFolderFromVault();
-        CrashReporter.ShowPendingCrash(this);
-        RenderContent();
     }
 
-    // After a reinstall or the cutover's factory reset, refill the chosen music-folder id from the encrypted
-    // Drive vault (needs the vault passphrase set + Google signed in), so the library reappears without
-    // re-picking the folder. Runs only when none is set locally. Best-effort and off the UI thread.
+    public override View BuildView() => BuildPodcastsPane();
+
+    /// <summary>The area's own actions. The shell hosts it under the now-playing bar.</summary>
+    public override View? BuildBottomBar() => PaperUi.BottomBar(Host,
+        PaperUi.SecondaryButton(Host, "Shows", () => { openFeedId = null; showingQueue = false; Invalidate(); }),
+        PaperUi.QuietButton(Host, "Queue", () => { showingQueue = true; Invalidate(); }),
+        PaperUi.QuietButton(Host, "Manage", () => Host.StartActivity(new Intent(Host, typeof(ManageSubscriptionsActivity)))),
+        PaperUi.QuietButton(Host, "Speed", ShowSpeedDialog));
+
+    public override bool GoBack()
+    {
+        if (showingQueue)
+        {
+            showingQueue = false;
+            Invalidate();
+            return true;
+        }
+
+        if (openFeedId is not null)
+        {
+            openFeedId = null;
+            Invalidate();
+            return true;
+        }
+
+        return false;
+    }
+
+    public override void Resume()
+    {
+        subscriptions = new SubscriptionList(subscriptionStore.Load());
+        settings = settingsStore.Load();
+        _ = RefreshFeedsAsync();
+    }
+
+    /// <summary>
+    /// Mirror the library to Drive on the way out — it captures anything marked
+    /// played this visit, resume points the playback service saved, and subscription
+    /// edits made in Manage.
+    /// </summary>
+    public override void Pause() => BackupLibraryToDrive();
+
     // Pulls the podcast library (shows + listened + resume points) down from Drive when this device has
     // none of its own — a factory reset or a new phone. Best-effort and off the UI thread; on success it
     // reloads the local state and re-renders. Local always wins when it already has shows, so this never
@@ -127,12 +116,12 @@ public class AudioActivity : Activity
             if (!await librarySync.RestoreAsync(CancellationToken.None))
                 return;
 
-            RunOnUiThread(() =>
+            Host.RunOnUiThread(() =>
             {
                 subscriptions = new SubscriptionList(subscriptionStore.Load());
                 settings = settingsStore.Load(); // restored speed/skip-silence takes effect on next play
                 RecomputeDone();
-                RenderContent();
+                Invalidate();
                 _ = RefreshFeedsAsync();
             });
         }
@@ -156,6 +145,7 @@ public class AudioActivity : Activity
         }
     });
 
+
     // The old store persisted a bare feed-URL set; seed the ordered subscription
     // list from it the first time so no shows are lost on upgrade.
     private void MigrateLegacyFeedsIfNeeded()
@@ -173,143 +163,14 @@ public class AudioActivity : Activity
         subscriptionStore.Save(subscriptions.Export());
     }
 
-    // Composes a greeting in the owner's voice (from the shared Drive profile + key) and shows it under the
-    // header. Best-effort: it stays hidden when there's no signed-in account, profile, key, or on any error.
-    private async void ShowGreetingAsync()
-    {
-        if (greeting is null || greetingView is null)
-            return;
-        var message = await greeting.ComposeAsync(
-            "welcome", "the owner is opening their music and podcasts", CancellationToken.None);
-        if (string.IsNullOrWhiteSpace(message))
-            return;
-        greetingView.Text = message;
-        greetingView.Visibility = ViewStates.Visible;
-    }
-
-    private View BuildLayout()
-    {
-        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
-
-        var header = PaperUi.PageHeader(this, "Score");
-        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(header);
-
-        // A greeting in the owner's voice, hidden until composed (and only when a shared profile exists).
-        greetingView = PaperUi.Secondary(this, string.Empty);
-        greetingView.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X4));
-        greetingView.Visibility = ViewStates.Gone;
-        root.AddView(greetingView);
-
-        var toggle = PaperUi.SegmentedToggle(this, "Podcasts", "Music", index =>
-        {
-            side = index;
-            RenderContent();
-        });
-        toggle.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X4));
-        root.AddView(toggle);
-
-        content = new FrameLayout(this);
-        content.SetPadding(edge, 0, edge, 0);
-        root.AddView(content, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
-
-        nowPlayingBar = new NowPlayingBar(this, playback.SkipBack, playback.TogglePlayPause, playback.SkipForward,
-            onOpen: () => StartActivity(new Intent(this, typeof(NowPlayingActivity))));
-        root.AddView(nowPlayingBar);
-
-        // The podcast-only bar. Held in a field so RenderContent can hide it on the
-        // music side (its actions are all podcast-oriented); the now-playing bar
-        // above it stays shared for both sides.
-        podcastBottomBar = PaperUi.BottomBar(this,
-            PaperUi.SecondaryButton(this, "Shows", () => { side = 0; openFeedId = null; showingQueue = false; RenderContent(); }),
-            PaperUi.QuietButton(this, "Queue", () => { side = 0; showingQueue = true; RenderContent(); }),
-            PaperUi.QuietButton(this, "Manage", () => StartActivity(new Intent(this, typeof(ManageSubscriptionsActivity)))),
-            PaperUi.QuietButton(this, "Speed", ShowSpeedDialog));
-        root.AddView(podcastBottomBar);
-        return root;
-    }
-
-    protected override void OnResume()
-    {
-        base.OnResume();
-        subscriptions = new SubscriptionList(subscriptionStore.Load());
-        settings = settingsStore.Load();
-        StartTicking();
-        _ = RefreshFeedsAsync();
-    }
-
-    protected override void OnPause()
-    {
-        base.OnPause();
-        StopTicking();
-
-        // Finalize whatever was mid-play, then fold the day's listening into the Taste Profile (throttled).
-        listening.Stop();
-        listening.MaybeRefreshTaste();
-
-        // Mirror the podcast library to Drive on the way out — captures anything marked played this visit,
-        // plus resume points the playback service saved, and subscription edits made in Manage.
-        BackupLibraryToDrive();
-    }
-
-    protected override void OnDestroy()
-    {
-        playback.Release();
-        base.OnDestroy();
-    }
-
-    public override void OnBackPressed()
-    {
-        if (side == 0 && showingQueue)
-        {
-            showingQueue = false;
-            RenderContent();
-        }
-        else if (side == 0 && openFeedId is not null)
-        {
-            openFeedId = null;
-            RenderContent();
-        }
-        else if (side == 1 && music.GoBack())
-        {
-            // The area came up a level and asked for the redraw itself.
-        }
-        else
-        {
-            base.OnBackPressed();
-        }
-    }
-
-    // ---- Content rendering ----
-
-    private void RenderContent()
-    {
-        content.RemoveAllViews();
-        var pane = side == 1 ? music.BuildView() : BuildPodcastsPane();
-        content.AddView(pane, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
-
-        // The podcast bar (Shows/Queue/Manage/Speed) has no meaning on the music side.
-        podcastBottomBar.Visibility = side == 1 ? ViewStates.Gone : ViewStates.Visible;
-    }
 
     private View WrapScroll(View inner)
     {
-        var scroll = new ScrollView(this);
+        var scroll = new ScrollView(Host);
         scroll.AddView(inner);
         return scroll;
     }
 
-    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
-    {
-        base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode == DeviceAccountSignIn.RequestCode)
-        {
-            DeviceAccountSignIn.HandleChooserResult(resultCode, data);
-        }
-    }
 
     private View BuildPodcastsPane()
     {
@@ -326,17 +187,17 @@ public class AudioActivity : Activity
         var shelf = PodcastShelf.Build(episodes, feedTitles, doneIds);
         if (shelf.Count == 0)
         {
-            return PaperUi.EmptyState(this, EmptyShelfMessage());
+            return PaperUi.EmptyState(Host, EmptyShelfMessage());
         }
 
         var rows = shelf
             .Select(show => new PaperListRow(show.Title, $"{show.UnplayedCount} unplayed"))
             .ToList();
-        return PaperUi.List(this, rows,
+        return PaperUi.List(Host, rows,
             position =>
             {
                 openFeedId = shelf[position].FeedId;
-                RenderContent();
+                Invalidate();
             },
             position => ShowShelfActions(shelf[position]));
     }
@@ -344,7 +205,7 @@ public class AudioActivity : Activity
     // Long-press a show on the shelf: its one bulk action, marking every episode played.
     private void ShowShelfActions(ShowSummary show)
     {
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(Host)
             .SetTitle(show.Title)!
             .SetItems(new[] { "Mark all as played" }, (_, _) =>
                 MarkManyWithUndo(BulkListen.AllInShow(episodes, show.FeedId), "Marked show played."))!
@@ -371,14 +232,14 @@ public class AudioActivity : Activity
             .ToList();
         if (showEpisodes.Count == 0)
         {
-            return PaperUi.EmptyState(this, "All caught up.");
+            return PaperUi.EmptyState(Host, "All caught up.");
         }
 
         var progress = new PlaybackProgressBook(progressStore.Load());
         var rows = showEpisodes
             .Select(episode => new PaperListRow(episode.Title, EpisodeSubtitle(episode, progress)))
             .ToList();
-        return PaperUi.List(this, rows,
+        return PaperUi.List(Host, rows,
             position => EnqueueAndPlay(showEpisodes[position]),
             position => ShowEpisodeActions(showEpisodes[position]));
     }
@@ -387,7 +248,7 @@ public class AudioActivity : Activity
     // everything older beneath it. Tapping the row (not long-press) still plays.
     private void ShowEpisodeActions(Episode episode)
     {
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(Host)
             .SetTitle(episode.Title)!
             .SetItems(new[] { "Add to queue", "Mark played", "Mark older as played" }, (_, args) =>
             {
@@ -414,16 +275,16 @@ public class AudioActivity : Activity
             !doneIds.Contains(id) && episodes.Any(episode => episode.Id == id)));
         SaveQueue();
 
-        var container = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        var container = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
-        var head = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        var head = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
         head.SetGravity(GravityFlags.CenterVertical);
-        head.AddView(PaperUi.Heading(this, "Queue"),
+        head.AddView(PaperUi.Heading(Host, "Queue"),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        head.AddView(PaperUi.SecondaryButton(this, "Auto-arrange", ShowArrangeDialog));
+        head.AddView(PaperUi.SecondaryButton(Host, "Auto-arrange", ShowArrangeDialog));
         if (queue.Count > 0)
         {
-            head.AddView(PaperUi.QuietButton(this, "Clear", ClearQueueWithUndo));
+            head.AddView(PaperUi.QuietButton(Host, "Clear", ClearQueueWithUndo));
         }
 
         container.AddView(head);
@@ -433,12 +294,12 @@ public class AudioActivity : Activity
             .ToList();
         if (queued.Count == 0)
         {
-            container.AddView(PaperUi.EmptyState(this, "Queue is empty."));
+            container.AddView(PaperUi.EmptyState(Host, "Queue is empty."));
             return container;
         }
 
-        var scroll = new ScrollView(this);
-        var list = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        var scroll = new ScrollView(Host);
+        var list = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         for (var i = 0; i < queued.Count; i++)
         {
             list.AddView(BuildQueueRow(queued[i], i, queued.Count));
@@ -452,24 +313,24 @@ public class AudioActivity : Activity
 
     private View BuildQueueRow(Episode episode, int index, int total)
     {
-        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
         row.SetGravity(GravityFlags.CenterVertical);
-        var vertical = PaperTheme.Dp(this, DesignTokens.Space.X3);
+        var vertical = PaperTheme.Dp(Host, DesignTokens.Space.X3);
         row.SetPadding(0, vertical, 0, vertical);
 
-        var title = PaperUi.Body(this, episode.Title);
+        var title = PaperUi.Body(Host, episode.Title);
         title.Clickable = true;
         title.Click += (_, _) => PlayQueue(episode.Id);
         row.AddView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
         if (index > 0)
         {
-            row.AddView(PaperUi.QuietButton(this, "↑", () => { queue.Move(index, index - 1); SaveQueue(); RenderContent(); }));
+            row.AddView(PaperUi.QuietButton(Host, "↑", () => { queue.Move(index, index - 1); SaveQueue(); Invalidate(); }));
         }
 
         if (index < total - 1)
         {
-            row.AddView(PaperUi.QuietButton(this, "↓", () => { queue.Move(index, index + 1); SaveQueue(); RenderContent(); }));
+            row.AddView(PaperUi.QuietButton(Host, "↓", () => { queue.Move(index, index + 1); SaveQueue(); Invalidate(); }));
         }
 
         return row;
@@ -505,17 +366,17 @@ public class AudioActivity : Activity
         var wasQueued = queue.Items.Contains(episode.Id);
         queue.Add(episode.Id);
         SaveQueue();
-        RenderContent();
+        Invalidate();
         if (wasQueued)
         {
             return; // already in the queue; nothing new to undo
         }
 
-        UndoBar.Show(this, content, "Added to queue.", onUndo: () =>
+        UndoBar.Show(Host, Overlay, "Added to queue.", onUndo: () =>
         {
             queue.Remove(episode.Id);
             SaveQueue();
-            RenderContent();
+            Invalidate();
         });
     }
 
@@ -529,12 +390,12 @@ public class AudioActivity : Activity
         var snapshot = queue.Export();
         queue.Clear();
         SaveQueue();
-        RenderContent();
-        UndoBar.Show(this, content, "Cleared queue.", onUndo: () =>
+        Invalidate();
+        UndoBar.Show(Host, Overlay, "Cleared queue.", onUndo: () =>
         {
             queue.ReplaceWith(snapshot);
             SaveQueue();
-            RenderContent();
+            Invalidate();
         });
     }
 
@@ -545,7 +406,7 @@ public class AudioActivity : Activity
         queue.Add(episode.Id);
         SaveQueue();
         PlayQueue(episode.Id);
-        RenderContent();
+        Invalidate();
     }
 
     private void PlayQueue(string startId)
@@ -556,7 +417,7 @@ public class AudioActivity : Activity
         if (playback.Controller is null)
         {
             AudioDiagnostics.LogWarning("Playback", "Play requested before the media controller was ready.");
-            Toast.MakeText(this, PodcastPlaybackDiagnostics.ControllerNotReady, ToastLength.Short)!.Show();
+            Toast.MakeText(Host, PodcastPlaybackDiagnostics.ControllerNotReady, ToastLength.Short)!.Show();
             return;
         }
 
@@ -573,7 +434,7 @@ public class AudioActivity : Activity
             // so it can never start — tell the user which one instead of no-op.
             var title = episodes.FirstOrDefault(episode => episode.Id == startId)?.Title;
             AudioDiagnostics.LogWarning("Playback", $"Episode has no playable audio: id={startId}.");
-            Toast.MakeText(this, PodcastPlaybackDiagnostics.NoPlayableAudio(title), ToastLength.Short)!.Show();
+            Toast.MakeText(Host, PodcastPlaybackDiagnostics.NoPlayableAudio(title), ToastLength.Short)!.Show();
             return;
         }
 
@@ -594,7 +455,7 @@ public class AudioActivity : Activity
             // Never let a media-stack fault die silently — capture the stack trace
             // to the rolling log and give the user a brief, honest message.
             AudioDiagnostics.LogWarning("Playback", "Starting playback failed.", e);
-            Toast.MakeText(this, "Couldn't start playback — see Manage → Diagnostics.", ToastLength.Short)!.Show();
+            Toast.MakeText(Host, "Couldn't start playback — see Manage → Diagnostics.", ToastLength.Short)!.Show();
         }
     }
 
@@ -618,7 +479,7 @@ public class AudioActivity : Activity
             "Chronological (oldest first)",
             "Backlog-buster (finish shows)",
         };
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(Host)
             .SetTitle("Auto-arrange queue")!
             .SetItems(options, (_, args) =>
             {
@@ -650,18 +511,18 @@ public class AudioActivity : Activity
                 // say why and leave any existing queue intact rather than wiping it.
                 AudioDiagnostics.LogWarning("Queue",
                     $"Auto-arrange ({arrangement}) found no unplayed episodes; refreshing={isRefreshing}.");
-                Toast.MakeText(this, PodcastPlaybackDiagnostics.NothingToQueue(isRefreshing), ToastLength.Short)!.Show();
+                Toast.MakeText(Host, PodcastPlaybackDiagnostics.NothingToQueue(isRefreshing), ToastLength.Short)!.Show();
                 return;
             }
 
             queue.ReplaceWith(strategy.Arrange(unplayed).Select(episode => episode.Id));
             SaveQueue();
-            RenderContent(); // the filled queue is the confirmation (inline state change, DESIGN.md §5)
+            Invalidate(); // the filled queue is the confirmation (inline state change, DESIGN.md §5)
         }
         catch (Exception e)
         {
             AudioDiagnostics.LogWarning("Queue", $"Auto-arrange ({arrangement}) failed.", e);
-            Toast.MakeText(this, "Couldn't arrange the queue — see Manage → Diagnostics.", ToastLength.Short)!.Show();
+            Toast.MakeText(Host, "Couldn't arrange the queue — see Manage → Diagnostics.", ToastLength.Short)!.Show();
         }
     }
 
@@ -670,7 +531,7 @@ public class AudioActivity : Activity
     private void MarkDoneWithUndo(Episode episode)
     {
         SetListened(episode.Id, listened: true);
-        UndoBar.Show(this, content, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
+        UndoBar.Show(Host, Overlay, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
     }
 
     // Marks a batch played, remembering only the ids this action newly added so undo
@@ -687,14 +548,14 @@ public class AudioActivity : Activity
 
         store.SaveListenedIds(listened);
         RecomputeDone();
-        RenderContent();
-        UndoBar.Show(this, content, message, onUndo: () =>
+        Invalidate();
+        UndoBar.Show(Host, Overlay, message, onUndo: () =>
         {
             var ids = store.ListenedIds.ToHashSet();
             ids.ExceptWith(added);
             store.SaveListenedIds(ids);
             RecomputeDone();
-            RenderContent();
+            Invalidate();
         });
     }
 
@@ -712,7 +573,7 @@ public class AudioActivity : Activity
 
         store.SaveListenedIds(ids);
         RecomputeDone();
-        RenderContent();
+        Invalidate();
     }
 
     private void RecomputeDone() =>
@@ -736,9 +597,9 @@ public class AudioActivity : Activity
     {
         isRefreshing = true;
         // Only blank to "Fetching episodes…" when there's nothing cached to show yet (true first run).
-        if (side == 0 && !showingQueue && openFeedId is null && episodes.Count == 0)
+        if (!showingQueue && openFeedId is null && episodes.Count == 0)
         {
-            RenderContent();
+            Invalidate();
         }
 
         var ordered = subscriptions.Ordered.ToList();
@@ -791,17 +652,17 @@ public class AudioActivity : Activity
         // Failure may speak (DESIGN.md §7), but a wall of toasts must not: summarize when several feeds fail.
         if (failedHosts.Count == 1)
         {
-            Toast.MakeText(this, $"{failedHosts[0]} didn't answer. It retries on the next refresh.",
+            Toast.MakeText(Host, $"{failedHosts[0]} didn't answer. It retries on the next refresh.",
                 ToastLength.Short)!.Show();
         }
         else if (failedHosts.Count > 1)
         {
-            Toast.MakeText(this, $"{failedHosts.Count} shows didn't answer. They retry on the next refresh.",
+            Toast.MakeText(Host, $"{failedHosts.Count} shows didn't answer. They retry on the next refresh.",
                 ToastLength.Short)!.Show();
         }
 
         RecomputeDone();
-        RenderContent();
+        Invalidate();
     }
 
     // Fetches one feed, folding the family of expected feed failures into a result rather than throwing, so
@@ -827,43 +688,6 @@ public class AudioActivity : Activity
 
     // ---- Now-playing bar poll ----
 
-    private void StartTicking()
-    {
-        uiHandler ??= new Handler(Looper.MainLooper!);
-        ticker ??= new Java.Lang.Runnable(Tick);
-        uiHandler.PostDelayed(ticker, 1000);
-    }
-
-    private void StopTicking()
-    {
-        if (uiHandler is not null && ticker is not null)
-        {
-            uiHandler.RemoveCallbacks(ticker);
-        }
-    }
-
-    private void Tick()
-    {
-        if (playback.Controller is not null)
-        {
-            nowPlayingBar.Update(playback.CurrentTitle, playback.IsPlaying);
-            ObserveListening();
-        }
-
-        uiHandler?.PostDelayed(ticker!, 1000);
-    }
-
-    // Sample the music player for Genius. Only music counts (a podcast sets nowPlaying); the recorder turns
-    // id changes into completed/skipped signals itself.
-    private void ObserveListening()
-    {
-        if (playback.Kind != MediaKind.Music || playback.CurrentMediaId is null)
-        {
-            return;
-        }
-
-        listening.Observe(playback.CurrentMediaId, playback.Position, playback.Duration);
-    }
 
     // ---- Speed dialog (per-show speed + skip-silence) ----
 
@@ -872,11 +696,11 @@ public class AudioActivity : Activity
         var feedId = nowPlaying?.FeedId;
         var current = feedId is null ? settings.Default : settings.For(feedId);
 
-        var edge = PaperTheme.Dp(this, DesignTokens.Space.X4);
-        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        var edge = PaperTheme.Dp(Host, DesignTokens.Space.X4);
+        var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         layout.SetPadding(edge, edge, edge, edge);
 
-        var label = PaperUi.Title(this, SpeedLabel(current.Speed));
+        var label = PaperUi.Title(Host, SpeedLabel(current.Speed));
         layout.AddView(label);
 
         Button? trim = null;
@@ -893,21 +717,21 @@ public class AudioActivity : Activity
             PersistAndApply(feedId, current);
         }
 
-        var presetRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        presetRow.AddView(PaperUi.SecondaryButton(this, "−", () => Apply(current.Slower())));
+        var presetRow = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
+        presetRow.AddView(PaperUi.SecondaryButton(Host, "−", () => Apply(current.Slower())));
         foreach (var preset in PlaybackSettings.Presets)
         {
             var value = preset;
-            presetRow.AddView(PaperUi.QuietButton(this, $"{value:0.0}×", () => Apply(current.WithSpeed(value))));
+            presetRow.AddView(PaperUi.QuietButton(Host, $"{value:0.0}×", () => Apply(current.WithSpeed(value))));
         }
-        presetRow.AddView(PaperUi.SecondaryButton(this, "+", () => Apply(current.Faster())));
+        presetRow.AddView(PaperUi.SecondaryButton(Host, "+", () => Apply(current.Faster())));
         layout.AddView(presetRow);
 
-        trim = PaperUi.SecondaryButton(this, TrimLabel(current.SkipSilence),
+        trim = PaperUi.SecondaryButton(Host, TrimLabel(current.SkipSilence),
             () => Apply(current with { SkipSilence = !current.SkipSilence }));
         layout.AddView(trim);
 
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(Host)
             .SetTitle("Playback speed")!
             .SetView(layout)!
             .SetPositiveButton("Done", (_, _) => { })!
@@ -922,6 +746,7 @@ public class AudioActivity : Activity
         settingsStore.Save(settings);
         playback.ApplySettings(updated.Speed, updated.SkipSilence);
     }
+
 
     private static string SpeedLabel(float speed) => $"Speed {speed:0.0}×";
 

@@ -1,9 +1,5 @@
-using Android.App;
-using Android.Widget;
 using Codex.Domain.Audio;
 using Codex.Domain.Music;
-using Codex.Infrastructure.Music;
-using Codex.Infrastructure.Podcasts;
 using Codex.Ui.Voice;
 using Score.Google;
 using Storyworthtelling.Voice.Secrets;

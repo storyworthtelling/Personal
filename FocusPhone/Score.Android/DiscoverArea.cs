@@ -1,8 +1,5 @@
-using Android.App;
 using Android.Views;
-using Android.Widget;
 using Codex.Domain.Music;
-using Codex.Infrastructure.Music;
 using Codex.Ui;
 
 namespace Score;

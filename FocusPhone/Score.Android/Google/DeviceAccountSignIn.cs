@@ -35,7 +35,7 @@ public static class DeviceAccountSignIn
         return pendingChoice.Task;
     }
 
-    // Invoked from AudioActivity.OnActivityResult once the picker returns.
+    // Invoked from ScoreActivity.OnActivityResult once the picker returns.
     public static void HandleChooserResult(Result resultCode, Intent? data)
     {
         var tcs = pendingChoice;
