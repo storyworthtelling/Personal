@@ -12,6 +12,7 @@
     <!-- Test-only: the seam that keeps Codex's DesignTokens a faithful re-export of the shared
          P4 palette. Domain itself never references Paper (which carries SkiaSharp/PDFsharp). -->
     <ProjectReference Include="..\..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 
   <ItemGroup>

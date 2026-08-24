@@ -1,5 +1,4 @@
 using Codex.Domain.Policy;
-using Codex.Domain.Updates;
 using Xunit;
 
 namespace Codex.Tests.Guard;
@@ -75,13 +74,15 @@ public class FrozenInvariantsTests
             "The 'apps-latest' rolling-release tag is gone from .github — the device-owner update channel would break.");
 
         // The install decision is package-id based: an owner app upgrades, a stray package is skipped.
-        var upgraded = SiblingUpdatePlan.Decide(
-            [new InstallCandidate(PolicyContext.LauncherPackage, 2)],
+        var upgraded = Storyworthtelling.Updates.UpdateScope.Decide(
+            Storyworthtelling.Updates.UpdateRole.Bootstrapper, PolicyContext.LauncherPackage,
+            [new Storyworthtelling.Updates.InstallCandidate(PolicyContext.LauncherPackage, 2)],
             new Dictionary<string, long> { [PolicyContext.LauncherPackage] = 1 });
         Assert.Single(upgraded);
 
-        var skipped = SiblingUpdatePlan.Decide(
-            [new InstallCandidate("com.example.other", 9)],
+        var skipped = Storyworthtelling.Updates.UpdateScope.Decide(
+            Storyworthtelling.Updates.UpdateRole.Bootstrapper, PolicyContext.LauncherPackage,
+            [new Storyworthtelling.Updates.InstallCandidate("com.example.other", 9)],
             new Dictionary<string, long>());
         Assert.Empty(skipped);
     }
@@ -109,6 +110,16 @@ public class FrozenInvariantsTests
             return source.Contains($"\"{componentName}\"", StringComparison.Ordinal)
                 && source.Contains(attributeHint, StringComparison.Ordinal);
         });
+
+    // The owner namespace is the update channel's whole trust boundary, and it now
+    // lives in the shared update library — Codex.Domain keeps its own copy so it
+    // stays dependency-free, which means the two can drift. This is the guard that
+    // says they cannot.
+    [Fact]
+    public void OwnerPrefixMatchesTheSharedUpdateLibrary()
+    {
+        Assert.Equal(Storyworthtelling.Updates.SuiteApps.OwnerPackagePrefix, PolicyContext.OwnerPackagePrefix);
+    }
 
     // ---- Score (P6): the same invariants, for the second head through the rename ----
 

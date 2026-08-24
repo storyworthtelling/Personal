@@ -13,6 +13,7 @@ on:
       - 'FocusPhone/Codex.Domain/**'
       - 'FocusPhone/Codex.Infrastructure/**'
       - 'FocusPhone/Codex.Tests/**'
+      - 'Storyworthtelling.Updates/**'
       - '.github/workflows/build-flyleaf.yml'
 
 jobs:

@@ -1,4 +1,4 @@
-namespace Codex.Domain.Updates;
+namespace Storyworthtelling.Updates;
 
 /// <summary>What happened to a single app the update channel considered.</summary>
 public enum InstallOutcome

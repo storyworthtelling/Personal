@@ -1,7 +1,6 @@
-using Codex.Domain.Updates;
-using Xunit;
+using Storyworthtelling.Updates;
 
-namespace Codex.Tests.Updates;
+namespace Storyworthtelling.Updates.Tests;
 
 public class UpdateRunResultTests
 {

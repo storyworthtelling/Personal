@@ -3,7 +3,8 @@ using Android.Content;
 using Android.Content.PM;
 using Android.Util;
 using AndroidX.Work;
-using Codex.Domain.Updates;
+using Storyworthtelling.Updates;
+using Codex.Domain.Policy;
 using Codex.Infrastructure.Updates;
 using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
@@ -146,7 +147,11 @@ public static class UpdateService
         }
 
         var installedVersions = InstalledVersionCodes(context, downloaded.Select(d => d.Candidate.Package));
-        var toInstall = SiblingUpdatePlan.Decide(downloaded.Select(d => d.Candidate), installedVersions)
+        // Flyleaf is the bootstrapper: it updates itself, and it puts apps the device
+        // does not have on it. An installed sibling keeps itself current from here on.
+        var toInstall = UpdateScope
+            .Decide(UpdateRole.Bootstrapper, PolicyContext.LauncherPackage,
+                downloaded.Select(d => d.Candidate), installedVersions)
             .Select(c => c.Package)
             .ToHashSet();
 
