@@ -64,6 +64,7 @@ public class ScoreActivity : Activity
         [
             new MusicArea(this, musicLibrary),
             new PodcastsArea(this, playback, progressStore),
+            new PlayingArea(this, playback),
             new DiscoverArea(this, musicLibrary),
         ];
         foreach (var area in areas)
@@ -159,7 +160,7 @@ public class ScoreActivity : Activity
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         nowPlayingBar = new NowPlayingBar(this, playback.SkipBack, playback.TogglePlayPause, playback.SkipForward,
-            onOpen: () => StartActivity(new Intent(this, typeof(NowPlayingActivity))));
+            onOpen: () => TurnTo(typeof(PlayingArea)));
         root.AddView(nowPlayingBar);
 
         // A slot rather than a bar: each area supplies its own actions, and an area
@@ -212,6 +213,20 @@ public class ScoreActivity : Activity
 
     // ---- Content rendering ----
 
+    /// <summary>Turns the binder to an area by type, as the now-playing bar does.</summary>
+    private void TurnTo(Type areaType)
+    {
+        var index = Array.FindIndex(areas, area => area.GetType() == areaType);
+        if (index < 0 || index == activeIndex)
+        {
+            return;
+        }
+
+        activeIndex = index;
+        binder.SetActive(index);
+        RenderContent();
+    }
+
     private void RenderContent()
     {
         headerSlot.RemoveAllViews();
@@ -220,6 +235,9 @@ public class ScoreActivity : Activity
         content.RemoveAllViews();
         content.AddView(Active.BuildView(), new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        // The bar is chrome for areas that are not themselves the current track.
+        nowPlayingBar.Visibility = Active.ShowsNowPlayingBar ? ViewStates.Visible : ViewStates.Gone;
 
         bottomBarSlot.RemoveAllViews();
         if (Active.BuildBottomBar() is { } bar)
@@ -234,6 +252,12 @@ public class ScoreActivity : Activity
         if (requestCode == DeviceAccountSignIn.RequestCode)
         {
             DeviceAccountSignIn.HandleChooserResult(resultCode, data);
+            return;
+        }
+
+        foreach (var area in areas)
+        {
+            area.OnActivityResult(requestCode, resultCode, data);
         }
     }
 
@@ -258,6 +282,7 @@ public class ScoreActivity : Activity
         {
             nowPlayingBar.Update(playback.CurrentTitle, playback.IsPlaying);
             ObserveListening();
+            Active.OnTick();
         }
 
         uiHandler?.PostDelayed(ticker!, 1000);

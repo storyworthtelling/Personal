@@ -293,7 +293,8 @@ public static class PaperUi
     /// <i>change what this page is showing</i>.
     /// </summary>
     public static LinearLayout Segmented(
-        Context context, IReadOnlyList<string> labels, Action<int> onSelect, int initialIndex = 0, Color? hue = null)
+        Context context, IReadOnlyList<string> labels, Action<int> onSelect, int initialIndex = 0,
+        Color? hue = null, IReadOnlyList<bool>? enabled = null)
     {
         var tint = hue ?? PaperTheme.Accent;
         var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
@@ -306,7 +307,8 @@ public static class PaperUi
         {
             for (var i = 0; i < cells.Length; i++)
             {
-                var active = i == selected;
+                var live = enabled is null || i >= enabled.Count || enabled[i];
+                var active = i == selected && live;
                 cells[i].SetBackgroundColor(active
                     ? PaperTheme.Wash(tint)
                     : Color.Transparent);
@@ -326,13 +328,25 @@ public static class PaperUi
             cell.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
             var pad = PaperTheme.Dp(context, DesignTokens.Space.X2);
             cell.SetPadding(pad, pad, pad, pad);
-            cell.Clickable = true;
-            cell.Click += (_, _) =>
+
+            // §8 Disabled: a segment with nothing behind it is dimmed and inert, never
+            // removed — a control that changes shape as its content arrives is worse
+            // than one with a greyed-out third.
+            if (enabled is not null && index < enabled.Count && !enabled[index])
             {
-                selected = index;
-                Paint();
-                onSelect(index);
-            };
+                cell.Alpha = DesignTokens.Alpha.DisabledOpacity;
+                cell.Clickable = false;
+            }
+            else
+            {
+                cell.Clickable = true;
+                cell.Click += (_, _) =>
+                {
+                    selected = index;
+                    Paint();
+                    onSelect(index);
+                };
+            }
 
             cells[i] = cell;
             row.AddView(cell, new LinearLayout.LayoutParams(

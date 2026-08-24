@@ -1,3 +1,5 @@
+using Android.App;
+using Android.Content;
 using Android.Views;
 using Codex.Ui;
 
@@ -63,6 +65,27 @@ public abstract class ScoreArea(Activity host)
 
     /// <summary>The screen is going away. Called on every area, as Resume is.</summary>
     public virtual void Pause()
+    {
+    }
+
+    /// <summary>
+    /// Whether the shell's now-playing bar belongs on this area. False wherever the
+    /// screen already shows the current track — repeating it in a bar underneath is
+    /// the same information twice.
+    /// </summary>
+    public virtual bool ShowsNowPlayingBar => true;
+
+    /// <summary>
+    /// The shell's one-second tick. An area that shows live playback updates its own
+    /// views here rather than raising <see cref="Changed"/>, which would rebuild the
+    /// pane out from under a scrubber someone is dragging.
+    /// </summary>
+    public virtual void OnTick()
+    {
+    }
+
+    /// <summary>An activity result the shell could not place. Areas claim their own.</summary>
+    public virtual void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
     }
 

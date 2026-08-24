@@ -154,6 +154,13 @@ public static class DesignTokens
     public static class Alpha
     {
         public const byte Wash = 77;   // ~30%
+
+        /// <summary>
+        /// §8 Disabled: desaturate and dim to ~45%, never silently removed. A
+        /// fraction rather than a byte because this one is set on a whole view
+        /// (View.Alpha) rather than mixed into a colour.
+        /// </summary>
+        public const float DisabledOpacity = 0.45f;
     }
 
     /// <summary>Calm functional motion: two durations, decelerate curves, no haptics.</summary>

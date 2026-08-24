@@ -463,7 +463,12 @@ public sealed class PodcastsArea : ScoreArea
 
     private static MediaItem BuildItem(Episode episode)
     {
-        var metadata = new MediaMetadata.Builder().SetTitle(episode.Title)!.Build()!;
+        // The description rides along so the Playing area can show notes without
+        // reaching back into podcast state for the episode behind the media id.
+        var metadata = new MediaMetadata.Builder()
+            .SetTitle(episode.Title)!
+            .SetDescription(episode.Description)!
+            .Build()!;
         return new MediaItem.Builder()
             .SetMediaId(episode.Id)!
             .SetUri(episode.AudioUrl)!
