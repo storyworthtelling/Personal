@@ -76,7 +76,7 @@ Terracotta is **retired everywhere** — including documents, where the old "act
 | `PaperDeep` | `#F1EBDD` | Inset panels, explainer cards, mono fields, overlay haze |
 | `PaperShade` | `#E9E1CF` | Slider tracks, letterbox fill |
 | `Hairline` | `#E3DCC9` | Borders, dividers |
-| `Ink` | `#33322B` | Body & UI text, glyphs — **this value is correct**; the shipped token files still carry `#3A3A33` and are corrected during Ledger's rebrand |
+| `Ink` | `#33322B` | Body & UI text, glyphs |
 | `InkSoft` | `#6B6759` | Tertiary text for long runs |
 | `InkMuted` | `#8A8578` | Secondary text, metadata (≥14sp) |
 | `InkBlue` | `#2C3E5E` | "The pen": signatures, editorial marks, and the color of the voice |
