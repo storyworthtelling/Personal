@@ -110,6 +110,93 @@ public class FrozenInvariantsTests
                 && source.Contains(attributeHint, StringComparison.Ordinal);
         });
 
+    // ---- Score (P6): the same invariants, for the second head through the rename ----
+
+    // Exactly one head declares the frozen audio ApplicationId. Score renames its
+    // folder, csproj and namespace; the package name is what a device matches an
+    // update against, so it survives all three.
+    [Fact]
+    public void AudioCsprojDeclaresFrozenApplicationId()
+    {
+        var declaring = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains($"<ApplicationId>{PolicyContext.AudioPackage}</ApplicationId>", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(declaring.Count == 1,
+            $"Exactly one csproj must declare the frozen audio ApplicationId " +
+            $"'{PolicyContext.AudioPackage}'; found {declaring.Count}:\n" +
+            string.Join("\n", declaring.Select(RepoRelative)));
+    }
+
+    // Two registered component names outlive the process that registered them: the
+    // media session's foreground SERVICE, which a device may already be running
+    // across the upgrade, and the WorkManager WORKER, whose scheduled request is
+    // persisted by class name in WorkManager's own database. Renaming either strands
+    // the thing that refers to it — the service notification, or a Friday run that
+    // silently never fires again. This is why those two classes carry an explicit
+    // Name/Register rather than taking the namespace default.
+    [Fact]
+    public void PlaybackServiceAndPicksWorkerComponentNamesAreFrozen()
+    {
+        Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.PlaybackService", "Name ="));
+        Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.FridayPicksWorker", "Register("));
+    }
+
+    // Every on-device store the head owns, by SharedPreferences file name. These ARE
+    // the upgrade: the file name is the only handle Android gives you on the data, so
+    // a renamed constant reads as an empty app — no subscriptions, no resume points,
+    // no equalizer. Every prefs name in the repo is unique across all four heads, so
+    // "declared exactly once" catches both a rename and a drop without this test
+    // needing to know which folder the head lives in.
+    [Fact]
+    public void AudioPreferenceFileNamesAreFrozen()
+    {
+        string[] frozen =
+        [
+            "artwork", "equalizer", "fridayPicks", "listeningHistory", "music",
+            "podcast-queue", "podcastEpisodeCache", "podcastProgress", "podcastSettings",
+            "podcastSubscriptions", "podcasts",
+        ];
+
+        var declared = EnumerateRepoFiles("*.cs")
+            .SelectMany(file => PreferenceNames(File.ReadAllText(file)))
+            .ToList();
+
+        var missing = frozen.Where(name => declared.Count(found => found == name) != 1).ToList();
+
+        Assert.True(missing.Count == 0,
+            "These SharedPreferences file names must each be declared exactly once — a rename " +
+            "orphans the data behind them: " + string.Join(", ", missing));
+    }
+
+    private static IEnumerable<string> PreferenceNames(string source)
+    {
+        const string Declaration = "PreferencesName = \"";
+        var index = source.IndexOf(Declaration, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            var start = index + Declaration.Length;
+            var end = source.IndexOf('"', start);
+            if (end < 0)
+            {
+                yield break;
+            }
+            yield return source[start..end];
+            index = source.IndexOf(Declaration, end, StringComparison.Ordinal);
+        }
+    }
+
+    // The two Drive files the head reads its own backups back out of, found by NAME.
+    // Rename either and the restore finds nothing — the library and the taste profile
+    // are still sitting in Drive under the old name, invisible.
+    [Fact]
+    public void AudioDriveFileNamesAreFrozen()
+    {
+        Assert.Equal("focusphone-audio-library.json", Codex.Infrastructure.Podcasts.DriveAudioLibraryStore.FileName);
+        Assert.Equal("storyworthtelling-taste.json", Codex.Infrastructure.Music.DriveTasteProfileStore.FileName);
+    }
+
     // The heads sign with the one shared repo keystore, so they share a single
     // signature the update channel accepts across the suite. Asserted by capability
     // (shared keystore + alias driving a signed Android build), not by head name, so
