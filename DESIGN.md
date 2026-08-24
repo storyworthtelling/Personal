@@ -76,7 +76,7 @@ Terracotta is **retired everywhere** — including documents, where the old "act
 | `PaperDeep` | `#F1EBDD` | Inset panels, explainer cards, mono fields, overlay haze |
 | `PaperShade` | `#E9E1CF` | Slider tracks, letterbox fill |
 | `Hairline` | `#E3DCC9` | Borders, dividers |
-| `Ink` | `#33322B` | Body & UI text, glyphs |
+| `Ink` | `#33322B` | Body & UI text, glyphs — **this value is correct**; the shipped token files still carry `#3A3A33` and are corrected during Ledger's rebrand |
 | `InkSoft` | `#6B6759` | Tertiary text for long runs |
 | `InkMuted` | `#8A8578` | Secondary text, metadata (≥14sp) |
 | `InkBlue` | `#2C3E5E` | "The pen": signatures, editorial marks, and the color of the voice |
@@ -155,6 +155,7 @@ Headings are ink-black Serif with a **full-width marker underline** (a gently cu
 | **Checkbox / radio** | Hairline at rest; functional-hue on. Indeterminate renders as a **circle** (vs the square check). ≥48dp hit-area. |
 | **Segmented control** | Within-area view switch; selected shows the **highlighter wash** of the functional hue. |
 | **Chips** | Four defined types: **filter/choice** (toggle, highlighter wash on), **input/removable** (× to remove), **status/read-only** (no tap target, exempt from 48dp), **assist/action**. |
+| **Dial** | A circular control for a single value operated **while moving or not looking**: 270° hairline track, colored-**pencil** filled arc, paper knob, the figure in Cascadia at `Countdown` size in the centre. No shadow, no gloss. Use only where a big imprecise target genuinely beats a small precise one — a slider is the default and this is the exception. Added in P6 for Score's workout tempo. |
 | **Stepper** | ±, disabled at bounds, long-press to repeat; value in mono. |
 | **Slider** | Range (two-thumb) supported; filled portion is a colored-**pencil** track; value bubble on the thumb while dragging. |
 | **Text field** | `PaperBright` fill, 1dp `Hairline`, radius 12. Focus = 2dp **Action** border, no glow. Mono variant: `PaperDeep` + Cascadia. Required fields carry a **faint identity-tinted fill**. Multiline auto-grows. Validation on blur, then live. Two secret variants: **masked** (dots + reveal) and **clear-secret** (mono, always visible, no clipboard block — the vault passphrase). |
