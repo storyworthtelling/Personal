@@ -8,7 +8,7 @@ on:
       - 'FocusPhone/Flyleaf.Android/**'
       - 'FocusPhone/FocusPhone.Communication.Android/**'
       - 'FocusPhone/FocusPhone.Camera.Android/**'
-      - 'FocusPhone/FocusPhone.Audio.Android/**'
+      - 'FocusPhone/Score.Android/**'
       - 'FocusPhone/Codex.Ui.Android/**'
       - 'FocusPhone/Codex.Domain/**'
       - 'FocusPhone/Codex.Infrastructure/**'
@@ -123,10 +123,11 @@ jobs:
           # the code well above the old counter so versionCode stays monotonic across
           # the rename for every head.
           VERSION_CODE=$((100000 + RUN_NUMBER))
-          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android FocusPhone.Audio.Android; do
+          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android Score.Android; do
             # Flyleaf graduates from the 0.1 pilot to a 1.x major; the other heads stay 0.1.
             case "$proj" in
               Flyleaf.Android) DISPLAY_VERSION="1.0.$RUN_NUMBER" ;;
+              Score.Android)   DISPLAY_VERSION="1.0.$RUN_NUMBER" ;;
               *)               DISPLAY_VERSION="0.1.$RUN_NUMBER" ;;
             esac
             echo "::group::Publishing $proj (versionCode $VERSION_CODE, version $DISPLAY_VERSION)"
@@ -152,7 +153,7 @@ jobs:
           set +e
           echo "=== ICON CHECK ==="
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
-          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android FocusPhone.Audio.Android; do
+          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android Score.Android; do
             APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
             [ -z "$APK" ] && APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
             echo "--- $proj: $APK"
@@ -172,7 +173,7 @@ jobs:
           set -e
           echo "=== FONT CHECK ==="
           FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular"
-          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android FocusPhone.Audio.Android; do
+          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android Score.Android; do
             APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
             [ -z "$APK" ] && APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
             echo "--- $proj: $APK"
@@ -201,7 +202,7 @@ jobs:
             FocusPhone/Flyleaf.Android/bin/Release/net10.0-android/publish/*-Signed.apk
             FocusPhone/FocusPhone.Communication.Android/bin/Release/net10.0-android/publish/*-Signed.apk
             FocusPhone/FocusPhone.Camera.Android/bin/Release/net10.0-android/publish/*-Signed.apk
-            FocusPhone/FocusPhone.Audio.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/Score.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
 

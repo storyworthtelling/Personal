@@ -32,7 +32,13 @@ public class AdaptiveIconRendererTests : IDisposable
     public void SpecsCoverAllApps()
     {
         Assert.Equal(7, IconSpecs.All.Count);
-        Assert.Equal(4, IconSpecs.All.Count(s => s.App.StartsWith("FocusPhone.")));
+
+        // Counted by where the resources land, not by what the app is called. The
+        // phase renames rebrand one head at a time — Launcher became Flyleaf, Audio
+        // became Score — so a "FocusPhone.*" name prefix stops being true while the
+        // four heads under FocusPhone/ still all need an icon.
+        Assert.Equal(4, IconSpecs.All.Count(s => s.ResourceRoot.StartsWith("FocusPhone/")));
+        Assert.Equal(IconSpecs.All.Count, IconSpecs.All.Select(s => s.ResourceRoot).Distinct().Count());
         Assert.Contains(IconSpecs.All, s => s.App == "Canonizer" && s.Name == "appicon");
         Assert.Contains(IconSpecs.All, s => s.App == "DailyLoader" && s.Name == "ic_launcher");
         Assert.Contains(IconSpecs.All, s => s.App == "Ledger" && s.Name == "appicon");

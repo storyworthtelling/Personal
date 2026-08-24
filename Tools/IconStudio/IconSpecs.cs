@@ -22,7 +22,7 @@ public static class IconSpecs
     [
         new("FocusPhone.Launcher", "FocusPhone/Flyleaf.Android/Resources", "appicon", false, Glyphs.Bookplate, Tokens.IdentityWarmHex),
         new("FocusPhone.Camera", "FocusPhone/FocusPhone.Camera.Android/Resources", "appicon", false, Glyphs.Lens),
-        new("FocusPhone.Audio", "FocusPhone/FocusPhone.Audio.Android/Resources", "appicon", false, Glyphs.Waveform),
+        new("Score", "FocusPhone/Score.Android/Resources", "appicon", false, Glyphs.Waveform),
         new("FocusPhone.Communication", "FocusPhone/FocusPhone.Communication.Android/Resources", "appicon", false, Glyphs.Speech),
         // MAUI heads: resources live in the plain `Resources/` folder, not `Platforms/Android/Resources`.
         // These projects don't set <SingleProject>true</SingleProject>, so MAUI never repoints the Android
