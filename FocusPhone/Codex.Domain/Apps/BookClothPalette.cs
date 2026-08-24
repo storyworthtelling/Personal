@@ -15,9 +15,9 @@ public static class BookClothPalette
     // hues, the pen blue, and the walnut tones. All are DesignTokens references (no literals here).
     private static readonly string[] Cloths =
     [
-        DesignTokens.Identity.Warm,
-        DesignTokens.Identity.Mark,
-        DesignTokens.Identity.Deep,
+        DesignTokens.Identity.Flyleaf.Warm,
+        DesignTokens.Identity.Flyleaf.Mark,
+        DesignTokens.Identity.Flyleaf.Deep,
         DesignTokens.ActionDeep,
         DesignTokens.ReferenceDeep,
         DesignTokens.CautionDeep,

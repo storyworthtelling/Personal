@@ -40,16 +40,44 @@ public static class DesignTokens
     public const string ProgressFill = "#9BC7CD"; public const string ProgressMark = "#18717C"; public const string ProgressText = "#085C65"; public const string ProgressDeep = "#003F46";
 
     /// <summary>
-    /// Flyleaf's signature identity hue — warm study amber (DESIGN.md §3 identity set,
-    /// kept separate from the semantic roles so a tab/accent never reads as "caution").
-    /// PROVISIONAL: to be finalized by sampling the painted Flyleaf cover and registering
-    /// it in the OKLCH source spec (deferred to the cover / Gemini-paint pass).
+    /// Per-app signature hues (DESIGN.md §3 identity set), kept separate from the
+    /// semantic roles so a tab or accent never reads as "caution". Each app's hue is
+    /// sampled from its painted cover during its own phase, which is why these are
+    /// nested by app rather than pooled: a second app getting an identity is exactly
+    /// what makes a bare "Identity.Mark" ambiguous.
     /// </summary>
     public static class Identity
     {
-        public const string Warm = "#C9803A";
-        public const string Mark = "#B4552F";
-        public const string Deep = "#8A4A22";
+        /// <summary>
+        /// Flyleaf — warm study amber. PROVISIONAL: three tiers rather than the role
+        /// model's five, pending a resample from the painted cover.
+        /// </summary>
+        public static class Flyleaf
+        {
+            public const string Warm = "#C9803A";
+            public const string Mark = "#B4552F";
+            public const string Deep = "#8A4A22";
+        }
+
+        /// <summary>
+        /// Score — teal-slate, sampled from the ribbon cover and laddered into the
+        /// role model's five tiers.
+        ///
+        /// The hue was nudged from the as-painted 174 degrees to 165, by rotating the
+        /// painting rather than re-prompting it, so the paper texture and pigment
+        /// blooms are exactly as painted and only the hue moved. That shift is
+        /// load-bearing: at 174 it sat 13 degrees from the in-progress status teal,
+        /// which is too close for a set whose whole job is to not read as a status.
+        /// At 165 the separation is 21 degrees.
+        /// </summary>
+        public static class Score
+        {
+            public const string Fill = "#AFC0BC";
+            public const string Ground = "#93ABA5";
+            public const string Mark = "#436A61";
+            public const string Text = "#35544D";
+            public const string Deep = "#263B36";
+        }
     }
 
     /// <summary>

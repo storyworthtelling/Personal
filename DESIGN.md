@@ -87,6 +87,17 @@ Terracotta is **retired everywhere** — including documents, where the old "act
 
 Each app (book) has a **signature identity hue**, kept as a **separate set** from the semantic roles so a tab or accent never reads as "caution." Each app's identity is **sampled from its painted cover art** during its phase, not fixed here. Identity hues color the binder tabs (§10) and per-app accents.
 
+Sampling is not the whole rule: a sampled hue is then **checked against the semantic roles it will sit near**, and moved if it crowds one. *Score* sampled at 174° from its ribbon cover, 13° off the in-progress status teal — too close for a set whose job is to not read as a status — so it was rotated to **165°**, giving 21° of separation. The shift was applied by **rotating the painting**, not re-prompting it, so the paper texture and pigment blooms are exactly as painted and only the hue moved.
+
+Registered ladders (per-app `Design/DesignTokens.cs`, §19):
+
+| App | fill | ground | mark | text | deep |
+|---|---|---|---|---|---|
+| Flyleaf | — | `#C9803A` | `#B4552F` | — | `#8A4A22` |
+| Score | `#AFC0BC` | `#93ABA5` | `#436A61` | `#35544D` | `#263B36` |
+
+Flyleaf's three tiers predate the five-tier ladder and are **provisional** pending a resample.
+
 ### Contrast (binding)
 
 Body text ≥ **AA (4.5:1)**; UI/large text ≥ **3:1** — computed against the **darkest textured pixel** and **behind highlighter washes**, not the flat token. A role tier that fails is darkened to its `deep` tier. The contrast table is **generated and build-failing** (§19). Colorblind redundancy is not required on screen (single known user); documents keep their non-color cues (§16) regardless.

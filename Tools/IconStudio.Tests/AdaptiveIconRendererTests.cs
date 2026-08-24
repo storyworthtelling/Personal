@@ -21,7 +21,7 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal("#FAF8F2", Tokens.PaperHex);
         Assert.Equal("#33322B", Tokens.InkHex);
         Assert.Equal("#C2542F", Tokens.AccentHex);
-        Assert.Equal("#C9803A", Tokens.IdentityWarmHex);
+        Assert.Equal("#C9803A", Tokens.FlyleafWarmHex);
     }
 
     // A paper-background app (not Flyleaf, whose ground is the warm identity hue).
@@ -86,13 +86,13 @@ public class AdaptiveIconRendererTests : IDisposable
         var xml = File.ReadAllText(Path.Combine(
             root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
             "drawable", $"{spec.Name}_background.xml"));
-        Assert.Contains(Tokens.IdentityWarmHex, xml);
+        Assert.Contains(Tokens.FlyleafWarmHex, xml);
         Assert.DoesNotContain("gradient", xml);
         // The foreground bookplate lays a cream cover over that ground.
         using var legacy = SKBitmap.Decode(Path.Combine(
             root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
             "mipmap-xxxhdpi", $"{spec.Name}.png"));
-        Assert.Equal(Tokens.IdentityWarm, legacy.GetPixel(2, 2));
+        Assert.Equal(Tokens.FlyleafWarm, legacy.GetPixel(2, 2));
     }
 
     [Theory]

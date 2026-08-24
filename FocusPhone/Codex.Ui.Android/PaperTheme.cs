@@ -34,9 +34,18 @@ public static class PaperTheme
 
     // Flyleaf's realistic bookshelf surface (a scoped DESIGN.md §1/§5 exception): warm identity
     // and the walnut/firelight/bronze material tones, parsed once from the tokens.
-    public static readonly Color IdentityWarm = Color.ParseColor(DesignTokens.Identity.Warm);
-    public static readonly Color IdentityMark = Color.ParseColor(DesignTokens.Identity.Mark);
-    public static readonly Color IdentityDeep = Color.ParseColor(DesignTokens.Identity.Deep);
+    // Per-app identity hues (DESIGN.md §3). Named for their app, because the kit is
+    // shared and a bare "Identity" stopped meaning anything the moment a second app
+    // had one.
+    public static readonly Color FlyleafWarm = Color.ParseColor(DesignTokens.Identity.Flyleaf.Warm);
+    public static readonly Color FlyleafMark = Color.ParseColor(DesignTokens.Identity.Flyleaf.Mark);
+    public static readonly Color FlyleafDeep = Color.ParseColor(DesignTokens.Identity.Flyleaf.Deep);
+
+    public static readonly Color ScoreFill = Color.ParseColor(DesignTokens.Identity.Score.Fill);
+    public static readonly Color ScoreGround = Color.ParseColor(DesignTokens.Identity.Score.Ground);
+    public static readonly Color ScoreMark = Color.ParseColor(DesignTokens.Identity.Score.Mark);
+    public static readonly Color ScoreText = Color.ParseColor(DesignTokens.Identity.Score.Text);
+    public static readonly Color ScoreDeep = Color.ParseColor(DesignTokens.Identity.Score.Deep);
     public static readonly Color Walnut = Color.ParseColor(DesignTokens.Shelf.Walnut);
     public static readonly Color WalnutDeep = Color.ParseColor(DesignTokens.Shelf.WalnutDeep);
     public static readonly Color WalnutLight = Color.ParseColor(DesignTokens.Shelf.WalnutLight);

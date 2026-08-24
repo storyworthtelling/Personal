@@ -14,15 +14,15 @@ public static class Tokens
     public const string HairlineHex = "#E3DCC9";
 
     // Flyleaf's identity (warm study amber) — its icon is a cream bookplate on this warm ground.
-    public const string IdentityWarmHex = "#C9803A";
-    public const string IdentityMarkHex = "#B4552F";
-    public const string IdentityDeepHex = "#8A4A22";
+    public const string FlyleafWarmHex = "#C9803A";
+    public const string FlyleafMarkHex = "#B4552F";
+    public const string FlyleafDeepHex = "#8A4A22";
 
     public static readonly SKColor Paper = SKColor.Parse(PaperHex);
     public static readonly SKColor Ink = SKColor.Parse(InkHex);
     public static readonly SKColor Accent = SKColor.Parse(AccentHex);
     public static readonly SKColor Hairline = SKColor.Parse(HairlineHex);
-    public static readonly SKColor IdentityWarm = SKColor.Parse(IdentityWarmHex);
-    public static readonly SKColor IdentityMark = SKColor.Parse(IdentityMarkHex);
-    public static readonly SKColor IdentityDeep = SKColor.Parse(IdentityDeepHex);
+    public static readonly SKColor FlyleafWarm = SKColor.Parse(FlyleafWarmHex);
+    public static readonly SKColor FlyleafMark = SKColor.Parse(FlyleafMarkHex);
+    public static readonly SKColor FlyleafDeep = SKColor.Parse(FlyleafDeepHex);
 }

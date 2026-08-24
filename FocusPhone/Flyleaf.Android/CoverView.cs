@@ -59,7 +59,7 @@ public class CoverView : View
         using (var ground = new Paint { AntiAlias = true })
         {
             ground.SetShader(new LinearGradient(0, 0, 0, h,
-                PaperTheme.IdentityWarm, PaperTheme.IdentityDeep, Shader.TileMode.Clamp!));
+                PaperTheme.FlyleafWarm, PaperTheme.FlyleafDeep, Shader.TileMode.Clamp!));
             canvas.DrawRect(0, 0, w, h, ground);
         }
 
@@ -99,7 +99,7 @@ public class CoverView : View
 
     private void DrawCornerFlourishes(Canvas canvas, RectF r)
     {
-        using var flourish = new Paint { AntiAlias = true, Color = PaperTheme.IdentityMark, StrokeWidth = 1.4f * density };
+        using var flourish = new Paint { AntiAlias = true, Color = PaperTheme.FlyleafMark, StrokeWidth = 1.4f * density };
         flourish.SetStyle(Paint.Style.Stroke);
         var d = 9 * density;
         // Short right-angle ticks just inside each corner.
@@ -177,10 +177,10 @@ public class CoverView : View
     private void DrawMakersMark(Canvas canvas, float cx, float cy)
     {
         var radius = 12 * density;
-        using var ring = new Paint { AntiAlias = true, Color = PaperTheme.IdentityMark, StrokeWidth = 1.4f * density };
+        using var ring = new Paint { AntiAlias = true, Color = PaperTheme.FlyleafMark, StrokeWidth = 1.4f * density };
         ring.SetStyle(Paint.Style.Stroke);
         canvas.DrawCircle(cx, cy, radius, ring);
-        using var m = new Paint(PaintFlags.AntiAlias) { Color = PaperTheme.IdentityMark, TextAlign = Paint.Align.Center };
+        using var m = new Paint(PaintFlags.AntiAlias) { Color = PaperTheme.FlyleafMark, TextAlign = Paint.Align.Center };
         m.SetTypeface(PaperTheme.SerifSemibold(Context!));
         m.TextSize = radius * 1.1f;
         canvas.DrawText("M", cx, cy + m.TextSize / 3f, m);

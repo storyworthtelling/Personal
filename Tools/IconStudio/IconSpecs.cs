@@ -20,7 +20,7 @@ public static class IconSpecs
 {
     public static readonly IReadOnlyList<IconSpec> All =
     [
-        new("FocusPhone.Launcher", "FocusPhone/Flyleaf.Android/Resources", "appicon", false, Glyphs.Bookplate, Tokens.IdentityWarmHex),
+        new("FocusPhone.Launcher", "FocusPhone/Flyleaf.Android/Resources", "appicon", false, Glyphs.Bookplate, Tokens.FlyleafWarmHex),
         new("FocusPhone.Camera", "FocusPhone/FocusPhone.Camera.Android/Resources", "appicon", false, Glyphs.Lens),
         new("Score", "FocusPhone/Score.Android/Resources", "appicon", false, Glyphs.Waveform),
         new("FocusPhone.Communication", "FocusPhone/FocusPhone.Communication.Android/Resources", "appicon", false, Glyphs.Speech),

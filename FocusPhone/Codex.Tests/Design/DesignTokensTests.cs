@@ -50,6 +50,43 @@ public class DesignTokensTests
         Assert.True(ratio >= minimum, $"{fg} on {bg} is {ratio:F2}:1, below {minimum}:1");
     }
 
+    // Score's identity ladder, sampled from its cover per §3 and laddered into the
+    // role model's five tiers. Pinned here because the hue is a decision, not a
+    // derivation: it was nudged off the as-painted 174 degrees to clear the
+    // in-progress status teal, and a later resample must not quietly undo that.
+    [Fact]
+    public void ScoreIdentityIsTheApprovedLadder()
+    {
+        Assert.Equal("#AFC0BC", DesignTokens.Identity.Score.Fill);
+        Assert.Equal("#93ABA5", DesignTokens.Identity.Score.Ground);
+        Assert.Equal("#436A61", DesignTokens.Identity.Score.Mark);
+        Assert.Equal("#35544D", DesignTokens.Identity.Score.Text);
+        Assert.Equal("#263B36", DesignTokens.Identity.Score.Deep);
+    }
+
+    // The two tiers Score sets text and marks in have to clear §3's contrast
+    // binding on their own, the same as any semantic role. Fill and Ground are
+    // wash/fill tiers and carry no text, so they are not asserted.
+    [Theory]
+    [InlineData("#436A61", 3.0)]  // marks and UI, incl. the lit binder tab
+    [InlineData("#35544D", 4.5)]  // identity-colored text at any size
+    [InlineData("#263B36", 7.0)]  // the deep tier, body-text safe
+    public void ScoreIdentityTextTiersClearContrastOnPaper(string tier, double minimum)
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(tier, DesignTokens.Paper);
+        Assert.True(ratio >= minimum, $"{tier} on Paper is {ratio:F2}:1, below {minimum}:1");
+    }
+
+    // Identity is a separate set from the semantic roles precisely so a tab never
+    // reads as "caution" (§3). Score's mark must therefore be distinguishable from
+    // the status teal it sits nearest — that separation is why the hue moved.
+    [Fact]
+    public void ScoreIdentityIsNotAStatusHue()
+    {
+        Assert.NotEqual(DesignTokens.ProgressMark, DesignTokens.Identity.Score.Mark);
+        Assert.NotEqual(DesignTokens.ProgressText, DesignTokens.Identity.Score.Text);
+    }
+
     // The reading ladder. Countdown and CoverTitle sit outside it — they are
     // single-purpose sizes, not steps you would set prose at — so they are not
     // part of this ordering.
