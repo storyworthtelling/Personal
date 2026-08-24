@@ -136,6 +136,22 @@ public class RssFeedClientTests
         Assert.Contains(FeedUrl, ex.Message);
     }
 
+    // Several podcast CDNs (Megaphone, Art19, Libsyn) answer 403 or serve a
+    // redirect page to a client that sends no User-Agent, and .NET sends none by
+    // default — so a feed can fail before parsing ever gets a chance. The client
+    // identifies itself on every request rather than leaving it to each caller.
+    [Fact]
+    public async Task Fetch_SendsAUserAgent()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(FeedUrl, SampleRss, "application/rss+xml");
+
+        await new RssFeedClient(new HttpClient(handler)).FetchAsync(new Uri(FeedUrl));
+
+        var sent = Assert.Single(handler.Requests);
+        Assert.NotEmpty(sent.Headers.UserAgent);
+    }
+
     // ---- Where the audio URL comes from ----
     //
     // The live bug: an episode whose audio is not in a bare <enclosure url> was
