@@ -161,14 +161,15 @@ public sealed class MusicArea : ScoreArea
             case MusicView.Albums:
                 var albums = catalog.Albums();
                 return Browse(albums.Count,
-                    [.. albums.Select(album => (new PaperListRow(album.Name, album.AlbumArtist), album))],
+                    [.. albums.Select(album => (new PaperListRow(album.Name, album.AlbumArtist, album.ArtRef), album))],
                     album => library.PlayTracks(catalog.TracksInAlbum(album.AlbumArtist, album.Name), 0),
-                    album => library.PlayShuffled(catalog.TracksInAlbum(album.AlbumArtist, album.Name)));
+                    album => library.PlayShuffled(catalog.TracksInAlbum(album.AlbumArtist, album.Name)),
+                    asCovers: true);
 
             case MusicView.Songs:
                 var songs = catalog.Songs();
                 return Browse(songs.Count,
-                    [.. songs.Select(track => (new PaperListRow(track.DisplayTitle, track.DisplayArtist), track))],
+                    [.. songs.Select(track => (new PaperListRow(track.DisplayTitle, track.DisplayArtist, track.ArtRef), track))],
                     track => library.PlayTracks(songs, IndexIn(songs, track)),
                     library.PlaySmartMix);
 
@@ -203,7 +204,8 @@ public sealed class MusicArea : ScoreArea
     /// once you had narrowed the list far enough would take the query with it.
     /// </summary>
     private View Browse<T>(
-        int totalRows, IReadOnlyList<(PaperListRow Row, T Item)> entries, Action<T> onPlay, Action<T> onLongPress)
+        int totalRows, IReadOnlyList<(PaperListRow Row, T Item)> entries, Action<T> onPlay, Action<T> onLongPress,
+        bool asCovers = false)
     {
         if (totalRows == 0)
         {
@@ -220,11 +222,19 @@ public sealed class MusicArea : ScoreArea
                 : entries.Where(e => FilterMatch.MatchesAny(query, e.Row.Primary, e.Row.Secondary)).ToList();
 
             rows.RemoveAllViews();
-            rows.AddView(matches.Count == 0
-                ? PaperUi.EmptyState(Host, $"Nothing matches \u201c{query}\u201d.")
-                : PaperUi.List(Host, [.. matches.Select(e => e.Row)],
-                    position => onPlay(matches[position].Item),
-                    position => onLongPress(matches[position].Item)));
+            if (matches.Count == 0)
+            {
+                rows.AddView(PaperUi.EmptyState(Host, $"Nothing matches \u201c{query}\u201d."));
+                return;
+            }
+
+            var listed = matches.Select(e => e.Row).ToList();
+            void Play(int position) => onPlay(matches[position].Item);
+            void LongPress(int position) => onLongPress(matches[position].Item);
+
+            rows.AddView(asCovers
+                ? new CoverGrid(Host, listed, Play, LongPress)
+                : PaperUi.List(Host, listed, Play, LongPress));
         }
 
         if (FilterMatch.IsWarranted(totalRows))
