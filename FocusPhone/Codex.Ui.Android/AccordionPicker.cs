@@ -67,7 +67,9 @@ public class AccordionPicker : LinearLayout
     }
 
     /// <summary>Fires with the chosen index. Choosing closes the field.</summary>
-    public event Action<int>? Selected;
+    // Named Chosen rather than Selected because View already has a Selected
+    // property, and an event that shadows it reads as the wrong thing entirely.
+    public event Action<int>? Chosen;
 
     public PickerOption Current => choices[selectedIndex];
 
@@ -104,7 +106,7 @@ public class AccordionPicker : LinearLayout
         {
             // §8 Selected: the highlighter wash of the functional hue, behind
             // full-strength ink — never a dimmed row, which would mean disabled.
-            row.SetBackgroundColor(Wash(PaperTheme.Accent));
+            row.SetBackgroundColor(PaperTheme.Wash(PaperTheme.Accent));
         }
 
         var label = PaperUi.Body(Context!, choice.Label);
@@ -127,13 +129,10 @@ public class AccordionPicker : LinearLayout
             value.Text = choice.Label;
             Rebuild();
             Toggle();
-            Selected?.Invoke(index);
+            Chosen?.Invoke(index);
         };
 
         return row;
     }
 
-    /// <summary>The highlighter alpha DESIGN.md §3 gives the wash tier (~30%).</summary>
-    private static Android.Graphics.Color Wash(Android.Graphics.Color hue) =>
-        new(hue.R, hue.G, hue.B, 77);
 }

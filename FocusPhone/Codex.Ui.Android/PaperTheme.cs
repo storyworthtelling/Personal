@@ -83,6 +83,14 @@ public static class PaperTheme
         Typeface.CreateFromAsset(context.Assets, assetPath)
             ?? throw new InvalidOperationException($"Font asset not packaged: {assetPath}");
 
+    /// <summary>
+    /// A hue at the wash tier (DESIGN.md §3): the same colour, carried translucent.
+    /// This is the band §8's Selected state sits behind — one implementation, so a
+    /// selected row, a chosen picker option and a lit segment are the same weight.
+    /// </summary>
+    public static Color Wash(Color hue) =>
+        new(hue.R, hue.G, hue.B, DesignTokens.Alpha.Wash);
+
     /// <summary>Converts a DesignTokens.Space/Shape dp value to device pixels.</summary>
     public static int Dp(Context context, int dp) =>
         (int)(dp * context.Resources!.DisplayMetrics!.Density + 0.5f);

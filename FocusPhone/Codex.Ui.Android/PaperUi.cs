@@ -2,6 +2,7 @@ using Android.Content;
 using Android.Graphics;
 using Android.Graphics.Drawables;
 using Android.Text;
+using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 
@@ -268,7 +269,7 @@ public static class PaperUi
             {
                 var active = i == selected;
                 cells[i].SetBackgroundColor(active
-                    ? new Color(tint.R, tint.G, tint.B, WashAlpha)
+                    ? PaperTheme.Wash(tint)
                     : Color.Transparent);
                 cells[i].SetTextColor(active ? PaperTheme.Ink : PaperTheme.InkMuted);
                 cells[i].SetTypeface(
@@ -315,7 +316,6 @@ public static class PaperUi
     }
 
     /// <summary>The highlighter alpha DESIGN.md §3 gives the wash tier (~30%).</summary>
-    private const int WashAlpha = 77;
 
     /// <summary>
     /// A two-state segmented selector, kept for the heads that still call it.

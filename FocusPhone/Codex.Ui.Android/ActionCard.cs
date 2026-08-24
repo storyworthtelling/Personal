@@ -128,7 +128,7 @@ public static class ActionCard
 
     // Enough to settle the page back without hiding it — you are still looking at
     // the row you long-pressed, which is the point of a card over a dialog.
-    private const int HazeAlpha = 219;
+    private const byte HazeAlpha = 219;
 
     private static readonly Java.Lang.String HostTag = new("paper-action-card");
 }

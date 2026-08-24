@@ -28,6 +28,15 @@ public class PaperReExportParityTests
     }
 
     [Fact]
+    public void WashAlphaMatchesPaper()
+    {
+        // The wash tier is the only colour in the system with no committed hex — it
+        // is a role's Mark hue carried at this alpha — so it re-exports as a number
+        // and needs the same parity guard the hexes get.
+        Assert.Equal(PaperColorTokens.WashAlpha, DesignTokens.Alpha.Wash);
+    }
+
+    [Fact]
     public void EveryRoleTierMatchesPaperAppProfile()
     {
         Assert.Equal(PaperColorTokens.ActionFill, DesignTokens.ActionFill);

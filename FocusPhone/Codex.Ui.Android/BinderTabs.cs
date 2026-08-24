@@ -72,7 +72,7 @@ public class BinderTabs : ViewGroup
         activeIndex = index;
         for (var i = 0; i < ChildCount; i++)
         {
-            Paint(GetChildAt(i)!, areas[i], i == index);
+            PaintTab(GetChildAt(i)!, areas[i], i == index);
         }
 
         Invalidate();
@@ -98,11 +98,11 @@ public class BinderTabs : ViewGroup
         });
 
         tab.Click += (_, _) => AreaSelected?.Invoke(index);
-        Paint(tab, area, index == activeIndex);
+        PaintTab(tab, area, index == activeIndex);
         return tab;
     }
 
-    private void Paint(View tab, BinderArea area, bool active)
+    private void PaintTab(View tab, BinderArea area, bool active)
     {
         // The active tab is page-coloured and rounded only on the outer side, so it
         // reads as the page continuing under the seam rather than as a chip.

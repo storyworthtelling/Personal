@@ -114,6 +114,20 @@ public static class DesignTokens
         public const int ScreenEdgeDp = Space.X6;
     }
 
+    /// <summary>
+    /// The translucency the palette carries instead of committing to a hex
+    /// (DESIGN.md §3): the wash tier is a role's Mark hue drawn at this alpha, and
+    /// it is what §8's Selected state paints behind full-strength ink.
+    ///
+    /// Byte-typed on purpose. Every consumer builds a colour from it, and Android's
+    /// Color has both a (byte,byte,byte,byte) and an (int,int,int,int) constructor
+    /// — an int here makes the call ambiguous at every site.
+    /// </summary>
+    public static class Alpha
+    {
+        public const byte Wash = 77;   // ~30%
+    }
+
     /// <summary>Calm functional motion: two durations, decelerate curves, no haptics.</summary>
     public static class Motion
     {
