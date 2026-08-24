@@ -1,4 +1,5 @@
 using Android.Content;
+using Codex.Domain.Music;
 
 namespace Score;
 
@@ -14,6 +15,7 @@ public static class MusicSettingsStore
     private const string FolderKey = "musicFolderId";
     private const string LearningKey = "listeningGeniusEnabled";
     private const string LastRefreshKey = "tasteLastRefreshUtc";
+    private const string StackSizeKey = "fridayStackSize";
 
     private static ISharedPreferences Preferences =>
         global::Android.App.Application.Context.GetSharedPreferences(PreferencesName, FileCreationMode.Private)!;
@@ -36,6 +38,17 @@ public static class MusicSettingsStore
     {
         get => Preferences.GetBoolean(LearningKey, true);
         set => Preferences.Edit()!.PutBoolean(LearningKey, value)!.Apply();
+    }
+
+    /// <summary>
+    /// How many records the Friday crate holds. Clamped on the way out as well as in,
+    /// so a value written by an older build (or a future one) can never hand the
+    /// worker a stack size the owner could not have chosen.
+    /// </summary>
+    public static int FridayStackSize
+    {
+        get => FridayStack.Clamp(Preferences.GetInt(StackSizeKey, FridayStack.Default));
+        set => Preferences.Edit()!.PutInt(StackSizeKey, FridayStack.Clamp(value))!.Apply();
     }
 
     /// <summary>When the Taste Profile was last refreshed, so the app throttles the Claude refine.</summary>

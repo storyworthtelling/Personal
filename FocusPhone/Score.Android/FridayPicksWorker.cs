@@ -16,7 +16,6 @@ namespace Score;
 public class FridayPicksWorker : Worker
 {
     private const string WorkName = "focusphone-audio-friday-picks";
-    private const int MaxPicks = 20;
 
     public FridayPicksWorker(Context context, WorkerParameters parameters)
         : base(context, parameters)
@@ -50,7 +49,7 @@ public class FridayPicksWorker : Worker
         }
 
         var taste = new MusicTasteService(new DeviceAccountTokenProvider().GetAccessToken, "Score");
-        var selection = taste.FridayPicksAsync(catalog, MaxPicks, CancellationToken.None).GetAwaiter().GetResult();
+        var selection = taste.FridayPicksAsync(catalog, MusicSettingsStore.FridayStackSize, CancellationToken.None).GetAwaiter().GetResult();
         if (selection.TrackIds.Count > 0)
         {
             store.Save(selection, DateTimeOffset.Now);

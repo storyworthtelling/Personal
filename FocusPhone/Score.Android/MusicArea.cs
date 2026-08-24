@@ -57,8 +57,10 @@ public sealed class MusicArea : ScoreArea
             "First register this app as an Android OAuth client (Drive API enabled), then sign in:\n\n" +
             $"Package: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
 
-        // The secrets-vault passphrase (optional): set the same one as your other apps to back up and restore
-        // your keys from Drive, encrypted. Persisted when you sign in.
+        // The same setting Settings holds — both read and write VaultPassphraseStore,
+        // so they cannot disagree. It is offered here too because this is the
+        // after-a-reset path: entering it before signing in is what makes the library
+        // come back on the first try instead of the next launch.
         // Shown in the clear (not a password field) so it can be read back and copied — it's the one secret
         // that isn't kept in the vault, so being able to see it is what lets the owner set the same one everywhere.
         var passphrase = PaperUi.MonoField(Host, "Secrets vault passphrase (optional)");
