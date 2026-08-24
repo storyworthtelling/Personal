@@ -47,6 +47,11 @@ public sealed class PodcastsArea : ScoreArea
     // and unreachable if you want it again.
     private string? status;
 
+    // The shelf filter, held by the area rather than the field, so drilling into a
+    // show and coming back does not silently show a narrowed shelf as if it were
+    // the whole one.
+    private string shelfQuery = string.Empty;
+
     public PodcastsArea(Activity host, ScorePlayback playback, PlaybackProgressStore progress) : base(host)
     {
         this.playback = playback;
@@ -221,16 +226,46 @@ public sealed class PodcastsArea : ScoreArea
             return PaperUi.EmptyState(Host, EmptyShelfMessage());
         }
 
-        var rows = shelf
-            .Select(show => new PaperListRow(show.Title, $"{show.UnplayedCount} unplayed"))
-            .ToList();
-        return PaperUi.List(Host, rows,
-            position =>
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        var rows = new FrameLayout(Host);
+
+        void Fill()
+        {
+            var matches = string.IsNullOrEmpty(shelfQuery)
+                ? shelf
+                : shelf.Where(show => FilterMatch.Matches(show.Title, shelfQuery)).ToList();
+
+            rows.RemoveAllViews();
+            rows.AddView(matches.Count == 0
+                ? PaperUi.EmptyState(Host, $"No show matches \u201c{shelfQuery}\u201d.")
+                : PaperUi.List(Host,
+                    [.. matches.Select(show => new PaperListRow(show.Title, $"{show.UnplayedCount} unplayed"))],
+                    position =>
+                    {
+                        openFeedId = matches[position].FeedId;
+                        Invalidate();
+                    },
+                    position => ShowShelfActions(matches[position])));
+        }
+
+        if (FilterMatch.IsWarranted(shelf.Count))
+        {
+            var field = new FilterField(Host, "Filter shows", PaperTheme.ScoreMark);
+            field.SetQuery(shelfQuery);
+            // Rows only — rebuilding the pane per keystroke would take the field's
+            // focus and the keyboard with it.
+            field.QueryChanged += text =>
             {
-                openFeedId = shelf[position].FeedId;
-                Invalidate();
-            },
-            position => ShowShelfActions(shelf[position]));
+                shelfQuery = text;
+                Fill();
+            };
+            column.AddView(field);
+        }
+
+        Fill();
+        column.AddView(rows, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return column;
     }
 
     // Long-press a show on the shelf: its one bulk action, marking every episode

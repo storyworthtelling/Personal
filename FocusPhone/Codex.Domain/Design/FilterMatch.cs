@@ -18,6 +18,22 @@ public static class FilterMatch
     /// Does this field match the query? An empty query matches everything — the
     /// filter is not narrowing yet, so nothing should disappear.
     /// </summary>
+    /// <summary>
+    /// How many rows fit a screen, near enough — a list-row minimum of 56dp against
+    /// the content area a phone leaves under the header and above the bars.
+    /// </summary>
+    public const int ScreenfulRows = 12;
+
+    /// <summary>
+    /// Whether a list is long enough to earn a filter field above it (DESIGN.md §7).
+    ///
+    /// A fixed threshold rather than a real measurement, deliberately. Measuring would
+    /// make a list at the boundary gain and lose its field as items came and went;
+    /// a constant makes the field's presence something you learn once per screen
+    /// instead of checking every time.
+    /// </summary>
+    public static bool IsWarranted(int rowCount) => rowCount > ScreenfulRows;
+
     public static bool Matches(string? candidate, string query)
     {
         var needle = Fold(query);

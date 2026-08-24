@@ -80,6 +80,19 @@ public class FilterField : LinearLayout
     public void Clear() => input.Text = string.Empty;
 
     /// <summary>
+    /// Restores a query the screen was already holding — after a rebuild the field
+    /// did not cause. Fires <see cref="QueryChanged"/> like any other edit, so the
+    /// list it governs cannot end up showing something other than what the field says.
+    /// </summary>
+    public void SetQuery(string text)
+    {
+        if (Query != text)
+        {
+            input.Text = text;
+        }
+    }
+
+    /// <summary>
     /// Does this string match? Case- and accent-insensitive substring, which is
     /// what a filter over titles and artists actually wants — someone typing
     /// "bartok" means Bartók, and nobody types a diacritic to find a record.

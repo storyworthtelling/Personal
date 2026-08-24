@@ -1,6 +1,8 @@
 using Android.Content;
 using Android.Views;
 using Codex.Infrastructure.Music;
+using Codex.Domain.Design;
+using Codex.Domain.Music;
 using Codex.Ui;
 using Codex.Ui.Voice;
 using Score.Google;
@@ -18,6 +20,7 @@ public sealed class MusicArea : ScoreArea
 {
     private readonly MusicLibrary library;
     private MusicView view = MusicView.Menu;
+    private string query = string.Empty;
 
     public MusicArea(Activity host, MusicLibrary library) : base(host)
     {
@@ -35,6 +38,7 @@ public sealed class MusicArea : ScoreArea
         }
 
         view = MusicView.Menu;
+        query = string.Empty; // the filter belongs to the list you were in
         Invalidate();
         return true;
     }
@@ -149,38 +153,31 @@ public sealed class MusicArea : ScoreArea
         {
             case MusicView.Artists:
                 var artists = catalog.Artists();
-                return artists.Count == 0
-                    ? Nothing()
-                    : PaperUi.List(Host,
-                        [.. artists.Select(artist => new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"))],
-                        position => library.PlayTracks(catalog.TracksByArtist(artists[position].Name), 0),
-                        position => library.PlayShuffled(catalog.TracksByArtist(artists[position].Name)));
+                return Browse(artists.Count,
+                    [.. artists.Select(artist => (new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"), artist.Name))],
+                    name => library.PlayTracks(catalog.TracksByArtist(name), 0),
+                    name => library.PlayShuffled(catalog.TracksByArtist(name)));
 
             case MusicView.Albums:
                 var albums = catalog.Albums();
-                return albums.Count == 0
-                    ? Nothing()
-                    : PaperUi.List(Host,
-                        [.. albums.Select(album => new PaperListRow(album.Name, album.AlbumArtist))],
-                        position => library.PlayTracks(catalog.TracksInAlbum(albums[position].AlbumArtist, albums[position].Name), 0),
-                        position => library.PlayShuffled(catalog.TracksInAlbum(albums[position].AlbumArtist, albums[position].Name)));
+                return Browse(albums.Count,
+                    [.. albums.Select(album => (new PaperListRow(album.Name, album.AlbumArtist), album))],
+                    album => library.PlayTracks(catalog.TracksInAlbum(album.AlbumArtist, album.Name), 0),
+                    album => library.PlayShuffled(catalog.TracksInAlbum(album.AlbumArtist, album.Name)));
 
             case MusicView.Songs:
                 var songs = catalog.Songs();
-                return songs.Count == 0
-                    ? Nothing()
-                    : PaperUi.List(Host,
-                        [.. songs.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist))],
-                        position => library.PlayTracks(songs, position),
-                        position => library.PlaySmartMix(songs[position]));
+                return Browse(songs.Count,
+                    [.. songs.Select(track => (new PaperListRow(track.DisplayTitle, track.DisplayArtist), track))],
+                    track => library.PlayTracks(songs, IndexIn(songs, track)),
+                    library.PlaySmartMix);
 
             case MusicView.Genres:
                 var genres = catalog.Genres();
-                return genres.Count == 0
-                    ? Nothing()
-                    : PaperUi.List(Host, [.. genres.Select(genre => new PaperListRow(genre))],
-                        position => library.PlayTracks(catalog.TracksInGenre(genres[position]), 0),
-                        position => library.PlayShuffled(catalog.TracksInGenre(genres[position])));
+                return Browse(genres.Count,
+                    [.. genres.Select(genre => (new PaperListRow(genre), genre))],
+                    genre => library.PlayTracks(catalog.TracksInGenre(genre), 0),
+                    genre => library.PlayShuffled(catalog.TracksInGenre(genre)));
 
             case MusicView.Playlists:
                 return PaperUi.EmptyState(Host, "No playlists yet.");
@@ -190,12 +187,83 @@ public sealed class MusicArea : ScoreArea
                 return PaperUi.List(Host, [.. items.Select(item => new PaperListRow(item))], position =>
                 {
                     view = Enum.Parse<MusicView>(items[position]);
+                    query = string.Empty;
                     Invalidate();
                 });
         }
     }
 
+    /// <summary>
+    /// One browse list, filtered. Every level of the library goes through here so the
+    /// field appears by the same rule everywhere and the matching is the same
+    /// matching — the diacritic-insensitive one, because nobody types the accent in
+    /// Bartók to find a record they own.
+    ///
+    /// The filter is decided on the <b>unfiltered</b> count: a field that vanished
+    /// once you had narrowed the list far enough would take the query with it.
+    /// </summary>
+    private View Browse<T>(
+        int totalRows, IReadOnlyList<(PaperListRow Row, T Item)> entries, Action<T> onPlay, Action<T> onLongPress)
+    {
+        if (totalRows == 0)
+        {
+            return Nothing();
+        }
+
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        var rows = new FrameLayout(Host);
+
+        void Fill()
+        {
+            var matches = string.IsNullOrEmpty(query)
+                ? entries
+                : entries.Where(e => FilterMatch.MatchesAny(query, e.Row.Primary, e.Row.Secondary)).ToList();
+
+            rows.RemoveAllViews();
+            rows.AddView(matches.Count == 0
+                ? PaperUi.EmptyState(Host, $"Nothing matches \u201c{query}\u201d.")
+                : PaperUi.List(Host, [.. matches.Select(e => e.Row)],
+                    position => onPlay(matches[position].Item),
+                    position => onLongPress(matches[position].Item)));
+        }
+
+        if (FilterMatch.IsWarranted(totalRows))
+        {
+            var field = new FilterField(Host, "Filter", PaperTheme.ScoreMark);
+            field.SetQuery(query);
+            // Only the rows are rebuilt, never the pane: raising Changed on every
+            // keystroke would replace the field itself and take the focus, the
+            // keyboard and the cursor with it.
+            field.QueryChanged += text =>
+            {
+                query = text;
+                Fill();
+            };
+            column.AddView(field);
+        }
+
+        Fill();
+        column.AddView(rows, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return column;
+    }
+
     private View Nothing() => PaperUi.EmptyState(Host, "No music yet — scan your library.");
+
+    // Songs play from their position in the whole list, not in the filtered view, so
+    // starting a track under a filter still plays on into the rest of the library.
+    private static int IndexIn(IReadOnlyList<Track> tracks, Track track)
+    {
+        for (var i = 0; i < tracks.Count; i++)
+        {
+            if (ReferenceEquals(tracks[i], track))
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
 
     private View WrapScroll(View inner)
     {

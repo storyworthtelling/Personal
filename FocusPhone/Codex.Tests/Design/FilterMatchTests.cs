@@ -79,4 +79,26 @@ public class FilterMatchTests
         Assert.True(FilterMatch.MatchesAny("pine", null, "Kettle & Pine"));
         Assert.False(FilterMatch.MatchesAny("pine", null, null));
     }
+
+    // The mockups left "fits one screen" as a count, and noted the cost: a list at the
+    // boundary would gain and lose its field as items came and went. A fixed threshold
+    // is the predictable half of that trade, which is the property that matters — you
+    // learn where the field is, rather than checking each time.
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(FilterMatch.ScreenfulRows, false)]
+    [InlineData(FilterMatch.ScreenfulRows + 1, true)]
+    [InlineData(400, true)]
+    public void IsWarranted_TracksWhetherTheListOutrunsAScreen(int rows, bool expected)
+    {
+        Assert.Equal(expected, FilterMatch.IsWarranted(rows));
+    }
+
+    [Fact]
+    public void ScreenfulIsAWholeListOfRowsAtTheMinimumHeight()
+    {
+        // A 56dp row (§5's list minimum) against a content area of a few hundred dp.
+        Assert.InRange(FilterMatch.ScreenfulRows, 8, 20);
+    }
 }
