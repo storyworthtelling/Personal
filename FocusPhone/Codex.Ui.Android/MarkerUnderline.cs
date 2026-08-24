@@ -3,6 +3,9 @@ using Android.Graphics;
 using Android.Views;
 using Codex.Domain.Design;
 
+// System.IO.Path arrives via ImplicitUsings; drawing code means the graphics one.
+using Path = Android.Graphics.Path;
+
 namespace Codex.Ui;
 
 /// <summary>
