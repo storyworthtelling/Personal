@@ -4,31 +4,31 @@ namespace Storyworthtelling.Updates;
 public enum UpdateRole
 {
     /// <summary>
-    /// The ordinary case: an app keeps itself current and touches nothing else.
+    /// An app keeps itself current and touches nothing else. What every head does on
+    /// an ordinary Android phone, where it can run the confirmed installer itself.
     /// </summary>
     SelfOnly,
 
     /// <summary>
-    /// The launcher, which additionally puts brand-new sibling apps on the device.
-    /// It is the only app that can — a device with no copy of an app has nothing
-    /// there to notice a release.
+    /// One app installs updates for the whole suite. What the launcher does on the
+    /// locked phone, where it is the device owner and therefore the only thing that
+    /// can install anything at all.
     /// </summary>
-    Bootstrapper,
+    Custodian,
 }
 
 /// <summary>
 /// Which of a release's APKs this particular app should install.
 ///
-/// Every app used to be updated by the launcher, which made the launcher the single
-/// point of failure for the whole suite's updates and meant a new app could not ship
-/// without a launcher release. Now each app keeps itself current, and the launcher
-/// keeps only the job nothing else can do: installing an app the device does not
-/// have yet.
+/// The two roles exist because the answer depends on the device, not on the app. On
+/// the locked phone the device-owner launcher is the only thing that can install
+/// silently — a restriction the lockdown deliberately keeps — so it installs for
+/// everyone and the cost of it being a single point of failure is accepted rather
+/// than opened up. On an unrestricted phone every app can install itself, and does.
 ///
-/// The rule that matters is the one that stops the two overlapping. A bootstrapper
-/// does <b>not</b> update a sibling that is already installed, because that sibling
-/// is already updating itself and two installers racing the same package is how a
-/// half-applied update happens.
+/// Both roles are gated on the owner namespace first, which is the part that is
+/// never a device question: a package from anywhere else is not installed, whoever
+/// put it on the release.
 /// </summary>
 public static class UpdateScope
 {
@@ -46,25 +46,18 @@ public static class UpdateScope
                 continue;
             }
 
-            var isSelf = string.Equals(candidate.Package, selfPackage, StringComparison.Ordinal);
-            var installed = installedVersionCodes.TryGetValue(candidate.Package, out var version)
-                ? version
-                : (long?)null;
-
-            if (isSelf)
+            var mine = string.Equals(candidate.Package, selfPackage, StringComparison.Ordinal);
+            if (role == UpdateRole.SelfOnly && !mine)
             {
-                // An app updates itself when the release is ahead of what is running.
-                if (installed is null || candidate.VersionCode > installed)
-                {
-                    chosen.Add(candidate);
-                }
-
                 continue;
             }
 
-            // Someone else's app: install it only if it is missing entirely, and only
-            // if this app is the one whose job that is.
-            if (role == UpdateRole.Bootstrapper && installed is null)
+            // Not installed at all is what lets a brand-new sibling app land on its
+            // first build, rather than waiting for someone to sideload it; newer is
+            // the ordinary case. Older is never installed — the channel does not
+            // downgrade, whatever a release happens to contain.
+            if (!installedVersionCodes.TryGetValue(candidate.Package, out var installed)
+                || candidate.VersionCode > installed)
             {
                 chosen.Add(candidate);
             }

@@ -147,10 +147,10 @@ public static class UpdateService
         }
 
         var installedVersions = InstalledVersionCodes(context, downloaded.Select(d => d.Candidate.Package));
-        // Flyleaf is the bootstrapper: it updates itself, and it puts apps the device
-        // does not have on it. An installed sibling keeps itself current from here on.
+        // Flyleaf is the custodian on this device: as the device owner it is the only
+        // thing that can install silently, so it installs for the whole suite.
         var toInstall = UpdateScope
-            .Decide(UpdateRole.Bootstrapper, PolicyContext.LauncherPackage,
+            .Decide(UpdateRole.Custodian, PolicyContext.LauncherPackage,
                 downloaded.Select(d => d.Candidate), installedVersions)
             .Select(c => c.Package)
             .ToHashSet();

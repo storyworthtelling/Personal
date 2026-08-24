@@ -1,15 +1,71 @@
-using Storyworthtelling.Updates;
-
 namespace Storyworthtelling.Updates.Tests;
 
 public class UpdateScopeTests
 {
-    private const string Flyleaf = "com.storyworthtelling.focusphone.launcher";
+    private const string Launcher = "com.storyworthtelling.focusphone.launcher";
     private const string Score = "com.storyworthtelling.focusphone.audio";
-    private const string Health = "com.storyworthtelling.health";
+    private const string Storyboarder = "com.storyworthtelling.storyboarder";
+    private const string FutureHealthApp = "com.storyworthtelling.health";
 
     private static Dictionary<string, long> Installed(params (string Package, long Version)[] apps) =>
         apps.ToDictionary(a => a.Package, a => a.Version);
+
+    // ---- The custodian: the device-owner launcher on the locked phone ----
+
+    [Fact]
+    public void Custodian_InstallsANewOwnerAppOnFirstSight()
+    {
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
+            [new InstallCandidate(FutureHealthApp, 1)], Installed());
+
+        Assert.Contains(plan, c => c.Package == FutureHealthApp);
+    }
+
+    [Fact]
+    public void Custodian_UpdatesAnInstalledOwnerApp()
+    {
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
+            [new InstallCandidate(Storyboarder, 42)], Installed((Storyboarder, 41)));
+
+        Assert.Contains(plan, c => c.Package == Storyboarder);
+    }
+
+    [Fact]
+    public void Custodian_SkipsAVersionTheDeviceAlreadyHas()
+    {
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
+            [new InstallCandidate(Storyboarder, 42)], Installed((Storyboarder, 42)));
+
+        Assert.Empty(plan);
+    }
+
+    [Fact]
+    public void Custodian_NeverDowngrades()
+    {
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
+            [new InstallCandidate(Launcher, 5)], Installed((Launcher, 9)));
+
+        Assert.Empty(plan);
+    }
+
+    [Fact]
+    public void Custodian_InstallsOnlyTheOwnerAppsThatAdvanced()
+    {
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
+            [
+                new InstallCandidate(Launcher, 10),        // newer -> install
+                new InstallCandidate(Storyboarder, 3),     // same -> skip
+                new InstallCandidate(FutureHealthApp, 1),  // new -> install
+                new InstallCandidate("com.evil.app", 100), // not owner -> skip
+            ],
+            Installed((Launcher, 9), (Storyboarder, 3)));
+
+        Assert.Equal(
+            [Launcher, FutureHealthApp],
+            plan.Select(c => c.Package).OrderBy(p => p).ToArray());
+    }
+
+    // ---- Self-only: an app on an ordinary phone, installing for itself ----
 
     [Fact]
     public void SelfOnly_TakesANewerBuildOfItself()
@@ -23,11 +79,11 @@ public class UpdateScopeTests
     [Fact]
     public void SelfOnly_LeavesEveryOtherAppAlone()
     {
-        // The point of the split: another app's update is that app's business, even
-        // when this run happens to be looking at its APK.
+        // The whole difference between the roles: another app's update is that app's
+        // business, even when this run is looking straight at its APK.
         var plan = UpdateScope.Decide(UpdateRole.SelfOnly, Score,
-            [new InstallCandidate(Flyleaf, 9), new InstallCandidate(Health, 3)],
-            Installed((Flyleaf, 1)));
+            [new InstallCandidate(Launcher, 9), new InstallCandidate(FutureHealthApp, 3)],
+            Installed((Launcher, 1)));
 
         Assert.Empty(plan);
     }
@@ -41,45 +97,15 @@ public class UpdateScopeTests
         Assert.Empty(plan);
     }
 
-    [Fact]
-    public void Bootstrapper_TakesANewerBuildOfItself()
-    {
-        var plan = UpdateScope.Decide(UpdateRole.Bootstrapper, Flyleaf,
-            [new InstallCandidate(Flyleaf, 2)], Installed((Flyleaf, 1)));
-
-        Assert.Equal([Flyleaf], plan.Select(c => c.Package));
-    }
-
-    // The bootstrapper's other job, and the reason it exists: a brand-new sibling app
-    // lands on its first build rather than waiting for someone to sideload it.
-    [Fact]
-    public void Bootstrapper_InstallsAnAppTheDeviceDoesNotHaveYet()
-    {
-        var plan = UpdateScope.Decide(UpdateRole.Bootstrapper, Flyleaf,
-            [new InstallCandidate(Health, 1)], Installed((Flyleaf, 1)));
-
-        Assert.Equal([Health], plan.Select(c => c.Package));
-    }
-
-    // The behaviour that changes with the split. An installed sibling keeps itself
-    // current, so the bootstrapper must not also push updates at it — two installers
-    // racing the same package is how a half-applied update happens.
-    [Fact]
-    public void Bootstrapper_DoesNotUpdateAnAppThatIsAlreadyInstalled()
-    {
-        var plan = UpdateScope.Decide(UpdateRole.Bootstrapper, Flyleaf,
-            [new InstallCandidate(Score, 9)], Installed((Flyleaf, 1), (Score, 1)));
-
-        Assert.Empty(plan);
-    }
+    // ---- The trust boundary, which is not a device question ----
 
     [Fact]
     public void NeitherRoleTouchesAPackageOutsideTheSuite()
     {
-        var stray = new InstallCandidate("com.example.other", 9);
+        var stray = new InstallCandidate("com.someone.else", 99);
 
-        Assert.Empty(UpdateScope.Decide(UpdateRole.Bootstrapper, Flyleaf, [stray], Installed()));
-        Assert.Empty(UpdateScope.Decide(UpdateRole.SelfOnly, "com.example.other", [stray], Installed()));
+        Assert.Empty(UpdateScope.Decide(UpdateRole.Custodian, Launcher, [stray], Installed()));
+        Assert.Empty(UpdateScope.Decide(UpdateRole.SelfOnly, "com.someone.else", [stray], Installed()));
     }
 
     [Fact]
