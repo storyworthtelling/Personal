@@ -78,6 +78,106 @@ public static class Glyphs
         }
     }
 
+    /// <summary>
+    /// Score: a keyboard curving through the frame, bleeding off both edges so it
+    /// reads as a fragment of something larger rather than an object on a ground.
+    ///
+    /// <b>Generated, not painted.</b> Within an octave a black key sits after white
+    /// keys 0,1 and 3,4,5 — and not after 2 or 6, which is what gives a keyboard its
+    /// two-then-three grouping and the wide E–F and B–C gaps. Image models cannot
+    /// count, so every painted attempt spaced the black keys evenly, which is
+    /// musically wrong and unusable to a pianist. Drawing it makes it correct by
+    /// construction.
+    ///
+    /// White keys are cream rather than white — paper, not plastic, per DESIGN.md §2.
+    /// </summary>
+    public static void Keyboard(SKCanvas canvas, float s)
+    {
+        // The keys the black ones follow, within an octave of seven whites.
+        HashSet<int> blackAfter = [0, 1, 3, 4, 5];
+
+        const int Whites = 22;          // enough that the ends run off the frame
+        var depth = s * 0.19f;          // front-to-back, along the curve's normal
+        var centreY = s * 0.52f;
+        var amplitude = s * 0.118f;
+        const float Periods = 1.05f;    // just over one wave across the frame
+        const float Phase = -0.55f;
+
+        using var white = new SKPaint { Style = SKPaintStyle.Fill, Color = Tokens.Paper, IsAntialias = true };
+        using var black = new SKPaint { Style = SKPaintStyle.Fill, Color = Tokens.Ink, IsAntialias = true };
+        using var seam = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = s * 0.0022f * 2.2f,
+            Color = Tokens.Ink.WithAlpha(128),
+            IsAntialias = true,
+        };
+
+        (SKPoint Point, SKPoint Normal) At(float u)
+        {
+            var x = u * s;
+            var k = 2f * MathF.PI * Periods / s;
+            var y = centreY + (amplitude * MathF.Sin((k * x) + Phase));
+            var slope = amplitude * k * MathF.Cos((k * x) + Phase);
+            var length = MathF.Sqrt(1f + (slope * slope));
+            return (new SKPoint(x, y), new SKPoint(-slope / length, 1f / length));
+        }
+
+        static SKPoint Offset(SKPoint p, SKPoint normal, float distance) =>
+            new(p.X + (normal.X * distance), p.Y + (normal.Y * distance));
+
+        static void Quad(SKPath path, SKPoint a, SKPoint b, SKPoint c, SKPoint d)
+        {
+            path.MoveTo(a);
+            path.LineTo(b);
+            path.LineTo(c);
+            path.LineTo(d);
+            path.Close();
+        }
+
+        using var whites = new SKPath();
+        using var seams = new SKPath();
+        for (var i = 0; i < Whites; i++)
+        {
+            var (p0, n0) = At((float)i / Whites);
+            var (p1, n1) = At((float)(i + 1) / Whites);
+            var back0 = Offset(p0, n0, -depth / 2f);
+            var back1 = Offset(p1, n1, -depth / 2f);
+            Quad(whites, back0, back1, Offset(p1, n1, depth / 2f), Offset(p0, n0, depth / 2f));
+
+            if (i > 0)
+            {
+                seams.MoveTo(back0);
+                seams.LineTo(Offset(p0, n0, depth / 2f));
+            }
+        }
+
+        canvas.DrawPath(whites, white);
+        canvas.DrawPath(seams, seam);
+
+        var blackWidth = 1f / Whites * 0.58f;
+        var blackDepth = depth * 0.62f;
+        using var blacks = new SKPath();
+        for (var i = 0; i < Whites - 1; i++)
+        {
+            if (!blackAfter.Contains(i % 7))
+            {
+                continue;
+            }
+
+            var boundary = (float)(i + 1) / Whites;
+            var (pa, na) = At(boundary - (blackWidth / 2f));
+            var (pc, nc) = At(boundary + (blackWidth / 2f));
+            Quad(blacks,
+                Offset(pa, na, -depth / 2f),
+                Offset(pc, nc, -depth / 2f),
+                Offset(pc, nc, (-depth / 2f) + blackDepth),
+                Offset(pa, na, (-depth / 2f) + blackDepth));
+        }
+
+        canvas.DrawPath(blacks, black);
+    }
+
     /// <summary>Communication: speech bubble outline, terracotta dot.</summary>
     public static void Speech(SKCanvas canvas, float s)
     {

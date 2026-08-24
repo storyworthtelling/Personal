@@ -22,6 +22,13 @@ public static class Tokens
     public static readonly SKColor Ink = SKColor.Parse(InkHex);
     public static readonly SKColor Accent = SKColor.Parse(AccentHex);
     public static readonly SKColor Hairline = SKColor.Parse(HairlineHex);
+    // Score's identity (teal-slate) — its icon is a keyboard on this ground.
+    public const string ScoreGroundHex = "#93ABA5";
+    public const string ScoreMarkHex = "#436A61";
+    public const string ScoreDeepHex = "#263B36";
+
+    public static readonly SKColor ScoreGround = SKColor.Parse(ScoreGroundHex);
+
     public static readonly SKColor FlyleafWarm = SKColor.Parse(FlyleafWarmHex);
     public static readonly SKColor FlyleafMark = SKColor.Parse(FlyleafMarkHex);
     public static readonly SKColor FlyleafDeep = SKColor.Parse(FlyleafDeepHex);

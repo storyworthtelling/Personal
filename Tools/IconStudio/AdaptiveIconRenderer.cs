@@ -24,6 +24,8 @@ public static class AdaptiveIconRenderer
         var written = new List<string>();
         var root = Path.Combine(repoRoot, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar));
 
+        var ground = LoadGround(repoRoot, spec);
+
         written.Add(WriteText(Path.Combine(root, "mipmap-anydpi-v26", $"{spec.Name}.xml"), AdaptiveXml(spec)));
         written.Add(WriteText(Path.Combine(root, "mipmap-anydpi-v26", $"{spec.Name}_round.xml"), AdaptiveXml(spec)));
         written.Add(WriteText(Path.Combine(root, "drawable", $"{spec.Name}_background.xml"), BackgroundXml(spec)));
@@ -37,8 +39,16 @@ public static class AdaptiveIconRenderer
             written.Add(WritePng(Path.Combine(root, $"mipmap-{dpi}", $"{spec.Name}_foreground.png"),
                 RenderForeground(spec, foregroundPx)));
             written.Add(WritePng(Path.Combine(root, $"mipmap-{dpi}", $"{spec.Name}.png"),
-                RenderLegacy(spec, legacyPx)));
+                RenderLegacy(spec, legacyPx, ground)));
+
+            if (ground is not null)
+            {
+                written.Add(WritePng(Path.Combine(root, $"mipmap-{dpi}", $"{spec.Name}_ground.png"),
+                    RenderGround(ground, foregroundPx)));
+            }
         }
+
+        ground?.Dispose();
         return written;
     }
 
@@ -82,10 +92,42 @@ public static class AdaptiveIconRenderer
         return Encode(surface);
     }
 
-    private static byte[] RenderLegacy(IconSpec spec, int px)
+    // The painted wash, if the spec has one. Null is the ordinary case: a flat
+    // identity ground, which is a colour rather than a picture.
+    private static SKBitmap? LoadGround(string repoRoot, IconSpec spec)
+    {
+        if (spec.GroundImage is null)
+        {
+            return null;
+        }
+
+        var path = Path.Combine(repoRoot, spec.GroundImage.Replace('/', Path.DirectorySeparatorChar));
+        return File.Exists(path)
+            ? SKBitmap.Decode(path)
+            : throw new FileNotFoundException($"{spec.App}'s ground image is missing.", path);
+    }
+
+    // The adaptive background layer. Filled edge to edge, because a launcher may
+    // shift it against the foreground for parallax and any gap would show through.
+    private static byte[] RenderGround(SKBitmap ground, int px)
     {
         using var surface = SKSurface.Create(new SKImageInfo(px, px));
-        surface.Canvas.Clear(SKColor.Parse(spec.BackgroundHex));
+        surface.Canvas.DrawBitmap(ground, new SKRect(0, 0, px, px));
+        return Encode(surface);
+    }
+
+    private static byte[] RenderLegacy(IconSpec spec, int px, SKBitmap? ground = null)
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(px, px));
+        if (ground is not null)
+        {
+            surface.Canvas.DrawBitmap(ground, new SKRect(0, 0, px, px));
+        }
+        else
+        {
+            surface.Canvas.Clear(SKColor.Parse(spec.BackgroundHex));
+        }
+
         // Legacy icons show the full square; enlarge the safe-zone artwork a little.
         const float zoom = 108f / 84f;
         var canvas = surface.Canvas;
@@ -103,13 +145,21 @@ public static class AdaptiveIconRenderer
         return data.ToArray();
     }
 
-    private static string AdaptiveXml(IconSpec spec) => $"""
-        <?xml version="1.0" encoding="utf-8"?>
-        <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-          <background android:drawable="@drawable/{spec.Name}_background" />
-          <foreground android:drawable="@mipmap/{spec.Name}_foreground" />
-        </adaptive-icon>
-        """ + "\n";
+    private static string AdaptiveXml(IconSpec spec)
+    {
+        // A painted ground is a per-density bitmap; a flat one is the shape drawable.
+        var background = spec.GroundImage is null
+            ? $"@drawable/{spec.Name}_background"
+            : $"@mipmap/{spec.Name}_ground";
+
+        return $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="{background}" />
+              <foreground android:drawable="@mipmap/{spec.Name}_foreground" />
+            </adaptive-icon>
+            """ + "\n";
+    }
 
     private static string BackgroundXml(IconSpec spec) => $"""
         <?xml version="1.0" encoding="utf-8"?>
