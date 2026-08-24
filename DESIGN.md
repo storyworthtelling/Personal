@@ -219,7 +219,21 @@ Documents render through the **Document (muted)** profile and carry **grain only
 
 ## 12. Launcher icons & covers
 
-Each app is a **book with a painted cover**. The launcher icon follows the approved **Flyleaf hero template**: a watercolor ground, the ex-libris composition, real-paper texture, and the maker's mark — **no single accent detail** (color comes from the ground and glyph). Each app gets **bespoke painted cover art**; generation is **hybrid** (baked watercolor wash + procedural grain + vector glyph via IconStudio). Until an app's art is dropped in, IconStudio produces a **plain signature wash + glyph** fallback so a build is never icon-less. The maker's mark appears on PDF/report covers, settings screens, and the app-open (frameless cover) load screen — nowhere else.
+Each app is a **book with a painted cover**. The launcher icon follows the approved **Flyleaf hero template**: a watercolor ground, the ex-libris composition, real-paper texture — **no single accent detail** (color comes from the ground and glyph). Each app gets **bespoke painted cover art**; generation is **hybrid** (baked watercolor wash + procedural grain + vector glyph via IconStudio). Until an app's art is dropped in, IconStudio produces a **plain signature wash + glyph** fallback so a build is never icon-less.
+
+**The ex-libris plate — the anatomy, in order.** The art is a **window set into the binding**, never a full-bleed image:
+
+1. **Binding cloth** — the ground the plate sits on. Chosen per app (§3 identity hues).
+2. **Fine rule** — a hairline frame inset from the edge, **all four sides**.
+3. **Corner flourishes** — the quarter-curve motif at each corner, **bilaterally symmetrical**: each corner is a *reflection* of the top-left, not a rotation of it. Rotating one asymmetric curl through 90° produces a pinwheel with no mirror line and reads wrong on a plate. The window's inset must clear the flourishes or it paints over them.
+4. **Illustration window** — the painted art, framed by a keyline. Rectangular by default; a shaped window (Flyleaf's arch) is a per-app choice, and dropping the shape does **not** drop the frame.
+5. **Title band** — beneath the window, on the cloth.
+
+**Two variants, one plate.** The **shelf cover** (cover-out on the Flyleaf home, portrait at `CoverPortraitRatio`) carries the title — a book with no title cannot be identified on a shelf. The **launcher icon** (square) omits it: Android already prints the app name beneath the icon.
+
+**Binding cloth is chosen per app and may contrast its own art.** It is not required to match the identity hue: a binding that harmonises with the cover art makes the book the hardest of six to pick out of the row. *Score's binding is **cream linen** with the rule, flourishes and lettering inverted to ink* — chosen because it is the only light book on the shelf and so is findable at a glance.
+
+**The maker's mark is not on the launcher icon or the shelf cover.** It appears on PDF/report covers, settings screens, and on the cover art **when that art is expanded into the app-open (frameless cover) load screen** — nowhere else.
 
 ---
 
