@@ -19,6 +19,8 @@ public static class PaperTheme
     public static readonly Color Ink = Color.ParseColor(DesignTokens.Ink);
     public static readonly Color InkSoft = Color.ParseColor(DesignTokens.InkSoft);
     public static readonly Color InkMuted = Color.ParseColor(DesignTokens.InkMuted);
+    /// <summary>"The pen" — signatures, editorial marks, and the colour of the owner's voice.</summary>
+    public static readonly Color InkBlue = Color.ParseColor(DesignTokens.InkBlue);
     public static readonly Color Accent = Color.ParseColor(DesignTokens.Accent);
     public static readonly Color AccentDeep = Color.ParseColor(DesignTokens.AccentDeep);
 
@@ -36,16 +38,22 @@ public static class PaperTheme
 
     private static Typeface? serifRegular;
     private static Typeface? serifSemibold;
+    private static Typeface? serifBlack;
     private static Typeface? serifItalic;
     private static Typeface? sansRegular;
     private static Typeface? sansSemibold;
     private static Typeface? mono;
+    private static Typeface? script;
 
     public static Typeface SerifRegular(Context context) =>
         serifRegular ??= Load(context, DesignTokens.FontAssets.SerifRegular);
 
     public static Typeface SerifSemibold(Context context) =>
         serifSemibold ??= Load(context, DesignTokens.FontAssets.SerifSemibold);
+
+    /// <summary>The weight the reworked Display size is set in (DESIGN.md §4).</summary>
+    public static Typeface SerifBlack(Context context) =>
+        serifBlack ??= Load(context, DesignTokens.FontAssets.SerifBlack);
 
     public static Typeface SerifItalic(Context context) =>
         serifItalic ??= Load(context, DesignTokens.FontAssets.SerifItalic);
@@ -58,6 +66,10 @@ public static class PaperTheme
 
     public static Typeface Mono(Context context) =>
         mono ??= Load(context, DesignTokens.FontAssets.Mono);
+
+    /// <summary>Pinyon Script — reserved for the owner's voice, always in ink-blue.</summary>
+    public static Typeface Script(Context context) =>
+        script ??= Load(context, DesignTokens.FontAssets.Script);
 
     private static Typeface Load(Context context, string assetPath) =>
         Typeface.CreateFromAsset(context.Assets, assetPath)

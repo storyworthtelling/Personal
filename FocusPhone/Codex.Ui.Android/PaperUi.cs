@@ -17,7 +17,7 @@ public static class PaperUi
     // ---- Text ----
 
     public static TextView Display(Context context, string text) =>
-        Text(context, text, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
+        Text(context, text, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
 
     public static TextView Title(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Title, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
@@ -36,6 +36,18 @@ public static class PaperUi
 
     public static TextView Mono(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Mono, PaperTheme.Ink, PaperTheme.Mono(context));
+
+    /// <summary>
+    /// The owner's voice: Pinyon Script in ink-blue (DESIGN.md §4 reserves the
+    /// calligraphy hand for this and nothing else). Wraps, because a voiced line is
+    /// prose rather than a label.
+    /// </summary>
+    public static TextView Voice(Context context, string text)
+    {
+        var view = Text(context, text, DesignTokens.TypeSp.Voice, PaperTheme.InkBlue, PaperTheme.Script(context));
+        view.SetLineSpacing(0f, 1.25f);
+        return view;
+    }
 
     /// <summary>The unlock countdown: HH:MM:SS in Cascadia, the one oversized mono use.</summary>
     public static TextView Countdown(Context context) =>
@@ -191,7 +203,7 @@ public static class PaperUi
     /// <summary>The in-page chapter-heading screen title (DESIGN.md §7).</summary>
     public static TextView PageHeader(Context context, string title)
     {
-        var view = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
+        var view = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
         view.SetPadding(0, 0, 0, PaperTheme.Dp(context, DesignTokens.Space.X6));
         return view;
     }

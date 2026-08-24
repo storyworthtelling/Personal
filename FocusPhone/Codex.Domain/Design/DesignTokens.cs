@@ -68,12 +68,19 @@ public static class DesignTokens
         public const string BronzeDeep = "#4A3E22";
     }
 
-    /// <summary>Type scale in Android scaled pixels (sp).</summary>
+    /// <summary>
+    /// Type scale in Android scaled pixels (sp), per DESIGN.md §4's reworked scale —
+    /// bigger, with more contrast at the top. Display is Serif <b>Black</b> and is the
+    /// largest thing on a screen; Countdown and CoverTitle sit outside the reading
+    /// ladder as single-purpose sizes.
+    /// </summary>
     public static class TypeSp
     {
+        public const float CoverTitle = 72f;
+        public const float Display = 44f;
         public const float Countdown = 40f;
-        public const float Display = 34f;
-        public const float Title = 24f;
+        public const float Title = 28f;
+        public const float Voice = 26f;
         public const float Heading = 18f;
         public const float Body = 16f;
         public const float Secondary = 14f;
@@ -125,14 +132,22 @@ public static class DesignTokens
         public const uint Seed = 1913;
     }
 
-    /// <summary>Font asset paths as packaged by Codex.Ui.Android.</summary>
+    /// <summary>
+    /// Font asset paths as packaged by Codex.Ui.Android, whose csproj globs
+    /// <c>Fonts/*.ttf</c> — so every face here already ships in every APK.
+    /// <b>Black</b> anchors the reworked Display size and <b>Script</b> (Pinyon) is
+    /// the calligraphy hand DESIGN.md §4 reserves for the owner's voice; both were
+    /// being packaged and never declared, so neither could be used.
+    /// </summary>
     public static class FontAssets
     {
         public const string SerifRegular = "fonts/SourceSerif4-Regular.ttf";
         public const string SerifSemibold = "fonts/SourceSerif4-Semibold.ttf";
+        public const string SerifBlack = "fonts/SourceSerif4-Black.ttf";
         public const string SerifItalic = "fonts/SourceSerif4-Italic.ttf";
         public const string SansRegular = "fonts/SourceSans3-Regular.ttf";
         public const string SansSemibold = "fonts/SourceSans3-Semibold.ttf";
         public const string Mono = "fonts/CascadiaCode-Regular.ttf";
+        public const string Script = "fonts/PinyonScript-Regular.ttf";
     }
 }
