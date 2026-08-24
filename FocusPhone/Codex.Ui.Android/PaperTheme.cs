@@ -24,6 +24,14 @@ public static class PaperTheme
     public static readonly Color Accent = Color.ParseColor(DesignTokens.Accent);
     public static readonly Color AccentDeep = Color.ParseColor(DesignTokens.AccentDeep);
 
+    // The role tiers the components reach for by name (DESIGN.md §3): Action for a
+    // lead intent, Problem for a destructive one, Caution for a soft heads-up, and
+    // In-progress for "something is running". Parsed once, like everything above.
+    public static readonly Color ActionText = Color.ParseColor(DesignTokens.ActionText);
+    public static readonly Color ProblemMark = Color.ParseColor(DesignTokens.ProblemMark);
+    public static readonly Color CautionMark = Color.ParseColor(DesignTokens.CautionMark);
+    public static readonly Color ProgressText = Color.ParseColor(DesignTokens.ProgressText);
+
     // Flyleaf's realistic bookshelf surface (a scoped DESIGN.md §1/§5 exception): warm identity
     // and the walnut/firelight/bronze material tones, parsed once from the tokens.
     public static readonly Color IdentityWarm = Color.ParseColor(DesignTokens.Identity.Warm);

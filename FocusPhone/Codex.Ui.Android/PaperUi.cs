@@ -241,9 +241,86 @@ public static class PaperUi
     }
 
     /// <summary>
-    /// A two-state segmented selector (e.g. Podcasts | Music). Built from the
-    /// button recipes so no new tokens are needed: the active side is inked in
-    /// Accent, the inactive side muted. Calls back with the selected index.
+    /// The within-area view switch (DESIGN.md §7), for any number of segments —
+    /// Cover · Queue · Lyrics, Easy · Steady · Hard, Recent · Artist · Title.
+    ///
+    /// The selection is §8's <b>highlighter wash</b> of the hue behind full-strength
+    /// ink, not coloured text: a wash reads as "this one" at arm's length, where an
+    /// inked label reads as a link. Hairline-divided cells inside one rounded
+    /// outline, radius 12 and never a pill.
+    ///
+    /// Placed directly under the screen header, which across the app means one thing:
+    /// <i>change what this page is showing</i>.
+    /// </summary>
+    public static LinearLayout Segmented(
+        Context context, IReadOnlyList<string> labels, Action<int> onSelect, int initialIndex = 0, Color? hue = null)
+    {
+        var tint = hue ?? PaperTheme.Accent;
+        var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
+        row.Background = Outline(context, PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusInput);
+
+        var cells = new TextView[labels.Count];
+        var selected = initialIndex;
+
+        void Paint()
+        {
+            for (var i = 0; i < cells.Length; i++)
+            {
+                var active = i == selected;
+                cells[i].SetBackgroundColor(active
+                    ? new Color(tint.R, tint.G, tint.B, WashAlpha)
+                    : Color.Transparent);
+                cells[i].SetTextColor(active ? PaperTheme.Ink : PaperTheme.InkMuted);
+                cells[i].SetTypeface(
+                    active ? PaperTheme.SansSemibold(context) : PaperTheme.SansRegular(context),
+                    TypefaceStyle.Normal);
+            }
+        }
+
+        for (var i = 0; i < labels.Count; i++)
+        {
+            var index = i;
+            var cell = Text(context, labels[i], DesignTokens.TypeSp.Label, PaperTheme.InkMuted,
+                PaperTheme.SansRegular(context));
+            cell.Gravity = GravityFlags.Center;
+            cell.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
+            var pad = PaperTheme.Dp(context, DesignTokens.Space.X2);
+            cell.SetPadding(pad, pad, pad, pad);
+            cell.Clickable = true;
+            cell.Click += (_, _) =>
+            {
+                selected = index;
+                Paint();
+                onSelect(index);
+            };
+
+            cells[i] = cell;
+            row.AddView(cell, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+
+            if (i < labels.Count - 1)
+            {
+                var divider = new View(context);
+                divider.SetBackgroundColor(PaperTheme.Hairline);
+                row.AddView(divider, new LinearLayout.LayoutParams(
+                    PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp),
+                    ViewGroup.LayoutParams.MatchParent));
+            }
+        }
+
+        // Paint the starting selection without firing onSelect — a switch should
+        // reflect the current state on open without acting on it.
+        Paint();
+        return row;
+    }
+
+    /// <summary>The highlighter alpha DESIGN.md §3 gives the wash tier (~30%).</summary>
+    private const int WashAlpha = 77;
+
+    /// <summary>
+    /// A two-state segmented selector, kept for the heads that still call it.
+    /// Prefer <see cref="Segmented"/> — §8 wants the selection to be the highlighter
+    /// wash rather than inked text, and most switches now have more than two states.
     /// </summary>
     public static LinearLayout SegmentedToggle(
         Context context, string leftLabel, string rightLabel, Action<int> onSelect, int initialIndex = 0)
