@@ -40,6 +40,14 @@ public sealed class ScorePlayback(Activity host)
     /// <summary>What was last started. None until something plays.</summary>
     public MediaKind Kind { get; private set; }
 
+    /// <summary>
+    /// What the current item's playback settings are filed under — a podcast's feed
+    /// id, null for music. It travels with the start rather than being looked up,
+    /// so the Playing screen can offer per-show speed without having to know what a
+    /// show is.
+    /// </summary>
+    public string? SettingsKey { get; private set; }
+
     public bool IsPlaying => Controller?.IsPlaying == true;
 
     public string? CurrentTitle => Controller?.MediaMetadata?.Title?.ToString();
@@ -74,7 +82,8 @@ public sealed class ScorePlayback(Activity host)
     /// into the next album.
     /// </summary>
     public void Start(
-        MediaKind kind, IList<MediaItem> items, int index, long startMs, float speed, bool skipSilence)
+        MediaKind kind, IList<MediaItem> items, int index, long startMs, float speed, bool skipSilence,
+        string? settingsKey = null)
     {
         if (Controller is null || items.Count == 0)
         {
@@ -82,6 +91,7 @@ public sealed class ScorePlayback(Activity host)
         }
 
         Kind = kind;
+        SettingsKey = settingsKey;
         Controller.SetMediaItems(items, index, startMs);
         Controller.SetPlaybackSpeed(speed);
         Controller.Prepare();

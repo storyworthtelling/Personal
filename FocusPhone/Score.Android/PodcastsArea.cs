@@ -42,6 +42,11 @@ public sealed class PodcastsArea : ScoreArea
     private bool showingQueue;
     private bool isRefreshing; // a feed refresh is in flight — the empty shelf says so instead of "nothing new"
 
+    // What went wrong last, shown as a line on the page. §7 has no toasts: a message
+    // that floats over the content and then leaves is unreadable if you looked away,
+    // and unreachable if you want it again.
+    private string? status;
+
     public PodcastsArea(Activity host, ScorePlayback playback, PlaybackProgressStore progress) : base(host)
     {
         this.playback = playback;
@@ -65,14 +70,38 @@ public sealed class PodcastsArea : ScoreArea
 
     public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ScoreMark);
 
-    public override View BuildView() => BuildPodcastsPane();
+    public override View BuildView()
+    {
+        var pane = BuildPodcastsPane();
+        if (status is null)
+        {
+            return pane;
+        }
+
+        // Above the content, in the flow — it moves the page rather than covering it,
+        // which is what makes it survive looking away.
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        column.AddView(PaperUi.Secondary(Host, status));
+        column.AddView(pane, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return column;
+    }
+
+    // Says what went wrong, in place. Each new message replaces the last, and the
+    // actions that can fail drop it as they start — a stale complaint is worse
+    // than none.
+    private void Say(string message)
+    {
+        status = message;
+        Invalidate();
+    }
+
 
     /// <summary>The area's own actions. The shell hosts it under the now-playing bar.</summary>
     public override View? BuildBottomBar() => PaperUi.BottomBar(Host,
         PaperUi.SecondaryButton(Host, "Shows", () => { openFeedId = null; showingQueue = false; Invalidate(); }),
         PaperUi.QuietButton(Host, "Queue", () => { showingQueue = true; Invalidate(); }),
-        PaperUi.QuietButton(Host, "Manage", () => Host.StartActivity(new Intent(Host, typeof(ManageSubscriptionsActivity)))),
-        PaperUi.QuietButton(Host, "Speed", ShowSpeedDialog));
+        PaperUi.QuietButton(Host, "Manage", () => Host.StartActivity(new Intent(Host, typeof(ManageSubscriptionsActivity)))));
 
     public override bool GoBack()
     {
@@ -204,14 +233,14 @@ public sealed class PodcastsArea : ScoreArea
             position => ShowShelfActions(shelf[position]));
     }
 
-    // Long-press a show on the shelf: its one bulk action, marking every episode played.
+    // Long-press a show on the shelf: its one bulk action, marking every episode
+    // played. §7's action card rather than a dialog — it is not asking, it does the
+    // thing, and the undo dog-ear is what makes that safe.
     private void ShowShelfActions(ShowSummary show)
     {
-        new AlertDialog.Builder(Host)
-            .SetTitle(show.Title)!
-            .SetItems(new[] { "Mark all as played" }, (_, _) =>
-                MarkManyWithUndo(BulkListen.AllInShow(episodes, show.FeedId), "Marked show played."))!
-            .Show();
+        ActionCard.Show(Host, Overlay, show.Title, null,
+            new CardAction("Mark all as played",
+                () => MarkManyWithUndo(BulkListen.AllInShow(episodes, show.FeedId), "Marked show played.")));
     }
 
     // The empty shelf must never read like a dead-end: no shows points at Manage, a
@@ -250,24 +279,11 @@ public sealed class PodcastsArea : ScoreArea
     // everything older beneath it. Tapping the row (not long-press) still plays.
     private void ShowEpisodeActions(Episode episode)
     {
-        new AlertDialog.Builder(Host)
-            .SetTitle(episode.Title)!
-            .SetItems(new[] { "Add to queue", "Mark played", "Mark older as played" }, (_, args) =>
-            {
-                switch (args.Which)
-                {
-                    case 0:
-                        AddToQueueWithUndo(episode);
-                        break;
-                    case 1:
-                        MarkDoneWithUndo(episode);
-                        break;
-                    default:
-                        MarkManyWithUndo(BulkListen.OlderInShow(episodes, episode), "Marked older played.");
-                        break;
-                }
-            })!
-            .Show();
+        ActionCard.Show(Host, Overlay, episode.Title, feedTitles.GetValueOrDefault(episode.FeedId),
+            new CardAction("Add to queue", () => AddToQueueWithUndo(episode), Lead: true),
+            new CardAction("Mark played", () => MarkDoneWithUndo(episode)),
+            new CardAction("Mark older as played",
+                () => MarkManyWithUndo(BulkListen.OlderInShow(episodes, episode), "Marked older played.")));
     }
 
     private View BuildQueuePane()
@@ -283,13 +299,13 @@ public sealed class PodcastsArea : ScoreArea
         head.SetGravity(GravityFlags.CenterVertical);
         head.AddView(PaperUi.Heading(Host, "Queue"),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        head.AddView(PaperUi.SecondaryButton(Host, "Auto-arrange", ShowArrangeDialog));
         if (queue.Count > 0)
         {
             head.AddView(PaperUi.QuietButton(Host, "Clear", ClearQueueWithUndo));
         }
 
         container.AddView(head);
+        container.AddView(BuildArrangePicker());
 
         var queued = queue.Items
             .Select(id => episodes.First(episode => episode.Id == id))
@@ -413,13 +429,15 @@ public sealed class PodcastsArea : ScoreArea
 
     private void PlayQueue(string startId)
     {
+        status = null;
+
         // The controller is built asynchronously on cold start; a tap before it
         // connects can't play, so say so (the episode is already queued) rather
         // than fail silently, and record it for later diagnosis.
         if (playback.Controller is null)
         {
             AudioDiagnostics.LogWarning("Playback", "Play requested before the media controller was ready.");
-            Toast.MakeText(Host, PodcastPlaybackDiagnostics.ControllerNotReady, ToastLength.Short)!.Show();
+            Say(PodcastPlaybackDiagnostics.ControllerNotReady);
             return;
         }
 
@@ -436,7 +454,7 @@ public sealed class PodcastsArea : ScoreArea
             // so it can never start — tell the user which one instead of no-op.
             var title = episodes.FirstOrDefault(episode => episode.Id == startId)?.Title;
             AudioDiagnostics.LogWarning("Playback", $"Episode has no playable audio: id={startId}.");
-            Toast.MakeText(Host, PodcastPlaybackDiagnostics.NoPlayableAudio(title), ToastLength.Short)!.Show();
+            Say(PodcastPlaybackDiagnostics.NoPlayableAudio(title));
             return;
         }
 
@@ -450,14 +468,15 @@ public sealed class PodcastsArea : ScoreArea
                 .ResumeWithRewind(startEpisode.Id, DateTimeOffset.Now);
             var startMs = resume is { } point ? (long)point.TotalMilliseconds : 0L;
 
-            playback.Start(MediaKind.Podcast, items, index, startMs, showSettings.Speed, showSettings.SkipSilence);
+            playback.Start(MediaKind.Podcast, items, index, startMs, showSettings.Speed, showSettings.SkipSilence,
+                settingsKey: startEpisode.FeedId);
         }
         catch (Exception e)
         {
             // Never let a media-stack fault die silently — capture the stack trace
             // to the rolling log and give the user a brief, honest message.
             AudioDiagnostics.LogWarning("Playback", "Starting playback failed.", e);
-            Toast.MakeText(Host, "Couldn't start playback — see Manage → Diagnostics.", ToastLength.Short)!.Show();
+            Say("Couldn't start playback — see Manage → Diagnostics.");
         }
     }
 
@@ -478,31 +497,31 @@ public sealed class PodcastsArea : ScoreArea
 
     // ---- Queue arrangement ----
 
-    private void ShowArrangeDialog()
+    // §7's picker: the field expands in place. No dialog, and no remembered
+    // selection either — arranging is an act, not a mode, so the field reads
+    // "Auto-arrange:" until you pick one and does it.
+    private View BuildArrangePicker()
     {
-        var options = new[]
+        var arrangements = new[]
         {
-            "Round-robin (mix shows)",
-            "Chronological (oldest first)",
-            "Backlog-buster (finish shows)",
+            (QueueArrangement.RoundRobin, "Round-robin", "One from each show in turn."),
+            (QueueArrangement.Chronological, "Chronological", "Oldest first, across every show."),
+            (QueueArrangement.BacklogBuster, "Backlog-buster", "Finish one show before starting the next."),
         };
-        new AlertDialog.Builder(Host)
-            .SetTitle("Auto-arrange queue")!
-            .SetItems(options, (_, args) =>
-            {
-                var arrangement = args.Which switch
-                {
-                    0 => QueueArrangement.RoundRobin,
-                    1 => QueueArrangement.Chronological,
-                    _ => QueueArrangement.BacklogBuster,
-                };
-                AutoArrange(arrangement);
-            })!
-            .Show();
+
+        var picker = new AccordionPicker(
+            Host,
+            "Auto-arrange:",
+            arrangements.Select(a => new PickerOption(a.Item2, a.Item3)),
+            0);
+        picker.Chosen += index => AutoArrange(arrangements[index].Item1);
+        return picker;
     }
 
     private void AutoArrange(QueueArrangement arrangement)
     {
+        status = null;
+
         var strategy = EpisodeQueueStrategy.For(arrangement);
         if (strategy is null)
         {
@@ -518,7 +537,7 @@ public sealed class PodcastsArea : ScoreArea
                 // say why and leave any existing queue intact rather than wiping it.
                 AudioDiagnostics.LogWarning("Queue",
                     $"Auto-arrange ({arrangement}) found no unplayed episodes; refreshing={isRefreshing}.");
-                Toast.MakeText(Host, PodcastPlaybackDiagnostics.NothingToQueue(isRefreshing), ToastLength.Short)!.Show();
+                Say(PodcastPlaybackDiagnostics.NothingToQueue(isRefreshing));
                 return;
             }
 
@@ -529,7 +548,7 @@ public sealed class PodcastsArea : ScoreArea
         catch (Exception e)
         {
             AudioDiagnostics.LogWarning("Queue", $"Auto-arrange ({arrangement}) failed.", e);
-            Toast.MakeText(Host, "Couldn't arrange the queue — see Manage → Diagnostics.", ToastLength.Short)!.Show();
+            Say("Couldn't arrange the queue — see Manage → Diagnostics.");
         }
     }
 
@@ -656,16 +675,14 @@ public sealed class PodcastsArea : ScoreArea
         feedTitles = titles;
         episodeCache.Save(episodes, titles); // persist for the next cold launch
 
-        // Failure may speak (DESIGN.md §7), but a wall of toasts must not: summarize when several feeds fail.
+        // Failure may speak (DESIGN.md §7), but not once per feed: summarize when several fail.
         if (failedHosts.Count == 1)
         {
-            Toast.MakeText(Host, $"{failedHosts[0]} didn't answer. It retries on the next refresh.",
-                ToastLength.Short)!.Show();
+            Say($"{failedHosts[0]} didn't answer. It retries on the next refresh.");
         }
         else if (failedHosts.Count > 1)
         {
-            Toast.MakeText(Host, $"{failedHosts.Count} shows didn't answer. They retry on the next refresh.",
-                ToastLength.Short)!.Show();
+            Say($"{failedHosts.Count} shows didn't answer. They retry on the next refresh.");
         }
 
         RecomputeDone();
@@ -696,66 +713,5 @@ public sealed class PodcastsArea : ScoreArea
     // ---- Now-playing bar poll ----
 
 
-    // ---- Speed dialog (per-show speed + skip-silence) ----
 
-    private void ShowSpeedDialog()
-    {
-        var feedId = nowPlaying?.FeedId;
-        var current = feedId is null ? settings.Default : settings.For(feedId);
-
-        var edge = PaperTheme.Dp(Host, DesignTokens.Space.X4);
-        var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
-        layout.SetPadding(edge, edge, edge, edge);
-
-        var label = PaperUi.Title(Host, SpeedLabel(current.Speed));
-        layout.AddView(label);
-
-        Button? trim = null;
-
-        void Apply(PlaybackSettings updated)
-        {
-            current = updated;
-            label.Text = SpeedLabel(current.Speed);
-            if (trim is not null)
-            {
-                trim.Text = TrimLabel(current.SkipSilence);
-            }
-
-            PersistAndApply(feedId, current);
-        }
-
-        var presetRow = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
-        presetRow.AddView(PaperUi.SecondaryButton(Host, "−", () => Apply(current.Slower())));
-        foreach (var preset in PlaybackSettings.Presets)
-        {
-            var value = preset;
-            presetRow.AddView(PaperUi.QuietButton(Host, $"{value:0.0}×", () => Apply(current.WithSpeed(value))));
-        }
-        presetRow.AddView(PaperUi.SecondaryButton(Host, "+", () => Apply(current.Faster())));
-        layout.AddView(presetRow);
-
-        trim = PaperUi.SecondaryButton(Host, TrimLabel(current.SkipSilence),
-            () => Apply(current with { SkipSilence = !current.SkipSilence }));
-        layout.AddView(trim);
-
-        new AlertDialog.Builder(Host)
-            .SetTitle("Playback speed")!
-            .SetView(layout)!
-            .SetPositiveButton("Done", (_, _) => { })!
-            .Show();
-    }
-
-    private void PersistAndApply(string? feedId, PlaybackSettings updated)
-    {
-        settings = feedId is null
-            ? settings with { Default = updated }
-            : settings.With(feedId, updated);
-        settingsStore.Save(settings);
-        playback.ApplySettings(updated.Speed, updated.SkipSilence);
-    }
-
-
-    private static string SpeedLabel(float speed) => $"Speed {speed:0.0}×";
-
-    private static string TrimLabel(bool on) => on ? "Trim silence: on" : "Trim silence: off";
 }

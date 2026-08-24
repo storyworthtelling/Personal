@@ -1,6 +1,5 @@
 using Android.Graphics;
 using Android.Views;
-using Android.Widget;
 using AndroidX.Media3.Common;
 using Codex.Domain.Audio;
 using Codex.Domain.Design;
@@ -31,6 +30,7 @@ public sealed class PlayingArea : ScoreArea
 
     private readonly ScorePlayback playback;
     private readonly ArtworkOverrideStore artworkStore;
+    private readonly PlaybackSettingsStore settingsStore;
 
     private ArtworkWindow artwork = null!;
     private TextView titleView = null!;
@@ -53,6 +53,7 @@ public sealed class PlayingArea : ScoreArea
     {
         this.playback = playback;
         artworkStore = new ArtworkOverrideStore(host);
+        settingsStore = new PlaybackSettingsStore(host);
     }
 
     public override BinderArea Tab => new("Playing", Resource.Drawable.area_playing, PaperTheme.ScoreMark);
@@ -92,6 +93,14 @@ public sealed class PlayingArea : ScoreArea
         root.AddView(BuildScrubber());
         root.AddView(BuildTransport());
         root.AddView(BuildModes());
+
+        // Per-show speed belongs to the thing that is playing, so it lives here
+        // rather than on the podcast shelf — and it is §7's picker expanding in
+        // place, not the dialog it used to be.
+        if (playback.Kind == MediaKind.Podcast)
+        {
+            root.AddView(BuildSpeed());
+        }
 
         RenderPanel();
         Render();
@@ -173,6 +182,45 @@ public sealed class PlayingArea : ScoreArea
         row.AddView(PaperUi.QuietButton(Host, "Art", PickArt));
         return row;
     }
+
+    private View BuildSpeed()
+    {
+        var key = playback.SettingsKey;
+        var settings = settingsStore.Load();
+        var current = key is null ? settings.Default : settings.For(key);
+
+        var row = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+
+        var presets = PlaybackSettings.Presets.ToList();
+        var chosen = presets.IndexOf(current.Speed);
+        var picker = new AccordionPicker(
+            Host,
+            "Speed:",
+            presets.Select(preset => new PickerOption($"{preset:0.0}×")),
+            chosen < 0 ? presets.IndexOf(1.0f) : chosen);
+        picker.Chosen += index => Apply(current.WithSpeed(presets[index]));
+        row.AddView(picker);
+
+        Button? trim = null;
+        trim = PaperUi.QuietButton(Host, TrimLabel(current.SkipSilence), () =>
+        {
+            Apply(current with { SkipSilence = !current.SkipSilence });
+            trim!.Text = TrimLabel(current.SkipSilence);
+        });
+        row.AddView(trim);
+        return row;
+
+        void Apply(PlaybackSettings updated)
+        {
+            current = updated;
+            settingsStore.Save(key is null
+                ? settings with { Default = updated }
+                : settings.With(key, updated));
+            playback.ApplySettings(updated.Speed, updated.SkipSilence);
+        }
+    }
+
+    private static string TrimLabel(bool on) => on ? "Trim silence: on" : "Trim silence: off";
 
     private void RenderPanel()
     {

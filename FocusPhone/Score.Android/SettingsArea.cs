@@ -1,10 +1,8 @@
 using Android.Views;
-using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Domain.Music;
 using Codex.Ui;
 using Codex.Ui.Voice;
-using Score.Google;
 
 namespace Score;
 
