@@ -5,17 +5,13 @@ using Android.Views;
 using Android.Widget;
 using AndroidX.Media3.Common;
 using AndroidX.Media3.Session;
-using MediaController = AndroidX.Media3.Session.MediaController;
 using Score.Google;
 using Codex.Domain.Audio;
 using Codex.Domain.Design;
-using Codex.Domain.Music;
 using Codex.Domain.Time;
-using Codex.Infrastructure.Music;
 using Codex.Infrastructure.Podcasts;
 using Codex.Ui;
 using Codex.Ui.Voice;
-using Storyworthtelling.Voice.Secrets;
 
 namespace Score;
 
@@ -62,20 +58,14 @@ public class AudioActivity : Activity
 
     // Listening Genius (Phase 6): passive on-device recording -> Drive-backed Taste Profile.
     private ListeningLog listening = null!;
+    private MusicLibrary musicLibrary = null!;
+    private MusicArea music = null!;
 
     // Discovery (Phase 7): prompted playlists + the quiet weekly shelf.
-    private FridayPicksStore fridayPicksStore = null!;
-    private string? discoveryStatus;
 
     // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
     private Codex.Ui.Voice.VoiceGreeting? greeting;
     private TextView? greetingView;
-    private DriveMusicClient? driveClient;
-    private MusicTagReader? tagReader;
-    private MusicCatalog? musicCatalog;
-    private IReadOnlyList<DriveMusicClient.DriveFolder>? driveFolders;
-    private string? musicStatus;
-    private MusicView musicView = MusicView.Menu;
 
     private FrameLayout content = null!;
     private NowPlayingBar nowPlayingBar = null!;
@@ -104,20 +94,21 @@ public class AudioActivity : Activity
         LoadCachedEpisodes(); // paint the shelf from the previous fetch before the network refresh
         RestoreLibraryFromDrive();
 
-        driveClient = new DriveMusicClient(musicTokens);
-        tagReader = new MusicTagReader(Path.Combine(CacheDir!.AbsolutePath, "art"));
-        LoadMusicCatalog();
-
         listening = new ListeningLog(
             this, new Score.Google.MusicTasteService(musicTokens.GetAccessToken, "Score"));
-        fridayPicksStore = new FridayPicksStore(this);
+        musicLibrary = new MusicLibrary(this, musicTokens, playback, listening, progressStore);
+        musicLibrary.LoadCatalog();
+        music = new MusicArea(this, musicLibrary, new DiscoverArea(this, musicLibrary));
+        // The shell redraws only for the area that is showing — a scan finishing behind
+        // the podcast side should not rebuild the podcast side.
+        music.Changed += () => { if (side == 1) RenderContent(); };
         FridayPicksWorker.Schedule(this); // weekly "New for you"; no-ops until signed in
 
         greeting = new Codex.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "Score");
         SetContentView(BuildLayout());
         playback.Connect();
         ShowGreetingAsync();
-        RestoreMusicFolderFromVault();
+        musicLibrary.RestoreFolderFromVault();
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
     }
@@ -125,49 +116,6 @@ public class AudioActivity : Activity
     // After a reinstall or the cutover's factory reset, refill the chosen music-folder id from the encrypted
     // Drive vault (needs the vault passphrase set + Google signed in), so the library reappears without
     // re-picking the folder. Runs only when none is set locally. Best-effort and off the UI thread.
-    private void RestoreMusicFolderFromVault() => Task.Run(async () =>
-    {
-        try
-        {
-            if (!string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId))
-                return;
-
-            var access = new SecretsVaultAccess(musicTokens.GetAccessToken, "Score");
-            var result = await access.Service.LoadAsync(System.Threading.CancellationToken.None);
-            if (result.Status == SecretsVaultStatus.Loaded)
-            {
-                // Drive-by-ID (#13): pick up the ids persisted for the shared files.
-                Codex.Ui.Voice.SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
-                if (!string.IsNullOrEmpty(result.Vault.Music.FolderId)
-                    && string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId))
-                {
-                    MusicSettingsStore.MusicFolderId = result.Vault.Music.FolderId;
-                    RunOnUiThread(() => { RenderContent(); _ = ScanAsync(); });
-                }
-            }
-        }
-        catch
-        {
-            // Ignore: restore is a convenience; the folder picker is always available.
-        }
-    });
-
-    // Backs the chosen music-folder id up to the encrypted vault. Best-effort and off the UI thread.
-    private async void PublishMusicFolderToVault(string folderId)
-    {
-        try
-        {
-            var access = new SecretsVaultAccess(musicTokens.GetAccessToken, "Score");
-            await access.Service.PublishAsync(
-                v => v with { Music = new MusicSecrets(folderId) },
-                System.Threading.CancellationToken.None);
-        }
-        catch
-        {
-            // Best-effort: the vault picks the folder up on the next successful publish.
-        }
-    }
-
     // Pulls the podcast library (shows + listened + resume points) down from Drive when this device has
     // none of its own — a factory reset or a new phone. Best-effort and off the UI thread; on success it
     // reloads the local state and re-renders. Local always wins when it already has shows, so this never
@@ -207,12 +155,6 @@ public class AudioActivity : Activity
             // Best-effort: the next successful backup catches the cloud copy up.
         }
     });
-
-    private void LoadMusicCatalog()
-    {
-        using var database = MusicDatabase.Open(this);
-        musicCatalog = new MusicCatalog(database.Catalog.LoadAll());
-    }
 
     // The old store persisted a bare feed-URL set; seed the ordered subscription
     // list from it the first time so no shows are lost on upgrade.
@@ -330,10 +272,9 @@ public class AudioActivity : Activity
             openFeedId = null;
             RenderContent();
         }
-        else if (side == 1 && musicView != MusicView.Menu)
+        else if (side == 1 && music.GoBack())
         {
-            musicView = MusicView.Menu;
-            RenderContent();
+            // The area came up a level and asked for the redraw itself.
         }
         else
         {
@@ -346,7 +287,7 @@ public class AudioActivity : Activity
     private void RenderContent()
     {
         content.RemoveAllViews();
-        var pane = side == 1 ? BuildMusicPane() : BuildPodcastsPane();
+        var pane = side == 1 ? music.BuildView() : BuildPodcastsPane();
         content.AddView(pane, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
@@ -354,367 +295,11 @@ public class AudioActivity : Activity
         podcastBottomBar.Visibility = side == 1 ? ViewStates.Gone : ViewStates.Visible;
     }
 
-    private View BuildMusicPane()
-    {
-        if (string.IsNullOrEmpty(MusicSettingsStore.GoogleAccountEmail))
-        {
-            return BuildDriveSetup();
-        }
-
-        return string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId)
-            ? BuildFolderPicker()
-            : BuildMusicBrowse();
-    }
-
-    private View BuildDriveSetup()
-    {
-        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        layout.AddView(PaperUi.Body(this, "Stream your own music from Google Drive."));
-        layout.AddView(PaperUi.Secondary(this,
-            "First register this app as an Android OAuth client (Drive API enabled), then sign in:\n\n" +
-            $"Package: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
-
-        // The secrets-vault passphrase (optional): set the same one as your other apps to back up and restore
-        // your keys from Drive, encrypted. Persisted when you sign in.
-        // Shown in the clear (not a password field) so it can be read back and copied — it's the one secret
-        // that isn't kept in the vault, so being able to see it is what lets the owner set the same one everywhere.
-        var passphrase = PaperUi.MonoField(this, "Secrets vault passphrase (optional)");
-        passphrase.Text = VaultPassphraseStore.Passphrase;
-        layout.AddView(passphrase);
-
-        layout.AddView(PaperUi.PrimaryButton(this, "Sign in with Google", () =>
-        {
-            VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
-            _ = SignInAsync();
-        }));
-        return WrapScroll(layout);
-    }
-
-    private View BuildFolderPicker()
-    {
-        if (driveFolders is null)
-        {
-            _ = LoadFoldersAsync();
-            return PaperUi.EmptyState(this, "Finding your Drive folders…");
-        }
-
-        var container = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        container.AddView(PaperUi.Body(this, "Pick the folder your music lives in."));
-        container.AddView(PaperUi.SecondaryButton(this, "Use all of My Drive", () => ChooseFolder("root")));
-
-        var rows = driveFolders.Select(folder => new PaperListRow(folder.Name)).ToList();
-        var list = PaperUi.List(this, rows, position => ChooseFolder(driveFolders![position].Id));
-        container.AddView(list, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
-        return container;
-    }
-
-    private void ChooseFolder(string folderId)
-    {
-        MusicSettingsStore.MusicFolderId = folderId;
-        PublishMusicFolderToVault(folderId);
-        driveFolders = null;
-        RenderContent();
-        _ = ScanAsync();
-    }
-
-    private View BuildMusicBrowse()
-    {
-        var container = new LinearLayout(this) { Orientation = Orientation.Vertical };
-
-        var head = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        head.SetGravity(GravityFlags.CenterVertical);
-        head.AddView(PaperUi.Heading(this, musicView.ToString()),
-            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        head.AddView(PaperUi.QuietButton(this, "Shuffle", () => PlayShuffled((musicCatalog ?? new MusicCatalog([])).Songs())));
-        head.AddView(PaperUi.QuietButton(this, "Sound", () => StartActivity(new Intent(this, typeof(EqualizerActivity)))));
-        head.AddView(PaperUi.QuietButton(this, "Rescan", () => _ = ScanAsync()));
-        container.AddView(head);
-
-        if (!string.IsNullOrEmpty(musicStatus))
-        {
-            container.AddView(PaperUi.Secondary(this, musicStatus));
-        }
-
-        // An empty catalog (and no scan running) is the cold-start dead-end: show the
-        // "how to add music" guide instead of a bare "no music" line under every browse view.
-        var catalogEmpty = (musicCatalog ?? new MusicCatalog([])).Songs().Count == 0;
-        var body = catalogEmpty && string.IsNullOrEmpty(musicStatus)
-            ? BuildMusicEmptyGuide()
-            : BuildMusicBody();
-        container.AddView(body, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
-        return container;
-    }
-
-    // The cold-start guide: how to get music into the Drive folder. Tone stays quiet-neutral
-    // (DESIGN.md §11) and the supported extensions come straight from AudioFileTypes so the
-    // guide can't drift from what the scanner actually accepts.
-    private View BuildMusicEmptyGuide()
-    {
-        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        layout.AddView(PaperUi.Body(this, "No music in this folder yet. Here's how to add some."));
-        layout.AddView(PaperUi.Secondary(this,
-            "Put audio files in your Drive music folder — rip your CDs to tagged FLAC or MP3, copy the " +
-            "files iTunes already made, or buy real downloads (Bandcamp, Qobuz, Amazon Music). Streaming " +
-            "apps like YouTube Music can't be saved here."));
-        layout.AddView(PaperUi.Secondary(this,
-            "What organizes the library is each file's embedded tags — title, artist, album artist, album, " +
-            "track number, genre. Folder names and structure don't matter; the tags do."));
-        layout.AddView(PaperUi.Secondary(this,
-            "Playable file types: " + string.Join(", ", AudioFileTypes.SupportedExtensions) + "."));
-        layout.AddView(PaperUi.PrimaryButton(this, "Scan again", () => _ = ScanAsync()));
-        return WrapScroll(layout);
-    }
-
-    private View BuildMusicBody()
-    {
-        var catalog = musicCatalog ?? new MusicCatalog([]);
-        switch (musicView)
-        {
-            case MusicView.Artists:
-                var artists = catalog.Artists();
-                return artists.Count == 0
-                    ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : PaperUi.List(this, [.. artists.Select(artist => new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"))],
-                        position => PlayTracks(catalog.TracksByArtist(artists[position].Name), 0),
-                        position => PlayShuffled(catalog.TracksByArtist(artists[position].Name)));
-
-            case MusicView.Albums:
-                var albums = catalog.Albums();
-                return albums.Count == 0
-                    ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : PaperUi.List(this, [.. albums.Select(album => new PaperListRow(album.Name, album.AlbumArtist))],
-                        position => PlayTracks(catalog.TracksInAlbum(albums[position].AlbumArtist, albums[position].Name), 0),
-                        position => PlayShuffled(catalog.TracksInAlbum(albums[position].AlbumArtist, albums[position].Name)));
-
-            case MusicView.Songs:
-                var songs = catalog.Songs();
-                return songs.Count == 0
-                    ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : PaperUi.List(this, [.. songs.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist))],
-                        position => PlayTracks(songs, position),
-                        position => PlaySmartMix(songs[position], catalog));
-
-            case MusicView.Genres:
-                var genres = catalog.Genres();
-                return genres.Count == 0
-                    ? PaperUi.EmptyState(this, "No music yet — scan your library.")
-                    : PaperUi.List(this, [.. genres.Select(genre => new PaperListRow(genre))],
-                        position => PlayTracks(catalog.TracksInGenre(genres[position]), 0),
-                        position => PlayShuffled(catalog.TracksInGenre(genres[position])));
-
-            case MusicView.Playlists:
-                return PaperUi.EmptyState(this, "No playlists yet.");
-
-            case MusicView.Discovery:
-                return BuildDiscovery(catalog);
-
-            default:
-                var items = new[] { "Discovery", "Playlists", "Artists", "Albums", "Songs", "Genres" };
-                return PaperUi.List(this, [.. items.Select(item => new PaperListRow(item))], position =>
-                {
-                    musicView = Enum.Parse<MusicView>(items[position]);
-                    RenderContent();
-                });
-        }
-    }
-
-    // Discovery: a prompted playlist from the owner's own library, a quiet weekly "New for you" shelf, and
-    // the Listening Genius control + honest data note. Playlists generate only when asked (DESIGN.md: no
-    // surprise work); loading is a sentence, and the shelf is dismissable — never a toast, push, or badge.
-    private View BuildDiscovery(MusicCatalog catalog)
-    {
-        var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
-
-        var picks = ResolveFridayPicks(catalog);
-        if (picks is not null && !fridayPicksStore.Dismissed)
-        {
-            layout.AddView(PaperUi.Heading(this, "New for you"));
-            layout.AddView(PaperUi.Secondary(this, picks.Title));
-            layout.AddView(PaperUi.SecondaryButton(this, "Play these", () => PlayTracks(picks.Tracks, 0)));
-            layout.AddView(PaperUi.QuietButton(this, "Dismiss", () =>
-            {
-                fridayPicksStore.Dismissed = true;
-                RenderContent();
-            }));
-        }
-
-        layout.AddView(PaperUi.Body(this, "Make a playlist from your library."));
-        var input = PaperUi.Field(this, "What do you want to hear? A mood, a genre, an idea.");
-        layout.AddView(input);
-        layout.AddView(PaperUi.PrimaryButton(this, "Make a playlist", () => _ = MakePlaylistAsync(input.Text, catalog)));
-
-        if (!string.IsNullOrEmpty(discoveryStatus))
-        {
-            layout.AddView(PaperUi.Secondary(this, discoveryStatus));
-        }
-
-        layout.AddView(PaperUi.SecondaryButton(this, GeniusToggleLabel(), ToggleListeningGenius));
-        layout.AddView(PaperUi.Secondary(this,
-            "Listening Genius learns your taste on this phone from what you play — nothing you rate — and " +
-            "sends a short summary to Claude with your key to describe it. Turn it off any time; that also " +
-            "clears what's been gathered."));
-        return WrapScroll(layout);
-    }
-
-    private DiscoveryPlaylist? ResolveFridayPicks(MusicCatalog catalog)
-    {
-        var selection = fridayPicksStore.LoadSelection();
-        if (selection.TrackIds.Count == 0)
-        {
-            return null;
-        }
-
-        var playlist = PlaylistPlan.Resolve(selection.Title, selection.TrackIds, catalog.Songs(), 25);
-        return playlist.IsEmpty ? null : playlist;
-    }
-
-    private async Task MakePlaylistAsync(string? seed, MusicCatalog catalog)
-    {
-        if (string.IsNullOrWhiteSpace(seed) || listening.Taste is null)
-        {
-            return;
-        }
-
-        discoveryStatus = "Building a playlist…";
-        RenderContent();
-
-        var playlist = await listening.Taste.MakePlaylistAsync(
-            catalog.Songs(), new PlaylistRequest(seed.Trim()), CancellationToken.None);
-        if (playlist.IsEmpty)
-        {
-            discoveryStatus = "Couldn't build a playlist from that. Try another idea.";
-            RenderContent();
-            return;
-        }
-
-        discoveryStatus = null;
-        PlayTracks(playlist.Tracks, 0);
-        RenderContent();
-    }
-
-    private string GeniusToggleLabel() =>
-        MusicSettingsStore.ListeningGeniusEnabled ? "Listening Genius: on" : "Listening Genius: off";
-
-    private void ToggleListeningGenius()
-    {
-        var enabled = !MusicSettingsStore.ListeningGeniusEnabled;
-        MusicSettingsStore.ListeningGeniusEnabled = enabled;
-        listening.LearningEnabled = enabled;
-        if (!enabled)
-        {
-            listening.Clear(); // off means forget what was gathered, not just stop
-        }
-
-        RenderContent();
-    }
-
-    private void PlayTracks(IReadOnlyList<Track> tracks, int index, PlaybackLaunch launch = PlaybackLaunch.Album)
-    {
-        if (playback.Controller is null || tracks.Count == 0)
-        {
-            return;
-        }
-
-        nowPlaying = null; // music, not a podcast episode
-        // Speed 1.0 and skip-silence off: both are podcast settings, and a track must
-        // not inherit them from whatever episode played last.
-        playback.Start(MediaKind.Music, tracks.Select(BuildTrackItem).ToList(), index, 0L, 1.0f, skipSilence: false);
-
-        // Start a listening sitting for Genius; replay is judged against the saved progress book.
-        var progress = new PlaybackProgressBook(progressStore.Load());
-        listening.BeginSelection(tracks, index, launch, progress.IsComplete);
-    }
-
-    private void PlayShuffled(IReadOnlyList<Track> tracks) =>
-        PlayTracks(new ShufflePlanner().Shuffle(tracks), 0, PlaybackLaunch.Shuffle);
-
-    private void PlaySmartMix(Track seed, MusicCatalog catalog) =>
-        PlayTracks(new SmartMixBuilder(new ShufflePlanner()).Build(seed, catalog), 0, PlaybackLaunch.Shuffle);
-
-    private static MediaItem BuildTrackItem(Track track)
-    {
-        var metadata = new MediaMetadata.Builder()
-            .SetTitle(track.DisplayTitle)!
-            .SetArtist(track.DisplayArtist)!
-            .SetAlbumTitle(track.DisplayAlbum)!
-            .Build()!;
-        return new MediaItem.Builder()
-            .SetMediaId(track.Id)!
-            .SetUri($"drive://{track.Id}")!
-            .SetMediaMetadata(metadata)!
-            .Build()!;
-    }
-
     private View WrapScroll(View inner)
     {
         var scroll = new ScrollView(this);
         scroll.AddView(inner);
         return scroll;
-    }
-
-    private async Task SignInAsync()
-    {
-        try
-        {
-            await DeviceAccountSignIn.SignIn(this);
-            RenderContent();
-        }
-        catch (Exception e)
-        {
-            Toast.MakeText(this, e.Message, ToastLength.Long)!.Show();
-        }
-    }
-
-    private async Task LoadFoldersAsync()
-    {
-        try
-        {
-            driveFolders = await driveClient!.ListFoldersAsync("root", CancellationToken.None);
-            RenderContent();
-        }
-        catch (Exception e)
-        {
-            Toast.MakeText(this, e.Message, ToastLength.Long)!.Show();
-        }
-    }
-
-    private async Task ScanAsync()
-    {
-        var folderId = MusicSettingsStore.MusicFolderId;
-        if (folderId is null || driveClient is null || tagReader is null)
-        {
-            return;
-        }
-
-        var scanner = new MusicScanner(driveClient, musicTokens, tagReader);
-        musicStatus = "Scanning your library…";
-        RenderContent();
-        try
-        {
-            using var database = MusicDatabase.Open(this);
-            // The scanner reports once per parallel batch, so render each callback rather than re-throttling.
-            await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
-            {
-                RunOnUiThread(() =>
-                {
-                    musicStatus = done >= total ? null : $"Scanning… {done} of {total}";
-                    if (side == 1)
-                    {
-                        RenderContent();
-                    }
-                });
-            }, CancellationToken.None);
-            LoadMusicCatalog();
-            musicStatus = null;
-        }
-        catch (Exception e)
-        {
-            musicStatus = $"Scan couldn't finish: {e.Message}";
-        }
-
-        RenderContent();
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
@@ -1341,16 +926,4 @@ public class AudioActivity : Activity
     private static string SpeedLabel(float speed) => $"Speed {speed:0.0}×";
 
     private static string TrimLabel(bool on) => on ? "Trim silence: on" : "Trim silence: off";
-}
-
-/// <summary>The music side's browse levels — the iPod top menu and its lists.</summary>
-internal enum MusicView
-{
-    Menu,
-    Playlists,
-    Artists,
-    Albums,
-    Songs,
-    Genres,
-    Discovery,
 }
