@@ -21,6 +21,8 @@ public sealed class MusicArea : ScoreArea
     private readonly MusicLibrary library;
     private MusicView view = MusicView.Menu;
     private string query = string.Empty;
+    private PlaylistEditor? editor;
+    private string? generating;
 
     public MusicArea(Activity host, MusicLibrary library) : base(host)
     {
@@ -32,6 +34,15 @@ public sealed class MusicArea : ScoreArea
 
     public override bool GoBack()
     {
+        // The editor is a level below the list it was opened from, so back closes it
+        // and leaves you where you were rather than at the top menu.
+        if (editor is not null)
+        {
+            editor = null;
+            Invalidate();
+            return true;
+        }
+
         if (view == MusicView.Menu)
         {
             return false;
@@ -108,7 +119,7 @@ public sealed class MusicArea : ScoreArea
         head.AddView(PaperUi.Heading(Host, view.ToString()),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         head.AddView(PaperUi.QuietButton(Host, "Shuffle", () => library.PlayShuffled(library.Catalog.Songs())));
-        head.AddView(PaperUi.QuietButton(Host, "Sound", () => Host.StartActivity(new Intent(Host, typeof(EqualizerActivity)))));
+        head.AddView(PaperUi.QuietButton(Host, "EQ", () => Host.StartActivity(new Intent(Host, typeof(EqualizerActivity)))));
         head.AddView(PaperUi.QuietButton(Host, "Rescan", () => _ = library.ScanAsync()));
         container.AddView(head);
 
@@ -181,14 +192,7 @@ public sealed class MusicArea : ScoreArea
                     genre => library.PlayShuffled(catalog.TracksInGenre(genre)));
 
             case MusicView.Playlists:
-                var playlists = library.Playlists();
-                return playlists.Count == 0
-                    ? PaperUi.EmptyState(Host, "No playlists yet.")
-                    : Browse(playlists.Count,
-                        [.. playlists.Select(list =>
-                            (new PaperListRow(list.Name, list.Describe(catalog.Songs())), list))],
-                        list => library.PlayTracks(list.Tracks(catalog.Songs()), 0),
-                        list => library.PlayShuffled(list.Tracks(catalog.Songs())));
+                return BuildPlaylists();
 
             default:
                 var items = new[] { "Playlists", "Artists", "Albums", "Songs", "Genres" };
@@ -199,6 +203,139 @@ public sealed class MusicArea : ScoreArea
                     Invalidate();
                 });
         }
+    }
+
+    /// <summary>
+    /// The playlists level, and the editor that sits below it.
+    ///
+    /// The list carries its own primary action rather than hiding "new" behind a
+    /// long-press, because on an empty list there is nothing to long-press — the
+    /// empty state has to be the way in or the feature is invisible.
+    /// </summary>
+    private View BuildPlaylists()
+    {
+        if (editor is not null)
+        {
+            return editor.Build();
+        }
+
+        var songs = library.Catalog.Songs();
+        var playlists = library.Playlists();
+
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        column.AddView(PaperUi.SecondaryButton(Host, "New playlist from rules", () => Edit(null)));
+
+        // The other way to make one. It lives here rather than in Discover because a
+        // generated playlist is a thing you keep, and Discover is about music you do
+        // not own yet — and because generating from Discover would have had to touch
+        // the queue to show you anything, which Discover is not allowed to do.
+        var prompt = PaperUi.Field(Host, "Or describe one: a mood, a genre, an idea.");
+        column.AddView(prompt);
+        column.AddView(PaperUi.SecondaryButton(Host, "Generate", () => _ = GenerateAsync(prompt.Text)));
+        if (!string.IsNullOrEmpty(generating))
+        {
+            column.AddView(PaperUi.Secondary(Host, generating));
+        }
+
+        var body = playlists.Count == 0
+            ? PaperUi.EmptyState(Host, "No playlists yet.")
+            : Browse(playlists.Count,
+                [.. playlists.Select(list => (new PaperListRow(list.Name, list.Describe(songs)), list))],
+                list => library.PlayTracks(list.Tracks(songs), 0),
+                ShowPlaylistActions);
+
+        column.AddView(body, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return column;
+    }
+
+    // Loading is a status sentence, never a spinner (DESIGN.md §6), and the result is
+    // saved rather than played: the list is where you go to hear it, the same as every
+    // other playlist.
+    private async Task GenerateAsync(string? seed)
+    {
+        if (string.IsNullOrWhiteSpace(seed))
+        {
+            return;
+        }
+
+        if (library.Listening.Taste is null)
+        {
+            generating = "Generating needs the shared Claude key — set it in Settings.";
+            Invalidate();
+            return;
+        }
+
+        generating = "Making a playlist\u2026";
+        Invalidate();
+
+        var made = await library.Listening.Taste.MakePlaylistAsync(
+            library.Catalog.Songs(), new PlaylistRequest(seed.Trim()), CancellationToken.None);
+        if (made.IsEmpty)
+        {
+            generating = "Couldn't make a playlist from that. Try another idea.";
+            Invalidate();
+            return;
+        }
+
+        var saved = Playlist.Generated(
+            Guid.NewGuid().ToString("n"), made.Title, [.. made.Tracks.Select(track => track.Id)]);
+        library.SavePlaylists([.. library.Playlists(), saved]);
+        generating = null;
+        Invalidate();
+    }
+
+    // §7's action card, not a kebab and not a confirm: the entries do the thing, and
+    // delete is made safe by the undo bar rather than by asking first.
+    private void ShowPlaylistActions(Playlist playlist)
+    {
+        var songs = library.Catalog.Songs();
+        var actions = new List<CardAction>
+        {
+            new("Shuffle", () => library.PlayShuffled(playlist.Tracks(songs)), Lead: true),
+        };
+
+        // Only a rule playlist has rules to edit; a hand-made one is a list of tracks
+        // and its editor is the list itself.
+        if (playlist.Kind == PlaylistKind.Rules)
+        {
+            actions.Add(new CardAction("Edit rules", () => Edit(playlist)));
+        }
+
+        actions.Add(new CardAction("Delete", () => Delete(playlist), Destructive: true));
+        ActionCard.Show(Host, Overlay, playlist.Name, playlist.Describe(songs), [.. actions]);
+    }
+
+    private void Edit(Playlist? playlist)
+    {
+        editor = new PlaylistEditor(Host, library.Catalog.Songs(), playlist, Saved, Closed);
+        Invalidate();
+
+        void Saved(Playlist saved)
+        {
+            var kept = library.Playlists().Where(list => list.Id != saved.Id).ToList();
+            kept.Add(saved);
+            library.SavePlaylists(kept);
+            Closed();
+        }
+
+        void Closed()
+        {
+            editor = null;
+            Invalidate();
+        }
+    }
+
+    private void Delete(Playlist playlist)
+    {
+        var before = library.Playlists();
+        library.SavePlaylists([.. before.Where(list => list.Id != playlist.Id)]);
+        Invalidate();
+        UndoBar.Show(Host, Overlay, $"Deleted {playlist.Name}.", onUndo: () =>
+        {
+            library.SavePlaylists(before);
+            Invalidate();
+        });
     }
 
     /// <summary>

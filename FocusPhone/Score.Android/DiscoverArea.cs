@@ -5,11 +5,15 @@ using Codex.Ui;
 namespace Score;
 
 /// <summary>
-/// Discovery: a prompted playlist from the owner's own library, a quiet weekly
-/// "New for you" shelf, and the Listening Genius control with its honest data note.
+/// Discovery: a quiet weekly "New for you" shelf and the Listening Genius control
+/// with its honest data note.
 ///
-/// Playlists generate only when asked (DESIGN.md: no surprise work); loading is a
-/// sentence, and the shelf is dismissable — never a toast, a push, or a badge.
+/// Generating a playlist from a prompt used to live here and now lives under
+/// Playlists, where the result is kept instead of played: Discover is about music the
+/// owner does not own yet, and it is not allowed to touch the queues.
+///
+/// The shelf appears only when the weekly run has something (DESIGN.md: no surprise
+/// work) and is dismissable — never a toast, a push, or a badge.
 ///
 /// It is already its own area rather than a view inside Music, because the approved
 /// P6 screens promote it to a binder tab of its own — and because it covers podcasts
@@ -19,7 +23,6 @@ public sealed class DiscoverArea : ScoreArea
 {
     private readonly MusicLibrary library;
     private readonly FridayPicksStore picksStore;
-    private string? status;
 
     public DiscoverArea(Activity host, MusicLibrary library) : base(host)
     {
@@ -47,16 +50,6 @@ public sealed class DiscoverArea : ScoreArea
             }));
         }
 
-        layout.AddView(PaperUi.Body(Host, "Make a playlist from your library."));
-        var input = PaperUi.Field(Host, "What do you want to hear? A mood, a genre, an idea.");
-        layout.AddView(input);
-        layout.AddView(PaperUi.PrimaryButton(Host, "Make a playlist", () => _ = MakePlaylistAsync(input.Text)));
-
-        if (!string.IsNullOrEmpty(status))
-        {
-            layout.AddView(PaperUi.Secondary(Host, status));
-        }
-
         layout.AddView(PaperUi.SecondaryButton(Host, GeniusToggleLabel(), ToggleListeningGenius));
         layout.AddView(PaperUi.Secondary(Host,
             "Listening Genius learns your taste on this phone from what you play — nothing you rate — and " +
@@ -78,30 +71,6 @@ public sealed class DiscoverArea : ScoreArea
 
         var playlist = PlaylistPlan.Resolve(selection.Title, selection.TrackIds, library.Catalog.Songs(), 25);
         return playlist.IsEmpty ? null : playlist;
-    }
-
-    private async Task MakePlaylistAsync(string? seed)
-    {
-        if (string.IsNullOrWhiteSpace(seed) || library.Listening.Taste is null)
-        {
-            return;
-        }
-
-        status = "Building a playlist…";
-        Invalidate();
-
-        var playlist = await library.Listening.Taste.MakePlaylistAsync(
-            library.Catalog.Songs(), new PlaylistRequest(seed.Trim()), CancellationToken.None);
-        if (playlist.IsEmpty)
-        {
-            status = "Couldn't build a playlist from that. Try another idea.";
-            Invalidate();
-            return;
-        }
-
-        status = null;
-        library.PlayTracks(playlist.Tracks, 0);
-        Invalidate();
     }
 
     private string GeniusToggleLabel() =>
