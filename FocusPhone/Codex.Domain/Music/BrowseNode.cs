@@ -26,7 +26,7 @@ public sealed class MusicBrowseCatalog
 
     public MusicBrowseCatalog(MusicCatalog catalog) => this.catalog = catalog;
 
-    public BrowseNode Root() => Browsable(RootId, "Audio");
+    public BrowseNode Root() => Browsable(RootId, "Score");
 
     public IReadOnlyList<BrowseNode> Children(string parentId)
     {

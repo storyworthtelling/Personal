@@ -27,6 +27,11 @@ public sealed record SecretsVault
 
     public MusicSecrets Music { get; init; } = new();
 
+    // Score's TIDAL credentials. One section rather than one per person, because the
+    // subscription is a shared account — both installs restore the same token from
+    // the same vault, which is the whole reason it lives here rather than locally.
+    public TidalSecrets Tidal { get; init; } = new();
+
     // Stable Drive file ids for the suite's well-known JSON files (voice profile/config, this vault, taste
     // profile, audio library), keyed by file name. Lets those files be MOVED in Drive without breaking the
     // apps (thread #13): the app resolves by remembered id first, falling back to a name search. Cross-app,
@@ -70,3 +75,12 @@ public sealed record GmailSecrets(string Address = "", string AppPassword = "", 
 
 // The FocusPhone Audio head's chosen music Drive-folder id.
 public sealed record MusicSecrets(string FolderId = "");
+
+// Score's TIDAL credentials: the registered app's id and secret, plus the long-lived
+// refresh token the OAuth PKCE sign-in returns. The refresh token is the one that
+// matters for a reset — it is what stops the owner having to sign in again on a fresh
+// phone, exactly as RemarkableSecrets.DeviceToken does for the tablet.
+public sealed record TidalSecrets(
+    string ClientId = "",
+    string ClientSecret = "",
+    string RefreshToken = "");

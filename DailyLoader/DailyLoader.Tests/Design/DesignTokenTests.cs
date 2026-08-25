@@ -18,7 +18,7 @@ public class DesignTokenTests
         ["PaperDeep"] = "#F1EBDD",
         ["PaperShade"] = "#E9E1CF",
         ["Hairline"] = "#E3DCC9",
-        ["Ink"] = "#3A3A33",
+        ["Ink"] = "#33322B",
         ["InkSoft"] = "#6B6759",
         ["InkMuted"] = "#8A8578",
         ["Accent"] = "#C2542F",

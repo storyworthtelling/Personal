@@ -19,7 +19,7 @@ public class BookClothPaletteTests
     {
         var tokens = new HashSet<string>
         {
-            DesignTokens.Identity.Warm, DesignTokens.Identity.Mark, DesignTokens.Identity.Deep,
+            DesignTokens.Identity.Flyleaf.Warm, DesignTokens.Identity.Flyleaf.Mark, DesignTokens.Identity.Flyleaf.Deep,
             DesignTokens.ActionDeep, DesignTokens.ReferenceDeep, DesignTokens.CautionDeep,
             DesignTokens.ProblemDeep, DesignTokens.ProgressDeep, DesignTokens.InkBlue,
             DesignTokens.Shelf.WalnutLight,

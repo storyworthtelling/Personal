@@ -87,6 +87,17 @@ Terracotta is **retired everywhere** — including documents, where the old "act
 
 Each app (book) has a **signature identity hue**, kept as a **separate set** from the semantic roles so a tab or accent never reads as "caution." Each app's identity is **sampled from its painted cover art** during its phase, not fixed here. Identity hues color the binder tabs (§10) and per-app accents.
 
+Sampling is not the whole rule: a sampled hue is then **checked against the semantic roles it will sit near**, and moved if it crowds one. *Score* sampled at 174° from its ribbon cover, 13° off the in-progress status teal — too close for a set whose job is to not read as a status — so it was rotated to **165°**, giving 21° of separation. The shift was applied by **rotating the painting**, not re-prompting it, so the paper texture and pigment blooms are exactly as painted and only the hue moved.
+
+Registered ladders (per-app `Design/DesignTokens.cs`, §19):
+
+| App | fill | ground | mark | text | deep |
+|---|---|---|---|---|---|
+| Flyleaf | — | `#C9803A` | `#B4552F` | — | `#8A4A22` |
+| Score | `#AFC0BC` | `#93ABA5` | `#436A61` | `#35544D` | `#263B36` |
+
+Flyleaf's three tiers predate the five-tier ladder and are **provisional** pending a resample.
+
 ### Contrast (binding)
 
 Body text ≥ **AA (4.5:1)**; UI/large text ≥ **3:1** — computed against the **darkest textured pixel** and **behind highlighter washes**, not the flat token. A role tier that fails is darkened to its `deep` tier. The contrast table is **generated and build-failing** (§19). Colorblind redundancy is not required on screen (single known user); documents keep their non-color cues (§16) regardless.
@@ -155,12 +166,14 @@ Headings are ink-black Serif with a **full-width marker underline** (a gently cu
 | **Checkbox / radio** | Hairline at rest; functional-hue on. Indeterminate renders as a **circle** (vs the square check). ≥48dp hit-area. |
 | **Segmented control** | Within-area view switch; selected shows the **highlighter wash** of the functional hue. |
 | **Chips** | Four defined types: **filter/choice** (toggle, highlighter wash on), **input/removable** (× to remove), **status/read-only** (no tap target, exempt from 48dp), **assist/action**. |
+| **Dial** | A circular control for a single value operated **while moving or not looking**: 270° hairline track, colored-**pencil** filled arc, paper knob, the figure in Cascadia at `Countdown` size in the centre. No shadow, no gloss. Use only where a big imprecise target genuinely beats a small precise one — a slider is the default and this is the exception. Added in P6 for Score's workout tempo. |
 | **Stepper** | ±, disabled at bounds, long-press to repeat; value in mono. |
 | **Slider** | Range (two-thumb) supported; filled portion is a colored-**pencil** track; value bubble on the thumb while dragging. |
 | **Text field** | `PaperBright` fill, 1dp `Hairline`, radius 12. Focus = 2dp **Action** border, no glow. Mono variant: `PaperDeep` + Cascadia. Required fields carry a **faint identity-tinted fill**. Multiline auto-grows. Validation on blur, then live. Two secret variants: **masked** (dots + reveal) and **clear-secret** (mono, always visible, no clipboard block — the vault passphrase). |
 | **Picker** | Inline-**accordion**: the field expands in place (no overlay, no dialog). |
 | **Flip date picker** | Single-date, split-flap style: three flip columns (Month / Day / Year), flip up/down. |
-| **Search field** | Leading lens glyph, clear affordance, inline results, empty-state invitation. |
+| **Search field** | Leading lens glyph, clear affordance, empty-state invitation. It **filters in place** — it narrows the list it sits above; it never navigates to a results screen. **Pinned directly under the screen header**, above any sort/segment control, and it does not scroll away. It appears on **any list that cannot fit one screen** and is omitted where the content already does. The field takes the area's **identity border** while it holds a query, matches take the **highlighter wash** behind full-strength ink (§8 Selected), and the count line reports **matches of total**, not a total. Where a list spans more than one source, the filter spans them too — one field, one list, no seam. |
+| **Artwork slot** | Externally-supplied imagery — album and podcast art — is **content, not palette**: it keeps whatever colour it arrives with. What the system governs is the **window** it sits in. Every piece of art is framed by a hairline keyline and **never bled to the edge** — the ex-libris plate anatomy (§12) applied to someone else's picture, which is what lets a saturated cover sit on paper without either one losing. Art earns a slot only where it **distinguishes** something: a flat list of many items leads each row with it; a list already scoped to one work (an album's tracks) carries none, because every row would repeat the same picture. Missing art falls back to the miniature bookplate, so a ragged library reads as plain bindings rather than broken images. |
 | **Cards** | Five types: **warning** (`PaperDeep`, 3dp Action left rule), **explainer** (`PaperDeep`), **hairline** (`PaperBright` + 1dp hairline), **cover** (watercolor ground + title), **stat** (a single mono figure + label). |
 | **List rows & tables** | 56dp rows (Sans 16 `Ink` + Sans 14 `InkMuted`), hairline dividers, no zebra. Real tables where truly tabular (header row, aligned columns, horizontal scroll). Figures in Cascadia mono, right-aligned, tabular; negatives/deltas take the functional hue. Rows expand via the one inline-accordion pattern. |
 | **Action card** | Long-press → a **centered** paper card over a **PaperDeep haze** scrim (tap-out dismisses), animated in with the Ink reveal. Item actions only; never a confirm dialog. |
@@ -198,10 +211,10 @@ The **custom focus ring is dropped**; the platform/TalkBack focus indicator is r
 
 ## 9. Navigation & the app frame
 
-- **Binder tabs.** In-app navigation lives on **right-edge divider tabs**, like a school notebook. Icon + short label, **color-coded per area** from the identity set. A **page-edge line** runs down the right; inactive tabs are clipped at that line and point out toward the screen edge; the **active tab is page-colored and open on the page side (no left border)**, blending to the page at the seam without crossing into content. Tabs never overlap content controls (reserved gutter); the strip scrolls if there are many. Aim ≤5 areas.
+- **Binder tabs.** In-app navigation lives on **right-edge divider tabs**, like a school notebook. Icon + short label, **color-coded per area** from the identity set. A **page-edge line** runs down the right; inactive tabs are clipped at that line and point out toward the screen edge; the **active tab is page-colored and open on the page side (no left border)**, blending to the page at the seam without crossing into content. Tabs never overlap content controls (reserved gutter); the strip scrolls if there are many. **Aim ≤5 areas; six fits the gutter without scrolling** and has been drawn — Score runs six (Music · Podcasts · Playing · Discover · Workout · Settings). Past six the strip scrolls, which costs a tab its at-a-glance position, so six is the practical ceiling rather than a second aim.
 - **The frame.** Pinned Serif header (top) · binder tabs (right, always) · action bar (bottom, only when a screen has a primary action). Content scrolls in the well between; the frame stays thin (hairlines, no fills) so it reads airy.
 - **Working landing.** Apps open onto a working "now" view (not a blank hub). The shared *pattern* (not a fixed component) always carries: the in-page Serif header, a "now" status block (display-only), the binder tabs, and a reachable primary action.
-- **Back** = system back + OS edge-swipe (reads as sliding the page back). **Overflow** is inline-only — no kebab menu; item actions come from the long-press action card.
+- **Back** = system back + OS edge-swipe (reads as sliding the page back); **going to an area's root** = **tapping the binder tab you are already on**, from any depth, exactly as you grab a tab in a real binder rather than paging backwards. Navigation therefore adds **no chrome** — no back button, no home button. The one exception is a screen that claims horizontal swipe for itself (a transport that swipes between tracks): edge-swipe back is ambiguous there, so *that screen* carries a back affordance, not the whole app. Where a filter field is on screen, back stacks — the first press clears the query and dismisses the keyboard, the second leaves the screen. **Overflow** is inline-only — no kebab menu; item actions come from the long-press action card.
 
 ---
 
@@ -219,7 +232,21 @@ Documents render through the **Document (muted)** profile and carry **grain only
 
 ## 12. Launcher icons & covers
 
-Each app is a **book with a painted cover**. The launcher icon follows the approved **Flyleaf hero template**: a watercolor ground, the ex-libris composition, real-paper texture, and the maker's mark — **no single accent detail** (color comes from the ground and glyph). Each app gets **bespoke painted cover art**; generation is **hybrid** (baked watercolor wash + procedural grain + vector glyph via IconStudio). Until an app's art is dropped in, IconStudio produces a **plain signature wash + glyph** fallback so a build is never icon-less. The maker's mark appears on PDF/report covers, settings screens, and the app-open (frameless cover) load screen — nowhere else.
+Each app is a **book with a painted cover**. The launcher icon follows the approved **Flyleaf hero template**: a watercolor ground, the ex-libris composition, real-paper texture — **no single accent detail** (color comes from the ground and glyph). Each app gets **bespoke painted cover art**; generation is **hybrid** (baked watercolor wash + procedural grain + vector glyph via IconStudio). Until an app's art is dropped in, IconStudio produces a **plain signature wash + glyph** fallback so a build is never icon-less.
+
+**The ex-libris plate — the anatomy, in order.** The art is a **window set into the binding**, never a full-bleed image:
+
+1. **Binding cloth** — the ground the plate sits on. Chosen per app (§3 identity hues).
+2. **Fine rule** — a hairline frame inset from the edge, **all four sides**.
+3. **Corner flourishes** — the quarter-curve motif at each corner, **bilaterally symmetrical**: each corner is a *reflection* of the top-left, not a rotation of it. Rotating one asymmetric curl through 90° produces a pinwheel with no mirror line and reads wrong on a plate. The window's inset must clear the flourishes or it paints over them.
+4. **Illustration window** — the painted art, framed by a keyline. Rectangular by default; a shaped window (Flyleaf's arch) is a per-app choice, and dropping the shape does **not** drop the frame.
+5. **Title band** — beneath the window, on the cloth.
+
+**Two variants, one plate.** The **shelf cover** (cover-out on the Flyleaf home, portrait at `CoverPortraitRatio`) carries the title — a book with no title cannot be identified on a shelf. The **launcher icon** (square) omits it: Android already prints the app name beneath the icon.
+
+**Binding cloth is chosen per app and may contrast its own art.** It is not required to match the identity hue: a binding that harmonises with the cover art makes the book the hardest of six to pick out of the row. *Score's binding is **cream linen** with the rule, flourishes and lettering inverted to ink* — chosen because it is the only light book on the shelf and so is findable at a glance.
+
+**The maker's mark is not on the launcher icon or the shelf cover.** It appears on PDF/report covers, settings screens, and on the cover art **when that art is expanded into the app-open (frameless cover) load screen** — nowhere else.
 
 ---
 

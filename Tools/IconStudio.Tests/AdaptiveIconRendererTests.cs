@@ -19,9 +19,9 @@ public class AdaptiveIconRendererTests : IDisposable
     public void PaletteMatchesTheDesignBible()
     {
         Assert.Equal("#FAF8F2", Tokens.PaperHex);
-        Assert.Equal("#3A3A33", Tokens.InkHex);
+        Assert.Equal("#33322B", Tokens.InkHex);
         Assert.Equal("#C2542F", Tokens.AccentHex);
-        Assert.Equal("#C9803A", Tokens.IdentityWarmHex);
+        Assert.Equal("#C9803A", Tokens.FlyleafWarmHex);
     }
 
     // A paper-background app (not Flyleaf, whose ground is the warm identity hue).
@@ -32,15 +32,39 @@ public class AdaptiveIconRendererTests : IDisposable
     public void SpecsCoverAllApps()
     {
         Assert.Equal(7, IconSpecs.All.Count);
-        Assert.Equal(4, IconSpecs.All.Count(s => s.App.StartsWith("FocusPhone.")));
+
+        // Counted by where the resources land, not by what the app is called. The
+        // phase renames rebrand one head at a time — Launcher became Flyleaf, Audio
+        // became Score — so a "FocusPhone.*" name prefix stops being true while the
+        // four heads under FocusPhone/ still all need an icon.
+        Assert.Equal(4, IconSpecs.All.Count(s => s.ResourceRoot.StartsWith("FocusPhone/")));
+        Assert.Equal(IconSpecs.All.Count, IconSpecs.All.Select(s => s.ResourceRoot).Distinct().Count());
         Assert.Contains(IconSpecs.All, s => s.App == "Canonizer" && s.Name == "appicon");
         Assert.Contains(IconSpecs.All, s => s.App == "DailyLoader" && s.Name == "ic_launcher");
         Assert.Contains(IconSpecs.All, s => s.App == "Ledger" && s.Name == "appicon");
     }
 
+    // A spec with a painted ground reads it from the repo, so a scratch root needs a
+    // stand-in. Any decodable image will do — these tests are about what gets
+    // emitted, not what it looks like.
+    private void SeedGrounds()
+    {
+        foreach (var spec in IconSpecs.All.Where(s => s.GroundImage is not null))
+        {
+            var path = Path.Combine(root, spec.GroundImage!.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using var bitmap = new SKBitmap(8, 8);
+            bitmap.Erase(SKColors.Teal);
+            using var image = SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            File.WriteAllBytes(path, data.ToArray());
+        }
+    }
+
     [Fact]
     public void Write_EmitsTheFullResourceSetPerApp()
     {
+        SeedGrounds();
         foreach (var spec in IconSpecs.All)
         {
             var files = AdaptiveIconRenderer.Write(root, spec);
@@ -53,6 +77,11 @@ public class AdaptiveIconRendererTests : IDisposable
             {
                 Assert.True(File.Exists(Path.Combine(resourceRoot, $"mipmap-{dpi}", $"{spec.Name}_foreground.png")));
                 Assert.True(File.Exists(Path.Combine(resourceRoot, $"mipmap-{dpi}", $"{spec.Name}.png")));
+
+                // A painted ground is a per-density bitmap layer; a flat one is the
+                // shape drawable, and must not also emit one.
+                Assert.Equal(spec.GroundImage is not null,
+                    File.Exists(Path.Combine(resourceRoot, $"mipmap-{dpi}", $"{spec.Name}_ground.png")));
             }
             Assert.Equal(spec.WritesColorsXml,
                 File.Exists(Path.Combine(resourceRoot, "values", "colors.xml")));
@@ -80,13 +109,13 @@ public class AdaptiveIconRendererTests : IDisposable
         var xml = File.ReadAllText(Path.Combine(
             root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
             "drawable", $"{spec.Name}_background.xml"));
-        Assert.Contains(Tokens.IdentityWarmHex, xml);
+        Assert.Contains(Tokens.FlyleafWarmHex, xml);
         Assert.DoesNotContain("gradient", xml);
         // The foreground bookplate lays a cream cover over that ground.
         using var legacy = SKBitmap.Decode(Path.Combine(
             root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
             "mipmap-xxxhdpi", $"{spec.Name}.png"));
-        Assert.Equal(Tokens.IdentityWarm, legacy.GetPixel(2, 2));
+        Assert.Equal(Tokens.FlyleafWarm, legacy.GetPixel(2, 2));
     }
 
     [Theory]
@@ -108,23 +137,129 @@ public class AdaptiveIconRendererTests : IDisposable
     }
 
     [Fact]
-    public void Foregrounds_KeepCornersTransparent_AndDrawInkPlusAccent()
+    public void EveryForegroundKeepsItsCornersTransparent()
     {
+        SeedGrounds();
         foreach (var spec in IconSpecs.All)
         {
-            AdaptiveIconRenderer.Write(root, spec);
-            var path = Path.Combine(root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
-                "mipmap-xxxhdpi", $"{spec.Name}_foreground.png");
-            using var bitmap = SKBitmap.Decode(path);
+            using var bitmap = Foreground(spec);
 
-            // Corners are outside the safe zone and must stay empty.
+            // Corners are outside the safe zone and must stay empty, or a launcher
+            // mask clips artwork rather than padding.
             Assert.Equal(0, bitmap.GetPixel(4, 4).Alpha);
             Assert.Equal(0, bitmap.GetPixel(bitmap.Width - 5, bitmap.Height - 5).Alpha);
+        }
+    }
 
+    [Fact]
+    public void LineArtGlyphsDrawInkAndExactlyOneTerracottaDetail()
+    {
+        // Score is deliberately not in this set. Its icon is its cover — a keyboard
+        // on a painted ground — rather than an ink glyph on paper, so it has neither
+        // an ink line to count nor an accent detail to find.
+        foreach (var spec in IconSpecs.All.Where(s => s.App != "Score"))
+        {
+            using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);
             Assert.True(ink > 100, $"{spec.App}: expected ink glyph pixels, found {ink}");
             Assert.True(accent > 20, $"{spec.App}: expected one terracotta detail, found {accent} accent pixels");
         }
+    }
+
+    // The thing an image model could not do, asserted: within an octave the black
+    // keys group two then three, with the wide gaps at E–F and B–C. Counting the
+    // dark runs along the back of the keyboard is how that shows up in pixels.
+    [Fact]
+    public void ScoreDrawsAMusicallyCorrectKeyboard()
+    {
+        using var bitmap = Foreground(IconSpecs.All.First(s => s.App == "Score"));
+
+        // Counted as blobs, not scanned along a line. The keyboard curves, so neither
+        // a row nor a column crosses it cleanly — a column through a steep stretch
+        // passes through several keys at once. Connected regions of ink are the keys
+        // themselves, independent of where the curve happens to put them.
+        var keys = InkBlobs(bitmap);
+
+        // Twenty-two white keys spans three octaves exactly, and an octave carries
+        // five black keys — grouped two then three, with the wide gaps at E–F and
+        // B–C. That grouping is the whole reason this is drawn instead of painted.
+        Assert.Equal(15, keys);
+
+        // And the keys themselves are cream, not white — paper, not plastic (§2).
+        var cream = 0;
+        for (var x = 0; x < bitmap.Width; x += 2)
+        {
+            for (var yy = 0; yy < bitmap.Height; yy += 2)
+            {
+                if (bitmap.GetPixel(x, yy) == Tokens.Paper)
+                {
+                    cream++;
+                }
+            }
+        }
+
+        Assert.True(cream > 500, $"expected cream keys, found {cream} paper pixels");
+    }
+
+    // Four-way flood fill over full-strength ink. The seams between white keys are
+    // the same colour at half alpha and are deliberately not counted — they are not
+    // keys.
+    private static int InkBlobs(SKBitmap bitmap)
+    {
+        var seen = new bool[bitmap.Width, bitmap.Height];
+        var blobs = 0;
+
+        bool IsInk(int x, int y)
+        {
+            var p = bitmap.GetPixel(x, y);
+            return p.Alpha > 200 && p.Red < 80 && p.Green < 80 && p.Blue < 80;
+        }
+
+        for (var x = 0; x < bitmap.Width; x++)
+        {
+            for (var y = 0; y < bitmap.Height; y++)
+            {
+                if (seen[x, y] || !IsInk(x, y))
+                {
+                    continue;
+                }
+
+                var size = 0;
+                var stack = new Stack<(int X, int Y)>();
+                stack.Push((x, y));
+                seen[x, y] = true;
+                while (stack.Count > 0)
+                {
+                    var (cx, cy) = stack.Pop();
+                    size++;
+                    foreach (var (nx, ny) in new[] { (cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1) })
+                    {
+                        if (nx >= 0 && ny >= 0 && nx < bitmap.Width && ny < bitmap.Height
+                            && !seen[nx, ny] && IsInk(nx, ny))
+                        {
+                            seen[nx, ny] = true;
+                            stack.Push((nx, ny));
+                        }
+                    }
+                }
+
+                // Ignore anti-aliasing specks along an edge; a key is hundreds of pixels.
+                if (size > 100)
+                {
+                    blobs++;
+                }
+            }
+        }
+
+        return blobs;
+    }
+
+    private SKBitmap Foreground(IconSpec spec)
+    {
+        SeedGrounds();
+        AdaptiveIconRenderer.Write(root, spec);
+        return SKBitmap.Decode(Path.Combine(root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
+            "mipmap-xxxhdpi", $"{spec.Name}_foreground.png"));
     }
 
     [Fact]

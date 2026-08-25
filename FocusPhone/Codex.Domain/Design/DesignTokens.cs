@@ -18,7 +18,7 @@ public static class DesignTokens
     public const string PaperDeep = "#F1EBDD";
     public const string PaperShade = "#E9E1CF";
     public const string Hairline = "#E3DCC9";
-    public const string Ink = "#3A3A33";
+    public const string Ink = "#33322B";
     public const string InkSoft = "#6B6759";
     public const string InkMuted = "#8A8578";
     public const string InkBlue = "#2C3E5E"; // "the pen": signatures, editorial marks, the owner's voice
@@ -40,16 +40,44 @@ public static class DesignTokens
     public const string ProgressFill = "#9BC7CD"; public const string ProgressMark = "#18717C"; public const string ProgressText = "#085C65"; public const string ProgressDeep = "#003F46";
 
     /// <summary>
-    /// Flyleaf's signature identity hue — warm study amber (DESIGN.md §3 identity set,
-    /// kept separate from the semantic roles so a tab/accent never reads as "caution").
-    /// PROVISIONAL: to be finalized by sampling the painted Flyleaf cover and registering
-    /// it in the OKLCH source spec (deferred to the cover / Gemini-paint pass).
+    /// Per-app signature hues (DESIGN.md §3 identity set), kept separate from the
+    /// semantic roles so a tab or accent never reads as "caution". Each app's hue is
+    /// sampled from its painted cover during its own phase, which is why these are
+    /// nested by app rather than pooled: a second app getting an identity is exactly
+    /// what makes a bare "Identity.Mark" ambiguous.
     /// </summary>
     public static class Identity
     {
-        public const string Warm = "#C9803A";
-        public const string Mark = "#B4552F";
-        public const string Deep = "#8A4A22";
+        /// <summary>
+        /// Flyleaf — warm study amber. PROVISIONAL: three tiers rather than the role
+        /// model's five, pending a resample from the painted cover.
+        /// </summary>
+        public static class Flyleaf
+        {
+            public const string Warm = "#C9803A";
+            public const string Mark = "#B4552F";
+            public const string Deep = "#8A4A22";
+        }
+
+        /// <summary>
+        /// Score — teal-slate, sampled from the ribbon cover and laddered into the
+        /// role model's five tiers.
+        ///
+        /// The hue was nudged from the as-painted 174 degrees to 165, by rotating the
+        /// painting rather than re-prompting it, so the paper texture and pigment
+        /// blooms are exactly as painted and only the hue moved. That shift is
+        /// load-bearing: at 174 it sat 13 degrees from the in-progress status teal,
+        /// which is too close for a set whose whole job is to not read as a status.
+        /// At 165 the separation is 21 degrees.
+        /// </summary>
+        public static class Score
+        {
+            public const string Fill = "#AFC0BC";
+            public const string Ground = "#93ABA5";
+            public const string Mark = "#436A61";
+            public const string Text = "#35544D";
+            public const string Deep = "#263B36";
+        }
     }
 
     /// <summary>
@@ -68,12 +96,19 @@ public static class DesignTokens
         public const string BronzeDeep = "#4A3E22";
     }
 
-    /// <summary>Type scale in Android scaled pixels (sp).</summary>
+    /// <summary>
+    /// Type scale in Android scaled pixels (sp), per DESIGN.md §4's reworked scale —
+    /// bigger, with more contrast at the top. Display is Serif <b>Black</b> and is the
+    /// largest thing on a screen; Countdown and CoverTitle sit outside the reading
+    /// ladder as single-purpose sizes.
+    /// </summary>
     public static class TypeSp
     {
+        public const float CoverTitle = 72f;
+        public const float Display = 44f;
         public const float Countdown = 40f;
-        public const float Display = 34f;
-        public const float Title = 24f;
+        public const float Title = 28f;
+        public const float Voice = 26f;
         public const float Heading = 18f;
         public const float Body = 16f;
         public const float Secondary = 14f;
@@ -107,6 +142,27 @@ public static class DesignTokens
         public const int ScreenEdgeDp = Space.X6;
     }
 
+    /// <summary>
+    /// The translucency the palette carries instead of committing to a hex
+    /// (DESIGN.md §3): the wash tier is a role's Mark hue drawn at this alpha, and
+    /// it is what §8's Selected state paints behind full-strength ink.
+    ///
+    /// Byte-typed on purpose. Every consumer builds a colour from it, and Android's
+    /// Color has both a (byte,byte,byte,byte) and an (int,int,int,int) constructor
+    /// — an int here makes the call ambiguous at every site.
+    /// </summary>
+    public static class Alpha
+    {
+        public const byte Wash = 77;   // ~30%
+
+        /// <summary>
+        /// §8 Disabled: desaturate and dim to ~45%, never silently removed. A
+        /// fraction rather than a byte because this one is set on a whole view
+        /// (View.Alpha) rather than mixed into a colour.
+        /// </summary>
+        public const float DisabledOpacity = 0.45f;
+    }
+
     /// <summary>Calm functional motion: two durations, decelerate curves, no haptics.</summary>
     public static class Motion
     {
@@ -125,14 +181,22 @@ public static class DesignTokens
         public const uint Seed = 1913;
     }
 
-    /// <summary>Font asset paths as packaged by Codex.Ui.Android.</summary>
+    /// <summary>
+    /// Font asset paths as packaged by Codex.Ui.Android, whose csproj globs
+    /// <c>Fonts/*.ttf</c> — so every face here already ships in every APK.
+    /// <b>Black</b> anchors the reworked Display size and <b>Script</b> (Pinyon) is
+    /// the calligraphy hand DESIGN.md §4 reserves for the owner's voice; both were
+    /// being packaged and never declared, so neither could be used.
+    /// </summary>
     public static class FontAssets
     {
         public const string SerifRegular = "fonts/SourceSerif4-Regular.ttf";
         public const string SerifSemibold = "fonts/SourceSerif4-Semibold.ttf";
+        public const string SerifBlack = "fonts/SourceSerif4-Black.ttf";
         public const string SerifItalic = "fonts/SourceSerif4-Italic.ttf";
         public const string SansRegular = "fonts/SourceSans3-Regular.ttf";
         public const string SansSemibold = "fonts/SourceSans3-Semibold.ttf";
         public const string Mono = "fonts/CascadiaCode-Regular.ttf";
+        public const string Script = "fonts/PinyonScript-Regular.ttf";
     }
 }

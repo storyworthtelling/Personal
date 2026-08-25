@@ -2,6 +2,7 @@ using Android.Content;
 using Android.Graphics;
 using Android.Graphics.Drawables;
 using Android.Text;
+using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 
@@ -17,7 +18,7 @@ public static class PaperUi
     // ---- Text ----
 
     public static TextView Display(Context context, string text) =>
-        Text(context, text, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
+        Text(context, text, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
 
     public static TextView Title(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Title, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
@@ -36,6 +37,25 @@ public static class PaperUi
 
     public static TextView Mono(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Mono, PaperTheme.Ink, PaperTheme.Mono(context));
+
+    /// <summary>
+    /// Field labels, chips and tab labels (DESIGN.md §4): Sans SemiBold at the
+    /// smallest step. Muted by default — a label names a thing, it is not the thing.
+    /// </summary>
+    public static TextView Label(Context context, string text) =>
+        Text(context, text, DesignTokens.TypeSp.Label, PaperTheme.InkMuted, PaperTheme.SansSemibold(context));
+
+    /// <summary>
+    /// The owner's voice: Pinyon Script in ink-blue (DESIGN.md §4 reserves the
+    /// calligraphy hand for this and nothing else). Wraps, because a voiced line is
+    /// prose rather than a label.
+    /// </summary>
+    public static TextView Voice(Context context, string text)
+    {
+        var view = Text(context, text, DesignTokens.TypeSp.Voice, PaperTheme.InkBlue, PaperTheme.Script(context));
+        view.SetLineSpacing(0f, 1.25f);
+        return view;
+    }
 
     /// <summary>The unlock countdown: HH:MM:SS in Cascadia, the one oversized mono use.</summary>
     public static TextView Countdown(Context context) =>
@@ -186,20 +206,174 @@ public static class PaperUi
         list.DividerHeight = PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp);
     }
 
+    /// <summary>
+    /// A styled paper list with its taps already wired — the pairing every screen
+    /// that shows rows was writing out by hand, including the bounds check that stops
+    /// a stale adapter position indexing past the rows it was built from.
+    ///
+    /// Long-press is optional and, when given, is marked handled: §9 gives long-press
+    /// to the action card, so a row must not also fire its tap.
+    /// </summary>
+    public static ListView List(
+        Context context, IReadOnlyList<PaperListRow> rows, Action<int> onClick, Action<int>? onLongClick = null)
+    {
+        var list = new ListView(context);
+        StylePaperList(context, list);
+        list.Adapter = new PaperListAdapter(context, rows);
+
+        list.ItemClick += (_, e) =>
+        {
+            if (e.Position >= 0 && e.Position < rows.Count)
+            {
+                onClick(e.Position);
+            }
+        };
+
+        if (onLongClick is not null)
+        {
+            list.ItemLongClick += (_, e) =>
+            {
+                if (e.Position >= 0 && e.Position < rows.Count)
+                {
+                    onLongClick(e.Position);
+                }
+
+                e.Handled = true;
+            };
+        }
+
+        return list;
+    }
+
     // ---- Structure ----
 
-    /// <summary>The in-page chapter-heading screen title (DESIGN.md §7).</summary>
+    /// <summary>
+    /// The in-page chapter-heading screen title (DESIGN.md §7), without its stroke.
+    /// Prefer <see cref="ScreenHeader"/> — §7 says every screen opens with the title
+    /// <i>and</i> a full-width marker underline; this is the bare title for the
+    /// places that compose their own.
+    /// </summary>
     public static TextView PageHeader(Context context, string title)
     {
-        var view = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
+        var view = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
         view.SetPadding(0, 0, 0, PaperTheme.Dp(context, DesignTokens.Space.X6));
         return view;
     }
 
     /// <summary>
-    /// A two-state segmented selector (e.g. Podcasts | Music). Built from the
-    /// button recipes so no new tokens are needed: the active side is inked in
-    /// Accent, the inactive side muted. Calls back with the selected index.
+    /// How every screen opens (DESIGN.md §7): a Display Serif Black title with a
+    /// full-width marker underline in the area's hue, and nothing else. There is no
+    /// standing top app bar — the header <i>is</i> the chrome.
+    /// </summary>
+    public static LinearLayout ScreenHeader(Context context, string title, Color hue)
+    {
+        var column = new LinearLayout(context) { Orientation = Orientation.Vertical };
+
+        var text = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
+        column.AddView(text, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        column.AddView(new MarkerUnderline(context, hue), new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, PaperTheme.Dp(context, MarkerUnderline.HeightDp)));
+
+        column.SetPadding(0, 0, 0, PaperTheme.Dp(context, DesignTokens.Space.X3));
+        return column;
+    }
+
+    /// <summary>
+    /// The within-area view switch (DESIGN.md §7), for any number of segments —
+    /// Cover · Queue · Lyrics, Easy · Steady · Hard, Recent · Artist · Title.
+    ///
+    /// The selection is §8's <b>highlighter wash</b> of the hue behind full-strength
+    /// ink, not coloured text: a wash reads as "this one" at arm's length, where an
+    /// inked label reads as a link. Hairline-divided cells inside one rounded
+    /// outline, radius 12 and never a pill.
+    ///
+    /// Placed directly under the screen header, which across the app means one thing:
+    /// <i>change what this page is showing</i>.
+    /// </summary>
+    public static LinearLayout Segmented(
+        Context context, IReadOnlyList<string> labels, Action<int> onSelect, int initialIndex = 0,
+        Color? hue = null, IReadOnlyList<bool>? enabled = null)
+    {
+        var tint = hue ?? PaperTheme.Accent;
+        var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
+        row.Background = Outline(context, PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusInput);
+
+        var cells = new TextView[labels.Count];
+        var selected = initialIndex;
+
+        void Paint()
+        {
+            for (var i = 0; i < cells.Length; i++)
+            {
+                var live = enabled is null || i >= enabled.Count || enabled[i];
+                var active = i == selected && live;
+                cells[i].SetBackgroundColor(active
+                    ? PaperTheme.Wash(tint)
+                    : Color.Transparent);
+                cells[i].SetTextColor(active ? PaperTheme.Ink : PaperTheme.InkMuted);
+                cells[i].SetTypeface(
+                    active ? PaperTheme.SansSemibold(context) : PaperTheme.SansRegular(context),
+                    TypefaceStyle.Normal);
+            }
+        }
+
+        for (var i = 0; i < labels.Count; i++)
+        {
+            var index = i;
+            var cell = Text(context, labels[i], DesignTokens.TypeSp.Label, PaperTheme.InkMuted,
+                PaperTheme.SansRegular(context));
+            cell.Gravity = GravityFlags.Center;
+            cell.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
+            var pad = PaperTheme.Dp(context, DesignTokens.Space.X2);
+            cell.SetPadding(pad, pad, pad, pad);
+
+            // §8 Disabled: a segment with nothing behind it is dimmed and inert, never
+            // removed — a control that changes shape as its content arrives is worse
+            // than one with a greyed-out third.
+            if (enabled is not null && index < enabled.Count && !enabled[index])
+            {
+                cell.Alpha = DesignTokens.Alpha.DisabledOpacity;
+                cell.Clickable = false;
+            }
+            else
+            {
+                cell.Clickable = true;
+                cell.Click += (_, _) =>
+                {
+                    selected = index;
+                    Paint();
+                    onSelect(index);
+                };
+            }
+
+            cells[i] = cell;
+            row.AddView(cell, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+
+            if (i < labels.Count - 1)
+            {
+                var divider = new View(context);
+                divider.SetBackgroundColor(PaperTheme.Hairline);
+                row.AddView(divider, new LinearLayout.LayoutParams(
+                    PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp),
+                    ViewGroup.LayoutParams.MatchParent));
+            }
+        }
+
+        // Paint the starting selection without firing onSelect — a switch should
+        // reflect the current state on open without acting on it.
+        Paint();
+        return row;
+    }
+
+    /// <summary>The highlighter alpha DESIGN.md §3 gives the wash tier (~30%).</summary>
+
+    /// <summary>
+    /// A two-state segmented selector, kept for the heads that still call it.
+    /// Prefer <see cref="Segmented"/> — §8 wants the selection to be the highlighter
+    /// wash rather than inked text, and most switches now have more than two states.
     /// </summary>
     public static LinearLayout SegmentedToggle(
         Context context, string leftLabel, string rightLabel, Action<int> onSelect, int initialIndex = 0)

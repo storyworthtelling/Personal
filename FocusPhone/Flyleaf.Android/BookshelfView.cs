@@ -502,7 +502,7 @@ public class BookshelfView : View
         // Watercolor bloom behind the face.
         using var bloom = new Paint { AntiAlias = true };
         bloom.SetShader(Radial(cx, cy, faceR * 1.5f,
-            WithAlpha(PaperTheme.IdentityWarm, 90), WithAlpha(PaperTheme.IdentityWarm, 0)));
+            WithAlpha(PaperTheme.FlyleafWarm, 90), WithAlpha(PaperTheme.FlyleafWarm, 0)));
         canvas.DrawCircle(cx, cy, faceR * 1.5f, bloom);
 
         // Mantel body + little legs.
@@ -530,7 +530,7 @@ public class BookshelfView : View
         }
         // Hands (live).
         var (hourDeg, minuteDeg) = ClockAngles.FromTime(time);
-        using var hour = new Paint { AntiAlias = true, Color = PaperTheme.IdentityMark, StrokeWidth = 3 * density, StrokeCap = Paint.Cap.Round };
+        using var hour = new Paint { AntiAlias = true, Color = PaperTheme.FlyleafMark, StrokeWidth = 3 * density, StrokeCap = Paint.Cap.Round };
         using var minute = new Paint { AntiAlias = true, Color = PaperTheme.Ink, StrokeWidth = 2 * density, StrokeCap = Paint.Cap.Round };
         DrawHand(canvas, cx, cy, hourDeg, faceR * 0.52f, hour);
         DrawHand(canvas, cx, cy, minuteDeg, faceR * 0.78f, minute);

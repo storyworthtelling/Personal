@@ -50,12 +50,51 @@ public class DesignTokensTests
         Assert.True(ratio >= minimum, $"{fg} on {bg} is {ratio:F2}:1, below {minimum}:1");
     }
 
+    // Score's identity ladder, sampled from its cover per §3 and laddered into the
+    // role model's five tiers. Pinned here because the hue is a decision, not a
+    // derivation: it was nudged off the as-painted 174 degrees to clear the
+    // in-progress status teal, and a later resample must not quietly undo that.
     [Fact]
-    public void TypeScaleDescendsFromCountdownToLabel()
+    public void ScoreIdentityIsTheApprovedLadder()
+    {
+        Assert.Equal("#AFC0BC", DesignTokens.Identity.Score.Fill);
+        Assert.Equal("#93ABA5", DesignTokens.Identity.Score.Ground);
+        Assert.Equal("#436A61", DesignTokens.Identity.Score.Mark);
+        Assert.Equal("#35544D", DesignTokens.Identity.Score.Text);
+        Assert.Equal("#263B36", DesignTokens.Identity.Score.Deep);
+    }
+
+    // The two tiers Score sets text and marks in have to clear §3's contrast
+    // binding on their own, the same as any semantic role. Fill and Ground are
+    // wash/fill tiers and carry no text, so they are not asserted.
+    [Theory]
+    [InlineData("#436A61", 3.0)]  // marks and UI, incl. the lit binder tab
+    [InlineData("#35544D", 4.5)]  // identity-colored text at any size
+    [InlineData("#263B36", 7.0)]  // the deep tier, body-text safe
+    public void ScoreIdentityTextTiersClearContrastOnPaper(string tier, double minimum)
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(tier, DesignTokens.Paper);
+        Assert.True(ratio >= minimum, $"{tier} on Paper is {ratio:F2}:1, below {minimum}:1");
+    }
+
+    // Identity is a separate set from the semantic roles precisely so a tab never
+    // reads as "caution" (§3). Score's mark must therefore be distinguishable from
+    // the status teal it sits nearest — that separation is why the hue moved.
+    [Fact]
+    public void ScoreIdentityIsNotAStatusHue()
+    {
+        Assert.NotEqual(DesignTokens.ProgressMark, DesignTokens.Identity.Score.Mark);
+        Assert.NotEqual(DesignTokens.ProgressText, DesignTokens.Identity.Score.Text);
+    }
+
+    // The reading ladder. Countdown and CoverTitle sit outside it — they are
+    // single-purpose sizes, not steps you would set prose at — so they are not
+    // part of this ordering.
+    [Fact]
+    public void TypeScaleDescendsFromDisplayToLabel()
     {
         var scale = new[]
         {
-            DesignTokens.TypeSp.Countdown,
             DesignTokens.TypeSp.Display,
             DesignTokens.TypeSp.Title,
             DesignTokens.TypeSp.Heading,
@@ -67,6 +106,63 @@ public class DesignTokensTests
         {
             Assert.True(scale[i] < scale[i - 1], $"Type scale not strictly descending at index {i}");
         }
+    }
+
+    // DESIGN.md §4's reworked scale: Display is the largest thing on a screen and
+    // outranks the countdown, which the pre-rework scale had the other way round.
+    [Fact]
+    public void DisplayIsTheLargestScreenSize()
+    {
+        Assert.Equal(44f, DesignTokens.TypeSp.Display);
+        Assert.True(DesignTokens.TypeSp.Display > DesignTokens.TypeSp.Countdown);
+    }
+
+    [Fact]
+    public void TypeScaleMatchesTheDesignBible()
+    {
+        Assert.Equal(44f, DesignTokens.TypeSp.Display);
+        Assert.Equal(28f, DesignTokens.TypeSp.Title);
+        Assert.Equal(18f, DesignTokens.TypeSp.Heading);
+        Assert.Equal(16f, DesignTokens.TypeSp.Body);
+        Assert.Equal(14f, DesignTokens.TypeSp.Secondary);
+        Assert.Equal(13f, DesignTokens.TypeSp.Label);
+        Assert.Equal(14f, DesignTokens.TypeSp.Mono);
+        Assert.Equal(26f, DesignTokens.TypeSp.Voice);
+        Assert.Equal(40f, DesignTokens.TypeSp.Countdown);
+        Assert.Equal(72f, DesignTokens.TypeSp.CoverTitle);
+    }
+
+    // All six faces ship in every APK via the Fonts/*.ttf glob; Serif Black and
+    // Pinyon were packaged but unreachable, so Display could not be set in Black
+    // and the owner's voice had no hand to be written in.
+    [Fact]
+    public void EveryPackagedFaceIsDeclared()
+    {
+        var declared = new[]
+        {
+            DesignTokens.FontAssets.SerifRegular,
+            DesignTokens.FontAssets.SerifSemibold,
+            DesignTokens.FontAssets.SerifBlack,
+            DesignTokens.FontAssets.SerifItalic,
+            DesignTokens.FontAssets.SansRegular,
+            DesignTokens.FontAssets.SansSemibold,
+            DesignTokens.FontAssets.Mono,
+            DesignTokens.FontAssets.Script,
+        };
+
+        var fonts = Path.Combine(DesignTestHelpers.FocusPhoneRoot(), "..", "Fonts");
+        foreach (var asset in declared)
+        {
+            var file = Path.Combine(fonts, Path.GetFileName(asset));
+            Assert.True(File.Exists(file), $"{asset} is declared but {file} does not exist");
+        }
+
+        Assert.Equal(
+            Directory.EnumerateFiles(fonts, "*.ttf").Select(file => Path.GetFileName(file)).Order(),
+            declared.Select(asset => Path.GetFileName(asset)).Order());
+
+        Assert.Equal(declared.Length, declared.Distinct().Count());
+        Assert.All(declared, asset => Assert.StartsWith("fonts/", asset));
     }
 
     [Fact]
@@ -119,26 +215,4 @@ public class DesignTokensTests
         }
     }
 
-    [Fact]
-    public void FontAssetsUseTheSixCommittedFonts()
-    {
-        var root = DesignTestHelpers.FocusPhoneRoot();
-        var fontsDir = Path.Combine(Directory.GetParent(root)!.FullName, "Fonts");
-        var assets = new[]
-        {
-            DesignTokens.FontAssets.SerifRegular,
-            DesignTokens.FontAssets.SerifSemibold,
-            DesignTokens.FontAssets.SerifItalic,
-            DesignTokens.FontAssets.SansRegular,
-            DesignTokens.FontAssets.SansSemibold,
-            DesignTokens.FontAssets.Mono,
-        };
-        Assert.Equal(assets.Length, assets.Distinct().Count());
-        foreach (var asset in assets)
-        {
-            Assert.StartsWith("fonts/", asset);
-            var file = Path.Combine(fontsDir, Path.GetFileName(asset));
-            Assert.True(File.Exists(file), $"Font file missing from repo Fonts/: {file}");
-        }
-    }
 }
