@@ -60,7 +60,7 @@ public sealed class PodcastsArea : ScoreArea
         settingsStore = new PlaybackSettingsStore(host);
         subscriptionStore = new SubscriptionStore(host);
         episodeCache = new EpisodeCacheStore(host);
-        queueStore = new QueueStore(host);
+        queueStore = QueueStore.ForPodcasts(host);
         queue.ReplaceWith(queueStore.Load()); // restore the queue built in a previous session (pruned to live episodes on render)
         librarySync = new PodcastLibrarySync(
             new DeviceAccountTokenProvider().GetAccessToken, "Score",
@@ -476,14 +476,16 @@ public sealed class PodcastsArea : ScoreArea
             return;
         }
 
-        // Keep only playable, still-present episodes so start index and items align.
-        queue.ReplaceWith(queue.Items.Where(id =>
-            episodes.Any(episode => episode.Id == id && episode.AudioUrl is not null)));
+        // Prune to playable, still-present episodes and locate the chosen one in what
+        // survives — in that order, so the index matches the list the player gets.
+        var start = QueueStart.Locate(
+            queue.Items,
+            id => episodes.Any(episode => episode.Id == id && episode.AudioUrl is not null),
+            startId);
+        queue.ReplaceWith(start.Ids);
         SaveQueue();
 
-        var ids = queue.Items;
-        var index = ids.ToList().IndexOf(startId);
-        if (index < 0)
+        if (!start.Found)
         {
             // The chosen episode has no playable enclosure (it was pruned above),
             // so it can never start — tell the user which one instead of no-op.
@@ -495,7 +497,7 @@ public sealed class PodcastsArea : ScoreArea
 
         try
         {
-            var items = ids.Select(id => BuildItem(episodes.First(episode => episode.Id == id))).ToList();
+            var items = start.Ids.Select(id => BuildItem(episodes.First(episode => episode.Id == id))).ToList();
             var startEpisode = episodes.First(episode => episode.Id == startId);
             nowPlaying = startEpisode;
             var showSettings = settings.For(startEpisode.FeedId);
@@ -503,7 +505,7 @@ public sealed class PodcastsArea : ScoreArea
                 .ResumeWithRewind(startEpisode.Id, DateTimeOffset.Now);
             var startMs = resume is { } point ? (long)point.TotalMilliseconds : 0L;
 
-            playback.Start(MediaKind.Podcast, items, index, startMs, showSettings.Speed, showSettings.SkipSilence,
+            playback.Start(MediaKind.Podcast, items, start.Index, startMs, showSettings.Speed, showSettings.SkipSilence,
                 settingsKey: startEpisode.FeedId);
         }
         catch (Exception e)

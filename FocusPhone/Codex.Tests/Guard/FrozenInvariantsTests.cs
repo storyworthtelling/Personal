@@ -166,8 +166,8 @@ public class FrozenInvariantsTests
         string[] frozen =
         [
             "artwork", "equalizer", "fridayPicks", "listeningHistory", "music",
-            "podcast-queue", "podcastEpisodeCache", "podcastProgress", "podcastSettings",
-            "podcastSubscriptions", "podcasts",
+            "music-queue", "podcast-queue", "podcastEpisodeCache", "podcastProgress",
+            "podcastSettings", "podcastSubscriptions", "podcasts",
         ];
 
         var declared = EnumerateRepoFiles("*.cs")
@@ -181,6 +181,8 @@ public class FrozenInvariantsTests
             "orphans the data behind them: " + string.Join(", ", missing));
     }
 
+    // Matches any constant whose name ends in PreferencesName, so a class holding
+    // more than one — the two queue stores — is still fully covered.
     private static IEnumerable<string> PreferenceNames(string source)
     {
         const string Declaration = "PreferencesName = \"";

@@ -5,6 +5,9 @@ using MediaController = AndroidX.Media3.Session.MediaController;
 
 namespace Score;
 
+/// <summary>One line of the live queue: what it is, and whether it is the one playing.</summary>
+public sealed record QueuedItem(string Title, string? Subtitle, bool IsCurrent);
+
 /// <summary>What kind of thing the player was last asked to play.</summary>
 public enum MediaKind
 {
@@ -107,6 +110,45 @@ public sealed class ScorePlayback(Activity host)
     {
         Controller?.SetPlaybackSpeed(speed);
         SendSkipSilence(skipSilence);
+    }
+
+    /// <summary>
+    /// What the player is holding, in order, with the current item marked.
+    ///
+    /// Read from the live timeline rather than from either area's stored queue,
+    /// because the timeline is by definition the medium that is playing — which is
+    /// exactly what the Queue panel is meant to show. The stored queues exist to
+    /// survive a restart; this exists to be looked at.
+    /// </summary>
+    public IReadOnlyList<QueuedItem> Queued()
+    {
+        if (Controller is not { } controller)
+        {
+            return [];
+        }
+
+        var current = controller.CurrentMediaItemIndex;
+        var items = new List<QueuedItem>();
+        for (var i = 0; i < controller.MediaItemCount; i++)
+        {
+            var item = controller.GetMediaItemAt(i);
+            items.Add(new QueuedItem(
+                item?.MediaMetadata?.Title?.ToString() ?? string.Empty,
+                item?.MediaMetadata?.Artist?.ToString(),
+                i == current));
+        }
+
+        return items;
+    }
+
+    /// <summary>Jumps to a position in what is already playing.</summary>
+    public void PlayQueuedAt(int index)
+    {
+        if (Controller is { } controller && index >= 0 && index < controller.MediaItemCount)
+        {
+            controller.SeekTo(index, 0L);
+            controller.Play();
+        }
     }
 
     public void TogglePlayPause()

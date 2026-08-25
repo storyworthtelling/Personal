@@ -25,6 +25,12 @@ public sealed class MusicLibrary(
     private readonly DriveMusicClient driveClient = new(tokens);
     private readonly MusicTagReader tagReader = new(Path.Combine(host.CacheDir!.AbsolutePath, "art"));
 
+    // Music had no queue at all: it played by pushing items straight into the
+    // player's timeline, which died with the process and could not be looked at.
+    private readonly PlaybackQueue queue = new();
+    private readonly QueueStore queueStore = QueueStore.ForMusic(host);
+    private bool queueRestored;
+
     /// <summary>Raised when the catalog, the folder list or the status line moved.</summary>
     public event Action? Changed;
 
@@ -42,6 +48,22 @@ public sealed class MusicLibrary(
     public bool HasFolder => !string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId);
 
     public ListeningLog Listening => listening;
+
+    // Restored lazily rather than in the constructor, because the catalog may not
+    // have loaded yet at construction.
+    //
+    // Nothing reads the restored queue back yet, and that is deliberate rather than
+    // forgotten: showing a queue after a restart is only worth anything alongside a
+    // resume position, which is the next slice. Writing it has to come first — there
+    // is nothing to restore until something has been saved.
+    private void Restore()
+    {
+        if (!queueRestored)
+        {
+            queueRestored = true;
+            queue.ReplaceWith(queueStore.Load());
+        }
+    }
 
     public void LoadCatalog()
     {
@@ -164,6 +186,12 @@ public sealed class MusicLibrary(
         {
             return;
         }
+
+        // Putting something on REPLACES the music run — choosing an album is choosing
+        // what to listen to, not adding to a list. Only Enqueue builds one up.
+        Restore();
+        queue.ReplaceWith(tracks.Select(track => track.Id));
+        queueStore.Save(queue.Export());
 
         // Speed 1.0 and skip-silence off: both are podcast settings, and a track must
         // not inherit them from whatever episode played last.

@@ -125,8 +125,7 @@ public sealed class PlayingArea : ScoreArea
             },
             (int)showing,
             PaperTheme.ScoreMark,
-            // Queue is dimmed until there is a queue to show on both sides of the app.
-            [true, false, hasWords]);
+            [true, playback.Queued().Count > 0, hasWords]);
     }
 
     private View BuildScrubber()
@@ -235,7 +234,14 @@ public sealed class PlayingArea : ScoreArea
                 break;
 
             case Panel.Queue:
-                panel.AddView(PaperUi.EmptyState(Host, "Nothing queued."));
+                var queued = playback.Queued();
+                panel.AddView(queued.Count == 0
+                    ? PaperUi.EmptyState(Host, "Nothing queued.")
+                    : PaperUi.List(
+                        Host,
+                        [.. queued.Select(item => new PaperListRow(
+                            item.IsCurrent ? $"▸  {item.Title}" : item.Title, item.Subtitle))],
+                        playback.PlayQueuedAt));
                 break;
 
             default:
