@@ -155,7 +155,9 @@ public class FrozenInvariantsTests
     }
 
     // Every on-device store the head owns, by SharedPreferences file name. These ARE
-    // the upgrade: the file name is the only handle Android gives you on the data, so
+    // the upgrade — and playlists are the sharpest case, because unlike the queues
+    // and the episode cache they are not re-derivable from anything: a hand-made
+    // list exists nowhere else. These ARE the file name is the only handle Android gives you on the data, so
     // a renamed constant reads as an empty app — no subscriptions, no resume points,
     // no equalizer. Every prefs name in the repo is unique across all four heads, so
     // "declared exactly once" catches both a rename and a drop without this test
@@ -166,8 +168,8 @@ public class FrozenInvariantsTests
         string[] frozen =
         [
             "artwork", "equalizer", "fridayPicks", "listeningHistory", "music",
-            "music-queue", "podcast-queue", "podcastEpisodeCache", "podcastProgress",
-            "podcastSettings", "podcastSubscriptions", "podcasts",
+            "music-queue", "playlists", "podcast-queue", "podcastEpisodeCache",
+            "podcastProgress", "podcastSettings", "podcastSubscriptions", "podcasts",
         ];
 
         var declared = EnumerateRepoFiles("*.cs")

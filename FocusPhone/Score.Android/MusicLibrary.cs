@@ -27,6 +27,7 @@ public sealed class MusicLibrary(
 
     // Music had no queue at all: it played by pushing items straight into the
     // player's timeline, which died with the process and could not be looked at.
+    private readonly PlaylistStore playlistStore = new(host);
     private readonly PlaybackQueue queue = new();
     private readonly QueueStore queueStore = QueueStore.ForMusic(host);
     private bool queueRestored;
@@ -48,6 +49,11 @@ public sealed class MusicLibrary(
     public bool HasFolder => !string.IsNullOrEmpty(MusicSettingsStore.MusicFolderId);
 
     public ListeningLog Listening => listening;
+
+    /// <summary>The owner's playlists, newest last, as they were saved.</summary>
+    public IReadOnlyList<Playlist> Playlists() => playlistStore.Load();
+
+    public void SavePlaylists(IReadOnlyList<Playlist> playlists) => playlistStore.Save(playlists);
 
     // Restored lazily rather than in the constructor, because the catalog may not
     // have loaded yet at construction.

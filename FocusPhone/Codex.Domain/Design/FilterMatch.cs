@@ -15,10 +15,6 @@ namespace Codex.Domain.Design;
 public static class FilterMatch
 {
     /// <summary>
-    /// Does this field match the query? An empty query matches everything — the
-    /// filter is not narrowing yet, so nothing should disappear.
-    /// </summary>
-    /// <summary>
     /// How many rows fit a screen, near enough — a list-row minimum of 56dp against
     /// the content area a phone leaves under the header and above the bars.
     /// </summary>
@@ -34,6 +30,10 @@ public static class FilterMatch
     /// </summary>
     public static bool IsWarranted(int rowCount) => rowCount > ScreenfulRows;
 
+    /// <summary>
+    /// Does this field match the query? An empty query matches everything — the
+    /// filter is not narrowing yet, so nothing should disappear.
+    /// </summary>
     public static bool Matches(string? candidate, string query)
     {
         var needle = Fold(query);
@@ -44,6 +44,20 @@ public static class FilterMatch
 
         return candidate is not null
             && Fold(candidate).Contains(needle, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Is this field exactly the value, ignoring case and accents? The equality
+    /// counterpart to <see cref="Matches"/>, sharing its normalizer so a playlist
+    /// rule and a filter field can never disagree about what "Bartók" is. An empty
+    /// value matches nothing: unlike a filter, a rule with no value is not a rule.
+    /// </summary>
+    public static bool Equals(string? candidate, string value)
+    {
+        var wanted = Fold(value);
+        return wanted.Length != 0
+            && candidate is not null
+            && string.Equals(Fold(candidate), wanted, StringComparison.Ordinal);
     }
 
     /// <summary>

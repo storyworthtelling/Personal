@@ -181,7 +181,14 @@ public sealed class MusicArea : ScoreArea
                     genre => library.PlayShuffled(catalog.TracksInGenre(genre)));
 
             case MusicView.Playlists:
-                return PaperUi.EmptyState(Host, "No playlists yet.");
+                var playlists = library.Playlists();
+                return playlists.Count == 0
+                    ? PaperUi.EmptyState(Host, "No playlists yet.")
+                    : Browse(playlists.Count,
+                        [.. playlists.Select(list =>
+                            (new PaperListRow(list.Name, list.Describe(catalog.Songs())), list))],
+                        list => library.PlayTracks(list.Tracks(catalog.Songs()), 0),
+                        list => library.PlayShuffled(list.Tracks(catalog.Songs())));
 
             default:
                 var items = new[] { "Playlists", "Artists", "Albums", "Songs", "Genres" };
