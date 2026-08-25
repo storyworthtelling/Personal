@@ -52,6 +52,12 @@ public sealed class PodcastsArea : ScoreArea
     // the whole one.
     private string shelfQuery = string.Empty;
 
+    // The standing rule that rebuilds the queue, and what the owner pinned into it
+    // by hand. Both persist; the queue itself is derived from them plus what is
+    // still unplayed, which is why a rebuild is safe to run whenever that changes.
+    private QueueArrangement arrangement;
+    private readonly List<string> pinned = [];
+
     public PodcastsArea(Activity host, ScorePlayback playback, PlaybackProgressStore progress) : base(host)
     {
         this.playback = playback;
@@ -62,6 +68,8 @@ public sealed class PodcastsArea : ScoreArea
         episodeCache = new EpisodeCacheStore(host);
         queueStore = QueueStore.ForPodcasts(host);
         queue.ReplaceWith(queueStore.Load()); // restore the queue built in a previous session (pruned to live episodes on render)
+        arrangement = queueStore.LoadArrangement();
+        pinned.AddRange(queueStore.LoadPinned());
         librarySync = new PodcastLibrarySync(
             new DeviceAccountTokenProvider().GetAccessToken, "Score",
             store, subscriptionStore, progressStore, settingsStore, new EqualizerStore(host));
@@ -156,7 +164,7 @@ public sealed class PodcastsArea : ScoreArea
             {
                 subscriptions = new SubscriptionList(subscriptionStore.Load());
                 settings = settingsStore.Load(); // restored speed/skip-silence takes effect on next play
-                RecomputeDone();
+                RecomputeDoneAndRebuild();
                 Invalidate();
                 _ = RefreshFeedsAsync();
             });
@@ -323,10 +331,9 @@ public sealed class PodcastsArea : ScoreArea
 
     private View BuildQueuePane()
     {
-        // Prune finished/unknown episodes so the display order matches queue indices.
-        queue.ReplaceWith(queue.Items.Where(id =>
-            !doneIds.Contains(id) && episodes.Any(episode => episode.Id == id)));
-        SaveQueue();
+        // One authority: the rule decides what is in the queue, here as everywhere
+        // else. This used to prune inline, which meant two places could disagree.
+        RebuildQueue();
 
         var container = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
@@ -411,24 +418,45 @@ public sealed class PodcastsArea : ScoreArea
 
     private void SaveQueue() => queueStore.Save(queue.Export());
 
+    /// <summary>
+    /// Re-applies the standing rule. Called whenever the pool of unplayed episodes
+    /// changes — a refresh brought new ones in, something was marked played — which
+    /// is the whole difference between a rule and the one-shot this replaced.
+    /// </summary>
+    private void RebuildQueue()
+    {
+        // Only episodes that can actually play: an entry with no audio is noise in a
+        // list whose whole purpose is what to play next.
+        var unplayed = episodes
+            .Where(episode => !doneIds.Contains(episode.Id) && episode.AudioUrl is not null)
+            .ToList();
+        queue.ReplaceWith(StandingQueue.Rebuild(arrangement, pinned, unplayed));
+        SaveQueue();
+    }
+
+    private void SavePinned() => queueStore.SavePinned(pinned);
+
     // Add to the queue without playing. Not destructive, but offered undo-first for
     // reversible feedback, matching the mark-played idiom (DESIGN.md §7). A duplicate
     // add is a no-op in PlaybackQueue, so undo only removes what this add introduced.
     private void AddToQueueWithUndo(Episode episode)
     {
-        var wasQueued = queue.Items.Contains(episode.Id);
-        queue.Add(episode.Id);
-        SaveQueue();
-        Invalidate();
-        if (wasQueued)
+        if (pinned.Contains(episode.Id))
         {
-            return; // already in the queue; nothing new to undo
+            return; // already put there by hand; nothing new to undo
         }
+
+        // Queueing by hand pins it: an explicit instruction outlives every rebuild.
+        pinned.Add(episode.Id);
+        SavePinned();
+        RebuildQueue();
+        Invalidate();
 
         UndoBar.Show(Host, Overlay, "Added to queue.", onUndo: () =>
         {
-            queue.Remove(episode.Id);
-            SaveQueue();
+            pinned.Remove(episode.Id);
+            SavePinned();
+            RebuildQueue();
             Invalidate();
         });
     }
@@ -440,14 +468,28 @@ public sealed class PodcastsArea : ScoreArea
             return;
         }
 
-        var snapshot = queue.Export();
+        // Clearing has to stop the rule as well as empty the list. Leave the rule
+        // running and the next rebuild puts everything straight back, so the button
+        // would appear to do nothing.
+        var previousPins = pinned.ToList();
+        var previousArrangement = arrangement;
+
+        pinned.Clear();
+        arrangement = QueueArrangement.Manual;
+        SavePinned();
+        queueStore.SaveArrangement(arrangement);
         queue.Clear();
         SaveQueue();
         Invalidate();
+
         UndoBar.Show(Host, Overlay, "Cleared queue.", onUndo: () =>
         {
-            queue.ReplaceWith(snapshot);
-            SaveQueue();
+            pinned.Clear();
+            pinned.AddRange(previousPins);
+            arrangement = previousArrangement;
+            SavePinned();
+            queueStore.SaveArrangement(arrangement);
+            RebuildQueue();
             Invalidate();
         });
     }
@@ -534,57 +576,53 @@ public sealed class PodcastsArea : ScoreArea
 
     // ---- Queue arrangement ----
 
-    // §7's picker: the field expands in place. No dialog, and no remembered
-    // selection either — arranging is an act, not a mode, so the field reads
-    // "Auto-arrange:" until you pick one and does it.
+    // §7's picker: the field expands in place. It is a setting rather than a button
+    // now — it shows which rule is running, and Manual is how you turn it off.
     private View BuildArrangePicker()
     {
         var arrangements = new[]
         {
+            (QueueArrangement.Manual, "By hand", "Only what you add. Nothing rearranges it."),
             (QueueArrangement.RoundRobin, "Round-robin", "One from each show in turn."),
             (QueueArrangement.Chronological, "Chronological", "Oldest first, across every show."),
             (QueueArrangement.BacklogBuster, "Backlog-buster", "Finish one show before starting the next."),
         };
 
+        var current = Array.FindIndex(arrangements, a => a.Item1 == arrangement);
         var picker = new AccordionPicker(
             Host,
-            "Auto-arrange:",
+            "Keep the queue:",
             arrangements.Select(a => new PickerOption(a.Item2, a.Item3)),
-            0);
-        picker.Chosen += index => AutoArrange(arrangements[index].Item1);
+            current < 0 ? 0 : current);
+        picker.Chosen += index => ChooseArrangement(arrangements[index].Item1);
         return picker;
     }
 
-    private void AutoArrange(QueueArrangement arrangement)
+    private void ChooseArrangement(QueueArrangement chosen)
     {
         status = null;
-
-        var strategy = EpisodeQueueStrategy.For(arrangement);
-        if (strategy is null)
-        {
-            return;
-        }
+        arrangement = chosen;
+        queueStore.SaveArrangement(arrangement);
 
         try
         {
-            var unplayed = episodes.Where(episode => !doneIds.Contains(episode.Id)).ToList();
-            if (unplayed.Count == 0)
+            RebuildQueue();
+
+            // Under a rule, an empty result means the pool is empty — not that the
+            // arrangement failed. Say which, rather than leaving a blank queue.
+            if (queue.Count == 0 && arrangement != QueueArrangement.Manual)
             {
-                // Nothing to arrange (feeds not fetched yet, or all caught up):
-                // say why and leave any existing queue intact rather than wiping it.
                 AudioDiagnostics.LogWarning("Queue",
-                    $"Auto-arrange ({arrangement}) found no unplayed episodes; refreshing={isRefreshing}.");
+                    $"Arrangement ({arrangement}) found no unplayed episodes; refreshing={isRefreshing}.");
                 Say(PodcastPlaybackDiagnostics.NothingToQueue(isRefreshing));
                 return;
             }
 
-            queue.ReplaceWith(strategy.Arrange(unplayed).Select(episode => episode.Id));
-            SaveQueue();
             Invalidate(); // the filled queue is the confirmation (inline state change, DESIGN.md §5)
         }
         catch (Exception e)
         {
-            AudioDiagnostics.LogWarning("Queue", $"Auto-arrange ({arrangement}) failed.", e);
+            AudioDiagnostics.LogWarning("Queue", $"Arrangement ({arrangement}) failed.", e);
             Say("Couldn't arrange the queue — see Manage → Diagnostics.");
         }
     }
@@ -610,14 +648,14 @@ public sealed class PodcastsArea : ScoreArea
         }
 
         store.SaveListenedIds(listened);
-        RecomputeDone();
+        RecomputeDoneAndRebuild();
         Invalidate();
         UndoBar.Show(Host, Overlay, message, onUndo: () =>
         {
             var ids = store.ListenedIds.ToHashSet();
             ids.ExceptWith(added);
             store.SaveListenedIds(ids);
-            RecomputeDone();
+            RecomputeDoneAndRebuild();
             Invalidate();
         });
     }
@@ -635,8 +673,14 @@ public sealed class PodcastsArea : ScoreArea
         }
 
         store.SaveListenedIds(ids);
-        RecomputeDone();
+        RecomputeDoneAndRebuild();
         Invalidate();
+    }
+
+    private void RecomputeDoneAndRebuild()
+    {
+        RecomputeDone();
+        RebuildQueue();
     }
 
     private void RecomputeDone() =>
@@ -651,7 +695,7 @@ public sealed class PodcastsArea : ScoreArea
         var cache = episodeCache.Load();
         episodes = [.. cache.Episodes];
         feedTitles = new Dictionary<string, string>(cache.FeedTitles);
-        RecomputeDone();
+        RecomputeDoneAndRebuild();
     }
 
     private sealed record FeedFetchResult(PodcastSubscription Subscription, PodcastFeed? Feed, string? FailedHost);
@@ -722,7 +766,7 @@ public sealed class PodcastsArea : ScoreArea
             Say($"{failedHosts.Count} shows didn't answer. They retry on the next refresh.");
         }
 
-        RecomputeDone();
+        RecomputeDoneAndRebuild();
         Invalidate();
     }
 

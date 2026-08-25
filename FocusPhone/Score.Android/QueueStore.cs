@@ -1,4 +1,5 @@
 using Android.Content;
+using Codex.Domain.Audio;
 using Codex.Infrastructure.Podcasts;
 
 namespace Score;
@@ -24,6 +25,8 @@ public class QueueStore
     private const string PodcastPreferencesName = "podcast-queue";
     private const string MusicPreferencesName = "music-queue";
     private const string QueueKey = "orderedEpisodeIds";
+    private const string PinnedKey = "pinnedMediaIds";
+    private const string ArrangementKey = "arrangement";
 
     private readonly ISharedPreferences preferences;
 
@@ -43,4 +46,25 @@ public class QueueStore
 
     public void Save(IReadOnlyList<string> ids) =>
         preferences.Edit()!.PutString(QueueKey, QueueCodec.Encode(ids))!.Apply();
+
+    /// <summary>
+    /// What the owner put in this queue by hand, in the order they did it. Kept apart
+    /// from the queue itself because a standing arrangement rebuilds the queue and
+    /// must not be able to throw these away.
+    /// </summary>
+    public IReadOnlyList<string> LoadPinned() =>
+        QueueCodec.Decode(preferences.GetString(PinnedKey, null));
+
+    public void SavePinned(IReadOnlyList<string> ids) =>
+        preferences.Edit()!.PutString(PinnedKey, QueueCodec.Encode(ids))!.Apply();
+
+    /// <summary>
+    /// The standing rule that rebuilds this queue, or <see cref="QueueArrangement.Manual"/>
+    /// for a queue that is only ever what was put in it. Music leaves this at Manual.
+    /// </summary>
+    public QueueArrangement LoadArrangement() =>
+        (QueueArrangement)preferences.GetInt(ArrangementKey, (int)QueueArrangement.Manual);
+
+    public void SaveArrangement(QueueArrangement arrangement) =>
+        preferences.Edit()!.PutInt(ArrangementKey, (int)arrangement)!.Apply();
 }
