@@ -40,6 +40,10 @@ public sealed class WorkoutArea : ScoreArea
     private Dial? dial;
     private FrameLayout? poolLine;
 
+    // The tempo lookup, and what it is saying while it runs.
+    private string? lookupStatus;
+    private bool lookingUp;
+
     public WorkoutArea(Activity host, MusicLibrary library, ScorePlayback playback) : base(host)
     {
         this.library = library;
@@ -147,6 +151,22 @@ public sealed class WorkoutArea : ScoreArea
         {
             column.AddView(PaperUi.Secondary(Host,
                 "That will loop. Friday's crate will be asked for more at this tempo."));
+
+            // Offered only when the pool is thin, and only while there is anything left
+            // to look up — a button that is usually there and usually does nothing
+            // teaches you to press it for reassurance rather than for a reason.
+            var unmeasured = library.Catalog.Songs().Count(track => track.Bpm <= 0);
+            if (unmeasured > 0 && !lookingUp)
+            {
+                column.AddView(PaperUi.Secondary(Host,
+                    $"{unmeasured} tracks have no tempo yet — most files never carry one."));
+                column.AddView(PaperUi.SecondaryButton(Host, "Look up tempos", () => _ = LookUpTemposAsync()));
+            }
+        }
+
+        if (!string.IsNullOrEmpty(lookupStatus))
+        {
+            column.AddView(PaperUi.Secondary(Host, lookupStatus));
         }
 
         return column;
@@ -165,6 +185,46 @@ public sealed class WorkoutArea : ScoreArea
         }
 
         return column;
+    }
+
+    /// <summary>
+    /// Asks a public catalogue for the tempos the files do not carry. Loading is a
+    /// status sentence, never a spinner, and it counts up over a real library rather
+    /// than saying "working…" for several minutes.
+    /// </summary>
+    private async Task LookUpTemposAsync()
+    {
+        lookingUp = true;
+        lookupStatus = "Looking up tempos…";
+        FillBelowDial();
+
+        try
+        {
+            var found = await new TempoBackfill(Host).RunAsync(
+                library.Catalog.Songs(),
+                (done, total) =>
+                {
+                    lookupStatus = $"Looking up tempos… {done} of {total}.";
+                    Host.RunOnUiThread(FillBelowDial);
+                },
+                CancellationToken.None);
+
+            // The long tail nobody has measured anywhere is the normal outcome, and
+            // saying so is better than implying the lookup failed.
+            lookupStatus = found == 0
+                ? "No tempos found for those."
+                : $"Found {found}. Rescan isn't needed — they're in the library now.";
+            library.LoadCatalog();
+        }
+        catch (Exception e)
+        {
+            lookupStatus = "Couldn't reach the tempo catalogue: " + e.Message;
+        }
+        finally
+        {
+            lookingUp = false;
+            FillBelowDial();
+        }
     }
 
     private TempoPool Pool() => TempoPool.Build(library.Catalog.Songs(), tempo);

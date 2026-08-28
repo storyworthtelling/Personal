@@ -64,69 +64,19 @@ public static class PlaylistImport
     private static Track? Find(
         ImportedTrack wanted, IReadOnlyList<Track> catalog, HashSet<string> taken)
     {
+        // The artist has to agree either way; what the two passes choose between is
+        // which of the surviving candidates is meant.
         var available = catalog.Where(track =>
-            !taken.Contains(track.Id) && ArtistMatches(track, wanted.Artist)).ToList();
+            !taken.Contains(track.Id) && Credited(track, wanted.Artist)).ToList();
 
         return available.FirstOrDefault(track => FilterMatch.Equals(track.Title, wanted.Title))
             ?? available.FirstOrDefault(track =>
-                FilterMatch.Equals(Simplify(track.Title), Simplify(wanted.Title)));
+                FilterMatch.Equals(TrackIdentity.Simplify(track.Title), TrackIdentity.Simplify(wanted.Title)));
     }
 
-    /// <summary>
-    /// The shared list credits "Pat Barrett, Chris Tomlin" where the tag says
-    /// "Pat Barrett", and occasionally the reverse — so either name containing the
-    /// other counts. Containment is loose enough to pair a first name with a fuller
-    /// credit, which is the trade for catching the collaborations; the title still
-    /// has to agree, so a wrong pairing needs both halves to be wrong.
-    /// </summary>
-    private static bool ArtistMatches(Track track, string artist) =>
-        Credited(track.ArtistName, artist) || Credited(track.AlbumArtist, artist);
-
-    private static bool Credited(string? tagged, string listed) =>
-        FilterMatch.Equals(tagged, listed)
-        || (!string.IsNullOrWhiteSpace(tagged)
-            && (FilterMatch.Matches(listed, tagged) || FilterMatch.Matches(tagged, listed)));
-
-    /// <summary>
-    /// Drops the edition noise: every parenthesised or bracketed aside, and anything
-    /// after a spaced dash. Both are stripped from <b>both</b> sides, because either
-    /// side can be the variant — the shared list may say "Dare You To Move - 2011
-    /// Remaster" for a plain file, or say "Oh! Gravity" for a file tagged
-    /// "Oh! Gravity (Acoustic)".
-    ///
-    /// It is deliberately blunt: "Song - Part 1" simplifies to "Song" too. That only
-    /// ever loosens a match, and the exact pass runs first, so a title that agrees
-    /// exactly is never given away to a simplification.
-    /// </summary>
-    private static string Simplify(string title)
-    {
-        var text = title ?? string.Empty;
-        var builder = new System.Text.StringBuilder(text.Length);
-        var depth = 0;
-
-        foreach (var character in text)
-        {
-            if (character is '(' or '[')
-            {
-                depth++;
-            }
-            else if (character is ')' or ']')
-            {
-                depth = Math.Max(0, depth - 1);
-            }
-            else if (depth == 0)
-            {
-                builder.Append(character);
-            }
-        }
-
-        var stripped = builder.ToString();
-        var dash = stripped.IndexOf(" - ", StringComparison.Ordinal);
-        if (dash >= 0)
-        {
-            stripped = stripped[..dash];
-        }
-
-        return stripped.Trim();
-    }
+    // A tag credits one performer where a shared list credits all of them, and the
+    // album artist is sometimes the only one that matches.
+    private static bool Credited(Track track, string artist) =>
+        TrackIdentity.SameArtist(track.ArtistName, artist)
+        || TrackIdentity.SameArtist(track.AlbumArtist, artist);
 }

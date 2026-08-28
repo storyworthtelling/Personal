@@ -74,8 +74,17 @@ public sealed class MusicLibrary(
     public void LoadCatalog()
     {
         using var database = MusicDatabase.Open(host);
-        Catalog = new MusicCatalog(database.Catalog.LoadAll());
+
+        // One library out of both sources. The streamed half is empty until the
+        // provider is wired, and this is deliberately the seam rather than a branch
+        // added later: when it fills, nothing downstream learns that it did — which
+        // is the whole of the merged-library rule.
+        Catalog = new MusicCatalog(LibraryMerge.Merge(database.Catalog.LoadAll(), Streamed()));
     }
+
+    // What the streaming provider carries. Nothing yet: playback has to go through
+    // TIDAL's own player module, which is Kotlin and needs a binding project.
+    private static IReadOnlyList<Track> Streamed() => [];
 
     public async Task SignInAsync()
     {

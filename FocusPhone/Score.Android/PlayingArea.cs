@@ -4,6 +4,7 @@ using AndroidX.Media3.Common;
 using Codex.Domain.Audio;
 using Codex.Domain.Design;
 using Codex.Domain.Music;
+using Codex.Infrastructure.Music;
 using Codex.Ui;
 
 namespace Score;
@@ -48,6 +49,17 @@ public sealed class PlayingArea : ScoreArea
     private bool dragging;
     private string? pendingAlbumKey;
     private string? lastMediaId;
+
+    // The words, and which track they belong to. Fetched once per track and held for
+    // as long as it plays — they do not change, and the panel is opened and closed
+    // more often than the track changes.
+    private readonly ILyricsSource lyricsSource = new LrcLibClient(
+        new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()));
+    private Lyrics lyrics = Lyrics.None;
+    private string? lyricsFor;
+    private readonly List<TextView> lyricViews = [];
+    private ScrollView? lyricsScroll;
+    private int litLine = -1;
 
     public PlayingArea(Android.App.Activity host, ScorePlayback playback) : base(host)
     {
@@ -109,11 +121,11 @@ public sealed class PlayingArea : ScoreArea
 
     private View BuildSwitch()
     {
-        // Words is live only when there is something to show. Lyrics have no source
-        // at all yet — that is what the streaming survey has to answer — so on music
-        // the third segment is dimmed rather than dropped, per §8.
+        // Words is live only when there is something to show — an episode with notes,
+        // or a track somebody has typed the words up for. When there is nothing the
+        // segment is dimmed rather than dropped, per §8, so the switch keeps its shape.
         var isPodcast = playback.Kind == MediaKind.Podcast;
-        var hasWords = isPodcast && !string.IsNullOrWhiteSpace(Notes());
+        var hasWords = isPodcast ? !string.IsNullOrWhiteSpace(Notes()) : !lyrics.IsEmpty;
 
         return PaperUi.Segmented(
             Host,
@@ -227,10 +239,7 @@ public sealed class PlayingArea : ScoreArea
         switch (showing)
         {
             case Panel.Words:
-                notesView = PaperUi.Body(Host, Notes() ?? string.Empty);
-                var scroll = new ScrollView(Host);
-                scroll.AddView(notesView);
-                panel.AddView(scroll);
+                panel.AddView(playback.Kind == MediaKind.Podcast ? BuildNotes() : BuildLyrics());
                 break;
 
             case Panel.Queue:
@@ -253,7 +262,107 @@ public sealed class PlayingArea : ScoreArea
         }
     }
 
-    public override void OnTick() => Render();
+    private View BuildNotes()
+    {
+        notesView = PaperUi.Body(Host, Notes() ?? string.Empty);
+        var scroll = new ScrollView(Host);
+        scroll.AddView(notesView);
+        return scroll;
+    }
+
+    /// <summary>
+    /// The words, following along when somebody has timed them.
+    ///
+    /// Built once and then only re-coloured: rebuilding the panel every second to move
+    /// the highlight would throw away the scroll position, which on a long song means
+    /// the panel snaps back to the first verse once a second.
+    /// </summary>
+    private View BuildLyrics()
+    {
+        lyricViews.Clear();
+        litLine = -1;
+
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        foreach (var line in lyrics.Lines)
+        {
+            // An empty timed line is a rest — an instrumental — and it keeps its place
+            // so the highlight has somewhere to go that is not a lyric.
+            var view = PaperUi.Body(Host, line.Text);
+            view.SetTextColor(PaperTheme.InkMuted);
+            lyricViews.Add(view);
+            column.AddView(view);
+        }
+
+        lyricsScroll = new ScrollView(Host);
+        lyricsScroll.AddView(column);
+        LightTheLine();
+        return lyricsScroll;
+    }
+
+    // Untimed words are left plain: lighting the first line for the whole song would
+    // be worse than not following along at all.
+    private void LightTheLine()
+    {
+        if (!lyrics.Timed || lyricViews.Count == 0)
+        {
+            return;
+        }
+
+        var at = lyrics.LineAt(playback.Position);
+        if (at == litLine)
+        {
+            return;
+        }
+
+        if (litLine >= 0 && litLine < lyricViews.Count)
+        {
+            lyricViews[litLine].SetTextColor(PaperTheme.InkMuted);
+        }
+
+        litLine = at;
+        if (at < 0 || at >= lyricViews.Count)
+        {
+            return;
+        }
+
+        lyricViews[at].SetTextColor(PaperTheme.Ink);
+
+        // Kept a third of the way down rather than at the top, so the next lines are
+        // already readable when they arrive.
+        lyricsScroll?.SmoothScrollTo(0, Math.Max(0, lyricViews[at].Top - (lyricsScroll.Height / 3)));
+    }
+
+    // Best-effort and quiet: no words is the ordinary case, not a failure.
+    private async Task LoadLyricsAsync(string mediaId)
+    {
+        var found = await lyricsSource.FetchAsync(
+            playback.CurrentArtist ?? string.Empty,
+            playback.CurrentTitle ?? string.Empty,
+            playback.CurrentAlbum,
+            playback.Duration,
+            CancellationToken.None);
+
+        // The track may have moved on while the words were being fetched.
+        if (lyricsFor != mediaId)
+        {
+            return;
+        }
+
+        lyrics = found;
+        if (!found.IsEmpty)
+        {
+            Invalidate(); // the switch's third segment has just become live
+        }
+    }
+
+    public override void OnTick()
+    {
+        Render();
+        if (showing == Panel.Words && playback.Kind != MediaKind.Podcast)
+        {
+            LightTheLine();
+        }
+    }
 
     private void Render()
     {
@@ -275,6 +384,16 @@ public sealed class PlayingArea : ScoreArea
         {
             lastMediaId = mediaId;
             showing = Panel.Cover;
+
+            // New track, new words. Cleared before the fetch so the switch does not
+            // offer the last song's lyrics for this one.
+            lyrics = Lyrics.None;
+            lyricsFor = mediaId;
+            if (mediaId is not null && playback.Kind == MediaKind.Music)
+            {
+                _ = LoadLyricsAsync(mediaId);
+            }
+
             Invalidate();
             return;
         }

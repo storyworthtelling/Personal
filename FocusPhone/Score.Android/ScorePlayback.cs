@@ -59,6 +59,10 @@ public sealed class ScorePlayback(Activity host)
 
     public string? CurrentTitle => Controller?.MediaMetadata?.Title?.ToString();
 
+    public string? CurrentArtist => Controller?.MediaMetadata?.Artist?.ToString();
+
+    public string? CurrentAlbum => Controller?.MediaMetadata?.AlbumTitle?.ToString();
+
     public string? CurrentMediaId => Controller?.CurrentMediaItem?.MediaId;
 
     public TimeSpan Position => TimeSpan.FromMilliseconds(Math.Max(0, Controller?.CurrentPosition ?? 0));

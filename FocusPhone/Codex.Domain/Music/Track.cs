@@ -1,6 +1,26 @@
 namespace Codex.Domain.Music;
 
 /// <summary>
+/// Where a track can be played from.
+///
+/// The app is not supposed to show this. Owned files and streamed tracks are
+/// deliberately indistinguishable — one library, one queue, one listening log — and
+/// the only state that ever reaches a screen is <see cref="Unavailable"/>, which is
+/// drawn as DESIGN.md §8's Disabled row rather than removed.
+/// </summary>
+public enum TrackAvailability
+{
+    /// <summary>A file the owner has. The durable library, and the one that wins.</summary>
+    Local,
+
+    /// <summary>Carried by the streaming provider.</summary>
+    Streaming,
+
+    /// <summary>Was streamable and is not any more — pulled, or the region changed.</summary>
+    Unavailable,
+}
+
+/// <summary>
 /// One music track, built from a file's embedded tags. <see cref="Id"/> is the
 /// Google Drive file id (also the media id the queue and progress book key on).
 /// The Display* members apply the fallbacks (Unknown Artist/Album/Genre, album
@@ -22,8 +42,13 @@ public record Track(
     string Genre,
     TimeSpan Duration,
     string? ArtRef = null,
-    int Bpm = 0)
+    int Bpm = 0,
+    TrackAvailability Availability = TrackAvailability.Local)
 {
+    /// <summary>Whether this can actually be started. False only for a track the
+    /// provider has stopped carrying.</summary>
+    public bool IsPlayable => Availability != TrackAvailability.Unavailable;
+
     public string DisplayTitle => Blank(Title) ? "Unknown Title" : Title;
 
     public string DisplayArtist => Blank(ArtistName) ? "Unknown Artist" : ArtistName;
