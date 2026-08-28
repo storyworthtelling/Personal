@@ -94,9 +94,11 @@ public static class PolicyManager
         catch (Java.Lang.Exception e)
         {
             // A thrown exception (vs the result code above) is usually an invalid host or a transient
-            // state; retried on the next pass. Record the type when the message is blank so it's not a
-            // mystery (the earlier log showed an empty message).
-            var detail = string.IsNullOrEmpty(e.Message) ? e.GetType().Name : e.Message;
+            // state; retried on the next pass. The device logged a bare "RuntimeException" with no
+            // message, so surface the full chain — a RuntimeException from DevicePolicyManager typically
+            // WRAPS a more specific cause (ServiceSpecificException / SecurityException) whose message
+            // names the real reason. Include the cause's type and message so the next log is diagnosable.
+            var detail = DescribeThrowable(e);
             Log.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}");
             events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}"));
         }
@@ -149,6 +151,24 @@ public static class PolicyManager
 
     private static PolicyEvent Event(PolicyEventKind kind, string summary) =>
         new(DateTimeOffset.UtcNow, kind, summary);
+
+    // A readable one-liner for a thrown Java exception: its type, its message, and (crucially) its
+    // wrapped cause's type + message — because a bare RuntimeException often carries the real reason
+    // only on its cause. Walks up to two causes deep so the log names the actual failure.
+    private static string DescribeThrowable(Java.Lang.Throwable e)
+    {
+        static string One(Java.Lang.Throwable t) =>
+            $"{t.GetType().Name}: {(string.IsNullOrEmpty(t.Message) ? "(no message)" : t.Message)}";
+
+        var text = One(e);
+        var cause = e.Cause;
+        for (var depth = 0; cause is not null && depth < 2; depth++)
+        {
+            text += $" <- {One(cause)}";
+            cause = cause.Cause;
+        }
+        return text;
+    }
 
     /// <summary>
     /// Restarts the device. Only a device owner may reboot without user
