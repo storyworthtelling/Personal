@@ -55,7 +55,13 @@ public class FridayPicksWorker : Worker
         // cycle, rather than the moment it is tapped.
         taste.FoldVetoesAsync(VetoedPicks(store, catalog), CancellationToken.None).GetAwaiter().GetResult();
 
-        var selection = taste.FridayPicksAsync(catalog, MusicSettingsStore.FridayStackSize, CancellationToken.None).GetAwaiter().GetResult();
+        // What the workout ran short of, if anything. Read once and cleared, so a
+        // tempo the owner tried twice does not stack up into a demand.
+        var gap = MusicSettingsStore.TempoGap;
+        MusicSettingsStore.TempoGap = null;
+
+        var selection = taste.FridayPicksAsync(
+            catalog, MusicSettingsStore.FridayStackSize, gap, CancellationToken.None).GetAwaiter().GetResult();
         if (selection.TrackIds.Count > 0)
         {
             store.Save(selection, DateTimeOffset.Now);

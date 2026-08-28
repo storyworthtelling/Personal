@@ -134,4 +134,55 @@ public class MusicCatalogCacheTests : IDisposable
 
         Assert.Equal(new MusicFileVersion(7000, 1234), upgraded.LoadVersions()["1"]);
     }
+
+    [Fact]
+    public void Upsert_ThenLoadAll_KeepsTheTempo()
+    {
+        cache.Upsert([Tr("1") with { Bpm = 128 }]);
+
+        Assert.Equal(128, cache.LoadAll().Single().Bpm);
+    }
+
+    // A cache written before tempo existed must keep its rows and read them back as
+    // unknown, so the next scan fills them in rather than the library emptying.
+    [Fact]
+    public void Cache_AddsTheTempoColumnToAnOlderCache()
+    {
+        using var older = new SqliteConnection("Data Source=:memory:");
+        older.Open();
+        using (var create = older.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE tracks (
+                    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+                    album TEXT NOT NULL, albumArtist TEXT NOT NULL, trackNumber INTEGER NOT NULL,
+                    discNumber INTEGER NOT NULL, genre TEXT NOT NULL, durationTicks INTEGER NOT NULL,
+                    artRef TEXT);
+                INSERT INTO tracks VALUES ('1','Old','A','Al','A',1,1,'Rock',0,NULL);
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        var upgraded = new MusicCatalogCache(older).LoadAll().Single();
+
+        Assert.Equal("Old", upgraded.Title);
+        Assert.Equal(0, upgraded.Bpm);
+    }
+
+    // What the cache remembers about the reader that filled it, so a reader that has
+    // learned to read a new tag can tell that every row predates it.
+    [Fact]
+    public void ReaderVersion_StartsAtZero()
+    {
+        Assert.Equal(0, cache.ReaderVersion);
+    }
+
+    [Fact]
+    public void ReaderVersion_RoundTrips()
+    {
+        cache.ReaderVersion = 2;
+
+        Assert.Equal(2, cache.ReaderVersion);
+        Assert.Equal(2, new MusicCatalogCache(connection).ReaderVersion);
+    }
 }

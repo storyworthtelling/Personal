@@ -130,7 +130,7 @@ public sealed class MusicTasteService
 
     /// <summary>Picks the weekly "New for you" set as a raw selection (title + ids) for the worker to persist.</summary>
     public async Task<DiscoverySelection> FridayPicksAsync(
-        IReadOnlyList<Track> catalog, int maxTracks, CancellationToken cancellationToken)
+        IReadOnlyList<Track> catalog, int maxTracks, string? note, CancellationToken cancellationToken)
     {
         try
         {
@@ -141,7 +141,7 @@ public sealed class MusicTasteService
                 return DiscoverySelection.Empty; // no taste learned yet -> nothing to surface
             }
 
-            return await discovery.FridayPicksAsync(profile, catalog, maxTracks, cancellationToken);
+            return await discovery.FridayPicksAsync(profile, catalog, maxTracks, note, cancellationToken);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {

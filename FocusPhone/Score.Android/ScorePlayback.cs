@@ -38,6 +38,10 @@ public sealed class ScorePlayback(Activity host)
     // want their own steps — but this is the only skip the app has today.
     private const long SkipMs = 30_000;
 
+    /// <summary>How long the fade around a change of run takes. Fixed: the length is
+    /// not a thing anyone wants to set, and a dial for it would be a worse screen.</summary>
+    private const int FadeMs = 700;
+
     public MediaController? Controller { get; private set; }
 
     /// <summary>What was last started. None until something plays.</summary>
@@ -106,6 +110,49 @@ public sealed class ScorePlayback(Activity host)
     /// Applies a speed / skip-silence change to what is already playing, without
     /// restarting it. This is the per-show settings screen changing its mind mid-episode.
     /// </summary>
+    /// <summary>
+    /// Swaps what is playing for a new run, fading out and back in around the change.
+    ///
+    /// This is what a tempo change on the workout screen sounds like. It is a fade
+    /// <b>through</b>, not an overlap: ExoPlayer plays one timeline at a time, and a
+    /// true cross-fade needs a second player mixed against the first, which is a
+    /// larger thing than the moment deserves. What it buys is that the change does not
+    /// arrive as a cut, which is the part that breaks a stride.
+    /// </summary>
+    public void FadeInto(MediaKind kind, IList<MediaItem> items, int index)
+    {
+        if (Controller is not { } controller || items.Count == 0)
+        {
+            return;
+        }
+
+        Fade(controller, from: 1f, to: 0f, then: () =>
+        {
+            Start(kind, items, index, 0L, 1.0f, skipSilence: false);
+            Fade(controller, from: 0f, to: 1f, then: null);
+        });
+    }
+
+    // Stepped on the main thread's handler: Media3's volume is a plain setter, so a
+    // fade is a series of them rather than an animation the player runs itself.
+    private static void Fade(MediaController controller, float from, float to, Action? then)
+    {
+        const int Steps = 12;
+        var handler = new global::Android.OS.Handler(global::Android.OS.Looper.MainLooper!);
+        for (var step = 0; step <= Steps; step++)
+        {
+            var at = step;
+            handler.PostDelayed(() =>
+            {
+                controller.Volume = from + ((to - from) * at / (float)Steps);
+                if (at == Steps)
+                {
+                    then?.Invoke();
+                }
+            }, (long)(FadeMs * at / (double)Steps));
+        }
+    }
+
     public void ApplySettings(float speed, bool skipSilence)
     {
         Controller?.SetPlaybackSpeed(speed);

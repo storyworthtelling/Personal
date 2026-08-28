@@ -40,7 +40,10 @@ public sealed class MusicScanner
         var current = files.ToDictionary(
             file => file.Id, file => new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size));
 
-        var plan = MusicScanPlan.Compute(current, cache.LoadVersions());
+        // A cache filled by an older reader is missing whatever this one learned to
+        // read since; nothing about the files says so, so the scan is told directly.
+        var rereadAll = cache.ReaderVersion < MusicTagReader.Version;
+        var plan = MusicScanPlan.Compute(current, cache.LoadVersions(), rereadAll);
 
         // Drop tracks whose file disappeared from Drive (replaces the old clear-and-rebuild).
         foreach (var id in plan.ToDelete)
@@ -53,6 +56,7 @@ public sealed class MusicScanner
         onProgress(0, total);
         if (total == 0)
         {
+            cache.ReaderVersion = MusicTagReader.Version;
             return; // nothing new or changed — the cached catalog already matches Drive
         }
 
@@ -72,6 +76,10 @@ public sealed class MusicScanner
             done += batch.Length;
             onProgress(done, total);
         }
+
+        // Only once the pass finished. A cancelled scan has read part of the library,
+        // and marking it done would leave the rest missing the new field for good.
+        cache.ReaderVersion = MusicTagReader.Version;
     }
 
     private (Track Track, MusicFileVersion Version)? ReadTags(DriveAudioFile file, HttpClient http)

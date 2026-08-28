@@ -54,4 +54,26 @@ public class TagMappingTests
 
         Assert.Equal("drive-abc", track.Id);
     }
+
+    // Tempo comes from the tag first, because it is nearly free — the scanner already
+    // opens every file, and reading a field it has in hand costs nothing next to
+    // analysing the audio.
+    [Fact]
+    public void ToTrack_ReadsTheTaggedTempo()
+    {
+        var track = TagMapping.ToTrack(
+            "file1", "T", ["A"], "Al", ["A"], 1, 1, ["G"], TimeSpan.Zero, beatsPerMinute: 128);
+
+        Assert.Equal(128, track.Bpm);
+    }
+
+    // Most files carry no BPM tag at all, and zero is how the catalog says "unknown"
+    // rather than "no beats".
+    [Fact]
+    public void ToTrack_LeavesTempoUnknownWhenTheTagHasNone()
+    {
+        var track = TagMapping.ToTrack("file1", "T", ["A"], "Al", ["A"], 1, 1, ["G"], TimeSpan.Zero);
+
+        Assert.Equal(0, track.Bpm);
+    }
 }

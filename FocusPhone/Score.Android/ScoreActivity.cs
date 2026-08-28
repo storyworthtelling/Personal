@@ -67,6 +67,7 @@ public class ScoreActivity : Activity
             new PodcastsArea(this, playback, progressStore),
             new PlayingArea(this, playback),
             new DiscoverArea(this, musicLibrary),
+            new WorkoutArea(this, musicLibrary, playback),
             new SettingsArea(this, musicLibrary),
         ];
         foreach (var area in areas)

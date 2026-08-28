@@ -31,7 +31,8 @@ public class MusicCatalogCache
                 durationTicks INTEGER NOT NULL,
                 artRef TEXT,
                 modifiedTimeTicks INTEGER NOT NULL DEFAULT 0,
-                sizeBytes INTEGER NOT NULL DEFAULT 0
+                sizeBytes INTEGER NOT NULL DEFAULT 0,
+                bpm INTEGER NOT NULL DEFAULT 0
             )
             """;
         create.ExecuteNonQuery();
@@ -40,6 +41,41 @@ public class MusicCatalogCache
         // an upgrade keeps its rows (they read as version 0, i.e. "unknown", so the next scan re-reads once).
         EnsureColumn("modifiedTimeTicks");
         EnsureColumn("sizeBytes");
+
+        // Tempo arrived with the workout. It defaults to 0 = unknown, so an older
+        // cache keeps every row and the next scan fills the column in from the tags.
+        EnsureColumn("bpm");
+
+        using var meta = connection.CreateCommand();
+        meta.CommandText = "CREATE TABLE IF NOT EXISTS meta (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)";
+        meta.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Which generation of the tag reader filled this cache.
+    ///
+    /// It exists because a reader that starts reading a new tag cannot tell, from the
+    /// files alone, that its rows are stale: nothing about the files changed. Bumping
+    /// the reader's version is how a scan is told to go round once more.
+    /// </summary>
+    public int ReaderVersion
+    {
+        get
+        {
+            using var select = connection.CreateCommand();
+            select.CommandText = "SELECT value FROM meta WHERE key = 'readerVersion'";
+            return select.ExecuteScalar() is string stored && int.TryParse(stored, out var version) ? version : 0;
+        }
+        set
+        {
+            using var upsert = connection.CreateCommand();
+            upsert.CommandText = """
+                INSERT INTO meta (key, value) VALUES ('readerVersion', $value)
+                ON CONFLICT (key) DO UPDATE SET value = excluded.value
+                """;
+            upsert.Parameters.AddWithValue("$value", value.ToString());
+            upsert.ExecuteNonQuery();
+        }
     }
 
     private void EnsureColumn(string name)
@@ -86,10 +122,10 @@ public class MusicCatalogCache
         upsert.CommandText = """
             INSERT INTO tracks (
                 id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef,
-                modifiedTimeTicks, sizeBytes)
+                modifiedTimeTicks, sizeBytes, bpm)
             VALUES (
                 $id, $title, $artist, $album, $albumArtist, $trackNumber, $discNumber, $genre, $durationTicks, $artRef,
-                $modifiedTimeTicks, $sizeBytes)
+                $modifiedTimeTicks, $sizeBytes, $bpm)
             ON CONFLICT (id) DO UPDATE SET
                 title = excluded.title,
                 artist = excluded.artist,
@@ -101,7 +137,8 @@ public class MusicCatalogCache
                 durationTicks = excluded.durationTicks,
                 artRef = excluded.artRef,
                 modifiedTimeTicks = excluded.modifiedTimeTicks,
-                sizeBytes = excluded.sizeBytes
+                sizeBytes = excluded.sizeBytes,
+                bpm = excluded.bpm
             """;
 
         var parameters = new Dictionary<string, SqliteParameter>();
@@ -109,7 +146,7 @@ public class MusicCatalogCache
         {
             "$id", "$title", "$artist", "$album", "$albumArtist",
             "$trackNumber", "$discNumber", "$genre", "$durationTicks", "$artRef",
-            "$modifiedTimeTicks", "$sizeBytes",
+            "$modifiedTimeTicks", "$sizeBytes", "$bpm",
         })
         {
             var parameter = upsert.CreateParameter();
@@ -132,6 +169,7 @@ public class MusicCatalogCache
             parameters["$artRef"].Value = (object?)track.ArtRef ?? DBNull.Value;
             parameters["$modifiedTimeTicks"].Value = version.ModifiedTimeTicks;
             parameters["$sizeBytes"].Value = version.SizeBytes;
+            parameters["$bpm"].Value = track.Bpm;
             upsert.ExecuteNonQuery();
         }
 
@@ -173,7 +211,7 @@ public class MusicCatalogCache
     {
         using var select = connection.CreateCommand();
         select.CommandText = """
-            SELECT id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef
+            SELECT id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef, bpm
             FROM tracks
             """;
         using var reader = select.ExecuteReader();
@@ -191,7 +229,8 @@ public class MusicCatalogCache
                 reader.GetInt32(6),
                 reader.GetString(7),
                 TimeSpan.FromTicks(reader.GetInt64(8)),
-                reader.IsDBNull(9) ? null : reader.GetString(9)));
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.GetInt32(10)));
         }
 
         return tracks;

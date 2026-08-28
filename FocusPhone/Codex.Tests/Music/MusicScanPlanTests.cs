@@ -82,4 +82,32 @@ public class MusicScanPlanTests
         Assert.Equal(["edited", "new"], plan.ToRead.OrderBy(id => id).ToArray());
         Assert.Equal(["removed"], plan.ToDelete);
     }
+
+    // When the reader learns to read a new field — tempo, in P6 — every cached row is
+    // missing it, and no file has changed to say so. One forced pass over the library
+    // fills it in; without this the new column would stay empty until each file
+    // happened to be edited.
+    [Fact]
+    public void Compute_RereadsEverythingWhenAsked()
+    {
+        var version = new MusicFileVersion(10, 100);
+        var current = new Dictionary<string, MusicFileVersion> { ["a"] = version, ["b"] = version };
+
+        var plan = MusicScanPlan.Compute(current, current, rereadAll: true);
+
+        Assert.Equal(["a", "b"], plan.ToRead.OrderBy(id => id));
+    }
+
+    // A forced pass is still a scan: files that are gone still go.
+    [Fact]
+    public void Compute_StillDropsMissingFilesWhenRereading()
+    {
+        var version = new MusicFileVersion(10, 100);
+        var cached = new Dictionary<string, MusicFileVersion> { ["a"] = version, ["gone"] = version };
+
+        var plan = MusicScanPlan.Compute(
+            new Dictionary<string, MusicFileVersion> { ["a"] = version }, cached, rereadAll: true);
+
+        Assert.Equal(["gone"], plan.ToDelete);
+    }
 }

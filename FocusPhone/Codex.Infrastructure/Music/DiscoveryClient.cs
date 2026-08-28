@@ -54,11 +54,13 @@ public sealed class DiscoveryClient : IDiscoveryClient
     }
 
     public Task<DiscoverySelection> FridayPicksAsync(
-        TasteProfile profile, IReadOnlyList<Track> catalog, int maxTracks, CancellationToken cancellationToken)
+        TasteProfile profile, IReadOnlyList<Track> catalog, int maxTracks,
+        string? note, CancellationToken cancellationToken)
     {
         var userContent =
             $"TASTE PROFILE (JSON):\n{ProfileJson(profile)}\n\n" +
-            $"CATALOG (JSON):\n{CatalogJson(catalog)}\n\nMAX TRACKS: {maxTracks}";
+            $"CATALOG (JSON):\n{CatalogJson(catalog)}\n\nMAX TRACKS: {maxTracks}" +
+            (string.IsNullOrWhiteSpace(note) ? string.Empty : $"\n\nTHE SHELF IS SHORT OF: {note}");
         return Choose(FridayInstruction, userContent, cancellationToken);
     }
 

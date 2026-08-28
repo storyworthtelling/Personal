@@ -6,6 +6,10 @@ namespace Codex.Domain.Music;
 /// The Display* members apply the fallbacks (Unknown Artist/Album/Genre, album
 /// artist defaulting to the track artist) in one place so the catalog, shuffle,
 /// and smart-mix all group identically.
+///
+/// <see cref="Bpm"/> is 0 when nothing has established a tempo for the file. Zero is
+/// "unknown", not "no beats" — a workout pool has to be able to tell the difference
+/// between a track that is the wrong speed and one nobody has measured.
 /// </summary>
 public record Track(
     string Id,
@@ -17,7 +21,8 @@ public record Track(
     int DiscNumber,
     string Genre,
     TimeSpan Duration,
-    string? ArtRef = null)
+    string? ArtRef = null,
+    int Bpm = 0)
 {
     public string DisplayTitle => Blank(Title) ? "Unknown Title" : Title;
 

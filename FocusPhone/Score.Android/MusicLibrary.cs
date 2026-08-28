@@ -281,6 +281,33 @@ public sealed class MusicLibrary(
         listening.BeginSelection([track], 0, PlaybackLaunch.Album, book.IsComplete);
     }
 
+    /// <summary>
+    /// Starts a workout run: an <b>ephemeral</b> queue that is neither saved nor
+    /// logged.
+    ///
+    /// Both halves of that are deliberate. It does not touch the stored music queue,
+    /// so a workout cannot cost you a run you assembled; and it does not open a
+    /// listening sitting, so what you ran to never reaches the taste profile. Music
+    /// chosen for its tempo is not evidence of taste — it is evidence of a pace — and
+    /// letting it in would teach the profile the wrong thing about the owner.
+    /// </summary>
+    public void StartWorkout(IReadOnlyList<Track> tracks, bool fade)
+    {
+        if (playback.Controller is null || tracks.Count == 0)
+        {
+            return;
+        }
+
+        var items = tracks.Select(BuildItem).ToList();
+        if (fade)
+        {
+            playback.FadeInto(MediaKind.Music, items, 0);
+            return;
+        }
+
+        playback.Start(MediaKind.Music, items, 0, 0L, 1.0f, skipSilence: false);
+    }
+
     public void PlayShuffled(IReadOnlyList<Track> tracks) =>
         PlayTracks(new ShufflePlanner().Shuffle(tracks), 0, PlaybackLaunch.Shuffle);
 
