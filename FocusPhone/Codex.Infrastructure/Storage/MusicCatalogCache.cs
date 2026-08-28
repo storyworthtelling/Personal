@@ -32,7 +32,9 @@ public class MusicCatalogCache
                 artRef TEXT,
                 modifiedTimeTicks INTEGER NOT NULL DEFAULT 0,
                 sizeBytes INTEGER NOT NULL DEFAULT 0,
-                bpm INTEGER NOT NULL DEFAULT 0
+                bpm INTEGER NOT NULL DEFAULT 0,
+                sourceId TEXT,
+                clipStartTicks INTEGER NOT NULL DEFAULT 0
             )
             """;
         create.ExecuteNonQuery();
@@ -45,6 +47,12 @@ public class MusicCatalogCache
         // Tempo arrived with the workout. It defaults to 0 = unknown, so an older
         // cache keeps every row and the next scan fills the column in from the tags.
         EnsureColumn("bpm");
+
+        // Hidden-track splitting arrived after tempo. sourceId is nullable and NULL by
+        // default — "not a split segment" — so an older row reads back with no
+        // SourceFileId/ClipStart at all rather than looking like a clip starting at 0.
+        EnsureColumn("sourceId", "TEXT");
+        EnsureColumn("clipStartTicks");
 
         using var meta = connection.CreateCommand();
         meta.CommandText = "CREATE TABLE IF NOT EXISTS meta (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)";
@@ -78,7 +86,7 @@ public class MusicCatalogCache
         }
     }
 
-    private void EnsureColumn(string name)
+    private void EnsureColumn(string name, string sqlType = "INTEGER NOT NULL DEFAULT 0")
     {
         var present = false;
         using (var info = connection.CreateCommand())
@@ -101,7 +109,7 @@ public class MusicCatalogCache
         }
 
         using var alter = connection.CreateCommand();
-        alter.CommandText = $"ALTER TABLE tracks ADD COLUMN {name} INTEGER NOT NULL DEFAULT 0";
+        alter.CommandText = $"ALTER TABLE tracks ADD COLUMN {name} {sqlType}";
         alter.ExecuteNonQuery();
     }
 
@@ -122,10 +130,10 @@ public class MusicCatalogCache
         upsert.CommandText = """
             INSERT INTO tracks (
                 id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef,
-                modifiedTimeTicks, sizeBytes, bpm)
+                modifiedTimeTicks, sizeBytes, bpm, sourceId, clipStartTicks)
             VALUES (
                 $id, $title, $artist, $album, $albumArtist, $trackNumber, $discNumber, $genre, $durationTicks, $artRef,
-                $modifiedTimeTicks, $sizeBytes, $bpm)
+                $modifiedTimeTicks, $sizeBytes, $bpm, $sourceId, $clipStartTicks)
             ON CONFLICT (id) DO UPDATE SET
                 title = excluded.title,
                 artist = excluded.artist,
@@ -138,7 +146,9 @@ public class MusicCatalogCache
                 artRef = excluded.artRef,
                 modifiedTimeTicks = excluded.modifiedTimeTicks,
                 sizeBytes = excluded.sizeBytes,
-                bpm = excluded.bpm
+                bpm = excluded.bpm,
+                sourceId = excluded.sourceId,
+                clipStartTicks = excluded.clipStartTicks
             """;
 
         var parameters = new Dictionary<string, SqliteParameter>();
@@ -146,7 +156,7 @@ public class MusicCatalogCache
         {
             "$id", "$title", "$artist", "$album", "$albumArtist",
             "$trackNumber", "$discNumber", "$genre", "$durationTicks", "$artRef",
-            "$modifiedTimeTicks", "$sizeBytes", "$bpm",
+            "$modifiedTimeTicks", "$sizeBytes", "$bpm", "$sourceId", "$clipStartTicks",
         })
         {
             var parameter = upsert.CreateParameter();
@@ -170,6 +180,8 @@ public class MusicCatalogCache
             parameters["$modifiedTimeTicks"].Value = version.ModifiedTimeTicks;
             parameters["$sizeBytes"].Value = version.SizeBytes;
             parameters["$bpm"].Value = track.Bpm;
+            parameters["$sourceId"].Value = (object?)track.SourceFileId ?? DBNull.Value;
+            parameters["$clipStartTicks"].Value = track.ClipStart?.Ticks ?? 0L;
             upsert.ExecuteNonQuery();
         }
 
@@ -211,7 +223,8 @@ public class MusicCatalogCache
     {
         using var select = connection.CreateCommand();
         select.CommandText = """
-            SELECT id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef, bpm
+            SELECT id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef, bpm,
+                sourceId, clipStartTicks
             FROM tracks
             """;
         using var reader = select.ExecuteReader();
@@ -219,6 +232,7 @@ public class MusicCatalogCache
         var tracks = new List<Track>();
         while (reader.Read())
         {
+            var sourceId = reader.IsDBNull(11) ? null : reader.GetString(11);
             tracks.Add(new Track(
                 reader.GetString(0),
                 reader.GetString(1),
@@ -230,7 +244,9 @@ public class MusicCatalogCache
                 reader.GetString(7),
                 TimeSpan.FromTicks(reader.GetInt64(8)),
                 reader.IsDBNull(9) ? null : reader.GetString(9),
-                reader.GetInt32(10)));
+                reader.GetInt32(10),
+                SourceFileId: sourceId,
+                ClipStart: sourceId is null ? null : TimeSpan.FromTicks(reader.GetInt64(12))));
         }
 
         return tracks;
