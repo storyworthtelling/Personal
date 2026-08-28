@@ -58,6 +58,10 @@ public sealed class PodcastsArea : ScoreArea
     private QueueArrangement arrangement;
     private readonly List<string> pinned = [];
 
+    // Picking episodes. Held by the area, like the filter, so drilling out of a show
+    // and back does not leave a half-built selection behind a screen you cannot see.
+    private readonly Selection selection = new();
+
     public PodcastsArea(Activity host, ScorePlayback playback, PlaybackProgressStore progress) : base(host)
     {
         this.playback = playback;
@@ -110,14 +114,32 @@ public sealed class PodcastsArea : ScoreArea
     }
 
 
-    /// <summary>The area's own actions. The shell hosts it under the now-playing bar.</summary>
-    public override View? BuildBottomBar() => PaperUi.BottomBar(Host,
-        PaperUi.SecondaryButton(Host, "Shows", () => { openFeedId = null; showingQueue = false; Invalidate(); }),
-        PaperUi.QuietButton(Host, "Queue", () => { showingQueue = true; Invalidate(); }),
-        PaperUi.QuietButton(Host, "Manage", () => Host.StartActivity(new Intent(Host, typeof(ManageSubscriptionsActivity)))));
+    /// <summary>
+    /// The area's own actions. The shell hosts it under the now-playing bar — except
+    /// while picking, when the selection's actions take the bar and the now-playing
+    /// bar gives up its place: the list is not playing anything just then.
+    /// </summary>
+    public override View? BuildBottomBar() => selection.IsActive
+        ? PaperUi.BottomBar(Host,
+            PaperUi.QuietButton(Host, "Cancel", EndSelection),
+            PaperUi.SecondaryButton(Host, "Play next", () => QueuePicked(next: true)),
+            PaperUi.PrimaryButton(Host, $"Add {selection.Count}", () => QueuePicked(next: false)))
+        : PaperUi.BottomBar(Host,
+            PaperUi.SecondaryButton(Host, "Shows", () => { openFeedId = null; showingQueue = false; Invalidate(); }),
+            PaperUi.QuietButton(Host, "Queue", () => { showingQueue = true; Invalidate(); }),
+            PaperUi.QuietButton(Host, "Manage", () => Host.StartActivity(new Intent(Host, typeof(ManageSubscriptionsActivity)))));
+
+    public override bool ShowsNowPlayingBar => !selection.IsActive;
 
     public override bool GoBack()
     {
+        // Picking is a mode, not a level: back leaves the mode and keeps the list.
+        if (selection.IsActive)
+        {
+            EndSelection();
+            return true;
+        }
+
         if (showingQueue)
         {
             showingQueue = false;
@@ -311,11 +333,120 @@ public sealed class PodcastsArea : ScoreArea
 
         var progress = new PlaybackProgressBook(progressStore.Load());
         var rows = showEpisodes
-            .Select(episode => new PaperListRow(episode.Title, EpisodeSubtitle(episode, progress)))
+            .Select(episode => new PaperListRow(
+                episode.Title, EpisodeSubtitle(episode, progress),
+                Picked: selection.Contains(episode.Id)))
             .ToList();
-        return PaperUi.List(Host, rows,
-            position => EnqueueAndPlay(showEpisodes[position]),
-            position => ShowEpisodeActions(showEpisodes[position]));
+
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        column.AddView(BuildPickerControls([.. showEpisodes.Select(episode => episode.Id)]));
+
+        // While picking, a tap picks and nothing plays — the list is one control for
+        // as long as the mode is on.
+        var list = selection.IsActive
+            ? PaperUi.List(Host, rows, position =>
+            {
+                selection.Toggle(showEpisodes[position].Id);
+                Invalidate();
+            }, picking: true)
+            : PaperUi.List(Host, rows,
+                position => EnqueueAndPlay(showEpisodes[position]),
+                position => ShowEpisodeActions(showEpisodes[position]));
+
+        column.AddView(list, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return column;
+    }
+
+    /// <summary>
+    /// The way into picking, and what it offers above the list: the running count, an
+    /// All that flips to None once everything showing is picked, and the bulk mark —
+    /// which lives here because the bottom bar is already carrying the three things
+    /// you do with a selection, and a five-button bar is a menu.
+    /// </summary>
+    private View BuildPickerControls(IReadOnlyList<string> visible)
+    {
+        var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+
+        if (!selection.IsActive)
+        {
+            row.AddView(PaperUi.QuietButton(Host, "Select", () =>
+            {
+                selection.Begin();
+                Invalidate();
+            }));
+            return row;
+        }
+
+        row.AddView(PaperUi.Secondary(Host, $"{selection.Count} picked"),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        row.AddView(PaperUi.QuietButton(Host, selection.AllSelected(visible) ? "None" : "All", () =>
+        {
+            selection.ToggleAll(visible);
+            Invalidate();
+        }));
+
+        if (selection.Count > 0)
+        {
+            row.AddView(PaperUi.QuietButton(Host, "Mark played", () =>
+            {
+                var ids = selection.Items.ToList();
+                EndSelection();
+                MarkManyWithUndo(ids, "Marked played.");
+            }));
+        }
+
+        return row;
+    }
+
+    /// <summary>
+    /// Queue everything picked. Queueing by hand pins it, exactly as the single add
+    /// does — an explicit instruction outlives every rebuild of the standing rule.
+    ///
+    /// <i>Play next</i> puts the picks straight after whatever is playing, or at the
+    /// head of the pins when what is playing came from the rule rather than by hand;
+    /// the rule lays pinned episodes down first and in their own order, so the head
+    /// of the pins is the front of the run either way.
+    /// </summary>
+    private void QueuePicked(bool next)
+    {
+        var added = selection.Items.Where(id => !pinned.Contains(id)).ToList();
+        EndSelection();
+        if (added.Count == 0)
+        {
+            return;
+        }
+
+        var at = nowPlaying is not null ? pinned.IndexOf(nowPlaying.Id) : -1;
+        if (next)
+        {
+            pinned.InsertRange(at + 1, added);
+        }
+        else
+        {
+            pinned.AddRange(added);
+        }
+
+        SavePinned();
+        RebuildQueue();
+        Invalidate();
+
+        UndoBar.Show(Host, Overlay, $"Added {added.Count} to queue.", onUndo: () =>
+        {
+            // Only what this add introduced: anything that was already pinned was
+            // filtered out above, so undo cannot take a pin someone else made.
+            pinned.RemoveAll(added.Contains);
+            SavePinned();
+            RebuildQueue();
+            Invalidate();
+        });
+    }
+
+    private void EndSelection()
+    {
+        selection.Cancel();
+        Invalidate();
     }
 
     // Long-press an episode: queue it without playing, mark just it, or clear
