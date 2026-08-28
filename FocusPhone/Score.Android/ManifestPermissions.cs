@@ -8,6 +8,11 @@ using Android.App;
 [assembly: UsesPermission(Manifest.Permission.Internet)]
 [assembly: UsesPermission(Manifest.Permission.ForegroundService)]
 [assembly: UsesPermission(Manifest.Permission.ForegroundServiceMediaPlayback)]
+
+// Downloads run in a foreground service, because Android will not let an app fetch a
+// gigabyte in the background unasked. Data sync is the type that fits: it is not
+// playback, and every other type would be a lie about what the service is doing.
+[assembly: UsesPermission(Manifest.Permission.ForegroundServiceDataSync)]
 [assembly: UsesPermission(Manifest.Permission.PostNotifications)]
 
 // Needed to launch / hand off to the YouTube Music app under Android 11+

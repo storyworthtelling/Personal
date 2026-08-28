@@ -61,6 +61,7 @@ public sealed class PodcastsArea : ScoreArea
     // Picking episodes. Held by the area, like the filter, so drilling out of a show
     // and back does not leave a half-built selection behind a screen you cannot see.
     private readonly Selection selection = new();
+    private readonly DownloadStore downloads;
 
     public PodcastsArea(Activity host, ScorePlayback playback, PlaybackProgressStore progress) : base(host)
     {
@@ -71,6 +72,7 @@ public sealed class PodcastsArea : ScoreArea
         subscriptionStore = new SubscriptionStore(host);
         episodeCache = new EpisodeCacheStore(host);
         queueStore = QueueStore.ForPodcasts(host);
+        downloads = new DownloadStore(host);
         queue.ReplaceWith(queueStore.Load()); // restore the queue built in a previous session (pruned to live episodes on render)
         arrangement = queueStore.LoadArrangement();
         pinned.AddRange(queueStore.LoadPinned());
@@ -459,9 +461,25 @@ public sealed class PodcastsArea : ScoreArea
     {
         ActionCard.Show(Host, Overlay, episode.Title, feedTitles.GetValueOrDefault(episode.FeedId),
             new CardAction("Add to queue", () => AddToQueueWithUndo(episode), Lead: true),
+            new CardAction("Download", () => Download(episode)),
             new CardAction("Mark played", () => MarkDoneWithUndo(episode)),
             new CardAction("Mark older as played",
                 () => MarkManyWithUndo(BulkListen.OlderInShow(episodes, episode), "Marked older played.")));
+    }
+
+    // An episode with no audio cannot be downloaded, and an episode with no stated
+    // duration cannot be budgeted for — feeds leave both out often enough that
+    // guessing would put the allowance quietly wrong.
+    private void Download(Episode episode)
+    {
+        if (episode.AudioUrl is not { Length: > 0 } url || episode.Duration is not { } duration)
+        {
+            Say("That episode doesn't say how long it is, so it can't be budgeted for.");
+            return;
+        }
+
+        DownloadRequests.Ask(Host, Overlay, downloads, episode.Title,
+            [(new DownloadedItem(episode.Id, episode.Title, DownloadKind.Podcast, duration, DateTimeOffset.UtcNow), url)]);
     }
 
     private View BuildQueuePane()

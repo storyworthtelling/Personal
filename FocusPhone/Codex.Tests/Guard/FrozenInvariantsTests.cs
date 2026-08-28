@@ -140,35 +140,42 @@ public class FrozenInvariantsTests
             string.Join("\n", declaring.Select(RepoRelative)));
     }
 
-    // Two registered component names outlive the process that registered them: the
-    // media session's foreground SERVICE, which a device may already be running
-    // across the upgrade, and the WorkManager WORKER, whose scheduled request is
-    // persisted by class name in WorkManager's own database. Renaming either strands
-    // the thing that refers to it — the service notification, or a Friday run that
-    // silently never fires again. This is why those two classes carry an explicit
-    // Name/Register rather than taking the namespace default.
+    // Three registered component names outlive the process that registered them: the
+    // media session's foreground SERVICE, which a device may already be running across
+    // the upgrade; the WorkManager WORKER, whose scheduled request is persisted by
+    // class name in WorkManager's own database; and the DOWNLOAD service, which is a
+    // foreground service that can likewise be mid-fetch when the upgrade lands.
+    // Renaming any of them strands the thing that refers to it — a service
+    // notification, a download in flight, or a Friday run that silently never fires
+    // again. This is why those classes carry an explicit Name/Register rather than
+    // taking the namespace default.
     [Fact]
-    public void PlaybackServiceAndPicksWorkerComponentNamesAreFrozen()
+    public void RegisteredComponentNamesAreFrozen()
     {
         Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.PlaybackService", "Name ="));
         Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.FridayPicksWorker", "Register("));
+        Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.DownloadService", "Name ="));
     }
 
-    // Every on-device store the head owns, by SharedPreferences file name. These ARE
-    // the upgrade — and playlists are the sharpest case, because unlike the queues
-    // and the episode cache they are not re-derivable from anything: a hand-made
-    // list exists nowhere else. These ARE the file name is the only handle Android gives you on the data, so
-    // a renamed constant reads as an empty app — no subscriptions, no resume points,
-    // no equalizer. Every prefs name in the repo is unique across all four heads, so
-    // "declared exactly once" catches both a rename and a drop without this test
-    // needing to know which folder the head lives in.
+    // Every on-device store the head owns, by SharedPreferences file name. The file
+    // name is the only handle Android gives you on the data, so a renamed constant
+    // reads as an empty app — no subscriptions, no resume points, no equalizer.
+    //
+    // Playlists are the sharpest case, because unlike the queues and the episode cache
+    // they are not re-derivable from anything: a hand-made list exists nowhere else.
+    // Downloads are the next sharpest — the files survive a rename, but the dates do
+    // not, and without them the sweep has no idea what has been held too long.
+    //
+    // Every prefs name in the repo is unique across all four heads, so "declared
+    // exactly once" catches both a rename and a drop without this test needing to know
+    // which folder the head lives in.
     [Fact]
     public void AudioPreferenceFileNamesAreFrozen()
     {
         string[] frozen =
         [
-            "artwork", "equalizer", "fridayPicks", "listeningHistory", "music",
-            "music-queue", "playlists", "podcast-queue", "podcastEpisodeCache",
+            "artwork", "downloads", "equalizer", "fridayPicks", "listeningHistory",
+            "music", "music-queue", "playlists", "podcast-queue", "podcastEpisodeCache",
             "podcastProgress", "podcastSettings", "podcastSubscriptions", "podcasts",
         ];
 

@@ -42,7 +42,7 @@ public class VetoLedgerTests
         var once = VetoLedger.Fold(Profile, [P("Some Song", "A Band")]);
         var twice = VetoLedger.Fold(once, [P("some song", "a band")]);
 
-        Assert.Single(twice.Avoids.Where(line => line.StartsWith("passed on", StringComparison.Ordinal)));
+        Assert.Single(twice.Avoids, line => line.StartsWith("passed on", StringComparison.Ordinal));
     }
 
     // Batched weekly, a veto list would otherwise grow without end and crowd out the

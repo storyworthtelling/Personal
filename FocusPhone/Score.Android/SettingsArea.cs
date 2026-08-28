@@ -49,6 +49,10 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
         Group(column, "Listening");
         column.AddView(StackSizeRow());
 
+        Group(column, "Downloads");
+        column.AddView(PaperUi.SecondaryButton(Host, "Manage downloads",
+            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(DownloadsActivity)))));
+
         Group(column, "Sound");
         column.AddView(PaperUi.SecondaryButton(Host, "Equalizer",
             () => Host.StartActivity(new Android.Content.Intent(Host, typeof(EqualizerActivity)))));

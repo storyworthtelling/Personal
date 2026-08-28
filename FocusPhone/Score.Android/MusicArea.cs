@@ -1,6 +1,7 @@
 using Android.Content;
 using Android.Views;
 using Codex.Infrastructure.Music;
+using Codex.Domain.Audio;
 using Codex.Domain.Design;
 using Codex.Domain.Music;
 using Codex.Ui;
@@ -24,11 +25,13 @@ public sealed class MusicArea : ScoreArea
     private PlaylistEditor? editor;
     private string? generating;
     private readonly Selection selection = new();
+    private readonly DownloadStore downloads;
     private bool naming;
 
     public MusicArea(Activity host, MusicLibrary library) : base(host)
     {
         this.library = library;
+        downloads = new DownloadStore(host);
         library.Changed += Invalidate;
     }
 
@@ -183,7 +186,7 @@ public sealed class MusicArea : ScoreArea
                 return Browse(albums.Count,
                     [.. albums.Select(album => (new PaperListRow(album.Name, album.AlbumArtist, album.ArtRef), album))],
                     album => library.PlayTracks(catalog.TracksInAlbum(album.AlbumArtist, album.Name), 0),
-                    album => library.PlayShuffled(catalog.TracksInAlbum(album.AlbumArtist, album.Name)),
+                    album => ShowAlbumActions(album.Name, catalog.TracksInAlbum(album.AlbumArtist, album.Name)),
                     asCovers: true);
 
             case MusicView.Songs:
@@ -191,7 +194,7 @@ public sealed class MusicArea : ScoreArea
                 return Browse(songs.Count,
                     [.. songs.Select(track => (new PaperListRow(track.DisplayTitle, track.DisplayArtist, track.ArtRef), track))],
                     track => library.PlayTracks(songs, IndexIn(songs, track)),
-                    library.PlaySmartMix,
+                    ShowTrackActions,
                     idOf: track => track.Id);
 
             case MusicView.Genres:
@@ -294,6 +297,30 @@ public sealed class MusicArea : ScoreArea
         generating = null;
         Invalidate();
     }
+
+    // Long-press an album. Shuffle was the whole of it before, which meant the one
+    // §9 affordance the app has was spent on a shortcut.
+    private void ShowAlbumActions(string name, IReadOnlyList<Track> tracks)
+    {
+        ActionCard.Show(Host, Overlay, name, $"{tracks.Count} tracks",
+            new CardAction("Shuffle", () => library.PlayShuffled(tracks), Lead: true),
+            new CardAction("Download", () => Download(name, tracks)));
+    }
+
+    private void ShowTrackActions(Track track)
+    {
+        ActionCard.Show(Host, Overlay, track.DisplayTitle, track.DisplayArtist,
+            new CardAction("Start a mix from here", () => library.PlaySmartMix(track), Lead: true),
+            new CardAction("Download", () => Download(track.DisplayTitle, [track])));
+    }
+
+    // Anything at any level: one track or a whole album, against the same allowance.
+    private void Download(string what, IReadOnlyList<Track> tracks) =>
+        DownloadRequests.Ask(Host, Overlay, downloads, what,
+            [.. tracks.Select(track => (
+                new DownloadedItem(
+                    track.Id, track.DisplayTitle, DownloadKind.Music, track.Duration, DateTimeOffset.UtcNow),
+                $"drive://{track.Id}"))]);
 
     // §7's action card, not a kebab and not a confirm: the entries do the thing, and
     // delete is made safe by the undo bar rather than by asking first.

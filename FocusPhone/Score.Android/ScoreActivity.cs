@@ -85,6 +85,11 @@ public class ScoreActivity : Activity
         playback.Connect();
         ShowGreetingAsync();
         musicLibrary.RestoreFolderFromVault();
+
+        // The ten-day sweep. Here rather than on a schedule: it has nothing to do with
+        // what the app is doing, and a worker for it would be a worker that usually
+        // does nothing.
+        Downloads.Sweep(this, new DownloadStore(this), DateTimeOffset.UtcNow);
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
     }

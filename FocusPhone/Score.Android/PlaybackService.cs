@@ -51,6 +51,12 @@ public class PlaybackService : MediaLibraryService
         var resolvingFactory = new ResolvingDataSource.Factory(
             new DefaultHttpDataSource.Factory(),
             new DriveMediaResolver(new DeviceAccountTokenProvider()));
+
+        // Read through the download cache: anything downloaded plays from disk and
+        // needs no network, and everything else streams exactly as before. It is
+        // read-only, so streaming a track can never quietly fill the download budget
+        // with something nobody asked to keep.
+        var readFactory = Downloads.ReadFactory(this, resolvingFactory);
         // Hand audio focus to ExoPlayer so playback ducks/pauses for a call or nav prompt and resumes after,
         // and pauses when headphones unplug (Phase 8 — none of this was configured before).
         var audioAttributes = new AudioAttributes.Builder()
@@ -58,7 +64,7 @@ public class PlaybackService : MediaLibraryService
             .SetContentType(C.AudioContentTypeMusic)!
             .Build()!;
         player = new ExoPlayerBuilder(this)
-            .SetMediaSourceFactory(new DefaultMediaSourceFactory(resolvingFactory))
+            .SetMediaSourceFactory(new DefaultMediaSourceFactory(readFactory))
             .SetAudioAttributes(audioAttributes, true)
             .SetHandleAudioBecomingNoisy(true)
             .Build()!;
