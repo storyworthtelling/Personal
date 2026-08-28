@@ -22,7 +22,10 @@ public enum TrackAvailability
 
 /// <summary>
 /// One music track, built from a file's embedded tags. <see cref="Id"/> is the
-/// Google Drive file id (also the media id the queue and progress book key on).
+/// Google Drive file id (also the media id the queue and progress book key on) —
+/// unless this is a hidden-track split segment, in which case <see cref="Id"/> is a
+/// per-segment id of its own (each half needs its own queue/progress identity) and
+/// <see cref="SourceFileId"/> names the file both halves actually share.
 /// The Display* members apply the fallbacks (Unknown Artist/Album/Genre, album
 /// artist defaulting to the track artist) in one place so the catalog, shuffle,
 /// and smart-mix all group identically.
@@ -43,11 +46,17 @@ public record Track(
     TimeSpan Duration,
     string? ArtRef = null,
     int Bpm = 0,
-    TrackAvailability Availability = TrackAvailability.Local)
+    TrackAvailability Availability = TrackAvailability.Local,
+    string? SourceFileId = null,
+    TimeSpan? ClipStart = null)
 {
     /// <summary>Whether this can actually be started. False only for a track the
     /// provider has stopped carrying.</summary>
     public bool IsPlayable => Availability != TrackAvailability.Unavailable;
+
+    /// <summary>The id to actually resolve and stream — <see cref="Id"/> itself, unless
+    /// this is a hidden-track split segment sharing another track's file.</summary>
+    public string ResolvedSourceId => SourceFileId ?? Id;
 
     public string DisplayTitle => Blank(Title) ? "Unknown Title" : Title;
 
