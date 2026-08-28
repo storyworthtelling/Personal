@@ -90,12 +90,13 @@ public static partial class SpotifyEmbedPage
         }
 
         var best = new List<ImportedTrack>();
+        string? entityTitle = null;
         foreach (Match script in JsonScript().Matches(html))
         {
             try
             {
                 using var document = JsonDocument.Parse(script.Groups[1].Value);
-                Search(document.RootElement, best);
+                Search(document.RootElement, best, ref entityTitle);
             }
             catch (JsonException)
             {
@@ -104,35 +105,51 @@ public static partial class SpotifyEmbedPage
             }
         }
 
-        return best.Count == 0 ? SharedPlaylist.Empty : new SharedPlaylist(ReadTitle(html), best);
+        if (best.Count == 0)
+        {
+            return SharedPlaylist.Empty;
+        }
+
+        var title = entityTitle ?? ReadTitleFromHtml(html);
+        return new SharedPlaylist(title, best);
     }
 
     // Depth-first, keeping the longest track list found: an embed page carries
     // recommendation shelves beside the playlist, and the playlist is the long one.
-    private static void Search(JsonElement element, List<ImportedTrack> best)
+    //
+    // The check happens one level up, at the object holding the array, because that
+    // object is also where the playlist's own name lives — as a "name" or "title"
+    // sibling of the track list it names. The page itself no longer says the name
+    // anywhere else: Spotify's embed is client-hydrated now, with no og:title meta
+    // and an empty <title>, so the JSON is the only reliable source left.
+    private static void Search(JsonElement element, List<ImportedTrack> best, ref string? title)
     {
-        if (element.ValueKind == JsonValueKind.Array)
+        if (element.ValueKind == JsonValueKind.Object)
         {
-            var tracks = AsTrackList(element);
-            if (tracks.Count > best.Count)
+            foreach (var property in element.EnumerateObject())
             {
-                best.Clear();
-                best.AddRange(tracks);
-            }
+                if (property.Value.ValueKind == JsonValueKind.Array)
+                {
+                    var tracks = AsTrackList(property.Value);
+                    if (tracks.Count > best.Count)
+                    {
+                        best.Clear();
+                        best.AddRange(tracks);
+                        title = Text(element, "name") ?? Text(element, "title");
+                    }
+                }
 
-            foreach (var item in element.EnumerateArray())
-            {
-                Search(item, best);
+                Search(property.Value, best, ref title);
             }
 
             return;
         }
 
-        if (element.ValueKind == JsonValueKind.Object)
+        if (element.ValueKind == JsonValueKind.Array)
         {
-            foreach (var property in element.EnumerateObject())
+            foreach (var item in element.EnumerateArray())
             {
-                Search(property.Value, best);
+                Search(item, best, ref title);
             }
         }
     }
@@ -198,9 +215,10 @@ public static partial class SpotifyEmbedPage
             ? value.GetString()
             : null;
 
-    // The playlist's own name, which the JSON files under a different key in every
-    // shape but the page states plainly at the top.
-    private static string ReadTitle(string html)
+    // Fallback for when the JSON carried no name for the entity that owned the track
+    // list. Real embed pages don't populate either of these today, but a page that
+    // still does should not be made to pay for one that doesn't.
+    private static string ReadTitleFromHtml(string html)
     {
         var open = OpenGraphTitle().Match(html);
         var title = open.Success ? open.Groups[1].Value : PageTitle().Match(html) is { Success: true } m

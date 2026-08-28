@@ -97,6 +97,25 @@ public class SpotifyEmbedPageTests
         Assert.Equal("Ben & Jerry's mix", SpotifyEmbedPage.Read(html).Title);
     }
 
+    // The shape a real embed page carries today: Spotify no longer server-renders an
+    // og:title meta tag or a populated <title> — the page is client-hydrated, so both
+    // are empty, and the only place the playlist's name survives is the JSON, as a
+    // sibling of the trackList it names. Confirmed against the live page.
+    [Fact]
+    public void Read_TakesTheTitleFromTheEntityWhenThePageHasNoMetaTitleAtAll()
+    {
+        var html = "<html><head><title data-next-head=\"\"></title></head><body>" +
+            "<script id=\"__NEXT_DATA__\" type=\"application/json\">" +
+            """{"props":{"pageProps":{"state":{"data":{"entity":{"name":"Today’s Top Hits","trackList":[""" +
+            """{"title":"One","subtitle":"A"},{"title":"Two","subtitle":"B"}]}}}}}}""" +
+            "</script></body></html>";
+
+        var playlist = SpotifyEmbedPage.Read(html);
+
+        Assert.Equal("Today’s Top Hits", playlist.Title);
+        Assert.Equal(["One", "Two"], playlist.Tracks.Select(track => track.Title));
+    }
+
     [Fact]
     public void Read_FallsBackToThePageTitleWhenThereIsNoOpenGraphOne()
     {
