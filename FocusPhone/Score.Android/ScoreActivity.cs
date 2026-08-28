@@ -37,6 +37,7 @@ public class ScoreActivity : Activity
     // Owner's-voice greeting, reusing the music Google account to read the shared voice profile from Drive.
     private Codex.Ui.Voice.VoiceGreeting? greeting;
     private TextView? greetingView;
+    private string greetingText = string.Empty;
 
     private FrameLayout content = null!;
     private FrameLayout bottomBarSlot = null!;
@@ -97,8 +98,9 @@ public class ScoreActivity : Activity
             "welcome", "the owner is opening their music and podcasts", CancellationToken.None);
         if (string.IsNullOrWhiteSpace(message))
             return;
+        greetingText = message;
         greetingView.Text = message;
-        greetingView.Visibility = ViewStates.Visible;
+        RenderContent(); // the seat belongs to two areas, so the shell decides where it shows
     }
 
     private View BuildLayout()
@@ -119,7 +121,10 @@ public class ScoreActivity : Activity
         page.AddView(headerSlot);
 
         // A greeting in the owner's voice, hidden until composed (and only when a shared profile exists).
-        greetingView = PaperUi.Secondary(this, string.Empty);
+        // The calligraphy hand, in ink-blue (DESIGN.md §4): the owner's voice is the
+        // one thing set in it, and setting it in Sans would make it read as a status
+        // line, which is exactly what the voice must never be.
+        greetingView = PaperUi.Voice(this, string.Empty);
         greetingView.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X4));
         greetingView.Visibility = ViewStates.Gone;
         page.AddView(greetingView);
@@ -239,6 +244,15 @@ public class ScoreActivity : Activity
 
         // The bar is chrome for areas that are not themselves the current track.
         nowPlayingBar.Visibility = Active.ShowsNowPlayingBar ? ViewStates.Visible : ViewStates.Gone;
+
+        // The voice sits on the Music and Podcasts roots and nowhere else, so the
+        // shell asks the area rather than showing it everywhere it has room.
+        if (greetingView is not null)
+        {
+            greetingView.Visibility = Active.ShowsVoice && greetingText.Length > 0
+                ? ViewStates.Visible
+                : ViewStates.Gone;
+        }
 
         bottomBarSlot.RemoveAllViews();
         if (Active.BuildBottomBar() is { } bar)

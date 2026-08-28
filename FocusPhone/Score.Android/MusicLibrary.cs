@@ -263,6 +263,24 @@ public sealed class MusicLibrary(
         queueStore.Save(queue.Export());
     }
 
+    /// <summary>
+    /// Plays one record to hear what it is, without filing it. Discover's Play — it
+    /// starts the track and leaves the stored music queue exactly where it was, so
+    /// auditioning something cannot cost you a queue you assembled.
+    /// </summary>
+    public void Audition(Track track)
+    {
+        if (playback.Controller is null)
+        {
+            return;
+        }
+
+        playback.Start(MediaKind.Music, [BuildItem(track)], 0, 0L, 1.0f, skipSilence: false);
+
+        var book = new PlaybackProgressBook(progress.Load());
+        listening.BeginSelection([track], 0, PlaybackLaunch.Album, book.IsComplete);
+    }
+
     public void PlayShuffled(IReadOnlyList<Track> tracks) =>
         PlayTracks(new ShufflePlanner().Shuffle(tracks), 0, PlaybackLaunch.Shuffle);
 

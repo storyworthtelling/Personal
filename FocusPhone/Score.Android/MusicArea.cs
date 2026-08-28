@@ -502,6 +502,10 @@ public sealed class MusicArea : ScoreArea
 
     public override bool ShowsNowPlayingBar => !selection.IsActive;
 
+    // The root only. A drill-down opens straight into content — otherwise every level
+    // of the library gains the same line of calligraphy.
+    public override bool ShowsVoice => view == MusicView.Menu && editor is null && !selection.IsActive;
+
     private void Queue(bool next)
     {
         var tracks = Picked();

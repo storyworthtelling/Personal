@@ -28,14 +28,22 @@ public static class BookClothPalette
     ];
 
     /// <summary>The cloth tone (a DesignTokens hex string) for a package — stable per id.</summary>
-    public static string ForPackage(string package) => Cloths[StableIndex(package)];
+    public static string ForPackage(string package) => For(package);
+
+    /// <summary>
+    /// The cloth tone for any stable key. Nothing about the binding is app-specific —
+    /// it is a deterministic pick from the same ten tones — so the crate's stepped
+    /// sleeve edges use it too, and a record keeps its cloth for as long as it is in
+    /// the run.
+    /// </summary>
+    public static string For(string key) => Cloths[StableIndex(key)];
 
     // FNV-1a over the ordinal bytes — deterministic across processes (unlike string.GetHashCode),
     // so the binding is stable and the tests are not flaky.
-    private static int StableIndex(string package)
+    private static int StableIndex(string key)
     {
         uint hash = 2166136261u;
-        foreach (var c in package)
+        foreach (var c in key)
         {
             hash = (hash ^ c) * 16777619u;
         }

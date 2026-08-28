@@ -131,6 +131,10 @@ public sealed class PodcastsArea : ScoreArea
 
     public override bool ShowsNowPlayingBar => !selection.IsActive;
 
+    // The shelf only, for the same reason the music side keeps it to its root.
+    public override bool ShowsVoice =>
+        openFeedId is null && !showingQueue && !selection.IsActive;
+
     public override bool GoBack()
     {
         // Picking is a mode, not a level: back leaves the mode and keeps the list.
