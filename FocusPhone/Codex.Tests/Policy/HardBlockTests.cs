@@ -12,21 +12,37 @@ public class HardBlockTests
 
     [Theory]
     [InlineData(Game, true)]
-    [InlineData(Social, true)]
+    // CATEGORY_SOCIAL is NOT auto-blocked: first-party utilities (Google Messages, Contacts, Meet,
+    // Gemini) declare appCategory="social" and were wrongly hard-suspended. Real social media is
+    // caught by the curated list instead.
+    [InlineData(Social, false)]
     [InlineData(Undefined, false)]
     [InlineData(Productivity, false)]
-    public void IsNeverVisibleCategory_FlagsGamesAndSocial(int category, bool expected)
+    public void IsNeverVisibleCategory_FlagsGamesOnly(int category, bool expected)
     {
         Assert.Equal(expected, HardBlock.IsNeverVisibleCategory(category));
     }
 
     [Fact]
-    public void Detect_CatchesByAndroidCategory()
+    public void Detect_CatchesGamesByAndroidCategory()
     {
-        var blocked = HardBlock.Detect([("com.unknown.gamething", Game), ("com.unknown.feed", Social)]);
+        var blocked = HardBlock.Detect([("com.unknown.gamething", Game)]);
 
         Assert.Contains("com.unknown.gamething", blocked);
-        Assert.Contains("com.unknown.feed", blocked);
+    }
+
+    [Fact]
+    public void Detect_DoesNotBlockSocialCategoryUtilities()
+    {
+        // Google Messages / Contacts / Meet declare the social category but must stay visible.
+        var blocked = HardBlock.Detect(
+        [
+            ("com.google.android.apps.messaging", Social),
+            ("com.google.android.contacts", Social),
+            ("com.google.android.apps.tachyon", Social),
+        ]);
+
+        Assert.Empty(blocked);
     }
 
     [Fact]
