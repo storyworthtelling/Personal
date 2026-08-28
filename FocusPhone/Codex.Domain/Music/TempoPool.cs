@@ -61,6 +61,12 @@ public static class TempoBands
 /// lands — which is ordinary practice for running to music and is most of what saves
 /// a pool from being thin. A track nobody has measured (<see cref="Track.Bpm"/> of
 /// zero) is not evidence of anything and stays out: unknown is not slow.
+///
+/// It is <b>meter-blind</b>, and mostly that is fine: what a pool matches is step
+/// rate, and 165 beats a minute is 165 footfalls whether they fall in fives or in
+/// fours. Odd meters shift where the bar accent lands against a stride, which is a
+/// musical experience rather than a matching failure. Compound meters are the one
+/// real gap — see the note on the distance below.
 /// </summary>
 public sealed record TempoPool(IReadOnlyList<Track> Tracks, int Target)
 {
@@ -96,6 +102,20 @@ public sealed record TempoPool(IReadOnlyList<Track> Tracks, int Target)
 
     // How far a track is from keeping step, counting half and double time. Null when
     // there is no tempo to compare.
+    //
+    // Duple only, deliberately. Triple would matter for compound meters — a 6/8 track
+    // tagged at its dotted-quarter rate of 55 is 165 eighths a minute, which is
+    // exactly where a runner steps, and nothing here finds it. It is left out because
+    // the ratio cannot be told apart from a slow duple track: allowing x3 would also
+    // match a 55 BPM 4/4 ballad to a 165 target, which is technically steppable and
+    // not what anyone wants mid-run. The x2 relationship is safe because in duple
+    // music it is genuinely there; the x3 one exists only in compound or shuffled
+    // music, and nothing available says which we have — ID3 carries TBPM and TKEY but
+    // no meter frame, and TagLib exposes none.
+    //
+    // So this waits on measurement rather than on a guess: detecting tempo from the
+    // audio gives the pulse a listener actually steps to, whatever the tagger meant by
+    // the number, and settles compound meters without having to name them.
     private static int? DistanceFrom(int bpm, int target)
     {
         if (bpm <= 0)
