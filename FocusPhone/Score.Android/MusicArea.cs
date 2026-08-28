@@ -23,6 +23,8 @@ public sealed class MusicArea : ScoreArea
     private string query = string.Empty;
     private PlaylistEditor? editor;
     private string? generating;
+    private readonly Selection selection = new();
+    private bool naming;
 
     public MusicArea(Activity host, MusicLibrary library) : base(host)
     {
@@ -34,6 +36,13 @@ public sealed class MusicArea : ScoreArea
 
     public override bool GoBack()
     {
+        // Picking is a mode, not a level: back leaves the mode and keeps the list.
+        if (selection.IsActive)
+        {
+            EndSelection();
+            return true;
+        }
+
         // The editor is a level below the list it was opened from, so back closes it
         // and leaves you where you were rather than at the top menu.
         if (editor is not null)
@@ -182,7 +191,8 @@ public sealed class MusicArea : ScoreArea
                 return Browse(songs.Count,
                     [.. songs.Select(track => (new PaperListRow(track.DisplayTitle, track.DisplayArtist, track.ArtRef), track))],
                     track => library.PlayTracks(songs, IndexIn(songs, track)),
-                    library.PlaySmartMix);
+                    library.PlaySmartMix,
+                    idOf: track => track.Id);
 
             case MusicView.Genres:
                 var genres = catalog.Genres();
@@ -349,7 +359,7 @@ public sealed class MusicArea : ScoreArea
     /// </summary>
     private View Browse<T>(
         int totalRows, IReadOnlyList<(PaperListRow Row, T Item)> entries, Action<T> onPlay, Action<T> onLongPress,
-        bool asCovers = false)
+        bool asCovers = false, Func<T, string>? idOf = null)
     {
         if (totalRows == 0)
         {
@@ -358,6 +368,7 @@ public sealed class MusicArea : ScoreArea
 
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         var rows = new FrameLayout(Host);
+        var picking = idOf is not null && selection.IsActive;
 
         void Fill()
         {
@@ -372,6 +383,22 @@ public sealed class MusicArea : ScoreArea
                 return;
             }
 
+            if (picking)
+            {
+                // A tap picks; nothing plays. The whole list is one control while the
+                // mode is on, which is why the mini-bar gives up its place to the
+                // action bar rather than sitting under a list that no longer plays.
+                var picked = matches
+                    .Select(e => e.Row with { Picked = selection.Contains(idOf!(e.Item)) })
+                    .ToList();
+                rows.AddView(PaperUi.List(Host, picked, position =>
+                {
+                    selection.Toggle(idOf!(matches[position].Item));
+                    Invalidate();
+                }, picking: true));
+                return;
+            }
+
             var listed = matches.Select(e => e.Row).ToList();
             void Play(int position) => onPlay(matches[position].Item);
             void LongPress(int position) => onLongPress(matches[position].Item);
@@ -379,6 +406,11 @@ public sealed class MusicArea : ScoreArea
             rows.AddView(asCovers
                 ? new CoverGrid(Host, listed, Play, LongPress)
                 : PaperUi.List(Host, listed, Play, LongPress));
+        }
+
+        if (idOf is not null)
+        {
+            column.AddView(BuildPickerControls(entries.Select(e => idOf(e.Item)).ToList()));
         }
 
         if (FilterMatch.IsWarranted(totalRows))
@@ -400,6 +432,124 @@ public sealed class MusicArea : ScoreArea
         column.AddView(rows, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         return column;
+    }
+
+    /// <summary>
+    /// The way into selection mode, and what the mode offers above the list: the
+    /// running count, an All that flips to None once everything showing is picked,
+    /// and the way to keep the picks as a playlist.
+    ///
+    /// It sits above the rows rather than in the action bar because the bar is
+    /// already carrying the three things you do with a selection, and a five-button
+    /// bar is a menu.
+    /// </summary>
+    private View BuildPickerControls(IReadOnlyList<string> visible)
+    {
+        var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+
+        if (!selection.IsActive)
+        {
+            row.AddView(PaperUi.QuietButton(Host, "Select", () =>
+            {
+                selection.Begin();
+                Invalidate();
+            }));
+            return row;
+        }
+
+        if (naming)
+        {
+            // Naming happens in place — no dialog, and no losing the picks to it.
+            var field = PaperUi.Field(Host, "Playlist name");
+            row.AddView(field, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+            row.AddView(PaperUi.QuietButton(Host, "Save", () => SaveAsPlaylist(field.Text)));
+            return row;
+        }
+
+        row.AddView(PaperUi.Secondary(Host, $"{selection.Count} picked"),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        row.AddView(PaperUi.QuietButton(Host, selection.AllSelected(visible) ? "None" : "All", () =>
+        {
+            selection.ToggleAll(visible);
+            Invalidate();
+        }));
+
+        if (selection.Count > 0)
+        {
+            row.AddView(PaperUi.QuietButton(Host, "Save as playlist", () =>
+            {
+                naming = true;
+                Invalidate();
+            }));
+        }
+
+        return row;
+    }
+
+    /// <summary>
+    /// The action bar the picks act through. It replaces the now-playing bar rather
+    /// than stacking under it: while you are picking, the list is not playing
+    /// anything, so a bar about what is playing is the wrong thing in the way.
+    /// </summary>
+    public override View? BuildBottomBar() => selection.IsActive
+        ? PaperUi.BottomBar(Host,
+            PaperUi.QuietButton(Host, "Cancel", EndSelection),
+            PaperUi.SecondaryButton(Host, "Play next", () => Queue(next: true)),
+            PaperUi.PrimaryButton(Host, $"Add {selection.Count}", () => Queue(next: false)))
+        : null;
+
+    public override bool ShowsNowPlayingBar => !selection.IsActive;
+
+    private void Queue(bool next)
+    {
+        var tracks = Picked();
+        if (tracks.Count == 0)
+        {
+            return;
+        }
+
+        if (next)
+        {
+            library.PlayNext(tracks);
+        }
+        else
+        {
+            library.Enqueue(tracks);
+        }
+
+        EndSelection();
+    }
+
+    // Manual playlists are the one kind the owner builds by hand, so the pick order
+    // is the playlist order — Selection already keeps it.
+    private void SaveAsPlaylist(string? name)
+    {
+        var tracks = Picked();
+        if (tracks.Count == 0)
+        {
+            EndSelection();
+            return;
+        }
+
+        var title = string.IsNullOrWhiteSpace(name) ? "New playlist" : name.Trim();
+        library.SavePlaylists([.. library.Playlists(), Playlist.Manual(
+            Guid.NewGuid().ToString("n"), title, [.. tracks.Select(track => track.Id)])]);
+        EndSelection();
+    }
+
+    private IReadOnlyList<Track> Picked()
+    {
+        var byId = library.Catalog.Songs().ToDictionary(track => track.Id);
+        return [.. selection.Items.Where(byId.ContainsKey).Select(id => byId[id])];
+    }
+
+    private void EndSelection()
+    {
+        selection.Cancel();
+        naming = false;
+        Invalidate();
     }
 
     private View Nothing() => PaperUi.EmptyState(Host, "No music yet — scan your library.");

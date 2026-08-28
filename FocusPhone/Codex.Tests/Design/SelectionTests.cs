@@ -144,4 +144,98 @@ public class SelectionTests
 
         Assert.Equal(["a", "b"], selection.Items);
     }
+
+    // The action bar's "All" control. Adding is the common half — you enter the
+    // picker on an album meaning to take the album.
+    [Fact]
+    public void ToggleAll_PicksEveryVisibleRowWhenSomeAreUnpicked()
+    {
+        var selection = new Selection();
+        selection.Begin("a");
+
+        selection.ToggleAll(["a", "b", "c"]);
+
+        Assert.Equal(3, selection.Count);
+    }
+
+    // Once everything on screen is picked the same control has to mean "none", or it
+    // is a button that has stopped doing anything.
+    [Fact]
+    public void ToggleAll_ClearsTheVisibleRowsWhenAllArePicked()
+    {
+        var selection = new Selection();
+        selection.ToggleAll(["a", "b"]);
+
+        selection.ToggleAll(["a", "b"]);
+
+        Assert.Equal(0, selection.Count);
+    }
+
+    // "All" is about what is on screen. A pick made under a different filter is not
+    // visible, so clearing the visible rows must not take it.
+    [Fact]
+    public void ToggleAll_LeavesPicksThatAreNotVisible()
+    {
+        var selection = new Selection();
+        selection.ToggleAll(["a", "b", "elsewhere"]);
+
+        selection.ToggleAll(["a", "b"]);
+
+        Assert.Equal(["elsewhere"], selection.Items);
+    }
+
+    // Picking the whole list at once has no tap order to honour, so it takes the
+    // list's — an album picked with "All" still queues in album order.
+    [Fact]
+    public void ToggleAll_AppendsInTheOrderTheRowsAreListed()
+    {
+        var selection = new Selection();
+        selection.Begin("c");
+
+        selection.ToggleAll(["a", "b", "c"]);
+
+        Assert.Equal(["c", "a", "b"], selection.Items);
+    }
+
+    [Fact]
+    public void AllSelected_ReportsWhetherTheVisibleRowsArePicked()
+    {
+        var selection = new Selection();
+        selection.Begin("a");
+
+        Assert.False(selection.AllSelected(["a", "b"]));
+        Assert.True(selection.AllSelected(["a"]));
+    }
+
+    // Nothing on screen is not "all of it": the control would read as "none" over an
+    // empty list, which is the wrong half of the toggle.
+    [Fact]
+    public void AllSelected_IsFalseForNothing()
+    {
+        Assert.False(new Selection().AllSelected([]));
+    }
+
+    // Entering the mode from a Select button, where there is nothing picked yet: the
+    // list has to change shape before the first tap, or there is nothing to tap.
+    [Fact]
+    public void Begin_WithNothing_ActivatesAnEmptySelection()
+    {
+        var selection = new Selection();
+
+        selection.Begin();
+
+        Assert.True(selection.IsActive);
+        Assert.Equal(0, selection.Count);
+    }
+
+    [Fact]
+    public void Begin_WithNothing_KeepsWhatIsAlreadyPicked()
+    {
+        var selection = new Selection();
+        selection.Begin("a");
+
+        selection.Begin();
+
+        Assert.Equal(["a"], selection.Items);
+    }
 }

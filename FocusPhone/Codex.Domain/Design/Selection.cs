@@ -35,6 +35,14 @@ public sealed class Selection
     }
 
     /// <summary>
+    /// Enter selection mode with nothing picked — the <i>Select</i> button's door, as
+    /// opposed to the long-press one. The list has to change shape before the first
+    /// tap or there is nothing to tap, and an already-active selection is left
+    /// exactly as it is.
+    /// </summary>
+    public void Begin() => IsActive = true;
+
+    /// <summary>
     /// Pick or unpick. Re-picking moves the item to the end, because the pick order
     /// is the queue order and the last thing you tapped is the last thing you meant.
     /// </summary>
@@ -45,6 +53,39 @@ public sealed class Selection
             picked.Add(id);
         }
     }
+
+    /// <summary>
+    /// The action bar's <i>All</i> control, over the rows currently on screen.
+    ///
+    /// Picks every visible row that is not picked yet; once they all are, the same
+    /// control unpicks them, because a control that stops doing anything at the end
+    /// of its own job is worse than one that does two things. Picks made elsewhere —
+    /// under a different filter, on a different letter — are left alone either way,
+    /// since <i>all</i> means what is on screen.
+    ///
+    /// Picking a whole list at once has no tap order to honour, so it takes the
+    /// list's: an album picked with All still queues in album order.
+    /// </summary>
+    public void ToggleAll(IReadOnlyCollection<string> visible)
+    {
+        if (AllSelected(visible))
+        {
+            picked.RemoveAll(visible.Contains);
+            return;
+        }
+
+        foreach (var id in visible.Where(id => !picked.Contains(id)))
+        {
+            picked.Add(id);
+        }
+    }
+
+    /// <summary>
+    /// Whether every visible row is picked — what tells the All control which half of
+    /// itself it currently is. Nothing on screen is not "all of it".
+    /// </summary>
+    public bool AllSelected(IReadOnlyCollection<string> visible) =>
+        visible.Count > 0 && visible.All(picked.Contains);
 
     /// <summary>
     /// Drop anything that no longer exists — unsubscribed, deleted, swept — while

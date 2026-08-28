@@ -208,6 +208,61 @@ public sealed class MusicLibrary(
         listening.BeginSelection(tracks, index, launch, book.IsComplete);
     }
 
+    /// <summary>
+    /// Adds to the end of the music run — the only thing that builds a queue up
+    /// rather than replacing it.
+    /// </summary>
+    public void Enqueue(IReadOnlyList<Track> tracks) => AddToQueue(tracks, next: false);
+
+    /// <summary>Adds directly behind what is playing.</summary>
+    public void PlayNext(IReadOnlyList<Track> tracks) => AddToQueue(tracks, next: true);
+
+    private void AddToQueue(IReadOnlyList<Track> tracks, bool next)
+    {
+        if (playback.Controller is not { } controller || tracks.Count == 0)
+        {
+            return;
+        }
+
+        Restore();
+
+        // Nothing of ours is playing, so there is no run to add to — and a queue the
+        // app does not yet show anywhere would be an invisible no-op. Start it.
+        if (playback.Kind != MediaKind.Music || controller.MediaItemCount == 0)
+        {
+            PlayTracks(tracks, 0);
+            return;
+        }
+
+        // Anything already queued is left where it is. The queue holds an id once,
+        // and the player's timeline is kept in lockstep with it by only ever adding
+        // what is genuinely new — a second copy in the timeline is a drift that shows
+        // up later as the wrong track playing.
+        var fresh = tracks.Where(track => !queue.Items.Contains(track.Id)).ToList();
+        if (fresh.Count == 0)
+        {
+            return;
+        }
+
+        var items = fresh.Select(BuildItem).ToList();
+        if (next)
+        {
+            queue.InsertAfter(playback.CurrentMediaId, fresh.Select(track => track.Id));
+            controller.AddMediaItems(controller.CurrentMediaItemIndex + 1, items);
+        }
+        else
+        {
+            foreach (var track in fresh)
+            {
+                queue.Add(track.Id);
+            }
+
+            controller.AddMediaItems(items);
+        }
+
+        queueStore.Save(queue.Export());
+    }
+
     public void PlayShuffled(IReadOnlyList<Track> tracks) =>
         PlayTracks(new ShufflePlanner().Shuffle(tracks), 0, PlaybackLaunch.Shuffle);
 
