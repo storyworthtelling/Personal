@@ -85,6 +85,10 @@ public class ScoreActivity : Activity
         playback.Connect();
         ShowGreetingAsync();
         musicLibrary.RestoreFolderFromVault();
+
+        // The TIDAL pairing, from this person's own vault. Only when this phone has
+        // none — a phone that is signed in is already right, whatever the backup says.
+        _ = new TidalAccountSync(this).RestoreAsync(CancellationToken.None);
         _ = musicLibrary.RevalidateSavedTidalTracksAsync();
 
         // The ten-day sweep. Here rather than on a schedule: it has nothing to do with

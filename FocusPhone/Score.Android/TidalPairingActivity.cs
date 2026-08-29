@@ -106,7 +106,9 @@ public class TidalPairingActivity : Activity
 
     private void SignOut()
     {
-        new TidalAccountStore(this).Clear();
+        // Reaches the vault too, or the next launch restores the account that was
+        // just signed out of.
+        _ = new TidalAccountSync(this).SignOutAsync(CancellationToken.None);
         signedIn = false;
         status = string.Empty;
         code = null;
@@ -120,7 +122,8 @@ public class TidalPairingActivity : Activity
         Render();
 
         var vaultAccess = new SecretsVaultAccess(
-            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score");
+            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
+            () => ScoreIdentity.Account);
         var vaultResult = await vaultAccess.Service.LoadAsync(CancellationToken.None);
         if (vaultResult.Status != SecretsVaultStatus.Loaded || string.IsNullOrEmpty(vaultResult.Vault.Tidal.ClientId))
         {
@@ -163,7 +166,12 @@ public class TidalPairingActivity : Activity
 
         if (result.Status == TidalTokenPollStatus.Success && !string.IsNullOrEmpty(result.RefreshToken))
         {
-            new TidalAccountStore(this).Save(new TidalAccount(result.UserId ?? "", result.RefreshToken));
+            var account = new TidalAccount(result.UserId ?? "", result.RefreshToken);
+            new TidalAccountStore(this).Save(account);
+
+            // Mirrored into this person's own vault so a factory reset costs a
+            // passphrase rather than another pairing. Best-effort, off the UI thread.
+            _ = new TidalAccountSync(this).BackUpAsync(account, CancellationToken.None);
             signedIn = true;
             code = null;
             verificationUri = null;

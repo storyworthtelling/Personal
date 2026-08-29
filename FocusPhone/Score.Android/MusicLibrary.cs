@@ -334,7 +334,7 @@ public sealed class MusicLibrary(
                 return;
             }
 
-            var access = new SecretsVaultAccess(tokens.GetAccessToken, "Score");
+            var access = new SecretsVaultAccess(tokens.GetAccessToken, "Score", () => ScoreIdentity.Account);
             var result = await access.Service.LoadAsync(CancellationToken.None);
             if (result.Status != SecretsVaultStatus.Loaded)
             {
@@ -524,7 +524,7 @@ public sealed class MusicLibrary(
     {
         try
         {
-            var access = new SecretsVaultAccess(tokens.GetAccessToken, "Score");
+            var access = new SecretsVaultAccess(tokens.GetAccessToken, "Score", () => ScoreIdentity.Account);
             await access.Service.PublishAsync(
                 v => v with { Music = new MusicSecrets(folderId) }, CancellationToken.None);
         }

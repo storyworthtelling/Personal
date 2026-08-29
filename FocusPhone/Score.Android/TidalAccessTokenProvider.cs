@@ -29,7 +29,8 @@ public sealed class TidalAccessTokenProvider(Context context)
         }
 
         var vaultAccess = new SecretsVaultAccess(
-            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score");
+            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
+            () => ScoreIdentity.Account);
         var vaultResult = await vaultAccess.Service.LoadAsync(cancellationToken);
         if (vaultResult.Status != SecretsVaultStatus.Loaded || string.IsNullOrEmpty(vaultResult.Vault.Tidal.ClientId))
         {
