@@ -290,10 +290,38 @@ public sealed class DiscoverArea : ScoreArea
             .Select(track => new PaperListRow(track.DisplayTitle, $"{track.DisplayArtist} — {track.DisplayAlbum}"))
             .ToList();
 
-        // Play, not add-to-queue — the same audition-without-filing rule the crate's
-        // own Play follows (see the class remarks), so trying a search result can
-        // never cost the queue already assembled.
-        return PaperUi.List(Host, rows, position => library.Audition(trackResults[position]));
+        // Tap plays — the same audition-without-filing rule the crate's own Play
+        // follows (see the class remarks), so trying a search result can never cost
+        // the queue already assembled. Long-press is the one place a result actually
+        // joins the library, matching MusicArea's own long-press-for-actions
+        // convention (§9 bans a kebab menu) rather than inventing a second gesture.
+        return PaperUi.List(Host, rows,
+            position => library.Audition(trackResults[position]),
+            position => ShowTrackSearchActions(trackResults[position]));
+    }
+
+    private void ShowTrackSearchActions(Track track)
+    {
+        var saved = library.IsTrackSaved(track.Id);
+        var action = saved
+            ? new CardAction("Remove from library", () => RemoveSaved(track))
+            : new CardAction("Save to library", () => Save(track), Lead: true);
+        ActionCard.Show(Host, Overlay, track.DisplayTitle, track.DisplayArtist, action);
+    }
+
+    // Inline state change (§7): the library reloads and the crate/results redraw —
+    // no toast, no confirmation. Undo-first for the one irreversible-feeling half of
+    // this (losing the save), the same as Subscribe's own undo bar above.
+    private void Save(Track track)
+    {
+        library.SaveTrack(track);
+        UndoBar.Show(Host, Overlay, $"Saved {track.DisplayTitle}.", onUndo: () => library.RemoveSavedTrack(track.Id));
+    }
+
+    private void RemoveSaved(Track track)
+    {
+        library.RemoveSavedTrack(track.Id);
+        UndoBar.Show(Host, Overlay, $"Removed {track.DisplayTitle}.", onUndo: () => library.SaveTrack(track));
     }
 
     private View BuildCrate()

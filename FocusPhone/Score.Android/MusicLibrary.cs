@@ -24,6 +24,7 @@ public sealed class MusicLibrary(
 {
     private readonly DriveMusicClient driveClient = new(tokens);
     private readonly MusicTagReader tagReader = new(Path.Combine(host.CacheDir!.AbsolutePath, "art"));
+    private readonly SavedTidalTracksStore savedTidal = new(host);
 
     // Music had no queue at all: it played by pushing items straight into the
     // player's timeline, which died with the process and could not be looked at.
@@ -82,9 +83,36 @@ public sealed class MusicLibrary(
         Catalog = new MusicCatalog(LibraryMerge.Merge(database.Catalog.LoadAll(), Streamed()));
     }
 
-    // What the streaming provider carries. Nothing yet: playback has to go through
-    // TIDAL's own player module, which is Kotlin and needs a binding project.
-    private static IReadOnlyList<Track> Streamed() => [];
+    // What the streaming provider carries: the tracks the owner has explicitly saved
+    // from a Discover search (see SavedTidalTracksStore) — never a bare search result,
+    // which is why this is not the same thing as "everything TIDAL search has ever
+    // returned". This is the fill spoken of above: nothing downstream had to change
+    // to pick these up once there was something here.
+    private IReadOnlyList<Track> Streamed() => savedTidal.Load();
+
+    public bool IsTrackSaved(string trackId) => savedTidal.Contains(trackId);
+
+    /// <summary>
+    /// Saves a TIDAL search result into the library. Inline state change, not a
+    /// dialog (§7) — the caller re-renders the row to say Saved once this returns.
+    /// Reloads the merged catalog immediately, so the track shows up in Songs and
+    /// playlists without waiting for the next scan, which may never come.
+    /// </summary>
+    public void SaveTrack(Track track)
+    {
+        savedTidal.Add(track);
+        LoadCatalog();
+        Changed?.Invoke();
+    }
+
+    /// <summary>The undo side of <see cref="SaveTrack"/> — a saved track leaving the
+    /// library the same way a subscription does, immediately and reversibly.</summary>
+    public void RemoveSavedTrack(string trackId)
+    {
+        savedTidal.Remove(trackId);
+        LoadCatalog();
+        Changed?.Invoke();
+    }
 
     public async Task SignInAsync()
     {
