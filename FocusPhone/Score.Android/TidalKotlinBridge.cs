@@ -81,11 +81,209 @@ internal static class TidalKotlinBridge
             "emptyFlow",
             "()Lkotlinx/coroutines/flow/Flow;"));
 
-    // Both are process-lifetime singletons on the Kotlin side (COROUTINE_SUSPENDED is
-    // a fixed marker object; an empty Flow carries no state), so the JNI round trip
-    // only has to happen once each.
+    /// <summary>
+    /// The raw packed <c>long</c> a <c>kotlin.time.Duration</c> inline value class
+    /// erases to at the JVM level for the given number of milliseconds — needed
+    /// because <see cref="BufferConfiguration"/>/<see cref="AssetTimeoutConfig"/>/
+    /// <see cref="StreamingApiTimeoutConfig"/> are Kotlin data classes whose only
+    /// public constructors take <c>Duration</c> parameters already erased to this raw
+    /// form (confirmed by <c>javap</c>: e.g.
+    /// <c>BufferConfiguration(long, long, long, long, long, long,
+    /// DefaultConstructorMarker)</c>), and Kotlin's packing of that raw value
+    /// (whether it stores nanoseconds or milliseconds, and in which bit) is
+    /// deliberately undocumented, internal representation — not something safe to
+    /// hand-encode. Rather than guess that encoding, this calls Kotlin's own runtime
+    /// converter and uses whatever it returns verbatim, the same way
+    /// <c>20.seconds</c> in TIDAL's own Kotlin source compiles down to a call to this
+    /// exact function:
+    ///
+    /// <code>
+    /// public final class kotlin.time.DurationKt {
+    ///   public static final long toDuration(long, kotlin.time.DurationUnit);
+    /// }
+    /// public final class kotlin.time.DurationUnit extends java.lang.Enum&lt;...&gt; {
+    ///   public static final kotlin.time.DurationUnit MILLISECONDS;
+    /// }
+    /// </code>
+    ///
+    /// (both confirmed by <c>javap</c> on the real <c>kotlin-stdlib</c> .aar this
+    /// project resolves).
+    /// </summary>
+    public static long? DurationOfMillis(long millis)
+    {
+        var unit = Cached(ref millisecondsUnit, () => GetStaticObjectField<Java.Lang.Object>(
+            "kotlin/time/DurationUnit", "MILLISECONDS", "Lkotlin/time/DurationUnit;"));
+        if (unit is null)
+        {
+            Android.Util.Log.Error(LogTag, "DurationUnit.MILLISECONDS lookup failed; cannot convert " +
+                $"{millis}ms to a raw Duration — nothing sane to return.");
+            return null;
+        }
+
+        try
+        {
+            Android.Util.Log.Debug(LogTag, $"FindClass(\"kotlin/time/DurationKt\")");
+            if (!JniEnvironment.Types.TryFindClass("kotlin/time/DurationKt", out var type))
+            {
+                Android.Util.Log.Error(LogTag, "FindClass returned null for \"kotlin/time/DurationKt\".");
+                return null;
+            }
+
+            try
+            {
+                const string signature = "(JLkotlin/time/DurationUnit;)J";
+                Android.Util.Log.Debug(LogTag, $"GetStaticMethodID(\"kotlin/time/DurationKt\", \"toDuration\", " +
+                    $"\"{signature}\")");
+                var method = JniEnvironment.StaticMethods.GetStaticMethodID(type, "toDuration", signature);
+
+                Android.Util.Log.Debug(LogTag, $"CallStaticLongMethod(toDuration({millis}, MILLISECONDS))");
+                unsafe
+                {
+                    var args = stackalloc JniArgumentValue[2];
+                    args[0] = new JniArgumentValue(millis);
+                    args[1] = new JniArgumentValue(((Java.Lang.Object)unit).Handle);
+                    var raw = JniEnvironment.StaticMethods.CallStaticLongMethod(type, method, args);
+                    Android.Util.Log.Debug(LogTag, $"toDuration({millis}ms) -> raw {raw}");
+                    return raw;
+                }
+            }
+            finally
+            {
+                JniObjectReference.Dispose(ref type);
+            }
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Error(LogTag, $"kotlin/time/DurationKt.toDuration threw: {e}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Constructs an instance of a Kotlin data class whose only public constructor —
+    /// confirmed by <c>javap</c> at each call site — takes <paramref name="millisArgs"/>
+    /// raw <c>Duration</c> longs (see <see cref="DurationOfMillis"/>) followed by a
+    /// trailing, always-null <c>DefaultConstructorMarker</c>. That marker-typed
+    /// overload is not Kotlin's synthetic default-argument dispatcher (no bitmask
+    /// parameter) — decompiling its bytecode shows it does nothing but forward every
+    /// argument straight to the class's real private constructor, discarding the
+    /// marker outright, so passing null for it is not a guess about unused defaults;
+    /// it is calling the exact constructor TIDAL's own defaults resolve to, with every
+    /// value supplied explicitly.
+    /// </summary>
+    public static T? NewDurationDataClass<T>(string className, string ctorSignature, params long[] millisArgs)
+        where T : class, IJavaObject
+    {
+        var raw = new long[millisArgs.Length];
+        for (var i = 0; i < millisArgs.Length; i++)
+        {
+            if (DurationOfMillis(millisArgs[i]) is not { } value)
+            {
+                Android.Util.Log.Error(LogTag,
+                    $"Duration conversion failed for argument {i} ({millisArgs[i]}ms); aborting {className} construction.");
+                return null;
+            }
+
+            raw[i] = value;
+        }
+
+        try
+        {
+            Android.Util.Log.Debug(LogTag, $"FindClass(\"{className}\")");
+            if (!JniEnvironment.Types.TryFindClass(className, out var type))
+            {
+                Android.Util.Log.Error(LogTag, $"FindClass returned null for \"{className}\".");
+                return null;
+            }
+
+            try
+            {
+                Android.Util.Log.Debug(LogTag, $"GetMethodID(\"{className}\", \"<init>\", \"{ctorSignature}\")");
+                var ctor = JniEnvironment.InstanceMethods.GetMethodID(type, "<init>", ctorSignature);
+
+                Android.Util.Log.Debug(LogTag,
+                    $"NewObject({className}({string.Join(", ", raw)}, null /* marker */))");
+                unsafe
+                {
+                    var args = stackalloc JniArgumentValue[raw.Length + 1];
+                    for (var i = 0; i < raw.Length; i++)
+                    {
+                        args[i] = new JniArgumentValue(raw[i]);
+                    }
+
+                    args[raw.Length] = new JniArgumentValue(IntPtr.Zero);
+
+                    var resultRef = JniEnvironment.Object.NewObject(type, ctor, args);
+                    if (!resultRef.IsValid)
+                    {
+                        Android.Util.Log.Error(LogTag, $"NewObject returned an invalid reference for {className}.");
+                        return null;
+                    }
+
+                    var result = Java.Lang.Object.GetObject<T>(resultRef.Handle, JniHandleOwnership.TransferLocalRef);
+                    Android.Util.Log.Debug(LogTag, $"NewObject({className}) -> {result}");
+                    return result;
+                }
+            }
+            finally
+            {
+                JniObjectReference.Dispose(ref type);
+            }
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Error(LogTag, $"Constructing {className} threw: {e}");
+            return null;
+        }
+    }
+
+    private static T? GetStaticObjectField<T>(string className, string fieldName, string signature)
+        where T : class, IJavaObject
+    {
+        try
+        {
+            Android.Util.Log.Debug(LogTag, $"FindClass(\"{className}\")");
+            if (!JniEnvironment.Types.TryFindClass(className, out var type))
+            {
+                Android.Util.Log.Error(LogTag, $"FindClass returned null for \"{className}\".");
+                return null;
+            }
+
+            try
+            {
+                Android.Util.Log.Debug(LogTag, $"GetStaticFieldID(\"{className}\", \"{fieldName}\", \"{signature}\")");
+                var field = JniEnvironment.StaticFields.GetStaticFieldID(type, fieldName, signature);
+
+                Android.Util.Log.Debug(LogTag, $"GetStaticObjectField(\"{className}.{fieldName}\")");
+                var resultRef = JniEnvironment.StaticFields.GetStaticObjectField(type, field);
+                if (!resultRef.IsValid)
+                {
+                    Android.Util.Log.Error(LogTag, $"\"{className}.{fieldName}\" resolved to an invalid reference.");
+                    return null;
+                }
+
+                var result = Java.Lang.Object.GetObject<T>(resultRef.Handle, JniHandleOwnership.TransferLocalRef);
+                Android.Util.Log.Debug(LogTag, $"\"{className}.{fieldName}\" -> {result}");
+                return result;
+            }
+            finally
+            {
+                JniObjectReference.Dispose(ref type);
+            }
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Error(LogTag, $"\"{className}.{fieldName}\" threw: {e}");
+            return null;
+        }
+    }
+
+    // Process-lifetime singletons on the Kotlin side (COROUTINE_SUSPENDED is a fixed
+    // marker object, an empty Flow carries no state, DurationUnit.MILLISECONDS is an
+    // enum constant), so each JNI round trip only has to happen once.
     private static Java.Lang.Object? coroutineSuspended;
     private static Xamarin.KotlinX.Coroutines.Flow.IFlow? emptyFlow;
+    private static Java.Lang.Object? millisecondsUnit;
     private static readonly object gate = new();
 
     private static T? Cached<T>(ref T? cache, Func<T?> resolve) where T : class

@@ -10,6 +10,9 @@
     <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- TidalKotlinBridge builds raw JNI argument arrays with stackalloc, the same as
+         the generated Codex.Tidal.Binding constructors it mirrors. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
