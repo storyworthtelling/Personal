@@ -39,6 +39,13 @@ public sealed record SecretsVault
     // not owned by any one section.
     public IReadOnlyDictionary<string, string> DriveFileIds { get; init; } = new Dictionary<string, string>();
 
+    // The account that first published to this vault, and therefore the only one that
+    // writes it. Stamped by VaultOwnership.Claim on the first publish; every other
+    // install compares itself against this and settles for reading. Empty on a vault
+    // written before ownership existed, which reads as unclaimed — the owner's phone
+    // is the one that publishes most, so it takes it back on the next save.
+    public string OwnerAccount { get; init; } = string.Empty;
+
     public static SecretsVault Empty { get; } = new();
 }
 

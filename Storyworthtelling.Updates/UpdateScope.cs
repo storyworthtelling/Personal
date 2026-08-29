@@ -15,6 +15,14 @@ public enum UpdateRole
     /// can install anything at all.
     /// </summary>
     Custodian,
+
+    /// <summary>
+    /// Somebody else is the custodian here, so this app installs nothing — not even
+    /// itself. A sibling app on the locked phone: it is not the device owner and
+    /// unknown-sources stays off, so an attempt is a guaranteed failure that would
+    /// read as a permanent error on a phone whose updates are in fact working.
+    /// </summary>
+    Deferred,
 }
 
 /// <summary>
@@ -42,6 +50,11 @@ public static class UpdateScope
         foreach (var candidate in available)
         {
             if (!SuiteApps.IsOwnApp(candidate.Package))
+            {
+                continue;
+            }
+
+            if (role == UpdateRole.Deferred)
             {
                 continue;
             }
