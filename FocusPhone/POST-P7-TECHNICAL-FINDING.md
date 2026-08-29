@@ -39,16 +39,21 @@ from memory. They are the constraints the design has to live inside.
 
 ### What F3 and F4 mean together
 
-The owner's rule is *"own as much of the UI as possible, deep link Google Phone where necessary."* Applied
-honestly, taking the dialer role means:
+The owner's rule is *"own as much of the UI as possible, deep link Google Phone where necessary."* The first
+reading of that was to take the dialer role. **The mockup review reversed it** — see §2.2, which supersedes
+what this section originally concluded.
 
-- **Gained:** the ringing screen, in-call controls, real call-log writes (so deleting a spam call actually
-  removes it from Google Phone's records too), and a coherent app.
-- **Lost, permanently:** call recording. There is no route back. The design interview's answer that a call
-  row should carry "a summary of the transcript" is **not deliverable**; the agreed fallback is the owner's
-  **own note on the call**, prompted after it ends.
-- **At risk:** Google's spam screening. It may survive via F4. If it does not, that is a real regression and
-  the owner should know before the dialer role ships — which is why it is isolated in Release C.
+The reversal turned on a question the owner asked: if the call screens go frameless anyway, what is the role
+actually buying? The honest answer is *one screen*. Call-log deletion needs `WRITE_CALL_LOG`, a permission
+already force-granted; blocking needs the default dialer **or** the default SMS app, and Post takes the SMS
+role regardless. So the role bought a differently-typeset ringing screen and cost Google's screening (F4) and
+recording (F3) to get it.
+
+What survives from this section is **F3's real consequence**: the design interview's answer that a call row
+should carry "a summary of the transcript" is **not deliverable by Post** either way. Even with Google Phone
+keeping the dialer, Call Notes writes its transcript into that app's Recents with no content provider and no
+API — the share sheet is the only way out. So the agreed fallback stands: the owner's **own note**, offered
+when they next open Post rather than at hang-up, since Post is not on screen when a call ends.
 
 ---
 
@@ -84,18 +89,71 @@ needs Go, the Android NDK and network access, none of which the sandbox has. CLA
 **keep the head genuinely thin** — Areas and adapters only — with every rule in `Codex.Domain` and every
 service client in `Codex.Infrastructure`, both of which still build and unit-test locally.
 
-### 2.2 Calls — own the UI, lose recording, isolate the risk
+### 2.2 Calls — Post dials, Google Phone connects
 
-**Decision:** Post takes `ROLE_DIALER` and implements `InCallService`, but **in Release C, on its own**.
+**Decision (revised during the mockup review — this reverses the original recommendation):** Post does
+**not** take `ROLE_DIALER`. It dials; the system dialer connects.
 
-Scope is the basics done well plus **Bluetooth/audio-route switching** — ringing, answer, decline, mute,
-speaker, keypad, hang up, and a live call in the shade. Not conference, hold, or transfer.
+The original recommendation was to take the role and accept losing Google's screening and recording. Working
+through the mockups exposed that the trade was much worse than it looked, for three reasons.
 
-**Emergency calls always hand to the system dialer.** Never Post's own UI, under any circumstance.
+**The role buys one screen.** Everything else it appeared to buy turns out not to need it:
 
-Marking a call as spam after taking it does four things: delete it from the call log (so it leaves Google
-Phone's records), block the number through Android's own blocked-numbers list, report it to Google if the
-screening role exposes a path, and remember it locally as a backstop.
+- **Deleting a spam call from the log** needs `WRITE_CALL_LOG` — a *permission*, which `PolicyPlanBuilder`
+  already force-grants to Post. Not the role.
+- **Blocking a number** through `BlockedNumberContract` needs the default dialer **or the default SMS app** —
+  and Post is taking the SMS role regardless. Not the role.
+
+So `ROLE_DIALER` uniquely buys the ringing screen and the in-call UI, and nothing else.
+
+**And that screen was going to be frameless anyway.** The call screens drop the binder tabs — nobody
+navigates to Settings while the phone is ringing — so what the role bought was a differently-typeset version
+of a screen Google Phone already does well.
+
+**What it cost was real.** Google's spam screening (`ROLE_CALL_SCREENING` separability is unverified) and
+Pixel's own call recording. On a Pixel 9 that also means **Call Notes** — on-device recording, transcription
+and summary. That is a Pixel 9 feature and the owner is on a **Pixel 8a**, so it is likely absent; worth
+confirming on device, because if it *is* present the case is stronger still.
+
+**Transcripts were never reachable anyway.** Call Notes writes its transcript and summary into the Recents
+tab of Phone by Google, exported only through the share sheet — no content provider, no API. Post's timeline
+could never have ingested them. Keeping Google Phone as the dialer does not put call content in Post; it just
+means the content exists somewhere, manually shareable.
+
+**The seam is already built.** `ThreadActivity.PlaceCall` fires `ACTION_CALL` with a `tel:` URI and
+`CALL_PHONE` is already declared; the connected call goes to whichever app holds the role. The owner dials in
+Post — with Post's keypad and Post's contact matching, which searches the merged Rolodex and so beats the
+system dialer's — and Google Phone takes the call. `CALL_PHONE` should be added to the policy's force-granted
+list so dialling is dialog-free like the rest.
+
+**What Post keeps:** the call in the merged timeline, call-log deletion, blocking, the keypad, and a summary
+note offered afterwards. **What it never builds:** `InCallService`, a ringing screen, in-call controls.
+
+#### Taking Call Notes when it exists, without depending on it
+
+Not taking the dialer role means Google Phone keeps recording and — on hardware that has it — transcribing
+and summarising. That content is worth having in the timeline, and there is exactly one door: **the share
+sheet**. So Post declares an `ACTION_SEND` / `text/plain` intent filter and becomes a share target. Sharing a
+Call Notes summary out of Phone drops it onto the matching correspondence, matched to the most recent call
+from that number within a short window; ambiguous shares ask which correspondence rather than guessing.
+
+Three properties make this safe to build now:
+
+- **It degrades to nothing.** If Call Notes is absent — likely on the Pixel 8a, which is the owner's current
+  device — no share ever arrives and the manual note is simply what happens. There is no broken state and no
+  empty affordance to explain.
+- **It is not a dependency.** The manual note is the primary path and stays the primary path. The share target
+  is an *additional* way to fill the same field.
+- **It survives the upgrade.** The owner expects to move to newer hardware eventually, at which point this
+  starts working with no further code.
+
+The one thing it must not do is imply a capability the device lacks: Post never advertises "get the transcript
+from Phone" as a button, because on the 8a that button would go nowhere. It accepts a share if one comes.
+
+Marking a call as spam after taking it still does three things: delete it from the call log, block the number
+through Android's own list, and remember it locally as a backstop.
+
+**Consequence for §5:** Release C largely disappears, and with it the phase's only irreversible trade.
 
 ### 2.3 Email — move to the Gmail API
 
@@ -211,8 +269,11 @@ Extending `Codex.Tests/Guard/FrozenInvariantsTests.cs`, in the spirit of Score's
 - **The prefs migration path** — the literals `account` and `emailSync` still appear in the migration code, so
   the one-time copy-across to the postal names cannot be deleted by accident, orphaning the credentials.
 - **`timeline.db` by name** — the ghost archive makes it genuinely irreplaceable.
-- **Role declarations** — the manifest components that `ROLE_SMS` and `ROLE_DIALER` require. Losing one
-  silently *disqualifies* Post from the role, which is the same class of bug as the device-admin receiver in P5.
+- **Role declarations** — the manifest components `ROLE_SMS` requires. Losing one silently *disqualifies*
+  Post from the role, which is the same class of bug as the device-admin receiver in P5. (`ROLE_DIALER` is no
+  longer taken, per §2.2, so nothing is asserted for it.)
+- **The share-target filter** — the `ACTION_SEND` / `text/plain` filter that lets Call Notes reach Post.
+  Silent to lose and invisible when missing, which is exactly the kind of thing a guard is for.
 - **The frozen listener component name** — `…communication.MessageBridgeListener`, now that it is kept for RCS.
 
 The rename is otherwise full, as Score's was: folder `Post.Android`, namespace `Post`, label "Post", app id
@@ -229,7 +290,7 @@ Three releases, the riskiest thing last and alone.
 |---|---|---|
 | **A** | Rename + guardrails + guard test · **`ROLE_SMS`** · **Gmail API** · plain compose and real delete on both · kit adoption and restyle · Areas breakup | Delivers the live pain (§0) as early as it can be delivered. Deliberately *minimal*: no attachments, no filing, no ghosts. |
 | **B** | Filing, tombstones and the ghost archive · classification and ageing · calendar detection · the Index handoff · attachments · Drive archive backup | The to-do-list model, on a base that already sends and deletes. |
-| **C** | **`ROLE_DIALER`** · `InCallService` · in-call UI · call-log writes · spam marking | Isolated because it is the only irreversible trade in the phase (F3) and the only one that can regress something that works today. |
+| **C** | Call polish: the summary note, spam marking, call-log deletion | Small, and no longer isolated for risk — §2.2 was revised so Post never takes the dialer role, which removed the phase's only irreversible trade. Foldable into B if it stays this size. |
 
 ---
 
@@ -241,8 +302,8 @@ Honestly stated, in the order they would hurt.
    largest unknown and the whole architecture rests on it. Mitigation agreed: Flyleaf's admin mode
    temporarily relaxes the policy to accept the dialog, then restores it. If that fails too, Release A's
    value collapses to email only. *Verified on device, not before.*
-2. **Call screening may not survive the dialer role.** (F4) A real regression to spam protection if it does
-   not. Isolated in Release C so it can be reverted without unwinding the phase.
+2. ~~**Call screening may not survive the dialer role.**~~ **Retired.** Post no longer takes the dialer role
+   (§2.2), so screening and recording stay with Google Phone and this risk is gone.
 3. **The bridge dying** — the owner's own pick for likeliest. Mitigated by the native spine (texts keep
    flowing), the retained listener (some RCS survives), and a dog-ear naming the bridge and the error text
    exactly. Not silent.
