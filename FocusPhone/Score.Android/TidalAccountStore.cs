@@ -43,4 +43,6 @@ public sealed class TidalAccountStore(Context context)
         .PutString(UserIdKey, account.UserId)!
         .PutString(RefreshTokenKey, account.RefreshToken)!
         .Apply();
+
+    public void Clear() => Prefs.Edit()!.Clear()!.Apply();
 }
