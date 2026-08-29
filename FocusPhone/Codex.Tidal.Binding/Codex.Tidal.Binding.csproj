@@ -50,5 +50,14 @@
          is written against, so those are left to resolve transitively: pinning them
          here only produces downgrade errors against whatever Media3 asks for. -->
     <PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.8.0.2" />
+
+    <!-- Player's own constructor takes an OkHttpClient — confirmed straight from the
+         bytecode (javap), not the generator's own (silent, unlogged) explanation. With
+         no C# type for okhttp3.OkHttpClient anywhere in this project, the generator
+         could not express the parameter and dropped the whole constructor rather than
+         erroring — which is why Player had no way to construct one at all until this
+         was added. A community binding, not TIDAL's own; the type is otherwise a
+         well-known, stable Java networking client. -->
+    <PackageReference Include="Square.OkHttp3" Version="5.5.0" />
   </ItemGroup>
 </Project>
