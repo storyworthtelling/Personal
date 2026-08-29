@@ -177,7 +177,7 @@ Headings are ink-black Serif with a **full-width marker underline** (a gently cu
 | **Cards** | Five types: **warning** (`PaperDeep`, 3dp Action left rule), **explainer** (`PaperDeep`), **hairline** (`PaperBright` + 1dp hairline), **cover** (watercolor ground + title), **stat** (a single mono figure + label). |
 | **List rows & tables** | 56dp rows (Sans 16 `Ink` + Sans 14 `InkMuted`), hairline dividers, no zebra. Real tables where truly tabular (header row, aligned columns, horizontal scroll). Figures in Cascadia mono, right-aligned, tabular; negatives/deltas take the functional hue. Rows expand via the one inline-accordion pattern. |
 | **Action card** | Long-press → a **centered** paper card over a **PaperDeep haze** scrim (tap-out dismisses), animated in with the Ink reveal. Item actions only; never a confirm dialog. |
-| **Undo dog-ear** | The confirmation replacement: the act happens, then an inline **dog-ear** bar appears (functional-hue notice, §13), holds **10s**, then settles. Never a dialog, never a toast. |
+| **Undo dog-ear** | The confirmation replacement: the act happens, then a **dog-ear folds into the top-right corner** carrying a **back-turn arrow** (functional hue, §13). It is not a bar and it turns to nothing — **tapping it reverses the act**. It holds **6s**, then flattens. While it shows it **overrides any notice fold**, so the corner never means two things at once. Never a dialog, never a toast. |
 | **Inline countdown** | For the rare irreversible act: a Cascadia countdown + Cancel; executes only when the visible countdown expires; leaving cancels it. |
 | **Status line** | The loading/progress voice: one `Secondary` sentence in the In-progress hue, updated in place. |
 | **Empty state** | Centered `Serif` italic invitation on plain paper + the primary action. (The frameless cover art is the *loading* screen, not the empty one.) |
@@ -255,7 +255,9 @@ Each app is a **book with a painted cover**. The launcher icon follows the appro
 Two markers, taking their cue from the Mockup 01 icon direction:
 
 - **Bookmark (out-of-app / launcher).** A ribbon bound at the spine that sticks out the **top** of the book near the left spine, **squared** end, in the functional hue — the launcher's "this app has a notification" marker.
-- **Dog-ear (in-app).** A real **folded page corner** (top-right): a cream flap folded down revealing a **functional-hue** notice triangle behind it, with a crease line and a highlight along the fold. Marks a waiting item and is the form the undo bar takes. **One dog-ear, no count** (presence, not quantity). It appears with a quiet fold-in (Quick 150) and never buzzes.
+- **Dog-ear (in-app).** A real **folded page corner** (top-right): a cream flap folded down revealing a **functional-hue** notice triangle behind it, with a crease line and a highlight along the fold. **One dog-ear, no count** (presence, not quantity) — so when several things wait at once, one fold carries them all and turning it lists them. It appears with a quiet fold-in (Quick 150) and never buzzes.
+
+  The fold has **two jobs, and never both at once**. As a **notice** it marks something waiting and you *turn* to it when ready, with no clock running; it is **scoped to its page**, so on a list it holds what waits for the app and inside an item it holds what waits for that item. As an **undo** it carries a **back-turn arrow**, turns to nothing, and *reverses the act* on tap; it holds 6s (§7) and **overrides any notice fold** for that window, because an undo is a closing window rather than something that waits. Nothing else in the app announces itself: errors and pending decisions live behind the fold, never as banners or cards on the page.
 
 Push stays almost silent (§1): only new comms earn a buzz; everything else waits as a quiet dog-ear/bookmark or arrives on the reMarkable.
 
