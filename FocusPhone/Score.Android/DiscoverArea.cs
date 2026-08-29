@@ -1,6 +1,7 @@
 using Android.Views;
 using Codex.Domain.Audio;
 using Codex.Domain.Music;
+using Codex.Infrastructure.Music;
 using Codex.Infrastructure.Podcasts;
 using Codex.Ui;
 
@@ -28,7 +29,14 @@ namespace Score;
 /// owns, so finding a <i>show</i> they have never heard of is a capability nothing
 /// else in the app has — and it is the half of Discover's search that does not wait
 /// on a streaming provider, since the open podcast web has a keyless directory and
-/// hands back the show's own feed. Catalogue search for music arrives with streaming.
+/// hands back the show's own feed.
+///
+/// A second, separate search finds a TIDAL <i>track</i> — kept apart from the podcast
+/// field rather than merged into one box, since a show search subscribes to something
+/// and a track search auditions it (the same one-record-at-a-time Play the crate
+/// uses, so a search cannot cost you the queue you assembled either). Hidden, with a
+/// quiet note in its place, until the owner has signed in under Settings — a search
+/// field that always comes back empty would look broken rather than merely unset.
 ///
 /// Generating a playlist from a prompt used to live here and now lives under
 /// Playlists, where the result is kept rather than played.
@@ -53,6 +61,16 @@ public sealed class DiscoverArea : ScoreArea
     private string? searchStatus;
     private IReadOnlyList<PodcastSearchResult> results = [];
 
+    // TIDAL's own catalogue coverage is the deciding factor for this, not the owner's
+    // locale — see the B7 streaming-decision note in CLAUDE.md — so this is fixed
+    // rather than read from the device, matching every other hardcoded default in
+    // this app until a real region setting exists anywhere.
+    private const string TidalCountryCode = "US";
+
+    private string trackQuery = string.Empty;
+    private string? trackSearchStatus;
+    private IReadOnlyList<Track> trackResults = [];
+
     public DiscoverArea(Activity host, MusicLibrary library) : base(host)
     {
         this.library = library;
@@ -74,6 +92,12 @@ public sealed class DiscoverArea : ScoreArea
             return true;
         }
 
+        if (trackResults.Count > 0 || trackQuery.Length > 0)
+        {
+            ClearTrackSearch();
+            return true;
+        }
+
         return false;
     }
 
@@ -82,6 +106,12 @@ public sealed class DiscoverArea : ScoreArea
         var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         layout.AddView(BuildSearch());
         layout.AddView(results.Count > 0 ? BuildResults() : BuildCrate());
+        layout.AddView(BuildTrackSearch());
+        if (trackResults.Count > 0)
+        {
+            layout.AddView(BuildTrackResults());
+        }
+
         layout.AddView(BuildGenius());
 
         var scroll = new ScrollView(Host);
@@ -180,6 +210,90 @@ public sealed class DiscoverArea : ScoreArea
             subscriptionStore.Save(current.Export());
             Invalidate();
         });
+    }
+
+    // Signed-out is the default state on every fresh install (Settings' Sign in to
+    // TIDAL row), so this checks the same local store that gates
+    // PlaybackService.BuildTidalSessionAsync rather than assuming a search is safe to
+    // attempt.
+    private View BuildTrackSearch()
+    {
+        if (new TidalAccountStore(Host).Load() is null)
+        {
+            return PaperUi.Secondary(Host, "Sign in to TIDAL in Settings to search the music catalogue.");
+        }
+
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+
+        var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+
+        var field = PaperUi.Field(Host, "Find a track");
+        field.Text = trackQuery;
+        field.TextChanged += (_, _) => trackQuery = field.Text ?? string.Empty;
+        row.AddView(field, new LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+
+        row.AddView(PaperUi.QuietButton(Host, "Search", () => _ = SearchTracksAsync()));
+        if (trackResults.Count > 0 || trackQuery.Length > 0)
+        {
+            row.AddView(PaperUi.QuietButton(Host, "Clear", ClearTrackSearch));
+        }
+
+        column.AddView(row);
+        if (!string.IsNullOrEmpty(trackSearchStatus))
+        {
+            column.AddView(PaperUi.Secondary(Host, trackSearchStatus));
+        }
+
+        return column;
+    }
+
+    private async Task SearchTracksAsync()
+    {
+        var asked = trackQuery.Trim();
+        if (asked.Length == 0)
+        {
+            return;
+        }
+
+        trackSearchStatus = "Looking…"; // §6: loading is a sentence
+        trackResults = [];
+        Invalidate();
+
+        var token = await new TidalAccessTokenProvider(Host).RefreshAsync(CancellationToken.None);
+        if (token.Status != TidalTokenPollStatus.Success || token.AccessToken is not { Length: > 0 } accessToken)
+        {
+            trackSearchStatus = "Couldn't reach TIDAL. Try again in a moment.";
+            Invalidate();
+            return;
+        }
+
+        var found = await new TidalCatalogClient(new HttpClient())
+            .SearchAsync(accessToken, asked, TidalCountryCode, CancellationToken.None);
+        trackResults = found;
+        trackSearchStatus = found.Count == 0 ? $"No tracks found for “{asked}”." : null;
+        Invalidate();
+    }
+
+    private void ClearTrackSearch()
+    {
+        trackQuery = string.Empty;
+        trackSearchStatus = null;
+        trackResults = [];
+        Invalidate();
+    }
+
+    private View BuildTrackResults()
+    {
+        var rows = trackResults
+            .Select(track => new PaperListRow(track.DisplayTitle, $"{track.DisplayArtist} — {track.DisplayAlbum}"))
+            .ToList();
+
+        // Play, not add-to-queue — the same audition-without-filing rule the crate's
+        // own Play follows (see the class remarks), so trying a search result can
+        // never cost the queue already assembled.
+        return PaperUi.List(Host, rows, position => library.Audition(trackResults[position]));
     }
 
     private View BuildCrate()

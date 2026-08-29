@@ -330,9 +330,15 @@ public sealed class MusicLibrary(
             .SetArtist(track.DisplayArtist)!
             .SetAlbumTitle(track.DisplayAlbum)!
             .Build()!;
+        // A TIDAL track's uri is inert — TidalMediaSessionPlayer.HandleSetMediaItems
+        // reads only MediaId (stripping the "tidal:" prefix to recover the SDK's
+        // product id; TIDAL's own Player resolves the actual stream, never Media3's
+        // DataSource pipeline) — but MediaItem still needs a well-formed uri, and
+        // "drive://tidal:…" would be actively misleading if ever inspected.
+        var uri = track.Availability == TrackAvailability.Streaming ? track.Id : $"drive://{track.ResolvedSourceId}";
         var builder = new AndroidX.Media3.Common.MediaItem.Builder()
             .SetMediaId(track.Id)!
-            .SetUri($"drive://{track.ResolvedSourceId}")!
+            .SetUri(uri)!
             .SetMediaMetadata(metadata)!;
 
         // A hidden-track split segment plays a clipped range of the file it shares

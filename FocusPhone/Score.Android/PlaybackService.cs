@@ -1,4 +1,3 @@
-using System.Net.Http;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -9,11 +8,9 @@ using AndroidX.Media3.ExoPlayer;
 using AndroidX.Media3.ExoPlayer.Source;
 using AndroidX.Media3.Session;
 using Codex.Infrastructure.Music;
-using Codex.Ui.Voice;
 using Score.Google;
 using Codex.Domain.Audio;
 using Codex.Domain.Music;
-using Storyworthtelling.Voice.Secrets;
 
 namespace Score;
 
@@ -144,34 +141,11 @@ public class PlaybackService : MediaLibraryService
             return;
         }
 
-        var vaultAccess = new SecretsVaultAccess(new DeviceAccountTokenProvider().GetAccessToken, "Score");
-        var vaultResult = await vaultAccess.Service.LoadAsync(CancellationToken.None);
-        if (vaultResult.Status != SecretsVaultStatus.Loaded || string.IsNullOrEmpty(vaultResult.Vault.Tidal.ClientId))
-        {
-            Android.Util.Log.Warn(logTag, $"Vault not readable or Tidal.ClientId unset (status={vaultResult.Status}); " +
-                "skipping the TIDAL session.");
-            return;
-        }
-
-        var clientId = vaultResult.Vault.Tidal.ClientId;
-        var clientSecret = vaultResult.Vault.Tidal.ClientSecret;
-
         // Called by TidalCredentialsProvider each time the SDK asks for fresh credentials, not just
-        // once here — refreshes on demand over the Player's lifetime, the same contract
-        // ICredentialsProvider.GetCredentials documents.
-        Task<TidalTokenPollResult> RefreshAccessToken()
-        {
-            var current = new TidalAccountStore(this).Load();
-            if (current is null)
-            {
-                return Task.FromResult(new TidalTokenPollResult(TidalTokenPollStatus.Denied));
-            }
-
-            return new TidalDeviceAuthClient(new HttpClient())
-                .RefreshAsync(clientId, clientSecret, current.RefreshToken, CancellationToken.None);
-        }
-
-        var probe = await RefreshAccessToken();
+        // once here — TidalAccessTokenProvider refreshes on demand over the Player's lifetime, the
+        // same contract ICredentialsProvider.GetCredentials documents.
+        var tokenProvider = new TidalAccessTokenProvider(this);
+        var probe = await tokenProvider.RefreshAsync(CancellationToken.None);
         if (probe.Status != TidalTokenPollStatus.Success)
         {
             Android.Util.Log.Warn(logTag, $"Stored TIDAL refresh token did not exchange (status={probe.Status}); " +
@@ -179,14 +153,7 @@ public class PlaybackService : MediaLibraryService
             return;
         }
 
-        // A rotated refresh token invalidates the old one on TIDAL's side, so the new one has to be
-        // saved immediately — not just used for this one call — or the next refresh fails.
-        if (!string.IsNullOrEmpty(probe.RefreshToken))
-        {
-            new TidalAccountStore(this).Save(new TidalAccount(account.UserId, probe.RefreshToken));
-        }
-
-        var credentialsProvider = new TidalCredentialsProvider(RefreshAccessToken);
+        var credentialsProvider = new TidalCredentialsProvider(() => tokenProvider.RefreshAsync(CancellationToken.None));
         var tidalPlayer = TidalPlayerFactory.Create(Application!, credentialsProvider, appVersion: "1.0.0");
         if (tidalPlayer is null)
         {
