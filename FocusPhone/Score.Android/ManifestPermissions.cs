@@ -15,6 +15,12 @@ using Android.App;
 [assembly: UsesPermission(Manifest.Permission.ForegroundServiceDataSync)]
 [assembly: UsesPermission(Manifest.Permission.PostNotifications)]
 
+// Score keeps itself current on a phone with no device owner, where the only install
+// route is the one the person confirms. On the locked phone this permission is never
+// exercised: the launcher is the custodian there and Score's update run stops before
+// it downloads anything.
+[assembly: UsesPermission(Manifest.Permission.RequestInstallPackages)]
+
 // Needed to launch / hand off to the YouTube Music app under Android 11+
 // package-visibility filtering. Sideloaded app, so QUERY_ALL_PACKAGES is fine.
 [assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]

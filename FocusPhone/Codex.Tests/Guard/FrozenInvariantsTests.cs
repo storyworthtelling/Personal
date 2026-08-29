@@ -155,6 +155,11 @@ public class FrozenInvariantsTests
         Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.PlaybackService", "Name ="));
         Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.FridayPicksWorker", "Register("));
         Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.DownloadService", "Name ="));
+
+        // Score's own update worker, for the phone with no custodian. Persisted by
+        // class name in WorkManager's database exactly as the Friday picks worker is,
+        // so a rename strands a scheduled run that then silently never fires.
+        Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.ScoreUpdateWorker", "Register("));
     }
 
     // Every on-device store the head owns, by SharedPreferences file name. The file
@@ -177,6 +182,7 @@ public class FrozenInvariantsTests
             "artwork", "downloads", "equalizer", "fridayPicks", "listeningHistory",
             "music", "music-queue", "playlists", "podcast-queue", "podcastEpisodeCache",
             "podcastProgress", "podcastSettings", "podcastSubscriptions", "podcasts",
+            "scoreUpdateStatus",
         ];
 
         var declared = EnumerateRepoFiles("*.cs")

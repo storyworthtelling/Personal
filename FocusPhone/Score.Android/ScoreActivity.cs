@@ -80,6 +80,11 @@ public class ScoreActivity : Activity
 
         FridayPicksWorker.Schedule(this); // weekly "New for you"; no-ops until signed in
 
+        // Keeps Score current where nothing else will. On the locked phone the
+        // launcher is the custodian and this resolves to Deferred, so it costs a
+        // device-owner check a day and does nothing else.
+        ScoreUpdateService.Schedule(this);
+
         greeting = new Codex.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "Score");
         SetContentView(BuildLayout());
         playback.Connect();
