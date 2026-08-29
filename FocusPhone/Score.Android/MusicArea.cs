@@ -315,12 +315,17 @@ public sealed class MusicArea : ScoreArea
     }
 
     // Anything at any level: one track or a whole album, against the same allowance.
+    //
+    // A hidden-track split segment's MediaId is its shared source file, not its own
+    // per-queue Id — DownloadsActivity.MediaUri reconstructs the same drive:// uri from
+    // MediaId later to add/remove the download, so the two have to name the same file
+    // or that reconstruction targets a file that was never actually downloaded.
     private void Download(string what, IReadOnlyList<Track> tracks) =>
         DownloadRequests.Ask(Host, Overlay, downloads, what,
             [.. tracks.Select(track => (
                 new DownloadedItem(
-                    track.Id, track.DisplayTitle, DownloadKind.Music, track.Duration, DateTimeOffset.UtcNow),
-                $"drive://{track.Id}"))]);
+                    track.ResolvedSourceId, track.DisplayTitle, DownloadKind.Music, track.Duration, DateTimeOffset.UtcNow),
+                $"drive://{track.ResolvedSourceId}"))]);
 
     // §7's action card, not a kebab and not a confirm: the entries do the thing, and
     // delete is made safe by the undo bar rather than by asking first.

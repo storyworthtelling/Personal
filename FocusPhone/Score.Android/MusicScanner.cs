@@ -24,12 +24,14 @@ public sealed class MusicScanner
     private readonly DriveMusicClient driveClient;
     private readonly DeviceAccountTokenProvider tokens;
     private readonly MusicTagReader tagReader;
+    private readonly Lazy<HiddenTrackPass> hiddenTrackPass;
 
     public MusicScanner(DriveMusicClient driveClient, DeviceAccountTokenProvider tokens, MusicTagReader tagReader)
     {
         this.driveClient = driveClient;
         this.tokens = tokens;
         this.tagReader = tagReader;
+        hiddenTrackPass = new Lazy<HiddenTrackPass>(() => new HiddenTrackPass(tokens));
     }
 
     public async Task ScanAsync(
@@ -66,12 +68,26 @@ public sealed class MusicScanner
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Read this batch's tags concurrently (blocking TagLib/Drive work offloaded to the pool)...
-            var reads = batch.Select(file => Task.Run(() => ReadTags(file, http), cancellationToken));
+            // Read this batch's tags (and, for a long track, run the hidden-track pass) concurrently...
+            var reads = batch.Select(file => ReadFileAsync(file, http, cancellationToken)).ToList();
             var results = await Task.WhenAll(reads);
 
+            // A file being re-read here may have split differently than last time (or
+            // not at all any more) — clear its old row(s), split or not, before
+            // writing the fresh ones, but only once the read actually succeeded; a
+            // failed read leaves whatever was cached for it alone.
+            foreach (var (file, result) in batch.Zip(results))
+            {
+                if (result.Tracks.Count > 0)
+                {
+                    cache.Delete(file.Id);
+                }
+            }
+
             // ...then write them in one serialized transaction (SQLite single-writer).
-            cache.Upsert(results.Where(entry => entry is not null).Select(entry => entry!.Value));
+            cache.Upsert(results
+                .Where(result => result.Tracks.Count > 0)
+                .SelectMany(result => result.Tracks.Select(track => (track, result.Version))));
 
             done += batch.Length;
             onProgress(done, total);
@@ -82,18 +98,33 @@ public sealed class MusicScanner
         cache.ReaderVersion = MusicTagReader.Version;
     }
 
-    private (Track Track, MusicFileVersion Version)? ReadTags(DriveAudioFile file, HttpClient http)
+    // Empty Tracks means the file could not be read at all (skipped; the rest of the
+    // library still scans). One Track is the ordinary case. More than one means the
+    // hidden-track pass found — and split off — a bonus track.
+    private async Task<(IReadOnlyList<Track> Tracks, MusicFileVersion Version)> ReadFileAsync(
+        DriveAudioFile file, HttpClient http, CancellationToken cancellationToken)
     {
         try
         {
-            using var stream = new DriveSeekableStream(file.Id, file.Size, tokens, http);
-            var track = tagReader.Read(file.Id, file.Name, stream);
-            return (track, new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size));
+            Track track;
+            using (var stream = new DriveSeekableStream(file.Id, file.Size, tokens, http))
+            {
+                track = await Task.Run(() => tagReader.Read(file.Id, file.Name, stream), cancellationToken);
+            }
+
+            var version = new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size);
+            if (!hiddenTrackPass.Value.IsWorthScanning(track))
+            {
+                return ([track], version);
+            }
+
+            using var decodeStream = new DriveSeekableStream(file.Id, file.Size, tokens, http);
+            var tracks = await hiddenTrackPass.Value.RunAsync(track, decodeStream, cancellationToken);
+            return (tracks, version);
         }
-        catch
+        catch (Exception e) when (e is not OperationCanceledException)
         {
-            // Skip a file we can't read; the rest of the library still scans.
-            return null;
+            return ([], default);
         }
     }
 }

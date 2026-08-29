@@ -330,11 +330,23 @@ public sealed class MusicLibrary(
             .SetArtist(track.DisplayArtist)!
             .SetAlbumTitle(track.DisplayAlbum)!
             .Build()!;
-        return new AndroidX.Media3.Common.MediaItem.Builder()
+        var builder = new AndroidX.Media3.Common.MediaItem.Builder()
             .SetMediaId(track.Id)!
-            .SetUri($"drive://{track.Id}")!
-            .SetMediaMetadata(metadata)!
-            .Build()!;
+            .SetUri($"drive://{track.ResolvedSourceId}")!
+            .SetMediaMetadata(metadata)!;
+
+        // A hidden-track split segment plays a clipped range of the file it shares
+        // with its sibling segment, rather than a copy of it — the silence between
+        // them is never in either range, so it is never decoded or heard either.
+        if (track.ClipStart is { } start)
+        {
+            builder.SetClippingConfiguration(new AndroidX.Media3.Common.MediaItem.ClippingConfiguration.Builder()
+                .SetStartPositionMs((long)start.TotalMilliseconds)!
+                .SetEndPositionMs((long)(start + track.Duration).TotalMilliseconds)!
+                .Build()!);
+        }
+
+        return builder.Build()!;
     }
 
     // Backs the chosen folder id up to the encrypted vault. Best-effort, off the UI thread.

@@ -56,6 +56,24 @@ public class MusicCatalogCacheTests : IDisposable
         Assert.Equal("2", Assert.Single(cache.LoadAll()).Id);
     }
 
+    // A file that was split into two rows is still one physical file to the scan's
+    // delete list — it only ever names the file's own id, never knowing it produced
+    // two rows. Deleting by that id has to take both with it, or a removed file would
+    // leave its hidden-track half behind forever.
+    [Fact]
+    public void Delete_RemovesEveryHiddenTrackSplitSegmentOfTheDeletedFile()
+    {
+        cache.Upsert([
+            Tr("file#0") with { SourceFileId = "file", ClipStart = TimeSpan.Zero },
+            Tr("file#1") with { SourceFileId = "file", ClipStart = TimeSpan.FromMinutes(4) },
+            Tr("2"),
+        ]);
+
+        cache.Delete("file");
+
+        Assert.Equal("2", Assert.Single(cache.LoadAll()).Id);
+    }
+
     [Fact]
     public void Clear_EmptiesTheCache()
     {

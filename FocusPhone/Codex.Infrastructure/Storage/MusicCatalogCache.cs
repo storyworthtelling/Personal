@@ -204,10 +204,15 @@ public class MusicCatalogCache
         return versions;
     }
 
+    /// <summary>
+    /// Deletes by physical file id — which is all a scan ever names, since it diffs
+    /// Drive listings, not cache rows. A hidden-track split leaves two rows under
+    /// their own ids sharing that file as <c>sourceId</c>, so both have to go with it.
+    /// </summary>
     public void Delete(string id)
     {
         using var delete = connection.CreateCommand();
-        delete.CommandText = "DELETE FROM tracks WHERE id = $id";
+        delete.CommandText = "DELETE FROM tracks WHERE id = $id OR sourceId = $id";
         delete.Parameters.AddWithValue("$id", id);
         delete.ExecuteNonQuery();
     }
