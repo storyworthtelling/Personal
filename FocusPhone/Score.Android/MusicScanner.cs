@@ -93,6 +93,16 @@ public sealed class MusicScanner
             onProgress(done, total);
         }
 
+        // A song can end up duplicated across multiple physical files — repeated
+        // downloads, an upgrade from MP3 to FLAC left sitting next to the old copy.
+        // Runs over the WHOLE current catalog, not just what this pass touched, since
+        // a duplicate can be introduced by any new file matching any track already
+        // cached, not only ones against each other within the same batch.
+        foreach (var id in DuplicateTracks.FindLosingIds(cache.LoadAll()))
+        {
+            cache.Delete(id);
+        }
+
         // Only once the pass finished. A cancelled scan has read part of the library,
         // and marking it done would leave the rest missing the new field for good.
         cache.ReaderVersion = MusicTagReader.Version;

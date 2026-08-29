@@ -76,4 +76,24 @@ public class TagMappingTests
 
         Assert.Equal(0, track.Bpm);
     }
+
+    // Bitrate is what tells a duplicate scan which of two copies of the same song is
+    // the better source, so it has to survive the same tag-to-domain mapping as
+    // everything else the file carries.
+    [Fact]
+    public void ToTrack_ReadsTheBitrate()
+    {
+        var track = TagMapping.ToTrack(
+            "file1", "T", ["A"], "Al", ["A"], 1, 1, ["G"], TimeSpan.Zero, bitrateKbps: 320);
+
+        Assert.Equal(320, track.Bitrate);
+    }
+
+    [Fact]
+    public void ToTrack_LeavesBitrateUnknownWhenNotGiven()
+    {
+        var track = TagMapping.ToTrack("file1", "T", ["A"], "Al", ["A"], 1, 1, ["G"], TimeSpan.Zero);
+
+        Assert.Equal(0, track.Bitrate);
+    }
 }

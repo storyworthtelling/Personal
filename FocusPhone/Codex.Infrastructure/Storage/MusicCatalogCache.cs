@@ -34,7 +34,8 @@ public class MusicCatalogCache
                 sizeBytes INTEGER NOT NULL DEFAULT 0,
                 bpm INTEGER NOT NULL DEFAULT 0,
                 sourceId TEXT,
-                clipStartTicks INTEGER NOT NULL DEFAULT 0
+                clipStartTicks INTEGER NOT NULL DEFAULT 0,
+                bitrate INTEGER NOT NULL DEFAULT 0
             )
             """;
         create.ExecuteNonQuery();
@@ -53,6 +54,10 @@ public class MusicCatalogCache
         // SourceFileId/ClipStart at all rather than looking like a clip starting at 0.
         EnsureColumn("sourceId", "TEXT");
         EnsureColumn("clipStartTicks");
+
+        // Bitrate arrived with duplicate detection. Zero = unmeasured, so an older
+        // cache keeps every row and the next scan fills it in from the tags.
+        EnsureColumn("bitrate");
 
         using var meta = connection.CreateCommand();
         meta.CommandText = "CREATE TABLE IF NOT EXISTS meta (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)";
@@ -130,10 +135,10 @@ public class MusicCatalogCache
         upsert.CommandText = """
             INSERT INTO tracks (
                 id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef,
-                modifiedTimeTicks, sizeBytes, bpm, sourceId, clipStartTicks)
+                modifiedTimeTicks, sizeBytes, bpm, sourceId, clipStartTicks, bitrate)
             VALUES (
                 $id, $title, $artist, $album, $albumArtist, $trackNumber, $discNumber, $genre, $durationTicks, $artRef,
-                $modifiedTimeTicks, $sizeBytes, $bpm, $sourceId, $clipStartTicks)
+                $modifiedTimeTicks, $sizeBytes, $bpm, $sourceId, $clipStartTicks, $bitrate)
             ON CONFLICT (id) DO UPDATE SET
                 title = excluded.title,
                 artist = excluded.artist,
@@ -148,7 +153,8 @@ public class MusicCatalogCache
                 sizeBytes = excluded.sizeBytes,
                 bpm = excluded.bpm,
                 sourceId = excluded.sourceId,
-                clipStartTicks = excluded.clipStartTicks
+                clipStartTicks = excluded.clipStartTicks,
+                bitrate = excluded.bitrate
             """;
 
         var parameters = new Dictionary<string, SqliteParameter>();
@@ -156,7 +162,7 @@ public class MusicCatalogCache
         {
             "$id", "$title", "$artist", "$album", "$albumArtist",
             "$trackNumber", "$discNumber", "$genre", "$durationTicks", "$artRef",
-            "$modifiedTimeTicks", "$sizeBytes", "$bpm", "$sourceId", "$clipStartTicks",
+            "$modifiedTimeTicks", "$sizeBytes", "$bpm", "$sourceId", "$clipStartTicks", "$bitrate",
         })
         {
             var parameter = upsert.CreateParameter();
@@ -182,6 +188,7 @@ public class MusicCatalogCache
             parameters["$bpm"].Value = track.Bpm;
             parameters["$sourceId"].Value = (object?)track.SourceFileId ?? DBNull.Value;
             parameters["$clipStartTicks"].Value = track.ClipStart?.Ticks ?? 0L;
+            parameters["$bitrate"].Value = track.Bitrate;
             upsert.ExecuteNonQuery();
         }
 
@@ -229,7 +236,7 @@ public class MusicCatalogCache
         using var select = connection.CreateCommand();
         select.CommandText = """
             SELECT id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef, bpm,
-                sourceId, clipStartTicks
+                sourceId, clipStartTicks, bitrate
             FROM tracks
             """;
         using var reader = select.ExecuteReader();
@@ -251,7 +258,8 @@ public class MusicCatalogCache
                 reader.IsDBNull(9) ? null : reader.GetString(9),
                 reader.GetInt32(10),
                 SourceFileId: sourceId,
-                ClipStart: sourceId is null ? null : TimeSpan.FromTicks(reader.GetInt64(12))));
+                ClipStart: sourceId is null ? null : TimeSpan.FromTicks(reader.GetInt64(12)),
+                Bitrate: reader.GetInt32(13)));
         }
 
         return tracks;

@@ -33,6 +33,10 @@ public enum TrackAvailability
 /// <see cref="Bpm"/> is 0 when nothing has established a tempo for the file. Zero is
 /// "unknown", not "no beats" — a workout pool has to be able to tell the difference
 /// between a track that is the wrong speed and one nobody has measured.
+///
+/// <see cref="Bitrate"/> (kbps) is the file's encoded data rate — high for a lossless
+/// rip, low for a heavily-compressed one — and is what a duplicate scan uses to prefer
+/// the better of two copies of the same song. Zero means unmeasured, not "no data".
 /// </summary>
 public record Track(
     string Id,
@@ -48,7 +52,8 @@ public record Track(
     int Bpm = 0,
     TrackAvailability Availability = TrackAvailability.Local,
     string? SourceFileId = null,
-    TimeSpan? ClipStart = null)
+    TimeSpan? ClipStart = null,
+    int Bitrate = 0)
 {
     /// <summary>Whether this can actually be started. False only for a track the
     /// provider has stopped carrying.</summary>

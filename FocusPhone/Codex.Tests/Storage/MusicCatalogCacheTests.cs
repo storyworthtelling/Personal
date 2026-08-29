@@ -231,6 +231,38 @@ public class MusicCatalogCacheTests : IDisposable
     }
 
     [Fact]
+    public void Upsert_ThenLoadAll_KeepsTheBitrate()
+    {
+        cache.Upsert([Tr("1") with { Bitrate = 320 }]);
+
+        Assert.Equal(320, cache.LoadAll().Single().Bitrate);
+    }
+
+    [Fact]
+    public void Cache_AddsTheBitrateColumnToAnOlderCache()
+    {
+        using var older = new SqliteConnection("Data Source=:memory:");
+        older.Open();
+        using (var create = older.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE tracks (
+                    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+                    album TEXT NOT NULL, albumArtist TEXT NOT NULL, trackNumber INTEGER NOT NULL,
+                    discNumber INTEGER NOT NULL, genre TEXT NOT NULL, durationTicks INTEGER NOT NULL,
+                    artRef TEXT, bpm INTEGER NOT NULL DEFAULT 0);
+                INSERT INTO tracks VALUES ('1','Old','A','Al','A',1,1,'Rock',0,NULL,0);
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        var upgraded = new MusicCatalogCache(older).LoadAll().Single();
+
+        Assert.Equal("Old", upgraded.Title);
+        Assert.Equal(0, upgraded.Bitrate);
+    }
+
+    [Fact]
     public void Cache_AddsTheSplitColumnsToAnOlderCache()
     {
         using var older = new SqliteConnection("Data Source=:memory:");
