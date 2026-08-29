@@ -153,4 +153,61 @@ public class TidalCatalogClientTests
 
         Assert.Empty(tracks);
     }
+
+    // GetTrackAsync's fixture is NOT copied from a live call, unlike every fixture
+    // above — it follows the same JSON:API single-resource GET convention the
+    // second step of SearchAsync already uses for searchResults/{id} (a resource
+    // fetched directly, include= for its relationships), reusing the exact envelope
+    // shape (a resource with id/type/attributes/relationships, plus an included=
+    // pool) already confirmed live for the tracks nested inside a search result.
+    // Flagged here rather than silently treated as equally verified; check the
+    // commit message for whether a live call ever confirmed this specific path.
+    private const string TrackUrl = "https://openapi.tidal.com/v2/tracks/120268?countryCode=US&include=artists%2Calbums";
+
+    [Fact]
+    public async Task GetTrackAsync_ReadsTheTrackWithArtistAndAlbum()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TrackUrl, """
+            {"data":{"id":"120268","type":"tracks","attributes":{"title":"Don't Panic","duration":"PT2M17S"},
+              "relationships":{"albums":{"data":[{"id":"120267","type":"albums"}]},
+                                "artists":{"data":[{"id":"8812","type":"artists"}]}}},
+             "included":[
+               {"id":"120267","type":"albums","attributes":{"title":"Parachutes"}},
+               {"id":"8812","type":"artists","attributes":{"name":"Coldplay"}}
+             ]}
+            """);
+
+        var track = await client.GetTrackAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.NotNull(track);
+        Assert.Equal("tidal:120268", track.Id);
+        Assert.Equal("Don't Panic", track.Title);
+        Assert.Equal("Coldplay", track.ArtistName);
+        Assert.Equal("Parachutes", track.AlbumName);
+        Assert.Equal(TrackAvailability.Streaming, track.Availability);
+    }
+
+    [Fact]
+    public async Task GetTrackAsync_ReturnsNullWhenNotFound()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TrackUrl, """{"errors":[{"code":"NOT_FOUND"}]}""",
+            status: System.Net.HttpStatusCode.NotFound);
+
+        var track = await client.GetTrackAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Null(track);
+    }
+
+    [Fact]
+    public async Task GetTrackAsync_ReturnsNullOnAnyOtherFailure()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TrackUrl, "not json", status: System.Net.HttpStatusCode.OK);
+
+        var track = await client.GetTrackAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Null(track);
+    }
 }

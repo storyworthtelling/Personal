@@ -21,6 +21,7 @@ public sealed class SavedTidalTracksStore(Context context)
 {
     private const string PreferencesName = "savedTidalTracks";
     private const string TracksKey = "tracks";
+    private const string LastValidatedKey = "lastValidatedUtcTicks";
 
     private ISharedPreferences Prefs => context.GetSharedPreferences(PreferencesName, FileCreationMode.Private)!;
 
@@ -45,4 +46,24 @@ public sealed class SavedTidalTracksStore(Context context)
     }
 
     public void Remove(string trackId) => Save([.. Load().Where(track => track.Id != trackId)]);
+
+    /// <summary>Replaces a saved track's record in place (by id) — how
+    /// <see cref="MusicLibrary.RevalidateSavedTidalTracksAsync"/> updates a track's
+    /// <c>Availability</c> after re-checking it, without disturbing its position or
+    /// any other saved track.</summary>
+    public void Replace(Track track) =>
+        Save([.. Load().Select(existing => existing.Id == track.Id ? track : existing)]);
+
+    /// <summary>When the saved list was last checked against TIDAL's catalogue, or
+    /// null if never. Read/written as raw UTC ticks — SharedPreferences has no native
+    /// DateTimeOffset type, and ticks round-trip exactly without a format to agree on.</summary>
+    public DateTimeOffset? LastValidatedUtc
+    {
+        get
+        {
+            var ticks = Prefs.GetLong(LastValidatedKey, -1);
+            return ticks < 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+        set => Prefs.Edit()!.PutLong(LastValidatedKey, value?.UtcTicks ?? -1)!.Apply();
+    }
 }

@@ -1,5 +1,6 @@
 using Codex.Domain.Audio;
 using Codex.Domain.Music;
+using Codex.Infrastructure.Music;
 using Codex.Ui.Voice;
 using Score.Google;
 using Storyworthtelling.Voice.Secrets;
@@ -22,6 +23,19 @@ public sealed class MusicLibrary(
     ListeningLog listening,
     PlaybackProgressStore progress)
 {
+    // TIDAL's own catalogue coverage is the deciding factor for this, not the
+    // owner's locale — see the B7 streaming-decision note in CLAUDE.md — so this is
+    // fixed rather than read from the device, matching every other hardcoded default
+    // in this app until a real region setting exists anywhere. Shared with
+    // DiscoverArea's search so a track validates against the same regional
+    // availability it was found under.
+    public const string TidalCountryCode = "US";
+
+    // Re-checking every saved track costs one HTTP call each, so this is deliberately
+    // infrequent — losing streaming access to a track a day late is a much smaller
+    // problem than a background pass that runs on every app open.
+    private static readonly TimeSpan RevalidateInterval = TimeSpan.FromDays(1);
+
     private readonly DriveMusicClient driveClient = new(tokens);
     private readonly MusicTagReader tagReader = new(Path.Combine(host.CacheDir!.AbsolutePath, "art"));
     private readonly SavedTidalTracksStore savedTidal = new(host);
@@ -112,6 +126,79 @@ public sealed class MusicLibrary(
         savedTidal.Remove(trackId);
         LoadCatalog();
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Re-checks every saved TIDAL track against the catalogue and marks the ones
+    /// that no longer resolve as <see cref="TrackAvailability.Unavailable"/> — the
+    /// one thing a save alone can never do, since nothing else in this app ever asks
+    /// TIDAL about a track again after it is saved. A track that comes back
+    /// <i>available</i> after having been marked Unavailable is restored to
+    /// Streaming too — a lapsed subscription renewing, or a region change reversing,
+    /// should not leave a track permanently struck off.
+    ///
+    /// Best-effort and silently skipped, not just on failure but by design, when
+    /// there is nothing signed in or nothing saved — this runs unconditionally from
+    /// app launch (see ScoreActivity), so it has to be exactly as quiet as
+    /// RestoreFolderFromVault about a TIDAL account that does not exist yet.
+    /// Throttled to <see cref="RevalidateInterval"/> so a saved list of any real size
+    /// does not mean a burst of network calls on every cold start.
+    /// </summary>
+    public async Task RevalidateSavedTidalTracksAsync()
+    {
+        try
+        {
+            var last = savedTidal.LastValidatedUtc;
+            if (last is { } checkedAt && DateTimeOffset.UtcNow - checkedAt < RevalidateInterval)
+            {
+                return;
+            }
+
+            var saved = savedTidal.Load();
+            if (saved.Count == 0)
+            {
+                return;
+            }
+
+            var probe = await new TidalAccessTokenProvider(host).RefreshAsync(CancellationToken.None);
+            if (probe.Status != TidalTokenPollStatus.Success || probe.AccessToken is not { Length: > 0 } accessToken)
+            {
+                return; // Not signed in, or a transient failure — try again next launch.
+            }
+
+            var catalog = new TidalCatalogClient(new HttpClient());
+            var changed = false;
+            foreach (var track in saved)
+            {
+                var rawId = track.Id.StartsWith("tidal:", StringComparison.Ordinal)
+                    ? track.Id["tidal:".Length..]
+                    : track.Id;
+                var found = await catalog.GetTrackAsync(accessToken, rawId, TidalCountryCode, CancellationToken.None);
+                var isAvailable = found is not null;
+                var wasAvailable = track.Availability != TrackAvailability.Unavailable;
+                if (isAvailable == wasAvailable)
+                {
+                    continue;
+                }
+
+                savedTidal.Replace(track with
+                {
+                    Availability = isAvailable ? TrackAvailability.Streaming : TrackAvailability.Unavailable,
+                });
+                changed = true;
+            }
+
+            savedTidal.LastValidatedUtc = DateTimeOffset.UtcNow;
+            if (changed)
+            {
+                LoadCatalog();
+                Changed?.Invoke();
+            }
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Error("MusicLibrary", $"RevalidateSavedTidalTracksAsync threw: {e}");
+        }
     }
 
     public async Task SignInAsync()

@@ -58,6 +58,34 @@ public sealed class TidalCatalogClient(HttpClient httpClient)
         }
     }
 
+    /// <summary>
+    /// Looks up one track directly by its TIDAL id — for re-checking whether a
+    /// previously-saved track is still available, not for search. A single-resource
+    /// JSON:API GET rather than the two-step dance <see cref="SearchAsync"/> needs:
+    /// there is no opaque intermediate resource to resolve first when the id is
+    /// already known. Not found, a rejected token, or the service being down all
+    /// come back null, the same "never surface an exception" rule as
+    /// <see cref="SearchAsync"/> — a background availability check must never crash
+    /// the catalog load it feeds.
+    /// </summary>
+    public async Task<Track?> GetTrackAsync(
+        string accessToken, string trackId, string countryCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var url = $"{BaseUrl}tracks/{Uri.EscapeDataString(trackId)}" +
+                $"?countryCode={Uri.EscapeDataString(countryCode)}&include=artists%2Calbums";
+            var reply = await Get<TrackResourceReply>(accessToken, url, cancellationToken);
+            return reply?.Data is { Attributes: not null } resource
+                ? BuildTrack(resource, reply.Included ?? [])
+                : null;
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException)
+        {
+            return null;
+        }
+    }
+
     // The relationship list gives the order and which tracks belong to this result;
     // "included" is an unordered pool of every tracks/albums/artists resource the
     // include= asked for, matched back to it by (id, type) — JSON:API's normal shape.
@@ -79,29 +107,42 @@ public sealed class TidalCatalogClient(HttpClient httpClient)
                 continue;
             }
 
-            var artistName = string.Join(", ", (resource.Relationships?.Artists?.Data ?? [])
-                .Select(artist => artistsById.TryGetValue(artist.Id, out var found) ? found.Attributes?.Name : null)
-                .Where(name => !string.IsNullOrWhiteSpace(name)));
-
-            var albumId = resource.Relationships?.Albums?.Data?.FirstOrDefault()?.Id;
-            var albumName = albumId is not null && albumsById.TryGetValue(albumId, out var album)
-                ? album.Attributes?.Title ?? string.Empty
-                : string.Empty;
-
-            tracks.Add(new Track(
-                Id: $"tidal:{resource.Id}",
-                Title: resource.Attributes.Title ?? string.Empty,
-                ArtistName: artistName,
-                AlbumName: albumName,
-                AlbumArtist: artistName,
-                TrackNumber: 0,
-                DiscNumber: 0,
-                Genre: string.Empty,
-                Duration: ParseDuration(resource.Attributes.Duration),
-                Availability: TrackAvailability.Streaming));
+            tracks.Add(BuildTrack(resource, included, artistsById, albumsById));
         }
 
         return tracks;
+    }
+
+    // Shared by SearchAsync (a track resource found among "included") and
+    // GetTrackAsync (a track resource that IS "data") — same resource shape either
+    // way, so the same lookup-and-build logic applies once the id maps are ready.
+    private static Track BuildTrack(
+        IncludedResource resource, IReadOnlyList<IncludedResource> included,
+        Dictionary<string, IncludedResource>? artistsById = null, Dictionary<string, IncludedResource>? albumsById = null)
+    {
+        artistsById ??= included.Where(r => r.Type == "artists").ToDictionary(r => r.Id, r => r);
+        albumsById ??= included.Where(r => r.Type == "albums").ToDictionary(r => r.Id, r => r);
+
+        var artistName = string.Join(", ", (resource.Relationships?.Artists?.Data ?? [])
+            .Select(artist => artistsById.TryGetValue(artist.Id, out var found) ? found.Attributes?.Name : null)
+            .Where(name => !string.IsNullOrWhiteSpace(name)));
+
+        var albumId = resource.Relationships?.Albums?.Data?.FirstOrDefault()?.Id;
+        var albumName = albumId is not null && albumsById.TryGetValue(albumId, out var album)
+            ? album.Attributes?.Title ?? string.Empty
+            : string.Empty;
+
+        return new Track(
+            Id: $"tidal:{resource.Id}",
+            Title: resource.Attributes?.Title ?? string.Empty,
+            ArtistName: artistName,
+            AlbumName: albumName,
+            AlbumArtist: artistName,
+            TrackNumber: 0,
+            DiscNumber: 0,
+            Genre: string.Empty,
+            Duration: ParseDuration(resource.Attributes?.Duration),
+            Availability: TrackAvailability.Streaming);
     }
 
     // TIDAL reports duration as an ISO 8601 duration ("PT2M17S"), which is exactly the
@@ -126,6 +167,11 @@ public sealed class TidalCatalogClient(HttpClient httpClient)
     private sealed record ResourceRef(string Id, string Type);
 
     private sealed record SearchResultReply(SearchResultData? Data = null, List<IncludedResource>? Included = null);
+
+    // GetTrackAsync's envelope: Data IS the track resource directly (not a wrapper
+    // with a "tracks" relationship, since the id is already known), reusing
+    // IncludedResource's shape rather than a new type for the same fields.
+    private sealed record TrackResourceReply(IncludedResource? Data = null, List<IncludedResource>? Included = null);
 
     private sealed record SearchResultData(RelationshipSet? Relationships = null);
 

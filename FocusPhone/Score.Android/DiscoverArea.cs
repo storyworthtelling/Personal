@@ -61,12 +61,6 @@ public sealed class DiscoverArea : ScoreArea
     private string? searchStatus;
     private IReadOnlyList<PodcastSearchResult> results = [];
 
-    // TIDAL's own catalogue coverage is the deciding factor for this, not the owner's
-    // locale — see the B7 streaming-decision note in CLAUDE.md — so this is fixed
-    // rather than read from the device, matching every other hardcoded default in
-    // this app until a real region setting exists anywhere.
-    private const string TidalCountryCode = "US";
-
     private string trackQuery = string.Empty;
     private string? trackSearchStatus;
     private IReadOnlyList<Track> trackResults = [];
@@ -270,7 +264,7 @@ public sealed class DiscoverArea : ScoreArea
         }
 
         var found = await new TidalCatalogClient(new HttpClient())
-            .SearchAsync(accessToken, asked, TidalCountryCode, CancellationToken.None);
+            .SearchAsync(accessToken, asked, MusicLibrary.TidalCountryCode, CancellationToken.None);
         trackResults = found;
         trackSearchStatus = found.Count == 0 ? $"No tracks found for “{asked}”." : null;
         Invalidate();

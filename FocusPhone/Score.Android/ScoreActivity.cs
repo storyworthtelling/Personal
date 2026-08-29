@@ -85,6 +85,7 @@ public class ScoreActivity : Activity
         playback.Connect();
         ShowGreetingAsync();
         musicLibrary.RestoreFolderFromVault();
+        _ = musicLibrary.RevalidateSavedTidalTracksAsync();
 
         // The ten-day sweep. Here rather than on a schedule: it has nothing to do with
         // what the app is doing, and a worker for it would be a worker that usually
