@@ -210,4 +210,96 @@ public class TidalCatalogClientTests
 
         Assert.Null(track);
     }
+
+    // GetTrackArtworkUrlAsync's fixtures follow TIDAL's own published OpenAPI spec
+    // (components.schemas.Albums_Attributes carries no image field at all — cover
+    // art is a separate "coverArt" relationship resolving to an "artworks" resource
+    // with a files[] of different pixel sizes — confirmed against the spec document
+    // itself, not a live call). Two requests: the track for its album id, then the
+    // album for its cover art.
+    private const string TrackForArtUrl =
+        "https://openapi.tidal.com/v2/tracks/120268?countryCode=US&include=albums";
+    private const string AlbumUrl =
+        "https://openapi.tidal.com/v2/albums/120267?countryCode=US&include=coverArt";
+
+    [Fact]
+    public async Task GetTrackArtworkUrlAsync_PicksTheSmallestFileAtOrAboveThePreferredSize()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TrackForArtUrl, """
+            {"data":{"id":"120268","type":"tracks",
+              "relationships":{"albums":{"data":[{"id":"120267","type":"albums"}]}}}}
+            """);
+        handler.Respond(AlbumUrl, """
+            {"data":{"id":"120267","type":"albums"},
+             "included":[{"id":"art1","type":"artworks","attributes":{"mediaType":"IMAGE","files":[
+               {"href":"https://img.tidal.com/80.jpg","meta":{"width":80,"height":80}},
+               {"href":"https://img.tidal.com/320.jpg","meta":{"width":320,"height":320}},
+               {"href":"https://img.tidal.com/1280.jpg","meta":{"width":1280,"height":1280}}
+             ]}}]}
+            """);
+
+        var url = await client.GetTrackArtworkUrlAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Equal("https://img.tidal.com/320.jpg", url);
+    }
+
+    [Fact]
+    public async Task GetTrackArtworkUrlAsync_FallsBackToTheLargestFileWhenNoneMeetThePreferredSize()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TrackForArtUrl, """
+            {"data":{"id":"120268","type":"tracks",
+              "relationships":{"albums":{"data":[{"id":"120267","type":"albums"}]}}}}
+            """);
+        handler.Respond(AlbumUrl, """
+            {"data":{"id":"120267","type":"albums"},
+             "included":[{"id":"art1","type":"artworks","attributes":{"mediaType":"IMAGE","files":[
+               {"href":"https://img.tidal.com/80.jpg","meta":{"width":80,"height":80}}
+             ]}}]}
+            """);
+
+        var url = await client.GetTrackArtworkUrlAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Equal("https://img.tidal.com/80.jpg", url);
+    }
+
+    [Fact]
+    public async Task GetTrackArtworkUrlAsync_ReturnsNullWhenTheTrackHasNoAlbum()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TrackForArtUrl, """{"data":{"id":"120268","type":"tracks"}}""");
+
+        var url = await client.GetTrackArtworkUrlAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Null(url);
+        Assert.Single(handler.Requests); // never fetched an album with no id to fetch
+    }
+
+    [Fact]
+    public async Task GetTrackArtworkUrlAsync_ReturnsNullWhenTheAlbumHasNoCoverArt()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TrackForArtUrl, """
+            {"data":{"id":"120268","type":"tracks",
+              "relationships":{"albums":{"data":[{"id":"120267","type":"albums"}]}}}}
+            """);
+        handler.Respond(AlbumUrl, """{"data":{"id":"120267","type":"albums"},"included":[]}""");
+
+        var url = await client.GetTrackArtworkUrlAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Null(url);
+    }
+
+    [Fact]
+    public async Task GetTrackArtworkUrlAsync_ReturnsNullOnFailure()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TrackForArtUrl, """{"errors":[{"code":"NOT_FOUND"}]}""",
+            status: System.Net.HttpStatusCode.NotFound);
+
+        var url = await client.GetTrackArtworkUrlAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Null(url);
+    }
 }

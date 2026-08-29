@@ -86,6 +86,61 @@ public sealed class TidalCatalogClient(HttpClient httpClient)
         }
     }
 
+    // A file at or above this width is judged plenty for anywhere Score shows a
+    // cover — a phone list row or the now-playing bar, never a full-bleed print —
+    // so there is no reason to fetch the largest (and slowest) file TIDAL offers.
+    private const int PreferredArtworkPx = 320;
+
+    /// <summary>
+    /// The best-sized cover art URL for a track, or null if the track has no album
+    /// or the album has no cover art. Two requests, not one: cover art is not a
+    /// track or album attribute — TIDAL's published OpenAPI spec shows
+    /// Albums_Attributes carries no image field at all — it is a separate
+    /// <c>coverArt</c> relationship resolving to an <c>artworks</c> resource with a
+    /// <c>files[]</c> of different pixel sizes, and an album's id is not known until
+    /// the track itself has been fetched. Meant for one-off use (saving a track),
+    /// not for a whole page of search results, which is why this is not folded into
+    /// <see cref="SearchAsync"/> — N extra round trips for N results nobody has
+    /// chosen yet would make search itself slower for no benefit.
+    /// </summary>
+    public async Task<string?> GetTrackArtworkUrlAsync(
+        string accessToken, string trackId, string countryCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var trackUrl = $"{BaseUrl}tracks/{Uri.EscapeDataString(trackId)}" +
+                $"?countryCode={Uri.EscapeDataString(countryCode)}&include=albums";
+            var trackReply = await Get<TrackResourceReply>(accessToken, trackUrl, cancellationToken);
+            var albumId = trackReply?.Data?.Relationships?.Albums?.Data?.FirstOrDefault()?.Id;
+            if (string.IsNullOrEmpty(albumId))
+            {
+                return null;
+            }
+
+            var albumUrl = $"{BaseUrl}albums/{Uri.EscapeDataString(albumId)}" +
+                $"?countryCode={Uri.EscapeDataString(countryCode)}&include=coverArt";
+            var albumReply = await Get<TrackResourceReply>(accessToken, albumUrl, cancellationToken);
+            var files = albumReply?.Included?.FirstOrDefault(r => r.Type == "artworks")?.Attributes?.Files;
+            if (files is not { Count: > 0 })
+            {
+                return null;
+            }
+
+            // Smallest file that still clears the preferred size; if none does (every
+            // file is smaller than preferred), the largest available is the best on offer.
+            return files
+                .Where(f => (f.Meta?.Width ?? 0) >= PreferredArtworkPx)
+                .OrderBy(f => f.Meta!.Width)
+                .Select(f => f.Href)
+                .FirstOrDefault()
+                ?? files.OrderByDescending(f => f.Meta?.Width ?? 0).First().Href;
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException)
+        {
+            return null;
+        }
+    }
+
     // The relationship list gives the order and which tracks belong to this result;
     // "included" is an unordered pool of every tracks/albums/artists resource the
     // include= asked for, matched back to it by (id, type) — JSON:API's normal shape.
@@ -186,7 +241,12 @@ public sealed class TidalCatalogClient(HttpClient httpClient)
     private sealed record IncludedResource(
         string Id, string Type, ResourceAttributes? Attributes = null, RelationshipSet? Relationships = null);
 
-    // Shared across tracks/albums/artists: only the fields the type in question
-    // actually carries will be non-null after deserializing.
-    private sealed record ResourceAttributes(string? Title = null, string? Name = null, string? Duration = null);
+    // Shared across tracks/albums/artists/artworks: only the fields the type in
+    // question actually carries will be non-null after deserializing.
+    private sealed record ResourceAttributes(
+        string? Title = null, string? Name = null, string? Duration = null, List<ArtworkFile>? Files = null);
+
+    private sealed record ArtworkFile(string? Href = null, ArtworkFileMeta? Meta = null);
+
+    private sealed record ArtworkFileMeta(int? Width = null, int? Height = null);
 }

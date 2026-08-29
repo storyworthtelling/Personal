@@ -117,6 +117,55 @@ public sealed class MusicLibrary(
         savedTidal.Add(track);
         LoadCatalog();
         Changed?.Invoke();
+        _ = EnrichSavedTrackAsync(track);
+    }
+
+    /// <summary>
+    /// Fills in what TIDAL search results never carry — cover art (its own
+    /// relationship, not a search result attribute; see
+    /// <c>TidalCatalogClient.GetTrackArtworkUrlAsync</c>'s remarks) and tempo (TIDAL's
+    /// catalogue does not report BPM at all, the same reason Drive files fall back to
+    /// Deezer's keyless lookup — see CLAUDE.md's "Not from TIDAL" note). Run after
+    /// the save completes, not before, so the inline Saved state change (§7) never
+    /// waits on two extra network calls; best-effort throughout, since a track with
+    /// no artwork or no known tempo is still a perfectly usable saved track.
+    /// </summary>
+    private async Task EnrichSavedTrackAsync(Track track)
+    {
+        try
+        {
+            var probe = await new TidalAccessTokenProvider(host).RefreshAsync(CancellationToken.None);
+            if (probe.Status != TidalTokenPollStatus.Success || probe.AccessToken is not { Length: > 0 } accessToken)
+            {
+                return;
+            }
+
+            var rawId = track.Id.StartsWith("tidal:", StringComparison.Ordinal)
+                ? track.Id["tidal:".Length..]
+                : track.Id;
+            var catalog = new TidalCatalogClient(new HttpClient());
+            var artworkUrl = await catalog.GetTrackArtworkUrlAsync(
+                accessToken, rawId, TidalCountryCode, CancellationToken.None);
+            var artPath = artworkUrl is null
+                ? null
+                : await new TidalArtworkCache(host).DownloadAsync(rawId, artworkUrl, CancellationToken.None);
+
+            var bpm = await new DeezerTempoClient(new HttpClient())
+                .LookupAsync(track.ArtistName, track.Title, CancellationToken.None);
+
+            if (artPath is null && bpm == 0)
+            {
+                return; // Nothing learned — no point rewriting the record.
+            }
+
+            savedTidal.Replace(track with { ArtRef = artPath ?? track.ArtRef, Bpm = bpm != 0 ? bpm : track.Bpm });
+            LoadCatalog();
+            Changed?.Invoke();
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Error("MusicLibrary", $"EnrichSavedTrackAsync threw: {e}");
+        }
     }
 
     /// <summary>The undo side of <see cref="SaveTrack"/> — a saved track leaving the
