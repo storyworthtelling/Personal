@@ -11,12 +11,6 @@ public sealed class DriveSecretsVaultStore : ISecretsVaultStore
     // The shared file's name — one vault, referenced by name across every app (like the voice files).
     public const string FileName = "storyworthtelling-secrets.json";
 
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true
-    };
-
     private readonly IDriveTextFile file;
 
     public DriveSecretsVaultStore(IDriveTextFile file)
@@ -26,41 +20,15 @@ public sealed class DriveSecretsVaultStore : ISecretsVaultStore
 
     public async Task<SecretsVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken)
     {
-        var content = await file.ReadAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(content))
-            return SecretsVaultLoadResult.Empty;
-
-        SecretsEnvelope? envelope;
-        try
+        var (status, plaintext) = VaultEnvelope.Read(await file.ReadAsync(cancellationToken), passphrase);
+        if (status != SecretsVaultStatus.Loaded)
         {
-            envelope = JsonSerializer.Deserialize<SecretsEnvelope>(content, SerializerOptions);
-        }
-        catch (JsonException)
-        {
-            return SecretsVaultLoadResult.Corrupt;
-        }
-
-        if (envelope is null || string.IsNullOrEmpty(envelope.Ciphertext))
-            return SecretsVaultLoadResult.Corrupt;
-
-        string plaintext;
-        try
-        {
-            plaintext = SecretsCrypto.Decrypt(envelope, passphrase);
-        }
-        catch (WrongPassphraseException)
-        {
-            return SecretsVaultLoadResult.WrongPassphrase;
-        }
-        catch (FormatException)
-        {
-            // Base64 fields that aren't valid base64 — the envelope is malformed, not the passphrase.
-            return SecretsVaultLoadResult.Corrupt;
+            return new SecretsVaultLoadResult(status, SecretsVault.Empty);
         }
 
         try
         {
-            var vault = JsonSerializer.Deserialize<SecretsVault>(plaintext, SerializerOptions);
+            var vault = JsonSerializer.Deserialize<SecretsVault>(plaintext!, VaultEnvelope.SerializerOptions);
             return vault is null ? SecretsVaultLoadResult.Corrupt : SecretsVaultLoadResult.Loaded(vault);
         }
         catch (JsonException)
@@ -69,10 +37,8 @@ public sealed class DriveSecretsVaultStore : ISecretsVaultStore
         }
     }
 
-    public Task SaveAsync(SecretsVault vault, string passphrase, CancellationToken cancellationToken)
-    {
-        var plaintext = JsonSerializer.Serialize(vault, SerializerOptions);
-        var envelope = SecretsCrypto.Encrypt(plaintext, passphrase);
-        return file.WriteAsync(JsonSerializer.Serialize(envelope, SerializerOptions), cancellationToken);
-    }
+    public Task SaveAsync(SecretsVault vault, string passphrase, CancellationToken cancellationToken) =>
+        file.WriteAsync(
+            VaultEnvelope.Write(JsonSerializer.Serialize(vault, VaultEnvelope.SerializerOptions), passphrase),
+            cancellationToken);
 }
