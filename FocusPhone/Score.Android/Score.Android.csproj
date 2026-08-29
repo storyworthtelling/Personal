@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
     <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
     <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
+    <ProjectReference Include="..\Codex.Tidal.Binding\Codex.Tidal.Binding.csproj" />
   </ItemGroup>
 
   <ItemGroup>
