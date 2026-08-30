@@ -81,6 +81,32 @@ public class PostActivity : Activity
 
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
+        CheckSmsRole();
+    }
+
+    // Post cannot send a text or delete one for real without the SMS role, and the role
+    // can be taken away by something Post never sees — a policy pass, an OS update, the
+    // cutover's reset. So it is re-read on every launch rather than assumed from the day
+    // it was granted, and what comes back goes behind the fold: it is something waiting,
+    // not something to interrupt the owner with (§13).
+    private void CheckSmsRole()
+    {
+        var notice = SmsRoleAccess.CheckOnLaunch(this, new AccountStore(this));
+        if (!notice.Speaks)
+        {
+            DogEar.ClearNotices(content);
+            return;
+        }
+
+        DogEar.ShowNotices(this, content,
+        [
+            new DogEar.Notice(
+                notice.Headline,
+                notice.Detail,
+                notice.WasLost ? PaperTheme.ProblemMark : PaperTheme.CautionMark,
+                notice.CanRequest ? "Make Post the texting app" : null,
+                notice.CanRequest ? () => SmsRoleAccess.Request(this) : null),
+        ]);
     }
 
     // After a reinstall or the cutover's factory reset, refill the mail credentials from the
@@ -237,6 +263,14 @@ public class PostActivity : Activity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == SmsRoleAccess.RequestCode)
+        {
+            // Re-read rather than trusting the result code: the owner can leave the dialog
+            // by any route, and the only answer that matters is what the platform says now.
+            CheckSmsRole();
+            return;
+        }
+
         foreach (var area in areas)
         {
             area.OnActivityResult(requestCode, resultCode, data);

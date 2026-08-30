@@ -6,8 +6,18 @@ using Codex.Domain.Design;
 
 namespace Codex.Ui;
 
-/// <summary>One line on the card. Lead marks the primary intent; Destructive warns.</summary>
-public sealed record CardAction(string Label, Action Invoke, bool Lead = false, bool Destructive = false);
+/// <summary>
+/// One line on the card. Lead marks the primary intent; Destructive warns. Detail is a
+/// second, quieter line beneath the label — a notice needs to say what happened, not just
+/// name itself, and Hue lets a notice carry its own functional colour (§13).
+/// </summary>
+public sealed record CardAction(
+    string Label,
+    Action Invoke,
+    bool Lead = false,
+    bool Destructive = false,
+    string? Detail = null,
+    Color? Hue = null);
 
 /// <summary>
 /// Item actions (DESIGN.md §7): long-press opens a <b>centred paper card</b> over a
@@ -84,20 +94,29 @@ public static class ActionCard
 
     private static View BuildRow(Context context, FrameLayout host, CardAction action, int pad)
     {
-        var row = PaperUi.Body(context, action.Label);
-        row.SetTextColor(action.Destructive
+        var label = PaperUi.Body(context, action.Label);
+        label.SetTextColor(action.Hue ?? (action.Destructive
             ? PaperTheme.ProblemMark
-            : action.Lead ? PaperTheme.ActionText : PaperTheme.Ink);
+            : action.Lead ? PaperTheme.ActionText : PaperTheme.Ink));
 
-        if (action.Lead || action.Destructive)
+        if (action.Lead || action.Destructive || action.Hue is not null)
         {
-            row.SetTypeface(PaperTheme.SansSemibold(context), TypefaceStyle.Normal);
+            label.SetTypeface(PaperTheme.SansSemibold(context), TypefaceStyle.Normal);
         }
 
         var vertical = PaperTheme.Dp(context, DesignTokens.Space.X3);
+        var row = new LinearLayout(context) { Orientation = Orientation.Vertical };
         row.SetPadding(pad, vertical, pad, vertical);
         row.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
-        row.Gravity = GravityFlags.CenterVertical;
+        row.AddView(label);
+
+        // A notice has to say what happened, not just name itself. An action with nothing
+        // to add stays a single line, so the card is unchanged everywhere it was before.
+        if (!string.IsNullOrWhiteSpace(action.Detail))
+        {
+            row.AddView(PaperUi.Secondary(context, action.Detail));
+        }
+
         row.Clickable = true;
         row.Click += (_, _) =>
         {

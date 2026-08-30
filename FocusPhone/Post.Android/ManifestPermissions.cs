@@ -21,6 +21,14 @@ using Android;
 [assembly: UsesPermission(Manifest.Permission.WriteCallLog)]
 [assembly: UsesPermission(Manifest.Permission.WriteContacts)]
 
+// The SMS role. RECEIVE_SMS/RECEIVE_MMS are what let the delivery receivers fire at all,
+// and SEND_SMS is the send itself. Writing to the SMS provider needs no permission of its
+// own — being the role holder IS the permission, and it is also the duty: Android stops
+// persisting incoming texts the moment a third-party app takes over.
+[assembly: UsesPermission(Manifest.Permission.ReceiveSms)]
+[assembly: UsesPermission(Manifest.Permission.ReceiveMms)]
+[assembly: UsesPermission(Manifest.Permission.SendSms)]
+
 // Needed to resolve/deep-link the dialer, Google Messages, and email apps under
 // Android 11+ package-visibility filtering. Sideloaded, so QUERY_ALL_PACKAGES is fine.
 [assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]

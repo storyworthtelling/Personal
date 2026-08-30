@@ -330,6 +330,66 @@ public class FrozenInvariantsTests
             string.Join(", ", unpublished));
     }
 
+    // Android will not even OFFER Post the SMS role unless all four of these components
+    // are declared WITH their intent filters. An app missing one is simply absent from the
+    // "default SMS app" list, with nothing anywhere saying why — the same class of silent
+    // disqualification as the device-admin receiver in P5, and the reason this is a guard.
+    //
+    // Losing the role is not cosmetic: without it Post cannot send a text or delete one
+    // for real, which is half of what this phase exists to fix.
+    //
+    // The filter has to be found inside an [IntentFilter] attribute, not merely somewhere
+    // in the file. The first version of this test looked for the action string anywhere in
+    // the declaring file and passed happily with the attribute deleted, because the action
+    // is also the value of the constant the attribute referred to.
+    [Fact]
+    public void SmsRoleComponentsAreDeclaredWithTheirFilters()
+    {
+        (string Component, string Filter)[] required =
+        [
+            ("SmsDeliverReceiver", "SmsDeliver"),
+            ("MmsDeliverReceiver", "WapPushDeliver"),
+            ("RespondViaMessageService", "RespondViaMessage"),
+            ("SmsSendToActivity", "ActionSendto"),
+        ];
+
+        var sources = EnumerateRepoFiles("*.cs").Select(File.ReadAllText).ToList();
+
+        var missing = required.Where(component => !sources.Any(source =>
+                source.Contains($"\"{PolicyContext.CommunicationPackage}.{component.Component}\"", StringComparison.Ordinal)
+                && IntentFilters(source).Any(filter => filter.Contains(component.Filter, StringComparison.Ordinal))))
+            .Select(component => component.Component)
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "These components are what qualify Post for the SMS role; without every one of them, filter " +
+            "included, the phone will not offer it the role and nothing will say so: " + string.Join(", ", missing));
+    }
+
+    // Every [IntentFilter(...)] attribute in a source file, as text.
+    private static IEnumerable<string> IntentFilters(string source)
+    {
+        const string Attribute = "[IntentFilter(";
+        var index = source.IndexOf(Attribute, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            var depth = 0;
+            var end = index + Attribute.Length - 1;
+            for (; end < source.Length; end++)
+            {
+                if (source[end] == '(')
+                {
+                    depth++;
+                }
+                else if (source[end] == ')' && --depth == 0)
+                {
+                    break;
+                }
+            }
+            yield return source[index..Math.Min(end + 1, source.Length)];
+            index = source.IndexOf(Attribute, Math.Min(end + 1, source.Length), StringComparison.Ordinal);
+        }
+    }
     private static int CountCsFilesContaining(string literal) =>
         EnumerateRepoFiles("*.cs").Count(file =>
             File.ReadAllText(file).Contains(literal, StringComparison.Ordinal));

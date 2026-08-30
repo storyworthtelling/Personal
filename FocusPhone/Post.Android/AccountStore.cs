@@ -15,6 +15,7 @@ public class AccountStore
     private const string AddressKey = "gmailAddress";
     private const string AppPasswordKey = "gmailAppPassword";
     private const string GmBridgeSessionKey = "gmBridgeSession";
+    private const string SmsRoleHeldKey = "smsRoleHeld";
 
     private readonly ISharedPreferences preferences;
 
@@ -44,6 +45,18 @@ public class AccountStore
     {
         get => preferences.GetString(GmBridgeSessionKey, null);
         set => preferences.Edit()!.PutString(GmBridgeSessionKey, value)!.Apply();
+    }
+
+    /// <summary>
+    /// Whether Post held the SMS role the last time it looked. Kept because the useful
+    /// question on launch is not "do we hold it" but "did we just lose it" — the same
+    /// missing role reads as first-run setup or as something silently breaking texting,
+    /// and those want different words.
+    /// </summary>
+    public bool SmsRoleHeldAtLastLaunch
+    {
+        get => preferences.GetBoolean(SmsRoleHeldKey, false);
+        set => preferences.Edit()!.PutBoolean(SmsRoleHeldKey, value)!.Apply();
     }
 
     public bool IsConfigured =>
