@@ -23,6 +23,14 @@ public static class PaletteSpec
             [ColorRole.InProgress] = (207, 0.076),  // teal
         };
 
+    /// <summary>
+    /// The role wheel, exposed so a guard can check a per-app identity hue against the
+    /// SPEC that positions the roles rather than against a hand-copied list of degrees.
+    /// §3 requires an identity to stay clear of the roles it sits near; a copy of these
+    /// numbers in a test would drift the moment a role moved, and silently pass.
+    /// </summary>
+    public static IReadOnlyDictionary<ColorRole, (double Hue, double Chroma)> RoleWheel => RoleAxis;
+
     // Perceptual-lightness ladder shared by every role, with a per-tier chroma scale.
     private static readonly IReadOnlyDictionary<ColorTier, (double L, double CScale)> TierLadder =
         new Dictionary<ColorTier, (double, double)>

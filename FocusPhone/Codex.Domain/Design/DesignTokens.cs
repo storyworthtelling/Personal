@@ -78,6 +78,30 @@ public static class DesignTokens
             public const string Text = "#35544D";
             public const string Deep = "#263B36";
         }
+
+        /// <summary>
+        /// Post — deep indigo, sampled from the cover's BINDING rather than its
+        /// painting, and laddered into the role model's five tiers.
+        ///
+        /// Sampling the binding is a departure from the usual route, taken because the
+        /// subject is intrinsically warm: the mailbox painting samples near 65 degrees,
+        /// which is 14 from the resolved gray and 24 from Flyleaf's amber — an identity
+        /// that would both read as a status and look like the launcher on the shelf.
+        /// §12 already allows a binding to contrast the art it wraps, so the cloth is
+        /// what was sampled. At 285 degrees the nearest role is the slate-blue
+        /// reference, a comfortable 32 away.
+        ///
+        /// Lightnesses match Score's ladder exactly; chroma is roughly doubled, which
+        /// is what lets an indigo hold its own against a teal-slate on the same shelf.
+        /// </summary>
+        public static class Post
+        {
+            public const string Fill = "#B9B9D4";
+            public const string Ground = "#A1A1C7";
+            public const string Mark = "#5C5894";
+            public const string Text = "#494676";
+            public const string Deep = "#333252";
+        }
     }
 
     /// <summary>
