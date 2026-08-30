@@ -69,15 +69,101 @@ public static class PostSync
             : await FetchWithAppPasswordAsync(account, since);
 
         using var database = TimelineDatabase.Open(context);
+
+        // The load-bearing line of the whole phase. Reconcile mirrors the source, and a
+        // message the owner filed is still AT the source until its delete lands — so
+        // without this it walks straight back into the Mailbox, over and over, and filing
+        // looks broken.
+        var tombstones = database.Filing.LoadTombstones();
+        var visible = items.Where(item => !tombstones.IsFiled(item.SourceId)).ToList();
+
         if (reconcile)
         {
-            database.Cache.ReconcileWindow(TimelineItemKind.Email, since, items);
+            database.Cache.ReconcileWindow(TimelineItemKind.Email, since, visible);
         }
         else
         {
-            database.Cache.Upsert(items);
+            database.Cache.Upsert(visible);
         }
+
+        await RetryOwedDeletesAsync(context, database, account, route, tombstones);
         preferences.Edit()!.PutString(LastSyncKey, now.ToString("O"))!.Apply();
+    }
+
+    // A filing is not finished until the source agrees. Every sync retries what is still
+    // owed; a delete that lands drops its tombstone, and one that keeps failing eventually
+    // earns a fold — but the item stays filed either way, because the owner's intent stands
+    // whatever the server does.
+    private static async Task RetryOwedDeletesAsync(
+        Context context, TimelineDatabase database, AccountStore account,
+        MailTransport route, Tombstones tombstones)
+    {
+        var owed = tombstones.Outstanding();
+        if (owed.Count == 0)
+        {
+            return;
+        }
+
+        var archive = database.Filing.LoadArchive();
+        var byId = archive.All.ToDictionary(ghost => ghost.Item.SourceId, ghost => ghost.Item);
+
+        foreach (var sourceId in owed)
+        {
+            if (!byId.TryGetValue(sourceId, out var item))
+            {
+                // Nothing left to delete with — the ghost is gone, so nothing is owed.
+                tombstones.SourceConfirmed(sourceId);
+                continue;
+            }
+
+            try
+            {
+                if (await DeleteAtSourceAsync(context, account, route, item))
+                {
+                    tombstones.SourceConfirmed(sourceId);
+                }
+                else
+                {
+                    tombstones.AttemptFailed(sourceId, DateTimeOffset.UtcNow);
+                }
+            }
+            catch (Exception e)
+            {
+                tombstones.AttemptFailed(sourceId, DateTimeOffset.UtcNow);
+                Android.Util.Log.Warn("Post", $"Owed delete of {sourceId} failed: {e}");
+                PostDiagnostics.LogWarning("Filing", $"Owed delete of {sourceId} failed", e);
+            }
+        }
+
+        database.Filing.SaveTombstones(tombstones);
+    }
+
+    private static async Task<bool> DeleteAtSourceAsync(
+        Context context, AccountStore account, MailTransport route, TimelineItem item)
+    {
+        if (item.Kind != TimelineItemKind.Email)
+        {
+            // Texts and calls are deleted where they live, at the moment they are filed —
+            // the provider and the call log are local and do not need a round trip.
+            return true;
+        }
+        if (item.MessageId is null)
+        {
+            return true; // nothing to address the delete to
+        }
+
+        return route switch
+        {
+            MailTransport.GmailApi => await MailAccess.Api(context, account).TrashAsync(item.MessageId),
+            MailTransport.AppPassword => await DeleteWithAppPasswordAsync(account, item.MessageId),
+            _ => false,
+        };
+    }
+
+    private static async Task<bool> DeleteWithAppPasswordAsync(AccountStore account, string messageId)
+    {
+        await new GmailClient(account.GmailAddress!, account.GmailAppPassword!).DeleteAsync(messageId);
+        return true;
     }
 
     // The path Post is leaving. It stays only until the API is proven on a device: an

@@ -18,6 +18,14 @@ public sealed class TimelineDatabase : IDisposable
     public IdentityLinkStore IdentityLinks { get; }
     public ReadStateStore ReadState { get; }
 
+    /// <summary>
+    /// The ghost archive and the tombstones. Separate tables in the same file: the cache
+    /// mirrors the source and is rebuilt from it, while these are the opposite — once a
+    /// message is deleted at the source the ghost is the only copy anywhere. Same file so
+    /// there is one thing to back up, which timeline.db already is.
+    /// </summary>
+    public FilingStore Filing { get; }
+
     private TimelineDatabase(SqliteConnection connection)
     {
         this.connection = connection;
@@ -25,6 +33,7 @@ public sealed class TimelineDatabase : IDisposable
         Hidden = new HiddenItemStore(connection);
         IdentityLinks = new IdentityLinkStore(connection);
         ReadState = new ReadStateStore(connection);
+        Filing = new FilingStore(connection);
     }
 
     public static TimelineDatabase Open(Context context)

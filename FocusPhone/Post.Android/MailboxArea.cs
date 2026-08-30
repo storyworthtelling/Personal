@@ -96,6 +96,16 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             Host.StartActivity(intent);
         };
 
+        // Filing is the Mailbox's one destructive act, and it is undo-first: the
+        // correspondence goes at once and the corner folds (§7).
+        threadList.ItemLongClick += (_, e) =>
+        {
+            if (e.Position >= 0 && e.Position < shownRows.Count)
+            {
+                ShowRowActions(shownRows[e.Position]);
+            }
+        };
+
         // Pull the next page as the list nears its end (only while more remains).
         threadList.Scroll += (_, e) =>
         {
@@ -337,6 +347,46 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             emptyView.Text = emptyLine;
         }
     }
+
+    private void ShowRowActions(ThreadRow row)
+    {
+        ActionCard.Show(Host, Overlay, row.Title, row.Subtitle,
+            new CardAction("File this correspondence", () => FileCorrespondence(row), Lead: true));
+    }
+
+    // A correspondence is filed whole: every item in it goes to the archive and every
+    // source delete is owed. The owner deals with a PERSON on this screen, not with one
+    // message, which is why the Mailbox's unit is the thread and the correspondence
+    // screen's is the message.
+    private void FileCorrespondence(ThreadRow row)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var filed = ItemsFor(row.ContactKey);
+        if (filed.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var item in filed)
+        {
+            Filing.File(Host, item, now);
+        }
+
+        ReloadThreads();
+        DogEar.Show(Host, Overlay, $"Filed {row.Title}.", onUndo: () =>
+        {
+            foreach (var item in filed)
+            {
+                Filing.Unfile(Host, item.SourceId);
+            }
+            ReloadThreads();
+        });
+    }
+
+    private IReadOnlyList<TimelineItem> ItemsFor(string contactKey) =>
+        liveItems.Concat(cachedItems)
+            .Where(item => item.ContactKey == contactKey)
+            .ToList();
 
     // Brings the cache up to date with the mail account. Success is the refreshed list —
     // no toast, no banner, no "last synced" line. A failure folds into the corner and
