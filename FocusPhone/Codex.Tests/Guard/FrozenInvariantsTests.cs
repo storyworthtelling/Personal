@@ -227,6 +227,68 @@ public class FrozenInvariantsTests
         Assert.Contains("secrets.KEY_ALIAS", signingWorkflow!, StringComparison.Ordinal);
     }
 
+    // ---- Post (P7): the same invariants, for the third head through the rename ----
+
+    // Exactly one head declares the frozen communication ApplicationId. Post renames
+    // its folder, csproj and namespace; the package name is what a device matches an
+    // update against, so it survives all three.
+    [Fact]
+    public void CommunicationCsprojDeclaresFrozenApplicationId()
+    {
+        var declaring = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains($"<ApplicationId>{PolicyContext.CommunicationPackage}</ApplicationId>", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(declaring.Count == 1,
+            $"Exactly one csproj must declare the frozen communication ApplicationId " +
+            $"'{PolicyContext.CommunicationPackage}'; found {declaring.Count}:\n" +
+            string.Join("\n", declaring.Select(RepoRelative)));
+    }
+
+    // The head's two SharedPreferences files hold the mail account and the sync
+    // watermark. The rename moves them to postal names, which is only safe because a
+    // one-time copy-across reads the old files first — so the OLD literals must keep
+    // existing somewhere in the source. Delete the migration and the credentials are
+    // orphaned on device with no error: the app simply looks unconfigured.
+    [Fact]
+    public void CommunicationPreferenceMigrationLiteralsSurvive()
+    {
+        string[] frozen = ["account", "emailSync"];
+
+        var missing = frozen
+            .Where(name => CountCsFilesContaining($"\"{name}\"") == 0)
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "These original SharedPreferences file names must stay in the source so the one-time " +
+            "copy-across to the postal names can still find them: " + string.Join(", ", missing));
+    }
+
+    // The timeline database is named once, and that name is the only handle Android
+    // gives you on the file. Renaming it reads as a device with no history — and once
+    // the ghost archive lands, the history is no longer re-derivable from the sources.
+    [Fact]
+    public void TimelineDatabaseFileNameIsFrozen()
+    {
+        Assert.Equal(1, CountCsFilesContaining("\"timeline.db\""));
+    }
+
+    // The notification listener's access is granted once during provisioning against
+    // this component name, and the listener is KEPT after the rename as the fallback
+    // path for RCS (which never reaches the SMS provider). Renaming the class would
+    // revoke listener access silently on the next upgrade.
+    [Fact]
+    public void MessageBridgeListenerComponentNameIsFrozen()
+    {
+        Assert.Equal(1, CountCsFilesDeclaring(
+            $"{PolicyContext.CommunicationPackage}.MessageBridgeListener", "Name ="));
+    }
+
+    private static int CountCsFilesContaining(string literal) =>
+        EnumerateRepoFiles("*.cs").Count(file =>
+            File.ReadAllText(file).Contains(literal, StringComparison.Ordinal));
+
     // ---- repo helpers (root = the ancestor holding .github; survives the rename) ----
 
     private static string RepoRoot()
