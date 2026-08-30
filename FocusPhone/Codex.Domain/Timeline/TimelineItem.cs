@@ -60,6 +60,13 @@ public record TimelineItem(
     public bool Unread { get; init; }
     public IReadOnlyList<AttachmentRef> Attachments { get; init; } = [];
 
+    /// <summary>
+    /// What this mail is (Post). Null means not yet judged — which is not the same as
+    /// human, and is why the Mailbox treats an unclassified message as something that
+    /// waits rather than as trivia with a lifetime.
+    /// </summary>
+    public Post.MailClass? MailClass { get; init; }
+
     public bool IsGroup => GroupId is not null;
 }
 

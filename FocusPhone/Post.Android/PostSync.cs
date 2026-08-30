@@ -87,7 +87,29 @@ public static class PostSync
         }
 
         await RetryOwedDeletesAsync(context, database, account, route, tombstones);
+
+        // Sorting rides on the sync: the messages are already in hand and the phone is
+        // already awake, so a second worker would only be a second thing to go wrong.
+        await MailIntelligence.RunAsync(context, database, ReadingClient(context), now);
         preferences.Edit()!.PutString(LastSyncKey, now.ToString("O"))!.Apply();
+    }
+
+    // The model half of classification, or null when there is no key. Null is a working
+    // state rather than an error: rules-only Post still sorts every bill and most machine
+    // mail, and asks nothing of the network.
+    private static MailReadingClient? ReadingClient(Context context)
+    {
+        try
+        {
+            var options = Codex.Ui.Voice.VoiceOptionsAccess.ForHead(
+                MailAccess.Account().GetAccessToken, "Post");
+            return new MailReadingClient(MailAccess.Shared, options);
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Info("Post", $"No reading client: {e.Message}");
+            return null;
+        }
     }
 
     // A filing is not finished until the source agrees. Every sync retries what is still

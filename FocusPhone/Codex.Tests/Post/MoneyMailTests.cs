@@ -121,4 +121,36 @@ public class MoneyMailTests
         Assert.NotNull(payload);
         Assert.Null(payload!.AsOf);
     }
+
+    // The wire shape. It is a contract with another app, so it is pinned: a key renamed on
+    // one side of an intent fails by the receiver quietly reading nothing, which looks
+    // exactly like a balance that was never sent.
+    [Fact]
+    public void TheWireShapeIsPinned()
+    {
+        Assert.Equal("com.storyworthtelling.index", IndexHandoff.Package);
+        Assert.Equal("com.storyworthtelling.index.BalanceReceiver", IndexHandoff.Receiver);
+        Assert.Equal("com.storyworthtelling.index.RECEIVE_BALANCE", IndexHandoff.Permission);
+        Assert.Equal("balance", IndexHandoff.BalanceExtra);
+        Assert.Equal("asOf", IndexHandoff.AsOfExtra);
+    }
+
+    // A balance is money and must not be handed over as a double: 0.1 + 0.2 is not 0.3,
+    // and a ledger that disagrees with a bank by a cent is a ledger nobody trusts.
+    [Fact]
+    public void TheBalanceCrossesAsExactText()
+    {
+        var extras = IndexHandoff.Extras(new IndexBalance(2500.10m, new DateOnly(2026, 9, 1)));
+
+        Assert.Equal("2500.10", extras[IndexHandoff.BalanceExtra]);
+        Assert.Equal("2026-09-01", extras[IndexHandoff.AsOfExtra]);
+    }
+
+    [Fact]
+    public void ADatelessBalanceCarriesNoDateKeyAtAll()
+    {
+        var extras = IndexHandoff.Extras(new IndexBalance(2500m, AsOf: null));
+
+        Assert.False(extras.ContainsKey(IndexHandoff.AsOfExtra));
+    }
 }

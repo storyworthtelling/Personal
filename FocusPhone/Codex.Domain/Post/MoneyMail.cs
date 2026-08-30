@@ -202,6 +202,46 @@ public sealed record IndexBalance(decimal Balance, DateOnly? AsOf);
 /// </summary>
 public static class IndexHandoff
 {
+    /// <summary>Index's package. The intent names it explicitly rather than broadcasting.</summary>
+    public const string Package = "com.storyworthtelling.index";
+
+    /// <summary>The receiver, named directly so nothing else can intercept the balance.</summary>
+    public const string Receiver = "com.storyworthtelling.index.BalanceReceiver";
+
+    public const string Action = "com.storyworthtelling.index.action.BALANCE";
+
+    /// <summary>
+    /// The permission Index declares at protectionLevel="signature". It costs nothing —
+    /// every head already shares one keystore for the update channel — and without it any
+    /// app on the phone could feed Index fabricated balances.
+    /// </summary>
+    public const string Permission = "com.storyworthtelling.index.RECEIVE_BALANCE";
+
+    public const string BalanceExtra = "balance";
+    public const string AsOfExtra = "asOf";
+
     public static IndexBalance? PayloadFor(MoneyFacts facts) =>
         facts.Balance is { } balance ? new IndexBalance(balance, facts.AsOf) : null;
+
+    /// <summary>
+    /// The payload as intent extras. The balance crosses as exact TEXT rather than as a
+    /// double: 0.1 + 0.2 is not 0.3 in binary floating point, and a ledger that disagrees
+    /// with a bank by a cent is a ledger nobody trusts.
+    ///
+    /// A dateless balance carries no date key at all, rather than an empty one — Index
+    /// stamps arrival in that case, and an empty string would have to be told apart from a
+    /// date that failed to parse.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> Extras(IndexBalance payload)
+    {
+        var extras = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [BalanceExtra] = payload.Balance.ToString("0.00", CultureInfo.InvariantCulture),
+        };
+        if (payload.AsOf is { } asOf)
+        {
+            extras[AsOfExtra] = asOf.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+        return extras;
+    }
 }

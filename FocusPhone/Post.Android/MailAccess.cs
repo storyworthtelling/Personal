@@ -31,4 +31,7 @@ internal static class MailAccess
     // One HttpClient for the process, per the usual guidance: a new one per call leaks
     // sockets, and mail is reached often enough for that to matter on a phone.
     private static readonly HttpClient Http = new();
+
+    /// <summary>The same client, for anything else in the head that talks HTTP.</summary>
+    public static HttpClient Shared => Http;
 }

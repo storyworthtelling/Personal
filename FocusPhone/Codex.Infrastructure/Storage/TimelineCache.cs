@@ -29,6 +29,7 @@ public class TimelineCache
         ("externalConversationId", "TEXT"),
         ("unread", "INTEGER NOT NULL DEFAULT 0"),
         ("attachments", "TEXT"),
+        ("mailClass", "INTEGER"),
     };
 
     private readonly SqliteConnection connection;
@@ -84,11 +85,11 @@ public class TimelineCache
             INSERT INTO timelineItems (
                 kind, sourceId, contactKey, timestampUtc, snippet, incoming,
                 subject, body, fromAddress, recipients, carbonCopy, messageId, inReplyTo,
-                groupId, participants, externalConversationId, unread, attachments)
+                groupId, participants, externalConversationId, unread, attachments, mailClass)
             VALUES (
                 $kind, $sourceId, $contactKey, $timestampUtc, $snippet, $incoming,
                 $subject, $body, $fromAddress, $recipients, $carbonCopy, $messageId, $inReplyTo,
-                $groupId, $participants, $externalConversationId, $unread, $attachments)
+                $groupId, $participants, $externalConversationId, $unread, $attachments, $mailClass)
             ON CONFLICT (kind, sourceId) DO UPDATE SET
                 contactKey = excluded.contactKey,
                 timestampUtc = excluded.timestampUtc,
@@ -105,7 +106,12 @@ public class TimelineCache
                 participants = excluded.participants,
                 externalConversationId = excluded.externalConversationId,
                 unread = excluded.unread,
-                attachments = excluded.attachments
+                attachments = excluded.attachments,
+                -- A classification is only ever ADDED to a row, never cleared by a later
+                -- upsert: a re-sync re-reads the message from the source, which knows
+                -- nothing about how Post sorted it, and would otherwise undo the judgement
+                -- (and any correction the owner made) every half hour.
+                mailClass = COALESCE(excluded.mailClass, timelineItems.mailClass)
             """;
         var parameters = new Dictionary<string, SqliteParameter>();
         foreach (var name in new[]
@@ -113,6 +119,7 @@ public class TimelineCache
             "$kind", "$sourceId", "$contactKey", "$timestampUtc", "$snippet", "$incoming",
             "$subject", "$body", "$fromAddress", "$recipients", "$carbonCopy", "$messageId", "$inReplyTo",
             "$groupId", "$participants", "$externalConversationId", "$unread", "$attachments",
+            "$mailClass",
         })
         {
             var parameter = upsert.CreateParameter();
@@ -141,6 +148,7 @@ public class TimelineCache
             parameters["$externalConversationId"].Value = Nullable(item.ExternalConversationId);
             parameters["$unread"].Value = item.Unread ? 1 : 0;
             parameters["$attachments"].Value = Nullable(EncodeAttachments(item.Attachments));
+            parameters["$mailClass"].Value = item.MailClass is { } mailClass ? (int)mailClass : DBNull.Value;
             upsert.ExecuteNonQuery();
         }
         transaction.Commit();
@@ -159,7 +167,7 @@ public class TimelineCache
     private const string SelectColumns = """
         kind, sourceId, contactKey, timestampUtc, snippet, incoming,
         subject, body, fromAddress, recipients, carbonCopy, messageId, inReplyTo,
-        groupId, participants, externalConversationId, unread, attachments
+        groupId, participants, externalConversationId, unread, attachments, mailClass
         """;
 
     public IReadOnlyList<TimelineItem> LoadAll()
@@ -276,6 +284,7 @@ public class TimelineCache
                 ExternalConversationId = ReadString(reader, 15),
                 Unread = !reader.IsDBNull(16) && reader.GetInt32(16) != 0,
                 Attachments = DecodeAttachments(ReadString(reader, 17)),
+                MailClass = reader.IsDBNull(18) ? null : (Codex.Domain.Post.MailClass)reader.GetInt32(18),
             });
         }
         return items;
