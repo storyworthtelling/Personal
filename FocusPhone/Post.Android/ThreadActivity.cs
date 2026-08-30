@@ -5,9 +5,11 @@ using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Domain.Time;
+using Codex.Domain.Post;
 using Codex.Domain.Timeline;
 using Codex.Infrastructure.Email;
 using Codex.Ui;
+using Codex.Ui.Voice;
 
 namespace Post;
 
@@ -297,30 +299,63 @@ public class ThreadActivity : Activity
     private void DeleteEmail(TimelineItem item)
     {
         var account = new AccountStore(this);
-        if (account.IsConfigured && item.MessageId is not null)
+        if (item.MessageId is not null)
         {
-            new GmailClient(account.GmailAddress!, account.GmailAppPassword!)
-                .DeleteAsync(item.MessageId).GetAwaiter().GetResult();
+            switch (MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured))
+            {
+                case MailTransport.GmailApi:
+                    // A real trash, recoverable for 30 days — the same delete the Gmail app
+                    // performs, rather than IMAP's move into a folder that happens to be named
+                    // Trash. This is what makes filing safe enough to be a first-class verb.
+                    MailAccess.Api(this, account).TrashAsync(item.MessageId).GetAwaiter().GetResult();
+                    break;
+                case MailTransport.AppPassword:
+                    new GmailClient(account.GmailAddress!, account.GmailAppPassword!)
+                        .DeleteAsync(item.MessageId).GetAwaiter().GetResult();
+                    break;
+            }
         }
         using var database = TimelineDatabase.Open(this);
         database.Cache.Delete(item.Kind, item.SourceId);
     }
 
-    // The owner chose: try the bridge's remote-delete, else hide locally (the SMS
-    // provider only lets the default SMS app delete).
+    // Deleting a text for real depends on where it came from, and the routing is decided
+    // by pure tested logic rather than here. Holding the SMS role is what unlocks the
+    // provider: only the default app may write to it, which is exactly why Post takes it.
     private void DeleteText(TimelineItem item)
     {
-        if (item.SourceId.StartsWith("gm:", StringComparison.Ordinal))
+        var holdsRole = SmsRoleAccess.Status(this) == Codex.Domain.Post.SmsRoleStatus.Held;
+        switch (TextDelete.Choose(item.SourceId, holdsRole, GmBridgeClient.Shared(this).IsConnected))
         {
-            var messageId = item.SourceId["gm:".Length..];
-            if (!messageId.Contains(':') && GmBridgeClient.Shared(this).TryDelete(messageId))
-            {
-                using var database = TimelineDatabase.Open(this);
-                database.Cache.Delete(item.Kind, item.SourceId);
+            case TextDeletePath.SmsProvider:
+                DeleteProviderRow(Android.Provider.Telephony.Sms.ContentUri!, item, "sms:");
                 return;
-            }
+            case TextDeletePath.MmsProvider:
+                DeleteProviderRow(Android.Provider.Telephony.Mms.ContentUri!, item, "mms:");
+                return;
+            case TextDeletePath.Bridge:
+                var messageId = item.SourceId["gm:".Length..];
+                if (!messageId.Contains(':') && GmBridgeClient.Shared(this).TryDelete(messageId))
+                {
+                    using var database = TimelineDatabase.Open(this);
+                    database.Cache.Delete(item.Kind, item.SourceId);
+                    return;
+                }
+                break;
         }
+
         HideLocally(item);
+    }
+
+    // Removes the row the timeline item came from. The provider is the phone's own record
+    // of the owner's texts, so this is the delete that actually means something — every
+    // other app that reads it sees the message gone too.
+    private void DeleteProviderRow(Android.Net.Uri contentUri, TimelineItem item, string prefix)
+    {
+        var rowId = item.SourceId[prefix.Length..];
+        ContentResolver!.Delete(contentUri, "_id = ?", [rowId]);
+        using var database = TimelineDatabase.Open(this);
+        database.Cache.Delete(item.Kind, item.SourceId);
     }
 
     private void DeleteCallOrVoicemail(TimelineItem item)
@@ -346,16 +381,63 @@ public class ThreadActivity : Activity
     private void PlaceCall(string number) =>
         StartActivity(new Intent(Intent.ActionCall, Android.Net.Uri.Parse($"tel:{number}")));
 
-    // In-app via the bridge when it's connected and this thread has a known
-    // conversation; otherwise deep-link to Google Messages (documented fallback).
+    // The bridge first (the only route that carries RCS and full-quality pictures), then
+    // Post sending the SMS itself as role holder, then — only if neither is possible —
+    // handing the owner to Google Messages. Leaving Post to answer someone is the failure
+    // this app is measured against, so the deep link is genuinely last.
     private void SendText(string number)
     {
-        if (GmBridgeClient.Shared(this).IsConnected && bridgeConversationId is not null)
+        var holdsRole = SmsRoleAccess.Status(this) == Codex.Domain.Post.SmsRoleStatus.Held;
+        switch (TextSend.Choose(
+            GmBridgeClient.Shared(this).IsConnected, bridgeConversationId is not null, holdsRole))
         {
-            ShowBridgeCompose(bridgeConversationId, number);
-            return;
+            case TextSendPath.Bridge:
+                ShowBridgeCompose(bridgeConversationId!, number);
+                return;
+            case TextSendPath.NativeSms:
+                ShowNativeCompose(number);
+                return;
+            default:
+                StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{number}")));
+                return;
         }
-        StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{number}")));
+    }
+
+    // Post sends the text itself. As role holder it is also responsible for the record, so
+    // the sent message is written into the provider — Android does not do it for us, and a
+    // sent text missing from the phone's own store is a text the owner cannot find later.
+    private void ShowNativeCompose(string number)
+    {
+        var input = new EditText(this) { Hint = "Message" };
+        new AlertDialog.Builder(this)
+            .SetTitle("Text")!
+            .SetView(input)!
+            .SetPositiveButton("Send", (_, _) =>
+            {
+                var text = input.Text ?? string.Empty;
+                if (text.Length == 0)
+                {
+                    return;
+                }
+                try
+                {
+                    SmsSender.Send(this, number, text);
+                    LoadItems();
+                }
+                catch (Exception e)
+                {
+                    Android.Util.Log.Warn("Post", $"Native SMS send failed: {e}");
+                    PostDiagnostics.LogWarning("Sms", "Sending a text failed", e);
+                    DogEar.ShowNotices(this, undoHost!,
+                    [
+                        new DogEar.Notice("That text did not go out.",
+                            "Post holds the texting role but the send failed. It is still in the box below.",
+                            PaperTheme.ProblemMark),
+                    ]);
+                }
+            })!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
     }
 
     private void ShowBridgeCompose(string conversationId, string number)

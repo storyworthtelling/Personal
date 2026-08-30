@@ -1,4 +1,6 @@
+using Codex.Domain.Credentials;
 using Android.Content;
+using Codex.Domain.Post;
 using Codex.Domain.Timeline;
 using Codex.Infrastructure.Email;
 using Codex.Ui.Voice;
@@ -49,7 +51,8 @@ public static class PostSync
         }
 
         var account = new AccountStore(context);
-        if (!account.IsConfigured)
+        var route = MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured);
+        if (route == MailTransport.None)
         {
             return;
         }
@@ -61,21 +64,9 @@ public static class PostSync
             : (DateTimeOffset?)null;
         var since = EmailSyncWindow.Since(reconcile, lastSync, now, ReconcileWindow);
 
-        var client = new GmailClient(account.GmailAddress!, account.GmailAppPassword!);
-        var health = new CredentialHealthStore();
-        IReadOnlyList<TimelineItem> items;
-        try
-        {
-            items = await client.FetchRecentAsync(since);
-            // A completed authenticated fetch clears any prior app-password failure.
-            health.MarkOk(CredentialIds.GmailAppPassword);
-        }
-        catch (MailKit.Security.AuthenticationException ex)
-        {
-            // Only an auth rejection flags the app password; connect/network failures are transient.
-            health.MarkFailing(CredentialIds.GmailAppPassword, ex.Message);
-            throw;
-        }
+        var items = route == MailTransport.GmailApi
+            ? await MailAccess.Api(context, account).FetchRecentAsync(since)
+            : await FetchWithAppPasswordAsync(account, since);
 
         using var database = TimelineDatabase.Open(context);
         if (reconcile)
@@ -87,5 +78,28 @@ public static class PostSync
             database.Cache.Upsert(items);
         }
         preferences.Edit()!.PutString(LastSyncKey, now.ToString("O"))!.Apply();
+    }
+
+    // The path Post is leaving. It stays only until the API is proven on a device: an
+    // owner who has not yet registered Post as an OAuth client has no other way to reach
+    // their mail, and shipping API-only would leave email dead in that window.
+    private static async Task<IReadOnlyList<TimelineItem>> FetchWithAppPasswordAsync(
+        AccountStore account, DateTimeOffset since)
+    {
+        var client = new GmailClient(account.GmailAddress!, account.GmailAppPassword!);
+        var health = new CredentialHealthStore();
+        try
+        {
+            var items = await client.FetchRecentAsync(since);
+            // A completed authenticated fetch clears any prior app-password failure.
+            health.MarkOk(CredentialIds.GmailAppPassword);
+            return items;
+        }
+        catch (MailKit.Security.AuthenticationException ex)
+        {
+            // Only an auth rejection flags the app password; connect/network failures are transient.
+            health.MarkFailing(CredentialIds.GmailAppPassword, ex.Message);
+            throw;
+        }
     }
 }

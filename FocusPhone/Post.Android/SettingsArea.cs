@@ -1,8 +1,10 @@
+using Codex.Domain.Credentials;
 using Android.App;
 using Android.Content;
 using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
+using Codex.Domain.Post;
 using Codex.Ui;
 using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
@@ -102,9 +104,20 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
             Host.StartActivity(new Intent(Host, typeof(DiagnosticsActivity))));
         layout.AddView(diagnostics, Spaced(DesignTokens.Space.X4, 0));
 
+        // Which path mail is actually taking. Worth stating plainly, because the two behave
+        // differently in a way the owner will notice: only the API can really trash a
+        // message or have Gmail run the search.
+        var route = MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured);
+        layout.AddView(PaperUi.Secondary(Host, route switch
+        {
+            MailTransport.GmailApi => "Mail is going through the Gmail API. Deleting really trashes, and search runs on Gmail.",
+            MailTransport.AppPassword => "Mail is going through IMAP on the app password. Sign in with Google below to move to the Gmail API.",
+            _ => "No mail account yet.",
+        }), Spaced(DesignTokens.Space.X6, 0));
+
         var voiceStatus = PaperUi.Secondary(Host, VoiceGoogleAccount.IsSignedIn
             ? $"Signed in as {VoiceGoogleAccount.Email}."
-            : "Sign in with Google to back up your credentials to your encrypted vault.");
+            : "Sign in with Google to move mail to the Gmail API and back up your credentials to your encrypted vault.");
         var voiceSignIn = PaperUi.SecondaryButton(Host, "Sign in with Google", () => _ = SignInAsync(voiceStatus));
         layout.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));
         layout.AddView(voiceStatus, Spaced(DesignTokens.Space.X2, 0));

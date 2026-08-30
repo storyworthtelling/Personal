@@ -10,6 +10,14 @@ public class FakeHttpMessageHandler : HttpMessageHandler
 
     public List<HttpRequestMessage> Requests { get; } = [];
 
+    /// <summary>
+    /// Each request's body, captured while the request is still alive and keyed by its
+    /// index in <see cref="Requests"/>. A client that disposes its HttpRequestMessage —
+    /// which a well-behaved one does — takes the content with it, so reading the body off
+    /// a recorded request afterwards throws ObjectDisposedException.
+    /// </summary>
+    public List<string> Bodies { get; } = [];
+
     public void Respond(string url, string body, string mediaType = "application/json",
         System.Net.HttpStatusCode status = System.Net.HttpStatusCode.OK)
     {
@@ -19,18 +27,22 @@ public class FakeHttpMessageHandler : HttpMessageHandler
         };
     }
 
-    protected override Task<HttpResponseMessage> SendAsync(
+    protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Requests.Add(request);
+        Bodies.Add(request.Content is null
+            ? string.Empty
+            : await request.Content.ReadAsStringAsync(cancellationToken));
+
         var url = request.RequestUri!.AbsoluteUri;
         if (!responses.TryGetValue(url, out var factory))
         {
-            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
             {
                 Content = new StringContent($"No canned response for {url}"),
-            });
+            };
         }
-        return Task.FromResult(factory());
+        return factory();
     }
 }

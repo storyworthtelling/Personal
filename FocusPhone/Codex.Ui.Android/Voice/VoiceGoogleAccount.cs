@@ -13,9 +13,33 @@ namespace Codex.Ui.Voice;
 public sealed class VoiceGoogleAccount
 {
     public const int RequestCode = 9201;
-    private const string TokenScope = "oauth2:https://www.googleapis.com/auth/drive";
+    private const string DriveScope = "https://www.googleapis.com/auth/drive";
     private const string PrefsName = "voice";
     private const string EmailKey = "googleAccountEmail";
+
+    private readonly string tokenScope;
+
+    /// <summary>
+    /// Drive alone, which is what every head needs for the voice profile and the vault.
+    /// </summary>
+    public VoiceGoogleAccount() : this([])
+    {
+    }
+
+    /// <summary>
+    /// Drive plus whatever else this head needs — Post adds the two Gmail scopes.
+    /// The scope string IS the AccountManager token type, so a head asking for more gets
+    /// its own token rather than sharing one; and because it is also the consent screen,
+    /// adding a scope means re-registering the OAuth client and consenting again.
+    /// </summary>
+    public VoiceGoogleAccount(params string[] extraScopes)
+    {
+        var scopes = new[] { DriveScope }
+            .Concat(extraScopes.Where(scope => !string.IsNullOrWhiteSpace(scope)))
+            .Distinct()
+            .OrderBy(scope => scope, StringComparer.Ordinal);
+        tokenScope = "oauth2:" + string.Join(' ', scopes);
+    }
 
     private static TaskCompletionSource<string>? pendingChoice;
     private readonly object gate = new();
@@ -58,7 +82,7 @@ public sealed class VoiceGoogleAccount
                     manager.InvalidateAuthToken("com.google", cachedToken);
             }
 
-            var token = manager.BlockingGetAuthToken(account, TokenScope, true)
+            var token = manager.BlockingGetAuthToken(account, tokenScope, true)
                 ?? throw new InvalidOperationException("Could not get a Google token. Sign in again.");
             lock (gate)
             {
@@ -107,12 +131,12 @@ public sealed class VoiceGoogleAccount
             tcs.TrySetResult(email);
     }
 
-    private static Task EnsureConsent(Activity activity, string email)
+    private Task EnsureConsent(Activity activity, string email)
     {
         var manager = AccountManager.Get(activity)!;
         var account = new Account(email, "com.google");
         var tcs = new TaskCompletionSource<bool>();
-        manager.GetAuthToken(account, TokenScope, null, activity, new ConsentCallback(tcs), null);
+        manager.GetAuthToken(account, tokenScope, null, activity, new ConsentCallback(tcs), null);
         return tcs.Task;
     }
 

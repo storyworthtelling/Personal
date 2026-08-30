@@ -34,7 +34,10 @@ namespace Post;
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class PostActivity : Activity
 {
-    private readonly VoiceGoogleAccount voiceAccount = new();
+    // One Google sign-in for the whole head, scoped for BOTH jobs it has to do: Drive, for
+    // the encrypted secrets vault, and the two Gmail scopes the API path needs. Asking
+    // twice would mean two consent screens and two tokens for one account.
+    private readonly VoiceGoogleAccount voiceAccount = MailAccess.Account();
 
     private PostArea[] areas = [];
     private int activeIndex;
