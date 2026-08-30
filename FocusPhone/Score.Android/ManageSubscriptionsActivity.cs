@@ -143,7 +143,7 @@ public class ManageSubscriptionsActivity : Activity
         subscriptions.Remove(subscription.FeedUrl);
         Persist();
         Render();
-        UndoBar.Show(this, undoHost, $"Removed {subscription.Title}.", onUndo: () =>
+        DogEar.Show(this, undoHost, $"Removed {subscription.Title}.", onUndo: () =>
         {
             subscriptions = new SubscriptionList(snapshot);
             Persist();

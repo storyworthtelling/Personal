@@ -12,10 +12,14 @@ using Path = Android.Graphics.Path;
 namespace Codex.Ui;
 
 /// <summary>
-/// The book-metaphor undo affordance (DESIGN.md §13): instead of a floating bar that reads like a toast,
-/// a destructive act folds a <b>dog-ear</b> into the top-right corner of the page. Tapping the fold turns
-/// back — it reverses the act. The corner auto-flattens (dismisses) after the undo window. Overlay it on a
-/// FrameLayout host. One at a time; a new act replaces any fold still showing.
+/// The book-metaphor undo affordance (DESIGN.md §7 and §13): instead of a floating bar that reads like a
+/// toast, a destructive act folds a <b>dog-ear</b> into the top-right corner of the page. Tapping the fold
+/// turns back — it reverses the act. The corner auto-flattens (dismisses) after the undo window. Overlay it
+/// on a FrameLayout host. One at a time; a new act replaces any fold still showing.
+///
+/// This is the suite's <b>only</b> undo affordance. It replaced a bottom UndoBar, which was the same idea in
+/// the wrong dialect: two undo idioms in one design system, and the one that read as a toast was the one
+/// most screens had reached for.
 /// </summary>
 public static class DogEar
 {
@@ -24,9 +28,9 @@ public static class DogEar
         Dismiss(host);
 
         var size = PaperTheme.Dp(context, 72);
-        var fold = new FoldView(context, undoHint) { Tag = HostTag };
-
         var handler = new Handler(Looper.MainLooper!);
+        var fold = new FoldView(context, undoHint, handler) { Tag = HostTag };
+
         fold.Click += (_, _) =>
         {
             handler.RemoveCallbacksAndMessages(null);
@@ -49,11 +53,20 @@ public static class DogEar
 
     private static void Dismiss(FrameLayout host)
     {
-        var existing = host.FindViewWithTag(HostTag);
-        if (existing is not null)
+        if (host.FindViewWithTag(HostTag) is not View existing)
         {
-            host.RemoveView(existing);
+            return;
         }
+
+        // Cancel the OUTGOING fold's timer, not just its view. Each Show posts a
+        // delayed fade that finds the current fold by tag, so a timer left running
+        // from the fold being replaced would fade out its replacement early — the
+        // second undo of a quick pair would get a fraction of its window.
+        if (existing is FoldView outgoing)
+        {
+            outgoing.Timer.RemoveCallbacksAndMessages(null);
+        }
+        host.RemoveView(existing);
     }
 
     private static readonly Java.Lang.String HostTag = new("paper-dog-ear");
@@ -63,15 +76,17 @@ public static class DogEar
     private sealed class FoldView : View
     {
         private readonly float density;
-        private readonly string hint;
 
-        public FoldView(Context context, string hint) : base(context)
+        public FoldView(Context context, string hint, Handler timer) : base(context)
         {
             density = context.Resources!.DisplayMetrics!.Density;
-            this.hint = hint;
+            Timer = timer;
             Clickable = true;
             ContentDescription = hint;
         }
+
+        /// <summary>The auto-flatten timer, held so a replacing fold can cancel it.</summary>
+        public Handler Timer { get; }
 
         protected override void OnDraw(Canvas canvas)
         {

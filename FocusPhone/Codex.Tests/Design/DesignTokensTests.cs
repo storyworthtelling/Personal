@@ -140,6 +140,21 @@ public class DesignTokensTests
         }
     }
 
+    // §9: an inactive binder tab is cut from its area's own coloured cloth — the
+    // fill tier — and its glyph and label are plain Ink. That only works if Ink is
+    // legible on every cloth an area might take, which is a property of the ladder
+    // rather than of any one app, so it is asserted across the whole fill row. A
+    // label is small text, so AA body applies.
+    [Theory]
+    [InlineData("#A5C8AD")] [InlineData("#B1C69A")] [InlineData("#C0BDB9")] [InlineData("#AEC0D5")]
+    [InlineData("#D0BB91")] [InlineData("#E8ACAD")] [InlineData("#9BC7CD")]   // the seven roles
+    [InlineData("#AFC0BC")] [InlineData("#B9B9D4")]                            // Score, Post
+    public void InkIsLegibleOnEveryBinderTabCloth(string cloth)
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, cloth);
+        Assert.True(ratio >= 4.5, $"Ink on the {cloth} tab cloth is {ratio:F2}:1, below 4.5:1");
+    }
+
     // The reading ladder. Countdown and CoverTitle sit outside it — they are
     // single-purpose sizes, not steps you would set prose at — so they are not
     // part of this ordering.

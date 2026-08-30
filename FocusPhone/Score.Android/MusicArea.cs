@@ -28,7 +28,7 @@ public sealed class MusicArea : ScoreArea
         library.Changed += Invalidate;
     }
 
-    public override BinderArea Tab => new("Music", Resource.Drawable.area_music, PaperTheme.ScoreMark);
+    public override BinderArea Tab => new("Music", Resource.Drawable.area_music, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
 
     public override bool GoBack()
     {
@@ -239,7 +239,7 @@ public sealed class MusicArea : ScoreArea
 
         if (FilterMatch.IsWarranted(totalRows))
         {
-            var field = new FilterField(Host, "Filter", PaperTheme.ScoreMark);
+            var field = new FilterField(Host, "Filter", PaperTheme.ScoreMark, PaperTheme.ScoreFill);
             field.SetQuery(query);
             // Only the rows are rebuilt, never the pane: raising Changed on every
             // keystroke would replace the field itself and take the focus, the

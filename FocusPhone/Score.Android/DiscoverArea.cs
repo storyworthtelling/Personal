@@ -28,7 +28,7 @@ public sealed class DiscoverArea : ScoreArea
         library.Changed += Invalidate;
     }
 
-    public override BinderArea Tab => new("Discover", Resource.Drawable.area_discover, PaperTheme.ScoreMark);
+    public override BinderArea Tab => new("Discover", Resource.Drawable.area_discover, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
 
     public override View BuildView()
     {

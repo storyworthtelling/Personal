@@ -53,16 +53,33 @@ public class BinderTabLayoutTests
         Assert.True(tabs[^1].BottomDp <= 680);
     }
 
-    // The strip is centred rather than top-aligned so the frame stays balanced when
-    // an app carries fewer areas than the ceiling.
-    [Fact]
-    public void Tabs_AreCentredInTheWell()
+    // The strip is top-aligned under the header, not centred (§9). A centred strip
+    // moves every tab whenever an area is added or removed; a top-aligned one keeps
+    // each tab where the hand last found it, which is the whole point of a binder.
+    [Theory]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(6)]
+    [InlineData(9)]
+    public void Tabs_AreTopAlignedInTheWell(int count)
     {
-        var tabs = BinderTabLayout.Compute(4, wellHeightDp: 680);
+        var tabs = BinderTabLayout.Compute(count, wellHeightDp: 680);
 
-        var above = tabs[0].TopDp;
-        var below = 680 - tabs[^1].BottomDp;
-        Assert.InRange(Math.Abs(above - below), 0, 1);
+        Assert.Equal(0, tabs[0].TopDp);
+    }
+
+    // The corollary, and the reason it matters: an app that gains or loses an area
+    // leaves the tabs above the change exactly where they were.
+    [Fact]
+    public void AddingAnArea_DoesNotMoveTheTabsAboveIt()
+    {
+        var five = BinderTabLayout.Compute(5, wellHeightDp: 680);
+        var six = BinderTabLayout.Compute(6, wellHeightDp: 680);
+
+        for (var i = 0; i < five.Count; i++)
+        {
+            Assert.Equal(five[i].TopDp, six[i].TopDp);
+        }
     }
 
     // Six is the practical ceiling (DESIGN.md §9); past it the strip scrolls, which

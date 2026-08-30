@@ -105,7 +105,7 @@ public class AudioDiagnosticsActivity : Activity
         var snapshot = AudioDiagnostics.ReadAll();
         AudioDiagnostics.Clear();
         BindContent();
-        UndoBar.Show(this, undoHost!, "Cleared diagnostics.", onUndo: () =>
+        DogEar.Show(this, undoHost!, "Cleared diagnostics.", onUndo: () =>
         {
             AudioDiagnostics.Restore(snapshot);
             BindContent();

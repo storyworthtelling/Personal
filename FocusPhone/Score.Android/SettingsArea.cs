@@ -24,7 +24,7 @@ namespace Score;
 /// </summary>
 public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library) : ScoreArea(host)
 {
-    public override BinderArea Tab => new("Settings", Resource.Drawable.area_settings, PaperTheme.ScoreMark);
+    public override BinderArea Tab => new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
 
     public override View BuildView()
     {

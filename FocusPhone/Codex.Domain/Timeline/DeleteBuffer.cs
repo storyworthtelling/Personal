@@ -13,7 +13,7 @@ public record PendingDelete(TimelineItemKind Kind, string SourceId, DateTimeOffs
 /// the item at once and starts a timer; undo cancels it before the timer fires;
 /// once due, the item is handed back to the caller to perform the real, channel-
 /// specific deletion. Pure and testable — the Android layer owns the clock, the
-/// UndoBar, and the actual deletes.
+/// dog-ear, and the actual deletes.
 /// </summary>
 public sealed class DeleteBuffer
 {

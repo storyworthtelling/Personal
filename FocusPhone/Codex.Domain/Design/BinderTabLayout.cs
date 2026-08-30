@@ -48,9 +48,10 @@ public sealed class BinderTabStrip(IReadOnlyList<BinderTab> tabs, bool scrolls)
 ///
 /// Two rules shape it. Every tab clears §5's 48dp touch minimum, without exception —
 /// past the point where they all fit, the strip <b>scrolls</b> rather than shrinking
-/// them, which is why six is the practical ceiling. And the strip is <b>centred</b>
-/// in the well rather than top-aligned, so the frame stays balanced for an app
-/// carrying fewer areas.
+/// them, which is why six is the practical ceiling. And the strip is <b>top-aligned</b>
+/// under the header rather than centred in the well: a centred strip shifts every tab
+/// whenever an area is added or removed, while a top-aligned one keeps each tab where
+/// the hand last found it, which is the entire point of reaching for a divider.
 /// </summary>
 public static class BinderTabLayout
 {
@@ -85,13 +86,10 @@ public static class BinderTabLayout
         var used = (height * count) + gaps;
         var scrolls = used > available;
 
-        // A scrolling strip starts at the top; a fitting one is centred.
-        var top = scrolls ? 0 : (available - used) / 2;
-
         var tabs = new BinderTab[count];
         for (var i = 0; i < count; i++)
         {
-            tabs[i] = new BinderTab(top + (i * (height + GapDp)), height);
+            tabs[i] = new BinderTab(i * (height + GapDp), height);
         }
 
         return new BinderTabStrip(tabs, scrolls);

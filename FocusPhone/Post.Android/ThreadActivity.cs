@@ -249,7 +249,7 @@ public class ThreadActivity : Activity
         deleteBuffer.Schedule(item, DateTimeOffset.Now, window);
         LoadItems(); // Item disappears immediately.
 
-        UndoBar.Show(this, undoHost!, $"Deleted {ChannelWord(item)}.", onUndo: () =>
+        DogEar.Show(this, undoHost!, $"Deleted {ChannelWord(item)}.", onUndo: () =>
         {
             deleteBuffer.Undo(item.Kind, item.SourceId);
             LoadItems();

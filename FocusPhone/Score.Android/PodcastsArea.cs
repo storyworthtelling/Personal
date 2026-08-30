@@ -73,7 +73,7 @@ public sealed class PodcastsArea : ScoreArea
         RestoreLibraryFromDrive();
     }
 
-    public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ScoreMark);
+    public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
 
     public override View BuildView()
     {
@@ -250,7 +250,7 @@ public sealed class PodcastsArea : ScoreArea
 
         if (FilterMatch.IsWarranted(shelf.Count))
         {
-            var field = new FilterField(Host, "Filter shows", PaperTheme.ScoreMark);
+            var field = new FilterField(Host, "Filter shows", PaperTheme.ScoreMark, PaperTheme.ScoreFill);
             field.SetQuery(shelfQuery);
             // Rows only — rebuilding the pane per keystroke would take the field's
             // focus and the keyboard with it.
@@ -425,7 +425,7 @@ public sealed class PodcastsArea : ScoreArea
             return; // already in the queue; nothing new to undo
         }
 
-        UndoBar.Show(Host, Overlay, "Added to queue.", onUndo: () =>
+        DogEar.Show(Host, Overlay, "Added to queue.", onUndo: () =>
         {
             queue.Remove(episode.Id);
             SaveQueue();
@@ -444,7 +444,7 @@ public sealed class PodcastsArea : ScoreArea
         queue.Clear();
         SaveQueue();
         Invalidate();
-        UndoBar.Show(Host, Overlay, "Cleared queue.", onUndo: () =>
+        DogEar.Show(Host, Overlay, "Cleared queue.", onUndo: () =>
         {
             queue.ReplaceWith(snapshot);
             SaveQueue();
@@ -592,7 +592,7 @@ public sealed class PodcastsArea : ScoreArea
     private void MarkDoneWithUndo(Episode episode)
     {
         SetListened(episode.Id, listened: true);
-        UndoBar.Show(Host, Overlay, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
+        DogEar.Show(Host, Overlay, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
     }
 
     // Marks a batch played, remembering only the ids this action newly added so undo
@@ -610,7 +610,7 @@ public sealed class PodcastsArea : ScoreArea
         store.SaveListenedIds(listened);
         RecomputeDone();
         Invalidate();
-        UndoBar.Show(Host, Overlay, message, onUndo: () =>
+        DogEar.Show(Host, Overlay, message, onUndo: () =>
         {
             var ids = store.ListenedIds.ToHashSet();
             ids.ExceptWith(added);

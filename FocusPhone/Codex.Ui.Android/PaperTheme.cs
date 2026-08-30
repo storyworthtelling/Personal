@@ -46,6 +46,21 @@ public static class PaperTheme
     public static readonly Color ScoreMark = Color.ParseColor(DesignTokens.Identity.Score.Mark);
     public static readonly Color ScoreText = Color.ParseColor(DesignTokens.Identity.Score.Text);
     public static readonly Color ScoreDeep = Color.ParseColor(DesignTokens.Identity.Score.Deep);
+    public static readonly Color PostFill = Color.ParseColor(DesignTokens.Identity.Post.Fill);
+    public static readonly Color PostGround = Color.ParseColor(DesignTokens.Identity.Post.Ground);
+    public static readonly Color PostMark = Color.ParseColor(DesignTokens.Identity.Post.Mark);
+    public static readonly Color PostText = Color.ParseColor(DesignTokens.Identity.Post.Text);
+    public static readonly Color PostDeep = Color.ParseColor(DesignTokens.Identity.Post.Deep);
+
+    // The fill tiers exist here because §9 cuts an inactive binder tab from its area's
+    // own cloth, which is exactly that tier. Resolved is the neutral every app's
+    // Settings tab takes, so the one area they all share looks the same everywhere.
+    public static readonly Color ResolvedFill = Color.ParseColor(DesignTokens.ResolvedFill);
+    public static readonly Color ResolvedMark = Color.ParseColor(DesignTokens.ResolvedMark);
+    public static readonly Color CautionFill = Color.ParseColor(DesignTokens.CautionFill);
+    public static readonly Color PositiveFill = Color.ParseColor(DesignTokens.PositiveFill);
+    public static readonly Color PositiveMark = Color.ParseColor(DesignTokens.PositiveMark);
+
     public static readonly Color Walnut = Color.ParseColor(DesignTokens.Shelf.Walnut);
     public static readonly Color WalnutDeep = Color.ParseColor(DesignTokens.Shelf.WalnutDeep);
     public static readonly Color WalnutLight = Color.ParseColor(DesignTokens.Shelf.WalnutLight);

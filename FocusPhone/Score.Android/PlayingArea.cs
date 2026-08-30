@@ -56,7 +56,7 @@ public sealed class PlayingArea : ScoreArea
         settingsStore = new PlaybackSettingsStore(host);
     }
 
-    public override BinderArea Tab => new("Playing", Resource.Drawable.area_playing, PaperTheme.ScoreMark);
+    public override BinderArea Tab => new("Playing", Resource.Drawable.area_playing, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
 
     /// <summary>Named for the area, not for the track — the track has the page below.</summary>
     public override string Title => "Now playing";

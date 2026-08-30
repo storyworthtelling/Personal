@@ -105,7 +105,7 @@ public class DiagnosticsActivity : Activity
         var snapshot = PostDiagnostics.ReadAll();
         PostDiagnostics.Clear();
         BindContent();
-        UndoBar.Show(this, undoHost!, "Cleared diagnostics.", onUndo: () =>
+        DogEar.Show(this, undoHost!, "Cleared diagnostics.", onUndo: () =>
         {
             PostDiagnostics.Restore(snapshot);
             BindContent();
