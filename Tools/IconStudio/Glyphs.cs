@@ -314,5 +314,95 @@ public static class Glyphs
         canvas.DrawCircle(s * 0.5f, s * 0.71f, s * 0.026f, accent);
     }
 
+    /// <summary>
+    /// How far in from each edge §12's illustration window sits, as a fraction of the layer.
+    /// Shared with the renderer, which draws the art into exactly this rect — a second copy
+    /// of the number in either place would drift and leave the frame off the picture.
+    /// </summary>
+    public const float PlateInset = 0.325f;
+
+    /// <summary>
+    /// Post's cover, as the launcher icon: §12's ex-libris plate with the mailbox painting
+    /// already set into the window by the renderer. This draws what goes AROUND it — the
+    /// frame rule, the window keyline, and the four corner brackets.
+    ///
+    /// The corners are a <b>mitred bracket</b> rather than the default quarter-curve: the
+    /// art it frames is flat and geometric, where a curl fights it, and a bracket is the
+    /// variant that survives being shrunk to 48dp. Each corner is a REFLECTION of the
+    /// top-left, never a rotation — rotating an asymmetric corner through 90 degrees gives
+    /// a pinwheel with no mirror line, which reads wrong on a plate (§12).
+    /// </summary>
+    public static void PostPlate(SKCanvas canvas, float s)
+    {
+        using var cream = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = s * 0.011f,
+            StrokeCap = SKStrokeCap.Butt,
+            StrokeJoin = SKStrokeJoin.Miter,
+            Color = Tokens.Paper,
+            IsAntialias = true,
+        };
+        using var hair = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = s * 0.006f,
+            StrokeJoin = SKStrokeJoin.Miter,
+            Color = Tokens.Paper.WithAlpha(150),
+            IsAntialias = true,
+        };
+
+        // The window keyline, on exactly the rect the renderer put the painting in.
+        var window = new SKRect(
+            s * PlateInset, s * PlateInset, s * (1f - PlateInset), s * (1f - PlateInset));
+        canvas.DrawRect(window, cream);
+
+        // The brackets ARE the framing here; the shelf cover's full ex-libris rule is
+        // dropped. An adaptive icon's safe zone is the central 72 of 108, so a rule and a
+        // window keyline both fit only by sitting almost on top of each other, which at
+        // 48dp reads as one thick smudged border with the corners crushed against the art.
+        //
+        // The inset is set by the ROUND mask, not the square one. A corner sits at
+        // sqrt(2) x (0.5 - inset) from the centre, while a circular mask keeps only the
+        // central 72 of 108 — radius 0.333. Anything closer to the edge than 0.264 is
+        // outside that circle and is cut off completely on a launcher that draws round
+        // icons, which would leave the plate with no framing at all rather than with
+        // clipped framing.
+        var frame = new SKRect(s * 0.268f, s * 0.268f, s * 0.732f, s * 0.732f);
+        DrawMitredBrackets(canvas, frame, s, cream, hair);
+    }
+
+    // One bracket, drawn at the top-left of the frame and then mirrored into the other
+    // three corners — scale(-1,1), (1,-1) and (-1,-1) about the frame's own centre.
+    private static void DrawMitredBrackets(
+        SKCanvas canvas, SKRect frame, float s, SKPaint heavy, SKPaint light)
+    {
+        var arm = s * 0.062f;
+        var innerOffset = s * 0.015f;
+        var innerArm = arm * 0.55f;
+
+        using var bracket = new SKPath();
+        bracket.MoveTo(frame.Left, frame.Top + arm);
+        bracket.LineTo(frame.Left, frame.Top);
+        bracket.LineTo(frame.Left + arm, frame.Top);
+
+        using var inner = new SKPath();
+        inner.MoveTo(frame.Left + innerOffset, frame.Top + innerOffset + innerArm);
+        inner.LineTo(frame.Left + innerOffset, frame.Top + innerOffset);
+        inner.LineTo(frame.Left + innerOffset + innerArm, frame.Top + innerOffset);
+
+        (float X, float Y)[] mirrors = [(1, 1), (-1, 1), (1, -1), (-1, -1)];
+        foreach (var (x, y) in mirrors)
+        {
+            canvas.Save();
+            canvas.Translate(frame.MidX, frame.MidY);
+            canvas.Scale(x, y);
+            canvas.Translate(-frame.MidX, -frame.MidY);
+            canvas.DrawPath(bracket, heavy);
+            canvas.DrawPath(inner, light);
+            canvas.Restore();
+        }
+    }
+
     private static SKRect Inset(SKRect r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
 }

@@ -29,6 +29,17 @@ public static class Tokens
 
     public static readonly SKColor ScoreGround = SKColor.Parse(ScoreGroundHex);
 
+    // Post's identity (deep indigo, sampled from the cover's BINDING rather than its warm
+    // mailbox painting — see DESIGN.md §3). Its icon is that cover: the indigo cloth as the
+    // ground, with the painting set into a window on the foreground.
+    public const string PostGroundHex = "#A1A1C7";
+    public const string PostMarkHex = "#5C5894";
+    public const string PostDeepHex = "#333252";
+
+    public static readonly SKColor PostGround = SKColor.Parse(PostGroundHex);
+    public static readonly SKColor PostMark = SKColor.Parse(PostMarkHex);
+    public static readonly SKColor PostDeep = SKColor.Parse(PostDeepHex);
+
     public static readonly SKColor FlyleafWarm = SKColor.Parse(FlyleafWarmHex);
     public static readonly SKColor FlyleafMark = SKColor.Parse(FlyleafMarkHex);
     public static readonly SKColor FlyleafDeep = SKColor.Parse(FlyleafDeepHex);
