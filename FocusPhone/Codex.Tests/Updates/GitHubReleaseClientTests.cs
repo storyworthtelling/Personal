@@ -16,7 +16,7 @@ public class GitHubReleaseClientTests
           "name": "FocusPhone 1.4.0",
           "assets": [
             { "id": 11, "name": "Flyleaf.apk", "browser_download_url": "https://github.com/storyworthtelling/Personal/releases/download/apps-latest/Flyleaf.apk" },
-            { "id": 22, "name": "FocusPhone.Communication.apk", "browser_download_url": "https://github.com/storyworthtelling/Personal/releases/download/apps-latest/FocusPhone.Communication.apk" },
+            { "id": 22, "name": "Post.apk", "browser_download_url": "https://github.com/storyworthtelling/Personal/releases/download/apps-latest/Post.apk" },
             { "id": 33, "name": "checksums.txt", "browser_download_url": "https://github.com/storyworthtelling/Personal/releases/download/apps-latest/checksums.txt" }
           ]
         }

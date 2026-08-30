@@ -3,7 +3,7 @@ using Codex.Domain.Timeline;
 using Codex.Infrastructure.Email;
 using Codex.Ui.Voice;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Drives a Gmail sync into the timeline cache. Two modes share one path so the
@@ -17,7 +17,7 @@ namespace FocusPhone.Communication;
 /// The gmbridge text stream is a push feed with no delete channel, so the most a
 /// sync can do for texts is make sure the bridge is connected and draining.
 /// </summary>
-public static class CommunicationSync
+public static class PostSync
 {
     private const string SyncPreferences = "emailSync";
     private const string LastSyncKey = "lastSyncUtc";
@@ -44,7 +44,7 @@ public static class CommunicationSync
             catch (Exception e)
             {
                 Android.Util.Log.Warn("FocusPhoneComm", $"Bridge refresh during sync failed: {e}");
-                CommunicationDiagnostics.LogWarning("Bridge", "Bridge refresh during sync failed", e);
+                PostDiagnostics.LogWarning("Bridge", "Bridge refresh during sync failed", e);
             }
         }
 

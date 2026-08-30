@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Codex.Tests", "Codex.Tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flyleaf.Android", "Flyleaf.Android\Flyleaf.Android.csproj", "{D34BADED-1FCF-4719-9F4C-7868C7C058CE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FocusPhone.Communication.Android", "FocusPhone.Communication.Android\FocusPhone.Communication.Android.csproj", "{25F880BC-DBE3-4291-AE71-84E560C21F6A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Post.Android", "Post.Android\Post.Android.csproj", "{25F880BC-DBE3-4291-AE71-84E560C21F6A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FocusPhone.Camera.Android", "FocusPhone.Camera.Android\FocusPhone.Camera.Android.csproj", "{EA0AE816-1C63-45B5-B76F-A9828F9D09EB}"
 EndProject

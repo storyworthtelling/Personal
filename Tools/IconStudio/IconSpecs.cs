@@ -30,7 +30,7 @@ public static class IconSpecs
         new("FocusPhone.Camera", "FocusPhone/FocusPhone.Camera.Android/Resources", "appicon", false, Glyphs.Lens),
         new("Score", "FocusPhone/Score.Android/Resources", "appicon", false, Glyphs.Keyboard,
             Tokens.ScoreGroundHex, GroundImage: "Branding/score-ground.png"),
-        new("FocusPhone.Communication", "FocusPhone/FocusPhone.Communication.Android/Resources", "appicon", false, Glyphs.Speech),
+        new("Post", "FocusPhone/Post.Android/Resources", "appicon", false, Glyphs.Speech),
         // MAUI heads: resources live in the plain `Resources/` folder, not `Platforms/Android/Resources`.
         // These projects don't set <SingleProject>true</SingleProject>, so MAUI never repoints the Android
         // resource prefix at Platforms/Android/Resources — the active prefix stays the .NET-for-Android

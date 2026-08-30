@@ -2,7 +2,7 @@ using Android.Content;
 using AndroidX.Work;
 using Codex.Infrastructure.Email;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Gmail account settings. The app password is stored in app-private
@@ -54,8 +54,15 @@ public class AccountStore
 /// Periodic Gmail sync into the timeline cache (last 30 days on first run,
 /// then incremental). The one-shot run after configuring the account
 /// reconciles the full window so deletions land immediately; the actual sync
-/// work lives in <see cref="CommunicationSync"/>, shared with the Sync button.
+/// work lives in <see cref="PostSync"/>, shared with the Sync button.
+///
+/// The JNI class name is REGISTERED under the pre-rename namespace and frozen: the
+/// periodic request is persisted by class name in WorkManager's own database, and it
+/// is enqueued with ExistingPeriodicWorkPolicy.Keep — so on an upgraded device the
+/// stale registration wins, and if the class it names has moved the email sync simply
+/// never runs again, with nothing to see.
 /// </summary>
+[global::Android.Runtime.Register("com.storyworthtelling.focusphone.communication.EmailSyncWorker")]
 public class EmailSyncWorker : Worker
 {
     private const string WorkName = "focusphone-email-sync";
@@ -100,15 +107,15 @@ public class EmailSyncWorker : Worker
         try
         {
             // A WorkManager Worker.DoWork runs synchronously on its own background executor thread, so
-            // bridging the async sync here (rather than inside CommunicationSync) keeps the blocking at the
+            // bridging the async sync here (rather than inside PostSync) keeps the blocking at the
             // true sync/async boundary while the UI's Sync button awaits it properly.
             if (InputData.GetBoolean(ReconcileKey, false))
             {
-                CommunicationSync.RunReconcileAsync(ApplicationContext).GetAwaiter().GetResult();
+                PostSync.RunReconcileAsync(ApplicationContext).GetAwaiter().GetResult();
             }
             else
             {
-                CommunicationSync.RunIncrementalAsync(ApplicationContext).GetAwaiter().GetResult();
+                PostSync.RunIncrementalAsync(ApplicationContext).GetAwaiter().GetResult();
             }
             return Result.InvokeSuccess();
         }
@@ -117,7 +124,7 @@ public class EmailSyncWorker : Worker
             Android.Util.Log.Warn("FocusPhoneEmail", $"Email sync failed; will retry: {e}");
             // This runs invisibly in the background worker; without a durable record
             // a failing sync would silently stop conversations updating.
-            CommunicationDiagnostics.LogWarning("EmailSync", "Email sync failed; will retry", e);
+            PostDiagnostics.LogWarning("EmailSync", "Email sync failed; will retry", e);
             return Result.InvokeRetry();
         }
     }

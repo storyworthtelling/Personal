@@ -1,7 +1,7 @@
 using Android.App;
 using Android.Content;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Launches the in-app email composer (EmailComposeActivity). Kept as a small

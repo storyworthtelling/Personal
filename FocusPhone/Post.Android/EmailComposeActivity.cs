@@ -6,7 +6,7 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// In-app email composer: subject + Cc + body sent directly via Gmail, with file
@@ -137,7 +137,7 @@ public class EmailComposeActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Attachment copy failed: {e}");
-            CommunicationDiagnostics.LogWarning("Email", "Attachment copy failed", e);
+            PostDiagnostics.LogWarning("Email", "Attachment copy failed", e);
             return null;
         }
     }

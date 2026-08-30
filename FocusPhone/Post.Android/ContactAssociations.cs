@@ -3,7 +3,7 @@ using Android.Provider;
 using Codex.Domain.Timeline;
 using Codex.Infrastructure.Storage;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Reads the device's contact cards and returns, for each contact that has more

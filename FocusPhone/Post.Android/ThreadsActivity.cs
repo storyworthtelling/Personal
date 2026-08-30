@@ -12,7 +12,7 @@ using Codex.Ui;
 using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Secrets;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// The main screen: every conversation (calls, texts, email) merged into one
@@ -21,7 +21,7 @@ namespace FocusPhone.Communication;
 /// no data yet.
 /// </summary>
 [Activity(
-    Label = "Communication",
+    Label = "Post",
     MainLauncher = true,
     Exported = true,
     Theme = "@style/Theme.FocusPhone.Paper")]
@@ -76,7 +76,7 @@ public class ThreadsActivity : Activity
             if (account.IsConfigured)
                 return; // already have local credentials — never overwrite them
 
-            var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "FocusPhone.Communication");
+            var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "Post");
             var result = await access.Service.LoadAsync(System.Threading.CancellationToken.None);
             if (result.Status != SecretsVaultStatus.Loaded)
                 return;
@@ -105,7 +105,7 @@ public class ThreadsActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
-        greeting = new Codex.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "FocusPhone.Communication");
+        greeting = new Codex.Ui.Voice.VoiceGreeting(voiceAccount.GetAccessToken, "Post");
         RestoreGmailFromVault();
         SetContentView(BuildLayout());
 
@@ -139,7 +139,7 @@ public class ThreadsActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Could not schedule email sync: {e}");
-            CommunicationDiagnostics.LogWarning("EmailSync", "Could not schedule email sync", e);
+            PostDiagnostics.LogWarning("EmailSync", "Could not schedule email sync", e);
         }
 
         CrashReporter.ShowPendingCrash(this);
@@ -175,7 +175,7 @@ public class ThreadsActivity : Activity
             PaperTheme.Dp(this, DesignTokens.Space.X3), PaperTheme.Dp(this, DesignTokens.Space.X3));
         header.SetGravity(GravityFlags.CenterVertical);
 
-        var title = PaperUi.Display(this, "Communication");
+        var title = PaperUi.Display(this, "Mailbox");
         header.AddView(title,
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
@@ -404,7 +404,7 @@ public class ThreadsActivity : Activity
             // The timeline cache is a convenience over the live call log; never let
             // a database problem crash the screen — fall back to a plain merge.
             Android.Util.Log.Warn("FocusPhoneComm", $"Timeline stores unavailable: {e}");
-            CommunicationDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
+            PostDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
             merged = new TimelineMerger().Merge(live.Concat(priorCache).Concat(page));
         }
 
@@ -470,13 +470,13 @@ public class ThreadsActivity : Activity
             var ok = true;
             try
             {
-                await CommunicationSync.RunReconcileAsync(this);
+                await PostSync.RunReconcileAsync(this);
             }
             catch (Exception e)
             {
                 ok = false;
                 Android.Util.Log.Warn("FocusPhoneComm", $"Manual sync failed: {e}");
-                CommunicationDiagnostics.LogWarning("EmailSync", "Manual sync failed", e);
+                PostDiagnostics.LogWarning("EmailSync", "Manual sync failed", e);
             }
             RunOnUiThread(() =>
             {

@@ -2,7 +2,7 @@ using Android.Content;
 using Android.Provider;
 using Codex.Domain.Timeline;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Reads the system SMS/MMS store (Google Messages remains the SMS app; we

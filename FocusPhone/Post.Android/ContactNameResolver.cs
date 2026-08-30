@@ -1,7 +1,7 @@
 using Android.Content;
 using Android.Provider;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Resolves timeline contact keys (normalized phone numbers, email addresses,

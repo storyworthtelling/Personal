@@ -6,7 +6,7 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Settings → Diagnostics: shows the rolling diagnostic log (non-fatal failures
@@ -56,7 +56,7 @@ public class DiagnosticsActivity : Activity
     private void BindContent()
     {
         contentColumn!.RemoveAllViews();
-        var logText = CommunicationDiagnostics.ReadAll().TrimEnd();
+        var logText = PostDiagnostics.ReadAll().TrimEnd();
         var hasEntries = logText.Length > 0;
 
         contentColumn.AddView(PaperUi.PageHeader(this, "Diagnostics"));
@@ -80,7 +80,7 @@ public class DiagnosticsActivity : Activity
         if (GetSystemService(Context.ClipboardService) is ClipboardManager clipboard)
         {
             clipboard.PrimaryClip = ClipData.NewPlainText(
-                "FocusPhone diagnostics", CommunicationDiagnostics.BuildExport(this));
+                "FocusPhone diagnostics", PostDiagnostics.BuildExport(this));
             Toast.MakeText(this, "Copied to clipboard.", ToastLength.Short)!.Show();
         }
     }
@@ -89,25 +89,25 @@ public class DiagnosticsActivity : Activity
     {
         var intent = new Intent(Intent.ActionSend);
         intent.SetType("text/plain");
-        intent.PutExtra(Intent.ExtraSubject, "FocusPhone Communication diagnostics");
-        intent.PutExtra(Intent.ExtraText, CommunicationDiagnostics.BuildExport(this));
+        intent.PutExtra(Intent.ExtraSubject, "Post diagnostics");
+        intent.PutExtra(Intent.ExtraText, PostDiagnostics.BuildExport(this));
         StartActivity(Intent.CreateChooser(intent, "Share diagnostics"));
     }
 
     private void ClearLog()
     {
-        if (!CommunicationDiagnostics.HasEntries)
+        if (!PostDiagnostics.HasEntries)
         {
             return;
         }
         // Destructive acts are undo-first, never a confirm dialog (DESIGN.md §7):
         // clear now, refresh to the empty state, and offer a window to reverse it.
-        var snapshot = CommunicationDiagnostics.ReadAll();
-        CommunicationDiagnostics.Clear();
+        var snapshot = PostDiagnostics.ReadAll();
+        PostDiagnostics.Clear();
         BindContent();
         UndoBar.Show(this, undoHost!, "Cleared diagnostics.", onUndo: () =>
         {
-            CommunicationDiagnostics.Restore(snapshot);
+            PostDiagnostics.Restore(snapshot);
             BindContent();
         });
     }

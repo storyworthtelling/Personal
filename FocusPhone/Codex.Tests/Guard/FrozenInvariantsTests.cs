@@ -285,6 +285,51 @@ public class FrozenInvariantsTests
             $"{PolicyContext.CommunicationPackage}.MessageBridgeListener", "Name ="));
     }
 
+    // The periodic email sync is enqueued with ExistingPeriodicWorkPolicy.Keep, so on
+    // an upgraded device the request WorkManager already persisted wins — and it names
+    // the worker by JNI class name. Move the class and Keep hands the sync to a name
+    // that no longer resolves: it never runs again, and nothing says so. The class is
+    // therefore Registered under its pre-rename name, and the two unique work names
+    // are frozen alongside it, since those are what Keep and Replace match on.
+    [Fact]
+    public void EmailSyncWorkerRegistrationAndWorkNamesAreFrozen()
+    {
+        Assert.Equal(1, CountCsFilesDeclaring(
+            $"{PolicyContext.CommunicationPackage}.EmailSyncWorker", "Register("));
+        Assert.Equal(1, CountCsFilesContaining("\"focusphone-email-sync\""));
+        Assert.Equal(1, CountCsFilesContaining("\"focusphone-email-sync-once\""));
+    }
+
+    // Every owner-namespace head must actually reach the rolling release, or the
+    // device-owner update channel never sees it. This is not hypothetical: the
+    // publish step used to match heads with a `FocusPhone.*.Android` glob, which
+    // silently stopped matching a head each time one was renamed — it missed Flyleaf,
+    // and then missed Score for an entire phase. A workflow that builds a head but
+    // does not publish it looks completely healthy from the outside, which is exactly
+    // what a guard is for.
+    [Fact]
+    public void EveryOwnerHeadIsPublishedToTheRollingRelease()
+    {
+        var publishSteps = Directory
+            .EnumerateFiles(Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml")
+            .Select(File.ReadAllText)
+            .Where(text => text.Contains("publish-rolling-release", StringComparison.Ordinal))
+            .ToList();
+
+        var unpublished = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains("<ApplicationId>com.storyworthtelling.", StringComparison.Ordinal))
+            .Select(file => Path.GetDirectoryName(RepoRelative(file))!.Replace(Path.DirectorySeparatorChar, '/'))
+            .Where(directory => !publishSteps.Any(text =>
+                text.Contains($"{directory}/bin/Release/net10.0-android/publish/", StringComparison.Ordinal)))
+            .ToList();
+
+        Assert.True(unpublished.Count == 0,
+            "These heads declare an owner-namespace ApplicationId but no workflow publishes their " +
+            "signed APK to the apps-latest rolling release, so the phone will never install them: " +
+            string.Join(", ", unpublished));
+    }
+
     private static int CountCsFilesContaining(string literal) =>
         EnumerateRepoFiles("*.cs").Count(file =>
             File.ReadAllText(file).Contains(literal, StringComparison.Ordinal));

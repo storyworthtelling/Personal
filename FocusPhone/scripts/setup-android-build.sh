@@ -66,6 +66,6 @@ chmod +x "${SDK}/platform-tools/adb"
 
 echo
 echo "Done. Build the heads with:"
-for head in Codex.Ui.Android Flyleaf.Android FocusPhone.Audio.Android FocusPhone.Communication.Android; do
+for head in Codex.Ui.Android Flyleaf.Android Score.Android Post.Android; do
   echo "  dotnet build FocusPhone/${head}/${head}.csproj -p:AndroidSdkDirectory=${SDK} -p:AndroidUseApkSigner=false"
 done

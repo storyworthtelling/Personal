@@ -2,7 +2,7 @@ using Android.App;
 using Android.Service.Notification;
 using Codex.Domain.Timeline;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Tier-2 messaging bridge: captures incoming texts from Google Messages
@@ -112,7 +112,7 @@ public class MessagesNotificationListener : NotificationListenerService
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Could not cache notification items: {e}");
-            CommunicationDiagnostics.LogWarning("Notifications", "Could not cache notification items", e);
+            PostDiagnostics.LogWarning("Notifications", "Could not cache notification items", e);
         }
     }
 

@@ -4,10 +4,10 @@ using Android.Content.PM;
 using Android.Runtime;
 using Codex.Domain.Diagnostics;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
-/// The Communication head's diagnostics layer, on top of the shared one-shot
+/// The Post head's diagnostics layer, on top of the shared one-shot
 /// <see cref="Ui.CrashReporter"/>. It keeps a rolling, reviewable
 /// <see cref="DiagnosticLog"/> of non-fatal failures (background email sync, the
 /// message bridge, timeline-store problems) that never crash the app, plus a copy
@@ -15,14 +15,14 @@ namespace FocusPhone.Communication;
 /// Settings → Diagnostics screen. There is no ADB or logcat after cutover
 /// (CUTOVER.md §17), so this on-device log is the only window into these faults.
 ///
-/// Install once from <see cref="CommunicationApplication.OnCreate"/> (after the
+/// Install once from <see cref="PostApplication.OnCreate"/> (after the
 /// shared CrashReporter). The log is rooted at the app's FilesDir, which the
 /// WorkManager sync process shares with the UI process, so background failures
 /// land in the same file the screen reads.
 /// </summary>
-public static class CommunicationDiagnostics
+public static class PostDiagnostics
 {
-    private const string Label = "Communication";
+    private const string Label = "Post";
 
     private static DiagnosticLog? log;
     private static CrashLogStore? crashStore;

@@ -2,7 +2,7 @@ using Android.Content;
 using Codex.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Opens the app-private SQLite database backing the timeline cache.

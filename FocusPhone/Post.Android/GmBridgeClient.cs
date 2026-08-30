@@ -2,7 +2,7 @@ using System.Text.Json;
 using Android.Content;
 using Codex.Domain.Timeline;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Wraps the gmbridge Messages-for-Web binding: pairs a Google account, keeps a
@@ -56,7 +56,7 @@ public sealed class GmBridgeClient
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Bridge connect failed: {e}");
-            CommunicationDiagnostics.LogWarning("Bridge", "Bridge connect failed", e);
+            PostDiagnostics.LogWarning("Bridge", "Bridge connect failed", e);
         }
     }
 
@@ -82,7 +82,7 @@ public sealed class GmBridgeClient
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Bridge send failed: {e}");
-            CommunicationDiagnostics.LogWarning("Bridge", "Bridge text send failed", e);
+            PostDiagnostics.LogWarning("Bridge", "Bridge text send failed", e);
             return false;
         }
     }
@@ -102,7 +102,7 @@ public sealed class GmBridgeClient
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Bridge media send failed: {e}");
-            CommunicationDiagnostics.LogWarning("Bridge", "Bridge media send failed", e);
+            PostDiagnostics.LogWarning("Bridge", "Bridge media send failed", e);
             return false;
         }
     }

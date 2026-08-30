@@ -9,7 +9,7 @@ using Codex.Domain.Timeline;
 using Codex.Infrastructure.Email;
 using Codex.Ui;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// One person's or group's unified history — texts, calls, voicemails, and email
@@ -133,7 +133,7 @@ public class ThreadActivity : Activity
             catch (Exception e)
             {
                 Android.Util.Log.Warn("FocusPhoneComm", $"Timeline stores unavailable: {e}");
-                CommunicationDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
+                PostDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
                 thread = new TimelineMerger().Merge(gathered)
                     .FirstOrDefault(candidate => candidate.ContactKey == contactKey);
             }
@@ -289,7 +289,7 @@ public class ThreadActivity : Activity
             catch (Exception e)
             {
                 Android.Util.Log.Warn("FocusPhoneComm", $"Delete of {item.Kind}:{item.SourceId} failed: {e}");
-                CommunicationDiagnostics.LogWarning("Delete", $"Delete of {item.Kind}:{item.SourceId} failed", e);
+                PostDiagnostics.LogWarning("Delete", $"Delete of {item.Kind}:{item.SourceId} failed", e);
             }
         });
     }
@@ -452,7 +452,7 @@ public class ThreadActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Reading photo failed: {e}");
-            CommunicationDiagnostics.LogWarning("Photo", "Reading photo attachment failed", e);
+            PostDiagnostics.LogWarning("Photo", "Reading photo attachment failed", e);
             return null;
         }
     }
@@ -476,7 +476,7 @@ public class ThreadActivity : Activity
         catch (Exception e)
         {
             Android.Util.Log.Warn("FocusPhoneComm", $"Outgoing echo failed: {e}");
-            CommunicationDiagnostics.LogWarning("Bridge", "Recording sent message locally failed", e);
+            PostDiagnostics.LogWarning("Bridge", "Recording sent message locally failed", e);
         }
     }
 

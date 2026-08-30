@@ -1,7 +1,7 @@
 using Android.Content;
 using Android.Provider;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Lists device contacts for the new-conversation recipient picker: phone

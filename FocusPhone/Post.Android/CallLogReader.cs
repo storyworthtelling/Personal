@@ -2,7 +2,7 @@ using Android.Content;
 using Android.Provider;
 using Codex.Domain.Timeline;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Reads the system call log (Google Phone remains the dialer; we only

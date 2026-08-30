@@ -9,7 +9,7 @@ using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 
-namespace FocusPhone.Communication;
+namespace Post;
 
 /// <summary>
 /// Gmail account setup: address + app password. Reached by long-pressing the
@@ -52,7 +52,7 @@ public class SettingsActivity : Activity
     {
         try
         {
-            var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "FocusPhone.Communication");
+            var access = new SecretsVaultAccess(voiceAccount.GetAccessToken, "Post");
             await access.Service.PublishAsync(v => v with
             {
                 Gmail = new GmailSecrets(

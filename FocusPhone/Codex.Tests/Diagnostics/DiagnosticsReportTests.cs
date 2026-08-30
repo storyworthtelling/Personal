@@ -16,7 +16,7 @@ public class DiagnosticsReportTests
         "Communication",
         "System.InvalidOperationException",
         "SQLite provider missing",
-        "   at FocusPhone.Communication.TimelineDatabase.Open()");
+        "   at Post.TimelineDatabase.Open()");
 
     [Fact]
     public void Build_ContainsAllSectionsAndSnapshot()
