@@ -250,7 +250,7 @@ public sealed class PodcastsArea : ScoreArea
 
         if (FilterMatch.IsWarranted(shelf.Count))
         {
-            var field = new FilterField(Host, "Filter shows", PaperTheme.ScoreMark, PaperTheme.ScoreFill);
+            var field = new FilterField(Host, "Filter shows", PaperTheme.ScoreMark);
             field.SetQuery(shelfQuery);
             // Rows only — rebuilding the pane per keystroke would take the field's
             // focus and the keyboard with it.

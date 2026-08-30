@@ -239,7 +239,7 @@ public sealed class MusicArea : ScoreArea
 
         if (FilterMatch.IsWarranted(totalRows))
         {
-            var field = new FilterField(Host, "Filter", PaperTheme.ScoreMark, PaperTheme.ScoreFill);
+            var field = new FilterField(Host, "Filter", PaperTheme.ScoreMark);
             field.SetQuery(query);
             // Only the rows are rebuilt, never the pane: raising Changed on every
             // keystroke would replace the field itself and take the focus, the
