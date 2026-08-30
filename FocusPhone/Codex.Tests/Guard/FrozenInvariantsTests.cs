@@ -366,6 +366,28 @@ public class FrozenInvariantsTests
             "included, the phone will not offer it the role and nothing will say so: " + string.Join(", ", missing));
     }
 
+    // The share-target filter is the only way Google's Call Notes can reach Post: it
+    // exports through the share sheet and nowhere else. Invisible when missing and silent
+    // when it goes — the note simply never arrives and the owner is left typing it.
+    //
+    // Matched on the attribute rather than on the file, and on ActionSend as a whole
+    // token: an earlier version of this looked for "Intent.ActionSend" anywhere in the
+    // source and passed happily on Intent.ActionSendto, which is a different filter on a
+    // different component.
+    [Fact]
+    public void CallNoteShareTargetIsDeclared()
+    {
+        var declared = EnumerateRepoFiles("*.cs")
+            .Select(File.ReadAllText)
+            .SelectMany(IntentFilters)
+            .Any(filter =>
+                filter.Contains("Intent.ActionSend]", StringComparison.Ordinal)
+                && filter.Contains("\"text/plain\"", StringComparison.Ordinal));
+
+        Assert.True(declared,
+            "No component declares an ACTION_SEND / text/plain filter — Call Notes has no way into Post.");
+    }
+
     // Every [IntentFilter(...)] attribute in a source file, as text.
     private static IEnumerable<string> IntentFilters(string source)
     {

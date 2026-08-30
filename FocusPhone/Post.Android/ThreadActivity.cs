@@ -212,37 +212,126 @@ public class ThreadActivity : Activity
         });
     }
 
-    // Long-press: contextual actions per item — call-back / text-back for a person
-    // with a number, plus the undo-first delete.
+    // Long-press: what can be done to this one message. The shared action card rather than
+    // a dialog — §7 makes the card the app's only overflow, and it is never a confirm
+    // step: everything here does something, and the destructive things are undone from the
+    // corner rather than asked about first.
     private void ShowItemActions(TimelineItem item)
     {
-        var labels = new List<string>();
-        var actions = new List<Action>();
+        var actions = new List<CardAction>();
 
         var phone = memberKeys.FirstOrDefault(IsPhone) ?? (IsPhone(contactKey) ? contactKey : null);
         if (phone is not null && !isGroup)
         {
-            labels.Add("Call back");
-            actions.Add(() => PlaceCall(phone));
-            labels.Add("Text back");
-            actions.Add(() => SendText(phone));
+            actions.Add(new CardAction("Call back", () => PlaceCall(phone)));
+            actions.Add(new CardAction("Text back", () => SendText(phone), Lead: true));
         }
 
         var email = memberKeys.FirstOrDefault(IsEmail) ?? (IsEmail(contactKey) ? contactKey : null);
         if (item.Kind == TimelineItemKind.Email && email is not null)
         {
-            labels.Add("Reply");
-            actions.Add(() => EmailComposeDialog.Show(
-                this, email, titleView!.Text!.ToString()!, ReplySubject(item.Subject), item.MessageId));
+            actions.Add(new CardAction("Reply", () => EmailComposeDialog.Show(
+                this, email, titleView!.Text!.ToString()!, ReplySubject(item.Subject), item.MessageId),
+                Lead: true));
         }
 
-        labels.Add("Delete");
-        actions.Add(() => DeleteWithUndo(item));
+        if (item.Kind == TimelineItemKind.Call && phone is not null)
+        {
+            actions.Add(new CardAction("Write a note on this call", () => WriteCallNote(phone)));
+        }
 
+        actions.Add(new CardAction("File", () => FileWithUndo(item)));
+        actions.Add(new CardAction("Delete", () => DeleteWithUndo(item), Destructive: true));
+
+        if (phone is not null && !isGroup)
+        {
+            actions.Add(new CardAction("Block this number", () => Block(phone), Destructive: true));
+        }
+
+        ActionCard.Show(this, undoHost!, titleView!.Text!.ToString()!,
+            TimelineItemFormatter.Describe(item), actions.ToArray());
+    }
+
+    // The owner's own note on a call, since a transcript is not deliverable on Android.
+    // It asks for a summary and nothing else — no lead-in explaining why, because the
+    // owner already knows why and reads it every time.
+    private void WriteCallNote(string number)
+    {
+        var input = PaperUi.Field(this, "A summary, for future reference");
         new AlertDialog.Builder(this)
-            .SetItems(labels.ToArray(), (_, e) => actions[e.Which]())!
+            .SetTitle("Note on this call")!
+            .SetView(input)!
+            .SetPositiveButton("Keep", (_, _) =>
+            {
+                var text = (input.Text ?? string.Empty).Trim();
+                if (text.Length == 0)
+                {
+                    return;
+                }
+                using var database = TimelineDatabase.Open(this);
+                database.Cache.Upsert([CallNote.For(number, text, DateTimeOffset.UtcNow)]);
+                LoadItems();
+            })!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
+    }
+
+    // Blocking is handed to Android's own blocked-numbers list rather than kept here, so
+    // it applies everywhere on the phone instead of only inside Post — a number blocked in
+    // one app and ringing through in another is worse than not blocking it.
+    private void Block(string number)
+    {
+        try
+        {
+            var values = new Android.Content.ContentValues();
+            values.Put(Android.Provider.BlockedNumberContract.BlockedNumbers.ColumnOriginalNumber, number);
+            ContentResolver!.Insert(
+                Android.Provider.BlockedNumberContract.BlockedNumbers.ContentUri!, values);
+
+            DogEar.Show(this, undoHost!, $"Blocked {number}.", onUndo: () => Unblock(number));
+        }
+        catch (Exception e)
+        {
+            // Only the default SMS or dialer app may write the blocked list. Post holds the
+            // SMS role, so this should work — but if it does not, say so rather than
+            // leaving the owner believing a number is blocked when it is not.
+            Android.Util.Log.Warn("Post", $"Could not block {number}: {e}");
+            PostDiagnostics.LogWarning("Block", $"Could not block {number}", e);
+            DogEar.SetNotice(this, undoHost!, NoticeKeys.Block, new DogEar.Notice(
+                "That number was not blocked.",
+                "The phone would not accept it. Blocking is the system's list, not Post's, and it "
+                + "refused — so calls from this number will still come through.",
+                PaperTheme.ProblemMark));
+        }
+    }
+
+    private void Unblock(string number)
+    {
+        try
+        {
+            ContentResolver!.Delete(
+                Android.Provider.BlockedNumberContract.BlockedNumbers.ContentUri!,
+                $"{Android.Provider.BlockedNumberContract.BlockedNumbers.ColumnOriginalNumber} = ?",
+                [number]);
+        }
+        catch (Exception e)
+        {
+            PostDiagnostics.LogWarning("Block", $"Could not unblock {number}", e);
+        }
+    }
+
+    // Filing one message: the ghost is kept and the source delete is owed. The correspondence
+    // screen's unit is the message; the Mailbox's is the whole correspondence.
+    private void FileWithUndo(TimelineItem item)
+    {
+        Filing.File(this, item, DateTimeOffset.UtcNow);
+        LoadItems();
+
+        DogEar.Show(this, undoHost!, $"Filed {ChannelWord(item)}.", onUndo: () =>
+        {
+            Filing.Unfile(this, item.SourceId);
+            LoadItems();
+        });
     }
 
     private void DeleteWithUndo(TimelineItem item)
