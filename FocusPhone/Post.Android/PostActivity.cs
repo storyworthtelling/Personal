@@ -95,21 +95,14 @@ public class PostActivity : Activity
     private void CheckSmsRole()
     {
         var notice = SmsRoleAccess.CheckOnLaunch(this, new AccountStore(this));
-        if (!notice.Speaks)
-        {
-            DogEar.ClearNotices(content);
-            return;
-        }
-
-        DogEar.ShowNotices(this, content,
-        [
-            new DogEar.Notice(
+        DogEar.SetNotice(this, content, NoticeKeys.SmsRole, notice.Speaks
+            ? new DogEar.Notice(
                 notice.Headline,
                 notice.Detail,
                 notice.WasLost ? PaperTheme.ProblemMark : PaperTheme.CautionMark,
                 notice.CanRequest ? "Make Post the texting app" : null,
-                notice.CanRequest ? () => SmsRoleAccess.Request(this) : null),
-        ]);
+                notice.CanRequest ? () => SmsRoleAccess.Request(this) : null)
+            : null);
     }
 
     // After a reinstall or the cutover's factory reset, refill the mail credentials from the

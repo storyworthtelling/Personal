@@ -39,6 +39,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private int cacheOffset;
     private bool cacheExhausted;
     private bool loading;
+    private bool syncing;
     // Bumped on every full reload so a superseded background load discards itself.
     private int loadGeneration;
 
@@ -119,7 +120,15 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         return column;
     }
 
-    public override void Resume() => ReloadThreads();
+    public override void Resume()
+    {
+        // The cache paints first so the Mailbox is never blank while the network is
+        // consulted, then the sync brings it up to date behind that. Refresh on every open
+        // plus the 30-minute worker; no last-synced line, and no Sync button — the Mailbox
+        // has no pinned actions because what you do here you do to a row.
+        ReloadThreads();
+        SyncInBackground();
+    }
 
     public override void OnPermissionsResult() => ReloadThreads();
 
@@ -327,6 +336,53 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         {
             emptyView.Text = emptyLine;
         }
+    }
+
+    // Brings the cache up to date with the mail account. Success is the refreshed list —
+    // no toast, no banner, no "last synced" line. A failure folds into the corner and
+    // waits, rather than putting machine text on the page (§13).
+    private void SyncInBackground()
+    {
+        if (syncing)
+        {
+            return;
+        }
+        syncing = true;
+
+        Task.Run(async () =>
+        {
+            string? failure = null;
+            try
+            {
+                await PostSync.RunReconcileAsync(Host);
+            }
+            catch (Exception e)
+            {
+                failure = e.Message;
+                Android.Util.Log.Warn("Post", $"Sync failed: {e}");
+                PostDiagnostics.LogWarning("Sync", "Sync failed", e);
+            }
+
+            Host.RunOnUiThread(() =>
+            {
+                syncing = false;
+                DogEar.SetNotice(Host, Overlay, NoticeKeys.Sync, failure is null
+                    ? null
+                    : new DogEar.Notice(
+                        "Your mail did not come through.",
+                        "Post could not reach the account. What is already here is still here; it will "
+                        + "try again shortly. Diagnostics has the details.",
+                        PaperTheme.ProblemMark,
+                        "What happened →",
+                        () => Host.StartActivity(
+                            new Android.Content.Intent(Host, typeof(DiagnosticsActivity)))));
+
+                if (failure is null)
+                {
+                    ReloadThreads();
+                }
+            });
+        });
     }
 
     private void SetStatus(string text)

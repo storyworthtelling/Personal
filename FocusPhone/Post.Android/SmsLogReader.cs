@@ -1,12 +1,14 @@
 using Android.Content;
 using Android.Provider;
+using Codex.Domain.Post;
 using Codex.Domain.Timeline;
 
 namespace Post;
 
 /// <summary>
-/// Reads the system SMS/MMS store (Google Messages remains the SMS app; we
-/// only observe) into timeline items keyed by normalized phone number. Like
+/// Reads the system SMS/MMS store into timeline items keyed by normalized phone number.
+/// Post is the SMS app now rather than an observer, so this is reading its own record.
+/// Like
 /// READ_CALL_LOG, the READ_SMS permission is hard-restricted and only takes
 /// effect on a whitelisted install; callers catch SecurityException.
 /// </summary>
@@ -37,12 +39,16 @@ public static class SmsLogReader
         }
         while (cursor.MoveToNext())
         {
-            var item = SmsRecordMapper.Map(
-                cursor.GetString(0)!,
-                cursor.IsNull(1) ? null : cursor.GetString(1),
-                cursor.GetLong(2),
-                cursor.GetInt(3),
-                cursor.IsNull(4) ? null : cursor.GetString(4));
+            var address = cursor.IsNull(1) ? null : cursor.GetString(1);
+            var body = cursor.IsNull(4) ? null : cursor.GetString(4);
+            var when = DateTimeOffset.FromUnixTimeMilliseconds(cursor.GetLong(2));
+
+            // A Google Fi voicemail arrives as an ordinary SMS from the caller's own
+            // number, so it has to be recognised BEFORE it is mapped as a text — otherwise
+            // it threads with that person's messages instead of beside their calls.
+            var item = FiVoicemail.TryParse(address, body, when)
+                ?? SmsRecordMapper.Map(
+                    cursor.GetString(0)!, address, cursor.GetLong(2), cursor.GetInt(3), body);
             if (item is not null)
             {
                 items.Add(item);

@@ -47,17 +47,43 @@ public static class DogEar
 
     private sealed class NoticeBox
     {
-        public IReadOnlyList<Notice> Notices { get; set; } = [];
+        // Keyed, and newest first. Several parts of a screen raise notices independently —
+        // the shell watches the SMS role while the list watches the sync — and a plain
+        // replace would mean whichever spoke last silently erased the other.
+        public List<(string Key, Notice Notice)> Entries { get; } = [];
+
+        public IReadOnlyList<Notice> Notices => Entries.Select(entry => entry.Notice).ToList();
     }
 
     /// <summary>
-    /// Sets what is waiting behind the fold, newest first. An empty list flattens the corner.
-    /// Safe to call on every render: it replaces rather than accumulates, so a screen can simply
-    /// state what is wrong each time it draws.
+    /// Sets or clears ONE owner's notice, leaving everyone else's alone. Passing null for
+    /// <paramref name="notice"/> withdraws it. Safe to call on every render: an owner simply
+    /// states what is wrong, or that nothing is, each time it draws.
+    /// </summary>
+    public static void SetNotice(Context context, FrameLayout host, string key, Notice? notice)
+    {
+        var box = Waiting.GetOrCreateValue(host);
+        box.Entries.RemoveAll(entry => entry.Key == key);
+        if (notice is not null)
+        {
+            box.Entries.Insert(0, (key, notice)); // newest first (§13)
+        }
+
+        if (host.FindViewWithTag(HostTag) is null)
+        {
+            RepaintNotices(context, host);
+        }
+    }
+
+    /// <summary>
+    /// Replaces every notice at once. For a screen that owns the whole corner; anything
+    /// sharing it should use <see cref="SetNotice"/> instead.
     /// </summary>
     public static void ShowNotices(Context context, FrameLayout host, IReadOnlyList<Notice> notices)
     {
-        Waiting.GetOrCreateValue(host).Notices = notices;
+        var box = Waiting.GetOrCreateValue(host);
+        box.Entries.Clear();
+        box.Entries.AddRange(notices.Select((notice, index) => ($"anon-{index}", notice)));
 
         // An undo is a closing window and outranks anything that merely waits, so it keeps the
         // corner; the notices reappear the moment it is gone.
@@ -69,10 +95,10 @@ public static class DogEar
         RepaintNotices(context, host);
     }
 
-    /// <summary>Flattens the notice fold and forgets what was waiting.</summary>
+    /// <summary>Flattens the notice fold and forgets everything that was waiting.</summary>
     public static void ClearNotices(FrameLayout host)
     {
-        Waiting.GetOrCreateValue(host).Notices = [];
+        Waiting.GetOrCreateValue(host).Entries.Clear();
         if (host.FindViewWithTag(NoticeTag) is View existing)
         {
             host.RemoveView(existing);

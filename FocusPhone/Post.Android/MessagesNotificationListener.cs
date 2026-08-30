@@ -30,11 +30,12 @@ public class MessagesNotificationListener : NotificationListenerService
         {
             return;
         }
-        if (sbn.PackageName == VoicemailNotificationParser.DialerPackage)
-        {
-            CaptureVoicemail(sbn);
-        }
-        else if (sbn.PackageName == GoogleMessagesPackage)
+        // Voicemail no longer comes through here. Google Fi's "Voicemails by text" delivers
+        // the transcript as an SMS from the caller's own number, which is a durable record
+        // in the provider rather than a one-shot Post has to be running to catch — and a
+        // notification missed while the phone was off is gone. Capturing both would also
+        // put two rows in the timeline for one message.
+        if (sbn.PackageName == GoogleMessagesPackage)
         {
             CaptureMessages(sbn);
         }
@@ -67,35 +68,6 @@ public class MessagesNotificationListener : NotificationListenerService
                 SourceId: $"{contactKey}:{message.Timestamp}"));
         }
         Cache(items);
-    }
-
-    private void CaptureVoicemail(StatusBarNotification sbn)
-    {
-        var extras = sbn.Notification!.Extras;
-        var item = VoicemailNotificationParser.TryParse(
-            sbn.PackageName,
-            sbn.Notification.ChannelId,
-            extras?.GetCharSequence(Notification.ExtraTitle)?.ToString(),
-            extras?.GetCharSequence(Notification.ExtraText)?.ToString()
-                ?? extras?.GetCharSequence(Notification.ExtraBigText)?.ToString(),
-            sbn.Notification.When);
-        if (item is null)
-        {
-            return;
-        }
-        // The parser keys by whatever the title carried; when that is a display
-        // name, re-key to the contact's number so the voicemail lands in the
-        // same thread as the calls. The SourceId keeps the original key so the
-        // id stays stable however contacts change later.
-        if (!item.ContactKey.Contains('@') && !item.ContactKey.All(char.IsAsciiDigit))
-        {
-            var number = ContactNameResolver.PhoneForDisplayName(this, item.ContactKey);
-            if (number is not null)
-            {
-                item = item with { ContactKey = number };
-            }
-        }
-        Cache([item]);
     }
 
     private void Cache(List<TimelineItem> items)
