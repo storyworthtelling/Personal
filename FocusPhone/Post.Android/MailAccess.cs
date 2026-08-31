@@ -26,7 +26,12 @@ internal static class MailAccess
         new(account.GmailAddress ?? VoiceGoogleAccount.Email,
             Account().GetAccessToken,
             Http,
-            new CredentialHealthStore());
+            new CredentialHealthStore(),
+            // Only the MIME level knows whether a message had a plain-text part; by the
+            // time it is a timeline item its body is already the readable form. This is the
+            // number that says whether the shared web view is urgent or theoretical.
+            observeBodyShape: (hasText, hasHtml) =>
+                FieldNotesStore.Record(context, notes => notes.WithMail(hasText, hasHtml, [])));
 
     // One HttpClient for the process, per the usual guidance: a new one per call leaks
     // sockets, and mail is reached often enough for that to matter on a phone.

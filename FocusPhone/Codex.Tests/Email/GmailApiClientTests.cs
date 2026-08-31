@@ -152,6 +152,27 @@ public class GmailApiClientTests
         Assert.Equal(expectFlagged, health.Rejected);
     }
 
+    // An HTML-only message has no plain-text part at all. Reading TextBody alone leaves the
+    // body null, so the message lists, opens, and shows the owner nothing — with no error
+    // logged, because nothing failed. Until Post has a real renderer the HTML is reduced to
+    // readable text rather than dropped.
+    [Fact]
+    public async Task AnHtmlOnlyMessageIsNotBlank()
+    {
+        var html = "From: her@example.com\r\nTo: owner@gmail.com\r\nSubject: Dinner\r\n"
+            + "Message-Id: <m9@example.com>\r\nDate: Sat, 29 Aug 2026 10:00:00 +0000\r\n"
+            + "Content-Type: text/html; charset=utf-8\r\n\r\n"
+            + "<html><body><p>Seven &amp; a half?</p></body></html>";
+
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond($"{Base}/messages?q=plumber&maxResults=50", """{"messages":[{"id":"g9"}]}""");
+        handler.Respond($"{Base}/messages/g9?format=raw", $$"""{"id":"g9","raw":"{{Base64Url(html)}}"}""");
+
+        var item = Assert.Single(await Client(handler).SearchAsync("plumber"));
+
+        Assert.Equal("Seven & a half?", item.Body);
+    }
+
     private sealed class RecordingHealthSink : Storyworthtelling.Voice.Health.ICredentialHealthSink
     {
         public bool Rejected { get; private set; }

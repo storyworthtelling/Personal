@@ -33,6 +33,36 @@ public static class ContactPicker
             .ToList();
     }
 
+    /// <summary>
+    /// How many contacts there are, and how many have no photo. This is the whole
+    /// justification for the Rolodex photo pass: because the Mailbox leads every row with a
+    /// face, a missing one is a gap the owner sees constantly — and whether that pass is
+    /// worth building is a question about THEIR address book, not about address books.
+    ///
+    /// Counted against the contacts table directly rather than over <see cref="People"/>,
+    /// since a contact with a photo and no reachable address still occupies the book.
+    /// </summary>
+    public static (int Total, int WithoutPhoto) PhotoCoverage(Context context)
+    {
+        var total = 0;
+        var withoutPhoto = 0;
+
+        using var cursor = context.ContentResolver!.Query(
+            ContactsContract.Contacts.ContentUri!,
+            ["_id", "photo_id"], null, null, null);
+
+        while (cursor is not null && cursor.MoveToNext())
+        {
+            total++;
+            if (cursor.IsNull(1) || cursor.GetLong(1) == 0)
+            {
+                withoutPhoto++;
+            }
+        }
+
+        return (total, withoutPhoto);
+    }
+
     private static void Gather(
         Context context, Android.Net.Uri uri, string? valueColumn, bool isEmail,
         Dictionary<long, (string Name, List<string> Phones, List<string> Emails)> byId)

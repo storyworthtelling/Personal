@@ -98,7 +98,13 @@ public static class PostDiagnostics
             version,
             $"{Android.OS.Build.Manufacturer} {Android.OS.Build.Model}",
             DateTimeOffset.Now);
-        return DiagnosticsReport.Build(reportContext, ReadAll(), crashStore?.ReadLatest());
+        // Field notes ride along with the failures. They are what turns one run of the
+        // on-device test plan into the numbers the deferred work needs — how much of the
+        // owner's real mail is HTML-only, what their attachments are, how far the archive
+        // grows, how many contacts have no face, and whether date detection finds anything
+        // worth proposing.
+        var report = DiagnosticsReport.Build(reportContext, ReadAll(), crashStore?.ReadLatest());
+        return $"{report}\n\n{FieldNotesStore.Load(context).Render()}";
     }
 
     private static void RecordCrash(Exception? exception)

@@ -38,17 +38,26 @@ public class GmailApiClient
     private readonly HttpClient http;
     private readonly ICredentialHealthSink? health;
     private readonly GmailMessageMapper mapper;
+    private readonly Action<bool, bool>? observeBodyShape;
 
+    /// <param name="observeBodyShape">
+    /// Told, per message, whether it carried a plain-text part and an HTML part. Only the
+    /// MIME level knows this — by the time a message is a timeline item its body is already
+    /// the readable form, so the distinction is gone. It is what says whether the shared
+    /// web view is urgent or theoretical, and it is optional so no existing caller changes.
+    /// </param>
     public GmailApiClient(
         string accountAddress,
         Func<Task<string>> accessToken,
         HttpClient http,
-        ICredentialHealthSink? health = null)
+        ICredentialHealthSink? health = null,
+        Action<bool, bool>? observeBodyShape = null)
     {
         this.accountAddress = GmailCredentials.NormalizeAddress(accountAddress);
         this.accessToken = accessToken;
         this.http = http;
         this.health = health;
+        this.observeBodyShape = observeBodyShape;
         mapper = new GmailMessageMapper(this.accountAddress);
     }
 
@@ -136,6 +145,8 @@ public class GmailApiClient
         {
             if (await LoadRawAsync(id, cancellation) is { } message)
             {
+                var (hasText, hasHtml) = GmailMessageMapper.BodyShape(message);
+                observeBodyShape?.Invoke(hasText, hasHtml);
                 items.Add(mapper.Map(message));
             }
         }
