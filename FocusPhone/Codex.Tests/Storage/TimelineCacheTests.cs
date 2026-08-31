@@ -277,4 +277,33 @@ public class TimelineCacheTests : IDisposable
         Assert.Empty(item.Attachments);
         Assert.False(item.Unread);
     }
+
+    // A classification is only ever added to a row, never cleared. A re-sync re-reads the
+    // message from the source, which knows nothing about how Post sorted it — so an upsert
+    // that carried a null through would undo the judgement, and the owner's correction with
+    // it, every half hour.
+    [Fact]
+    public void ReSyncingAMessageKeepsItsClassification()
+    {
+        var item = new TimelineItem(
+            TimelineItemKind.Email, "news@shop.example", DateTimeOffset.UtcNow, "Sale",
+            Incoming: true, SourceId: "m1");
+
+        cache.Upsert([item with { MailClass = Codex.Domain.Post.MailClass.Marketing }]);
+        cache.Upsert([item]); // the source, re-read, knowing nothing about the sorting
+
+        Assert.Equal(Codex.Domain.Post.MailClass.Marketing, cache.LoadRecent(10).Single().MailClass);
+    }
+
+    [Fact]
+    public void AClassificationRoundTrips()
+    {
+        cache.Upsert(
+        [
+            new TimelineItem(TimelineItemKind.Email, "bank@example.com", DateTimeOffset.UtcNow, "Statement",
+                Incoming: true, SourceId: "m2") { MailClass = Codex.Domain.Post.MailClass.Bill },
+        ]);
+
+        Assert.Equal(Codex.Domain.Post.MailClass.Bill, cache.LoadRecent(10).Single().MailClass);
+    }
 }

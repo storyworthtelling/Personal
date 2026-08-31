@@ -75,7 +75,7 @@ public sealed class DiscoverArea : ScoreArea
         library.Changed += Invalidate;
     }
 
-    public override BinderArea Tab => new("Discover", Resource.Drawable.area_discover, PaperTheme.ScoreMark);
+    public override BinderArea Tab => new("Discover", Resource.Drawable.area_discover, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
 
     public override bool GoBack()
     {
@@ -197,7 +197,7 @@ public sealed class DiscoverArea : ScoreArea
         subscriptionStore.Save(subscriptions.Export());
         Invalidate();
 
-        UndoBar.Show(Host, Overlay, $"Following {show.Title}.", onUndo: () =>
+        DogEar.Show(Host, Overlay, $"Following {show.Title}.", onUndo: () =>
         {
             var current = new SubscriptionList(subscriptionStore.Load());
             current.Remove(show.FeedUrl);
@@ -309,13 +309,13 @@ public sealed class DiscoverArea : ScoreArea
     private void Save(Track track)
     {
         library.SaveTrack(track);
-        UndoBar.Show(Host, Overlay, $"Saved {track.DisplayTitle}.", onUndo: () => library.RemoveSavedTrack(track.Id));
+        DogEar.Show(Host, Overlay, $"Saved {track.DisplayTitle}.", onUndo: () => library.RemoveSavedTrack(track.Id));
     }
 
     private void RemoveSaved(Track track)
     {
         library.RemoveSavedTrack(track.Id);
-        UndoBar.Show(Host, Overlay, $"Removed {track.DisplayTitle}.", onUndo: () => library.SaveTrack(track));
+        DogEar.Show(Host, Overlay, $"Removed {track.DisplayTitle}.", onUndo: () => library.SaveTrack(track));
     }
 
     private View BuildCrate()

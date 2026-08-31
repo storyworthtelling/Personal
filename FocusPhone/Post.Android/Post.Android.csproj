@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Post</RootNamespace>
+    <ApplicationId>com.storyworthtelling.focusphone.communication</ApplicationId>
+    <ApplicationTitle>Post</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
+    <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
+    <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
+  </ItemGroup>
+
+  <!-- In-app texting: reference the gmbridge binding only when its .aar has been
+       built (CI builds it before the heads). When absent, GMBRIDGE is undefined
+       and GmBridgeClient compiles to a stub, so the head still builds and texting
+       falls back to the Google Messages deep link. -->
+  <PropertyGroup Condition="Exists('..\gmbridge\gmbridge.aar')">
+    <DefineConstants>$(DefineConstants);GMBRIDGE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('..\gmbridge\gmbridge.aar')">
+    <ProjectReference Include="..\Codex.GmBridge.Binding\Codex.GmBridge.Binding.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+  </ItemGroup>
+
+  <!-- Preserve SQLitePCLRaw from the Release IL trimmer. Its provider is wired
+       up by a module initializer and reflection; trimming it makes the first
+       SqliteConnection.Open() fail at runtime (the app crashed on launch). -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Microsoft.Data.Sqlite" RootMode="All" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.core" RootMode="All" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.batteries_v2" RootMode="All" />
+    <TrimmerRootAssembly Include="SQLitePCLRaw.provider.e_sqlite3" RootMode="All" />
+  </ItemGroup>
+</Project>

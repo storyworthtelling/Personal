@@ -68,7 +68,7 @@ public static class DownloadRequests
         // Undo-first, like every other act with a cost. Undoing stops the fetch rather
         // than deleting something finished, which is the point of offering it here
         // instead of making the owner go to the downloads screen.
-        UndoBar.Show(host, overlay, $"Downloading {what}.", onUndo: () =>
+        DogEar.Show(host, overlay, $"Downloading {what}.", onUndo: () =>
         {
             var current = store.Load();
             foreach (var (item, _) in wanted)

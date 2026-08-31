@@ -37,8 +37,19 @@ dotnet workload install android
 dotnet workload repair
 
 echo "==> Locating the workload's bundled aapt2…"
-AAPT2="$(find "${HOME}/.dotnet" /usr/lib/dotnet /usr/share/dotnet \
-  -path '*Microsoft.Android.Sdk.Linux*/tools/Linux/aapt2' 2>/dev/null | sort -V | tail -1)"
+# Search only the roots that exist. find returns non-zero for a missing directory even
+# with stderr silenced, and under `set -euo pipefail` that killed this assignment — and
+# with it the whole script, before the error message below could ever run. A machine
+# without one of these three dotnet roots got a silent exit 1 and no explanation.
+ROOTS=()
+for root in "${HOME}/.dotnet" /usr/lib/dotnet /usr/share/dotnet; do
+  [[ -d "${root}" ]] && ROOTS+=("${root}")
+done
+AAPT2=""
+if [[ ${#ROOTS[@]} -gt 0 ]]; then
+  AAPT2="$(find "${ROOTS[@]}" \
+    -path '*Microsoft.Android.Sdk.Linux*/tools/Linux/aapt2' 2>/dev/null | sort -V | tail -1 || true)"
+fi
 if [[ -z "${AAPT2}" ]]; then
   echo "ERROR: could not find aapt2 in the installed Android workload." >&2
   exit 1
@@ -66,6 +77,6 @@ chmod +x "${SDK}/platform-tools/adb"
 
 echo
 echo "Done. Build the heads with:"
-for head in Codex.Ui.Android Flyleaf.Android FocusPhone.Audio.Android FocusPhone.Communication.Android; do
+for head in Codex.Ui.Android Flyleaf.Android Score.Android Post.Android; do
   echo "  dotnet build FocusPhone/${head}/${head}.csproj -p:AndroidSdkDirectory=${SDK} -p:AndroidUseApkSigner=false"
 done

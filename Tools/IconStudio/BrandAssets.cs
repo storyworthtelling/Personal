@@ -24,7 +24,7 @@ public static class BrandAssets
         "Storyboarder/Storyboarder.Infrastructure/Resources/owner.png",
         "Storyboarder/Storyboarder.Android/Resources/drawable-nodpi/owner_medallion.png",
         "DailyLoader/DailyLoader.Android/Resources/drawable-nodpi/owner_medallion.png",
-        "FocusPhone/FocusPhone.Communication.Android/Resources/drawable-nodpi/owner_medallion.png",
+        "FocusPhone/Post.Android/Resources/drawable-nodpi/owner_medallion.png",
         "Ledger/Ledger.Android/Resources/drawable-nodpi/owner_medallion.png",
     ];
 

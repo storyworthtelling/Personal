@@ -44,14 +44,20 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Contains(IconSpecs.All, s => s.App == "Ledger" && s.Name == "appicon");
     }
 
-    // A spec with a painted ground reads it from the repo, so a scratch root needs a
-    // stand-in. Any decodable image will do — these tests are about what gets
-    // emitted, not what it looks like.
+    // A spec with painted artwork reads it from the repo, so a scratch root needs a
+    // stand-in — for the ground layer and for the plate set into the window alike. Any
+    // decodable image will do; these tests are about what gets emitted, not what it
+    // looks like.
     private void SeedGrounds()
     {
-        foreach (var spec in IconSpecs.All.Where(s => s.GroundImage is not null))
+        var artwork = IconSpecs.All
+            .SelectMany(spec => new[] { spec.GroundImage, spec.PlateImage })
+            .OfType<string>()
+            .Distinct();
+
+        foreach (var relative in artwork)
         {
-            var path = Path.Combine(root, spec.GroundImage!.Replace('/', Path.DirectorySeparatorChar));
+            var path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             using var bitmap = new SKBitmap(8, 8);
             bitmap.Erase(SKColors.Teal);
@@ -59,6 +65,54 @@ public class AdaptiveIconRendererTests : IDisposable
             using var data = image.Encode(SKEncodedImageFormat.Png, 100);
             File.WriteAllBytes(path, data.ToArray());
         }
+    }
+
+    // §12 requires a plate's framing to have both mirror lines: each corner is a
+    // REFLECTION of the top-left, never a rotation, because a rotated asymmetric corner
+    // produces a pinwheel with no mirror line and reads wrong.
+    //
+    // What this asserts is the mirror lines themselves, which is the visible property.
+    // It does NOT distinguish reflection from rotation for Post specifically, and cannot:
+    // a mitred bracket with equal arms is symmetric about its own diagonal, so the two
+    // give pixel-identical results. Verified by forcing a rotation, which this test
+    // passes. The distinction bites for an asymmetric motif — the default quarter-curve —
+    // and this catches the thing that actually goes wrong either way: framing that has
+    // drifted off-centre and no longer mirrors at all.
+    //
+    // Checked outside the illustration window, since the painting inside it is not
+    // symmetric and is not meant to be.
+    [Fact]
+    public void PlateFramingMirrorsOnBothAxes()
+    {
+        var spec = IconSpecs.All.Single(s => s.App == "Post");
+        using var foreground = Foreground(spec);
+
+        // Compared with a tolerance rather than exactly. Anti-aliasing rounds a stroke's
+        // edge alpha differently on the two sides of a mirror line — a unit or two, on
+        // hundreds of pixels — which is invisible and is not what this test is about. A
+        // rotated corner puts cream where there should be nothing, a difference of 250.
+        const int Tolerance = 16;
+        var window = foreground.Width * spec.PlateInset;
+        var mismatches = 0;
+        for (var y = 0; y < foreground.Height / 2; y++)
+        {
+            for (var x = 0; x < foreground.Width / 2; x++)
+            {
+                if (x > window && y > window)
+                {
+                    continue; // inside the window: the art, which has no mirror line
+                }
+                var here = foreground.GetPixel(x, y);
+                if (Differs(here, foreground.GetPixel(foreground.Width - 1 - x, y), Tolerance)
+                    || Differs(here, foreground.GetPixel(x, foreground.Height - 1 - y), Tolerance))
+                {
+                    mismatches++;
+                }
+            }
+        }
+
+        Assert.True(mismatches < 50,
+            $"{mismatches} pixels outside the window break the plate's mirror lines — the framing has drifted off-centre.");
     }
 
     [Fact]
@@ -154,10 +208,11 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void LineArtGlyphsDrawInkAndExactlyOneTerracottaDetail()
     {
-        // Score is deliberately not in this set. Its icon is its cover — a keyboard
-        // on a painted ground — rather than an ink glyph on paper, so it has neither
-        // an ink line to count nor an accent detail to find.
-        foreach (var spec in IconSpecs.All.Where(s => s.App != "Score"))
+        // Score and Post are deliberately not in this set. Each one's icon IS its cover —
+        // a keyboard on a painted ground, a mailbox painting set into an indigo plate —
+        // rather than an ink glyph on paper, so neither has an ink line to count or a
+        // terracotta detail to find. Their covers are checked by their own tests instead.
+        foreach (var spec in IconSpecs.All.Where(s => s.App is not ("Score" or "Post")))
         {
             using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);
@@ -253,6 +308,56 @@ public class AdaptiveIconRendererTests : IDisposable
 
         return blobs;
     }
+
+    // A plate's corner framing has to survive a ROUND mask, which is the tighter of the two
+    // an Android launcher may apply. A corner sits at sqrt(2) x (0.5 - inset) from the
+    // centre while the round mask keeps only radius 0.333 of the layer, so framing that
+    // looks correctly placed on a square icon can be cut away entirely on a round one —
+    // leaving the painting in a window with nothing around it, and no error anywhere.
+    [Fact]
+    public void PlateFramingSurvivesARoundMask()
+    {
+        var spec = IconSpecs.All.Single(s => s.App == "Post");
+        using var foreground = Foreground(spec);
+
+        var size = foreground.Width;
+        var centre = size / 2f;
+        var maskRadius = size * (72f / 108f) / 2f;
+        var window = size * spec.PlateInset;
+
+        // Only the four CORNER squares count. An earlier version of this counted anything
+        // outside the window, which meant it was really counting the window keyline —
+        // that runs through the middle of each edge, is always well inside the mask, and
+        // survives however far out the corners have drifted. It passed happily with the
+        // corners entirely outside the circle.
+        var framingInsideTheMask = 0;
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var inACorner = (x < window || x > size - window) && (y < window || y > size - window);
+                if (!inACorner)
+                {
+                    continue;
+                }
+                var distance = Math.Sqrt(((x - centre) * (x - centre)) + ((y - centre) * (y - centre)));
+                if (distance <= maskRadius && foreground.GetPixel(x, y).Alpha > 200)
+                {
+                    framingInsideTheMask++;
+                }
+            }
+        }
+
+        Assert.True(framingInsideTheMask > 200,
+            $"Only {framingInsideTheMask} corner pixels fall inside a round mask — the plate's corners "
+            + "are outside it and would be cut away completely on a launcher that draws round icons.");
+    }
+
+    private static bool Differs(SKColor a, SKColor b, int tolerance) =>
+        Math.Abs(a.Red - b.Red) > tolerance
+        || Math.Abs(a.Green - b.Green) > tolerance
+        || Math.Abs(a.Blue - b.Blue) > tolerance
+        || Math.Abs(a.Alpha - b.Alpha) > tolerance;
 
     private SKBitmap Foreground(IconSpec spec)
     {

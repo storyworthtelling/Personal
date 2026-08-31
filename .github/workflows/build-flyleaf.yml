@@ -6,7 +6,6 @@ on:
     branches: [main, 'claude/**']
     paths:
       - 'FocusPhone/Flyleaf.Android/**'
-      - 'FocusPhone/FocusPhone.Communication.Android/**'
       - 'FocusPhone/FocusPhone.Camera.Android/**'
       - 'FocusPhone/Score.Android/**'
       - 'FocusPhone/Codex.Ui.Android/**'
@@ -58,57 +57,10 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      # In-app texting: build the gomobile shim over libgm (gmbridge/bridge.go)
-      # into gmbridge.aar, which Codex.GmBridge.Binding turns into a C#
-      # binding the Communication head calls. Needs Go + the runner's Android NDK.
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-
-      - name: Build gmbridge.aar (gomobile)
-        working-directory: FocusPhone/gmbridge
-        run: |
-          set -e
-          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
-          echo "Using Android NDK at $ANDROID_NDK_HOME"
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          go install golang.org/x/mobile/cmd/gobind@latest
-          export PATH="$PATH:$(go env GOPATH)/bin"
-          gomobile init || true
-          ./build.sh
-
-      # Prove the .aar binds to C# (isolated from the four heads while the bridge
-      # integration lands) — grep the log for "=== GMBRIDGE BINDING ===".
-      - name: GmBridge binding check
-        working-directory: FocusPhone
-        run: |
-          echo "=== GMBRIDGE BINDING ==="
-          dotnet build Codex.GmBridge.Binding -c Release
-          echo "=== END GMBRIDGE BINDING ==="
-
-      # Print the generated binding's public API so GmBridgeClient can be written
-      # against the real C# names — grep the log for "=== GMBRIDGE API ===".
-      - name: Dump GmBridge binding API
-        continue-on-error: true
-        working-directory: FocusPhone
-        run: |
-          echo "=== GMBRIDGE API ==="
-          echo "--- Java classes in gmbridge.aar ---"
-          if [ -f gmbridge/gmbridge.aar ]; then
-            mkdir -p /tmp/aar && unzip -o gmbridge/gmbridge.aar classes.jar -d /tmp/aar >/dev/null 2>&1 || true
-            [ -f /tmp/aar/classes.jar ] && unzip -l /tmp/aar/classes.jar | grep -iE 'gmbridge.*\.class' || echo "(no classes.jar)"
-          fi
-          echo "--- Generated C# binding ---"
-          find Codex.GmBridge.Binding/obj -path '*generated*' -name '*.cs' 2>/dev/null | while read -r f; do
-            echo "----- $f"
-            grep -nE 'namespace |public (sealed |partial |abstract )*(class|interface)|public .*\(.*\)' "$f" | head -80
-          done
-          echo "=== END GMBRIDGE API ==="
-
-      # All four heads sign with the one shared repo keystore so they carry a single
-      # signature — required for the device-owner silent-update channel to accept
-      # updates across the suite.
+      # Every head signs with the one shared repo keystore so the suite carries a
+      # single signature — required for the device-owner silent-update channel to
+      # accept updates across it. Post signs with the same keystore from its own
+      # workflow (build-post.yml), which is also where the gmbridge build moved.
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/focusphone.keystore
 
@@ -124,7 +76,7 @@ jobs:
           # the code well above the old counter so versionCode stays monotonic across
           # the rename for every head.
           VERSION_CODE=$((100000 + RUN_NUMBER))
-          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android Score.Android; do
+          for proj in Flyleaf.Android FocusPhone.Camera.Android Score.Android; do
             # Flyleaf graduates from the 0.1 pilot to a 1.x major; the other heads stay 0.1.
             case "$proj" in
               Flyleaf.Android) DISPLAY_VERSION="1.0.$RUN_NUMBER" ;;
@@ -154,7 +106,7 @@ jobs:
           set +e
           echo "=== ICON CHECK ==="
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
-          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android Score.Android; do
+          for proj in Flyleaf.Android FocusPhone.Camera.Android Score.Android; do
             APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
             [ -z "$APK" ] && APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
             echo "--- $proj: $APK"
@@ -174,7 +126,7 @@ jobs:
           set -e
           echo "=== FONT CHECK ==="
           FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular"
-          for proj in Flyleaf.Android FocusPhone.Communication.Android FocusPhone.Camera.Android Score.Android; do
+          for proj in Flyleaf.Android FocusPhone.Camera.Android Score.Android; do
             APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
             [ -z "$APK" ] && APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
             echo "--- $proj: $APK"
@@ -201,7 +153,6 @@ jobs:
           name: Flyleaf-Android
           path: |
             FocusPhone/Flyleaf.Android/bin/Release/net10.0-android/publish/*-Signed.apk
-            FocusPhone/FocusPhone.Communication.Android/bin/Release/net10.0-android/publish/*-Signed.apk
             FocusPhone/FocusPhone.Camera.Android/bin/Release/net10.0-android/publish/*-Signed.apk
             FocusPhone/Score.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
@@ -214,8 +165,12 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/publish-rolling-release
         with:
-          # Flyleaf.Android is listed explicitly — the FocusPhone.*.Android glob does NOT
-          # match the renamed launcher head, which is why its APK was never reaching the release.
+          # Every head is listed by its own path. The FocusPhone.*.Android glob this
+          # replaces silently stopped matching a head each time one was renamed: it
+          # missed Flyleaf (noted at the time) and then missed Score too, so Score has
+          # never actually reached the rolling release. A glob over project folders is
+          # the wrong shape for a list that renames — spell them out.
           apks: |
             FocusPhone/Flyleaf.Android/bin/Release/net10.0-android/publish/*-Signed.apk
-            FocusPhone/FocusPhone.*.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/Score.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+            FocusPhone/FocusPhone.Camera.Android/bin/Release/net10.0-android/publish/*-Signed.apk

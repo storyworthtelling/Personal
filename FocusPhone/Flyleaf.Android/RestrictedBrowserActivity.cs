@@ -88,14 +88,12 @@ public class RestrictedBrowserActivity : Activity
 
     private void ConfigureWebView(WebView view, Uri origin, LinkPolicy policy)
     {
-        var settings = view.Settings;
-        settings.JavaScriptEnabled = true;
-        settings.SafeBrowsingEnabled = true;
-        settings.AllowFileAccess = false;
-        settings.AllowContentAccess = false;
-        settings.SetSupportMultipleWindows(false);
-        settings.JavaScriptCanOpenWindowsAutomatically = false;
-        settings.SetGeolocationEnabled(false);
+        // The hardening itself lives in Codex.Ui's PaperWebView, shared with Post's mail
+        // reader. Two WebViews configured separately is two places to get wrong, and the
+        // one that gets forgotten is the one that gets exploited. What differs here is only
+        // the posture: this is a browser, so script runs and a link may navigate in place —
+        // which is why this keeps its own client rather than taking the leave-always one.
+        PaperWebView.Harden(view, WebPosture.Browsing, onLinkOut: _ => { });
 
         view.SetDownloadListener(new DownloadStartListener(this));
         view.SetWebViewClient(new SameDomainWebViewClient(this, policy, origin));

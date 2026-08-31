@@ -53,7 +53,7 @@ irreversible, so it comes absolutely last.
 
    ```
    adb install -g -r Flyleaf.apk
-   adb install -g -r FocusPhone.Communication.apk
+   adb install -g -r Post.apk
    adb install -g -r FocusPhone.Camera.apk
    adb install -g -r Score.apk
    ```

@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Codex.Domain.Design;
+using Storyworthtelling.Paper;
 using Xunit;
 
 namespace Codex.Tests.Design;
@@ -77,14 +78,81 @@ public class DesignTokensTests
         Assert.True(ratio >= minimum, $"{tier} on Paper is {ratio:F2}:1, below {minimum}:1");
     }
 
-    // Identity is a separate set from the semantic roles precisely so a tab never
-    // reads as "caution" (§3). Score's mark must therefore be distinguishable from
-    // the status teal it sits nearest — that separation is why the hue moved.
+    // Post's identity ladder, sampled at 285 degrees from the cover's BINDING rather
+    // than its painting — a deliberate departure from §3's usual route, recorded
+    // there. The mailbox art samples warm, around 65 degrees, which is 14 from the
+    // resolved gray and 24 from Flyleaf: an identity that would read as a status and
+    // look like the launcher on the shelf. §12 already allows a binding to contrast
+    // the art it wraps, so the binding is what was sampled. Lightnesses follow
+    // Score's five-tier ladder exactly; chroma is roughly doubled.
     [Fact]
-    public void ScoreIdentityIsNotAStatusHue()
+    public void PostIdentityIsTheApprovedLadder()
     {
-        Assert.NotEqual(DesignTokens.ProgressMark, DesignTokens.Identity.Score.Mark);
-        Assert.NotEqual(DesignTokens.ProgressText, DesignTokens.Identity.Score.Text);
+        Assert.Equal("#B9B9D4", DesignTokens.Identity.Post.Fill);
+        Assert.Equal("#A1A1C7", DesignTokens.Identity.Post.Ground);
+        Assert.Equal("#5C5894", DesignTokens.Identity.Post.Mark);
+        Assert.Equal("#494676", DesignTokens.Identity.Post.Text);
+        Assert.Equal("#333252", DesignTokens.Identity.Post.Deep);
+    }
+
+    // The tiers Post sets text and marks in clear §3's contrast binding on their own,
+    // the same as any semantic role. Fill and Ground are wash tiers and carry no text.
+    [Theory]
+    [InlineData("#5C5894", 3.0)]  // marks and UI, incl. the lit binder tab
+    [InlineData("#494676", 4.5)]  // identity-colored text at any size
+    [InlineData("#333252", 7.0)]  // the deep tier, body-text safe
+    public void PostIdentityTextTiersClearContrastOnPaper(string tier, double minimum)
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(tier, DesignTokens.Paper);
+        Assert.True(ratio >= minimum, $"{tier} on Paper is {ratio:F2}:1, below {minimum}:1");
+    }
+
+    // §3's actual rule: an identity hue is sampled, then CHECKED against the semantic
+    // roles it will sit near, and moved if it crowds one — so a tab never reads as a
+    // status. That is a claim about degrees on the OKLCH wheel, and it was previously
+    // "tested" by asserting two hex strings differ, which any two colors satisfy.
+    //
+    // 20 degrees is the floor every registered ladder already clears, the tightest
+    // being Flyleaf's mark at 24 from the problem rose. Resolved is excluded: at 0.010
+    // chroma it is a warm gray, and an angle measured off almost no chroma is not a
+    // hue anyone can see.
+    [Theory]
+    [InlineData("#C9803A")] [InlineData("#B4552F")] [InlineData("#8A4A22")]  // Flyleaf
+    [InlineData("#93ABA5")] [InlineData("#436A61")]                          // Score
+    [InlineData("#A1A1C7")] [InlineData("#5C5894")]                          // Post
+    public void IdentityTiersStayClearOfEverySemanticRole(string identityTier)
+    {
+        const double MinimumSeparation = 20.0;
+        const double NearNeutralChroma = 0.02;
+
+        var (_, _, hue) = Oklch.FromHex(identityTier);
+
+        foreach (var (role, (roleHue, roleChroma)) in PaletteSpec.RoleWheel)
+        {
+            if (roleChroma < NearNeutralChroma)
+            {
+                continue;
+            }
+            var separation = Oklch.HueSeparation(hue, roleHue);
+            Assert.True(separation >= MinimumSeparation,
+                $"{identityTier} sits {separation:F1} degrees from the {role} role " +
+                $"(minimum {MinimumSeparation}) — an identity that close reads as a status.");
+        }
+    }
+
+    // §9: an inactive binder tab is cut from its area's own coloured cloth — the
+    // fill tier — and its glyph and label are plain Ink. That only works if Ink is
+    // legible on every cloth an area might take, which is a property of the ladder
+    // rather than of any one app, so it is asserted across the whole fill row. A
+    // label is small text, so AA body applies.
+    [Theory]
+    [InlineData("#A5C8AD")] [InlineData("#B1C69A")] [InlineData("#C0BDB9")] [InlineData("#AEC0D5")]
+    [InlineData("#D0BB91")] [InlineData("#E8ACAD")] [InlineData("#9BC7CD")]   // the seven roles
+    [InlineData("#AFC0BC")] [InlineData("#B9B9D4")]                            // Score, Post
+    public void InkIsLegibleOnEveryBinderTabCloth(string cloth)
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, cloth);
+        Assert.True(ratio >= 4.5, $"Ink on the {cloth} tab cloth is {ratio:F2}:1, below 4.5:1");
     }
 
     // The reading ladder. Countdown and CoverTitle sit outside it — they are

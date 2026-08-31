@@ -25,6 +25,7 @@ public static class AdaptiveIconRenderer
         var root = Path.Combine(repoRoot, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar));
 
         var ground = LoadGround(repoRoot, spec);
+        var plate = LoadPlate(repoRoot, spec);
 
         written.Add(WriteText(Path.Combine(root, "mipmap-anydpi-v26", $"{spec.Name}.xml"), AdaptiveXml(spec)));
         written.Add(WriteText(Path.Combine(root, "mipmap-anydpi-v26", $"{spec.Name}_round.xml"), AdaptiveXml(spec)));
@@ -37,9 +38,9 @@ public static class AdaptiveIconRenderer
         foreach (var (dpi, foregroundPx, legacyPx) in Densities)
         {
             written.Add(WritePng(Path.Combine(root, $"mipmap-{dpi}", $"{spec.Name}_foreground.png"),
-                RenderForeground(spec, foregroundPx)));
+                RenderForeground(spec, foregroundPx, plate)));
             written.Add(WritePng(Path.Combine(root, $"mipmap-{dpi}", $"{spec.Name}.png"),
-                RenderLegacy(spec, legacyPx, ground)));
+                RenderLegacy(spec, legacyPx, ground, plate)));
 
             if (ground is not null)
             {
@@ -49,6 +50,7 @@ public static class AdaptiveIconRenderer
         }
 
         ground?.Dispose();
+        plate?.Dispose();
         return written;
     }
 
@@ -84,12 +86,46 @@ public static class AdaptiveIconRenderer
         return path;
     }
 
-    private static byte[] RenderForeground(IconSpec spec, int px)
+    private static byte[] RenderForeground(IconSpec spec, int px, SKBitmap? plate = null)
     {
         using var surface = SKSurface.Create(new SKImageInfo(px, px));
         surface.Canvas.Clear(SKColors.Transparent);
+        DrawPlate(surface.Canvas, spec, px, plate);
         spec.Glyph(surface.Canvas, px);
         return Encode(surface);
+    }
+
+    // §12's illustration window: cover art set INTO the plate rather than bleeding to the
+    // edge, drawn before the glyph so the glyph's frame and corners sit over it. Square,
+    // centre-cropped from whatever the painting's aspect happens to be.
+    private static void DrawPlate(SKCanvas canvas, IconSpec spec, int px, SKBitmap? plate)
+    {
+        if (plate is null)
+        {
+            return;
+        }
+
+        var inset = px * spec.PlateInset;
+        var window = new SKRect(inset, inset, px - inset, px - inset);
+        var side = Math.Min(plate.Width, plate.Height);
+        var source = new SKRect(
+            (plate.Width - side) / 2f, (plate.Height - side) / 2f,
+            (plate.Width + side) / 2f, (plate.Height + side) / 2f);
+        canvas.DrawBitmap(plate, source, window);
+    }
+
+    // The cover art set into the window, if the spec has one.
+    private static SKBitmap? LoadPlate(string repoRoot, IconSpec spec)
+    {
+        if (spec.PlateImage is null)
+        {
+            return null;
+        }
+
+        var path = Path.Combine(repoRoot, spec.PlateImage.Replace('/', Path.DirectorySeparatorChar));
+        return File.Exists(path)
+            ? SKBitmap.Decode(path)
+            : throw new FileNotFoundException($"{spec.App}'s plate image is missing.", path);
     }
 
     // The painted wash, if the spec has one. Null is the ordinary case: a flat
@@ -116,7 +152,7 @@ public static class AdaptiveIconRenderer
         return Encode(surface);
     }
 
-    private static byte[] RenderLegacy(IconSpec spec, int px, SKBitmap? ground = null)
+    private static byte[] RenderLegacy(IconSpec spec, int px, SKBitmap? ground = null, SKBitmap? plate = null)
     {
         using var surface = SKSurface.Create(new SKImageInfo(px, px));
         if (ground is not null)
@@ -134,6 +170,7 @@ public static class AdaptiveIconRenderer
         canvas.Translate(px / 2f, px / 2f);
         canvas.Scale(zoom);
         canvas.Translate(-px / 2f, -px / 2f);
+        DrawPlate(canvas, spec, px, plate);
         spec.Glyph(canvas, px);
         return Encode(surface);
     }

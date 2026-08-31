@@ -244,6 +244,195 @@ public class FrozenInvariantsTests
         Assert.Contains("secrets.KEY_ALIAS", signingWorkflow!, StringComparison.Ordinal);
     }
 
+    // ---- Post (P7): the same invariants, for the third head through the rename ----
+
+    // Exactly one head declares the frozen communication ApplicationId. Post renames
+    // its folder, csproj and namespace; the package name is what a device matches an
+    // update against, so it survives all three.
+    [Fact]
+    public void CommunicationCsprojDeclaresFrozenApplicationId()
+    {
+        var declaring = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains($"<ApplicationId>{PolicyContext.CommunicationPackage}</ApplicationId>", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(declaring.Count == 1,
+            $"Exactly one csproj must declare the frozen communication ApplicationId " +
+            $"'{PolicyContext.CommunicationPackage}'; found {declaring.Count}:\n" +
+            string.Join("\n", declaring.Select(RepoRelative)));
+    }
+
+    // The head's two SharedPreferences files hold the mail account and the sync
+    // watermark. The rename moves them to postal names, which is only safe because a
+    // one-time copy-across reads the old files first — so the OLD literals must keep
+    // existing somewhere in the source. Delete the migration and the credentials are
+    // orphaned on device with no error: the app simply looks unconfigured.
+    [Fact]
+    public void CommunicationPreferenceMigrationLiteralsSurvive()
+    {
+        string[] frozen = ["account", "emailSync"];
+
+        var missing = frozen
+            .Where(name => CountCsFilesContaining($"\"{name}\"") == 0)
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "These original SharedPreferences file names must stay in the source so the one-time " +
+            "copy-across to the postal names can still find them: " + string.Join(", ", missing));
+    }
+
+    // The timeline database is named once, and that name is the only handle Android
+    // gives you on the file. Renaming it reads as a device with no history — and once
+    // the ghost archive lands, the history is no longer re-derivable from the sources.
+    [Fact]
+    public void TimelineDatabaseFileNameIsFrozen()
+    {
+        Assert.Equal(1, CountCsFilesContaining("\"timeline.db\""));
+    }
+
+    // The notification listener's access is granted once during provisioning against
+    // this component name, and the listener is KEPT after the rename as the fallback
+    // path for RCS (which never reaches the SMS provider). Renaming the class would
+    // revoke listener access silently on the next upgrade.
+    [Fact]
+    public void MessageBridgeListenerComponentNameIsFrozen()
+    {
+        Assert.Equal(1, CountCsFilesDeclaring(
+            $"{PolicyContext.CommunicationPackage}.MessageBridgeListener", "Name ="));
+    }
+
+    // The periodic email sync is enqueued with ExistingPeriodicWorkPolicy.Keep, so on
+    // an upgraded device the request WorkManager already persisted wins — and it names
+    // the worker by JNI class name. Move the class and Keep hands the sync to a name
+    // that no longer resolves: it never runs again, and nothing says so. The class is
+    // therefore Registered under its pre-rename name, and the two unique work names
+    // are frozen alongside it, since those are what Keep and Replace match on.
+    [Fact]
+    public void EmailSyncWorkerRegistrationAndWorkNamesAreFrozen()
+    {
+        Assert.Equal(1, CountCsFilesDeclaring(
+            $"{PolicyContext.CommunicationPackage}.EmailSyncWorker", "Register("));
+        Assert.Equal(1, CountCsFilesContaining("\"focusphone-email-sync\""));
+        Assert.Equal(1, CountCsFilesContaining("\"focusphone-email-sync-once\""));
+    }
+
+    // Every owner-namespace head must actually reach the rolling release, or the
+    // device-owner update channel never sees it. This is not hypothetical: the
+    // publish step used to match heads with a `FocusPhone.*.Android` glob, which
+    // silently stopped matching a head each time one was renamed — it missed Flyleaf,
+    // and then missed Score for an entire phase. A workflow that builds a head but
+    // does not publish it looks completely healthy from the outside, which is exactly
+    // what a guard is for.
+    [Fact]
+    public void EveryOwnerHeadIsPublishedToTheRollingRelease()
+    {
+        var publishSteps = Directory
+            .EnumerateFiles(Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml")
+            .Select(File.ReadAllText)
+            .Where(text => text.Contains("publish-rolling-release", StringComparison.Ordinal))
+            .ToList();
+
+        var unpublished = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains("<ApplicationId>com.storyworthtelling.", StringComparison.Ordinal))
+            .Select(file => Path.GetDirectoryName(RepoRelative(file))!.Replace(Path.DirectorySeparatorChar, '/'))
+            .Where(directory => !publishSteps.Any(text =>
+                text.Contains($"{directory}/bin/Release/net10.0-android/publish/", StringComparison.Ordinal)))
+            .ToList();
+
+        Assert.True(unpublished.Count == 0,
+            "These heads declare an owner-namespace ApplicationId but no workflow publishes their " +
+            "signed APK to the apps-latest rolling release, so the phone will never install them: " +
+            string.Join(", ", unpublished));
+    }
+
+    // Android will not even OFFER Post the SMS role unless all four of these components
+    // are declared WITH their intent filters. An app missing one is simply absent from the
+    // "default SMS app" list, with nothing anywhere saying why — the same class of silent
+    // disqualification as the device-admin receiver in P5, and the reason this is a guard.
+    //
+    // Losing the role is not cosmetic: without it Post cannot send a text or delete one
+    // for real, which is half of what this phase exists to fix.
+    //
+    // The filter has to be found inside an [IntentFilter] attribute, not merely somewhere
+    // in the file. The first version of this test looked for the action string anywhere in
+    // the declaring file and passed happily with the attribute deleted, because the action
+    // is also the value of the constant the attribute referred to.
+    [Fact]
+    public void SmsRoleComponentsAreDeclaredWithTheirFilters()
+    {
+        (string Component, string Filter)[] required =
+        [
+            ("SmsDeliverReceiver", "SmsDeliver"),
+            ("MmsDeliverReceiver", "WapPushDeliver"),
+            ("RespondViaMessageService", "RespondViaMessage"),
+            ("SmsSendToActivity", "ActionSendto"),
+        ];
+
+        var sources = EnumerateRepoFiles("*.cs").Select(File.ReadAllText).ToList();
+
+        var missing = required.Where(component => !sources.Any(source =>
+                source.Contains($"\"{PolicyContext.CommunicationPackage}.{component.Component}\"", StringComparison.Ordinal)
+                && IntentFilters(source).Any(filter => filter.Contains(component.Filter, StringComparison.Ordinal))))
+            .Select(component => component.Component)
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "These components are what qualify Post for the SMS role; without every one of them, filter " +
+            "included, the phone will not offer it the role and nothing will say so: " + string.Join(", ", missing));
+    }
+
+    // The share-target filter is the only way Google's Call Notes can reach Post: it
+    // exports through the share sheet and nowhere else. Invisible when missing and silent
+    // when it goes — the note simply never arrives and the owner is left typing it.
+    //
+    // Matched on the attribute rather than on the file, and on ActionSend as a whole
+    // token: an earlier version of this looked for "Intent.ActionSend" anywhere in the
+    // source and passed happily on Intent.ActionSendto, which is a different filter on a
+    // different component.
+    [Fact]
+    public void CallNoteShareTargetIsDeclared()
+    {
+        var declared = EnumerateRepoFiles("*.cs")
+            .Select(File.ReadAllText)
+            .SelectMany(IntentFilters)
+            .Any(filter =>
+                filter.Contains("Intent.ActionSend]", StringComparison.Ordinal)
+                && filter.Contains("\"text/plain\"", StringComparison.Ordinal));
+
+        Assert.True(declared,
+            "No component declares an ACTION_SEND / text/plain filter — Call Notes has no way into Post.");
+    }
+
+    // Every [IntentFilter(...)] attribute in a source file, as text.
+    private static IEnumerable<string> IntentFilters(string source)
+    {
+        const string Attribute = "[IntentFilter(";
+        var index = source.IndexOf(Attribute, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            var depth = 0;
+            var end = index + Attribute.Length - 1;
+            for (; end < source.Length; end++)
+            {
+                if (source[end] == '(')
+                {
+                    depth++;
+                }
+                else if (source[end] == ')' && --depth == 0)
+                {
+                    break;
+                }
+            }
+            yield return source[index..Math.Min(end + 1, source.Length)];
+            index = source.IndexOf(Attribute, Math.Min(end + 1, source.Length), StringComparison.Ordinal);
+        }
+    }
+    private static int CountCsFilesContaining(string literal) =>
+        EnumerateRepoFiles("*.cs").Count(file =>
+            File.ReadAllText(file).Contains(literal, StringComparison.Ordinal));
+
     // ---- repo helpers (root = the ancestor holding .github; survives the rename) ----
 
     private static string RepoRoot()

@@ -87,7 +87,7 @@ public sealed class PodcastsArea : ScoreArea
         RestoreLibraryFromDrive();
     }
 
-    public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ScoreMark);
+    public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
 
     public override View BuildView()
     {
@@ -438,7 +438,7 @@ public sealed class PodcastsArea : ScoreArea
         RebuildQueue();
         Invalidate();
 
-        UndoBar.Show(Host, Overlay, $"Added {added.Count} to queue.", onUndo: () =>
+        DogEar.Show(Host, Overlay, $"Added {added.Count} to queue.", onUndo: () =>
         {
             // Only what this add introduced: anything that was already pinned was
             // filtered out above, so undo cannot take a pin someone else made.
@@ -605,7 +605,7 @@ public sealed class PodcastsArea : ScoreArea
         RebuildQueue();
         Invalidate();
 
-        UndoBar.Show(Host, Overlay, "Added to queue.", onUndo: () =>
+        DogEar.Show(Host, Overlay, "Added to queue.", onUndo: () =>
         {
             pinned.Remove(episode.Id);
             SavePinned();
@@ -635,7 +635,7 @@ public sealed class PodcastsArea : ScoreArea
         SaveQueue();
         Invalidate();
 
-        UndoBar.Show(Host, Overlay, "Cleared queue.", onUndo: () =>
+        DogEar.Show(Host, Overlay, "Cleared queue.", onUndo: () =>
         {
             pinned.Clear();
             pinned.AddRange(previousPins);
@@ -785,7 +785,7 @@ public sealed class PodcastsArea : ScoreArea
     private void MarkDoneWithUndo(Episode episode)
     {
         SetListened(episode.Id, listened: true);
-        UndoBar.Show(Host, Overlay, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
+        DogEar.Show(Host, Overlay, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
     }
 
     // Marks a batch played, remembering only the ids this action newly added so undo
@@ -803,7 +803,7 @@ public sealed class PodcastsArea : ScoreArea
         store.SaveListenedIds(listened);
         RecomputeDoneAndRebuild();
         Invalidate();
-        UndoBar.Show(Host, Overlay, message, onUndo: () =>
+        DogEar.Show(Host, Overlay, message, onUndo: () =>
         {
             var ids = store.ListenedIds.ToHashSet();
             ids.ExceptWith(added);

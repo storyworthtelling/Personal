@@ -7,15 +7,21 @@ using Codex.Domain.Design;
 
 namespace Codex.Ui;
 
-/// <summary>One area the binder can turn to: its glyph, its short label, its hue.</summary>
-public sealed record BinderArea(string Label, int GlyphResourceId, Color Hue);
+/// <summary>
+/// One area the binder can turn to. It carries TWO colours because a tab is coloured
+/// differently depending on which side of the seam it is on (§9): <paramref name="Cloth"/>
+/// is the area's fill tier, the coloured cloth an INACTIVE tab is cut from, and
+/// <paramref name="Hue"/> is the mark tier the ACTIVE tab sets its glyph and label in
+/// once the tab itself has gone page-coloured.
+/// </summary>
+public sealed record BinderArea(string Label, int GlyphResourceId, Color Hue, Color Cloth);
 
 /// <summary>
 /// In-app navigation as the right-edge divider tabs of a school notebook
 /// (DESIGN.md §9). A <b>page-edge line</b> runs down the left of the gutter;
-/// inactive tabs sit outside it in PaperDeep, pointing out toward the screen edge;
-/// the <b>active tab is page-coloured and open on the page side</b>, so it blends
-/// into the content at the seam instead of crossing into it.
+/// inactive tabs sit outside it in their own area's cloth, pointing out toward the
+/// screen edge; the <b>active tab is page-coloured and open on the page side</b>, so
+/// it blends into the content at the seam instead of crossing into it.
 ///
 /// Positions come from the pure <see cref="BinderTabLayout"/>, so the rule that
 /// every tab clears §5's 48dp minimum — and that the strip scrolls rather than
@@ -105,8 +111,10 @@ public class BinderTabs : ViewGroup
     private void PaintTab(View tab, BinderArea area, bool active)
     {
         // The active tab is page-coloured and rounded only on the outer side, so it
-        // reads as the page continuing under the seam rather than as a chip.
-        var fill = active ? PaperTheme.Paper : PaperTheme.PaperDeep;
+        // reads as the page continuing under the seam rather than as a chip. An
+        // inactive tab is cut from its own area's cloth, so the strip reads as coded
+        // dividers at rest — the tab carries the colour, not the glyph on it.
+        var fill = active ? PaperTheme.Paper : area.Cloth;
         var shape = new GradientDrawable();
         shape.SetColor(fill);
         shape.SetStroke(PaperTheme.Dp(Context!, DesignTokens.Shape.HairlineDp), PaperTheme.Hairline);
@@ -120,7 +128,11 @@ public class BinderTabs : ViewGroup
         {
             var glyph = (ImageView)column.GetChildAt(0)!;
             var label = (TextView)column.GetChildAt(1)!;
-            var tint = active ? area.Hue : PaperTheme.InkMuted;
+            // On the page-coloured active tab the hue is the only thing marking the
+            // area, so it goes in the ink. On the coloured cloth of an inactive tab
+            // the cloth is already saying it, and tinting the glyph too would leave a
+            // strip that reads as a row of disabled buttons.
+            var tint = active ? area.Hue : PaperTheme.Ink;
             glyph.SetColorFilter(tint);
             label.SetTextColor(tint);
         }

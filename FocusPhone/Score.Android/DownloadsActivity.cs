@@ -139,7 +139,7 @@ public class DownloadsActivity : Activity
         store.Save(budget);
         Render();
 
-        UndoBar.Show(this, undoHost, $"Removed {item.Title}.", onUndo: () =>
+        DogEar.Show(this, undoHost, $"Removed {item.Title}.", onUndo: () =>
         {
             Downloads.Add(this, item.MediaId, MediaUri(item));
             budget = budget.With(item with { DownloadedUtc = DateTimeOffset.UtcNow });

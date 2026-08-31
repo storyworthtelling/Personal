@@ -35,7 +35,7 @@ public sealed class MusicArea : ScoreArea
         library.Changed += Invalidate;
     }
 
-    public override BinderArea Tab => new("Music", Resource.Drawable.area_music, PaperTheme.ScoreMark);
+    public override BinderArea Tab => new("Music", Resource.Drawable.area_music, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
 
     public override bool GoBack()
     {
@@ -373,7 +373,7 @@ public sealed class MusicArea : ScoreArea
         var before = library.Playlists();
         library.SavePlaylists([.. before.Where(list => list.Id != playlist.Id)]);
         Invalidate();
-        UndoBar.Show(Host, Overlay, $"Deleted {playlist.Name}.", onUndo: () =>
+        DogEar.Show(Host, Overlay, $"Deleted {playlist.Name}.", onUndo: () =>
         {
             library.SavePlaylists(before);
             Invalidate();
