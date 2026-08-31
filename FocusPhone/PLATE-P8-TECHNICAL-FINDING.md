@@ -382,7 +382,16 @@ is not a guard.
    `IdentityTiersStayClearOfEverySemanticRole` theory, measured through `PaletteSpec.RoleWheel`.
 7. **No colour hex or type-size literal outside the registered token files** — the existing
    leak guard, extended to Plate's sources.
-8. **The Index contract is unchanged** — the existing `MoneyMailTests` assertions still hold
+8. **All eight fonts are packaged, not six.** `Codex.Ui.Android` globs
+   `..\..\Fonts\*.ttf`, so every font ships — but the fatal FONT CHECK in
+   `build-flyleaf.yml` asserts only six, and **the two it omits are
+   `SourceSerif4-Black`, which every `PaperUi.ScreenHeader` renders in, and
+   `PinyonScript-Regular`, which is the owner's voice.** The check exists because a
+   `Link`-separator bug can pack a font under a wrong literal name so `Assets.Open` fails
+   silently; it would currently miss that happening to the header font or the voice.
+   `build-plate.yml` asserts all eight. Proven to fail by removing one from the glob.
+   *(CLAUDE.md also says "six shared fonts" and should be corrected to eight.)*
+9. **The Index contract is unchanged** — the existing `MoneyMailTests` assertions still hold
    with Plate as a second sender.
 
 ---
