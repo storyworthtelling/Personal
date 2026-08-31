@@ -27,8 +27,18 @@ public static class BookClothPalette
         DesignTokens.Shelf.WalnutLight,
     ];
 
-    /// <summary>The cloth tone (a DesignTokens hex string) for a package — stable per id.</summary>
-    public static string ForPackage(string package) => Cloths[StableIndex(package)];
+    // An app that has earned a signature identity hue (sampled from its own painted cover during its
+    // rebrand phase) binds in that hue, so its cloth agrees with its cover instead of a hashed tone
+    // fighting it. Apps without a shipped identity fall back to the stable hash below. This is the
+    // "identity hue if the app has one, hashed fallback if not" model (owner decision). Entries are
+    // added as each app's identity lands; contrast across the six home books is a separate concern
+    // (exactly one app should hold a pale cloth — kept a hashed/curated call, not forced here).
+    private static readonly IReadOnlyDictionary<string, string> IdentityCloths = new Dictionary<string, string>();
+
+    /// <summary>The cloth tone (a DesignTokens hex string) for a package — the app's identity hue if it
+    /// has one, otherwise a stable hash of the id.</summary>
+    public static string ForPackage(string package) =>
+        IdentityCloths.TryGetValue(package, out var identity) ? identity : Cloths[StableIndex(package)];
 
     // FNV-1a over the ordinal bytes — deterministic across processes (unlike string.GetHashCode),
     // so the binding is stable and the tests are not flaky.

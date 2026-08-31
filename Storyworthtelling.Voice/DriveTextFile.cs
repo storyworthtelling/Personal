@@ -58,6 +58,13 @@ public sealed class DriveTextFile : IDriveTextFile
             var result = await create.UploadAsync(cancellationToken);
             if (result.Exception is not null)
                 throw result.Exception;
+            // Remember the id of the file we just created, RIGHT NOW — not only on a later name-search.
+            // Without this, a file created this session but renamed/moved by the owner before any later
+            // resolve was re-created as a duplicate (the id was never captured, so the next run fell back
+            // to a name search that the rename defeats). Capturing on create closes that window.
+            var createdId = create.ResponseBody?.Id;
+            if (createdId is not null)
+                fileIdStore?.Set(fileName, createdId);
             return;
         }
 

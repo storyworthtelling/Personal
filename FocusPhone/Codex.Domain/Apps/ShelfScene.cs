@@ -53,7 +53,7 @@ public readonly record struct ShelfMetrics(
     public static ShelfMetrics Default { get; } = new(
         SidePadding: 20f,
         ShelfGap: 16f,
-        ItemGap: 6f, // books sit close together, not spaced apart
+        ItemGap: 2f, // books abut — a hair of separation reads as separate bindings, not a gap
         LedgeThickness: 10f,
         CoverWidth: 96f,
         CoverPortraitRatio: 0.68f,
