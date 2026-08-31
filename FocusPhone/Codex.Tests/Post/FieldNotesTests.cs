@@ -207,6 +207,41 @@ public class FieldNotesTests
         Assert.Equal("Recital", back.DetectedEvents.Single().Title);
     }
 
+    // ---- how the built work behaved ----
+
+    // Every one of these is now a working feature rather than a proposal, so the notes
+    // record how they FARED, not whether they are worth building. An HTML message the
+    // reader could not render, an attachment that would not open, a calendar write that was
+    // refused: each is a thing the owner hit and could not otherwise report.
+    [Fact]
+    public void OutcomesAreTallied()
+    {
+        var notes = FieldNotes.Fresh
+            .WithHtmlRender(rendered: true)
+            .WithHtmlRender(rendered: false)
+            .WithAttachmentOpened(opened: false)
+            .WithCalendarWrite(written: true)
+            .WithCalendarWrite(written: false);
+
+        Assert.Equal(1, notes.HtmlRendered);
+        Assert.Equal(1, notes.HtmlFellBackToText);
+        Assert.Equal(1, notes.AttachmentsRefusedOrFailed);
+        Assert.Equal(1, notes.CalendarWritesLanded);
+        Assert.Equal(1, notes.CalendarWritesRefused);
+    }
+
+    [Fact]
+    public void OutcomesAppearInTheRenderedBlock()
+    {
+        var rendered = FieldNotes.Fresh
+            .WithHtmlRender(false)
+            .WithCalendarWrite(false)
+            .Render();
+
+        Assert.Contains("fell back to text: 1", rendered, StringComparison.Ordinal);
+        Assert.Contains("refused: 1", rendered, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("not json")]

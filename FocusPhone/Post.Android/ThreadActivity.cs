@@ -61,7 +61,25 @@ public class ThreadActivity : Activity
             }
         };
 
+        // Email in a stream is a subject and a snippet; the message itself is its own page.
+        listView!.ItemClick += (_, e) =>
+        {
+            if (e.Position < 0 || e.Position >= items.Count)
+            {
+                return;
+            }
+            var tapped = items[e.Position];
+            if (tapped.Kind != TimelineItemKind.Email)
+            {
+                return;
+            }
+            var reader = new Intent(this, typeof(MailReaderActivity));
+            reader.PutExtra(MailReaderActivity.ExtraSourceId, tapped.SourceId);
+            StartActivity(reader);
+        };
+
         LoadItems();
+        ShowAnyProposedDate();
     }
 
     private View BuildLayout()
@@ -332,6 +350,65 @@ public class ThreadActivity : Activity
             Filing.Unfile(this, item.SourceId);
             LoadItems();
         });
+    }
+
+    // A date this correspondence proposed, waiting behind the fold. Offered, never written
+    // silently and never always-asked: the owner decides, and Post says what the day
+    // already holds so the decision is worth something.
+    private void ShowAnyProposedDate()
+    {
+        var offer = ProposedDates.For(this, contactKey);
+        if (offer is null)
+        {
+            DogEar.SetNotice(this, undoHost!, NoticeKeys.ProposedDate, null);
+            return;
+        }
+
+        var when = offer.Event.StartsAt is { } time
+            ? $"{offer.Event.StartsOn:ddd d MMM} at {time:h:mm tt}"
+            : $"{offer.Event.StartsOn:ddd d MMM}, all day";
+
+        var detail = offer.Clashed switch
+        {
+            true => $"{when}. Something else is already in that day.",
+            false => $"{when}. The day is clear.",
+            null => $"{when}. Post could not read your calendar, so the day has not been checked.",
+        };
+
+        DogEar.SetNotice(this, undoHost!, NoticeKeys.ProposedDate, new DogEar.Notice(
+            offer.Event.Title,
+            detail,
+            offer.Clashed == true ? PaperTheme.CautionMark : PaperTheme.PostMark,
+            "Put it in the calendar",
+            () => AddToCalendar(offer.Event)));
+    }
+
+    private void AddToCalendar(ProposedEvent proposal)
+    {
+        try
+        {
+            if (CalendarAccess.Write(this, proposal))
+            {
+                ProposedDates.Clear(this, contactKey);
+                ShowAnyProposedDate();
+                FieldNotesStore.Record(this, notes => notes.WithCalendarWrite(written: true));
+                return;
+            }
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("Post", $"Could not write a calendar event: {e}");
+            PostDiagnostics.LogWarning("Calendar", "Could not write the event", e);
+        }
+
+        // Reported rather than swallowed. Believing something is in the calendar when it is
+        // not is the one outcome worse than never having been offered it.
+        DogEar.SetNotice(this, undoHost!, NoticeKeys.ProposedDate, new DogEar.Notice(
+            "That did not reach your calendar.",
+            "Post could not write to it — there may be no calendar it is allowed to add to. "
+            + "The date is still here; nothing was lost.",
+            PaperTheme.ProblemMark));
+        FieldNotesStore.Record(this, notes => notes.WithCalendarWrite(written: false));
     }
 
     private void DeleteWithUndo(TimelineItem item)

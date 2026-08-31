@@ -10,4 +10,7 @@ internal static class NoticeKeys
     public const string SmsRole = "sms-role";
     public const string Sync = "sync";
     public const string Block = "block";
+    public const string Attachment = "attachment";
+    public const string ProposedDate = "proposed-date";
+    public const string Photos = "photos";
 }

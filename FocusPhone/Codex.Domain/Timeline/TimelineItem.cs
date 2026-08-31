@@ -67,6 +67,13 @@ public record TimelineItem(
     /// </summary>
     public Post.MailClass? MailClass { get; init; }
 
+    /// <summary>
+    /// The message's HTML body, when it had one. Kept ALONGSIDE the readable text rather
+    /// than instead of it: the list and the filter want words, and only the reader wants
+    /// markup. Null for anything that arrived as plain text.
+    /// </summary>
+    public string? HtmlBody { get; init; }
+
     public bool IsGroup => GroupId is not null;
 }
 

@@ -39,6 +39,7 @@ public class GmailMessageMapper
         {
             Subject = message.Subject,
             Body = ReadableBody(message),
+            HtmlBody = message.HtmlBody,
             FromAddress = from,
             Recipients = message.To.Mailboxes.Select(box => box.Address).ToList(),
             CarbonCopy = message.Cc.Mailboxes.Select(box => box.Address).ToList(),

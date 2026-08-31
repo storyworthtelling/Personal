@@ -29,6 +29,12 @@ using Android;
 [assembly: UsesPermission(Manifest.Permission.ReceiveMms)]
 [assembly: UsesPermission(Manifest.Permission.SendSms)]
 
+// The calendar. READ is what makes a proposal worth making — a date offered without
+// checking the day is a date the owner has to go and check themselves, which is the work
+// the detection was meant to save. WRITE is only ever used after the owner confirms one.
+[assembly: UsesPermission(Manifest.Permission.ReadCalendar)]
+[assembly: UsesPermission(Manifest.Permission.WriteCalendar)]
+
 // Needed to resolve/deep-link the dialer, Google Messages, and email apps under
 // Android 11+ package-visibility filtering. Sideloaded, so QUERY_ALL_PACKAGES is fine.
 [assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]

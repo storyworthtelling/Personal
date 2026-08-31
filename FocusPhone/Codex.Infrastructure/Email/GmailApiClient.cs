@@ -137,6 +137,41 @@ public class GmailApiClient
         await SendAsync(request, cancellation);
     }
 
+    /// <summary>
+    /// One attachment's bytes, fetched only when the owner asks to open it. The message is
+    /// re-read whole rather than the part being addressed by id, because the cache stores
+    /// attachment METADATA and not Gmail's part ids — and re-reading one message on a tap
+    /// is cheaper than carrying another identifier through the schema for every message
+    /// that will never be opened.
+    /// </summary>
+    public async Task<byte[]?> FetchAttachmentAsync(
+        string rfcMessageId, string fileName, CancellationToken cancellation = default)
+    {
+        var ids = await ListIdsAsync($"rfc822msgid:{rfcMessageId}", 5, cancellation);
+        foreach (var id in ids)
+        {
+            if (await LoadRawAsync(id, cancellation) is not { } message)
+            {
+                continue;
+            }
+
+            var part = message.Attachments
+                .OfType<MimePart>()
+                .FirstOrDefault(candidate =>
+                    string.Equals(candidate.FileName, fileName, StringComparison.Ordinal));
+            if (part is null)
+            {
+                continue;
+            }
+
+            using var buffer = new MemoryStream();
+            await part.Content.DecodeToAsync(buffer, cancellation);
+            return buffer.ToArray();
+        }
+
+        return null;
+    }
+
     private async Task<IReadOnlyList<TimelineItem>> FetchQueryAsync(
         string query, int pageSize, CancellationToken cancellation)
     {

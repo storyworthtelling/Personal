@@ -91,6 +91,13 @@ public static class PostSync
         // Sorting rides on the sync: the messages are already in hand and the phone is
         // already awake, so a second worker would only be a second thing to go wrong.
         await MailIntelligence.RunAsync(context, database, ReadingClient(context), now);
+
+        // The archive is the one thing here that cannot be rebuilt from a source, so it is
+        // the one thing worth carrying off the device. Written only when it has changed.
+        if (VoiceGoogleAccount.IsSignedIn)
+        {
+            await new ArchiveBackup(MailAccess.Account().GetAccessToken, "Post").BackUpAsync(context);
+        }
         preferences.Edit()!.PutString(LastSyncKey, now.ToString("O"))!.Apply();
     }
 

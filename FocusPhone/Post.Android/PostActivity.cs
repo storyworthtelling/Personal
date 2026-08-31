@@ -146,6 +146,11 @@ public class PostActivity : Activity
             {
                 EmailSyncWorker.RunOnce(this);
             }
+
+            // A device with nothing filed takes the archive back down: after the cutover's
+            // factory reset the ghosts are the only copy of messages whose originals were
+            // deleted at the source on purpose, so there is nothing else to rebuild from.
+            await new ArchiveBackup(voiceAccount.GetAccessToken, "Post").RestoreIfEmptyAsync(this);
         }
         catch
         {

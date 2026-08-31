@@ -33,6 +33,28 @@ internal static class MailAccess
             observeBodyShape: (hasText, hasHtml) =>
                 FieldNotesStore.Record(context, notes => notes.WithMail(hasText, hasHtml, [])));
 
+    /// <summary>
+    /// One attachment's bytes, on demand. Only the API path can fetch one: the IMAP client
+    /// was never given the job, and it is the path being retired.
+    /// </summary>
+    public static byte[]? Attachment(
+        Context context, Codex.Domain.Timeline.TimelineItem item,
+        Codex.Domain.Timeline.AttachmentRef attachment)
+    {
+        var account = new AccountStore(context);
+        if (Codex.Domain.Post.MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured)
+            != Codex.Domain.Post.MailTransport.GmailApi
+            || item.MessageId is null
+            || attachment.FileName is null)
+        {
+            return null;
+        }
+
+        return Api(context, account)
+            .FetchAttachmentAsync(item.MessageId, attachment.FileName)
+            .GetAwaiter().GetResult();
+    }
+
     // One HttpClient for the process, per the usual guidance: a new one per call leaks
     // sockets, and mail is reached often enough for that to matter on a phone.
     private static readonly HttpClient Http = new();

@@ -19,12 +19,15 @@ public sealed record DetectedEventSample(string Title, DateOnly StartsOn, bool? 
 /// notes are therefore <b>tallies</b> plus a few bounded samples, rendered once into the
 /// export the owner shares.
 ///
-/// Everything here answers a question the deferred work cannot be designed without:
-/// how much of the owner's real mail is HTML with no text part (does the shared web view
-/// matter?), what their attachments actually look like, how large the ghost archive grows
-/// (is plaintext JSON on every change sane?), how many contacts have no photo (is the
-/// Rolodex pass worth building?), and whether date detection produces anything worth
-/// proposing — which a count alone cannot answer, so a few are kept in full.
+/// Two kinds of thing are recorded, and the distinction matters. The <b>shape</b> of the
+/// owner's real world — how much of their mail is HTML with no text part, what their
+/// attachments look like, how far the archive grows, how many contacts have no face — and
+/// the <b>outcomes</b> of the surfaces built on top of it: did the reader render, did the
+/// attachment open, did the calendar accept the write. The first sizes the problem; the
+/// second says whether the answer works on their phone rather than on the fakes.
+///
+/// Detected dates are the one case a count cannot settle, so a few are kept in full: only
+/// the words can say whether a proposal was worth making.
 /// </summary>
 public sealed record FieldNotes(
     int MailSeen,
@@ -38,7 +41,13 @@ public sealed record FieldNotes(
     int MostGhosts,
     long LargestArchiveBytes,
     int ContactsTotal,
-    int ContactsWithoutPhoto)
+    int ContactsWithoutPhoto,
+    int HtmlRendered = 0,
+    int HtmlFellBackToText = 0,
+    int AttachmentsOpened = 0,
+    int AttachmentsRefusedOrFailed = 0,
+    int CalendarWritesLanded = 0,
+    int CalendarWritesRefused = 0)
 {
     /// <summary>
     /// How many detected events are kept in full. Bounded because a phone syncing every
@@ -93,6 +102,31 @@ public sealed record FieldNotes(
         return this with { EventsDetected = EventsDetected + 1, DetectedEvents = samples };
     }
 
+    /// <summary>
+    /// Whether the mail reader rendered a message's HTML or fell back to the extracted
+    /// text. The fallback is not a failure — a message still arrived readable — but it is
+    /// the number that says whether the reader is doing its job on real mail.
+    /// </summary>
+    public FieldNotes WithHtmlRender(bool rendered) => this with
+    {
+        HtmlRendered = HtmlRendered + (rendered ? 1 : 0),
+        HtmlFellBackToText = HtmlFellBackToText + (rendered ? 0 : 1),
+    };
+
+    /// <summary>Whether an attachment opened. Refusals count here too — a refusal is a design decision meeting real mail.</summary>
+    public FieldNotes WithAttachmentOpened(bool opened) => this with
+    {
+        AttachmentsOpened = AttachmentsOpened + (opened ? 1 : 0),
+        AttachmentsRefusedOrFailed = AttachmentsRefusedOrFailed + (opened ? 0 : 1),
+    };
+
+    /// <summary>Whether a confirmed date reached the calendar. A refusal is the one the owner would notice.</summary>
+    public FieldNotes WithCalendarWrite(bool written) => this with
+    {
+        CalendarWritesLanded = CalendarWritesLanded + (written ? 1 : 0),
+        CalendarWritesRefused = CalendarWritesRefused + (written ? 0 : 1),
+    };
+
     /// <summary>The archive's high-water mark — it shrinks when things are un-filed.</summary>
     public FieldNotes WithArchive(int ghosts, long bytes) => this with
     {
@@ -117,7 +151,9 @@ public sealed record FieldNotes(
     /// </summary>
     public string Render()
     {
-        if (MailSeen == 0 && EventsDetected == 0 && ContactsTotal == 0 && MostGhosts == 0)
+        if (MailSeen == 0 && EventsDetected == 0 && ContactsTotal == 0 && MostGhosts == 0
+            && HtmlRendered == 0 && HtmlFellBackToText == 0 && AttachmentsOpened == 0
+            && AttachmentsRefusedOrFailed == 0 && CalendarWritesLanded == 0 && CalendarWritesRefused == 0)
         {
             return "FIELD NOTES\nNothing observed yet.\n";
         }
@@ -151,6 +187,12 @@ public sealed record FieldNotes(
 
         text.AppendLine(Invariant($"Archive high-water mark: {MostGhosts} ghosts, {LargestArchiveBytes} bytes"));
         text.AppendLine(Invariant($"Contacts: {ContactsTotal}, without a photo: {ContactsWithoutPhoto}"));
+
+        text.AppendLine();
+        text.AppendLine("How the newer surfaces fared:");
+        text.AppendLine(Invariant($"  HTML mail rendered: {HtmlRendered}, fell back to text: {HtmlFellBackToText}"));
+        text.AppendLine(Invariant($"  Attachments opened: {AttachmentsOpened}, refused or failed: {AttachmentsRefusedOrFailed}"));
+        text.AppendLine(Invariant($"  Calendar writes landed: {CalendarWritesLanded}, refused: {CalendarWritesRefused}"));
         return text.ToString();
     }
 
