@@ -7,9 +7,11 @@ the release shape, and the risks that are still open when the phase starts.
 P7 added this stage and it paid for itself by reversing one of its own decisions before
 any code was written. This one reverses one too — see §2.1.
 
-**Status: approved by the owner. §2.7 was revised after approval — the identity hue is
-settled at magenta 326° on a light cloth, and the §3 departure that section originally
-recorded turned out not to be needed.**
+**Status: approved, then substantially revised during the mockup walkthrough.** Two changes
+after approval are large enough that this document should be re-read rather than remembered:
+the identity hue settled at magenta 326° on a light cloth with no §3 departure needed
+(§2.7 of the approved draft, now §2.6 of the studies record), and **the spine was reversed —
+Plate gained a Darkroom** (§0, §2.1). The release shape is now four builds, not one (§5).
 
 ---
 
@@ -19,6 +21,18 @@ The design interview produced one rule and one condition:
 
 > **Plate never keeps anything — every capture is handed somewhere and forgotten.
 > But it must never lose one.**
+
+**That rule was reversed during the mockup walkthrough, deliberately, by the owner.** It is
+kept above because everything below was built on it and because the reversal is the most
+important thing in this document. The rule now is:
+
+> **Nothing leaves Plate until you have chosen it. Nothing stays once you have.**
+
+Plate gained a **Darkroom**: captures wait there to be culled, cropped and tinted, and only
+what survives is sent. See §2.1. The owner's gate-1 answers that this supersedes — *"nothing,
+it's just gone into Photos"* and *"the Photos button is the whole answer"* — are left in the
+list below rather than edited out, because a phase that quietly rewrites what it was told is
+a phase nobody can audit.
 
 Everything below is measured against that sentence. The rest of what the owner said,
 because the detail matters more than the summary:
@@ -36,7 +50,7 @@ because the detail matters more than the summary:
 - All four Post handoff moments are real: a card becomes a contact · a face for a contact
   who has none · a statement becomes a balance · an emailed photo opens properly.
 - Video, the front camera, and flash/low light are all real absences. **All of it, one
-  release.**
+  release** — superseded in the walkthrough once the scope roughly tripled; see §5.
 - Plate should **be the phone's camera** — the one that opens when anything asks for a
   picture.
 
@@ -115,6 +129,23 @@ text rather than a double. `MoneyMail.Read(subject, body)` is pure and takes tex
 *(Read directly.)* A statement photographed and recognised into text can go straight in
 with a null subject. **The statement→balance route is nearly free once text exists.**
 
+**F12 — Google cannot be asked what is in a photo.** As of **31 March 2025** the
+`photoslibrary.readonly`, `photoslibrary.sharing` and `photoslibrary` scopes are removed and
+calls relying on them return `403 PERMISSION_DENIED`; what survives is `appendonly` and
+`readonly.appcreateddata`, so an app reads back only what it uploaded itself. Reading the
+wider library needs the Picker API, which is a user-driven file picker rather than a query.
+*(Verified against Google's own "Updates to the Google Photos APIs" and "Authorization
+scopes" pages.)* The API has also never exposed per-item content labels or face groupings —
+the nearest thing is a `contentFilter` on search. **And it is moot regardless: a Darkroom
+photo has not been uploaded, so Google knows nothing about it by definition.**
+
+**F13 — Claude will describe a photo but will not name the people in it.** So neither the
+caption call (§2.7) nor any cloud service supplies *who*. Recognition therefore has to be
+local and learned: ML Kit Face **Detection** finds and crops faces on-device but identifies
+nobody; identity needs an embedding model and a labelled store the owner builds by naming a
+face once. *(Established from the model's own behaviour and ML Kit's documented API surface;
+the bundled-model plumbing is unverified here and is what Release D exists to prove.)*
+
 **F10 — the reMarkable library already takes exactly what the scanner produces.**
 `IRemarkableClient.Upload(title, byte[] pdfBytes, string? parentFolderId)` plus
 `EnsureFolder(name)`. *(Read directly.)* The document scanner already emits a PDF.
@@ -144,77 +175,89 @@ asserted by `FrozenInvariantsTests`. *(Read directly.)* All five are within reac
 
 ## 2. The decisions
 
-### 2.1 The spine, and the outbox P7 refused
+### 2.1 The Darkroom — and the spine it replaced
 
-**Plate never keeps anything; every capture is handed somewhere and forgotten. But it must
-never lose one.** The owner added the second clause and it is the load-bearing one.
+**Nothing leaves Plate until you have chosen it. Nothing stays once you have.**
 
-The mechanism is a **pending tray with retry**, chosen over "durable write, then hand off."
-That is a deliberate reversal of a decision `IndexHandoff` states in its own doc comment:
+Plate keeps every capture in a **Darkroom** until it is sent or deleted. The owner reversed
+the original spine here for a reason their own gate-1 answers support: someone who shoots a
+lot and never goes back is exactly the person who needs a triage step, and nobody culls
+inside Google Photos. The Darkroom is where several shots of the same thing become one, where
+a crop or a tint happens, and where the rest are thrown away before they reach anything.
 
-> There is no outbox. If Index is not installed or the send fails, Post drops it — Index
-> will see the same email on a later sync, so the case self-heals, and a durable retry
-> queue is real machinery to maintain for something that fixes itself.
+**Everything waits in one room, not two.** Photos to be chosen and scans whose handoff failed
+share the Darkroom, chosen over a version that separated them under their own headings. One
+front door, at the cost of a creative step and a delivery failure sitting in the same list.
 
-**That reasoning does not survive the move from Post to Plate, and the difference is the
-whole justification: an email that fails to hand over comes round again on the next sync.
-A photograph is unrepeatable.** Post drops a balance because the source still has it;
-Plate cannot drop a scan because Plate's capture *is* the source. Two apps will therefore
-disagree about outboxes in the same repo, on purpose, and both doc comments must say so —
-otherwise the next reader "fixes" one of them.
+**What this costs, stated plainly and accepted by the owner.** Under the old spine a photo was
+safe the instant the shutter closed, because it went straight to `DCIM/Camera` and Google
+Photos backed it up. Under the Darkroom **Plate holds the only copy** until the owner acts.
+An app-data clear, a factory reset, or simply never getting round to it loses pictures that
+were never backed up anywhere — which is the same failure this phase exists to fix
+(F1), reached deliberately instead of by accident.
 
-The tray is the P7 tombstone shape reused, not a new invention: a durable record, hidden
-from the ordinary view, retried on a trigger, dropped when the handoff is confirmed, and
-folded into the **`DogEar`** when it needs to say something. It is not a gallery — it holds
-only what has *not* landed, so a working Plate shows an empty one, which is to say shows
-nothing at all.
+The owner was offered four mitigations — auto-send after a week, auto-send only what was
+never opened, a dog-ear that refuses to flatten, or nothing — and **chose nothing**:
+*"it's my darkroom, my job."* There is therefore **no auto-send, no expiry and no nag.**
+This is a knowingly accepted risk, and the on-device test plan must state it as one rather
+than test around it.
 
-All of the tray's logic is pure and lives in `Codex.Domain` — what is pending, what to
-retry, when to give up, what the fold says. That is not tidiness; it is the only way any of
-it gets tested this phase (F6).
+**The never-lose clause is now load-bearing in a way it was not.** The Darkroom is the only
+copy, so its store cannot be a cache: it survives process death, upgrade and reboot, and a
+failed handoff keeps its file rather than dropping it. That reasoning still diverges from
+`IndexHandoff`'s documented "there is no outbox" — an email that fails to hand over comes
+round again on the next sync; **a photograph is unrepeatable** — and both doc comments must
+say so, or someone will "fix" one of them.
 
-### 2.2 Photos — the live bug
+### 2.2 Photos — the live bug, and where the fix now lands
 
-Set `MediaStore.IMediaColumns.RelativePath` to `DCIM/Camera` on the capture insert, so a
-photo lands where Google Photos already backs up rather than in a folder the owner would
-have to know to enable. This is the "handed somewhere and forgotten" rule applied to the
-case that matters most, and it is the phase's one true bug fix.
+The bug is unchanged (F1): the capture insert carries no `RELATIVE_PATH`, so every photo this
+app has taken has landed in `Pictures/` rather than `DCIM/Camera`, outside what Google Photos
+backs up by default.
 
-The display-name prefix changes from `FocusPhone_` to `Plate_`; it is display text keyed
-to nothing (F3), and existing files keep their names.
+**What changes is when the fix applies.** Capture now writes into the Darkroom's own store.
+`RELATIVE_PATH = DCIM/Camera` is set on the MediaStore insert performed **when the photo is
+sent**, not when it is taken — so a photo the owner deletes never enters the camera roll at
+all, which is the whole point of culling. A sent photo carries its edits; the original is not
+kept, because keeping both would rebuild the roll the Darkroom exists to keep clean.
 
-### 2.3 Scans — the destination is chosen first
+### 2.3 Scans — chosen first, assembled by us, delivered to the root
 
-Three entry points, not one scanner and a chooser: **Scan to Drive**, **Scan to Post**,
-**Scan to the reMarkable**. The owner picks before scanning because the destination is the
-reason they opened the scanner.
+Three entry points, picked before scanning: **to Drive**, **to Post**, **to the reMarkable**.
+Delivery stays hybrid — share intents for Drive and Post, the shared library for the
+reMarkable.
 
-Delivery is **hybrid**, as approved:
+**Plate assembles the document; Google only scans a page.** `GmsDocumentScanner` caps at 50
+pages and the owner wants longer, so Plate stops taking its finished PDF and takes the
+**per-page images** instead — which the shipped code already requests (`ResultFormatJpeg`
+alongside `ResultFormatPdf`, `CameraActivity.cs:135`) and then discards — holds them in a page
+tray, and composes the document itself. Page order, naming and assembly are ordinary logic
+that lives in `Codex.Domain`/`Codex.Infrastructure` where the test suite reaches it (F6),
+which makes this the most verifiable new work in the phase. It costs one dependency: PdfSharp,
+already used by Canonizer, from a well-established publisher.
 
-- **Drive and Post — share intents.** Both already have an app on this phone that accepts
-  a PDF, and Post's is a first-party app whose package is already named in Domain. A share
-  is honest, costs nothing, and is exactly the spine's shape.
-- **The reMarkable — the shared library.** `Storyworthtelling.Remarkable` already uploads
-  PDF bytes into a named folder (F10), which no share intent will do, and DailyLoader and
-  Canonizer already pair the device token.
+**The reMarkable delivery goes to the account root**, not into a named folder. That uses
+`IRemarkableClient.Upload(title, pdfBytes)` — the plain overload DailyLoader has exercised all
+along — instead of `EnsureFolder` plus the folder overload. It is a risk reduction rather than
+a simplification: CLAUDE.md records the reMarkable v2 cloud path as reconstructed and not
+live-verified, **especially the folder/collection wire format**. Sending to the root means
+Plate depends only on the part of that library which has actually run.
 
-**The cost the hybrid does not avoid, stated plainly:** the reMarkable device token lives
-in the vault, the vault lives in Drive, and reading it needs a Google account and a vault
-passphrase — **neither of which Plate has today.** So the hybrid still buys one Google
-sign-in and one passphrase field in Plate's settings; what it avoids is a Drive API client
-and a `drive` write scope. If the sign-in proves worse on-device than it looks on paper,
-the documented fallback is a share intent to the reMarkable app (which is already
-allowlisted in `PolicyContext`), at the price of losing the named folder.
+**QR scanning stays**, as a fourth door set apart from the three destinations. It was nearly
+lost: the rev-2 mockups dropped it silently even though the shipped head has it
+(`StartQrScan`). One thing changes — today the result appears in an `AlertDialog`, which §7
+bans outright; the value goes on the page instead, with a URL still handed to the restricted
+browser exactly as now.
 
-A share intent cannot confirm delivery. Under §2.1 that is survivable: the scan is in the
-tray until the owner marks it gone, and an unconfirmable handoff is one the tray keeps.
+**Reading is not a Plate door.** A statement read starts in **Index**, a card read starts in
+**Post**. Plate never decides what a piece of paper is for — it is asked, it reads, it
+returns. See §3.
 
 ### 2.4 Plate is the phone's camera
 
-Plate declares the full camera component set, so nothing on this phone ever opens a
-different camera. This is the `ROLE_SMS` shape from P7 and it carries the same trap:
-**Android silently omits an app that is missing a component** — it does not warn, the app
-simply never appears as an option. The set:
+Unchanged from the approved draft: Plate declares the full camera component set so nothing on
+this phone opens a different camera. This is the `ROLE_SMS` shape from P7 with the same trap —
+**Android silently omits an app missing a component**, with no warning.
 
 | Component | Why |
 |---|---|
@@ -223,139 +266,97 @@ simply never appears as an option. The set:
 | `MediaStore.ACTION_VIDEO_CAPTURE` | another app asks for a video |
 | `Intent.ACTION_STILL_IMAGE_CAMERA` | the power-button double-press |
 | `Intent.ACTION_STILL_IMAGE_CAMERA_SECURE` | the same, locked |
-| `Intent.ACTION_VIEW` + `image/*` | **Post's attachment route** — without this, `Attachments.cs` setting the package produces an activity-not-found, not a picture |
+| `Intent.ACTION_VIEW` + `image/*` | **Post's attachment route** — without it, `Attachments.cs` setting the package produces an activity-not-found rather than a picture |
 
-That last row is the one that is easy to miss and the only one another app already depends
-on (F7). It is also the one that reconciles "no gallery" with "an emailed photo opens
-properly": Plate keeps no roll of its own pictures, but it will display one handed to it.
+**A requested capture goes through the Darkroom first**, by the owner's decision, taken over
+returning it immediately. The consequence to watch on-device: `ACTION_IMAGE_CAPTURE` is a
+*blocking* contract — the calling app is sitting in `onActivityResult` waiting, and a detour
+through culling and editing can outlive it, with the caller backgrounded or killed. The test
+plan must exercise this specifically, because it is the one decision in the phase that makes
+another app's behaviour depend on how long the owner lingers.
 
-### 2.5 Camera scope — video, front camera, flash
+### 2.5 Camera scope — video, front camera, flash, and a true ratio
 
-All three, one release, as decided. This means `Xamarin.AndroidX.Camera.Video`, a lens
-selector, a flash mode, and `RECORD_AUDIO` — which, like `CAMERA`, is a sensor permission
-the device owner **cannot** silently grant, so it costs a runtime dialog (see R4).
+All three, as decided: `Xamarin.AndroidX.Camera.Video`, a lens selector, a flash mode, and
+`RECORD_AUDIO` — a sensor permission the device owner cannot silently grant, so it costs a
+runtime dialog. **Video must degrade to silent rather than refuse** if that dialog is
+suppressed by the lockdown.
 
-### 2.6 Text recognition — cards and statements
+**The preview window always carries a true capture ratio.** It is never stretched, padded or
+cropped to fill the well. The default is **9:16** (the 16:9 sensor crop held portrait), which
+at 411dp fills 528dp of a ~694dp well where 3:4 filled 396dp and left 210dp of slack; choosing
+3:4 makes the window *shorter* rather than the frame dishonest. That needs a ratio control,
+which the first mockups lacked.
 
-`Xamarin.GooglePlayServices.MLKit.TextRecognition`, a fourth binding on the one head with
-no compiler. Both routes are in, as decided. The statement route is cheap because
-`MoneyMail.Read` and `IndexHandoff` already exist (F9); the card route needs new pure
-parsing (a name, a phone, an email out of recognised lines) which is Domain work and
-therefore testable here.
+### 2.6 Recognition — text now, faces later
 
-### 2.7 The identity hue — magenta 326°, and no deviation after all
+**Text** (`Xamarin.GooglePlayServices.MLKit.TextRecognition`) serves the inbound reads: a card
+for Post, a statement for Index. The statement route is cheap because `MoneyMail.Read` and
+`IndexHandoff` already exist (F9); the card route needs new pure parsing, which is Domain work
+and therefore testable here.
 
-**Settled: 326°, the light cloth, ink framing.** The committed ladder, generated the way
-the shipped ones were rather than hand-picked — Post and Score agree to three decimals on
-the lightness ladder (0.794 / 0.722 / 0.491 / 0.420 / 0.334) and to within 0.02 on the
-chroma ratios, so Plate reuses both at a peak chroma of 0.085, between Score's muted 0.047
-and Post's vivid 0.095:
+**Faces are a separate subsystem in a separate release.** Two facts shape it (F13):
+Google's Photos API cannot be asked what is in a picture, and **Claude will describe a photo
+but will not name the people in it**. So recognition cannot come from either. It is built
+locally, in the order it learns: ML Kit **Face Detection** crops faces → a bundled
+MobileFaceNet-class TensorFlow Lite model embeds each one → the owner labels a face once →
+later faces are matched by nearest neighbour against the stored labels, with a confidence
+floor and an "is this Ashley?" fold when it is unsure.
 
-| tier | fill | ground | mark | text | deep |
-|---|---|---|---|---|---|
-| hex | `#C8B5C8` | `#B69BB6` | `#7A4F7B` | `#613F62` | `#442D44` |
+Nothing about that leaves the device, and the parts that decide anything — thresholds,
+tie-breaks, when to ask rather than assert — are pure and testable in `Codex.Domain`. The
+model file and the ML Kit/TFLite bindings are the parts that cannot be verified here.
 
-50.4° from the problem rose (the nearest chromatic role), 41.0° from Post. Ink on the light
-cloth clears AA at 5.12:1; mark/text/deep on paper measure 6.12 / 8.25 / 11.60 against the
-3.0 / 4.5 / 7.0 floors the committed Post ladder is already tested against.
+### 2.7 The Darkroom's captions go to Claude, and what that costs
 
-**This supersedes an earlier draft of this section, which recommended 345° and recorded a
-deliberate departure from §3.** That draft computed the free window first and would have
-had the painting made to fit it — the inverse of §3's route, which is to sample the art and
-*then* check it. The owner stopped that, correctly, and the honest route produced a better
-answer: **twelve cover studies were generated with no colour named in any prompt**, and the
-eleventh — the same lens-and-tree subject under identical wording as the chosen cover —
-measured **326.5°**, landing in free wheel space unprompted, because its coating flare came
-out magenta where the chosen cover's dust is warm.
+Captions come from a Claude vision call, by the owner's decision. Two consequences are on the
+record because they are not obvious:
 
-So Plate's identity is sampled from its own art after all, and **there is no §3 departure to
-record.** Post's remains the only one.
+**The photo leaves the phone before the owner has chosen to send it.** The cull therefore
+stops meaning *"the bad ones never reach a cloud"* and starts meaning *"the bad ones never
+reach Google Photos"* — including the ones about to be deleted. The owner chose this knowing
+it; a cheap mitigation exists if they later want it (caption only what survives a first cull).
 
-**The cloth is light, not deep, and that is a departure from Post's construction rather than
-from §3.** §12: *a binding that harmonises with the cover art makes the book the hardest of
-six to pick out of the row.* Post's warm mailbox painting sits on deep indigo with cream
-framing; **Plate's art is a near-black lens**, so the same construction would put a dark
-plate on a dark cloth. Plate therefore takes Score's construction — the `ground` tier as
-cloth with the rule, brackets and lettering inverted to ink — chosen for the reason Score's
-was: findability on a shelf of six.
-
-The committed tiers get the same treatment as every other ladder: registered in §19,
-leak-guarded, and added to the `IdentityTiersStayClearOfEverySemanticRole` theory so the
-claim is measured rather than asserted.
-
-### 2.8 The workflow — `build-plate.yml`, and the five places that break
-
-Plate takes **its own workflow**, following Post's precedent, for a reason that is Plate's
-alone: it is the only head that needs `dl.google.com` at build time, so it is the slowest
-and flakiest build in the repo, and isolating it means a Plate binding failure stops
-shipping Plate rather than stopping Flyleaf and Score too.
-
-**versionCode floor 200000.** `build-plate.yml`'s `run_number` restarts at 1 while the head
-has shipped at up to 100108 (F4), and a lower code is simply rejected by the update
-channel. 200000 is Post's number; versionCodes are per-package, so Post and Plate sharing a
-floor is harmless and one number is easier to remember than two.
-
-**A fatal APP ID CHECK** that reads the frozen id back out of the built APK, as
-`build-post.yml` does. A green build then proves the id survived the rename.
-
-**And the part that breaks silently: Camera must come *out* of `build-flyleaf.yml` in all
-five places** — the `paths:` trigger (line 9), the three `for proj in …` loops (79, 109,
-129), the artifact upload path (156) and the rolling-release path (176). That is six
-references, not five; the loops are three of them and each has to be edited. Miss one and
-`build-flyleaf` starts failing on a folder that no longer exists — `if-no-files-found:
-error` on the upload makes that fatal — or, worse, keeps quietly publishing nothing.
-(There is a seventh mention, at line 52, in a comment explaining why the runner needs
-network access. It is not functional, but it stops being true and should go with the rest.)
-**This is the bug that meant Score never reached the rolling release**, and the workflow's
-own comment says so at line 170. The guard in §4 exists because of it.
-
-### 2.9 One package id, not five
-
-Collapse the five copies (F12) to the single `Codex.Domain` constant and have Flyleaf and
-Post reference it. The constant is renamed to `PlatePackage`; the *value* is frozen, the
-C# identifier is not. This is not tidying — four of the five copies are unguarded, and the
-two in Post are the ones the handoff depends on.
-
-`PolicyContext.OwnerPackagePrefix` keeps its deliberate duplicate in
-`Storyworthtelling.Updates` (Domain must stay dependency-free there, and a parity guard
-holds them equal). That is a different situation and is left alone.
-
----
+**Google cannot be asked instead.** As of 31 March 2025 the `photoslibrary.readonly`,
+`.sharing` and `photoslibrary` scopes are removed and return `403 PERMISSION_DENIED`; what
+survives reads back only what the app itself uploaded. And a Darkroom photo has not been
+uploaded, so Google knows nothing about it by definition (F12).
 
 ## 3. The handoff contract, in both directions
 
 P7 shaped this to accept an inbound direction and built nothing speculative. P8 builds the
-inbound half.
+inbound half — and the walkthrough moved **reading** from the outbound side to the inbound
+one, which is the simpler contract: the app that wants the data already knows what it wants,
+so Plate never has to work out what a piece of paper is for.
 
-**Post → Plate** *(exists, compiled, unproven — F7)*
+**Inbound — another app asks, Plate looks, Plate returns**
 
 | Trigger | Mechanism | Plate's obligation |
 |---|---|---|
-| Photo attachment | `ACTION_VIEW`, `image/*`, `setPackage(Plate)` | declare the VIEW filter (§2.4) and show the image |
-| Contact needs a face | `GetLaunchIntentForPackage(Plate)` | open ready to take a face and hand it back |
+| Photo attachment *(exists, unproven — F7)* | `ACTION_VIEW`, `image/*`, `setPackage(Plate)` | declare the VIEW filter (§2.4) and show the image |
+| Contact needs a face *(exists, unproven — F7)* | `GetLaunchIntentForPackage(Plate)` | open ready to take a face and hand it back |
+| **Read a card** *(new)* | explicit intent from Post's Rolodex | recognise, let the owner correct it, return name/phone/email as text |
+| **Read a statement** *(new)* | explicit intent from Index | recognise, let the owner correct it, return via `IndexHandoff` unchanged |
+| Requested capture | `ACTION_IMAGE_CAPTURE` | **through the Darkroom first** (§2.4) — and see R10 |
 
-The contact-photo route arrives today as a *bare launch* — Post opens Plate and hopes. P8
-should give it an explicit action so Plate knows why it was opened and what to send back,
-while continuing to accept the bare launch, because the version of Post in the field will
-keep sending it until Post ships again.
+The contact-photo route arrives today as a **bare launch**: Post opens Plate and hopes. P8
+gives it an explicit action and a returned result **while continuing to accept the bare
+launch**, because the Post already in the field will keep sending it until Post ships again.
 
-**Plate → Post / Index** *(new)*
+**Index does not exist yet.** It is P11. So P8 builds Plate's end of the statement read and
+**Post is the only live caller** until then — which means that route ships untested against a
+real counterpart, and the test plan must say so rather than imply a passing check.
+
+**Outbound — Plate hands something over**
 
 | Capture | Destination | Mechanism |
 |---|---|---|
-| Business card | Post's Rolodex | explicit intent, signature-permission guarded, carrying recognised name/phone/email as text |
-| A face | Post's Rolodex | the same, carrying a content URI |
-| Scan | Post as an attachment | share intent (§2.3) |
-| Statement | Index | **`IndexHandoff` unchanged** (F9) — balance and date only, as exact text |
+| Photo, once chosen | Google Photos | MediaStore insert with `RELATIVE_PATH = DCIM/Camera` (§2.2) |
+| Scan | Drive · Post | share intent (§2.3) |
+| Scan | the reMarkable | `Upload(title, pdfBytes)` — **the account root** (§2.3) |
 
-Index's contract is reused byte-for-byte rather than copied. Post's side is new and should
-be defined in `Codex.Domain` beside `IndexHandoff`, in the same shape and with the same
-signature-level permission, so there is one pattern in the repo and not two.
-
-**Vitality's recipe scan** (P12) is a later consumer of the card path. It is designed for —
-the recognised-text handoff is a general shape, not a card-shaped one — and **not built**.
-
----
+**Vitality's recipe scan** (P12) is a later consumer of the inbound read path. It is designed
+for — an "ask Plate to read this" contract is general, not card-shaped — and **not built**.
 
 ## 4. What the guard test must assert
 
@@ -388,29 +389,28 @@ is not a guard.
 
 ## 5. Release shape
 
-**One release, as decided.** Not because it is the low-risk shape — it is not — but because
-a camera that cannot take a video or a selfie is not the camera this phone needs, and
-splitting it would leave the head half-renamed across a phase boundary.
+**Four releases, not one.** The owner's original "all of it, one release" answered a question
+about video, the front camera and flash. The scope has since roughly tripled — multi-page
+scanning with our own PDF assembly, the Darkroom, an editor, Claude captions and a
+face-recognition subsystem — into the one head that cannot be compiled here, with CI down.
+Put back to the owner, they chose **guardrails, then the camera, then the Darkroom**, with
+recognition in its own release.
 
-Build order inside the release is not negotiable, because the guardrails are what make the
-rest safe to get wrong:
+| | Release | Contents |
+|---|---|---|
+| **A** | Guardrails | The rename with app id, keystore and versionCode frozen · `build-plate.yml` · Camera out of `build-flyleaf.yml` · every guard in §4, each watched to fail · the package id collapsed to one constant. **Nothing else.** |
+| **B** | The camera | The Photos bug (§2.2) · video, front lens, flash, the true-ratio window (§2.5) · scanning with our own multi-page assembly, QR restored, reMarkable to root (§2.3) · kit adoption and restyle · the inbound reads (§3). |
+| **C** | The Darkroom | The room, the editor (crop, tint, filters), culling, and the Claude captions (§2.1, §2.7). |
+| **D** | Recognition | Detection → embeddings → the labelled store → matching, and the "is this Ashley?" fold (§2.6). |
 
-1. **Guardrails.** The rename with app id, keystore and update channel byte-identical.
-   `build-plate.yml`, Camera out of `build-flyleaf.yml`, the id collapsed to one constant,
-   and every guard in §4 written first and watched to fail.
-2. **The live bugs.** `RELATIVE_PATH` (§2.2) and the scan destination (§2.3).
-3. **Kit adoption and restyle.** The identity hue registered, the shared kit adopted, the
-   `AppCompat` theme reconciled with `PaperTheme`.
-4. **Features.** The camera scope (§2.5), the scan routes, the handoff both ways (§3), the
-   pending tray (§2.1), text recognition (§2.6).
+**A is deliberately almost empty**, and that is the point: it proves the in-place upgrade and
+the update channel before a single feature rides on either. It is also the only release whose
+whole content this sandbox can verify, since it is guards, workflow and one constant.
 
-**The merge gate, as instructed: no building until Wednesday, and no merge without a green
-`build-plate.yml` that has produced a signed APK.** CI is expected back on the 1st (F5); if
-it is not, the phase does not merge on a promise. The Domain suite (F6) is a necessary
-condition and nowhere near a sufficient one — it has never once compiled a line of this
-head.
-
----
+**The merge gate, unchanged: no building until Wednesday, and nothing merges without a green
+`build-plate.yml` that has produced a signed APK.** CI is expected back on the 1st (F5); if it
+is not, the phase does not merge on a promise. The Domain suite (F6) is necessary and nowhere
+near sufficient — it has never compiled a line of this head.
 
 ## 6. Open risks
 
@@ -467,6 +467,25 @@ questions only the owner's actual paper can answer. The test plan brings numbers
 rather than impressions, the way P7's field notes were meant to.
 
 ---
+
+**R10 — a requested capture now blocks on the owner.** `ACTION_IMAGE_CAPTURE` is a blocking
+contract: the calling app waits in `onActivityResult`. Routing it through the Darkroom (§2.4)
+means another app's behaviour depends on how long the owner spends culling, and a backgrounded
+caller can be killed. Decided knowingly; it needs its own on-device check rather than a
+general one.
+
+**R11 — the Darkroom is the only copy, with nothing to catch a forgotten photo.** No
+auto-send, no expiry, no nag, by explicit choice (§2.1). The failure mode is silent and looks
+exactly like the bug the phase set out to fix.
+
+**R12 — photos leave the phone to be captioned.** Including ones about to be deleted (§2.7).
+
+**R13 — Release D rests on a bundled model.** A TensorFlow Lite face-embedding model in the
+APK, plus ML Kit face detection: two more `dl.google.com`-shaped dependencies (R3) and an
+asset whose size and load behaviour cannot be measured from here.
+
+**R14 — the editor is unbudgeted.** Crop, tint and filters are the one part of Release C with
+no existing analogue anywhere in the suite, and no shared component to borrow.
 
 ## 7. What this supersedes, and what it does not build
 
