@@ -11,14 +11,15 @@ namespace Codex.Domain.Policy;
 /// </summary>
 public static class HardBlock
 {
-    // Android's ApplicationInfo.Category ints. Only Game and Social map cleanly to a
-    // never-visible category; Dating / Gambling / Short-form aren't Android categories, so those
-    // rely on the curated list below.
+    // Android's ApplicationInfo.Category ints. Only Game maps cleanly to a never-visible category.
+    // CATEGORY_SOCIAL (4) is deliberately NOT auto-blocked: first-party communication utilities —
+    // Google Messages, Contacts, Meet, Gemini — declare appCategory="social" and were wrongly
+    // hard-suspended ("blocked by your administrator"). Social media / dating / gambling / short-form
+    // are caught by the curated list below instead, which doesn't sweep up those utilities.
     private const int CategoryGame = 0;
-    private const int CategorySocial = 4;
 
     public static bool IsNeverVisibleCategory(int androidCategory) =>
-        androidCategory is CategoryGame or CategorySocial;
+        androidCategory is CategoryGame;
 
     /// <summary>Well-known packages in the never-visible categories that don't reliably self-declare.
     /// Not exhaustive — extend as new ones surface; the Android-category check catches the rest.</summary>

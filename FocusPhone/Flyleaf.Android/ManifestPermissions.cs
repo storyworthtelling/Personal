@@ -22,3 +22,9 @@ using Android;
 [assembly: UsesPermission(Manifest.Permission.BluetoothAdmin)]
 [assembly: UsesPermission(Manifest.Permission.BluetoothConnect)]
 [assembly: UsesPermission(Manifest.Permission.KillBackgroundProcesses)]
+
+// Long-press a book -> Uninstall routes to Android's own uninstall confirmation via
+// ACTION_UNINSTALL_PACKAGE. That intent is silently dropped unless the caller holds
+// REQUEST_DELETE_PACKAGES — which is why the uninstall did "nothing" on device (no
+// ActivityNotFoundException was thrown, so the ACTION_DELETE fallback never ran either).
+[assembly: UsesPermission(Manifest.Permission.RequestDeletePackages)]
