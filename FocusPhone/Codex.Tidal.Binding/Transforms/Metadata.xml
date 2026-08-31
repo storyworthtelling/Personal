@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <!--
+    What is deliberately NOT bound.
+
+    com.tidal.sdk.player.events.model is TIDAL's playback telemetry — the events the
+    SDK sends home about what played, at what quality, over which CDM. Score never
+    reads it, and it does not survive the trip into C#: the models are a Kotlin sealed
+    hierarchy whose members narrow their inherited return types, which Java's generics
+    can express and C#'s override rules cannot. Every one of the 25 errors the first
+    build produced was in this one package.
+
+    Removing it here takes it out of the generated C# only. The classes are still in
+    the packaged .aar, so the SDK sends its telemetry at runtime exactly as its own
+    terms require — this is a binding decision, not a modification of the player.
+  -->
+  <remove-node path="/api/package[@name='com.tidal.sdk.player.events.model']" />
+</metadata>
