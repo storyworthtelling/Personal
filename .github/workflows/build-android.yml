@@ -1,0 +1,99 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'DailyLoader/DailyLoader.Android/**'
+      - 'DailyLoader/DailyLoader.Infrastructure/**'
+      - 'DailyLoader/DailyLoader.Domain/**'
+      # Shared libraries that ship in the APK (referenced by Infrastructure/head), so a change rebuilds it.
+      - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Remarkable/**'
+      - '.github/workflows/build-android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # actions: write lets the prune step delete artifacts from older runs;
+    # contents: write lets the rolling-release step publish the signed APK.
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/dailyloader.keystore
+
+      - name: Build APK
+        working-directory: DailyLoader
+        run: >
+          dotnet publish DailyLoader.Android -f net10.0-android -c Release
+          -p:AndroidKeyStore=true
+          -p:AndroidSigningKeyStore=/tmp/dailyloader.keystore
+          -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }}
+          -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }}
+          -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
+
+      # Prove the Paper & Ink launcher icon and shared fonts are actually packaged, and FAIL the build
+      # if the icon is missing. This head does not set <SingleProject>true</SingleProject>, so anything
+      # under Platforms/Android/Resources is silently dropped and android:icon resolves to empty; a plain
+      # "it built" hid that. This gate reads the resolved android:icon back out of the APK.
+      - name: ICON+FONT CHECK
+        working-directory: DailyLoader
+        run: |
+          set +e
+          echo "=== ICON+FONT CHECK ==="
+          APK=$(ls -1 DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls -1 DailyLoader.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+          echo "APK: $APK"
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
+          BADGING=$("$AAPT2" dump badging "$APK" 2>/dev/null)
+          echo "$BADGING" | grep -Ei 'application(-icon)?:' || echo "(no icon line)"
+          unzip -l "$APK" | grep -Ei 'mipmap.*ic_launcher' | head -4 || echo "(no ic_launcher entries)"
+          echo "fonts packaged: $(unzip -l "$APK" | grep -ci '\.ttf')"
+          echo "=== END ICON+FONT CHECK ==="
+          APPICON=$(echo "$BADGING" | grep -E '^application:' | sed -n "s/.*icon='\([^']*\)'.*/\1/p")
+          if [ -z "$APPICON" ]; then
+            echo "ICON+FONT CHECK FAILED: android:icon is empty — the launcher icon is not packaged/resolved."
+            exit 1
+          fi
+          echo "ICON+FONT CHECK PASSED: android:icon = $APPICON"
+
+      # Keep only the latest run's artifacts: delete artifacts from older runs of
+      # this workflow before uploading, which also frees storage so the upload succeeds.
+      - name: Prune old artifacts
+        uses: ./.github/actions/prune-old-artifacts
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Daily-Loader-Android
+          path: DailyLoader/DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      # Publish the signed APK to the rolling "apps-latest" release the phone's
+      # update channel installs from. main only — feature-branch builds must never
+      # reach the device. No ApplicationVersion override here: DailyLoader already
+      # self-versions its versionCode from a UTC timestamp (monotonic), so the
+      # channel's per-app newer-than check works without run_number.
+      - name: Publish to rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/publish-rolling-release
+        with:
+          apks: DailyLoader/DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk
