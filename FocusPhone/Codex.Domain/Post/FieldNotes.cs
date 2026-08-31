@@ -5,8 +5,9 @@ namespace Codex.Domain.Post;
 
 /// <summary>
 /// One date a message proposed, kept so the detection can be judged rather than counted.
-/// <paramref name="Clashed"/> is nullable because Post cannot read the calendar yet — it
-/// holds no calendar permission — and "not checked" is not the same answer as "clear".
+/// <paramref name="Clashed"/> is nullable because the day cannot always be read — no
+/// calendar permission, no calendar, a provider that refused — and "not checked" is not the
+/// same answer as "clear".
 /// </summary>
 public sealed record DetectedEventSample(string Title, DateOnly StartsOn, bool? Clashed, DateTimeOffset SeenUtc);
 

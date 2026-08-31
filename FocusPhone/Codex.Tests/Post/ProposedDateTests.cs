@@ -75,4 +75,50 @@ public class ProposedDateTests
     {
         Assert.Null(ProposedDateCodec.Decode(stored, Today));
     }
+
+    // Whether the day is free is the whole value of proposing a date rather than merely
+    // detecting one, so the three answers — clashed, clear, nobody looked — are asserted
+    // separately. Collapsing "not checked" into "clear" is the failure that would make the
+    // proposal actively misleading.
+    [Fact]
+    public void ADayWithAnOverlappingAppointmentReadsAsClashed()
+    {
+        var proposal = new ProposedEvent("Recital", new DateOnly(2026, 9, 9), new TimeOnly(14, 0));
+        var day = new[]
+        {
+            new Appointment("Dentist", new DateTime(2026, 9, 9, 14, 30, 0), TimeSpan.FromHours(1)),
+        };
+
+        Assert.True(ProposedDate.From(proposal, day).Clashed);
+    }
+
+    [Fact]
+    public void AnEmptyDayReadsAsClear()
+    {
+        var proposal = new ProposedEvent("Recital", new DateOnly(2026, 9, 9), new TimeOnly(14, 0));
+
+        Assert.False(ProposedDate.From(proposal, []).Clashed);
+    }
+
+    [Fact]
+    public void ADayNobodyCouldReadIsNotClaimedToBeClear()
+    {
+        var proposal = new ProposedEvent("Recital", new DateOnly(2026, 9, 9), new TimeOnly(14, 0));
+
+        Assert.Null(ProposedDate.From(proposal, day: null).Clashed);
+    }
+
+    [Fact]
+    public void AnAllDayProposalOnABusyDayIsNotReportedAsClashing()
+    {
+        // An all-day proposal has no clock to compare against; calling it a clash would
+        // make the check fire on exactly the days it is least useful.
+        var proposal = new ProposedEvent("Half day", new DateOnly(2026, 9, 9), StartsAt: null);
+        var day = new[]
+        {
+            new Appointment("Dentist", new DateTime(2026, 9, 9, 14, 30, 0), TimeSpan.FromHours(1)),
+        };
+
+        Assert.False(ProposedDate.From(proposal, day).Clashed);
+    }
 }

@@ -36,7 +36,7 @@ internal static class MailIntelligence
             try
             {
                 var reading = await ReadAsync(item, promotions, reader);
-                NoteAnyDetectedEvent(context, reading.Event, now);
+                OfferAnyDetectedDate(context, item, reading.Event, now);
 
                 if (reading.Kind is null)
                 {
@@ -84,20 +84,43 @@ internal static class MailIntelligence
         return reading with { Kind = promotions.Apply(signals, reading.Kind) };
     }
 
-    // Post does not write calendar events yet, so a detected date has nowhere to go but
-    // here. Keeping it is what makes the detection judgeable rather than merely counted.
-    private static void NoteAnyDetectedEvent(Context context, ProposedEvent? detected, DateTimeOffset now)
+    // A detected date goes two places: onto the correspondence as a proposal the owner can
+    // accept, and into the field notes so the detection itself can be judged. Detection that
+    // is never accepted is detection that is wrong, and only the second number says so.
+    //
+    // The day is read here rather than at the fold because this is where the phone is
+    // already awake. A calendar that cannot be read is recorded as UNCHECKED, never as
+    // clear — the proposal then says so rather than implying the day is free.
+    private static void OfferAnyDetectedDate(
+        Context context, TimelineItem item, ProposedEvent? detected, DateTimeOffset now)
     {
         if (detected is null)
         {
             return;
         }
 
-        // Recorded as UNCHECKED rather than clear: Post holds no calendar permission, so
-        // nothing has looked at that day. CalendarConflicts is built and tested and will
-        // take this the moment there is a calendar to read.
+        var day = ReadDay(context, detected.StartsOn);
+        var offer = ProposedDate.From(detected, day);
+
+        ProposedDates.Offer(context, item, detected, offer.Clashed);
         FieldNotesStore.Record(context, notes =>
-            notes.WithDetectedEvent(detected.Title, detected.StartsOn, clashed: null, now));
+            notes.WithDetectedEvent(detected.Title, detected.StartsOn, offer.Clashed, now));
+    }
+
+    // Null means nobody looked. The permission is asked for on the way in, but a sync can
+    // run before the owner has answered and a policy pass can take it away afterwards, so
+    // the refusal is handled rather than assumed away.
+    private static IReadOnlyList<Appointment>? ReadDay(Context context, DateOnly day)
+    {
+        try
+        {
+            return CalendarAccess.Day(context, day);
+        }
+        catch (Exception e)
+        {
+            PostDiagnostics.LogWarning("Calendar", "Could not read the day for a proposed date", e);
+            return null;
+        }
     }
 
     // A balance is Index's business; a bill's amount and due date stay here on the row.

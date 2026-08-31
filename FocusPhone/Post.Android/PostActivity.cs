@@ -290,6 +290,11 @@ public class PostActivity : Activity
             // unless the APK was installed whitelisted, but they take effect post-cutover.
             Manifest.Permission.ReadCallLog,
             Manifest.Permission.ReadSms,
+            // Reading the day a message proposes, and writing the event once the owner
+            // accepts it. Refused, a date is still detected and still offered — it simply
+            // says the day was not checked.
+            Manifest.Permission.ReadCalendar,
+            Manifest.Permission.WriteCalendar,
         };
         var toRequest = wanted
             .Where(permission => CheckSelfPermission(permission) != Permission.Granted)
