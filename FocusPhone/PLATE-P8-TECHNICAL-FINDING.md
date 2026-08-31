@@ -7,7 +7,9 @@ the release shape, and the risks that are still open when the phase starts.
 P7 added this stage and it paid for itself by reversing one of its own decisions before
 any code was written. This one reverses one too — see §2.1.
 
-**Status: awaiting the owner's approval.**
+**Status: approved by the owner. §2.7 was revised after approval — the identity hue is
+settled at magenta 326° on a light cloth, and the §3 departure that section originally
+recorded turned out not to be needed.**
 
 ---
 
@@ -241,19 +243,41 @@ no compiler. Both routes are in, as decided. The statement route is cheap becaus
 parsing (a name, a phone, an email out of recognised lines) which is Domain work and
 therefore testable here.
 
-### 2.7 The identity hue — 345°, and a recorded deviation
+### 2.7 The identity hue — magenta 326°, and no deviation after all
 
-**Recommended: 345°.** 32° clear of the problem rose at 17° (the tightest role), 60° from
-Post, 56° from Flyleaf, 167° from Score. A crimson — and a darkroom safelight is the one
-light a photographic plate can be developed under, so the name and the only available
-window happen to agree.
+**Settled: 326°, the light cloth, ink framing.** The committed ladder, generated the way
+the shipped ones were rather than hand-picked — Post and Score agree to three decimals on
+the lightness ladder (0.794 / 0.722 / 0.491 / 0.420 / 0.334) and to within 0.02 on the
+chroma ratios, so Plate reuses both at a peak chroma of 0.085, between Score's muted 0.047
+and Post's vivid 0.095:
 
-**The deviation, recorded as §3 requires.** §3's route is *sample the painting, then check
-the sample against the roles*. This inverts it: the window was computed first (F11) and the
-painting will be made to land in it, because with 85° of usable wheel left and Post already
-in it, a sampled hue would more likely than not have to be moved anyway. §3 already has
-precedent for a departure — Post's hue came from the binding cloth rather than the
-painting, and that was written down. This is written down for the same reason.
+| tier | fill | ground | mark | text | deep |
+|---|---|---|---|---|---|
+| hex | `#C8B5C8` | `#B69BB6` | `#7A4F7B` | `#613F62` | `#442D44` |
+
+50.4° from the problem rose (the nearest chromatic role), 41.0° from Post. Ink on the light
+cloth clears AA at 5.12:1; mark/text/deep on paper measure 6.12 / 8.25 / 11.60 against the
+3.0 / 4.5 / 7.0 floors the committed Post ladder is already tested against.
+
+**This supersedes an earlier draft of this section, which recommended 345° and recorded a
+deliberate departure from §3.** That draft computed the free window first and would have
+had the painting made to fit it — the inverse of §3's route, which is to sample the art and
+*then* check it. The owner stopped that, correctly, and the honest route produced a better
+answer: **twelve cover studies were generated with no colour named in any prompt**, and the
+eleventh — the same lens-and-tree subject under identical wording as the chosen cover —
+measured **326.5°**, landing in free wheel space unprompted, because its coating flare came
+out magenta where the chosen cover's dust is warm.
+
+So Plate's identity is sampled from its own art after all, and **there is no §3 departure to
+record.** Post's remains the only one.
+
+**The cloth is light, not deep, and that is a departure from Post's construction rather than
+from §3.** §12: *a binding that harmonises with the cover art makes the book the hardest of
+six to pick out of the row.* Post's warm mailbox painting sits on deep indigo with cream
+framing; **Plate's art is a near-black lens**, so the same construction would put a dark
+plate on a dark cloth. Plate therefore takes Score's construction — the `ground` tier as
+cloth with the rule, brackets and lettering inverted to ink — chosen for the reason Score's
+was: findability on a shelf of six.
 
 The committed tiers get the same treatment as every other ladder: registered in §19,
 leak-guarded, and added to the `IdentityTiersStayClearOfEverySemanticRole` theory so the
