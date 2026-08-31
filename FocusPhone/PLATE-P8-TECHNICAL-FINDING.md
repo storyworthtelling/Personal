@@ -129,23 +129,6 @@ text rather than a double. `MoneyMail.Read(subject, body)` is pure and takes tex
 *(Read directly.)* A statement photographed and recognised into text can go straight in
 with a null subject. **The statement→balance route is nearly free once text exists.**
 
-**F12 — Google cannot be asked what is in a photo.** As of **31 March 2025** the
-`photoslibrary.readonly`, `photoslibrary.sharing` and `photoslibrary` scopes are removed and
-calls relying on them return `403 PERMISSION_DENIED`; what survives is `appendonly` and
-`readonly.appcreateddata`, so an app reads back only what it uploaded itself. Reading the
-wider library needs the Picker API, which is a user-driven file picker rather than a query.
-*(Verified against Google's own "Updates to the Google Photos APIs" and "Authorization
-scopes" pages.)* The API has also never exposed per-item content labels or face groupings —
-the nearest thing is a `contentFilter` on search. **And it is moot regardless: a Darkroom
-photo has not been uploaded, so Google knows nothing about it by definition.**
-
-**F13 — Claude will describe a photo but will not name the people in it.** So neither the
-caption call (§2.7) nor any cloud service supplies *who*. Recognition therefore has to be
-local and learned: ML Kit Face **Detection** finds and crops faces on-device but identifies
-nobody; identity needs an embedding model and a labelled store the owner builds by naming a
-face once. *(Established from the model's own behaviour and ML Kit's documented API surface;
-the bundled-model plumbing is unverified here and is what Release D exists to prove.)*
-
 **F10 — the reMarkable library already takes exactly what the scanner produces.**
 `IRemarkableClient.Upload(title, byte[] pdfBytes, string? parentFolderId)` plus
 `EnsureFolder(name)`. *(Read directly.)* The document scanner already emits a PDF.
@@ -170,6 +153,23 @@ chromatic role (excluding near-neutral *resolved* at 0.010 chroma) are:
 private `PlatePackage` (`Attachments.cs:98`, `RolodexArea.cs:175`). Only the first is
 asserted by `FrozenInvariantsTests`. *(Read directly.)* All five are within reach of
 `Codex.Domain`, which every one of those files already references.
+
+**F13 — Google cannot be asked what is in a photo.** As of **31 March 2025** the
+`photoslibrary.readonly`, `photoslibrary.sharing` and `photoslibrary` scopes are removed and
+calls relying on them return `403 PERMISSION_DENIED`; what survives is `appendonly` and
+`readonly.appcreateddata`, so an app reads back only what it uploaded itself. Reading the
+wider library needs the Picker API, which is a user-driven file picker rather than a query.
+*(Verified against Google's own "Updates to the Google Photos APIs" and "Authorization
+scopes" pages.)* The API has also never exposed per-item content labels or face groupings —
+the nearest thing is a `contentFilter` on search. **And it is moot regardless: a Darkroom
+photo has not been uploaded, so Google knows nothing about it by definition.**
+
+**F14 — Claude will describe a photo but will not name the people in it.** So neither the
+caption call (§2.7) nor any cloud service supplies *who*. Recognition therefore has to be
+local and learned: ML Kit Face **Detection** finds and crops faces on-device but identifies
+nobody; identity needs an embedding model and a labelled store the owner builds by naming a
+face once. *(Established from the model's own behaviour and ML Kit's documented API surface;
+the bundled-model plumbing is unverified here and is what Release D exists to prove.)*
 
 ---
 
@@ -295,7 +295,7 @@ for Post, a statement for Index. The statement route is cheap because `MoneyMail
 `IndexHandoff` already exist (F9); the card route needs new pure parsing, which is Domain work
 and therefore testable here.
 
-**Faces are a separate subsystem in a separate release.** Two facts shape it (F13):
+**Faces are a separate subsystem in a separate release.** Two facts shape it (F13, F14):
 Google's Photos API cannot be asked what is in a picture, and **Claude will describe a photo
 but will not name the people in it**. So recognition cannot come from either. It is built
 locally, in the order it learns: ML Kit **Face Detection** crops faces → a bundled
