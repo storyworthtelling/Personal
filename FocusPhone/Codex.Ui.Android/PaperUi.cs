@@ -215,11 +215,12 @@ public static class PaperUi
     /// to the action card, so a row must not also fire its tap.
     /// </summary>
     public static ListView List(
-        Context context, IReadOnlyList<PaperListRow> rows, Action<int> onClick, Action<int>? onLongClick = null)
+        Context context, IReadOnlyList<PaperListRow> rows, Action<int> onClick,
+        Action<int>? onLongClick = null, bool picking = false)
     {
         var list = new ListView(context);
         StylePaperList(context, list);
-        list.Adapter = new PaperListAdapter(context, rows);
+        list.Adapter = new PaperListAdapter(context, rows, picking);
 
         list.ItemClick += (_, e) =>
         {

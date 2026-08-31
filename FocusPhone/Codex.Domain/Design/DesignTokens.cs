@@ -138,6 +138,13 @@ public static class DesignTokens
         public const int HairlineDp = 1;
         public const int WarningRuleDp = 3;
         public const int ListRowMinHeightDp = 56;
+
+        /// <summary>
+        /// The checkbox's drawn size (DESIGN.md §7). Small on purpose — §7 says
+        /// refined controls keep a small visual and borrow a ≥48dp hit-area, which
+        /// here is the 56dp list row it sits in.
+        /// </summary>
+        public const int CheckboxDp = 20;
         public const int TouchTargetDp = 48;
         public const int ScreenEdgeDp = Space.X6;
     }

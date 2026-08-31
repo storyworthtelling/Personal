@@ -123,4 +123,41 @@ public class DialGeometryTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new DialGeometry(120, 120));
         Assert.Throws<ArgumentOutOfRangeException>(() => new DialGeometry(120, 90));
     }
+
+    // Where a finger is, in the view's own coordinates (y grows downward), and what
+    // value that means. The sweep runs clockwise from the lower left.
+    [Fact]
+    public void ValueAtPoint_AtTheStartOfTheTrack_IsTheMinimum()
+    {
+        Assert.Equal(90, Tempo.ValueAtPoint(-10, 10));
+    }
+
+    [Fact]
+    public void ValueAtPoint_AtTheEndOfTheTrack_IsTheMaximum()
+    {
+        // 45° clockwise from three o'clock: the lower right, where the sweep ends.
+        Assert.Equal(180, Tempo.ValueAtPoint(10, 10));
+    }
+
+    [Fact]
+    public void ValueAtPoint_StraightUp_IsTheMidpoint()
+    {
+        Assert.Equal(135, Tempo.ValueAtPoint(0, -10));
+    }
+
+    // The open quarter at the bottom is not part of the track, so a finger that
+    // wanders into it takes the end it is nearest rather than jumping across the dial.
+    [Fact]
+    public void ValueAtPoint_InTheGap_TakesTheNearerEnd()
+    {
+        Assert.Equal(180, Tempo.ValueAtPoint(5, 10));   // below the end of the sweep
+        Assert.Equal(90, Tempo.ValueAtPoint(-5, 10));   // below its start
+    }
+
+    [Fact]
+    public void ValueAtPoint_AtTheCentre_IsTheMinimum()
+    {
+        // No direction to read; the value cannot be changed by a tap on the pivot.
+        Assert.Equal(90, Tempo.ValueAtPoint(0, 0));
+    }
 }

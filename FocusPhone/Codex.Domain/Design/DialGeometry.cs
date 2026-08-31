@@ -53,6 +53,44 @@ public sealed record DialGeometry
     }
 
     /// <summary>
+    /// The value a point means, given as an offset from the dial's centre in the
+    /// view's own coordinates (y grows downward).
+    ///
+    /// The open quarter at the bottom is not part of the track, so a finger that
+    /// wanders into it takes the end it is nearest — jumping to the far end of the
+    /// dial because a thumb slipped below it is the one thing a tempo control must
+    /// not do.
+    /// </summary>
+    public int ValueAtPoint(double dx, double dy)
+    {
+        if (dx == 0d && dy == 0d)
+        {
+            return Minimum; // the pivot has no direction to read
+        }
+
+        var degrees = (Math.Atan2(dy, dx) * 180d / Math.PI + 360d) % 360d;
+
+        // The sweep runs 135° → 405°, so the part of it past the wrap (0°–45°) belongs
+        // at the top of that range rather than at the bottom of the circle.
+        var end = StartDegrees + SweepDegrees;
+        var wrapped = end - 360d;
+        if (degrees <= wrapped)
+        {
+            degrees += 360d;
+        }
+
+        // What is left below the start is the open quarter at the bottom. Take the end
+        // it is nearest: jumping to the far end of the dial because a thumb slipped
+        // below it is the one thing a tempo control must not do.
+        if (degrees < StartDegrees)
+        {
+            degrees = degrees - wrapped < StartDegrees - degrees ? end : StartDegrees;
+        }
+
+        return ValueAtAngle(degrees);
+    }
+
+    /// <summary>
     /// Where the knob's centre goes for a value. Screen coordinates, so y grows
     /// downward and the sweep runs clockwise from the lower left.
     /// </summary>

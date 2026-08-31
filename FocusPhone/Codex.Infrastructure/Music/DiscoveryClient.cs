@@ -19,10 +19,6 @@ public sealed class DiscoveryClient : IDiscoveryClient
     private const string AnthropicVersion = "2023-06-01";
     private const int MaxTokens = 1_200;
 
-    // The catalog can be large; a digest of the head keeps the prompt bounded. The taste profile, not the
-    // full library, is what shapes the pick.
-    private const int CatalogDigestLimit = 400;
-
     private const string PlaylistInstruction =
         "You are a music curator picking a playlist from ONE listener's own library. You are given their " +
         "TASTE PROFILE, a CATALOG (each track: id, title, artist, genre), and a REQUEST (a mood/genre/idea). " +
@@ -58,11 +54,13 @@ public sealed class DiscoveryClient : IDiscoveryClient
     }
 
     public Task<DiscoverySelection> FridayPicksAsync(
-        TasteProfile profile, IReadOnlyList<Track> catalog, int maxTracks, CancellationToken cancellationToken)
+        TasteProfile profile, IReadOnlyList<Track> catalog, int maxTracks,
+        string? note, CancellationToken cancellationToken)
     {
         var userContent =
             $"TASTE PROFILE (JSON):\n{ProfileJson(profile)}\n\n" +
-            $"CATALOG (JSON):\n{CatalogJson(catalog)}\n\nMAX TRACKS: {maxTracks}";
+            $"CATALOG (JSON):\n{CatalogJson(catalog)}\n\nMAX TRACKS: {maxTracks}" +
+            (string.IsNullOrWhiteSpace(note) ? string.Empty : $"\n\nTHE SHELF IS SHORT OF: {note}");
         return Choose(FridayInstruction, userContent, cancellationToken);
     }
 
@@ -103,8 +101,11 @@ public sealed class DiscoveryClient : IDiscoveryClient
         explicitAdvisory = profile.ExplicitAdvisory
     });
 
+    // The catalog can be large, so the prompt carries a bounded sample of it — taken
+    // across artists by CatalogDigest rather than off the top, because the head of an
+    // artist-sorted catalog is the letter A and nothing else.
     private static string CatalogJson(IReadOnlyList<Track> catalog) => JsonSerializer.Serialize(
-        catalog.Take(CatalogDigestLimit).Select(track => new
+        CatalogDigest.Sample(catalog).Select(track => new
         {
             id = track.Id,
             title = track.DisplayTitle,

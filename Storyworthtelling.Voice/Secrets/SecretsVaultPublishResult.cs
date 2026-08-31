@@ -15,7 +15,11 @@ public enum SecretsVaultPublishStatus
 
     // The vault read fine but writing it back to storage failed (typically no full `drive` scope, or no
     // network). This is the failure that silently left the vault empty after the cutover, so it must surface.
-    WriteFailed
+    WriteFailed,
+
+    // This install reads the shared vault and does not write it — the second phone in
+    // the household. Not a failure and not something to act on: it is the design.
+    ReadOnly,
 }
 
 // The outcome of a PublishAsync. Publishing is best-effort — an app always works from its local settings —
@@ -28,12 +32,16 @@ public sealed record SecretsVaultPublishResult(SecretsVaultPublishStatus Status,
     public static SecretsVaultPublishResult NoPassphrase { get; } = new(SecretsVaultPublishStatus.NoPassphrase);
     public static SecretsVaultPublishResult VaultUnreadable { get; } = new(SecretsVaultPublishStatus.VaultUnreadable);
     public static SecretsVaultPublishResult WriteFailed(string error) => new(SecretsVaultPublishStatus.WriteFailed, error);
+    public static SecretsVaultPublishResult ReadOnly { get; } = new(SecretsVaultPublishStatus.ReadOnly);
 
     // True only when the section was actually stored in the vault.
     public bool Succeeded => Status == SecretsVaultPublishStatus.Published;
 
     // True for the states the owner should see and act on: a passphrase was set but the backup didn't land.
     // NoPassphrase is not "attention" — the app just isn't in the vault yet, which is a normal starting state.
+    // ReadOnly is deliberately absent: her install not writing the household vault is
+    // it working, and a settings screen that flagged it would be nagging about a
+    // decision nobody can or should change.
     public bool NeedsAttention => Status is SecretsVaultPublishStatus.VaultUnreadable or SecretsVaultPublishStatus.WriteFailed;
 
     // A neutral, factual one-liner for the settings screen (empty when there's nothing to surface). It always

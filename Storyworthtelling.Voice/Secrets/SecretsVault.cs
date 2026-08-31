@@ -27,9 +27,10 @@ public sealed record SecretsVault
 
     public MusicSecrets Music { get; init; } = new();
 
-    // Score's TIDAL credentials. One section rather than one per person, because the
-    // subscription is a shared account — both installs restore the same token from
-    // the same vault, which is the whole reason it lives here rather than locally.
+    // Score's TIDAL APP credentials — the registered developer app, which is one thing
+    // the household owns however many people listen. The per-person half of TIDAL (the
+    // refresh token that carries someone's subscription) is deliberately NOT here: see
+    // PersonalVault.
     public TidalSecrets Tidal { get; init; } = new();
 
     // Stable Drive file ids for the suite's well-known JSON files (voice profile/config, this vault, taste
@@ -38,8 +39,44 @@ public sealed record SecretsVault
     // not owned by any one section.
     public IReadOnlyDictionary<string, string> DriveFileIds { get; init; } = new Dictionary<string, string>();
 
+    // The account that first published to this vault, and therefore the only one that
+    // writes it. Stamped by VaultOwnership.Claim on the first publish; every other
+    // install compares itself against this and settles for reading. Empty on a vault
+    // written before ownership existed, which reads as unclaimed — the owner's phone
+    // is the one that publishes most, so it takes it back on the next save.
+    public string OwnerAccount { get; init; } = string.Empty;
+
     public static SecretsVault Empty { get; } = new();
 }
+
+// The other vault: one file per PERSON, in that person's own Drive, holding the
+// credentials that are theirs rather than the household's.
+//
+// It exists because the shared vault is exactly that — shared — and some credentials
+// must not be. A TIDAL refresh token carries one member's Family entitlement; sharing
+// it would put both installs on one membership and back into the single-stream problem
+// Family was bought to solve, and it would mean either person's sign-out silently
+// signing the other out too.
+//
+// Same shape and same crypto as SecretsVault, deliberately: one passphrase, one
+// envelope format, one thing to understand. What differs is only where the file lives
+// and who may write it — the shared vault is read-only on the second install, this one
+// is not.
+public sealed record PersonalVault
+{
+    // Whose listening account this install signs in as. The refresh token is what
+    // survives a factory reset, exactly as RemarkableSecrets.DeviceToken does for the
+    // tablet — without it the owner signs in again on a fresh phone, with it they do
+    // not.
+    public TidalAccount TidalAccount { get; init; } = new();
+
+    public static PersonalVault Empty { get; } = new();
+}
+
+// One person's TIDAL sign-in. UserId is kept beside the token because a token alone
+// cannot tell you who it belongs to, and an install that cannot name its own account
+// cannot say anything useful when the sign-in stops working.
+public sealed record TidalAccount(string UserId = "", string RefreshToken = "");
 
 // The shared Claude/Anthropic key that drives the owner's-voice messaging across every app. Canonical
 // source of truth once the vault is live (replaces the plaintext storyworthtelling-voice-config.json).
@@ -76,11 +113,13 @@ public sealed record GmailSecrets(string Address = "", string AppPassword = "", 
 // The FocusPhone Audio head's chosen music Drive-folder id.
 public sealed record MusicSecrets(string FolderId = "");
 
-// Score's TIDAL credentials: the registered app's id and secret, plus the long-lived
-// refresh token the OAuth PKCE sign-in returns. The refresh token is the one that
-// matters for a reset — it is what stops the owner having to sign in again on a fresh
-// phone, exactly as RemarkableSecrets.DeviceToken does for the tablet.
+// Score's TIDAL app credentials: the registered developer app's id and secret. These
+// identify the SOFTWARE, not a listener — TIDAL's own Credentials model draws the same
+// line, carrying a clientId always and a userId only once somebody has signed in.
+//
+// The app is free and shared; the subscription is not. So this section holds only the
+// half that is genuinely common to both installs, and the refresh token that carries a
+// person's Family membership lives in their own PersonalVault.
 public sealed record TidalSecrets(
     string ClientId = "",
-    string ClientSecret = "",
-    string RefreshToken = "");
+    string ClientSecret = "");

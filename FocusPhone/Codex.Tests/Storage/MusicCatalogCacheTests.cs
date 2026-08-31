@@ -56,6 +56,24 @@ public class MusicCatalogCacheTests : IDisposable
         Assert.Equal("2", Assert.Single(cache.LoadAll()).Id);
     }
 
+    // A file that was split into two rows is still one physical file to the scan's
+    // delete list — it only ever names the file's own id, never knowing it produced
+    // two rows. Deleting by that id has to take both with it, or a removed file would
+    // leave its hidden-track half behind forever.
+    [Fact]
+    public void Delete_RemovesEveryHiddenTrackSplitSegmentOfTheDeletedFile()
+    {
+        cache.Upsert([
+            Tr("file#0") with { SourceFileId = "file", ClipStart = TimeSpan.Zero },
+            Tr("file#1") with { SourceFileId = "file", ClipStart = TimeSpan.FromMinutes(4) },
+            Tr("2"),
+        ]);
+
+        cache.Delete("file");
+
+        Assert.Equal("2", Assert.Single(cache.LoadAll()).Id);
+    }
+
     [Fact]
     public void Clear_EmptiesTheCache()
     {
@@ -133,5 +151,139 @@ public class MusicCatalogCacheTests : IDisposable
         upgraded.Upsert([(Tr("1"), new MusicFileVersion(7000, 1234))]);
 
         Assert.Equal(new MusicFileVersion(7000, 1234), upgraded.LoadVersions()["1"]);
+    }
+
+    [Fact]
+    public void Upsert_ThenLoadAll_KeepsTheTempo()
+    {
+        cache.Upsert([Tr("1") with { Bpm = 128 }]);
+
+        Assert.Equal(128, cache.LoadAll().Single().Bpm);
+    }
+
+    // A cache written before tempo existed must keep its rows and read them back as
+    // unknown, so the next scan fills them in rather than the library emptying.
+    [Fact]
+    public void Cache_AddsTheTempoColumnToAnOlderCache()
+    {
+        using var older = new SqliteConnection("Data Source=:memory:");
+        older.Open();
+        using (var create = older.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE tracks (
+                    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+                    album TEXT NOT NULL, albumArtist TEXT NOT NULL, trackNumber INTEGER NOT NULL,
+                    discNumber INTEGER NOT NULL, genre TEXT NOT NULL, durationTicks INTEGER NOT NULL,
+                    artRef TEXT);
+                INSERT INTO tracks VALUES ('1','Old','A','Al','A',1,1,'Rock',0,NULL);
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        var upgraded = new MusicCatalogCache(older).LoadAll().Single();
+
+        Assert.Equal("Old", upgraded.Title);
+        Assert.Equal(0, upgraded.Bpm);
+    }
+
+    // What the cache remembers about the reader that filled it, so a reader that has
+    // learned to read a new tag can tell that every row predates it.
+    [Fact]
+    public void ReaderVersion_StartsAtZero()
+    {
+        Assert.Equal(0, cache.ReaderVersion);
+    }
+
+    [Fact]
+    public void ReaderVersion_RoundTrips()
+    {
+        cache.ReaderVersion = 2;
+
+        Assert.Equal(2, cache.ReaderVersion);
+        Assert.Equal(2, new MusicCatalogCache(connection).ReaderVersion);
+    }
+
+    [Fact]
+    public void Upsert_ThenLoadAll_RoundTripsAHiddenTrackSplitSegment()
+    {
+        cache.Upsert([Tr("file#1", "Bonus") with { SourceFileId = "file", ClipStart = TimeSpan.FromMinutes(4) }]);
+
+        var track = cache.LoadAll().Single();
+
+        Assert.Equal("file", track.SourceFileId);
+        Assert.Equal(TimeSpan.FromMinutes(4), track.ClipStart);
+        Assert.Equal("file", track.ResolvedSourceId);
+    }
+
+    // An ordinary track — never split — must not come back looking like a clip that
+    // merely starts at zero; ClipStart has to round-trip as genuinely absent.
+    [Fact]
+    public void Upsert_ThenLoadAll_AnOrdinaryTrackHasNoClipStart()
+    {
+        cache.Upsert([Tr("1")]);
+
+        var track = cache.LoadAll().Single();
+
+        Assert.Null(track.SourceFileId);
+        Assert.Null(track.ClipStart);
+        Assert.Equal("1", track.ResolvedSourceId);
+    }
+
+    [Fact]
+    public void Upsert_ThenLoadAll_KeepsTheBitrate()
+    {
+        cache.Upsert([Tr("1") with { Bitrate = 320 }]);
+
+        Assert.Equal(320, cache.LoadAll().Single().Bitrate);
+    }
+
+    [Fact]
+    public void Cache_AddsTheBitrateColumnToAnOlderCache()
+    {
+        using var older = new SqliteConnection("Data Source=:memory:");
+        older.Open();
+        using (var create = older.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE tracks (
+                    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+                    album TEXT NOT NULL, albumArtist TEXT NOT NULL, trackNumber INTEGER NOT NULL,
+                    discNumber INTEGER NOT NULL, genre TEXT NOT NULL, durationTicks INTEGER NOT NULL,
+                    artRef TEXT, bpm INTEGER NOT NULL DEFAULT 0);
+                INSERT INTO tracks VALUES ('1','Old','A','Al','A',1,1,'Rock',0,NULL,0);
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        var upgraded = new MusicCatalogCache(older).LoadAll().Single();
+
+        Assert.Equal("Old", upgraded.Title);
+        Assert.Equal(0, upgraded.Bitrate);
+    }
+
+    [Fact]
+    public void Cache_AddsTheSplitColumnsToAnOlderCache()
+    {
+        using var older = new SqliteConnection("Data Source=:memory:");
+        older.Open();
+        using (var create = older.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE tracks (
+                    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+                    album TEXT NOT NULL, albumArtist TEXT NOT NULL, trackNumber INTEGER NOT NULL,
+                    discNumber INTEGER NOT NULL, genre TEXT NOT NULL, durationTicks INTEGER NOT NULL,
+                    artRef TEXT, bpm INTEGER NOT NULL DEFAULT 0);
+                INSERT INTO tracks VALUES ('1','Old','A','Al','A',1,1,'Rock',0,NULL,0);
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        var upgraded = new MusicCatalogCache(older).LoadAll().Single();
+
+        Assert.Equal("Old", upgraded.Title);
+        Assert.Null(upgraded.SourceFileId);
+        Assert.Null(upgraded.ClipStart);
     }
 }

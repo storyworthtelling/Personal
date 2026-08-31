@@ -49,13 +49,42 @@ public class FridayPicksWorker : Worker
         }
 
         var taste = new MusicTasteService(new DeviceAccountTokenProvider().GetAccessToken, "Score");
-        var selection = taste.FridayPicksAsync(catalog, MusicSettingsStore.FridayStackSize, CancellationToken.None).GetAwaiter().GetResult();
+
+        // The week's strikes go in before the crate is replaced. This is the batching
+        // that keeps a veto from being a rating: it lands once, on the stack's own
+        // cycle, rather than the moment it is tapped.
+        taste.FoldVetoesAsync(VetoedPicks(store, catalog), CancellationToken.None).GetAwaiter().GetResult();
+
+        // What the workout ran short of, if anything. Read once and cleared, so a
+        // tempo the owner tried twice does not stack up into a demand.
+        var gap = MusicSettingsStore.TempoGap;
+        MusicSettingsStore.TempoGap = null;
+
+        var selection = taste.FridayPicksAsync(
+            catalog, MusicSettingsStore.FridayStackSize, gap, CancellationToken.None).GetAwaiter().GetResult();
         if (selection.TrackIds.Count > 0)
         {
             store.Save(selection, DateTimeOffset.Now);
         }
 
         return Result.InvokeSuccess();
+    }
+
+    // The outgoing crate's struck records, named. Resolved against the live catalog
+    // like everything else the shelf shows, so an id whose track has since gone
+    // simply is not folded rather than going in as a blank.
+    private static IReadOnlyList<CratePick> VetoedPicks(FridayPicksStore store, IReadOnlyList<Track> catalog)
+    {
+        var struck = store.Vetoed;
+        if (struck.Count == 0)
+        {
+            return [];
+        }
+
+        var byId = catalog.ToDictionary(track => track.Id);
+        return [.. struck.Where(byId.ContainsKey)
+            .Select(id => byId[id])
+            .Select(track => new CratePick(track.Id, track.DisplayTitle, track.DisplayArtist, track.ArtRef))];
     }
 
     /// <summary>The daily backbone (network-connected); Keep so relaunches don't reset a pending run.</summary>

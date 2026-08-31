@@ -20,7 +20,9 @@ public static class TagMapping
         uint discNumber,
         IReadOnlyList<string>? genres,
         TimeSpan duration,
-        string? artRef = null) =>
+        string? artRef = null,
+        uint beatsPerMinute = 0,
+        int bitrateKbps = 0) =>
         new(
             fileId,
             title ?? string.Empty,
@@ -31,7 +33,9 @@ public static class TagMapping
             discNumber == 0 ? 1 : (int)discNumber,
             First(genres),
             duration,
-            artRef);
+            artRef,
+            (int)beatsPerMinute,
+            Bitrate: bitrateKbps);
 
     private static string First(IReadOnlyList<string>? values) =>
         values is { Count: > 0 } ? values[0] : string.Empty;

@@ -42,4 +42,15 @@ public class BookClothPaletteTests
 
         Assert.True(picks > 1, "cloth tones should vary across packages");
     }
+
+    // The crate's stepped sleeve edges bind on a pick id rather than a package. It is
+    // the same deterministic pick from the same tones, so a record keeps its cloth
+    // for as long as it is in the run.
+    [Fact]
+    public void For_AgreesWithForPackage()
+    {
+        Assert.Equal(
+            BookClothPalette.ForPackage("com.storyworthtelling.ledger"),
+            BookClothPalette.For("com.storyworthtelling.ledger"));
+    }
 }

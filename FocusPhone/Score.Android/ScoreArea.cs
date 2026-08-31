@@ -69,6 +69,19 @@ public abstract class ScoreArea(Activity host)
     }
 
     /// <summary>
+    /// Whether the owner's voice belongs on this screen. False everywhere by default:
+    /// the voice sits on the two <b>roots</b> that are about the owner's library —
+    /// Music and Podcasts — and stays out of the three areas that are a tool, a mode
+    /// and a control panel. It also leaves as soon as you drill in, or the line would
+    /// be repeated down every level of the library.
+    ///
+    /// This is about the hourly seat, not about voiced copy in general: the crate
+    /// writes a note per record and the workout writes one per track, which are
+    /// per-item and belong to their screens.
+    /// </summary>
+    public virtual bool ShowsVoice => false;
+
+    /// <summary>
     /// Whether the shell's now-playing bar belongs on this area. False wherever the
     /// screen already shows the current track — repeating it in a bar underneath is
     /// the same information twice.
