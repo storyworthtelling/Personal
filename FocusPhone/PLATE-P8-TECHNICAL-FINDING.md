@@ -320,7 +320,97 @@ it; a cheap mitigation exists if they later want it (caption only what survives 
 **Google cannot be asked instead.** As of 31 March 2025 the `photoslibrary.readonly`,
 `.sharing` and `photoslibrary` scopes are removed and return `403 PERMISSION_DENIED`; what
 survives reads back only what the app itself uploaded. And a Darkroom photo has not been
-uploaded, so Google knows nothing about it by definition (F12).
+uploaded, so Google knows nothing about it by definition (F13).
+
+### 2.8 The identity hue — magenta 326°, and no deviation after all
+
+**Settled: 326°, the light cloth, ink framing.** The committed ladder, generated the way the
+shipped ones were rather than hand-picked — Post and Score agree to three decimals on the
+lightness ladder (0.794 / 0.722 / 0.491 / 0.420 / 0.334) and to within 0.02 on the chroma
+ratios, so Plate reuses both at a peak chroma of 0.085, between Score's muted 0.047 and
+Post's vivid 0.095:
+
+| tier | fill | ground | mark | text | deep |
+|---|---|---|---|---|---|
+| hex | `#C8B5C8` | `#B69BB6` | `#7A4F7B` | `#613F62` | `#442D44` |
+
+50.4° from the problem rose (the nearest chromatic role), 41.0° from Post. Ink on the light
+cloth clears AA at 5.12:1; mark/text/deep on paper measure 6.12 / 8.25 / 11.60 against the
+3.0 / 4.5 / 7.0 floors the committed Post ladder is already tested against.
+
+**An earlier draft of this section recommended 345° and recorded a deliberate departure from
+§3.** That draft computed the free window first and would have had the painting made to fit
+it — the inverse of §3's route, which is to sample the art and *then* check. The owner
+stopped it, and the honest route produced a better answer: **twelve cover studies were
+generated with no colour named in any prompt**, and the eleventh — the same lens-and-tree
+subject under identical wording as the chosen cover — measured **326.5°**, landing in free
+wheel space unprompted, because its coating flare came out magenta where the chosen cover's
+dust is warm. So the identity is sampled from Plate's own art and **there is no §3 departure
+to record**; Post's remains the only one.
+
+**The cloth is light, not deep, which is a departure from Post's construction rather than
+from the bible.** §12: *a binding that harmonises with the cover art makes the book the
+hardest of six to pick out of the row.* Post's warm mailbox painting sits on deep indigo with
+cream framing; **Plate's art is a near-black lens**, so the same construction would put a
+dark plate on a dark cloth. Plate therefore takes Score's construction — the `ground` tier as
+cloth with the rule, brackets and lettering inverted to ink.
+
+The committed tiers get the same treatment as every other ladder: registered in §19,
+leak-guarded, and added to `IdentityTiersStayClearOfEverySemanticRole` so the claim is
+measured rather than asserted.
+
+### 2.9 The workflow — `build-plate.yml`, and the six references that break
+
+Plate takes **its own workflow**, following Post's precedent, for a reason that is Plate's
+alone: it is the only head that needs `dl.google.com` at build time, so it is the slowest and
+flakiest build in the repo, and isolating it means a Plate binding failure stops shipping
+Plate rather than stopping Flyleaf and Score too.
+
+**versionCode floor 200000.** `build-plate.yml`'s `run_number` restarts at 1 while the head
+has shipped at up to 100108 (F4), and a lower code is simply rejected by the update channel.
+200000 is Post's number; versionCodes are per-package, so Post and Plate sharing a floor is
+harmless and one number is easier to remember than two.
+
+**A fatal APP ID CHECK** that reads the frozen id back out of the built APK, as
+`build-post.yml` does, plus a **fatal ICON CHECK** (`build-flyleaf.yml`'s is
+`continue-on-error`) and the FONT CHECK covering all eight fonts (§4.8).
+
+**And the part that breaks silently: Camera must come *out* of `build-flyleaf.yml` in six
+places** — the `paths:` trigger (line 9), the three `for proj in …` loops (79, 109, 129), the
+artifact upload path (156) and the rolling-release path (176). There is a seventh mention at
+line 52, in a comment explaining why the runner needs network access; it is not functional but
+it stops being true. Miss one of the six and `build-flyleaf` starts failing on a folder that
+no longer exists — `if-no-files-found: error` makes that fatal — or keeps quietly publishing
+nothing. **This is the bug that meant Score never reached the rolling release**, and the
+workflow's own comment says so at line 170. Guard §4.5 exists because of it.
+
+### 2.10 The Settings glyph, and a third copy of it
+
+The suite's Settings tab glyph is **sliders, not a gear** — `area_settings.xml` says why in
+its own comment: *"this is a place things are tuned."* Plate uses it verbatim.
+
+It is currently **byte-identical in `Post.Android` and `Score.Android`**: two copies of one
+file, and Plate would be the third. It moves to `Codex.Ui.Android/Resources/drawable/`, which
+every head already merges, and both copies go. Same class of problem as §2.11's five package
+ids — a shared thing living in each consumer instead of in the shared place.
+
+Plate's own three area glyphs (Camera, Scan, Darkroom) are new, authored in the suite's
+existing language: a 24-unit viewport, a single filled path, and a one-line comment naming the
+metaphor, matching `area_music`, `area_playing` and `area_discover`. **Note for §10:** the
+bible says in-app glyphs are "generated and governed by `Tools/IconStudio`", but every area
+glyph in the repo is a hand-authored vector drawable. The code is the truth; §10's claim wants
+correcting.
+
+### 2.11 One package id, not five
+
+Collapse the five copies (F12) to the single `Codex.Domain` constant and have Flyleaf and Post
+reference it. The constant is renamed to `PlatePackage`; the *value* is frozen, the C#
+identifier is not. This is not tidying — four of the five copies are unguarded, and the two in
+Post are the ones the handoff depends on.
+
+`PolicyContext.OwnerPackagePrefix` keeps its deliberate duplicate in
+`Storyworthtelling.Updates` (Domain must stay dependency-free there, and a parity guard holds
+them equal). That is a different situation and is left alone.
 
 ## 3. The handoff contract, in both directions
 
