@@ -268,12 +268,21 @@ this phone opens a different camera. This is the `ROLE_SMS` shape from P7 with t
 | `Intent.ACTION_STILL_IMAGE_CAMERA_SECURE` | the same, locked |
 | `Intent.ACTION_VIEW` + `image/*` | **Post's attachment route** — without it, `Attachments.cs` setting the package produces an activity-not-found rather than a picture |
 
-**A requested capture goes through the Darkroom first**, by the owner's decision, taken over
-returning it immediately. The consequence to watch on-device: `ACTION_IMAGE_CAPTURE` is a
-*blocking* contract — the calling app is sitting in `onActivityResult` waiting, and a detour
-through culling and editing can outlive it, with the caller backgrounded or killed. The test
-plan must exercise this specifically, because it is the one decision in the phase that makes
-another app's behaviour depend on how long the owner lingers.
+**A requested capture goes through the Darkroom, but as a fast lane.** The owner's refinement:
+*"a very quick capture to Darkroom editing to send back process — I don't want it to linger."*
+So a requested capture **shoot → crop → send back**, and specifically:
+
+- it **never joins the Darkroom's pile**: no cull grid, no caption, no waiting to be chosen;
+- it **leaves Plate the moment it is returned**, so nothing accumulates from another app's
+  errand;
+- **no Claude call** — the caller is blocked, and a caption is not worth a round trip;
+- **backing out returns `RESULT_CANCELED` immediately** rather than leaving the caller hanging.
+
+**And the frame enforces it: an errand has no navigation.** Every screen another app is
+waiting on — the requested capture, both reads (§3), and the photo Post hands over — **drops
+the binder gutter entirely.** There is nowhere else to go, so the structure says so instead of
+a rule politely asking the owner not to wander. That is what closes R10 rather than merely
+documenting it.
 
 ### 2.5 Camera scope — video, front camera, flash, and a true ratio
 
@@ -567,11 +576,13 @@ rather than impressions, the way P7's field notes were meant to.
 
 ---
 
-**R10 — a requested capture now blocks on the owner.** `ACTION_IMAGE_CAPTURE` is a blocking
-contract: the calling app waits in `onActivityResult`. Routing it through the Darkroom (§2.4)
-means another app's behaviour depends on how long the owner spends culling, and a backgrounded
-caller can be killed. Decided knowingly; it needs its own on-device check rather than a
-general one.
+**R10 — a requested capture blocks on the owner, and is now bounded rather than open-ended.**
+`ACTION_IMAGE_CAPTURE` is a blocking contract: the caller waits in `onActivityResult`. Routing
+it through the Darkroom originally meant another app's behaviour depended on how long the
+owner spent culling. The fast lane (§2.4) — no pile, no caption, no gutter, an immediate
+cancel on back — reduces this to roughly the dwell of any stock camera, which is the risk
+every Android app already accepts. **Downgraded from a design risk to an on-device check:**
+confirm the caller survives a realistic crop, and that backing out returns promptly.
 
 **R11 — the Darkroom is the only copy, with nothing to catch a forgotten photo.** No
 auto-send, no expiry, no nag, by explicit choice (§2.1). The failure mode is silent and looks
