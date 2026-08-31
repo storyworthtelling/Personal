@@ -7,16 +7,14 @@ namespace Codex.Tests;
 public class FakeHttpMessageHandler : HttpMessageHandler
 {
     private readonly Dictionary<string, Func<HttpResponseMessage>> responses = [];
+    private readonly Dictionary<string, Queue<Func<HttpResponseMessage>>> sequences = [];
 
     public List<HttpRequestMessage> Requests { get; } = [];
 
-    /// <summary>
-    /// Each request's body, captured while the request is still alive and keyed by its
-    /// index in <see cref="Requests"/>. A client that disposes its HttpRequestMessage —
-    /// which a well-behaved one does — takes the content with it, so reading the body off
-    /// a recorded request afterwards throws ObjectDisposedException.
-    /// </summary>
-    public List<string> Bodies { get; } = [];
+    /// <summary>Each request's body, read eagerly here because the client typically
+    /// disposes its <see cref="HttpRequestMessage"/> (and its content with it) before
+    /// a test gets to assert on it. Null for a request with no content.</summary>
+    public List<string?> RequestBodies { get; } = [];
 
     public void Respond(string url, string body, string mediaType = "application/json",
         System.Net.HttpStatusCode status = System.Net.HttpStatusCode.OK)
@@ -27,15 +25,32 @@ public class FakeHttpMessageHandler : HttpMessageHandler
         };
     }
 
+    /// <summary>Queues one response per call to the same URL, in order — for a client
+    /// that polls the same endpoint and is expected to see it change over time.</summary>
+    public void RespondSequence(string url, params (string Body, System.Net.HttpStatusCode Status)[] replies)
+    {
+        sequences[url] = new Queue<Func<HttpResponseMessage>>(replies.Select(reply =>
+            (Func<HttpResponseMessage>)(() => new HttpResponseMessage(reply.Status)
+            {
+                Content = new StringContent(reply.Body, System.Text.Encoding.UTF8, "application/json"),
+            })));
+    }
+
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Requests.Add(request);
-        Bodies.Add(request.Content is null
-            ? string.Empty
+        RequestBodies.Add(request.Content is null
+            ? null
             : await request.Content.ReadAsStringAsync(cancellationToken));
 
         var url = request.RequestUri!.AbsoluteUri;
+
+        if (sequences.TryGetValue(url, out var queue) && queue.Count > 0)
+        {
+            return queue.Dequeue()();
+        }
+
         if (!responses.TryGetValue(url, out var factory))
         {
             return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)

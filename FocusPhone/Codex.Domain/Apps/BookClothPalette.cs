@@ -27,15 +27,37 @@ public static class BookClothPalette
         DesignTokens.Shelf.WalnutLight,
     ];
 
-    /// <summary>The cloth tone (a DesignTokens hex string) for a package — stable per id.</summary>
-    public static string ForPackage(string package) => Cloths[StableIndex(package)];
+    // An app that has earned a signature identity hue (sampled from its own painted cover during its
+    // rebrand phase) binds in that hue, so its cloth agrees with its cover instead of a hashed tone
+    // fighting it. Apps without a shipped identity fall back to the stable hash below. This is the
+    // "identity hue if the app has one, hashed fallback if not" model (owner decision). Entries are
+    // added as each app's identity lands; contrast across the six home books is a separate concern
+    // (exactly one app should hold a pale cloth — kept a hashed/curated call, not forced here).
+    private static readonly IReadOnlyDictionary<string, string> IdentityCloths = new Dictionary<string, string>();
+
+    /// <summary>The cloth tone (a DesignTokens hex string) for a package — the app's identity hue if it
+    /// has one, otherwise a stable hash of the id.</summary>
+    public static string ForPackage(string package) =>
+        IdentityCloths.TryGetValue(package, out var identity) ? identity : For(package);
+
+    /// <summary>
+    /// The cloth tone for any stable key. Nothing about the binding is app-specific —
+    /// it is a deterministic pick from the same ten tones — so the crate's stepped
+    /// sleeve edges use it too, and a record keeps its cloth for as long as it is in
+    /// the run.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately does <i>not</i> consult <see cref="IdentityCloths"/>: an identity hue
+    /// belongs to an app, and a key that is not a package id has no identity to honor.
+    /// </remarks>
+    public static string For(string key) => Cloths[StableIndex(key)];
 
     // FNV-1a over the ordinal bytes — deterministic across processes (unlike string.GetHashCode),
     // so the binding is stable and the tests are not flaky.
-    private static int StableIndex(string package)
+    private static int StableIndex(string key)
     {
         uint hash = 2166136261u;
-        foreach (var c in package)
+        foreach (var c in key)
         {
             hash = (hash ^ c) * 16777619u;
         }

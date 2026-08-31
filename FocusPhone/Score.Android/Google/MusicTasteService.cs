@@ -98,9 +98,39 @@ public sealed class MusicTasteService
         }
     }
 
+    /// <summary>
+    /// Writes a week of struck records into the Taste Profile — the one deliberate
+    /// exception to passive-only learning, and the reason it is done here rather than
+    /// at the moment of the tap: batched once a week it is an observation, not a
+    /// rating. Best-effort, like everything else that talks to Drive.
+    /// </summary>
+    public async Task FoldVetoesAsync(IReadOnlyList<CratePick> vetoed, CancellationToken cancellationToken)
+    {
+        if (vetoed.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var profile = await store.LoadAsync(cancellationToken);
+            if (profile.IsEmpty)
+            {
+                return; // nothing to annotate yet; the strikes go with the stack
+            }
+
+            await store.SaveAsync(VetoLedger.Fold(profile, vetoed), cancellationToken);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // The crate is replaced either way. A week of strikes is worth having, not
+            // worth wedging the weekly run over.
+        }
+    }
+
     /// <summary>Picks the weekly "New for you" set as a raw selection (title + ids) for the worker to persist.</summary>
     public async Task<DiscoverySelection> FridayPicksAsync(
-        IReadOnlyList<Track> catalog, int maxTracks, CancellationToken cancellationToken)
+        IReadOnlyList<Track> catalog, int maxTracks, string? note, CancellationToken cancellationToken)
     {
         try
         {
@@ -111,7 +141,7 @@ public sealed class MusicTasteService
                 return DiscoverySelection.Empty; // no taste learned yet -> nothing to surface
             }
 
-            return await discovery.FridayPicksAsync(profile, catalog, maxTracks, cancellationToken);
+            return await discovery.FridayPicksAsync(profile, catalog, maxTracks, note, cancellationToken);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {

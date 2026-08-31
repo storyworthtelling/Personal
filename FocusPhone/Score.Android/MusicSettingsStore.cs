@@ -16,6 +16,7 @@ public static class MusicSettingsStore
     private const string LearningKey = "listeningGeniusEnabled";
     private const string LastRefreshKey = "tasteLastRefreshUtc";
     private const string StackSizeKey = "fridayStackSize";
+    private const string TempoGapKey = "tempoGap";
 
     private static ISharedPreferences Preferences =>
         global::Android.App.Application.Context.GetSharedPreferences(PreferencesName, FileCreationMode.Private)!;
@@ -49,6 +50,20 @@ public static class MusicSettingsStore
     {
         get => FridayStack.Clamp(Preferences.GetInt(StackSizeKey, FridayStack.Default));
         set => Preferences.Edit()!.PutInt(StackSizeKey, FridayStack.Clamp(value))!.Apply();
+    }
+
+    /// <summary>
+    /// What the workout could not find enough of — "more tracks near 165 BPM".
+    ///
+    /// A measurement rather than a preference, which is what lets it cross into the
+    /// weekly crate without breaking the promise that a workout teaches the taste
+    /// profile nothing. Friday reads it and clears it, so a tempo tried twice does not
+    /// stack up into a demand.
+    /// </summary>
+    public static string? TempoGap
+    {
+        get => Preferences.GetString(TempoGapKey, null);
+        set => Preferences.Edit()!.PutString(TempoGapKey, value)!.Apply();
     }
 
     /// <summary>When the Taste Profile was last refreshed, so the app throttles the Claude refine.</summary>

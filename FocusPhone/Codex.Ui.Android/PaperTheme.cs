@@ -118,4 +118,12 @@ public static class PaperTheme
     /// <summary>Converts a DesignTokens.Space/Shape dp value to device pixels.</summary>
     public static int Dp(Context context, int dp) =>
         (int)(dp * context.Resources!.DisplayMetrics!.Density + 0.5f);
+
+    /// <summary>
+    /// A type size in device pixels, for the few places that set text on a Paint
+    /// rather than a TextView — a canvas has no notion of sp, but the reader's font
+    /// scale still applies to what they are reading.
+    /// </summary>
+    public static float Sp(Context context, float sp) =>
+        sp * context.Resources!.DisplayMetrics!.ScaledDensity;
 }

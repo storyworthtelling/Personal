@@ -52,7 +52,7 @@ public class DiscoveryClientTests
         var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse(
             """Here you go: {"title":"New for you","trackIds":["a"]}"""));
 
-        var selection = await Client(handler).FridayPicksAsync(Profile(), Catalog, 12, CancellationToken.None);
+        var selection = await Client(handler).FridayPicksAsync(Profile(), Catalog, 12, note: null, CancellationToken.None);
 
         Assert.Equal("New for you", selection.Title);
         Assert.Equal(["a"], selection.TrackIds);

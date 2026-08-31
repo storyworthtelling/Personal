@@ -49,6 +49,13 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
         Group(column, "Listening");
         column.AddView(StackSizeRow());
 
+        Group(column, "TIDAL");
+        column.AddView(TidalRow());
+
+        Group(column, "Downloads");
+        column.AddView(PaperUi.SecondaryButton(Host, "Manage downloads",
+            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(DownloadsActivity)))));
+
         Group(column, "Sound");
         column.AddView(PaperUi.SecondaryButton(Host, "Equalizer",
             () => Host.StartActivity(new Android.Content.Intent(Host, typeof(EqualizerActivity)))));
@@ -92,6 +99,23 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
             MusicSettingsStore.MusicFolderId = null;
             Invalidate();
         });
+    }
+
+    // Signing in/out both happen on TidalPairingActivity — sign-out is offered there
+    // too (SignOut needs no confirmation dialog per §7, but device-code pairing
+    // genuinely needs its own screen: a code, a link, and a poll that runs for
+    // minutes are not a settings row). This row only ever needs to say which state
+    // that screen last left things in.
+    private View TidalRow()
+    {
+        if (new TidalAccountStore(Host).Load() is null)
+        {
+            return PaperUi.PrimaryButton(Host, "Sign in to TIDAL",
+                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(TidalPairingActivity))));
+        }
+
+        return Settled("Signed in to TIDAL", "Manage",
+            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(TidalPairingActivity))));
     }
 
     private View StackSizeRow()

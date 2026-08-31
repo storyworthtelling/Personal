@@ -106,7 +106,7 @@ public class GmailApiClientTests
 
         await Client(handler).SendAsync("her@example.com", "Dinner", "Seven?");
 
-        var payload = Assert.Single(handler.Bodies);
+        var payload = Assert.Single(handler.RequestBodies);
         Assert.Contains("\"raw\":", payload, StringComparison.Ordinal);
         // Base64url, so the standard alphabet's + and / must never appear.
         var raw = System.Text.Json.JsonDocument.Parse(payload).RootElement.GetProperty("raw").GetString()!;

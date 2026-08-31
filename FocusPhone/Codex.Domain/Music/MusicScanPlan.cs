@@ -16,14 +16,22 @@ public readonly record struct MusicFileVersion(long ModifiedTimeTicks, long Size
 /// </summary>
 public sealed record MusicScanPlan(IReadOnlyList<string> ToRead, IReadOnlyList<string> ToDelete)
 {
+    /// <param name="rereadAll">
+    /// Read every file regardless of whether it changed. What this is for: when the
+    /// reader learns to read a field it did not read before, every cached row is
+    /// missing it and <b>no file has changed to say so</b> — the signatures all still
+    /// match. One forced pass fills the gap; without it the new column would stay
+    /// empty until each file happened to be edited.
+    /// </param>
     public static MusicScanPlan Compute(
         IReadOnlyDictionary<string, MusicFileVersion> current,
-        IReadOnlyDictionary<string, MusicFileVersion> cached)
+        IReadOnlyDictionary<string, MusicFileVersion> cached,
+        bool rereadAll = false)
     {
         var toRead = new List<string>();
         foreach (var (id, version) in current)
         {
-            if (!cached.TryGetValue(id, out var known) || !known.Equals(version))
+            if (rereadAll || !cached.TryGetValue(id, out var known) || !known.Equals(version))
             {
                 toRead.Add(id);
             }

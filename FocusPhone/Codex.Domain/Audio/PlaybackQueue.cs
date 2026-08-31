@@ -53,6 +53,33 @@ public class PlaybackQueue
     }
 
     /// <summary>
+    /// Puts items directly behind <paramref name="anchorMediaId"/> — what "play next"
+    /// means: whatever is playing keeps playing, and the picked items land behind it
+    /// rather than at the end of the run.
+    ///
+    /// An anchor that is null or not in the queue puts them first, because nothing is
+    /// playing out of this queue and next is simply first. An item already queued
+    /// further on <b>moves</b> rather than repeating: ids are unique here, and leaving
+    /// it where it was would make the control look broken.
+    /// </summary>
+    public void InsertAfter(string? anchorMediaId, IEnumerable<string> orderedMediaIds)
+    {
+        var incoming = Dedupe(orderedMediaIds);
+        if (incoming.Count == 0)
+        {
+            return;
+        }
+
+        // Remove first, then find the anchor: removing an item ahead of the anchor
+        // shifts it, and inserting at the stale index would put the items in the
+        // wrong place.
+        mediaIds.RemoveAll(incoming.Contains);
+
+        var at = anchorMediaId is null ? -1 : mediaIds.IndexOf(anchorMediaId);
+        mediaIds.InsertRange(at + 1, incoming);
+    }
+
+    /// <summary>
     /// Replaces the whole queue with a new order (e.g. the output of an
     /// <see cref="IEpisodeQueueStrategy"/>), de-duplicating while preserving order.
     /// </summary>

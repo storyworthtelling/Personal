@@ -12,6 +12,14 @@ namespace Score;
 /// </summary>
 public sealed class MusicTagReader
 {
+    /// <summary>
+    /// Which fields this reader knows how to read. Bumped whenever it starts reading
+    /// one it did not before — tempo, at version 2, bitrate (for duplicate detection),
+    /// at version 3 — so a cache filled by an older reader is re-read once instead of
+    /// carrying an empty column until every file happens to be edited.
+    /// </summary>
+    public const int Version = 3;
+
     private readonly string artCacheDirectory;
 
     public MusicTagReader(string artCacheDirectory) => this.artCacheDirectory = artCacheDirectory;
@@ -30,7 +38,9 @@ public sealed class MusicTagReader
             tag.Disc,
             tag.Genres,
             file.Properties?.Duration ?? TimeSpan.Zero,
-            SaveArtwork(fileId, tag));
+            SaveArtwork(fileId, tag),
+            tag.BeatsPerMinute,
+            file.Properties?.AudioBitrate ?? 0);
     }
 
     private string? SaveArtwork(string fileId, TagLib.Tag tag)
