@@ -121,11 +121,11 @@ public static class BookshelfLayout
                 continue;
             }
 
-            // Fill the compartment: the books stand nearly the full band height (just a hair of headroom
-            // under the shelf above), so the shelf reads full rather than half-empty. Shrink only if the
-            // pair would then overflow the content width.
+            // Fill the compartment, but sit clear of the shelf above: reserve that board's thickness plus a
+            // gap so the book (and its drawn page-block) never overlaps the shelf overhead. Shrink only if
+            // the pair would then overflow the content width.
             var n = spec.Entries.Count;
-            var coverHeight = compartment - metrics.ShelfGap;
+            var coverHeight = compartment - metrics.ShelfGap - metrics.LedgeThickness;
             var coverWidth = coverHeight * metrics.CoverPortraitRatio;
             var maxRowWidth = contentRight - contentLeft;
             var groupWidth = n * coverWidth + Math.Max(0, n - 1) * metrics.ItemGap;
