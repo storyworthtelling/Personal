@@ -319,27 +319,90 @@ public class BookshelfView : View
         }
     }
 
+    // The auto-generated alias/fallback cover, mirroring the ex-libris bookplate anatomy of CoverView
+    // (the approved mockup) at book scale: a warm identity ground, a cream bookplate with a fine
+    // double-rule + corner flourishes, a LARGE SQUARE illustration window holding the app's icon as
+    // central art, and a lower title band. (Bespoke painted covers, when present, take DrawCoverBook's
+    // bitmap path instead; this is the "bookplate template + the app's own icon" fallback until an app's
+    // Gemini-painted cover lands.)
     private void DrawClothCover(Canvas canvas, PlacedItem item, RectF rect)
     {
-        using var cloth = new Paint { AntiAlias = true, Color = new Color(art.Cloth(item.Key)) };
-        canvas.DrawRect(rect, cloth);
-        // A small centered launcher icon as the cover art.
+        var clothColor = new Color(art.Cloth(item.Key));
+
+        // Warm identity ground (the app's cloth), lightly graded for depth.
+        using (var ground = new Paint { AntiAlias = true })
+        {
+            ground.SetShader(Linear(0, rect.Top, 0, rect.Bottom, clothColor, Darken(clothColor, 0.80f)));
+            canvas.DrawRect(rect, ground);
+        }
+
+        // The ex-libris bookplate: a cream card inset from the cloth border.
+        var margin = rect.Width() * 0.07f;
+        var plate = new RectF(rect.Left + margin, rect.Top + margin, rect.Right - margin, rect.Bottom - margin);
+        using (var card = new Paint { AntiAlias = true, Color = PaperTheme.Paper })
+        {
+            canvas.DrawRoundRect(plate, 4 * density, 4 * density, card);
+        }
+        DrawPlateDoubleRule(canvas, plate);
+        DrawPlateCornerFlourishes(canvas, Inset(plate, 5 * density));
+
+        // Large SQUARE illustration window in the upper portion, the app's icon as central art on a soft
+        // identity wash (chosen to sit under any icon), with a fine keyline.
+        var innerMargin = plate.Width() * 0.11f;
+        var winSide = plate.Width() - 2 * innerMargin;
+        var window = new RectF(plate.Left + innerMargin, plate.Top + innerMargin,
+            plate.Right - innerMargin, plate.Top + innerMargin + winSide);
+        using (var wash = new Paint { AntiAlias = true })
+        {
+            wash.SetShader(Radial(window.CenterX(), window.CenterY(), winSide * 0.75f,
+                WithAlpha(clothColor, 45), WithAlpha(clothColor, 120)));
+            canvas.DrawRect(window, wash);
+        }
         var icon = art.Icon(item.Key);
         if (icon is not null)
         {
-            var s = rect.Width() * 0.42f;
-            var ix = rect.CenterX() - s / 2;
-            var iy = rect.Top + rect.Height() * 0.22f;
+            var s = winSide * 0.74f;
+            var ix = window.CenterX() - s / 2;
+            var iy = window.CenterY() - s / 2;
             icon.SetBounds((int)ix, (int)iy, (int)(ix + s), (int)(iy + s));
             icon.Draw(canvas);
         }
-        // A lower bookplate band with the label.
-        var bandTop = rect.Bottom - rect.Height() * 0.26f;
-        using var plate = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 235) };
-        canvas.DrawRect(rect.Left + 4 * density, bandTop, rect.Right - 4 * density, rect.Bottom - 6 * density, plate);
+        using (var wedge = new Paint { AntiAlias = true, Color = PaperTheme.Ink, StrokeWidth = 1 * density })
+        {
+            wedge.SetStyle(Paint.Style.Stroke);
+            canvas.DrawRect(window, wedge);
+        }
+
+        // Title band on the cream plate, below the window.
         DrawFittedLabel(canvas, art.Label(item.Key),
-            rect.Left + 6 * density, bandTop, rect.Right - 6 * density, rect.Bottom - 6 * density);
+            plate.Left + 5 * density, window.Bottom, plate.Right - 5 * density, plate.Bottom - 5 * density);
     }
+
+    private void DrawPlateDoubleRule(Canvas canvas, RectF plate)
+    {
+        using var rule = new Paint { AntiAlias = true, Color = PaperTheme.Ink, StrokeWidth = 1.3f * density };
+        rule.SetStyle(Paint.Style.Stroke);
+        canvas.DrawRoundRect(Inset(plate, 4 * density), 3 * density, 3 * density, rule);
+        rule.Color = PaperTheme.InkSoft;
+        rule.StrokeWidth = 0.8f * density;
+        canvas.DrawRoundRect(Inset(plate, 7 * density), 2 * density, 2 * density, rule);
+    }
+
+    private void DrawPlateCornerFlourishes(Canvas canvas, RectF r)
+    {
+        using var flourish = new Paint { AntiAlias = true, Color = PaperTheme.FlyleafMark, StrokeWidth = 1.2f * density };
+        flourish.SetStyle(Paint.Style.Stroke);
+        var d = 6 * density;
+        canvas.DrawLine(r.Left, r.Top, r.Left + d, r.Top, flourish); canvas.DrawLine(r.Left, r.Top, r.Left, r.Top + d, flourish);
+        canvas.DrawLine(r.Right, r.Top, r.Right - d, r.Top, flourish); canvas.DrawLine(r.Right, r.Top, r.Right, r.Top + d, flourish);
+        canvas.DrawLine(r.Left, r.Bottom, r.Left + d, r.Bottom, flourish); canvas.DrawLine(r.Left, r.Bottom, r.Left, r.Bottom - d, flourish);
+        canvas.DrawLine(r.Right, r.Bottom, r.Right - d, r.Bottom, flourish); canvas.DrawLine(r.Right, r.Bottom, r.Right, r.Bottom - d, flourish);
+    }
+
+    private static RectF Inset(RectF r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
+
+    private static Color Darken(Color c, float factor) =>
+        new((byte)(c.R * factor), (byte)(c.G * factor), (byte)(c.B * factor), c.A);
 
     private void DrawSpineBook(Canvas canvas, PlacedItem item)
     {
