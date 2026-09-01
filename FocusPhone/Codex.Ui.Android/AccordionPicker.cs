@@ -32,6 +32,24 @@ public class AccordionPicker : LinearLayout
     {
         Orientation = Orientation.Vertical;
         choices.AddRange(items);
+
+        // Fail here, naming the picker, rather than three lines later inside Current
+        // with a bare index-out-of-range that says nothing about which screen built it.
+        // A selection that does not exist is a caller bug — clamping it would silently
+        // show the wrong value as chosen, which on a settings screen is a lie.
+        if (choices.Count == 0)
+        {
+            throw new ArgumentException($"The \"{prefix}\" picker was given no choices.", nameof(items));
+        }
+
+        if (selected < 0 || selected >= choices.Count)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(selected),
+                selected,
+                $"The \"{prefix}\" picker has {choices.Count} choices, so {selected} is not one of them.");
+        }
+
         selectedIndex = selected;
 
         Background = PaperUi.Outline(
