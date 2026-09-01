@@ -47,6 +47,19 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # Score's TIDAL Player binding ships jars compiled to Java 21 (class file
+      # major 65). The runner's default JDK is 17, whose javac reads major 61 and
+      # refuses them outright — "class file has wrong version 65.0, should be 61.0"
+      # — and the generated ImmediateFuture stub also calls Future.State, which
+      # does not exist before Java 19. Pin the JDK rather than inherit the runner's:
+      # this passed locally on JDK 21 against the same Android SDK pack (36.1.69)
+      # while CI was down, so the difference was never visible until now.
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       # The FocusPhone heads are plain .NET-for-Android (not MAUI), so the lighter
       # 'android' workload is sufficient. Unlike the local sandbox, the runner has
       # network access, so the Camera app's ML Kit / Play-services bindings can
