@@ -48,6 +48,9 @@ public class HomeActivity : Activity
 
     private TimeTickReceiver? timeTickReceiver;
     private NotificationsChangedReceiver? notificationsReceiver;
+    private UninstallResultReceiver? uninstallReceiver;
+
+    private const string UninstallResultAction = "com.storyworthtelling.focusphone.launcher.UNINSTALL_RESULT";
     private readonly HashSet<string> notifiedPackages = [];
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -167,6 +170,8 @@ public class HomeActivity : Activity
         notificationsReceiver = new NotificationsChangedReceiver(OnNotificationsChanged);
         RegisterReceiver(notificationsReceiver,
             new IntentFilter(TileNotificationListener.ActionNotificationsChanged), ReceiverFlags.NotExported);
+        uninstallReceiver = new UninstallResultReceiver(this);
+        RegisterReceiver(uninstallReceiver, new IntentFilter(UninstallResultAction), ReceiverFlags.NotExported);
     }
 
     protected override void OnPause()
@@ -174,6 +179,29 @@ public class HomeActivity : Activity
         base.OnPause();
         UnregisterReceiver(timeTickReceiver);
         UnregisterReceiver(notificationsReceiver);
+        UnregisterReceiver(uninstallReceiver);
+    }
+
+    // Receives the device-owner uninstall result: on success/failure it rebuilds the shelf (so a removed
+    // app disappears immediately); if the platform needs a user confirm (the silent path was refused), it
+    // launches the confirm intent the installer handed back.
+    private sealed class UninstallResultReceiver(HomeActivity activity) : BroadcastReceiver
+    {
+        private const int StatusPendingUserAction = -1; // PackageInstaller.STATUS_PENDING_USER_ACTION
+
+        public override void OnReceive(Context? context, Intent? intent)
+        {
+            var status = intent?.GetIntExtra(PackageInstaller.ExtraStatus, (int)PackageInstallStatus.Failure)
+                ?? (int)PackageInstallStatus.Failure;
+            if (status == StatusPendingUserAction
+                && intent?.GetParcelableExtra(Intent.ExtraIntent) is Intent confirm)
+            {
+                confirm.SetFlags(ActivityFlags.NewTask);
+                activity.StartActivity(confirm);
+                return;
+            }
+            activity.RunOnUiThread(activity.ReloadScene);
+        }
     }
 
     public override void OnWindowFocusChanged(bool hasFocus)
@@ -245,18 +273,30 @@ public class HomeActivity : Activity
         ShowPaperMenu(label, actions);
     }
 
-    // Routes to Android's own uninstall confirmation. The old ACTION_DELETE intent did nothing from the
-    // immersive home; ACTION_UNINSTALL_PACKAGE with NEW_TASK reliably raises the system uninstaller
-    // (the device owner no longer sets no_control_apps / no_uninstall_apps, so it's permitted).
+    // Device-owner SILENT uninstall (owner's call): as device owner, Flyleaf can remove an app outright via
+    // the PackageInstaller, no system dialog. The long-press action card is the deliberate confirmation. The
+    // result broadcast rebuilds the shelf so the app disappears at once; if the platform can't do it silently
+    // (not device owner for this app), it hands back a confirm intent we launch instead of failing.
     private void UninstallApp(string package)
     {
-        var uri = Android.Net.Uri.Parse("package:" + package);
-        var uninstall = new Intent(Intent.ActionUninstallPackage, uri);
-        uninstall.PutExtra(Intent.ExtraReturnResult, true);
-        uninstall.SetFlags(ActivityFlags.NewTask);
         try
         {
-            StartActivity(uninstall);
+            var installer = PackageManager!.PackageInstaller;
+            var intent = new Intent(UninstallResultAction).SetPackage(PackageName);
+            var pending = PendingIntent.GetBroadcast(this, package.GetHashCode(), intent,
+                PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Mutable)!;
+            installer.Uninstall(package, pending.IntentSender);
+            return;
+        }
+        catch (Java.Lang.Exception)
+        {
+            // Silent path unavailable — fall back to Android's own uninstaller UI.
+        }
+
+        var uri = Android.Net.Uri.Parse("package:" + package);
+        try
+        {
+            StartActivity(new Intent(Intent.ActionUninstallPackage, uri).SetFlags(ActivityFlags.NewTask));
         }
         catch (Android.Content.ActivityNotFoundException)
         {
@@ -410,6 +450,10 @@ public class HomeActivity : Activity
         // set. Google apps carry our bespoke illustrations; apps without one fall back to the launcher icon.
         private static readonly Dictionary<string, int> CoverResources = new()
         {
+            // The heads' full-bleed source paintings (the same art the launcher icons were cropped from),
+            // filling the bookplate window. Camera has none yet (its rebrand isn't coded) -> icon fallback.
+            [HomeFeatureSet.CommunicationPackage] = Resource.Drawable.cover_post,
+            [HomeFeatureSet.AudioPackage] = Resource.Drawable.cover_score,
             [HomeFeatureSet.MapsPackage] = Resource.Drawable.cover_maps,
             [HomeFeatureSet.DrivePackage] = Resource.Drawable.cover_drive,
             [HomeFeatureSet.GoogleHomePackage] = Resource.Drawable.cover_googlehome,
