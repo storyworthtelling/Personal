@@ -1,3 +1,5 @@
+using AndroidX.Lifecycle;
+using AndroidX.Work;
 using Codex.Domain.Audio;
 using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
@@ -37,7 +39,6 @@ public sealed class MusicLibrary(
     private static readonly TimeSpan RevalidateInterval = TimeSpan.FromDays(1);
 
     private readonly DriveMusicClient driveClient = new(tokens);
-    private readonly MusicTagReader tagReader = new(Path.Combine(host.CacheDir!.AbsolutePath, "art"));
     private readonly SavedTidalTracksStore savedTidal = new(host);
 
     // Music had no queue at all: it played by pushing items straight into the
@@ -285,43 +286,113 @@ public sealed class MusicLibrary(
         _ = ScanAsync();
     }
 
-    public async Task ScanAsync()
+    // Held so the observer can be torn down when the scan reaches a terminal state.
+    private WorkInfoObserver? scanObserver;
+
+    /// <summary>
+    /// Kicks off a library scan under WorkManager (see <see cref="MusicScanWorker"/>)
+    /// so it survives Score being backgrounded, and watches its progress while this
+    /// screen is up. Returns as soon as the work is enqueued — the status line and the
+    /// catalog reload now come from the observer, not from awaiting the scan inline.
+    /// </summary>
+    public Task ScanAsync()
     {
-        var folderId = MusicSettingsStore.MusicFolderId;
-        if (folderId is null)
+        if (MusicSettingsStore.MusicFolderId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        MusicScanWorker.Enqueue(host);
+        Status = "Scanning your library…";
+        Changed?.Invoke();
+        ObserveScan();
+        return Task.CompletedTask;
+    }
+
+    private void ObserveScan() => host.RunOnUiThread(() =>
+    {
+        if (scanObserver is not null)
+        {
+            return; // Already watching this unique work.
+        }
+
+        scanObserver = new WorkInfoObserver(this);
+        WorkManager.GetInstance(host)
+            .GetWorkInfosForUniqueWorkLiveData(MusicScanWorker.WorkName)!
+            .ObserveForever(scanObserver);
+    });
+
+    private void StopObservingScan()
+    {
+        if (scanObserver is null)
         {
             return;
         }
 
-        var scanner = new MusicScanner(driveClient, tokens, tagReader);
-        Status = "Scanning your library…";
-        Changed?.Invoke();
-        try
+        WorkManager.GetInstance(host)
+            .GetWorkInfosForUniqueWorkLiveData(MusicScanWorker.WorkName)!
+            .RemoveObserver(scanObserver);
+        scanObserver = null;
+    }
+
+    private void OnScanWorkInfo(WorkInfo info)
+    {
+        var state = info.GetState();
+        if (state == WorkInfo.State.Running)
         {
-            using var database = MusicDatabase.Open(host);
-            // The scanner reports once per parallel batch, so surface each callback
-            // rather than re-throttling; the shell drops the redraw if music isn't showing.
-            await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
-            {
-                host.RunOnUiThread(() =>
-                {
-                    Status = done >= total ? null : $"Scanning… {done} of {total}";
-                    Changed?.Invoke();
-                });
-            }, CancellationToken.None);
+            var done = info.Progress!.GetInt(MusicScanWorker.ProgressDone, 0);
+            var total = info.Progress.GetInt(MusicScanWorker.ProgressTotal, 0);
+            Status = total > 0 && done < total ? $"Scanning… {done} of {total}" : "Scanning your library…";
+            Changed?.Invoke();
+            return;
+        }
+
+        var finished = state == WorkInfo.State.Succeeded
+            || state == WorkInfo.State.Failed
+            || state == WorkInfo.State.Cancelled;
+        if (!finished)
+        {
+            return; // Enqueued/Blocked: nothing to show yet.
+        }
+
+        if (state == WorkInfo.State.Succeeded)
+        {
             LoadCatalog();
             Status = null;
         }
-        catch (Exception e)
+        else
         {
-            Status = $"Scan couldn't finish: {e.Message}";
+            Status = state == WorkInfo.State.Failed ? "Scan couldn't finish." : null;
         }
 
+        StopObservingScan();
         Changed?.Invoke();
     }
 
+    // WorkManager hands progress and terminal state back on the main thread as a list
+    // of WorkInfo for the unique work — there is only ever one, so the first is it.
+    private sealed class WorkInfoObserver(MusicLibrary owner) : Java.Lang.Object, IObserver
+    {
+        public void OnChanged(Java.Lang.Object? value)
+        {
+            if (value is not Android.Runtime.JavaList list)
+            {
+                return;
+            }
+
+            foreach (var item in list)
+            {
+                if (item is WorkInfo info)
+                {
+                    owner.OnScanWorkInfo(info);
+                    return;
+                }
+            }
+        }
+    }
+
     /// <summary>
-    /// After a reinstall or the cutover's factory reset, refills the chosen folder id
+    /// After a reinstall
     /// from the encrypted vault, so the library reappears without re-picking it. Runs
     /// only when none is set locally; best-effort and off the UI thread.
     /// </summary>
