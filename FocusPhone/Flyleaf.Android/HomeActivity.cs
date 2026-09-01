@@ -404,14 +404,11 @@ public class HomeActivity : Activity
         private readonly Dictionary<string, string> labels = [];
         private readonly Dictionary<string, Android.Graphics.Bitmap?> covers = [];
 
-        // The bespoke painted covers (Gemini-painted, committed as drawables). Keyed by the alias package;
-        // the three app heads have no bespoke cover yet and fall back to the cloth binding.
-        private static readonly Dictionary<string, int> CoverResources = new()
-        {
-            [HomeFeatureSet.MapsPackage] = Resource.Drawable.cover_maps,
-            [HomeFeatureSet.DrivePackage] = Resource.Drawable.cover_drive,
-            [HomeFeatureSet.GoogleHomePackage] = Resource.Drawable.cover_googlehome,
-        };
+        // Bespoke painted (Gemini) covers, keyed by package. Empty for now: Maps, Drive, and Google Home
+        // use the shared ex-libris BOOKPLATE (icon-as-central-art on their identity cloth) so every home
+        // book reads as one consistent set, per the owner's call. A real Gemini-painted cover for a given
+        // app is re-registered here when it lands, and that app then takes the bitmap path instead.
+        private static readonly Dictionary<string, int> CoverResources = new();
 
         public Android.Graphics.Bitmap? Cover(string packageKey)
         {
