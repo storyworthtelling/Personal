@@ -352,14 +352,18 @@ public class BookshelfView : View
         }
         else
         {
-            using (var bg = new Paint { AntiAlias = true, Color = PaperTheme.PaperBright })
+            // No bespoke painting yet (the heads await their Gemini illustration): fill the window with the
+            // identity cloth so it reads as one object, not a white box, and lay the launcher icon large
+            // on top as the interim art.
+            using (var bg = new Paint { AntiAlias = true })
             {
+                bg.SetShader(Linear(window.Left, window.Top, window.Right, window.Bottom, cloth, Darken(cloth, 0.88f)));
                 canvas.DrawRect(window, bg);
             }
             var icon = art.Icon(item.Key);
             if (icon is not null)
             {
-                var s = winSide * 0.86f;
+                var s = winSide * 0.92f;
                 var ix = window.CenterX() - s / 2;
                 var iy = window.CenterY() - s / 2;
                 icon.SetBounds((int)ix, (int)iy, (int)(ix + s), (int)(iy + s));
