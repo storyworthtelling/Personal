@@ -1,0 +1,21 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## User secrets / credentials (never commit these)
+**/appsettings.Production.json
+**/secrets.json
+
+## Release signing keystore (escrowed off-device; never commit)
+*.keystore
+*.jks
+
+## Publish output
+publish/
+
+## Go / gomobile build output
+gmbridge/gmbridge.aar
+gmbridge/gmbridge-sources.jar
