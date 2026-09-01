@@ -287,16 +287,9 @@ public class BookshelfView : View
             canvas.DrawRect(rect.Left + 2 * density, rect.Top - pageDepth, rect.Right - 1 * density, rect.Top, pages);
         }
 
-        var cover = art.Cover(item.Key);
-        if (cover is not null)
-        {
-            using var clip = new Paint { AntiAlias = true, FilterBitmap = true };
-            canvas.DrawBitmap(cover, null, rect, clip);
-        }
-        else
-        {
-            DrawClothCover(canvas, item, rect);
-        }
+        // Every home book is the ex-libris bookplate (the approved Post mockup): the app's identity cloth
+        // fills the plate, its illustration fills the window, the title sits on the cloth.
+        DrawBookplateCover(canvas, item, rect);
 
         // A gentle form gradient (lit upper-left, shaded lower-right) for roundness, a darker seam down the
         // left edge (the spine hinge), then a thin keyline — the cues that make a bound book read as 3-D.
@@ -319,84 +312,116 @@ public class BookshelfView : View
         }
     }
 
-    // The auto-generated alias/fallback cover, mirroring the ex-libris bookplate anatomy of CoverView
-    // (the approved mockup) at book scale: a warm identity ground, a cream bookplate with a fine
-    // double-rule + corner flourishes, a LARGE SQUARE illustration window holding the app's icon as
-    // central art, and a lower title band. (Bespoke painted covers, when present, take DrawCoverBook's
-    // bitmap path instead; this is the "bookplate template + the app's own icon" fallback until an app's
-    // Gemini-painted cover lands.)
-    private void DrawClothCover(Canvas canvas, PlacedItem item, RectF rect)
+    private static readonly Paint ImageFill = new(PaintFlags.AntiAlias | PaintFlags.FilterBitmap);
+
+    // The ex-libris bookplate cover, matching the approved Post mockup (artifact 759ca17e): the app's
+    // IDENTITY CLOTH fills the whole plate; a fine light rule + mitred-bracket corners frame it; the
+    // ILLUSTRATION fills a near-square window (its bespoke painting, or the launcher icon as a fallback);
+    // and the title sits on the cloth below. Proportions are the mockup's (window at ~13.75% / 14.5%,
+    // 72.5% wide, square). Every home book uses this, so the six read as one set.
+    private void DrawBookplateCover(Canvas canvas, PlacedItem item, RectF rect)
     {
-        var clothColor = new Color(art.Cloth(item.Key));
+        var cloth = new Color(art.Cloth(item.Key));
 
-        // Warm identity ground (the app's cloth), lightly graded for depth.
-        using (var ground = new Paint { AntiAlias = true })
+        // 1. Binding cloth fills the whole plate (a hair of vertical grade for depth).
+        using (var fill = new Paint { AntiAlias = true })
         {
-            ground.SetShader(Linear(0, rect.Top, 0, rect.Bottom, clothColor, Darken(clothColor, 0.80f)));
-            canvas.DrawRect(rect, ground);
-        }
-
-        // The ex-libris bookplate: a cream card inset from the cloth border.
-        var margin = rect.Width() * 0.07f;
-        var plate = new RectF(rect.Left + margin, rect.Top + margin, rect.Right - margin, rect.Bottom - margin);
-        using (var card = new Paint { AntiAlias = true, Color = PaperTheme.Paper })
-        {
-            canvas.DrawRoundRect(plate, 4 * density, 4 * density, card);
-        }
-        DrawPlateDoubleRule(canvas, plate);
-        DrawPlateCornerFlourishes(canvas, Inset(plate, 5 * density));
-
-        // Large SQUARE illustration window in the upper portion, the app's icon as central art on a soft
-        // identity wash (chosen to sit under any icon), with a fine keyline.
-        var innerMargin = plate.Width() * 0.11f;
-        var winSide = plate.Width() - 2 * innerMargin;
-        var window = new RectF(plate.Left + innerMargin, plate.Top + innerMargin,
-            plate.Right - innerMargin, plate.Top + innerMargin + winSide);
-        using (var wash = new Paint { AntiAlias = true })
-        {
-            wash.SetShader(Radial(window.CenterX(), window.CenterY(), winSide * 0.75f,
-                WithAlpha(clothColor, 45), WithAlpha(clothColor, 120)));
-            canvas.DrawRect(window, wash);
-        }
-        var icon = art.Icon(item.Key);
-        if (icon is not null)
-        {
-            var s = winSide * 0.74f;
-            var ix = window.CenterX() - s / 2;
-            var iy = window.CenterY() - s / 2;
-            icon.SetBounds((int)ix, (int)iy, (int)(ix + s), (int)(iy + s));
-            icon.Draw(canvas);
-        }
-        using (var wedge = new Paint { AntiAlias = true, Color = PaperTheme.Ink, StrokeWidth = 1 * density })
-        {
-            wedge.SetStyle(Paint.Style.Stroke);
-            canvas.DrawRect(window, wedge);
+            fill.SetShader(Linear(0, rect.Top, 0, rect.Bottom, cloth, Darken(cloth, 0.86f)));
+            canvas.DrawRect(rect, fill);
         }
 
-        // Title band on the cream plate, below the window.
-        DrawFittedLabel(canvas, art.Label(item.Key),
-            plate.Left + 5 * density, window.Bottom, plate.Right - 5 * density, plate.Bottom - 5 * density);
+        // 2. Fine light rule inset ~4.7%, then mitred-bracket corners.
+        using (var rule = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 180), StrokeWidth = 1.3f * density })
+        {
+            rule.SetStyle(Paint.Style.Stroke);
+            canvas.DrawRect(Inset(rect, rect.Width() * 0.047f), rule);
+        }
+        DrawMitredBrackets(canvas, Inset(rect, rect.Width() * 0.072f));
+
+        // 3. Illustration window (near-square), the painting or the icon filling it, keyline-framed.
+        var winLeft = rect.Left + rect.Width() * 0.1375f;
+        var winTop = rect.Top + rect.Width() * 0.145f;
+        var winSide = rect.Width() * 0.725f;
+        var window = new RectF(winLeft, winTop, winLeft + winSide, winTop + winSide);
+        canvas.Save();
+        canvas.ClipRect(window);
+        var illustration = art.Cover(item.Key);
+        if (illustration is not null)
+        {
+            canvas.DrawBitmap(illustration, SourceCropFor(illustration, window), window, ImageFill);
+        }
+        else
+        {
+            using (var bg = new Paint { AntiAlias = true, Color = PaperTheme.PaperBright })
+            {
+                canvas.DrawRect(window, bg);
+            }
+            var icon = art.Icon(item.Key);
+            if (icon is not null)
+            {
+                var s = winSide * 0.86f;
+                var ix = window.CenterX() - s / 2;
+                var iy = window.CenterY() - s / 2;
+                icon.SetBounds((int)ix, (int)iy, (int)(ix + s), (int)(iy + s));
+                icon.Draw(canvas);
+            }
+        }
+        canvas.Restore();
+        using (var keyline = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 235), StrokeWidth = 1.2f * density })
+        {
+            keyline.SetStyle(Paint.Style.Stroke);
+            canvas.DrawRect(window, keyline);
+        }
+
+        // 4. Title on the cloth below the window — light ink with a soft dark halo so it reads on any cloth.
+        DrawTitleOnCloth(canvas, art.Label(item.Key),
+            rect.Left + 6 * density, window.Bottom, rect.Right - 6 * density, rect.Bottom - 6 * density);
     }
 
-    private void DrawPlateDoubleRule(Canvas canvas, RectF plate)
+    // Two nested right-angle brackets at each corner, drawn once and mirrored into all four (the mockup's
+    // "mitred-bracket" motif), in the light cloth-rule ink.
+    private void DrawMitredBrackets(Canvas canvas, RectF r)
     {
-        using var rule = new Paint { AntiAlias = true, Color = PaperTheme.Ink, StrokeWidth = 1.3f * density };
-        rule.SetStyle(Paint.Style.Stroke);
-        canvas.DrawRoundRect(Inset(plate, 4 * density), 3 * density, 3 * density, rule);
-        rule.Color = PaperTheme.InkSoft;
-        rule.StrokeWidth = 0.8f * density;
-        canvas.DrawRoundRect(Inset(plate, 7 * density), 2 * density, 2 * density, rule);
+        var leg = r.Width() * 0.13f;
+        var step = 4 * density;
+        void Bracket(float cx, float cy, float sx, float sy)
+        {
+            using var outer = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 235), StrokeWidth = 2.2f * density };
+            outer.SetStyle(Paint.Style.Stroke); outer.StrokeCap = Paint.Cap.Square;
+            canvas.DrawLine(cx, cy + sy * leg, cx, cy, outer);
+            canvas.DrawLine(cx, cy, cx + sx * leg, cy, outer);
+            using var inner = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 140), StrokeWidth = 1.2f * density };
+            inner.SetStyle(Paint.Style.Stroke); inner.StrokeCap = Paint.Cap.Square;
+            canvas.DrawLine(cx + sx * step, cy + sy * (leg * 0.6f + step), cx + sx * step, cy + sy * step, inner);
+            canvas.DrawLine(cx + sx * step, cy + sy * step, cx + sx * (leg * 0.6f + step), cy + sy * step, inner);
+        }
+        Bracket(r.Left, r.Top, 1, 1);
+        Bracket(r.Right, r.Top, -1, 1);
+        Bracket(r.Left, r.Bottom, 1, -1);
+        Bracket(r.Right, r.Bottom, -1, -1);
     }
 
-    private void DrawPlateCornerFlourishes(Canvas canvas, RectF r)
+    private void DrawTitleOnCloth(Canvas canvas, string label, float left, float top, float right, float bottom)
     {
-        using var flourish = new Paint { AntiAlias = true, Color = PaperTheme.FlyleafMark, StrokeWidth = 1.2f * density };
-        flourish.SetStyle(Paint.Style.Stroke);
-        var d = 6 * density;
-        canvas.DrawLine(r.Left, r.Top, r.Left + d, r.Top, flourish); canvas.DrawLine(r.Left, r.Top, r.Left, r.Top + d, flourish);
-        canvas.DrawLine(r.Right, r.Top, r.Right - d, r.Top, flourish); canvas.DrawLine(r.Right, r.Top, r.Right, r.Top + d, flourish);
-        canvas.DrawLine(r.Left, r.Bottom, r.Left + d, r.Bottom, flourish); canvas.DrawLine(r.Left, r.Bottom, r.Left, r.Bottom - d, flourish);
-        canvas.DrawLine(r.Right, r.Bottom, r.Right - d, r.Bottom, flourish); canvas.DrawLine(r.Right, r.Bottom, r.Right, r.Bottom - d, flourish);
+        using var text = new Paint(PaintFlags.AntiAlias) { Color = WithAlpha(PaperTheme.Paper, 245), TextAlign = Paint.Align.Center };
+        text.SetTypeface(PaperTheme.SerifSemibold(Context!));
+        text.TextSize = Math.Min((bottom - top) * 0.40f, 13 * density);
+        text.SetShadowLayer(2f * density, 0, 0.5f * density, WithAlpha(PaperTheme.Ink, 160));
+        var trimmed = Ellipsize(label, text, left, right);
+        canvas.DrawText(trimmed, (left + right) / 2, (top + bottom) / 2 + text.TextSize / 3f, text);
+    }
+
+    // Center-crop the source sub-rect whose aspect matches the window, so the art fills it without distortion.
+    private static Rect SourceCropFor(Bitmap art, RectF window)
+    {
+        float bw = art.Width, bh = art.Height;
+        var aspect = window.Width() / window.Height();
+        var cropW = bw;
+        var cropH = bw / aspect;
+        if (cropH > bh) { cropH = bh; cropW = bh * aspect; }
+        var left = (bw - cropW) / 2f;
+        var top = (bh - cropH) / 2f;
+        return new Rect((int)left, (int)top, (int)(left + cropW), (int)(top + cropH));
     }
 
     private static RectF Inset(RectF r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
