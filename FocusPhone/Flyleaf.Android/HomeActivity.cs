@@ -410,6 +410,10 @@ public class HomeActivity : Activity
         // set. Google apps carry our bespoke illustrations; apps without one fall back to the launcher icon.
         private static readonly Dictionary<string, int> CoverResources = new()
         {
+            // The heads' full-bleed source paintings (the same art the launcher icons were cropped from),
+            // filling the bookplate window. Camera has none yet (its rebrand isn't coded) -> icon fallback.
+            [HomeFeatureSet.CommunicationPackage] = Resource.Drawable.cover_post,
+            [HomeFeatureSet.AudioPackage] = Resource.Drawable.cover_score,
             [HomeFeatureSet.MapsPackage] = Resource.Drawable.cover_maps,
             [HomeFeatureSet.DrivePackage] = Resource.Drawable.cover_drive,
             [HomeFeatureSet.GoogleHomePackage] = Resource.Drawable.cover_googlehome,
