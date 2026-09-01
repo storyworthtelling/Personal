@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The shared "owner's voice" library, referenced by every com.storyworthtelling app (Storyboarder,
+    Ledger, FocusPhone, …). It learns a voice profile from documents the owner uploads and composes
+    situational UI messages in that voice. Pure .NET (HttpClient + System.Text.Json + Google Drive), no
+    MAUI/Android APIs, so any Android head can reference it directly and the desktop test builds compile it
+    without the Android workload. Targets net10.0 — every head is now on net10.0-android. The Extensions
+    packages stay at 9.0.0 (fully net10-compatible; only the stable IOptions/ILogger surface is used) to keep
+    one Extensions version across the whole repo; Google.Apis is netstandard2.0 and version-agnostic here.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Voice</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The profile is stored as a JSON file in the owner's Google Drive so every app shares one voice. -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>
