@@ -1,0 +1,125 @@
+namespace Storyworthtelling.Voice.Secrets;
+
+// The single cross-app secrets vault: every com.storyworthtelling app's keys and durable "magic strings"
+// in one record, serialized to JSON, encrypted (see SecretsCrypto), and stored as ONE file in the owner's
+// Google Drive (DriveSecretsVaultStore). It exists so the FocusPhone cutover's factory reset — which wipes
+// every on-device store — no longer means re-entering every credential by hand: after the reset the owner
+// enters one passphrase per app and each app restores its own section from Drive.
+//
+// Each app owns exactly one section. Publishing is a per-section merge (load the vault, replace only your
+// section with `with`, save) so one app's write never clobbers another's. Reading takes only your section.
+// Sections carry empty defaults so a vault that has only ever been written by one app still round-trips.
+public sealed record SecretsVault
+{
+    public ClaudeSecrets Claude { get; init; } = new();
+    public GeminiSecrets Gemini { get; init; } = new();
+    public PlaidSecrets Plaid { get; init; } = new();
+    public NytSecrets Nyt { get; init; } = new();
+    public RemarkableSecrets Remarkable { get; init; } = new();
+
+    // DailyLoader's own Anthropic key for handwriting extraction, separate from the shared Claude voice key.
+    public DailyLoaderSecrets DailyLoader { get; init; } = new();
+
+    public GmailSecrets Gmail { get; init; } = new();
+
+    // The FocusPhone launcher's GitHub token for the self-update channel.
+    public string GitHubUpdateToken { get; init; } = string.Empty;
+
+    public MusicSecrets Music { get; init; } = new();
+
+    // Score's TIDAL APP credentials — the registered developer app, which is one thing
+    // the household owns however many people listen. The per-person half of TIDAL (the
+    // refresh token that carries someone's subscription) is deliberately NOT here: see
+    // PersonalVault.
+    public TidalSecrets Tidal { get; init; } = new();
+
+    // Stable Drive file ids for the suite's well-known JSON files (voice profile/config, this vault, taste
+    // profile, audio library), keyed by file name. Lets those files be MOVED in Drive without breaking the
+    // apps (thread #13): the app resolves by remembered id first, falling back to a name search. Cross-app,
+    // not owned by any one section.
+    public IReadOnlyDictionary<string, string> DriveFileIds { get; init; } = new Dictionary<string, string>();
+
+    // The account that first published to this vault, and therefore the only one that
+    // writes it. Stamped by VaultOwnership.Claim on the first publish; every other
+    // install compares itself against this and settles for reading. Empty on a vault
+    // written before ownership existed, which reads as unclaimed — the owner's phone
+    // is the one that publishes most, so it takes it back on the next save.
+    public string OwnerAccount { get; init; } = string.Empty;
+
+    public static SecretsVault Empty { get; } = new();
+}
+
+// The other vault: one file per PERSON, in that person's own Drive, holding the
+// credentials that are theirs rather than the household's.
+//
+// It exists because the shared vault is exactly that — shared — and some credentials
+// must not be. A TIDAL refresh token carries one member's Family entitlement; sharing
+// it would put both installs on one membership and back into the single-stream problem
+// Family was bought to solve, and it would mean either person's sign-out silently
+// signing the other out too.
+//
+// Same shape and same crypto as SecretsVault, deliberately: one passphrase, one
+// envelope format, one thing to understand. What differs is only where the file lives
+// and who may write it — the shared vault is read-only on the second install, this one
+// is not.
+public sealed record PersonalVault
+{
+    // Whose listening account this install signs in as. The refresh token is what
+    // survives a factory reset, exactly as RemarkableSecrets.DeviceToken does for the
+    // tablet — without it the owner signs in again on a fresh phone, with it they do
+    // not.
+    public TidalAccount TidalAccount { get; init; } = new();
+
+    public static PersonalVault Empty { get; } = new();
+}
+
+// One person's TIDAL sign-in. UserId is kept beside the token because a token alone
+// cannot tell you who it belongs to, and an install that cannot name its own account
+// cannot say anything useful when the sign-in stops working.
+public sealed record TidalAccount(string UserId = "", string RefreshToken = "");
+
+// The shared Claude/Anthropic key that drives the owner's-voice messaging across every app. Canonical
+// source of truth once the vault is live (replaces the plaintext storyworthtelling-voice-config.json).
+public sealed record ClaudeSecrets(string ApiKey = "");
+
+public sealed record GeminiSecrets(string ApiKey = "");
+
+// Plaid's app credentials plus the per-institution access tokens, which are generated on-device by the
+// Hosted-Link flow and otherwise lost on a reset (each bank would have to be re-linked by hand).
+public sealed record PlaidSecrets(
+    string ClientId = "",
+    string Secret = "",
+    string Environment = "sandbox")
+{
+    public IReadOnlyList<PlaidItem> Items { get; init; } = [];
+}
+
+// One connected Plaid Item (= one bank login): the long-lived access token, its item id, and the display
+// name, mirroring the fields Ledger keeps on Ledger.Domain.Model.Institution.
+public sealed record PlaidItem(string ItemId = "", string AccessToken = "", string Name = "");
+
+public sealed record NytSecrets(string SessionCookie = "", string ApiKey = "");
+
+public sealed record RemarkableSecrets(string DeviceToken = "");
+
+// DailyLoader's handwriting Anthropic key plus the owner-authored calendar mapping JSON (a magic string
+// that is tedious to reconstruct by hand).
+public sealed record DailyLoaderSecrets(string AnthropicApiKey = "", string CalendarMappingJson = "");
+
+// The FocusPhone Communication head's Gmail credentials: address, the IMAP/SMTP app password, and the
+// Messages-for-Web (gmbridge) session blob, which is generated by pairing and otherwise lost on a reset.
+public sealed record GmailSecrets(string Address = "", string AppPassword = "", string BridgeSession = "");
+
+// The FocusPhone Audio head's chosen music Drive-folder id.
+public sealed record MusicSecrets(string FolderId = "");
+
+// Score's TIDAL app credentials: the registered developer app's id and secret. These
+// identify the SOFTWARE, not a listener — TIDAL's own Credentials model draws the same
+// line, carrying a clientId always and a userId only once somebody has signed in.
+//
+// The app is free and shared; the subscription is not. So this section holds only the
+// half that is genuinely common to both installs, and the refresh token that carries a
+// person's Family membership lives in their own PersonalVault.
+public sealed record TidalSecrets(
+    string ClientId = "",
+    string ClientSecret = "");
