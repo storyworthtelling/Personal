@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Defaults to both TFMs for Visual Studio / CI. Pass -p:DailyLoaderTfms=net10.0 to build
+         a single framework in environments without the Android workload installed. -->
+    <DailyLoaderTfms Condition="'$(DailyLoaderTfms)' == ''">net10.0;net10.0-android</DailyLoaderTfms>
+    <TargetFrameworks>$(DailyLoaderTfms)</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Let the test project exercise the internal Skia layout engine directly. -->
+    <InternalsVisibleTo Include="DailyLoader.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DailyLoader.Domain\DailyLoader.Domain.csproj" />
+    <!-- Shared credential-health seam (ICredentialHealthSink) reported by the NYT/reMarkable/Anthropic clients. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
+    <!-- Shared paper-composition library: the Skia layout + PDF assembly the documents now render with. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="1.1.2" />
+    <!-- Aligned to 1.75.0 to match Storyworthtelling.Voice (referenced for the shared credential-health seam);
+         the app already resolves this version through the head's vault reference to Voice. -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageReference Include="Google.Apis.Calendar.v3" Version="1.74.0.4154" />
+    <PackageReference Include="Google.Apis.Tasks.v1" Version="1.74.0.3958" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+    <!-- PDFsharp stays: PdfMerger concatenates the Skia-rendered pages with the external crossword PDF. -->
+    <PackageReference Include="PDFsharp" Version="6.1.1" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
+
+  <!-- Desktop/test TFM needs the Linux Skia natives; the Android build packages libSkiaSharp.so per ABI. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+  </ItemGroup>
+
+  <!-- Playwright requires native browser binaries — exclude from Android -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0-android'">
+    <PackageReference Include="Microsoft.Playwright" Version="1.49.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
+    <Compile Remove="Nyt\PlaywrightPageFetcher.cs" />
+  </ItemGroup>
+</Project>

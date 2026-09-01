@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsBindingProject>true</IsBindingProject>
+    <!-- A binding over somebody else's Kotlin is never warning-clean: the generator
+         cannot express suspend functions, internal classes, or Kotlin's nullability
+         in Java terms, and says so about each one. Errors still fail the build. -->
+    <NoWarn>$(NoWarn);BG8605;BG8606;BG8800;BG8801;CS0618;CS0109;XA4218</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    TIDAL's Player SDK, bound for Score.
+
+    Only playback needs this. The catalogue half — search, track metadata, the input
+    to LibraryMerge — is a plain REST API and is far better served by an HttpClient
+    that can be faked in a unit test than by a binding that cannot. So this project is
+    deliberately narrow: two entry points bound, everything else packaged so the
+    runtime can find it.
+
+    The artifacts are committed rather than restored at build time. They are 1.6 MB in
+    total, they must match each other exactly (the player modules are versioned in
+    lockstep at 0.0.71), and a build that silently picks up a different version of a
+    transitive module is the kind of failure that shows up as a crash on the phone
+    rather than as a red build.
+  -->
+  <ItemGroup>
+    <!-- Bound: what Score actually calls. -->
+    <AndroidLibrary Include="Jars\player-0.0.71.aar" Bind="true" />
+    <AndroidLibrary Include="Jars\auth-0.10.1.aar" Bind="true" />
+
+    <!-- Packaged but not bound: the modules the two above talk to among themselves.
+         Binding them would surface a large internal API surface into C# for no gain,
+         and each bound Kotlin module is more generator noise to keep quiet. -->
+    <AndroidLibrary Include="Jars\common-0.2.4.aar" Bind="false" />
+    <AndroidLibrary Include="Jars\eventproducer-0.3.2.aar" Bind="false" />
+    <AndroidLibrary Include="Jars\player-common-0.0.71.jar" Bind="false" />
+    <AndroidLibrary Include="Jars\player-common-android-0.0.71.aar" Bind="false" />
+    <AndroidLibrary Include="Jars\player-events-0.0.71.aar" Bind="false" />
+    <AndroidLibrary Include="Jars\player-playback-engine-0.0.71.aar" Bind="false" />
+    <AndroidLibrary Include="Jars\player-streaming-api-0.0.71.aar" Bind="false" />
+    <AndroidLibrary Include="Jars\player-streaming-privileges-0.0.71.aar" Bind="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The player is an ExoPlayer wrapper — it depends on Media3 rather than bringing
+         its own audio stack, which is why one media session can serve both halves of
+         the merged library. It also carries the Kotlin runtime and coroutines the SDK
+         is written against, so those are left to resolve transitively: pinning them
+         here only produces downgrade errors against whatever Media3 asks for. -->
+    <PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.8.0.2" />
+
+    <!-- Player's own constructor takes an OkHttpClient — confirmed straight from the
+         bytecode (javap), not the generator's own (silent, unlogged) explanation. With
+         no C# type for okhttp3.OkHttpClient anywhere in this project, the generator
+         could not express the parameter and dropped the whole constructor rather than
+         erroring — which is why Player had no way to construct one at all until this
+         was added. A community binding, not TIDAL's own; the type is otherwise a
+         well-known, stable Java networking client. -->
+    <PackageReference Include="Square.OkHttp3" Version="5.5.0" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,115 @@
+name: Cleanup merged branch
+
+# The build-*.yml workflows fire on every push to a claude/** feature branch, so each branch leaves
+# completed CI runs whose APKs sit at 90-day retention. After merge those leftovers are never reclaimed —
+# the per-workflow prune-old-artifacts step only sweeps *older runs of the same workflow* — and they pile up
+# against the account-wide Actions artifact-storage quota. That quota is what turned #114's green build red
+# at the upload step.
+#
+# Two entry points:
+#   • pull_request: closed — on merge, delete every run on the merged branch (deleting a run removes its
+#     artifacts and logs too), then delete the branch ref. Keeps the backlog from re-forming.
+#   • workflow_dispatch — a one-time backlog sweep: delete runs for every branch that no longer exists
+#     (branches merged + deleted before this workflow existed leave orphaned runs). Run this once after the
+#     workflow lands on the default branch to reclaim the existing pile.
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+
+# Least privilege: actions:write to delete workflow runs; contents:write to delete the merged branch ref.
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  cleanup:
+    # For a merge event, only a same-repo branch that actually merged. The manual sweep always runs.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete merged/orphaned branches' runs, artifacts, and refs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const defaultBranch = context.payload.repository.default_branch;
+
+            // Retry transient GitHub API failures (5xx / 429 / network) with backoff, matching the
+            // prune-old-artifacts action. Cleanup is best-effort — a blip must not fail the job.
+            async function withRetry(label, fn) {
+              const maxAttempts = 4;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  return await fn();
+                } catch (error) {
+                  const status = error?.status ?? 0;
+                  const transient = status === 0 || status === 429 || status >= 500;
+                  if (!transient || attempt === maxAttempts) throw error;
+                  const delayMs = 1000 * 2 ** (attempt - 1);
+                  core.info(`${label} failed (status ${status}); retry ${attempt}/${maxAttempts - 1} in ${delayMs}ms.`);
+                  await new Promise((resolve) => setTimeout(resolve, delayMs));
+                }
+              }
+            }
+
+            // Delete every workflow run on a branch (deleting a run removes its artifacts and logs too).
+            async function deleteRunsOnBranch(branch) {
+              const runs = await withRetry('listWorkflowRunsForRepo', () =>
+                github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+                  owner, repo, branch, per_page: 100,
+                }));
+              let deleted = 0;
+              for (const run of runs) {
+                try {
+                  await withRetry('deleteWorkflowRun', () =>
+                    github.rest.actions.deleteWorkflowRun({ owner, repo, run_id: run.id }));
+                  deleted++;
+                } catch (error) {
+                  // An in-progress run can't be deleted; skip it rather than fail the sweep.
+                  core.warning(`Could not delete run ${run.id} on ${branch}: ${error.message}`);
+                }
+              }
+              core.info(`Deleted ${deleted} of ${runs.length} run(s) on ${branch}.`);
+            }
+
+            try {
+              if (context.eventName === 'pull_request') {
+                // Merge event: clean just the merged branch, then delete its ref.
+                const branch = context.payload.pull_request.head.ref;
+                if (branch === defaultBranch) {
+                  core.info(`Head branch is the default branch (${branch}); nothing to clean up.`);
+                  return;
+                }
+                await deleteRunsOnBranch(branch);
+                try {
+                  await withRetry('deleteRef', () =>
+                    github.rest.git.deleteRef({ owner, repo, ref: `heads/${branch}` }));
+                  core.info(`Deleted branch ${branch}.`);
+                } catch (error) {
+                  core.info(`Branch ${branch} not deleted (may already be gone): ${error.message}`);
+                }
+                return;
+              }
+
+              // Manual backlog sweep: delete runs for every branch that no longer exists. Runs carry a
+              // head_branch even after the branch is gone, so diff the runs' branches against live branches.
+              const liveBranches = new Set((await withRetry('listBranches', () =>
+                github.paginate(github.rest.repos.listBranches, { owner, repo, per_page: 100 })))
+                .map(b => b.name));
+
+              const allRuns = await withRetry('listAllRuns', () =>
+                github.paginate(github.rest.actions.listWorkflowRunsForRepo, { owner, repo, per_page: 100 }));
+              const orphanBranches = [...new Set(allRuns.map(r => r.head_branch).filter(Boolean))]
+                .filter(b => b !== defaultBranch && !liveBranches.has(b));
+
+              core.info(`Backlog sweep: ${orphanBranches.length} orphaned branch(es) with runs to delete.`);
+              for (const branch of orphanBranches)
+                await deleteRunsOnBranch(branch);
+            } catch (error) {
+              // Cleanup is a storage optimization, not a gate. Never fail on an API hiccup.
+              core.warning(`Branch cleanup skipped: ${error.message}`);
+            }
