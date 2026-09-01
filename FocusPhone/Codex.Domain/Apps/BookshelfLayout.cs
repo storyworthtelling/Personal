@@ -51,7 +51,9 @@ public static class BookshelfLayout
         {
             PlaceHomeEven(width, viewportHeight, metrics, placed, contentLeft, contentRight,
                 shelves.Take(homeCount).ToList());
-            y = viewportHeight;
+            // The home's last shelf sits right at the fold; start the tray a shelf-gap below it (plus the
+            // board thickness) so the first tray row doesn't overlap the home's bottom shelf when scrolled.
+            y = viewportHeight + metrics.ShelfGap + metrics.LedgeThickness;
         }
         else
         {
