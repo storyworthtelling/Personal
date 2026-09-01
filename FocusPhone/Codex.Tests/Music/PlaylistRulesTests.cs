@@ -109,4 +109,17 @@ public class PlaylistRulesTests
 
         Assert.Equal(["2", "3"], matched.Select(track => track.Id));
     }
+
+    // The rule editor's three pickers index their option arrays by casting these enums,
+    // so an enum that grows without its array growing hands AccordionPicker a selection
+    // that does not exist — the same crash the Friday-crate row shipped with. These
+    // counts are the tripwire: if one fails, PlaylistEditor's matching array needs the
+    // new entry before the enum lands.
+    [Fact]
+    public void RuleEnumsStillMatchTheEditorsOptionLists()
+    {
+        Assert.Equal(5, Enum.GetValues<TrackField>().Length);
+        Assert.Equal(3, Enum.GetValues<RuleOperator>().Length);
+        Assert.Equal(2, Enum.GetValues<RuleMatch>().Length);
+    }
 }

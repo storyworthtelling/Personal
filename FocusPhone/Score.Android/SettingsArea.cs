@@ -120,17 +120,18 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
 
     private View StackSizeRow()
     {
-        var sizes = Enumerable
-            .Range(0, ((FridayStack.Largest - FridayStack.Smallest) / 5) + 1)
-            .Select(step => FridayStack.Smallest + (step * 5))
-            .ToList();
+        // The ladder is built around whatever size is actually in force, so the picker
+        // always has a real row to open on. Deriving the rungs here instead — round
+        // numbers only — is what crashed this screen: the default is 14, which is not
+        // one of them, so the selected index came back missing on every fresh install.
+        var inForce = MusicSettingsStore.FridayStackSize;
+        var sizes = FridayStack.Ladder(inForce);
 
-        var current = sizes.IndexOf(FridayStack.Clamp(MusicSettingsStore.FridayStackSize));
         var picker = new AccordionPicker(
             Host,
             "Friday crate:",
             sizes.Select(size => new PickerOption($"{size} records", Detail(size))),
-            current < 0 ? sizes.IndexOf(FridayStack.Default) : current);
+            FridayStack.IndexOn(inForce));
         picker.Chosen += index => MusicSettingsStore.FridayStackSize = sizes[index];
         return picker;
     }
