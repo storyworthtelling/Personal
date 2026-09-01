@@ -56,7 +56,7 @@ public readonly record struct ShelfMetrics(
         ItemGap: 2f, // books abut — a hair of separation reads as separate bindings, not a gap
         LedgeThickness: 10f,
         CoverWidth: 96f,
-        CoverPortraitRatio: 0.68f,
+        CoverPortraitRatio: 0.80f, // 4:5, matching the approved cover mockup
         SpineHeight: 168f,
         ClockSize: 176f,
         BookendWidth: 22f,
