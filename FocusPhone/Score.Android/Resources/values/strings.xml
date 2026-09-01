@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The notification channel downloads run in. Android shows this name in the
+       system settings for the app, so it is the owner's word for it, not ours. -->
+  <string name="downloads_channel">Downloads</string>
+</resources>

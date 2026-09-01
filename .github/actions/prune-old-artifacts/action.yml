@@ -1,0 +1,72 @@
+name: Prune old artifacts
+description: >
+  Delete artifacts from every run of the calling workflow except the current run,
+  so only the latest run's artifacts are retained. Frees account artifact storage
+  before the current run uploads its own artifacts.
+
+runs:
+  using: composite
+  steps:
+    - name: Delete artifacts from older runs of this workflow
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+
+          // Retry transient GitHub API failures (5xx / 429 / network) with backoff.
+          // The API occasionally returns 503 "No server is currently available";
+          // one blip must not fail the build — this step runs before the artifact
+          // upload, so throwing here also loses the APKs the run just built.
+          async function withRetry(label, fn) {
+            const maxAttempts = 4;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              try {
+                return await fn();
+              } catch (error) {
+                const status = error?.status ?? 0;
+                const transient = status === 0 || status === 429 || status >= 500;
+                if (!transient || attempt === maxAttempts) throw error;
+                const delayMs = 1000 * 2 ** (attempt - 1);
+                core.info(`${label} failed (status ${status}); retry ${attempt}/${maxAttempts - 1} in ${delayMs}ms.`);
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+              }
+            }
+          }
+
+          try {
+            // Resolve the workflow this run belongs to so we only prune our own runs,
+            // leaving other workflows' latest artifacts untouched.
+            const { data: thisRun } = await withRetry('getWorkflowRun', () =>
+              github.rest.actions.getWorkflowRun({ owner, repo, run_id: context.runId }));
+            const workflowId = thisRun.workflow_id;
+
+            const runs = await withRetry('listWorkflowRuns', () =>
+              github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner, repo, workflow_id: workflowId, per_page: 100,
+              }));
+
+            let deleted = 0;
+            for (const run of runs) {
+              if (run.id === context.runId) continue;
+              const artifacts = await withRetry('listWorkflowRunArtifacts', () =>
+                github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+                  owner, repo, run_id: run.id, per_page: 100,
+                }));
+              for (const artifact of artifacts) {
+                try {
+                  await withRetry('deleteArtifact', () =>
+                    github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id }));
+                  core.info(`Deleted artifact '${artifact.name}' (id ${artifact.id}) from run ${run.id}.`);
+                  deleted++;
+                } catch (error) {
+                  core.warning(`Could not delete artifact '${artifact.name}' (id ${artifact.id}): ${error.message}`);
+                }
+              }
+            }
+            core.info(`Pruned ${deleted} artifact(s) from older runs of workflow ${workflowId}.`);
+          } catch (error) {
+            // Pruning is a storage optimization, not a build requirement. Never fail
+            // the build (and block the artifact upload) because the API was briefly
+            // unavailable — the next run prunes whatever this one skipped.
+            core.warning(`Artifact pruning skipped: ${error.message}`);
+          }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the attachment provider is allowed to share, and nothing else. The cache
+     subfolder only: an attachment is fetched on demand, opened, and left for the system to
+     reclaim. Widening this to files-path would expose timeline.db and the ghost archive to
+     any app handed a URI. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+  <cache-path name="attachments" path="attachments/" />
+</paths>
