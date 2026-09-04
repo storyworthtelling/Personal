@@ -136,6 +136,31 @@ public static class PolicyManager
             }
         }
 
+        // Diagnostic: the allowlisted apps (GitHub / Gemini / Maps / reMarkable) must end up runnable after
+        // the release pass. If any is STILL suspended, name it in the log — this pins down why "Gemini
+        // blocked by your administrator" persisted (a stuck suspension vs. a managed-account block, which is
+        // not suspension at all). Also names the installed id, so a Gemini shipped under a different package
+        // than com.google.android.apps.bard shows up as simply not-installed here.
+        foreach (var allowlisted in PolicyContext.AllowlistedPackages)
+        {
+            if (!IsInstalled(context, allowlisted))
+            {
+                events.Add(Event(PolicyEventKind.Applied, $"Allowlisted app not installed under this id: {allowlisted}"));
+                continue;
+            }
+            try
+            {
+                if (dpm.IsPackageSuspended(admin, allowlisted))
+                {
+                    events.Add(Event(PolicyEventKind.ReleaseFailed, $"Allowlisted but still suspended: {allowlisted}"));
+                }
+            }
+            catch (Java.Lang.Exception)
+            {
+                // IsPackageSuspended throws NameNotFound for an unknown package; already guarded by IsInstalled.
+            }
+        }
+
         ApplyLoginBrowserConfig(context, dpm, admin, plan.LoginBrowser, events);
         GrantPermissions(dpm, admin, plan, events);
         PinHomeActivity(dpm, admin, context);
