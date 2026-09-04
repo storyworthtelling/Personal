@@ -593,4 +593,19 @@ public class FrozenInvariantsTests
             yield return file;
         }
     }
+    [Fact]
+    public void TheSuiteHasExactlyOneSettingsGlyph()
+    {
+        // Post and Score each carried a byte-identical copy of area_settings.xml, which is
+        // how a shared kit stops being shared: the third head to want it copies it again,
+        // and the day the glyph changes, two of the three quietly keep the old one. It lives
+        // in Codex.Ui.Android, whose resources every head already merges — the Paper theme's
+        // window background is a drawable from that same folder.
+        var glyphs = EnumerateRepoFiles("area_settings.xml").Select(RepoRelative).Order().ToList();
+
+        Assert.True(glyphs.Count == 1,
+            "The Settings glyph must live once, in the shared kit. Found:\n" + string.Join("\n", glyphs));
+        Assert.Contains("Codex.Ui.Android", glyphs[0], StringComparison.Ordinal);
+    }
+
 }
