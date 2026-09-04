@@ -61,8 +61,18 @@ public sealed class DriveTextFile : IDriveTextFile
             // Remember the id of the file we just created, RIGHT NOW — not only on a later name-search.
             // Without this, a file created this session but renamed/moved by the owner before any later
             // resolve was re-created as a duplicate (the id was never captured, so the next run fell back
-            // to a name search that the rename defeats). Capturing on create closes that window.
+            // to a name search that the rename defeats). Prefer the create response; if the SDK didn't
+            // surface the body, resolve by name once (the file exists now) so the id is still captured.
             var createdId = create.ResponseBody?.Id;
+            if (createdId is null)
+            {
+                var lookup = service.Files.List();
+                lookup.Q = $"name='{fileName}' and trashed=false";
+                lookup.Fields = "files(id)";
+                lookup.PageSize = 1;
+                var found = await lookup.ExecuteAsync(cancellationToken);
+                createdId = found.Files is { Count: > 0 } ? found.Files[0].Id : null;
+            }
             if (createdId is not null)
                 fileIdStore?.Set(fileName, createdId);
             return;

@@ -15,7 +15,7 @@ public class BookshelfLayoutTests
         new(ShelfFace.CoverOut, keys.Select(Cover).ToList());
 
     [Fact]
-    public void HomeShelves_SeatOnThePaintedLedges_WhenViewportGiven_AndTrayStacksBelow()
+    public void HomeShelves_FillTheFirstScreenInFourEvenBands_ItemsRestOnLedges_AndTrayStacksBelow()
     {
         const float viewport = 800f;
         var scene = BookshelfLayout.Build(Width, M,
@@ -29,25 +29,27 @@ public class BookshelfLayoutTests
 
         var home = scene.Shelves.Where(s => s.Home).ToList();
         Assert.Equal(4, home.Count);
-        // Items rest ON the painted backdrop's ledge fractions (crown + base eat the ends, so these are
-        // NOT even quarters), increasing down the case and all within the first screen.
-        float[] fractions = [0.30f, 0.52f, 0.735f, 0.91f];
+        // A small crown reserve, then four EQUAL bands fill the first screen: shelf i's ledge sits at the
+        // bottom of its band, so exactly the four home shelves land before the fold.
+        const float crown = viewport * 0.055f;
+        var band = (viewport - crown) / 4f;
         for (var i = 0; i < 4; i++)
         {
             Assert.True(home[i].Home);
-            var restY = viewport * fractions[i];
-            Assert.All(home[i].Items, it => Assert.Equal(restY, it.Rect.Bottom, precision: 1));
-            Assert.True(restY < viewport, "a home item rests below the first screen");
+            Assert.Equal(crown + (i + 1) * band, home[i].Ledge.Bottom, precision: 1);
+            // Items STAND on the native ledge — their bottom is the ledge's top surface.
+            Assert.All(home[i].Items, it => Assert.Equal(home[i].Ledge.Top, it.Rect.Bottom, precision: 1));
         }
-        // The clock stands on its shelf: its base rests on the top ledge, not centered mid-band.
+        // The clock stands on its shelf (bottom-rested), not centered mid-band.
         var clock = Assert.Single(home[0].Items);
-        Assert.Equal(viewport * fractions[0], clock.Rect.Bottom, precision: 1);
+        Assert.Equal(home[0].Ledge.Top, clock.Rect.Bottom, precision: 1);
+        // The two cover books fill most of their band height (a full shelf, not half-empty).
+        var covers = home[1].Items;
+        Assert.Equal(2, covers.Count);
+        Assert.All(covers, it => Assert.True(it.Rect.Bottom - it.Rect.Top > band * 0.7f, "home books should fill the compartment"));
         // The tray shelf begins at/after the fold, not intruding into the home screen.
         var tray = scene.Shelves.First(s => !s.Home);
         Assert.True(tray.Ledge.Top >= viewport - 1, "tray intrudes into the home screen");
-        // Home covers are group-centered on their ledge.
-        var firstCovers = home[1].Items;
-        Assert.Equal(2, firstCovers.Count);
     }
 
     [Fact]

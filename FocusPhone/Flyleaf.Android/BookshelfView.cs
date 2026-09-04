@@ -32,11 +32,9 @@ public class BookshelfView : View
     private TimeSpan time;
     private float viewportHeight;
 
-    // Painted wood assets (the "bake a painted bookcase" direction): the empty four-compartment home
-    // backdrop, and a walnut texture tiled as the tray's back wall. Loaded once, recycled on detach.
-    private Bitmap? homeBackdrop;
+    // The walnut wood texture, tiled as the single continuous back wall of the whole case. Loaded once,
+    // recycled on detach. (The old freestanding painted home backdrop is retired — one native case now.)
     private Bitmap? woodTexture;
-    private static readonly Paint ImagePaint = new(PaintFlags.AntiAlias | PaintFlags.FilterBitmap);
 
     private readonly GestureDetector gesture;
 
@@ -87,12 +85,6 @@ public class BookshelfView : View
         SetMeasuredDimension(width, height);
     }
 
-    // The bottom of the painted home region (the first screen). Zero when there are no home shelves
-    // (e.g. a unit-shaped scene), which falls the whole case back to the tray treatment.
-    private float HomeRegionBottom() =>
-        layout.Shelves.Any(s => s.Home) ? viewportHeight : 0f;
-
-    private Bitmap? HomeBackdrop => homeBackdrop ??= TryDecode(Resource.Drawable.shelf_bookcase_home);
     private Bitmap? WoodTexture => woodTexture ??= TryDecode(Resource.Drawable.shelf_wood_texture);
 
     private Bitmap? TryDecode(int resId)
@@ -104,7 +96,6 @@ public class BookshelfView : View
     protected override void OnDetachedFromWindow()
     {
         base.OnDetachedFromWindow();
-        homeBackdrop?.Recycle(); homeBackdrop = null;
         woodTexture?.Recycle(); woodTexture = null;
     }
 
@@ -174,11 +165,9 @@ public class BookshelfView : View
         DrawBackWall(canvas);
         foreach (var shelf in layout.Shelves)
         {
-            // Home ledges are painted into the backdrop; only the native tray draws its own boards.
-            if (!shelf.Home)
-            {
-                DrawLedge(canvas, shelf.Ledge);
-            }
+            // Every shelf draws its own native board now (home + tray), all in one coordinate system, so
+            // books rest on the shelves by construction.
+            DrawLedge(canvas, shelf.Ledge);
             if (shelf.Bookend is { } bookend)
             {
                 DrawBookend(canvas, bookend, shelf.BookendGlyph);
@@ -197,41 +186,58 @@ public class BookshelfView : View
 
     private void DrawBackWall(Canvas canvas)
     {
-        var homeBottom = HomeRegionBottom();
-
-        // Home region: the painted four-compartment bookcase backdrop, scaled to fill the first screen.
-        if (homeBottom > 0)
+        // ONE continuous walnut back wall for the whole case (home + tray) — the wood texture tiled down
+        // the entire scroll — so the home shelves flow straight into the tray with no seam. The freestanding
+        // painted backdrop (a self-contained cabinet with its own base) is retired: it couldn't continue
+        // downward, which is what made scrolling into the tray feel unnatural.
+        if (WoodTexture is { } tex)
         {
-            if (HomeBackdrop is { } backdrop)
-            {
-                canvas.DrawBitmap(backdrop, null, new RectF(0, 0, Width, homeBottom), ImagePaint);
-            }
-            else
-            {
-                DrawGradientWall(canvas, 0, homeBottom);
-            }
+            using var paint = new Paint { AntiAlias = true };
+            using var shader = new BitmapShader(tex, Shader.TileMode.Clamp!, Shader.TileMode.Repeat!);
+            var scale = Width / (float)tex.Width;
+            using var m = new Matrix();
+            m.SetScale(scale, scale);
+            shader.SetLocalMatrix(m);
+            paint.SetShader(shader);
+            canvas.DrawRect(0, 0, Width, Height, paint);
         }
-
-        // Tray region: the walnut wood texture tiled as the back wall (scaled so it fills the width and
-        // tiles down the scroll), replacing the old flat gradient.
-        if (Height > homeBottom)
+        else
         {
-            if (WoodTexture is { } tex)
-            {
-                using var paint = new Paint { AntiAlias = true };
-                using var shader = new BitmapShader(tex, Shader.TileMode.Clamp!, Shader.TileMode.Repeat!);
-                var scale = Width / (float)tex.Width;
-                using var m = new Matrix();
-                m.SetScale(scale, scale);
-                m.PostTranslate(0, homeBottom);
-                shader.SetLocalMatrix(m);
-                paint.SetShader(shader);
-                canvas.DrawRect(0, homeBottom, Width, Height, paint);
-            }
-            else
-            {
-                DrawGradientWall(canvas, homeBottom, Height);
-            }
+            DrawGradientWall(canvas, 0, Height);
+        }
+        DrawCaseFrame(canvas);
+    }
+
+    // The case's own structure drawn over the back wall: two side posts running the full scroll height and
+    // a lit crown board at the very top. Gives the continuous case real depth and frames every shelf, home
+    // and tray alike, between the posts.
+    private void DrawCaseFrame(Canvas canvas)
+    {
+        var side = metrics.SidePadding; // the side posts occupy the content inset; shelves span between them
+        using (var post = new Paint { AntiAlias = true })
+        {
+            post.SetShader(Linear(0, 0, side, 0, PaperTheme.WalnutDeep, PaperTheme.Walnut));
+            canvas.DrawRect(0, 0, side, Height, post);
+            post.SetShader(Linear(Width - side, 0, Width, 0, PaperTheme.Walnut, PaperTheme.WalnutDeep));
+            canvas.DrawRect(Width - side, 0, Width, Height, post);
+        }
+        using (var bevel = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.WalnutLight, 130), StrokeWidth = 1.5f * density })
+        {
+            bevel.SetStyle(Paint.Style.Stroke);
+            canvas.DrawLine(side, 0, side, Height, bevel);
+            canvas.DrawLine(Width - side, 0, Width - side, Height, bevel);
+        }
+        var crownH = 12 * density;
+        using (var crown = new Paint { AntiAlias = true })
+        {
+            crown.SetShader(Linear(0, 0, 0, crownH, PaperTheme.WalnutLight, PaperTheme.Walnut));
+            canvas.DrawRect(0, 0, Width, crownH, crown);
+        }
+        using (var sh = new Paint { AntiAlias = true })
+        {
+            sh.SetShader(Linear(0, crownH, 0, crownH + 8 * density,
+                WithAlpha(PaperTheme.WalnutDeep, 110), WithAlpha(PaperTheme.WalnutDeep, 0)));
+            canvas.DrawRect(0, crownH, Width, crownH + 8 * density, sh);
         }
     }
 
@@ -258,51 +264,174 @@ public class BookshelfView : View
 
     private void DrawContactShadow(Canvas canvas, LayoutRect rect)
     {
-        using var shadow = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.WalnutDeep, 120) };
-        canvas.DrawOval(rect.Left - 2 * density, rect.Bottom - 3 * density, rect.Right + 2 * density, rect.Bottom + 3 * density, shadow);
+        var r = ToRectF(rect);
+        // A soft, blurred cast shadow pooled under the item and offset slightly right (light from the
+        // upper-left), so it reads as a solid object standing ON the wood rather than a card pasted on.
+        using var shadow = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.WalnutDeep, 150) };
+        shadow.SetMaskFilter(new BlurMaskFilter(5 * density, BlurMaskFilter.Blur.Normal));
+        canvas.DrawOval(r.Left + 1 * density, r.Bottom - 4 * density, r.Right + 7 * density, r.Bottom + 7 * density, shadow);
     }
 
     private void DrawCoverBook(Canvas canvas, PlacedItem item)
     {
         DrawContactShadow(canvas, item.Rect);
         var rect = ToRectF(item.Rect);
-        var cover = art.Cover(item.Key);
-        if (cover is not null)
+
+        // The book's top page-block (fore-edge pages seen slightly from above), just above the cover, so a
+        // flat cover reads as a bound book with real thickness.
+        var pageDepth = 5 * density;
+        using (var pages = new Paint { AntiAlias = true })
         {
-            using var clip = new Paint { AntiAlias = true, FilterBitmap = true };
-            canvas.DrawBitmap(cover, null, rect, clip);
+            pages.SetShader(Linear(0, rect.Top - pageDepth, 0, rect.Top,
+                PaperTheme.PaperBright, WithAlpha(PaperTheme.PaperDeep, 235)));
+            canvas.DrawRect(rect.Left + 2 * density, rect.Top - pageDepth, rect.Right - 1 * density, rect.Top, pages);
+        }
+
+        // Every home book is the ex-libris bookplate (the approved Post mockup): the app's identity cloth
+        // fills the plate, its illustration fills the window, the title sits on the cloth.
+        DrawBookplateCover(canvas, item, rect);
+
+        // A gentle form gradient (lit upper-left, shaded lower-right) for roundness, a darker seam down the
+        // left edge (the spine hinge), then a thin keyline — the cues that make a bound book read as 3-D.
+        using (var form = new Paint { AntiAlias = true })
+        {
+            form.SetShader(Linear(rect.Left, rect.Top, rect.Right, rect.Bottom,
+                WithAlpha(PaperTheme.PaperBright, 26), WithAlpha(PaperTheme.WalnutDeep, 42)));
+            canvas.DrawRect(rect, form);
+        }
+        using (var spine = new Paint { AntiAlias = true })
+        {
+            spine.SetShader(Linear(rect.Left, 0, rect.Left + 6 * density, 0,
+                WithAlpha(PaperTheme.WalnutDeep, 90), WithAlpha(PaperTheme.WalnutDeep, 0)));
+            canvas.DrawRect(rect.Left, rect.Top, rect.Left + 6 * density, rect.Bottom, spine);
+        }
+        using (var edge = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.PaperDeep, 200), StrokeWidth = 1.5f * density })
+        {
+            edge.SetStyle(Paint.Style.Stroke);
+            canvas.DrawRect(rect, edge);
+        }
+    }
+
+    private static readonly Paint ImageFill = new(PaintFlags.AntiAlias | PaintFlags.FilterBitmap);
+
+    // The ex-libris bookplate cover, matching the approved Post mockup (artifact 759ca17e): the app's
+    // IDENTITY CLOTH fills the whole plate; a fine light rule + mitred-bracket corners frame it; the
+    // ILLUSTRATION fills a near-square window (its bespoke painting, or the launcher icon as a fallback);
+    // and the title sits on the cloth below. Proportions are the mockup's (window at ~13.75% / 14.5%,
+    // 72.5% wide, square). Every home book uses this, so the six read as one set.
+    private void DrawBookplateCover(Canvas canvas, PlacedItem item, RectF rect)
+    {
+        var cloth = new Color(art.Cloth(item.Key));
+
+        // 1. Binding cloth fills the whole plate (a hair of vertical grade for depth).
+        using (var fill = new Paint { AntiAlias = true })
+        {
+            fill.SetShader(Linear(0, rect.Top, 0, rect.Bottom, cloth, Darken(cloth, 0.86f)));
+            canvas.DrawRect(rect, fill);
+        }
+
+        // 2. Fine light rule inset ~4.7%, then mitred-bracket corners.
+        using (var rule = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 180), StrokeWidth = 1.3f * density })
+        {
+            rule.SetStyle(Paint.Style.Stroke);
+            canvas.DrawRect(Inset(rect, rect.Width() * 0.047f), rule);
+        }
+        DrawMitredBrackets(canvas, Inset(rect, rect.Width() * 0.072f));
+
+        // 3. Illustration window (near-square), the painting or the icon filling it, keyline-framed.
+        var winLeft = rect.Left + rect.Width() * 0.1375f;
+        var winTop = rect.Top + rect.Width() * 0.145f;
+        var winSide = rect.Width() * 0.725f;
+        var window = new RectF(winLeft, winTop, winLeft + winSide, winTop + winSide);
+        canvas.Save();
+        canvas.ClipRect(window);
+        var illustration = art.Cover(item.Key);
+        if (illustration is not null)
+        {
+            canvas.DrawBitmap(illustration, SourceCropFor(illustration, window), window, ImageFill);
         }
         else
         {
-            DrawClothCover(canvas, item, rect);
+            // No bespoke painting yet (the heads await their Gemini illustration): fill the window with the
+            // identity cloth so it reads as one object, not a white box, and lay the launcher icon large
+            // on top as the interim art.
+            using (var bg = new Paint { AntiAlias = true })
+            {
+                bg.SetShader(Linear(window.Left, window.Top, window.Right, window.Bottom, cloth, Darken(cloth, 0.88f)));
+                canvas.DrawRect(window, bg);
+            }
+            var icon = art.Icon(item.Key);
+            if (icon is not null)
+            {
+                var s = winSide * 0.92f;
+                var ix = window.CenterX() - s / 2;
+                var iy = window.CenterY() - s / 2;
+                icon.SetBounds((int)ix, (int)iy, (int)(ix + s), (int)(iy + s));
+                icon.Draw(canvas);
+            }
         }
-        // A thin ink keyline + a page-edge on the right for depth.
-        using var edge = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.PaperDeep, 220), StrokeWidth = 1.5f * density };
-        edge.SetStyle(Paint.Style.Stroke);
-        canvas.DrawRect(rect, edge);
+        canvas.Restore();
+        using (var keyline = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 235), StrokeWidth = 1.2f * density })
+        {
+            keyline.SetStyle(Paint.Style.Stroke);
+            canvas.DrawRect(window, keyline);
+        }
+
+        // 4. Title on the cloth below the window — light ink with a soft dark halo so it reads on any cloth.
+        DrawTitleOnCloth(canvas, art.Label(item.Key),
+            rect.Left + 6 * density, window.Bottom, rect.Right - 6 * density, rect.Bottom - 6 * density);
     }
 
-    private void DrawClothCover(Canvas canvas, PlacedItem item, RectF rect)
+    // Two nested right-angle brackets at each corner, drawn once and mirrored into all four (the mockup's
+    // "mitred-bracket" motif), in the light cloth-rule ink.
+    private void DrawMitredBrackets(Canvas canvas, RectF r)
     {
-        using var cloth = new Paint { AntiAlias = true, Color = new Color(art.Cloth(item.Key)) };
-        canvas.DrawRect(rect, cloth);
-        // A small centered launcher icon as the cover art.
-        var icon = art.Icon(item.Key);
-        if (icon is not null)
+        var leg = r.Width() * 0.13f;
+        var step = 4 * density;
+        void Bracket(float cx, float cy, float sx, float sy)
         {
-            var s = rect.Width() * 0.42f;
-            var ix = rect.CenterX() - s / 2;
-            var iy = rect.Top + rect.Height() * 0.22f;
-            icon.SetBounds((int)ix, (int)iy, (int)(ix + s), (int)(iy + s));
-            icon.Draw(canvas);
+            using var outer = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 235), StrokeWidth = 2.2f * density };
+            outer.SetStyle(Paint.Style.Stroke); outer.StrokeCap = Paint.Cap.Square;
+            canvas.DrawLine(cx, cy + sy * leg, cx, cy, outer);
+            canvas.DrawLine(cx, cy, cx + sx * leg, cy, outer);
+            using var inner = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 140), StrokeWidth = 1.2f * density };
+            inner.SetStyle(Paint.Style.Stroke); inner.StrokeCap = Paint.Cap.Square;
+            canvas.DrawLine(cx + sx * step, cy + sy * (leg * 0.6f + step), cx + sx * step, cy + sy * step, inner);
+            canvas.DrawLine(cx + sx * step, cy + sy * step, cx + sx * (leg * 0.6f + step), cy + sy * step, inner);
         }
-        // A lower bookplate band with the label.
-        var bandTop = rect.Bottom - rect.Height() * 0.26f;
-        using var plate = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 235) };
-        canvas.DrawRect(rect.Left + 4 * density, bandTop, rect.Right - 4 * density, rect.Bottom - 6 * density, plate);
-        DrawFittedLabel(canvas, art.Label(item.Key),
-            rect.Left + 6 * density, bandTop, rect.Right - 6 * density, rect.Bottom - 6 * density);
+        Bracket(r.Left, r.Top, 1, 1);
+        Bracket(r.Right, r.Top, -1, 1);
+        Bracket(r.Left, r.Bottom, 1, -1);
+        Bracket(r.Right, r.Bottom, -1, -1);
     }
+
+    private void DrawTitleOnCloth(Canvas canvas, string label, float left, float top, float right, float bottom)
+    {
+        using var text = new Paint(PaintFlags.AntiAlias) { Color = WithAlpha(PaperTheme.Paper, 245), TextAlign = Paint.Align.Center };
+        text.SetTypeface(PaperTheme.SerifSemibold(Context!));
+        text.TextSize = Math.Min((bottom - top) * 0.40f, 13 * density);
+        text.SetShadowLayer(2f * density, 0, 0.5f * density, WithAlpha(PaperTheme.Ink, 160));
+        var trimmed = Ellipsize(label, text, left, right);
+        canvas.DrawText(trimmed, (left + right) / 2, (top + bottom) / 2 + text.TextSize / 3f, text);
+    }
+
+    // Center-crop the source sub-rect whose aspect matches the window, so the art fills it without distortion.
+    private static Rect SourceCropFor(Bitmap art, RectF window)
+    {
+        float bw = art.Width, bh = art.Height;
+        var aspect = window.Width() / window.Height();
+        var cropW = bw;
+        var cropH = bw / aspect;
+        if (cropH > bh) { cropH = bh; cropW = bh * aspect; }
+        var left = (bw - cropW) / 2f;
+        var top = (bh - cropH) / 2f;
+        return new Rect((int)left, (int)top, (int)(left + cropW), (int)(top + cropH));
+    }
+
+    private static RectF Inset(RectF r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
+
+    private static Color Darken(Color c, float factor) =>
+        new((byte)(c.R * factor), (byte)(c.G * factor), (byte)(c.B * factor), c.A);
 
     private void DrawSpineBook(Canvas canvas, PlacedItem item)
     {
@@ -495,6 +624,8 @@ public class BookshelfView : View
     private void DrawMantelClock(Canvas canvas, LayoutRect rect)
     {
         var r = ToRectF(rect);
+        // A cast shadow under the mantel body so the clock stands ON the shelf.
+        DrawContactShadow(canvas, rect);
         var faceR = r.Width() * 0.36f;
         var cx = r.CenterX();
         var cy = r.Top + faceR + 10 * density;

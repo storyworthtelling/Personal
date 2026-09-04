@@ -29,8 +29,8 @@ public static class BookshelfLayout
     /// <summary>
     /// Lays out the scene. When <paramref name="viewportHeight"/> &gt; 0, the leading run of
     /// <see cref="ShelfSpec.Home"/> shelves (the mantel clock + the three cover-out home shelves) is
-    /// laid out to fill the first screen EVENLY — one equal band each — so it maps onto the
-    /// four-compartment painted home backdrop; the tray then stacks below the fold. With
+    /// laid out to fill the first screen EVENLY — one equal band each — so exactly those four shelves
+    /// land on the home screen and the tray stacks below the fold. With
     /// <paramref name="viewportHeight"/> = 0 every shelf simply stacks (legacy / unit-test path).
     /// </summary>
     public static ShelfSceneLayout Build(
@@ -51,7 +51,9 @@ public static class BookshelfLayout
         {
             PlaceHomeEven(width, viewportHeight, metrics, placed, contentLeft, contentRight,
                 shelves.Take(homeCount).ToList());
-            y = viewportHeight;
+            // The home's last shelf sits right at the fold; start the tray a shelf-gap below it (plus the
+            // board thickness) so the first tray row doesn't overlap the home's bottom shelf when scrolled.
+            y = viewportHeight + metrics.ShelfGap + metrics.LedgeThickness;
         }
         else
         {
@@ -85,38 +87,29 @@ public static class BookshelfLayout
         return PlaceBookRows(metrics, placed, spec, contentLeft, contentRight, y);
     }
 
-    // The painted home backdrop (shelf_bookcase_home.png) is NOT four equal quarters: a crown eats the
-    // top and a base the bottom, and its four shelf surfaces sit at these fractions of the home-region
-    // height (calibrated to the committed asset). Home items rest ON these surfaces so they stand on the
-    // painted ledges instead of floating in even bands. Index 0 = the clock shelf; 1..3 = the cover pairs.
-    private const float HomeCrownFraction = 0.09f;
-    private static readonly float[] HomeLedgeFractions = [0.30f, 0.52f, 0.735f, 0.91f];
+    // A small crown reserve at the very top of the case, so the first shelf isn't jammed under the top.
+    private const float HomeCrownFraction = 0.055f;
 
-    // The painted resting-surface Y for home shelf i. Uses the backdrop's calibrated ledge fractions when
-    // the home has the expected four shelves; otherwise falls back to even bands so an unusual shelf count
-    // still lays out sanely.
-    private static float LedgeY(int i, int count, float viewportHeight) =>
-        count == HomeLedgeFractions.Length
-            ? viewportHeight * HomeLedgeFractions[i]
-            : viewportHeight * (i + 1) / count;
-
-    // The fixed four-shelf home face: each Home shelf's item(s) STAND on the painted ledge surface
-    // (clock bottom-rested and centered, like a mantel clock; cover books bottom-rested), so they seat
-    // on the bookcase backdrop's shelves instead of floating. Painter skips native ledges here (the
-    // backdrop draws them). Each item is clamped to the compartment above its ledge so it never clips.
+    // The fixed four-shelf home face: after a small crown reserve, the first screen splits into `count`
+    // EQUAL shelf bands so EXACTLY the home shelves (clock + the three cover pairs) fill it and the tray
+    // begins right at the fold. Each shelf's item(s) STAND on that band's native ledge (clock
+    // bottom-rested and centered like a mantel clock; cover books bottom-rested), clamped to the
+    // compartment so they never clip. The case is drawn natively now, so items and ledges share one
+    // coordinate system — books rest on the shelves by construction.
     private static void PlaceHomeEven(
         float width, float viewportHeight, ShelfMetrics metrics, List<PlacedShelf> placed,
         float contentLeft, float contentRight, IReadOnlyList<ShelfSpec> homeShelves)
     {
         var count = homeShelves.Count;
+        var crown = viewportHeight * HomeCrownFraction;
+        var band = (viewportHeight - crown) / count;
         for (var i = 0; i < count; i++)
         {
             var spec = homeShelves[i];
-            var restY = LedgeY(i, count, viewportHeight);
-            var ceilingY = i == 0 ? viewportHeight * HomeCrownFraction : LedgeY(i - 1, count, viewportHeight);
-            var compartment = restY - ceilingY;
-            // Reference-only ledge for the home (the backdrop paints the real one); items rest on restY.
-            var ledge = new LayoutRect(contentLeft, restY, contentRight, restY + metrics.LedgeThickness);
+            var bandBottom = crown + (i + 1) * band;
+            var ledge = new LayoutRect(contentLeft, bandBottom - metrics.LedgeThickness, contentRight, bandBottom);
+            var restY = ledge.Top;
+            var compartment = band;
 
             if (spec.Face == ShelfFace.Clock)
             {
@@ -130,16 +123,20 @@ public static class BookshelfLayout
                 continue;
             }
 
-            var coverWidth = metrics.CoverWidth;
-            var coverHeight = coverWidth / metrics.CoverPortraitRatio;
-            var maxHeight = compartment - metrics.ShelfGap;
-            if (coverHeight > maxHeight)
-            {
-                coverHeight = maxHeight;
-                coverWidth = coverHeight * metrics.CoverPortraitRatio;
-            }
+            // Fill the compartment, but sit clear of the shelf above: reserve that board's thickness plus a
+            // gap so the book (and its drawn page-block) never overlaps the shelf overhead. Shrink only if
+            // the pair would then overflow the content width.
             var n = spec.Entries.Count;
+            var coverHeight = compartment - metrics.ShelfGap - metrics.LedgeThickness;
+            var coverWidth = coverHeight * metrics.CoverPortraitRatio;
+            var maxRowWidth = contentRight - contentLeft;
             var groupWidth = n * coverWidth + Math.Max(0, n - 1) * metrics.ItemGap;
+            if (groupWidth > maxRowWidth)
+            {
+                coverWidth = (maxRowWidth - Math.Max(0, n - 1) * metrics.ItemGap) / n;
+                coverHeight = coverWidth / metrics.CoverPortraitRatio;
+                groupWidth = n * coverWidth + Math.Max(0, n - 1) * metrics.ItemGap;
+            }
             var x = (width - groupWidth) / 2f;
             var top = restY - coverHeight;
             var items = new List<PlacedItem>(n);
