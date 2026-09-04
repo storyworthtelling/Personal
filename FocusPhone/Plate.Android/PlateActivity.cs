@@ -388,13 +388,13 @@ public class PlateActivity : AppCompatActivity
     // way to see it. The tray takes null for "no pages" so this can stay a straight read.
     private static IEnumerable<string>? PageUris(GmsDocumentScanningResult? result)
     {
-        var pages = result?.GetPages();
+        var pages = result?.Pages;
         if (pages is null)
         {
             return null;
         }
 
-        var uris = new List<string>(pages.Count);
+        var uris = new List<string>();
         foreach (var page in pages)
         {
             if (page?.ImageUri is not null)
