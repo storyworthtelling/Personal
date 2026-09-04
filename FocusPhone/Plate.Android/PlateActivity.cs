@@ -241,25 +241,25 @@ public class PlateActivity : AppCompatActivity
                     }
                 }
             }
-            if (value is null)
+
+            // What the code MEANS is decided in Codex.Domain.Plate.QrScan, where it can be
+            // tested without a camera. This used to end in an AlertDialog for anything that
+            // was not a link, which §7 bans: results surface inline, never in a dialog.
+            var reading = QrScan.Read(value);
+            switch (reading.Action)
             {
-                Toast.MakeText(activity, "No QR code found.", ToastLength.Short)!.Show();
-                return;
-            }
-            if (Uri.TryCreate(value, UriKind.Absolute, out var uri)
-                && uri.Scheme is "http" or "https")
-            {
-                // The device-owner persistent preferred activity routes this
-                // into the launcher's RestrictedBrowserActivity.
-                activity.StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(value)));
-            }
-            else
-            {
-                new Android.App.AlertDialog.Builder(activity)
-                    .SetTitle("Scanned")!
-                    .SetMessage(value)!
-                    .SetPositiveButton("OK", (_, _) => { })!
-                    .Show();
+                case QrAction.OpenInBrowser:
+                    // A plain VIEW intent; the device-owner persistent preferred activity
+                    // routes it into the launcher's RestrictedBrowserActivity. Only http
+                    // and https ever reach here — see QrScan.
+                    activity.StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(reading.Value)));
+                    break;
+                case QrAction.ShowText:
+                    activity.ShowStatus(reading.Value);
+                    break;
+                default:
+                    activity.ShowStatus("No code in that frame.");
+                    break;
             }
         }
     }
