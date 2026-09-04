@@ -17,7 +17,7 @@ using Codex.Domain.Design;
 using Codex.Domain.Time;
 using Codex.Ui;
 
-namespace FocusPhone.Camera;
+namespace Plate;
 
 /// <summary>
 /// Photo capture (CameraX preview + capture to MediaStore so Google Photos
@@ -26,12 +26,12 @@ namespace FocusPhone.Camera;
 /// policy routes into the launcher's restricted browser.
 /// </summary>
 [Activity(
-    Label = "Camera",
+    Label = "Plate",
     MainLauncher = true,
     Exported = true,
     Theme = "@style/Theme.FocusPhone.Paper.AppCompat")]
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
-public class CameraActivity : AppCompatActivity
+public class PlateActivity : AppCompatActivity
 {
     private const int DocumentScanRequest = 1;
 
@@ -170,9 +170,9 @@ public class CameraActivity : AppCompatActivity
 
     private class CaptureCallback : Java.Lang.Object, ImageCapture.IOnImageSavedCallback
     {
-        private readonly CameraActivity activity;
+        private readonly PlateActivity activity;
 
-        public CaptureCallback(CameraActivity activity)
+        public CaptureCallback(PlateActivity activity)
         {
             this.activity = activity;
         }
@@ -187,10 +187,10 @@ public class CameraActivity : AppCompatActivity
     // Captures a still frame to the cache, then decodes any QR code in it.
     private class QrCaptureCallback : Java.Lang.Object, ImageCapture.IOnImageSavedCallback
     {
-        private readonly CameraActivity activity;
+        private readonly PlateActivity activity;
         private readonly Java.IO.File file;
 
-        public QrCaptureCallback(CameraActivity activity, Java.IO.File file)
+        public QrCaptureCallback(PlateActivity activity, Java.IO.File file)
         {
             this.activity = activity;
             this.file = file;
@@ -213,9 +213,9 @@ public class CameraActivity : AppCompatActivity
 
     private class QrResultListener : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
     {
-        private readonly CameraActivity activity;
+        private readonly PlateActivity activity;
 
-        public QrResultListener(CameraActivity activity)
+        public QrResultListener(PlateActivity activity)
         {
             this.activity = activity;
         }
@@ -259,9 +259,9 @@ public class CameraActivity : AppCompatActivity
 
     private class IntentSenderListener : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
     {
-        private readonly CameraActivity activity;
+        private readonly PlateActivity activity;
 
-        public IntentSenderListener(CameraActivity activity)
+        public IntentSenderListener(PlateActivity activity)
         {
             this.activity = activity;
         }
@@ -277,10 +277,10 @@ public class CameraActivity : AppCompatActivity
 
     private class FailureToastListener : Java.Lang.Object, Android.Gms.Tasks.IOnFailureListener
     {
-        private readonly CameraActivity activity;
+        private readonly PlateActivity activity;
         private readonly string message;
 
-        public FailureToastListener(CameraActivity activity, string message)
+        public FailureToastListener(PlateActivity activity, string message)
         {
             this.activity = activity;
             this.message = message;

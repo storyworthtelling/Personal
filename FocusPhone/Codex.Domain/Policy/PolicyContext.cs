@@ -24,7 +24,8 @@ public record PolicyContext(
 
     public const string LauncherPackage = "com.storyworthtelling.focusphone.launcher";
     public const string CommunicationPackage = "com.storyworthtelling.focusphone.communication";
-    public const string CameraPackage = "com.storyworthtelling.focusphone.camera";
+    // Frozen: the head is renamed to Plate IN PLACE, so the package id never moves.
+    public const string PlatePackage = "com.storyworthtelling.focusphone.camera";
     public const string AudioPackage = "com.storyworthtelling.focusphone.audio";
     public const string PlayStorePackage = "com.android.vending";
 
@@ -47,7 +48,7 @@ public record PolicyContext(
     {
         LauncherPackage,
         CommunicationPackage,
-        CameraPackage,
+        PlatePackage,
         AudioPackage,
     };
 

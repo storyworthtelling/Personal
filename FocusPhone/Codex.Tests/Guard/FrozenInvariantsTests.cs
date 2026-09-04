@@ -23,7 +23,7 @@ public class FrozenInvariantsTests
         Assert.Equal("com.storyworthtelling.focusphone.launcher", PolicyContext.LauncherPackage);
         Assert.Equal("com.storyworthtelling.", PolicyContext.OwnerPackagePrefix);
         Assert.Equal("com.storyworthtelling.focusphone.communication", PolicyContext.CommunicationPackage);
-        Assert.Equal("com.storyworthtelling.focusphone.camera", PolicyContext.CameraPackage);
+        Assert.Equal("com.storyworthtelling.focusphone.camera", PolicyContext.PlatePackage);
         Assert.Equal("com.storyworthtelling.focusphone.audio", PolicyContext.AudioPackage);
     }
 
@@ -403,6 +403,139 @@ public class FrozenInvariantsTests
 
         Assert.True(declared,
             "No component declares an ACTION_SEND / text/plain filter — Call Notes has no way into Post.");
+    }
+
+    // ---- Plate (P8), Release A: the guardrails ----
+
+    /// <summary>
+    /// P8 renames the Camera head to Plate <b>in place</b>, so the package id must not move:
+    /// a device recognizes an update only when the package name is unchanged, and the
+    /// device-owner update channel installs by package id. The C# identifier is renamed to
+    /// PlatePackage; the VALUE is frozen and stays the pre-rename one forever.
+    ///
+    /// It must also live in exactly ONE place. Before P8 the literal was copied into five
+    /// files and only the Domain constant was guarded, so four copies could drift silently —
+    /// including the two in Post that its handoff to Plate depends on.
+    /// </summary>
+    [Fact]
+    public void PlatePackageIdIsFrozenAndAppearsOnlyInTheDomainConstant()
+    {
+        Assert.Equal("com.storyworthtelling.focusphone.camera", PolicyContext.PlatePackage);
+
+        // Two files may hold the literal: the Domain constant that defines it, and this
+        // guard, which has to spell it out to freeze it. Everything else references the
+        // constant.
+        var stray = EnumerateRepoFiles("*.cs")
+            .Where(file => File.ReadAllText(file).Contains(PolicyContext.PlatePackage, StringComparison.Ordinal))
+            .Select(RepoRelative)
+            .Where(path => !path.EndsWith("PolicyContext.cs", StringComparison.Ordinal)
+                && !path.EndsWith("FrozenInvariantsTests.cs", StringComparison.Ordinal))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(stray.Count == 0,
+            "The Plate package id is copied instead of referenced. Every one of these should use "
+            + $"PolicyContext.PlatePackage:\n{string.Join("\n", stray)}");
+    }
+
+    /// <summary>
+    /// Every Android head named in a workflow must exist on disk. This is the bug that meant
+    /// Score never reached the rolling release, caught mechanically instead of by remembering:
+    /// build-flyleaf.yml names its heads in six places (a paths: trigger, three shell loops
+    /// and two publish paths), and a rename that misses one leaves the workflow either failing
+    /// on a folder that is gone or quietly publishing nothing.
+    /// </summary>
+    [Fact]
+    public void EveryAndroidHeadNamedInAWorkflowExistsOnDisk()
+    {
+        // A project token, with or without a folder prefix. The trailing guard keeps
+        // Xamarin.AndroidX.* package references out, and net10.0-android is lower case.
+        var token = new System.Text.RegularExpressions.Regex(
+            @"(?<![A-Za-z0-9_.\-])(?:[A-Za-z0-9_]+/)?(?<name>[A-Za-z0-9_.]+\.Android)(?![A-Za-z0-9_.])");
+
+        var missing = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var workflow in Directory.EnumerateFiles(
+                     Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml"))
+        {
+            foreach (System.Text.RegularExpressions.Match match in token.Matches(File.ReadAllText(workflow)))
+            {
+                var name = match.Groups["name"].Value;
+                if (!Directory.EnumerateDirectories(RepoRoot(), name, SearchOption.AllDirectories).Any())
+                {
+                    missing.Add($"{Path.GetFileName(workflow)} names {name}, which does not exist");
+                }
+            }
+        }
+
+        Assert.True(missing.Count == 0,
+            "A workflow builds or publishes a head that is not on disk:\n" + string.Join("\n", missing));
+    }
+
+    /// <summary>
+    /// Plate ships from its own workflow, because it is the only head that needs
+    /// dl.google.com at build time and so is the slowest and flakiest build in the repo —
+    /// isolating it means a binding failure stops shipping Plate rather than Flyleaf and
+    /// Score too. Four things about that workflow are load-bearing enough to freeze.
+    /// </summary>
+    [Fact]
+    public void PlateWorkflowShipsThroughTheUpdateChannelWithAMonotonicVersionCode()
+    {
+        var path = Path.Combine(RepoRoot(), ".github", "workflows", "build-plate.yml");
+        Assert.True(File.Exists(path), "build-plate.yml is missing — Plate would never reach the update channel.");
+        var workflow = File.ReadAllText(path);
+
+        // The rolling release the device-owner update channel installs from.
+        Assert.Contains("publish-rolling-release", workflow, StringComparison.Ordinal);
+
+        // This workflow's run_number restarts at 1 while the head has already shipped at up
+        // to 100000 + 108. A lower code is rejected outright by the update channel, so the
+        // floor has to clear everything build-flyleaf.yml ever published for Camera.
+        Assert.Contains("200000 + RUN_NUMBER", workflow, StringComparison.Ordinal);
+
+        // The runner's default JDK is 17. Score's TIDAL binding was compiled to class-file
+        // major 65 and javac refused it; Plate's ML Kit bindings are the same kind of
+        // third-party .aar and Plate cannot be compiled locally at all, so there would be no
+        // warning before a red build.
+        Assert.Contains("setup-java", workflow, StringComparison.Ordinal);
+        Assert.Contains("java-version: '21'", workflow, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// All EIGHT fonts, not the six the other workflows check. Codex.Ui.Android globs
+    /// Fonts/*.ttf so every font ships, but the FONT CHECK exists because a Link-separator
+    /// bug can pack one under a wrong literal name and Assets.Open then fails silently at
+    /// runtime. The two the older checks omit are the two most visible in the suite:
+    /// SourceSerif4-Black, which every PaperUi.ScreenHeader renders in, and
+    /// PinyonScript-Regular, which is the owner's voice.
+    /// </summary>
+    [Fact]
+    public void PlateWorkflowChecksEveryPackagedFont()
+    {
+        var workflow = File.ReadAllText(
+            Path.Combine(RepoRoot(), ".github", "workflows", "build-plate.yml"));
+
+        // Read the FONTS= list itself, not the file. Scanning the whole workflow made this
+        // guard pass with the bug present: the comment above the step names the two fonts
+        // the older checks omit, so deleting one from the list changed nothing. A guard has
+        // to look at the thing that runs, not at prose about it.
+        var declared = System.Text.RegularExpressions.Regex.Match(workflow, @"FONTS=""(?<list>[^""]*)""");
+        Assert.True(declared.Success, "build-plate.yml has no FONTS=\"…\" list for the FONT CHECK to iterate.");
+        var checkedFonts = declared.Groups["list"].Value
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var packaged = Directory.EnumerateFiles(Path.Combine(RepoRoot(), "Fonts"), "*.ttf")
+            .Select(Path.GetFileNameWithoutExtension)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        var unchecked_ = packaged
+            .Where(name => !checkedFonts.Contains(name!))
+            .ToList();
+
+        Assert.True(unchecked_.Count == 0,
+            "build-plate.yml's FONT CHECK does not name every font in /Fonts, so a misfiled one "
+            + $"would ship broken:\n{string.Join("\n", unchecked_)}");
     }
 
     // Every [IntentFilter(...)] attribute in a source file, as text.

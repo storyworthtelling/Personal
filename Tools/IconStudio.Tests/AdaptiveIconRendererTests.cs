@@ -25,7 +25,7 @@ public class AdaptiveIconRendererTests : IDisposable
     }
 
     // A paper-background app (not Flyleaf, whose ground is the warm identity hue).
-    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Camera");
+    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Plate");
     private static IconSpec FlyleafSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Launcher");
 
     [Fact]

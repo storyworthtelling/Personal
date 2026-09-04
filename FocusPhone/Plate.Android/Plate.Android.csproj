@@ -2,9 +2,9 @@
   <PropertyGroup>
     <TargetFramework>net10.0-android</TargetFramework>
     <OutputType>Exe</OutputType>
-    <RootNamespace>FocusPhone.Camera</RootNamespace>
+    <RootNamespace>Plate</RootNamespace>
     <ApplicationId>com.storyworthtelling.focusphone.camera</ApplicationId>
-    <ApplicationTitle>Camera</ApplicationTitle>
+    <ApplicationTitle>Plate</ApplicationTitle>
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
     <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
