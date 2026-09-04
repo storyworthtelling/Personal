@@ -96,15 +96,29 @@ workflow and the run list; not read out of the APK, which would need a download 
 `com.storyworthtelling.focusphone.camera-Signed.apk` is on the `apps-latest` release,
 uploaded 23 Aug. *(Read from the release.)*
 
-**F5 — CI is dead, and has been since before P7 closed.** Every workflow on `main` failed
-3–5 seconds after starting as recently as 02:00 today: Flyleaf run 108, Ledger 51, Post 11,
-shared-libs 25, all `failure`. A 3-second failure is the account-level Actions billing
-stop, not a code failure. **`build-post.yml` has therefore never produced an APK** — P7
-closed with its first build unverified and it is still unverified. *(Read from the run
-list.)* The P7 plans say Actions resets 1 September.
+**F5 — CI was dead when this finding was written; it came back on 1 September.**
+*(Original reading, 31 Aug: every workflow on `main` failed 3–5 seconds after starting —
+the account-level Actions billing stop, not a code failure — and `build-post.yml` had never
+produced an APK.)* **Re-checked 2 Sept: the stop ended at 01:08 on the 1st and every run
+since has succeeded.** `build-post.yml` runs 12, 14, 16, 18 and 20 all completed green in
+about seven minutes each, so **P7's build is verified** and the risk that shaped this
+document has lifted.
+
+**F5b — the first run after the reset went red, and the fix matters to Plate.** PR #161
+pinned JDK 21 for the Flyleaf build after `Score.Android` failed in `javac` on the generated
+TIDAL binding stubs: `bad class file: com/tidal/sdk/player/Player.class — class file has
+wrong version 65.0, should be 61.0`. The runner had **no `setup-java` step at all** and
+inherited JDK 17, whose `javac` refuses class-file major 65. *(Read from the commit.)* Its
+own message records why nobody caught it: the sandbox that compiled it runs JDK 21, so local
+builds passed on exactly the code CI rejected.
+
+**`build-post.yml` still has no JDK pin.** Plate's ML Kit bindings are the same class of
+dependency — third-party `.aar` payloads whose class-file version we do not control — and
+Plate cannot be compiled locally at all, so there would be no local pass to mislead us and no
+warning either. **`build-plate.yml` pins JDK 21 from the start** (§2.9).
 
 **F6 — the Domain suite runs here, and it is the only compiler this phase has.**
-`dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj` — **1519 passed, 0 failed, 1 second**.
+`dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj` — **1519 passed** on 31 Aug; **1528** after merging `main` on 2 Sept.
 *(Run.)* The Android heads do not build in this sandbox and Plate is the one that cannot
 build even with the Android SDK stitched in, because `Xamarin.GooglePlayServices.MLKit.*`
 fetches `.aar` payloads from `dl.google.com` at build time.
@@ -380,15 +394,21 @@ has shipped at up to 100108 (F4), and a lower code is simply rejected by the upd
 200000 is Post's number; versionCodes are per-package, so Post and Plate sharing a floor is
 harmless and one number is easier to remember than two.
 
+**A pinned JDK 21** (`actions/setup-java@v4`, temurin) in the build job — F5b's lesson,
+applied before it can bite rather than after a red first build. Neither `build-post.yml` nor
+the pre-#161 `build-flyleaf.yml` had one.
+
 **A fatal APP ID CHECK** that reads the frozen id back out of the built APK, as
-`build-post.yml` does, plus a **fatal ICON CHECK** (`build-flyleaf.yml`'s is
-`continue-on-error`) and the FONT CHECK covering all eight fonts (§4.8).
+`build-post.yml` does, plus a **fatal ICON CHECK** (`build-flyleaf.yml`'s and
+`build-post.yml`'s are print-only) and the FONT CHECK covering all eight fonts (§4.8).
 
 **And the part that breaks silently: Camera must come *out* of `build-flyleaf.yml` in six
-places** — the `paths:` trigger (line 9), the three `for proj in …` loops (79, 109, 129), the
-artifact upload path (156) and the rolling-release path (176). There is a seventh mention at
-line 52, in a comment explaining why the runner needs network access; it is not functional but
-it stops being true. Miss one of the six and `build-flyleaf` starts failing on a folder that
+places** — the `paths:` trigger (line 9), the three `for proj in …` loops (92, 122, 142), the
+artifact upload path (169) and the rolling-release path (189). There is a seventh mention at
+line 65, in a comment explaining why the runner needs network access; it is not functional but
+it stops being true. *(Line numbers re-verified against `main` on 2 Sept — they had all
+shifted by 13 when PR #161 inserted the `setup-java` step, which is why they are checked
+rather than remembered.)* Miss one of the six and `build-flyleaf` starts failing on a folder that
 no longer exists — `if-no-files-found: error` makes that fatal — or keeps quietly publishing
 nothing. **This is the bug that meant Score never reached the rolling release**, and the
 workflow's own comment says so at line 170. Guard §4.5 exists because of it.
@@ -541,7 +561,10 @@ is worth confirming separately.
 **R3 — Four `dl.google.com` bindings, two of them new.** Barcode and DocumentScanner today,
 plus TextRecognition (§2.6) and `Camera.Video` (§2.5). Each is a build-time `.aar` fetch
 that only CI can perform. A version conflict between them is exactly the class of failure
-that cannot be seen from here.
+that cannot be seen from here — and F5b showed the sharper edge of it: a binding compiled to
+a newer Java class-file version than the runner's `javac` accepts fails with an error that
+names the library, not the toolchain. Pinning JDK 21 (§2.9) removes the known instance; it
+does not remove the class of problem.
 
 **R4 — `RECORD_AUDIO`.** A sensor permission, so the device owner cannot silently grant it
 (the same reason `CAMERA` is granted by dialog at cutover — see `ManifestPermissions.cs`).
