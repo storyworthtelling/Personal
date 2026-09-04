@@ -1,0 +1,50 @@
+name: Build shared libraries
+
+# The repo-root shared libraries (Storyworthtelling.Voice / .Remarkable / .Paper / .Google / .Updates) are pure
+# net10.0 and belong to no app .sln — before this, only build-storyboarder exercised Voice/Remarkable, so a
+# shared-lib change that no app workflow's path filter covered went untested. This builds and tests them on
+# their own, on any shared-lib change, as the single source of truth for the shared foundations.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Voice.Tests/**'
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Remarkable.Tests/**'
+      - 'Storyworthtelling.Paper/**'
+      - 'Storyworthtelling.Paper.Tests/**'
+      - 'Storyworthtelling.Google/**'
+      - 'Storyworthtelling.Google.Tests/**'
+      - 'Storyworthtelling.Updates/**'
+      - 'Storyworthtelling.Updates.Tests/**'
+      - '.github/workflows/build-shared-libs.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Each shared lib is pure net10.0 (no Android workload). Test whichever test projects exist — Google
+      # arrives in a later P3 increment, so its test project is exercised only once present.
+      - name: Test shared libraries
+        run: |
+          set -e
+          for proj in \
+            Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj \
+            Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj \
+            Storyworthtelling.Paper.Tests/Storyworthtelling.Paper.Tests.csproj \
+            Storyworthtelling.Google.Tests/Storyworthtelling.Google.Tests.csproj \
+            Storyworthtelling.Updates.Tests/Storyworthtelling.Updates.Tests.csproj ; do
+            if [ -f "$proj" ]; then
+              echo "== dotnet test $proj =="
+              dotnet test "$proj"
+            fi
+          done
