@@ -34,11 +34,7 @@ public class RemarkableStorageClient : IRemarkableClient
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
 
         var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"reMarkable upload failed: {(int)response.StatusCode} ({response.StatusCode}) for '{title}'",
-                inner: null,
-                response.StatusCode);
+        await EnsureSuccess(response, "upload", title);
     }
 
     public async Task<string> EnsureFolder(string name)
@@ -56,11 +52,7 @@ public class RemarkableStorageClient : IRemarkableClient
         request.Headers.Add("rm-source", "RoR-Browser");
 
         var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"reMarkable folder create failed: {(int)response.StatusCode} ({response.StatusCode}) for '{name}'",
-                inner: null,
-                response.StatusCode);
+        await EnsureSuccess(response, "folder create", name);
 
         var body = await response.Content.ReadAsStringAsync();
         return ReadCreatedId(body)
@@ -74,11 +66,7 @@ public class RemarkableStorageClient : IRemarkableClient
         // as an empty/partial list rather than a crash.
         using var request = await CreateRequest(HttpMethod.Get, FilesUrl);
         var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"reMarkable list failed: {(int)response.StatusCode} ({response.StatusCode})",
-                inner: null,
-                response.StatusCode);
+        await EnsureSuccess(response, "list");
 
         var json = await response.Content.ReadAsStringAsync();
         return ParseEntries(json).Select(e => new RemarkableDoc { Id = e.Id, Title = e.Title, PdfBytes = [] }).ToList();
@@ -94,11 +82,7 @@ public class RemarkableStorageClient : IRemarkableClient
         using var request = await CreateRequest(HttpMethod.Get, $"{FilesUrl}/{match.Id}");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/pdf"));
         var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"reMarkable download failed: {(int)response.StatusCode} ({response.StatusCode}) for '{title}'",
-                inner: null,
-                response.StatusCode);
+        await EnsureSuccess(response, "download", title);
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
         return new RemarkableDoc { Id = match.Id, Title = match.Title, PdfBytes = bytes };
@@ -108,11 +92,36 @@ public class RemarkableStorageClient : IRemarkableClient
     {
         using var request = await CreateRequest(HttpMethod.Delete, $"{FilesUrl}/{docId}");
         var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"reMarkable trash failed: {(int)response.StatusCode} ({response.StatusCode}) for '{docId}'",
-                inner: null,
-                response.StatusCode);
+        await EnsureSuccess(response, "trash", docId);
+    }
+
+    // Throws on a non-success response, INCLUDING the response body in the message. reMarkable returns a
+    // short explanation in the body (e.g. why a 405/400 was refused); dropping it left every failure a bare
+    // status code with no way to tell a stale endpoint from a rejected payload from a bad token — which is
+    // exactly what made the Canonizer delivery gap (D-04) impossible to diagnose from the device.
+    private static async Task EnsureSuccess(HttpResponseMessage response, string action, string? subject = null)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var body = string.Empty;
+        try
+        {
+            body = (await response.Content.ReadAsStringAsync()).Trim();
+        }
+        catch
+        {
+            // The body is best-effort diagnostics; never let reading it mask the real status.
+        }
+
+        const int maxBody = 500;
+        var snippet = body.Length > maxBody ? string.Concat(body.AsSpan(0, maxBody), "…") : body;
+        var forClause = string.IsNullOrEmpty(subject) ? string.Empty : $" for '{subject}'";
+        var detail = snippet.Length > 0 ? $" — {snippet}" : string.Empty;
+        throw new HttpRequestException(
+            $"reMarkable {action} failed: {(int)response.StatusCode} ({response.StatusCode}){forClause}{detail}",
+            inner: null,
+            response.StatusCode);
     }
 
     private static string Base64Meta(object metadata) =>
@@ -131,11 +140,7 @@ public class RemarkableStorageClient : IRemarkableClient
     {
         using var request = await CreateRequest(HttpMethod.Get, FilesUrl);
         var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"reMarkable list failed: {(int)response.StatusCode} ({response.StatusCode})",
-                inner: null,
-                response.StatusCode);
+        await EnsureSuccess(response, "list");
 
         var json = await response.Content.ReadAsStringAsync();
         return ParseEntries(json)

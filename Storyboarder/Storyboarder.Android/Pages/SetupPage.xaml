@@ -131,6 +131,11 @@
                     Clicked="OnExportDiagnosticsClicked" Style="{StaticResource SecondaryButton}" />
             <Label x:Name="DiagnosticsStatusLabel" Style="{StaticResource StatusLine}" />
 
+            <!-- Build number at the foot: version name + code + package id, so it's readable which build is
+                 installed even on a locked-down phone with no access to system app info. -->
+            <Label x:Name="BuildInfoLabel" Style="{StaticResource MonoLabel}"
+                   FontSize="{StaticResource LabelSize}" HorizontalTextAlignment="Center" Margin="0,16,0,0" />
+
         </VerticalStackLayout>
     </ScrollView>
 
