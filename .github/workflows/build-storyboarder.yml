@@ -1,0 +1,137 @@
+name: Build Canonizer APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'Storyboarder/Storyboarder.Android/**'
+      - 'Storyboarder/Storyboarder.Infrastructure/**'
+      - 'Storyboarder/Storyboarder.Domain/**'
+      - 'Storyboarder/Storyboarder.Tests/**'
+      # The shared owner's-voice library ships in the APK (referenced by Infrastructure), so a change
+      # to it must rebuild Storyboarder too.
+      - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Voice.Tests/**'
+      # The shared reMarkable delivery library also ships in the APK (Infrastructure references it).
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Remarkable.Tests/**'
+      - '.github/workflows/build-storyboarder.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android head, which would require the MAUI/Android workload. The
+      # -p:StoryboarderTfms switch keeps Infrastructure single-targeted at net10.0.
+      - name: Run tests
+        run: >
+          dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj
+          -p:StoryboarderTfms=net10.0
+
+      # The shared owner's-voice library (net10.0, pure .NET) ships in the APK; its own tests run here so
+      # a change to it is verified in the same workflow that rebuilds Storyboarder.
+      - name: Run voice tests
+        run: dotnet test Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj
+
+      # The shared reMarkable delivery library also ships in the APK; its tests run here too.
+      - name: Run reMarkable tests
+        run: dotnet test Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    # actions: write lets the prune step delete artifacts from older runs;
+    # contents: write lets the rolling-release step publish the signed APK.
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/storyboarder.keystore
+
+      - name: Build APK
+        working-directory: Storyboarder
+        run: >
+          dotnet publish Storyboarder.Android -f net10.0-android -c Release
+          -p:ApplicationVersion=${{ github.run_number }}
+          -p:ApplicationDisplayVersion=0.1.${{ github.run_number }}
+          -p:AndroidPackageFormat=apk
+          -p:AndroidKeyStore=true
+          -p:AndroidSigningKeyStore=/tmp/storyboarder.keystore
+          -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }}
+          -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }}
+          -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
+
+      # Prove the launcher icon is actually in the APK and FAIL the build if it is not. This head does
+      # not set <SingleProject>true</SingleProject>, so anything under Platforms/Android/Resources is
+      # silently dropped and android:icon resolves to empty; a plain "it built" hid that for months.
+      # This gate reads the resolved android:icon back out of the APK (grep the log for "ICON CHECK").
+      - name: ICON CHECK
+        working-directory: Storyboarder
+        run: |
+          set +e
+          echo "=== ICON CHECK ==="
+          APK=$(ls -1 Storyboarder.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls -1 Storyboarder.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+          echo "APK: $APK"
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
+          echo "aapt2: $AAPT2"
+          BADGING=$("$AAPT2" dump badging "$APK" 2>/dev/null)
+          echo "--- manifest application icon (aapt2 dump badging) ---"
+          echo "$BADGING" | grep -Ei 'application(-icon)?:|launchable-activity' || echo "(aapt2 badging produced no icon line)"
+          echo "--- packaged icon resources (unzip -l) ---"
+          unzip -l "$APK" | grep -Ei 'mipmap|appicon' || echo "(no mipmap/appicon entries found in APK)"
+          echo "--- packaged fonts (unzip -l) ---"
+          echo "fonts packaged: $(unzip -l "$APK" | grep -ci '\.ttf')"
+          echo "=== END ICON CHECK ==="
+          APPICON=$(echo "$BADGING" | grep -E '^application:' | sed -n "s/.*icon='\([^']*\)'.*/\1/p")
+          if [ -z "$APPICON" ]; then
+            echo "ICON CHECK FAILED: android:icon is empty — the launcher icon is not packaged/resolved."
+            exit 1
+          fi
+          echo "ICON CHECK PASSED: android:icon = $APPICON"
+
+      # Keep only the latest run's artifacts: delete artifacts from older runs of
+      # this workflow before uploading, which also frees storage so the upload succeeds.
+      - name: Prune old artifacts
+        uses: ./.github/actions/prune-old-artifacts
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Canonizer-Android
+          path: Storyboarder/Storyboarder.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      # Publish the signed APK to the rolling "apps-latest" release the phone's
+      # update channel installs from. main only — feature-branch builds must never
+      # reach the device.
+      - name: Publish to rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/publish-rolling-release
+        with:
+          apks: Storyboarder/Storyboarder.Android/bin/Release/net10.0-android/publish/*-Signed.apk
