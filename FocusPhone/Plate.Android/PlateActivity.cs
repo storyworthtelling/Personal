@@ -14,6 +14,7 @@ using Xamarin.Google.MLKit.Vision.BarCode;
 using Xamarin.Google.MLKit.Vision.Barcode.Common;
 using Xamarin.Google.MLKit.Vision.Common;
 using Codex.Domain.Design;
+using Codex.Domain.Plate;
 using Codex.Domain.Time;
 using Codex.Ui;
 
@@ -117,10 +118,16 @@ public class PlateActivity : AppCompatActivity
             return;
         }
 
+        // WHERE this lands is the phase's live bug, and it is decided in Codex.Domain
+        // (CaptureFiling) rather than here: without RELATIVE_PATH the Images collection
+        // files under its default Pictures/, and Google Photos backs up DCIM/Camera while
+        // treating every other device folder as opt-in — so every photo this app ever took
+        // was on the phone and outside backup.
+        var entry = CaptureFiling.Photo(DateTime.Now);
         var values = new ContentValues();
-        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName,
-            $"FocusPhone_{DateTime.Now:yyyyMMdd_HHmmss}.jpg");
-        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "image/jpeg");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, entry.DisplayName);
+        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, entry.MimeType);
+        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, entry.RelativePath);
         var options = new ImageCapture.OutputFileOptions.Builder(
             ContentResolver!, Android.Provider.MediaStore.Images.Media.ExternalContentUri!, values).Build();
 
@@ -178,7 +185,7 @@ public class PlateActivity : AppCompatActivity
         }
 
         public void OnImageSaved(ImageCapture.OutputFileResults? results) =>
-            activity.RunOnUiThread(() => activity.ShowStatus($"Photo saved · {TimeFormats.Clock12(DateTime.Now)}"));
+            activity.RunOnUiThread(() => activity.ShowStatus($"Photo saved to your camera roll · {TimeFormats.Clock12(DateTime.Now)}"));
 
         public void OnError(ImageCaptureException? exception) =>
             Toast.MakeText(activity, $"Capture failed: {exception?.Message}", ToastLength.Long)!.Show();
@@ -305,13 +312,18 @@ public class PlateActivity : AppCompatActivity
             return;
         }
 
-        // Persist the scan into MediaStore Downloads so Drive/Photos can see it.
+        // The other half of the live bug: this used to write into MediaStore.Downloads,
+        // which the owner reported as "scans vanish into Downloads". A scan is a document
+        // and files with documents. Documents/ is not a legal RELATIVE_PATH for the
+        // Downloads collection (that one must sit under Download/), so the insert goes to
+        // the Files collection instead.
+        var entry = CaptureFiling.Scan("Scan", DateTime.Now);
         var values = new ContentValues();
-        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName,
-            $"Scan_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
-        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, "application/pdf");
+        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, entry.DisplayName);
+        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, entry.MimeType);
+        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, entry.RelativePath);
         var target = ContentResolver!.Insert(
-            Android.Provider.MediaStore.Downloads.ExternalContentUri!, values);
+            Android.Provider.MediaStore.Files.GetContentUri("external")!, values);
         if (target is null)
         {
             return;
@@ -319,6 +331,6 @@ public class PlateActivity : AppCompatActivity
         using var input = ContentResolver.OpenInputStream(pdf.Uri)!;
         using var output = ContentResolver.OpenOutputStream(target)!;
         input.CopyTo(output);
-        ShowStatus($"Scan saved to Downloads · {TimeFormats.Clock12(DateTime.Now)}");
+        ShowStatus($"Scan saved to Documents · {TimeFormats.Clock12(DateTime.Now)}");
     }
 }
