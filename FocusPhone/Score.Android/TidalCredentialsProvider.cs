@@ -48,7 +48,7 @@ public sealed class TidalCredentialsProvider(Func<Task<TidalTokenPollResult>> re
                 // expects a real Flow, never null. Logged loudly; if the SDK reads
                 // this at all, the crash that follows is the truest possible signal
                 // that the raw JNI lookup needs fixing, not a caught-and-hidden one.
-                Android.Util.Log.Error(LogTag, "EmptyFlow() bridge call failed; Bus has nothing valid to return.");
+                AudioDiagnostics.LogWarning(LogTag, "EmptyFlow() bridge call failed; Bus has nothing valid to return.");
             }
 
             return flow!;
@@ -75,7 +75,7 @@ public sealed class TidalCredentialsProvider(Func<Task<TidalTokenPollResult>> re
             }
             catch (Exception e)
             {
-                Android.Util.Log.Error(LogTag, $"refreshAccessToken threw: {e}");
+                AudioDiagnostics.LogWarning(LogTag, $"refreshAccessToken threw: {e}");
                 result = BuildFailure("exception", apiErrorSubStatus);
             }
 
@@ -89,7 +89,7 @@ public sealed class TidalCredentialsProvider(Func<Task<TidalTokenPollResult>> re
                 // If this throws, the coroutine that is awaiting p1 hangs forever —
                 // there is nothing further this method can do about it, but it must
                 // not vanish silently.
-                Android.Util.Log.Error(LogTag, $"ResumeWith itself threw — the caller's coroutine will hang: {e}");
+                AudioDiagnostics.LogWarning(LogTag, $"ResumeWith itself threw — the caller's coroutine will hang: {e}");
             }
         });
 
@@ -100,7 +100,7 @@ public sealed class TidalCredentialsProvider(Func<Task<TidalTokenPollResult>> re
             // here instead of the real sentinel is unverified against what the SDK's
             // generated caller code actually checks for — this is exactly the
             // condition device testing needs to catch, logged so it is easy to find.
-            Android.Util.Log.Error(LogTag,
+            AudioDiagnostics.LogWarning(LogTag,
                 "CoroutineSuspended() bridge call failed; returning null instead of the real sentinel " +
                 "(unverified whether the SDK's caller handles that the same way).");
         }
