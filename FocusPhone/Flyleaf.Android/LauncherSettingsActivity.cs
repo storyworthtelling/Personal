@@ -193,19 +193,22 @@ public class LauncherSettingsActivity : Activity
         var dataOn = false;
         if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
         {
-            try { dataOn = telephony?.IsDataEnabled ?? false; } catch (Exception) { dataOn = false; }
+            // Java's isDataEnabled()/setDataEnabled() bind as one get/set property, DataEnabled.
+#pragma warning disable CA1422, CS0618
+            try { dataOn = telephony?.DataEnabled ?? false; } catch (Exception) { dataOn = false; }
+#pragma warning restore CA1422, CS0618
         }
         var carrier = telephony?.NetworkOperatorName;
         AddToggleRow(card, "Mobile data", string.IsNullOrEmpty(carrier) ? null : carrier, dataOn, on =>
         {
             try
             {
-                if (Build.VERSION.SdkInt < BuildVersionCodes.O)
+                if (Build.VERSION.SdkInt < BuildVersionCodes.O || telephony is null)
                 {
                     throw new InvalidOperationException("needs Android 8+");
                 }
 #pragma warning disable CA1422, CS0618
-                telephony?.SetDataEnabled(on);
+                telephony.DataEnabled = on;
 #pragma warning restore CA1422, CS0618
             }
             catch (Exception)
