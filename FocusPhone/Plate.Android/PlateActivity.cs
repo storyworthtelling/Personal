@@ -17,6 +17,7 @@ using Codex.Domain.Design;
 using Codex.Domain.Plate;
 using Codex.Domain.Time;
 using Codex.Ui;
+using Storyworthtelling.Paper;
 
 namespace Plate;
 
@@ -36,9 +37,18 @@ public class PlateActivity : AppCompatActivity
 {
     private const int DocumentScanRequest = 1;
 
+    // Google's scanner returns page rasters at roughly letter width; declaring them at 200
+    // DPI puts a scanned page on paper at about the size it was scanned from, rather than
+    // PdfSharp's default 96 DPI, which would print it half again too large.
+    private const int ScanDpi = 200;
+
     private PreviewView? previewView;
     private ImageCapture? imageCapture;
     private TextView? statusLine;
+    private FrameLayout? actionSlot;
+
+    // Null until the owner picks a door; the pages gathered so far once they have.
+    private ScanTray? scan;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -83,18 +93,70 @@ public class PlateActivity : AppCompatActivity
         root.AddView(statusLine, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
-        root.AddView(PaperUi.BottomBar(this,
-            PaperUi.PrimaryButton(this, "Capture", TakePhoto),
-            PaperUi.SecondaryButton(this, "Scan doc", StartDocumentScan),
-            PaperUi.SecondaryButton(this, "Scan QR", StartQrScan),
-            PaperUi.SecondaryButton(this, "Photos", OpenGooglePhotos)));
+        // The bar is swapped rather than the screen: picking a scan destination and gathering
+        // pages are steps within the camera, not places to go. §7 bans the dialog that would
+        // otherwise ask.
+        actionSlot = new FrameLayout(this);
+        root.AddView(actionSlot, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+        ShowCaptureBar();
         return root;
+    }
+
+    private void SetActions(params View[] actions)
+    {
+        actionSlot!.RemoveAllViews();
+        actionSlot.AddView(PaperUi.BottomBar(this, actions));
+    }
+
+    private void ShowCaptureBar()
+    {
+        scan = null;
+        SetActions(
+            PaperUi.PrimaryButton(this, "Capture", TakePhoto),
+            PaperUi.SecondaryButton(this, "Scan doc", ShowScanDestinations),
+            PaperUi.SecondaryButton(this, "Scan QR", StartQrScan),
+            PaperUi.SecondaryButton(this, "Photos", OpenGooglePhotos));
+    }
+
+    // Where a scan is going is picked before the scanner opens, so the owner is never left
+    // holding a finished document with nowhere obvious to put it.
+    private void ShowScanDestinations()
+    {
+        ShowStatus("Where is this going?");
+        SetActions(
+            PaperUi.SecondaryButton(this, "Drive", () => BeginScan(ScanDestination.Drive)),
+            PaperUi.SecondaryButton(this, "Post", () => BeginScan(ScanDestination.Post)),
+            PaperUi.SecondaryButton(this, "reMarkable", () => BeginScan(ScanDestination.Remarkable)),
+            PaperUi.SecondaryButton(this, "Back", () =>
+            {
+                HideStatus();
+                ShowCaptureBar();
+            }));
+    }
+
+    private void ShowScanBar()
+    {
+        var pages = scan!.Count;
+        SetActions(
+            PaperUi.PrimaryButton(this, pages > 0 ? "Save" : "Scan pages", SaveScan),
+            PaperUi.SecondaryButton(this, "Add pages", StartDocumentScan),
+            PaperUi.SecondaryButton(this, "Discard", () =>
+            {
+                HideStatus();
+                ShowCaptureBar();
+            }));
     }
 
     private void ShowStatus(string message)
     {
         statusLine!.Text = message;
         statusLine.Visibility = ViewStates.Visible;
+    }
+
+    private void HideStatus()
+    {
+        statusLine!.Visibility = ViewStates.Gone;
     }
 
     private void StartCamera()
@@ -135,11 +197,22 @@ public class PlateActivity : AppCompatActivity
             new CaptureCallback(this));
     }
 
+    private void BeginScan(ScanDestination destination)
+    {
+        scan = ScanTray.For(destination);
+        StartDocumentScan();
+    }
+
     private void StartDocumentScan()
     {
+        // JPEG only. Plate no longer takes the scanner's finished PDF: that PDF is capped at
+        // one run's worth of pages, and the owner wants to scan much more than that. The page
+        // rasters are asked for one run at a time and gathered in the tray until the document
+        // is whole; PdfVolumeComposer makes the PDF at the end.
         var options = new GmsDocumentScannerOptions.Builder()
             .SetGalleryImportAllowed(false)
-            .SetResultFormats(GmsDocumentScannerOptions.ResultFormatJpeg, GmsDocumentScannerOptions.ResultFormatPdf)
+            .SetPageLimit(ScanTray.PagesPerScannerRun)
+            .SetResultFormats(GmsDocumentScannerOptions.ResultFormatJpeg)
             .SetScannerMode(GmsDocumentScannerOptions.ScannerModeFull)
             .Build();
         var scanner = GmsDocumentScanning.GetClient(options);
@@ -306,11 +379,54 @@ public class PlateActivity : AppCompatActivity
         }
 
         var result = GmsDocumentScanningResult.FromActivityResultIntent(data);
-        var pdf = result?.GetPdf();
-        if (pdf?.Uri is null)
+        scan = (scan ?? ScanTray.For(ScanDestination.Drive)).Add(PageUris(result));
+        ShowStatus(scan.Count == 1 ? "1 page held." : $"{scan.Count} pages held.");
+        ShowScanBar();
+    }
+
+    // ML Kit hands back a nullable list of nullable pages; a cancelled run is the ordinary
+    // way to see it. The tray takes null for "no pages" so this can stay a straight read.
+    private static IEnumerable<string>? PageUris(GmsDocumentScanningResult? result)
+    {
+        var pages = result?.GetPages();
+        if (pages is null)
         {
+            return null;
+        }
+
+        var uris = new List<string>(pages.Count);
+        foreach (var page in pages)
+        {
+            if (page?.ImageUri is not null)
+            {
+                uris.Add(page.ImageUri.ToString()!);
+            }
+        }
+        return uris;
+    }
+
+    private void SaveScan()
+    {
+        if (scan is not { HasPages: true })
+        {
+            StartDocumentScan();
             return;
         }
+
+        // §8: loading is a status sentence, not a spinner. Composing a long document takes
+        // long enough to notice, and the sentence is what says so.
+        ShowStatus($"Composing {scan.Count} pages…");
+
+        var pageImages = new List<byte[]>(scan.Count);
+        foreach (var page in scan.Pages)
+        {
+            using var input = ContentResolver!.OpenInputStream(Android.Net.Uri.Parse(page)!)!;
+            using var buffer = new MemoryStream();
+            input.CopyTo(buffer);
+            pageImages.Add(buffer.ToArray());
+        }
+
+        var pdf = new PdfVolumeComposer().Compose(pageImages, ScanDpi);
 
         // The other half of the live bug: this used to write into MediaStore.Downloads,
         // which the owner reported as "scans vanish into Downloads". A scan is a document
@@ -326,11 +442,16 @@ public class PlateActivity : AppCompatActivity
             Android.Provider.MediaStore.Files.GetContentUri("external")!, values);
         if (target is null)
         {
+            ShowStatus("Could not file that scan.");
             return;
         }
-        using var input = ContentResolver.OpenInputStream(pdf.Uri)!;
-        using var output = ContentResolver.OpenOutputStream(target)!;
-        input.CopyTo(output);
+
+        using (var output = ContentResolver.OpenOutputStream(target)!)
+        {
+            output.Write(pdf, 0, pdf.Length);
+        }
+
         ShowStatus($"Scan saved to Documents · {TimeFormats.Clock12(DateTime.Now)}");
+        ShowCaptureBar();
     }
 }
