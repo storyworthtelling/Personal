@@ -105,7 +105,7 @@ public sealed class TidalPlaybackBridge : Java.Lang.Object, IFlowCollector
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error(LogTag, $"Events.Collect(...) threw: {e}");
+            AudioDiagnostics.LogWarning(LogTag, $"Events.Collect(...) threw: {e}");
         }
     }
 
@@ -117,7 +117,7 @@ public sealed class TidalPlaybackBridge : Java.Lang.Object, IFlowCollector
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error(LogTag, $"Handling a playback event threw: {e}");
+            AudioDiagnostics.LogWarning(LogTag, $"Handling a playback event threw: {e}");
         }
 
         // Synchronous, so this never suspends — Unit.Instance is the normal

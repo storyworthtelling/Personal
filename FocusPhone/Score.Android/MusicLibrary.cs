@@ -165,7 +165,7 @@ public sealed class MusicLibrary(
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error("MusicLibrary", $"EnrichSavedTrackAsync threw: {e}");
+            AudioDiagnostics.LogWarning("MusicLibrary", $"EnrichSavedTrackAsync threw: {e}");
         }
     }
 
@@ -247,7 +247,7 @@ public sealed class MusicLibrary(
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error("MusicLibrary", $"RevalidateSavedTidalTracksAsync threw: {e}");
+            AudioDiagnostics.LogWarning("MusicLibrary", $"RevalidateSavedTidalTracksAsync threw: {e}");
         }
     }
 

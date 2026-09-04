@@ -115,7 +115,7 @@ internal static class TidalKotlinBridge
             "kotlin/time/DurationUnit", "MILLISECONDS", "Lkotlin/time/DurationUnit;"));
         if (unit is null)
         {
-            Android.Util.Log.Error(LogTag, "DurationUnit.MILLISECONDS lookup failed; cannot convert " +
+            AudioDiagnostics.LogWarning(LogTag, "DurationUnit.MILLISECONDS lookup failed; cannot convert " +
                 $"{millis}ms to a raw Duration — nothing sane to return.");
             return null;
         }
@@ -125,7 +125,7 @@ internal static class TidalKotlinBridge
             Android.Util.Log.Debug(LogTag, $"FindClass(\"kotlin/time/DurationKt\")");
             if (!JniEnvironment.Types.TryFindClass("kotlin/time/DurationKt", out var type))
             {
-                Android.Util.Log.Error(LogTag, "FindClass returned null for \"kotlin/time/DurationKt\".");
+                AudioDiagnostics.LogWarning(LogTag, "FindClass returned null for \"kotlin/time/DurationKt\".");
                 return null;
             }
 
@@ -154,7 +154,7 @@ internal static class TidalKotlinBridge
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error(LogTag, $"kotlin/time/DurationKt.toDuration threw: {e}");
+            AudioDiagnostics.LogWarning(LogTag, $"kotlin/time/DurationKt.toDuration threw: {e}");
             return null;
         }
     }
@@ -179,7 +179,7 @@ internal static class TidalKotlinBridge
         {
             if (DurationOfMillis(millisArgs[i]) is not { } value)
             {
-                Android.Util.Log.Error(LogTag,
+                AudioDiagnostics.LogWarning(LogTag,
                     $"Duration conversion failed for argument {i} ({millisArgs[i]}ms); aborting {className} construction.");
                 return null;
             }
@@ -192,7 +192,7 @@ internal static class TidalKotlinBridge
             Android.Util.Log.Debug(LogTag, $"FindClass(\"{className}\")");
             if (!JniEnvironment.Types.TryFindClass(className, out var type))
             {
-                Android.Util.Log.Error(LogTag, $"FindClass returned null for \"{className}\".");
+                AudioDiagnostics.LogWarning(LogTag, $"FindClass returned null for \"{className}\".");
                 return null;
             }
 
@@ -216,7 +216,7 @@ internal static class TidalKotlinBridge
                     var resultRef = JniEnvironment.Object.NewObject(type, ctor, args);
                     if (!resultRef.IsValid)
                     {
-                        Android.Util.Log.Error(LogTag, $"NewObject returned an invalid reference for {className}.");
+                        AudioDiagnostics.LogWarning(LogTag, $"NewObject returned an invalid reference for {className}.");
                         return null;
                     }
 
@@ -232,7 +232,7 @@ internal static class TidalKotlinBridge
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error(LogTag, $"Constructing {className} threw: {e}");
+            AudioDiagnostics.LogWarning(LogTag, $"Constructing {className} threw: {e}");
             return null;
         }
     }
@@ -245,7 +245,7 @@ internal static class TidalKotlinBridge
             Android.Util.Log.Debug(LogTag, $"FindClass(\"{className}\")");
             if (!JniEnvironment.Types.TryFindClass(className, out var type))
             {
-                Android.Util.Log.Error(LogTag, $"FindClass returned null for \"{className}\".");
+                AudioDiagnostics.LogWarning(LogTag, $"FindClass returned null for \"{className}\".");
                 return null;
             }
 
@@ -258,7 +258,7 @@ internal static class TidalKotlinBridge
                 var resultRef = JniEnvironment.StaticFields.GetStaticObjectField(type, field);
                 if (!resultRef.IsValid)
                 {
-                    Android.Util.Log.Error(LogTag, $"\"{className}.{fieldName}\" resolved to an invalid reference.");
+                    AudioDiagnostics.LogWarning(LogTag, $"\"{className}.{fieldName}\" resolved to an invalid reference.");
                     return null;
                 }
 
@@ -273,7 +273,7 @@ internal static class TidalKotlinBridge
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error(LogTag, $"\"{className}.{fieldName}\" threw: {e}");
+            AudioDiagnostics.LogWarning(LogTag, $"\"{className}.{fieldName}\" threw: {e}");
             return null;
         }
     }
@@ -302,7 +302,7 @@ internal static class TidalKotlinBridge
             Android.Util.Log.Debug(LogTag, $"FindClass(\"{className}\")");
             if (!JniEnvironment.Types.TryFindClass(className, out var type))
             {
-                Android.Util.Log.Error(LogTag, $"FindClass returned null for \"{className}\" — class not on the " +
+                AudioDiagnostics.LogWarning(LogTag, $"FindClass returned null for \"{className}\" — class not on the " +
                     "classpath at all, or the name is wrong. Nothing further to try.");
                 return null;
             }
@@ -339,7 +339,7 @@ internal static class TidalKotlinBridge
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error(LogTag, $"\"{className}.{methodName}{signature}\" threw: {e}");
+            AudioDiagnostics.LogWarning(LogTag, $"\"{className}.{methodName}{signature}\" threw: {e}");
             return null;
         }
     }

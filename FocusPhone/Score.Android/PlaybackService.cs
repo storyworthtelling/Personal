@@ -157,7 +157,7 @@ public class PlaybackService : MediaLibraryService
         var tidalPlayer = TidalPlayerFactory.Create(Application!, credentialsProvider, appVersion: "1.0.0");
         if (tidalPlayer is null)
         {
-            Android.Util.Log.Error(logTag, "TidalPlayerFactory.Create returned null; skipping the TIDAL session.");
+            AudioDiagnostics.LogWarning(logTag, "TidalPlayerFactory.Create returned null; skipping the TIDAL session.");
             return;
         }
 
@@ -180,7 +180,7 @@ public class PlaybackService : MediaLibraryService
             }
             catch (Exception e)
             {
-                Android.Util.Log.Error(logTag, $"Building the TIDAL session threw: {e}");
+                AudioDiagnostics.LogWarning(logTag, $"Building the TIDAL session threw: {e}");
             }
             finally
             {

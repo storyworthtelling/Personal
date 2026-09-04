@@ -79,7 +79,7 @@ internal static class TidalPlayerFactory
                 1_500L)   // audioTrackBuffer: 1.5.seconds
             is not { } bufferConfiguration)
         {
-            Android.Util.Log.Error(LogTag, "BufferConfiguration construction failed; cannot build Player.");
+            AudioDiagnostics.LogWarning(LogTag, "BufferConfiguration construction failed; cannot build Player.");
             return null;
         }
 
@@ -89,7 +89,7 @@ internal static class TidalPlayerFactory
                 15_000L, 30_000L, 15_000L) // connect/read/write, matching TIDAL's own defaults
             is not { } assetTimeoutConfig)
         {
-            Android.Util.Log.Error(LogTag, "AssetTimeoutConfig construction failed; cannot build Player.");
+            AudioDiagnostics.LogWarning(LogTag, "AssetTimeoutConfig construction failed; cannot build Player.");
             return null;
         }
 
@@ -99,7 +99,7 @@ internal static class TidalPlayerFactory
                 15_000L, 30_000L, 15_000L) // connect/read/write, matching TIDAL's own defaults
             is not { } streamingApiTimeoutConfig)
         {
-            Android.Util.Log.Error(LogTag, "StreamingApiTimeoutConfig construction failed; cannot build Player.");
+            AudioDiagnostics.LogWarning(LogTag, "StreamingApiTimeoutConfig construction failed; cannot build Player.");
             return null;
         }
 
@@ -135,7 +135,7 @@ internal static class TidalPlayerFactory
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error(LogTag, $"new Player(...) threw: {e}");
+            AudioDiagnostics.LogWarning(LogTag, $"new Player(...) threw: {e}");
             return null;
         }
     }
