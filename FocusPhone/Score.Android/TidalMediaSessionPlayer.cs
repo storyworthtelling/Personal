@@ -148,7 +148,7 @@ public sealed class TidalMediaSessionPlayer : SimpleBasePlayer
 
     private void OnPlaybackError(string message)
     {
-        Android.Util.Log.Error(LogTag, $"PlaybackError: {message}");
+        AudioDiagnostics.LogWarning(LogTag, $"PlaybackError: {message}");
         ended = true;
         InvalidateState();
     }
