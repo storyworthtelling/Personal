@@ -62,6 +62,25 @@ public class RemarkableStorageClientTests
     }
 
     [Fact]
+    public async Task Upload_Throws_IncludingStatusAndResponseBody()
+    {
+        // The reMarkable cloud explains a refusal in the body; the exception must carry it so a device-side
+        // failure (D-04) is diagnosable instead of a bare status code.
+        var response = new HttpResponseMessage(HttpStatusCode.MethodNotAllowed)
+        {
+            Content = new StringContent("{\"message\":\"method not allowed on this route\"}"),
+        };
+        var (client, _) = Create(response);
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.Upload("Test", [1, 2, 3]));
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, ex.StatusCode);
+        Assert.Contains("405", ex.Message);
+        Assert.Contains("method not allowed on this route", ex.Message);
+        Assert.Contains("Test", ex.Message);
+    }
+
+    [Fact]
     public async Task EnsureFolder_ReturnsExistingCollection_WithoutCreating()
     {
         // The listing already contains a "Canonizer" collection — reuse it, no second (create) request.
