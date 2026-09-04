@@ -419,9 +419,19 @@ The suite's Settings tab glyph is **sliders, not a gear** — `area_settings.xml
 its own comment: *"this is a place things are tuned."* Plate uses it verbatim.
 
 It is currently **byte-identical in `Post.Android` and `Score.Android`**: two copies of one
-file, and Plate would be the third. It moves to `Codex.Ui.Android/Resources/drawable/`, which
-every head already merges, and both copies go. Same class of problem as §2.11's five package
-ids — a shared thing living in each consumer instead of in the shared place.
+file, and Plate would be the third. It should move to `Codex.Ui.Android/Resources/drawable/`
+and both copies go — the same problem as §2.11's five package ids, a shared thing living in
+each consumer rather than in the shared place.
+
+**Deferred from Release A to Release B, deliberately.** The claim that "every head already
+merges" that folder turned out to be untested: `Codex.Ui.Android/Resources/drawable/` holds
+exactly one file, `paper_background.xml`, and **no head references it**, so the cross-project
+drawable merge has never actually run in this repo. The Android workload is not installed in
+the sandbox, so the SDK's default glob cannot be inspected here either. Moving it would put
+Post's and Score's builds at risk to fix a duplication Plate does not yet consume — Release A
+adds no binder tabs — and a red first build would then be ambiguous between the rename and
+the glyph, which is the one thing Release A exists to avoid. It moves in Release B, where
+Plate actually uses it and where CI can prove the merge.
 
 Plate's own three area glyphs (Camera, Scan, Darkroom) are new, authored in the suite's
 existing language: a 24-unit viewport, a single filled path, and a one-line comment naming the

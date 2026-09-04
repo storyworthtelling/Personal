@@ -51,6 +51,11 @@ public static class PaperTheme
     public static readonly Color PostMark = Color.ParseColor(DesignTokens.Identity.Post.Mark);
     public static readonly Color PostText = Color.ParseColor(DesignTokens.Identity.Post.Text);
     public static readonly Color PostDeep = Color.ParseColor(DesignTokens.Identity.Post.Deep);
+    public static readonly Color PlateFill = Color.ParseColor(DesignTokens.Identity.Plate.Fill);
+    public static readonly Color PlateGround = Color.ParseColor(DesignTokens.Identity.Plate.Ground);
+    public static readonly Color PlateMark = Color.ParseColor(DesignTokens.Identity.Plate.Mark);
+    public static readonly Color PlateText = Color.ParseColor(DesignTokens.Identity.Plate.Text);
+    public static readonly Color PlateDeep = Color.ParseColor(DesignTokens.Identity.Plate.Deep);
 
     // The fill tiers exist here because §9 cuts an inactive binder tab from its area's
     // own cloth, which is exactly that tier. Resolved is the neutral every app's
