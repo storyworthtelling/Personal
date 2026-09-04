@@ -146,7 +146,8 @@ public class TidalPairingActivity : Activity
         }
         catch (Exception e)
         {
-            Android.Util.Log.Error("TidalPairingActivity", $"RequestDeviceCodeAsync threw: {e}");
+            AudioDiagnostics.LogWarning(
+                "TidalPairingActivity", "Requesting a TIDAL device code failed.", e);
             status = "Couldn't reach TIDAL. Try again in a moment.";
             Render();
             return;
