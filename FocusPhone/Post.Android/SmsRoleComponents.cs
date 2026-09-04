@@ -40,7 +40,11 @@ internal static class SmsRoleComponents
     Name = "com.storyworthtelling.focusphone.communication.SmsDeliverReceiver",
     Exported = true,
     Permission = "android.permission.BROADCAST_SMS")]
-[IntentFilter([SmsRoleComponents.SmsDeliver], DataMimeType = "*/*")]
+// No data type, deliberately. Android resolves a BARE Intent(SMS_DELIVER_ACTION)
+// when deciding who may be the default SMS app, and an untyped intent cannot match a
+// typed filter — a mimeType here disqualifies Post from the role, silently, and stops
+// real incoming texts reaching this receiver. Guarded by FrozenInvariantsTests.
+[IntentFilter([SmsRoleComponents.SmsDeliver])]
 public class SmsDeliverReceiver : BroadcastReceiver
 {
     public override void OnReceive(Context? context, Intent? intent)

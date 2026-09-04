@@ -383,6 +383,45 @@ public class FrozenInvariantsTests
             "included, the phone will not offer it the role and nothing will say so: " + string.Join(", ", missing));
     }
 
+    // Declaring the four components is necessary and NOT sufficient. Android decides
+    // whether Post may hold the SMS role by RESOLVING intents against those filters
+    // (SmsApplication.getApplicationCollectionInternal), and it resolves a BARE
+    // Intent(SMS_DELIVER_ACTION) — no data, no type. An intent carrying no type cannot
+    // match a filter that declares one: IntentFilter returns NO_MATCH_TYPE. So a data
+    // mimeType on the SMS_DELIVER filter silently disqualifies the app.
+    //
+    // Nothing reports it. Post simply never appears in the "default SMS app" list, and
+    // CreateRequestRoleIntent then finishes with no UI at all — the owner taps "Make Post
+    // the texting app" and the phone does nothing whatsoever. It also means the receiver
+    // would never fire for a real incoming text, because the system broadcasts that
+    // untyped too.
+    //
+    // WAP_PUSH_DELIVER is the mirror image: it is resolved WITH the MMS type, and a
+    // filter without that type is the one that fails to match.
+    [Fact]
+    public void TheSmsDeliverFilterCarriesNoDataTypeAndTheMmsOneDoes()
+    {
+        var source = EnumerateRepoFiles("*.cs")
+            .Select(File.ReadAllText)
+            .Single(text => text.Contains(
+                $"\"{PolicyContext.CommunicationPackage}.SmsDeliverReceiver\"", StringComparison.Ordinal));
+
+        var smsFilter = IntentFilters(source)
+            .Single(filter => filter.Contains("SmsDeliver", StringComparison.Ordinal)
+                && !filter.Contains("WapPushDeliver", StringComparison.Ordinal));
+
+        Assert.False(smsFilter.Contains("DataMimeType", StringComparison.Ordinal),
+            "The SMS_DELIVER filter must declare no data type. Android resolves a bare "
+            + "Intent(SMS_DELIVER_ACTION) against it, and an untyped intent never matches a typed "
+            + "filter — so a mimeType here disqualifies Post from the SMS role with nothing said, "
+            + "and stops incoming texts reaching the receiver at all. Filter was: " + smsFilter);
+
+        var mmsFilter = IntentFilters(source)
+            .Single(filter => filter.Contains("WapPushDeliver", StringComparison.Ordinal));
+
+        Assert.Contains("application/vnd.wap.mms-message", mmsFilter, StringComparison.Ordinal);
+    }
+
     // The share-target filter is the only way Google's Call Notes can reach Post: it
     // exports through the share sheet and nowhere else. Invisible when missing and silent
     // when it goes — the note simply never arrives and the owner is left typing it.
