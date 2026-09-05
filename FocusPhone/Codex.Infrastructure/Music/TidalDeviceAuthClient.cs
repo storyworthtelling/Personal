@@ -61,8 +61,16 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
 
     private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNameCaseInsensitive = true };
 
+    /// <summary>
+    /// Asks TIDAL for a device code. <paramref name="clientSecret"/> authenticates the
+    /// client, and is required: RFC 8628 section 3.1 says a confidential client MUST
+    /// authenticate at this endpoint as well as at the token endpoint, and Score is
+    /// confidential because it holds a secret. Only a client registered without one
+    /// passes an empty string, and then no header is sent — an empty Basic credential
+    /// is a different wrong request, not a neutral one.
+    /// </summary>
     public async Task<TidalDeviceAuthorization> RequestDeviceCodeAsync(
-        string clientId, CancellationToken cancellationToken)
+        string clientId, string clientSecret, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, DeviceAuthUrl)
         {
@@ -72,9 +80,24 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
             ]),
         };
 
+        if (!string.IsNullOrEmpty(clientSecret))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue(
+                "Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}")));
+        }
+
         using var response = await httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            // EnsureSuccessStatusCode would drop the body, and the body is the only
+            // part that says WHY. A bare "400" is what sent the last round of this
+            // back with nothing to act on.
+            throw new HttpRequestException(
+                $"TIDAL device_authorization refused the request with {(int)response.StatusCode} " +
+                $"{response.StatusCode}: {Describe(json)}");
+        }
+
         var reply = JsonSerializer.Deserialize<DeviceAuthReply>(json, SerializerOptions)
             ?? throw new HttpRequestException("TIDAL device_authorization returned an empty body.");
 
@@ -146,6 +169,33 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
         }
     }
 
+    // OAuth errors are {"error","error_description"}; anything else is quoted whole so
+    // an unexpected shape still reaches the person reading the log.
+    private static string Describe(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return "(empty body)";
+        }
+
+        try
+        {
+            var reply = JsonSerializer.Deserialize<ErrorReply>(body, SerializerOptions);
+            if (!string.IsNullOrWhiteSpace(reply?.Error))
+            {
+                return string.IsNullOrWhiteSpace(reply.ErrorDescription)
+                    ? reply.Error
+                    : $"{reply.Error} — {reply.ErrorDescription}";
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON. The raw body is still the most useful thing to carry.
+        }
+
+        return body.Length > 400 ? body[..400] : body;
+    }
+
     private async Task<TidalTokenPollResult> PostToken(
         string clientId, string clientSecret, FormUrlEncodedContent content, CancellationToken cancellationToken)
     {
@@ -186,4 +236,8 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
         TokenUser? User);
 
     private sealed record TokenUser(long UserId);
+
+    private sealed record ErrorReply(
+        string? Error,
+        [property: JsonPropertyName("error_description")] string? ErrorDescription);
 }

@@ -25,7 +25,7 @@ public class TidalDeviceAuthClientTests
              "expiresIn":300,"interval":2}
             """);
 
-        var auth = await client.RequestDeviceCodeAsync("client-id", CancellationToken.None);
+        var auth = await client.RequestDeviceCodeAsync("client-id", "secret", CancellationToken.None);
 
         Assert.Equal("d-123", auth.DeviceCode);
         Assert.Equal("ABCD-EFGH", auth.UserCode);
@@ -42,11 +42,66 @@ public class TidalDeviceAuthClientTests
         handler.Respond(DeviceAuthUrl,
             """{"deviceCode":"d","userCode":"u","verificationUri":"v","verificationUriComplete":"vc","expiresIn":1,"interval":1}""");
 
-        await client.RequestDeviceCodeAsync("client-id", CancellationToken.None);
+        await client.RequestDeviceCodeAsync("client-id", "secret", CancellationToken.None);
 
         var request = handler.Requests.Single();
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("client_id=client-id&scope=r_usr+w_usr+w_sub", handler.RequestBodies.Single());
+    }
+
+    // RFC 8628 section 3.1: a confidential client MUST authenticate at the device
+    // authorization endpoint too, the same way it does at the token endpoint. Score
+    // holds a client secret, so it is confidential — and it was sending none here,
+    // which is what TIDAL answered 400 to on device.
+    [Fact]
+    public async Task RequestDeviceCodeAsync_AuthenticatesTheClientLikeTheTokenEndpointDoes()
+    {
+        var (client, handler) = Build();
+        handler.Respond(DeviceAuthUrl,
+            """{"deviceCode":"d","userCode":"u","verificationUri":"v","verificationUriComplete":"vc","expiresIn":1,"interval":1}""");
+
+        await client.RequestDeviceCodeAsync("client-id", "the-secret", CancellationToken.None);
+
+        var auth = handler.Requests.Single().Headers.Authorization;
+        Assert.NotNull(auth);
+        Assert.Equal("Basic", auth.Scheme);
+        Assert.Equal(
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("client-id:the-secret")),
+            auth.Parameter);
+    }
+
+    // A public client — no secret — must NOT send an empty Basic header, which is a
+    // different and equally wrong request.
+    [Fact]
+    public async Task RequestDeviceCodeAsync_WithNoSecret_SendsNoAuthorizationHeader()
+    {
+        var (client, handler) = Build();
+        handler.Respond(DeviceAuthUrl,
+            """{"deviceCode":"d","userCode":"u","verificationUri":"v","verificationUriComplete":"vc","expiresIn":1,"interval":1}""");
+
+        await client.RequestDeviceCodeAsync("client-id", clientSecret: "", CancellationToken.None);
+
+        Assert.Null(handler.Requests.Single().Headers.Authorization);
+    }
+
+    // The 400 that started this said only "400". TIDAL puts the reason in the body,
+    // and EnsureSuccessStatusCode threw it away — the same mistake as logging to a
+    // console nobody can read, one layer down.
+    [Fact]
+    public async Task RequestDeviceCodeAsync_OnAnErrorReply_CarriesTidalsOwnExplanation()
+    {
+        var (client, handler) = Build();
+        handler.Respond(
+            DeviceAuthUrl,
+            """{"error":"invalid_scope","error_description":"w_sub is not permitted for this client"}""",
+            status: System.Net.HttpStatusCode.BadRequest);
+
+        var thrown = await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.RequestDeviceCodeAsync("client-id", "secret", CancellationToken.None));
+
+        Assert.Contains("400", thrown.Message);
+        Assert.Contains("invalid_scope", thrown.Message);
+        Assert.Contains("w_sub is not permitted for this client", thrown.Message);
     }
 
     [Fact]
