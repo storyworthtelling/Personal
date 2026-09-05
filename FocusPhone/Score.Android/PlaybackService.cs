@@ -87,7 +87,7 @@ public class PlaybackService : MediaLibraryService
         // Drive-backed music (drive://{fileId}) resolves to an authed download URL per
         // open; podcast http(s) URIs pass through. One factory serves both sides.
         var resolvingFactory = new ResolvingDataSource.Factory(
-            new DefaultHttpDataSource.Factory(),
+            PodcastAudioSource.Factory(),
             new DriveMediaResolver(new DeviceAccountTokenProvider()));
 
         // Read through the download cache: anything downloaded plays from disk and

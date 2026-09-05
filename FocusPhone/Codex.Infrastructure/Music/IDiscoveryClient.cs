@@ -29,7 +29,12 @@ public interface IDiscoveryClient
     /// rather than a rating, so it can cross over without the workout teaching the
     /// taste profile anything.
     /// </param>
-    Task<DiscoverySelection> FridayPicksAsync(
-        TasteProfile profile, IReadOnlyList<Track> catalog, int maxTracks,
+    /// <param name="owned">
+    /// What the listener already has. Evidence of taste and an <b>exclusion list</b> —
+    /// never the source. The crate exists to name records that are not on the shelf,
+    /// so a pick drawn from this is the one thing it must not return.
+    /// </param>
+    Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
+        TasteProfile profile, IReadOnlyList<Track> owned, int maxTracks,
         string? note, CancellationToken cancellationToken);
 }

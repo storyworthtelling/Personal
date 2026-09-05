@@ -21,6 +21,13 @@ public interface IShelfArt
     /// <summary>The book's cloth/binding color (ARGB int) — its spine and fallback cover ground.</summary>
     int Cloth(string packageKey);
 
+    /// <summary>
+    /// True when this book's binding is light enough that the plate's marks — rule,
+    /// corner flourishes, window keyline and title — have to be drawn in ink instead
+    /// of paper (DESIGN.md §12).
+    /// </summary>
+    bool MarksInvertToInk(string packageKey);
+
     /// <summary>True while the app has an active notification, so a bookmark tab is drawn.</summary>
     bool HasNotification(string packageKey);
 }
