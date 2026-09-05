@@ -37,5 +37,8 @@
     <!-- Reading a card or a statement when another app asks. On-device OCR: nothing Plate
          is handed to read leaves the phone to be recognised. -->
     <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" Version="116.0.1.9" />
+    <!-- Finding faces. ML Kit DETECTS a face; it does not say whose it is, so recognition
+         needs an embedding model behind IFaceEmbedder — see FaceRecogniser. -->
+    <PackageReference Include="Xamarin.Google.MLKit.FaceDetection" Version="116.1.7.9" />
   </ItemGroup>
 </Project>
