@@ -10,8 +10,16 @@ namespace Codex.Domain.Plate;
 /// </summary>
 public sealed record KnownPerson(string ContactId, string Name, IReadOnlyList<float[]> Faces);
 
-/// <summary>Who a face belongs to, or nobody.</summary>
-public readonly record struct FaceMatch(string ContactId, string Name)
+/// <summary>
+/// Who a face belongs to, or nobody — and how close the call was.
+///
+/// <para><see cref="Closeness"/> is carried so the owner can <b>see</b> it. The threshold
+/// below it is assumed rather than measured, and a number nobody can read is a number nobody
+/// can calibrate: P7 shipped a test step asking whether mail "was sorted" when nothing on any
+/// screen showed a message's class, and it was unanswerable. This is that lesson applied
+/// before the same mistake is made twice.</para>
+/// </summary>
+public readonly record struct FaceMatch(string ContactId, string Name, double Closeness = 1)
 {
     public static readonly FaceMatch Unknown = new(string.Empty, string.Empty);
 
@@ -99,7 +107,7 @@ public sealed record FaceBook
                 if (distance < bestDistance)
                 {
                     bestDistance = distance;
-                    best = new FaceMatch(person.ContactId, person.Name);
+                    best = new FaceMatch(person.ContactId, person.Name, distance);
                 }
             }
         }
