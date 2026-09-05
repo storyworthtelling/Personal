@@ -104,6 +104,60 @@ public class TidalDeviceAuthClientTests
         Assert.Contains("w_sub is not permitted for this client", thrown.Message);
     }
 
+    // The browser flow's one network call: the code the redirect carried, plus the
+    // verifier that never left the phone, exchanged for tokens.
+    [Fact]
+    public async Task ExchangeCodeAsync_SendsTheCodeTheVerifierAndTheRedirect()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TokenUrl, """
+            {"access_token":"acc","refresh_token":"ref","token_type":"Bearer","expires_in":604800,
+             "user":{"userId":12345,"countryCode":"US"}}
+            """);
+
+        var result = await client.ExchangeCodeAsync(
+            "cid", "secret", "the-code", "the-verifier", "app://back", CancellationToken.None);
+
+        Assert.Equal(TidalTokenPollStatus.Success, result.Status);
+        Assert.Equal("ref", result.RefreshToken);
+        Assert.Equal("12345", result.UserId);
+
+        var body = handler.RequestBodies.Single();
+        Assert.Contains("grant_type=authorization_code", body);
+        Assert.Contains("code=the-code", body);
+        Assert.Contains("code_verifier=the-verifier", body);
+        Assert.Contains("redirect_uri=app%3A%2F%2Fback", body);
+    }
+
+    [Fact]
+    public async Task ExchangeCodeAsync_AuthenticatesTheClient()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TokenUrl, """{"access_token":"a","refresh_token":"r","expires_in":1}""");
+
+        await client.ExchangeCodeAsync("cid", "sec", "c", "v", "app://back", CancellationToken.None);
+
+        var auth = handler.Requests.Single().Headers.Authorization;
+        Assert.Equal("Basic", auth!.Scheme);
+        Assert.Equal(
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("cid:sec")),
+            auth.Parameter);
+    }
+
+    // A refused exchange must not read as a signed-in account with no tokens in it.
+    [Fact]
+    public async Task ExchangeCodeAsync_OnARefusal_IsNotASuccess()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TokenUrl, """{"error":"invalid_grant"}""", status: System.Net.HttpStatusCode.BadRequest);
+
+        var result = await client.ExchangeCodeAsync(
+            "cid", "sec", "c", "v", "app://back", CancellationToken.None);
+
+        Assert.NotEqual(TidalTokenPollStatus.Success, result.Status);
+        Assert.Null(result.RefreshToken);
+    }
+
     [Fact]
     public async Task PollAsync_OnSuccessReadsTheTokensAndTheAccountId()
     {

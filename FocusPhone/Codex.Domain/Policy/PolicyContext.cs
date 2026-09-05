@@ -115,5 +115,9 @@ public record PolicyContext(
         "githubusercontent.com",
         // reMarkable account.
         "remarkable.com",
+        // TIDAL sign-in. login.tidal.com is the page the owner types a password into;
+        // auth.tidal.com issues the tokens. Score has to use this browser flow because
+        // TIDAL reserves its device-code flow for its own apps.
+        "tidal.com",
     ];
 }
