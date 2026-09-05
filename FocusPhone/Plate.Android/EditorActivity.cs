@@ -167,7 +167,11 @@ public class EditorActivity : AppCompatActivity
         // §13: something waiting, not something to interrupt with. The fold carries it.
         DogEar.SetNotice(this, overlay, "face", new DogEar.Notice(
             $"Is this {match.Name}?",
-            "Saying yes teaches it. Saying nothing changes nothing.",
+            // The closeness is on screen because the threshold behind it is assumed rather
+            // than measured, and the owner is the only one who can calibrate it — which
+            // they cannot do against a number nobody shows them.
+            $"Saying yes teaches it. Saying nothing changes nothing. (closeness "
+                + $"{match.Closeness:0.00} of {FaceBook.SameFace:0.00})",
             PaperTheme.ProgressMark,
             "Yes, that is them",
             () =>

@@ -170,4 +170,21 @@ public class FaceBookTests
 
         Assert.Equal(FaceBook.FacesPerPerson, book.People.Single().Faces.Count);
     }
+
+    [Fact]
+    public void AMatchCarriesHowCloseItWasSoItCanBeCalibrated()
+    {
+        // The threshold is assumed, not measured, and a number nobody can read is a number
+        // nobody can calibrate. This is what makes the on-device step answerable.
+        var exact = WithAshley().Nearest(Near(1, 0, 0));
+
+        Assert.Equal(0, exact.Closeness, 6);
+        Assert.True(exact.Closeness <= FaceBook.SameFace);
+    }
+
+    [Fact]
+    public void NobodyCarriesNoClosenessWorthReading()
+    {
+        Assert.Equal(FaceMatch.Unknown, WithAshley().Nearest(Near(0, 1, 0)));
+    }
 }
