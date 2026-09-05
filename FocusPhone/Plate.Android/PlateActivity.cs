@@ -214,9 +214,54 @@ public class PlateActivity : AppCompatActivity
     /// <summary>Tries a scan's handoff again. Wired in the next increment.</summary>
     public void RetryScan(DarkroomItem scan) => Room = Room.WithAttempt(scan.Id);
 
-    /// <summary>Opens one picture in the editor. Wired in the next increment.</summary>
+    /// <summary>
+    /// Opens one picture in the editor. It comes back sent, deleted, or untouched — the
+    /// editor writes nothing on the way out, so backing out really does leave it as taken.
+    /// </summary>
     public void OpenEditor(DarkroomItem item)
     {
+        var intent = new Intent(this, typeof(EditorActivity));
+        intent.PutExtra(EditorActivity.ItemExtra, item.Id);
+        intent.PutExtra(EditorActivity.CaptionExtra, item.Caption);
+        StartActivityForResult(intent, EditorRequest);
+    }
+
+    private const int EditorRequest = 31;
+
+    private void EditorReturned(Result resultCode, Intent? data)
+    {
+        var id = data?.GetStringExtra(EditorActivity.ItemExtra);
+        var item = Room.Items.FirstOrDefault(entry => entry.Id == id);
+        if (item is null)
+        {
+            return;
+        }
+
+        // Take it out by picking it and using the same path the grid does, so there is one
+        // way a thing leaves the room rather than two that can disagree.
+        Room = Room.Choose(item.Id);
+        var (remaining, taken) = Room.TakeChosen();
+        Room = remaining;
+
+        if ((int)resultCode == EditorActivity.SentResult)
+        {
+            Send(taken);
+        }
+        else if ((int)resultCode == EditorActivity.DeletedResult)
+        {
+            // The same undo the grid's delete gets: the act happens, the fold carries it,
+            // and the bytes outlive the row.
+            DogEar.Show(this, content, "1 deleted.", () =>
+            {
+                Room = Room.Restore(taken);
+                RenderContent();
+            });
+            ForgetWhenTheFoldCloses(taken);
+        }
+        else
+        {
+            Room = Room.Restore(taken);
+        }
     }
 
     /// <summary>The captions. Wired in the next increment.</summary>
@@ -348,6 +393,12 @@ public class PlateActivity : AppCompatActivity
         if (requestCode == VoiceGoogleAccount.RequestCode)
         {
             VoiceGoogleAccount.HandleChooserResult(resultCode, data);
+        }
+
+        if (requestCode == EditorRequest)
+        {
+            EditorReturned(resultCode, data);
+            return;
         }
 
         foreach (var area in areas)
