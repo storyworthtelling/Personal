@@ -608,4 +608,71 @@ public class FrozenInvariantsTests
         Assert.Contains("Codex.Ui.Android", glyphs[0], StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Plate declares the full camera component set so nothing on this phone opens a
+    /// different camera, and adds the two reads another app can ask it for.
+    ///
+    /// <para>This is the ROLE_SMS shape from P7 with the same trap: <b>Android silently
+    /// omits an app missing a component</b>, with no warning — it simply never appears in
+    /// the list of apps that can take a picture. So the assertion reads the
+    /// <c>[IntentFilter]</c> attributes themselves rather than the file, which is the exact
+    /// hole a P7 guard fell through: it passed with the attribute deleted, because the
+    /// action string was also present in a comment.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("android.media.action.IMAGE_CAPTURE")]
+    [InlineData("android.media.action.IMAGE_CAPTURE_SECURE")]
+    [InlineData("android.media.action.VIDEO_CAPTURE")]
+    [InlineData("android.media.action.STILL_IMAGE_CAMERA")]
+    [InlineData("android.media.action.STILL_IMAGE_CAMERA_SECURE")]
+    [InlineData("com.storyworthtelling.plate.action.READ_CARD")]
+    [InlineData("com.storyworthtelling.plate.action.READ_STATEMENT")]
+    public void PlateDeclaresEveryCameraComponentWithItsIntentFilter(string action)
+    {
+        // The constants are referenced by name in the attributes, so the filter text holds
+        // the identifier rather than the literal; either spelling counts as declared.
+        var constant = "Errands." + action.Split('.').Last()
+            .Split('_')
+            .Select(word => char.ToUpperInvariant(word[0]) + word[1..].ToLowerInvariant())
+            .Aggregate(string.Empty, (all, word) => all + word);
+
+        var declared = EnumerateRepoFiles("*.cs")
+            .Where(file => RepoRelative(file).Contains("Plate.Android", StringComparison.Ordinal))
+            .SelectMany(file => IntentFilters(File.ReadAllText(file)))
+            .Any(filter =>
+                filter.Contains(action, StringComparison.Ordinal)
+                || filter.Contains(constant, StringComparison.Ordinal)
+                || filter.Contains(ReadRequestMember(action), StringComparison.Ordinal));
+
+        Assert.True(declared,
+            $"No Plate component declares an [IntentFilter] for {action}. Android will "
+            + "silently leave Plate out of the list of apps that can do this, with no warning.");
+    }
+
+    /// <summary>
+    /// Post's attachment route. Without this filter, Attachments.cs setting the package
+    /// produces an activity-not-found rather than a picture.
+    /// </summary>
+    [Fact]
+    public void PlateDeclaresTheImageViewFilterPostsAttachmentsDependOn()
+    {
+        var declared = EnumerateRepoFiles("*.cs")
+            .Where(file => RepoRelative(file).Contains("Plate.Android", StringComparison.Ordinal))
+            .SelectMany(file => IntentFilters(File.ReadAllText(file)))
+            .Any(filter =>
+                filter.Contains("Intent.ActionView", StringComparison.Ordinal)
+                && filter.Contains("\"image/*\"", StringComparison.Ordinal));
+
+        Assert.True(declared,
+            "Plate declares no ACTION_VIEW image/* filter, so Post handing over an "
+            + "attachment gets an activity-not-found rather than a picture.");
+    }
+
+    private static string ReadRequestMember(string action) => action switch
+    {
+        "com.storyworthtelling.plate.action.READ_CARD" => "ReadRequest.ReadCard",
+        "com.storyworthtelling.plate.action.READ_STATEMENT" => "ReadRequest.ReadStatement",
+        _ => action,
+    };
+
 }
