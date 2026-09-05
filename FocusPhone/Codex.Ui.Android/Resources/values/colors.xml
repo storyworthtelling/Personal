@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paper & Ink palette. Kept in parity with Codex.Domain.Design.DesignTokens
+     (and DESIGN.md at the repo root) by Codex.Tests/Design/TokenParityTests. -->
+<resources>
+    <color name="paper">#FAF8F2</color>
+    <color name="paperBright">#FFFFFF</color>
+    <color name="paperDeep">#F1EBDD</color>
+    <color name="paperShade">#E9E1CF</color>
+    <color name="hairline">#E3DCC9</color>
+    <color name="ink">#33322B</color>
+    <color name="inkSoft">#6B6759</color>
+    <color name="inkMuted">#8A8578</color>
+    <color name="accent">#38734A</color>
+    <color name="accentDeep">#174025</color>
+</resources>
