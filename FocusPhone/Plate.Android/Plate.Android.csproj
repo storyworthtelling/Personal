@@ -32,5 +32,8 @@
     <PackageReference Include="Xamarin.AndroidX.AppCompat" Version="1.7.1.3" />
     <PackageReference Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.6" />
     <PackageReference Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.2" />
+    <!-- Reading a card or a statement when another app asks. On-device OCR: nothing Plate
+         is handed to read leaves the phone to be recognised. -->
+    <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" Version="116.0.1.9" />
   </ItemGroup>
 </Project>
