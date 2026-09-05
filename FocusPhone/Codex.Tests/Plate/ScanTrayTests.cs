@@ -17,6 +17,8 @@ namespace Codex.Tests.Plate;
 /// </summary>
 public class ScanTrayTests
 {
+    private static readonly DateTime Noon = new(2026, 9, 4, 12, 34, 56, DateTimeKind.Local);
+
     [Fact]
     public void GooglesPerRunCapIsTheReasonThisTypeExists()
     {
@@ -42,7 +44,7 @@ public class ScanTrayTests
     {
         var tray = ScanTray.For(ScanDestination.Drive).Add(["a.jpg", "b.jpg", "c.jpg"]);
 
-        Assert.Equal(["a.jpg", "b.jpg", "c.jpg"], tray.Pages);
+        Assert.Equal(["a.jpg", "b.jpg", "c.jpg"], References(tray));
         Assert.Equal(3, tray.Count);
         Assert.True(tray.HasPages);
     }
@@ -56,7 +58,7 @@ public class ScanTrayTests
             .Add(["1.jpg", "2.jpg"])
             .Add(["3.jpg"]);
 
-        Assert.Equal(["1.jpg", "2.jpg", "3.jpg"], tray.Pages);
+        Assert.Equal(["1.jpg", "2.jpg", "3.jpg"], References(tray));
     }
 
     [Fact]
@@ -70,8 +72,8 @@ public class ScanTrayTests
         }
 
         Assert.Equal(150, tray.Count);
-        Assert.Equal("run0-page0.jpg", tray.Pages[0]);
-        Assert.Equal("run2-page49.jpg", tray.Pages[149]);
+        Assert.Equal("run0-page0.jpg", tray.Pages[0].Reference);
+        Assert.Equal("run2-page49.jpg", tray.Pages[149].Reference);
     }
 
     [Fact]
@@ -79,7 +81,56 @@ public class ScanTrayTests
     {
         var tray = ScanTray.For(ScanDestination.Drive).Add(["a.jpg"]);
 
-        Assert.Equal(tray.Pages, tray.Add([]).Pages);
+        Assert.Equal(References(tray), References(tray.Add([])));
+    }
+
+    [Fact]
+    public void EachPageRemembersWhenItWasScanned()
+    {
+        // The tray screen lists the pages as "Page 2 · scanned 4:39 PM", which is the only
+        // way to tell two near-identical sheets apart when a long scan goes wrong.
+        var tray = ScanTray.For(ScanDestination.Drive).Add(["a.jpg"], Noon);
+
+        Assert.Equal("a.jpg", tray.Pages[0].Reference);
+        Assert.Equal(Noon, tray.Pages[0].ScannedAt);
+    }
+
+    [Fact]
+    public void APageCanBeMovedEarlierOrLater()
+    {
+        // Scanning a stack out of order is ordinary. Reordering has to be possible without
+        // rescanning, or a single misfed sheet costs the whole document.
+        var tray = ScanTray.For(ScanDestination.Drive).Add(["a.jpg", "b.jpg", "c.jpg"]);
+
+        Assert.Equal(["b.jpg", "a.jpg", "c.jpg"], References(tray.Move(0, 1)));
+        Assert.Equal(["a.jpg", "c.jpg", "b.jpg"], References(tray.Move(2, 1)));
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(0, -1)]
+    [InlineData(3, 0)]
+    [InlineData(0, 3)]
+    [InlineData(1, 1)]
+    public void MovingAPageNowhereLeavesTheTrayAlone(int from, int to)
+    {
+        // Moving the first page up, or the last page down, is a tap people make constantly.
+        // It has to do nothing rather than throw away a scan in progress.
+        var tray = ScanTray.For(ScanDestination.Drive).Add(["a.jpg", "b.jpg", "c.jpg"]);
+
+        Assert.Equal(["a.jpg", "b.jpg", "c.jpg"], References(tray.Move(from, to)));
+    }
+
+    [Fact]
+    public void MovingAPageCarriesItsTimeWithIt()
+    {
+        var tray = ScanTray.For(ScanDestination.Drive)
+            .Add(["a.jpg"], Noon)
+            .Add(["b.jpg"], Noon.AddMinutes(1))
+            .Move(1, 0);
+
+        Assert.Equal("b.jpg", tray.Pages[0].Reference);
+        Assert.Equal(Noon.AddMinutes(1), tray.Pages[0].ScannedAt);
     }
 
     [Fact]
@@ -89,7 +140,7 @@ public class ScanTrayTests
             .Add(["a.jpg", "b.jpg", "c.jpg"])
             .RemoveAt(1);
 
-        Assert.Equal(["a.jpg", "c.jpg"], tray.Pages);
+        Assert.Equal(["a.jpg", "c.jpg"], References(tray));
     }
 
     [Theory]
@@ -102,7 +153,7 @@ public class ScanTrayTests
         // rebuilt. Losing the whole tray to an exception would be far worse than a no-op.
         var tray = ScanTray.For(ScanDestination.Drive).Add(["a.jpg", "b.jpg"]);
 
-        Assert.Equal(["a.jpg", "b.jpg"], tray.RemoveAt(index).Pages);
+        Assert.Equal(["a.jpg", "b.jpg"], References(tray.RemoveAt(index)));
     }
 
     [Fact]
@@ -127,4 +178,7 @@ public class ScanTrayTests
 
         Assert.Empty(tray.Pages);
     }
+
+    private static IReadOnlyList<string> References(ScanTray tray) =>
+        [.. tray.Pages.Select(page => page.Reference)];
 }

@@ -1,31 +1,26 @@
 using Android.App;
 using Android.Content;
-using Android.Graphics;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
 using AndroidX.AppCompat.App;
-using AndroidX.Camera.Core;
-using AndroidX.Camera.Lifecycle;
-using AndroidX.Camera.View;
-using AndroidX.Core.Content;
-using Google.MLKit.Vision.Documentscanner;
-using Xamarin.Google.MLKit.Vision.BarCode;
-using Xamarin.Google.MLKit.Vision.Barcode.Common;
-using Xamarin.Google.MLKit.Vision.Common;
 using Codex.Domain.Design;
-using Codex.Domain.Plate;
-using Codex.Domain.Time;
 using Codex.Ui;
-using Storyworthtelling.Paper;
 
 namespace Plate;
 
 /// <summary>
-/// Photo capture (CameraX preview + capture to MediaStore so Google Photos
-/// backs everything up), ML Kit document scanning, and QR scanning. QR
-/// results that are URLs fire a plain VIEW intent, which the device-owner
-/// policy routes into the launcher's restricted browser.
+/// Plate's app shell, and only the shell: the frame, the binder gutter, and which area is
+/// showing. It holds no capture, page or setting state of its own — each
+/// <see cref="PlateArea"/> owns what it shows.
+///
+/// <para>The one thing no area can own is the camera, because two of them want it and a
+/// sensor cannot be bound twice. So the shell holds it (<see cref="PlateCamera"/>) and
+/// hands it to whichever area is on screen.</para>
+///
+/// <para>There is deliberately no voiced greeting here. Plate's voice belongs to the
+/// Darkroom's captions and its empty state, which is Release C; a greeting over a live
+/// viewfinder would be the voice standing next to content, which §14 rules out.</para>
 /// </summary>
 [Activity(
     Label = "Plate",
@@ -35,423 +30,176 @@ namespace Plate;
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class PlateActivity : AppCompatActivity
 {
-    private const int DocumentScanRequest = 1;
+    /// <summary>The one holder of the camera. Areas ask it for a preview; nobody else binds.</summary>
+    public PlateCamera Camera { get; private set; } = null!;
 
-    // Google's scanner returns page rasters at roughly letter width; declaring them at 200
-    // DPI puts a scanned page on paper at about the size it was scanned from, rather than
-    // PdfSharp's default 96 DPI, which would print it half again too large.
-    private const int ScanDpi = 200;
+    private PlateArea[] areas = [];
+    private int activeIndex;
 
-    private PreviewView? previewView;
-    private ImageCapture? imageCapture;
-    private TextView? statusLine;
-    private FrameLayout? actionSlot;
+    private FrameLayout content = null!;
+    private FrameLayout bottomBarSlot = null!;
+    private BinderTabs binder = null!;
+    private LinearLayout headerSlot = null!;
 
-    // Null until the owner picks a door; the pages gathered so far once they have.
-    private ScanTray? scan;
+    private PlateArea Active => areas[activeIndex];
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
+
+        Camera = new PlateCamera(this);
+        areas =
+        [
+            new CameraArea(this),
+            new ScanArea(this),
+            new SettingsArea(this),
+        ];
+        foreach (var area in areas)
+        {
+            var which = area;
+            area.Changed += () => { if (Active == which) RenderContent(); };
+        }
+
         SetContentView(BuildLayout());
 
-        if (CheckSelfPermission(Android.Manifest.Permission.Camera) == Android.Content.PM.Permission.Granted)
-        {
-            StartCamera();
-        }
-        else
+        if (CheckSelfPermission(Android.Manifest.Permission.Camera)
+            != Android.Content.PM.Permission.Granted)
         {
             RequestPermissions([Android.Manifest.Permission.Camera], 0);
         }
 
         CrashReporter.ShowPendingCrash(this);
+        RenderContent();
+        Active.OnShown(true);
+    }
+
+    private View BuildLayout()
+    {
+        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
+
+        // The page, and the binder gutter down its right edge. Everything above the bottom
+        // bar lives inside the page; the tabs sit outside it, which is what stops them ever
+        // overlapping content (§9's reserved gutter). The bottom bar is added to the root
+        // after the spread, so it spans the full width, under the gutter too.
+        var spread = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        var page = new LinearLayout(this) { Orientation = Orientation.Vertical };
+
+        headerSlot = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        headerSlot.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        page.AddView(headerSlot);
+
+        content = new FrameLayout(this);
+        foreach (var area in areas)
+        {
+            area.Overlay = content; // dog-ears and action cards overlay the content frame
+        }
+
+        content.SetPadding(edge, 0, edge, 0);
+        page.AddView(content, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        spread.AddView(page, new LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.MatchParent) { Weight = 1 });
+
+        binder = new BinderTabs(this);
+        binder.SetAreas(areas.Select(area => area.Tab), activeIndex);
+        binder.AreaSelected += index =>
+        {
+            // Tapping the tab you are already on returns that area to its root, which is why
+            // this is not guarded on the index having changed.
+            if (index == activeIndex)
+            {
+                while (Active.GoBack())
+                {
+                }
+                RenderContent();
+                return;
+            }
+
+            Active.OnShown(false);
+            activeIndex = index;
+            binder.SetActive(index);
+            RenderContent();
+            Active.OnShown(true);
+        };
+        spread.AddView(binder, new LinearLayout.LayoutParams(
+            PaperTheme.Dp(this, BinderTabs.WidthDp), ViewGroup.LayoutParams.MatchParent));
+
+        root.AddView(spread, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        // A slot rather than a bar: each area supplies its own actions, and an area with
+        // none simply leaves it empty.
+        bottomBarSlot = new FrameLayout(this);
+        root.AddView(bottomBarSlot);
+        return root;
+    }
+
+    private void RenderContent()
+    {
+        headerSlot.RemoveAllViews();
+        headerSlot.AddView(PaperUi.ScreenHeader(this, Active.Title, Active.Tab.Hue));
+
+        content.RemoveAllViews();
+        content.AddView(Active.BuildView(), new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        bottomBarSlot.RemoveAllViews();
+        if (Active.BuildBottomBar() is { } bar)
+        {
+            bottomBarSlot.AddView(bar);
+        }
+    }
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+        foreach (var area in areas)
+        {
+            area.Resume();
+        }
+        RenderContent();
+        Active.OnShown(true);
+    }
+
+    protected override void OnPause()
+    {
+        base.OnPause();
+        foreach (var area in areas)
+        {
+            area.Pause();
+        }
+    }
+
+    public override void OnBackPressed()
+    {
+        // The area gets first refusal — only it knows whether it is drilled into something.
+        if (Active.GoBack())
+        {
+            RenderContent();
+            return;
+        }
+        base.OnBackPressed();
     }
 
     public override void OnRequestPermissionsResult(int requestCode, string[] permissions,
         Android.Content.PM.Permission[] grantResults)
     {
         base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (grantResults.FirstOrDefault() == Android.Content.PM.Permission.Granted)
+        foreach (var area in areas)
         {
-            StartCamera();
+            area.OnPermissionsResult();
         }
-    }
-
-    private View BuildLayout()
-    {
-        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-
-        previewView = new PreviewView(this);
-        root.AddView(previewView, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
-
-        // Quiet inline status replaces success toasts (DESIGN.md §7).
-        statusLine = PaperUi.Secondary(this, "");
-        statusLine.Gravity = GravityFlags.CenterHorizontal;
-        statusLine.Visibility = ViewStates.Gone;
-        root.AddView(statusLine, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
-
-        // The bar is swapped rather than the screen: picking a scan destination and gathering
-        // pages are steps within the camera, not places to go. §7 bans the dialog that would
-        // otherwise ask.
-        actionSlot = new FrameLayout(this);
-        root.AddView(actionSlot, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
-        ShowCaptureBar();
-        return root;
-    }
-
-    private void SetActions(params View[] actions)
-    {
-        actionSlot!.RemoveAllViews();
-        actionSlot.AddView(PaperUi.BottomBar(this, actions));
-    }
-
-    private void ShowCaptureBar()
-    {
-        scan = null;
-        SetActions(
-            PaperUi.PrimaryButton(this, "Capture", TakePhoto),
-            PaperUi.SecondaryButton(this, "Scan doc", ShowScanDestinations),
-            PaperUi.SecondaryButton(this, "Scan QR", StartQrScan),
-            PaperUi.SecondaryButton(this, "Photos", OpenGooglePhotos));
-    }
-
-    // Where a scan is going is picked before the scanner opens, so the owner is never left
-    // holding a finished document with nowhere obvious to put it.
-    private void ShowScanDestinations()
-    {
-        ShowStatus("Where is this going?");
-        SetActions(
-            PaperUi.SecondaryButton(this, "Drive", () => BeginScan(ScanDestination.Drive)),
-            PaperUi.SecondaryButton(this, "Post", () => BeginScan(ScanDestination.Post)),
-            PaperUi.SecondaryButton(this, "reMarkable", () => BeginScan(ScanDestination.Remarkable)),
-            PaperUi.SecondaryButton(this, "Back", () =>
-            {
-                HideStatus();
-                ShowCaptureBar();
-            }));
-    }
-
-    private void ShowScanBar()
-    {
-        var pages = scan!.Count;
-        SetActions(
-            PaperUi.PrimaryButton(this, pages > 0 ? "Save" : "Scan pages", SaveScan),
-            PaperUi.SecondaryButton(this, "Add pages", StartDocumentScan),
-            PaperUi.SecondaryButton(this, "Discard", () =>
-            {
-                HideStatus();
-                ShowCaptureBar();
-            }));
-    }
-
-    private void ShowStatus(string message)
-    {
-        statusLine!.Text = message;
-        statusLine.Visibility = ViewStates.Visible;
-    }
-
-    private void HideStatus()
-    {
-        statusLine!.Visibility = ViewStates.Gone;
-    }
-
-    private void StartCamera()
-    {
-        var providerFuture = ProcessCameraProvider.GetInstance(this);
-        providerFuture.AddListener(new Java.Lang.Runnable(() =>
-        {
-            var provider = (ProcessCameraProvider)providerFuture.Get()!;
-            var preview = new Preview.Builder().Build();
-            preview.SurfaceProvider = previewView!.SurfaceProvider;
-            imageCapture = new ImageCapture.Builder().Build();
-            provider.UnbindAll();
-            provider.BindToLifecycle(this, CameraSelector.DefaultBackCamera!, preview, imageCapture);
-        }), ContextCompat.GetMainExecutor(this));
-    }
-
-    private void TakePhoto()
-    {
-        if (imageCapture is null)
-        {
-            return;
-        }
-
-        // WHERE this lands is the phase's live bug, and it is decided in Codex.Domain
-        // (CaptureFiling) rather than here: without RELATIVE_PATH the Images collection
-        // files under its default Pictures/, and Google Photos backs up DCIM/Camera while
-        // treating every other device folder as opt-in — so every photo this app ever took
-        // was on the phone and outside backup.
-        var entry = CaptureFiling.Photo(DateTime.Now);
-        var values = new ContentValues();
-        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, entry.DisplayName);
-        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, entry.MimeType);
-        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, entry.RelativePath);
-        var options = new ImageCapture.OutputFileOptions.Builder(
-            ContentResolver!, Android.Provider.MediaStore.Images.Media.ExternalContentUri!, values).Build();
-
-        imageCapture.TakePicture(options, ContextCompat.GetMainExecutor(this),
-            new CaptureCallback(this));
-    }
-
-    private void BeginScan(ScanDestination destination)
-    {
-        scan = ScanTray.For(destination);
-        StartDocumentScan();
-    }
-
-    private void StartDocumentScan()
-    {
-        // JPEG only. Plate no longer takes the scanner's finished PDF: that PDF is capped at
-        // one run's worth of pages, and the owner wants to scan much more than that. The page
-        // rasters are asked for one run at a time and gathered in the tray until the document
-        // is whole; PdfVolumeComposer makes the PDF at the end.
-        var options = new GmsDocumentScannerOptions.Builder()
-            .SetGalleryImportAllowed(false)
-            .SetPageLimit(ScanTray.PagesPerScannerRun)
-            .SetResultFormats(GmsDocumentScannerOptions.ResultFormatJpeg)
-            .SetScannerMode(GmsDocumentScannerOptions.ScannerModeFull)
-            .Build();
-        var scanner = GmsDocumentScanning.GetClient(options);
-        scanner.GetStartScanIntent(this)
-            .AddOnSuccessListener(new IntentSenderListener(this))
-            .AddOnFailureListener(new FailureToastListener(this, "Document scanner unavailable"));
-    }
-
-    // These bindings expose the ML Kit barcode *processing* API (not the turnkey
-    // GMS code-scanner UI), so QR scanning captures a still frame and decodes it.
-    private void StartQrScan()
-    {
-        if (imageCapture is null)
-        {
-            return;
-        }
-        var file = new Java.IO.File(CacheDir, "qr-scan.jpg");
-        var options = new ImageCapture.OutputFileOptions.Builder(file).Build();
-        imageCapture.TakePicture(options, ContextCompat.GetMainExecutor(this),
-            new QrCaptureCallback(this, file));
-    }
-
-    private void OpenGooglePhotos()
-    {
-        var intent = PackageManager!.GetLaunchIntentForPackage("com.google.android.apps.photos");
-        if (intent is not null)
-        {
-            StartActivity(intent);
-        }
-        else
-        {
-            Toast.MakeText(this, "Google Photos is not installed.", ToastLength.Short)!.Show();
-        }
-    }
-
-    private class CaptureCallback : Java.Lang.Object, ImageCapture.IOnImageSavedCallback
-    {
-        private readonly PlateActivity activity;
-
-        public CaptureCallback(PlateActivity activity)
-        {
-            this.activity = activity;
-        }
-
-        public void OnImageSaved(ImageCapture.OutputFileResults? results) =>
-            activity.RunOnUiThread(() => activity.ShowStatus($"Photo saved to your camera roll · {TimeFormats.Clock12(DateTime.Now)}"));
-
-        public void OnError(ImageCaptureException? exception) =>
-            Toast.MakeText(activity, $"Capture failed: {exception?.Message}", ToastLength.Long)!.Show();
-    }
-
-    // Captures a still frame to the cache, then decodes any QR code in it.
-    private class QrCaptureCallback : Java.Lang.Object, ImageCapture.IOnImageSavedCallback
-    {
-        private readonly PlateActivity activity;
-        private readonly Java.IO.File file;
-
-        public QrCaptureCallback(PlateActivity activity, Java.IO.File file)
-        {
-            this.activity = activity;
-            this.file = file;
-        }
-
-        public void OnImageSaved(ImageCapture.OutputFileResults? results)
-        {
-            var image = InputImage.FromFilePath(activity, Android.Net.Uri.FromFile(file)!);
-            var options = new BarcodeScannerOptions.Builder()
-                .SetBarcodeFormats(Barcode.FormatQrCode)
-                .Build();
-            BarcodeScanning.GetClient(options).Process(image)
-                .AddOnSuccessListener(new QrResultListener(activity))
-                .AddOnFailureListener(new FailureToastListener(activity, "QR scan failed"));
-        }
-
-        public void OnError(ImageCaptureException? exception) =>
-            Toast.MakeText(activity, $"QR capture failed: {exception?.Message}", ToastLength.Long)!.Show();
-    }
-
-    private class QrResultListener : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
-    {
-        private readonly PlateActivity activity;
-
-        public QrResultListener(PlateActivity activity)
-        {
-            this.activity = activity;
-        }
-
-        public void OnSuccess(Java.Lang.Object? result)
-        {
-            string? value = null;
-            if (result is System.Collections.IEnumerable barcodes)
-            {
-                foreach (var item in barcodes)
-                {
-                    if (item is Barcode barcode && barcode.RawValue is not null)
-                    {
-                        value = barcode.RawValue;
-                        break;
-                    }
-                }
-            }
-
-            // What the code MEANS is decided in Codex.Domain.Plate.QrScan, where it can be
-            // tested without a camera. This used to end in an AlertDialog for anything that
-            // was not a link, which §7 bans: results surface inline, never in a dialog.
-            var reading = QrScan.Read(value);
-            switch (reading.Action)
-            {
-                case QrAction.OpenInBrowser:
-                    // A plain VIEW intent; the device-owner persistent preferred activity
-                    // routes it into the launcher's RestrictedBrowserActivity. Only http
-                    // and https ever reach here — see QrScan.
-                    activity.StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(reading.Value)));
-                    break;
-                case QrAction.ShowText:
-                    activity.ShowStatus(reading.Value);
-                    break;
-                default:
-                    activity.ShowStatus("No code in that frame.");
-                    break;
-            }
-        }
-    }
-
-    private class IntentSenderListener : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
-    {
-        private readonly PlateActivity activity;
-
-        public IntentSenderListener(PlateActivity activity)
-        {
-            this.activity = activity;
-        }
-
-        public void OnSuccess(Java.Lang.Object? result)
-        {
-            if (result is IntentSender sender)
-            {
-                activity.StartIntentSenderForResult(sender, DocumentScanRequest, null, 0, 0, 0);
-            }
-        }
-    }
-
-    private class FailureToastListener : Java.Lang.Object, Android.Gms.Tasks.IOnFailureListener
-    {
-        private readonly PlateActivity activity;
-        private readonly string message;
-
-        public FailureToastListener(PlateActivity activity, string message)
-        {
-            this.activity = activity;
-            this.message = message;
-        }
-
-        public void OnFailure(Java.Lang.Exception e) =>
-            Toast.MakeText(activity, $"{message}: {e.Message}", ToastLength.Long)!.Show();
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode != DocumentScanRequest || resultCode != Result.Ok)
+        foreach (var area in areas)
         {
-            return;
+            area.OnActivityResult(requestCode, resultCode, data);
         }
-
-        var result = GmsDocumentScanningResult.FromActivityResultIntent(data);
-        scan = (scan ?? ScanTray.For(ScanDestination.Drive)).Add(PageUris(result));
-        ShowStatus(scan.Count == 1 ? "1 page held." : $"{scan.Count} pages held.");
-        ShowScanBar();
-    }
-
-    // ML Kit hands back a nullable list of nullable pages; a cancelled run is the ordinary
-    // way to see it. The tray takes null for "no pages" so this can stay a straight read.
-    private static IEnumerable<string>? PageUris(GmsDocumentScanningResult? result)
-    {
-        var pages = result?.Pages;
-        if (pages is null)
-        {
-            return null;
-        }
-
-        var uris = new List<string>();
-        foreach (var page in pages)
-        {
-            if (page?.ImageUri is not null)
-            {
-                uris.Add(page.ImageUri.ToString()!);
-            }
-        }
-        return uris;
-    }
-
-    private void SaveScan()
-    {
-        if (scan is not { HasPages: true })
-        {
-            StartDocumentScan();
-            return;
-        }
-
-        // §8: loading is a status sentence, not a spinner. Composing a long document takes
-        // long enough to notice, and the sentence is what says so.
-        ShowStatus($"Composing {scan.Count} pages…");
-
-        var pageImages = new List<byte[]>(scan.Count);
-        foreach (var page in scan.Pages)
-        {
-            using var input = ContentResolver!.OpenInputStream(Android.Net.Uri.Parse(page)!)!;
-            using var buffer = new MemoryStream();
-            input.CopyTo(buffer);
-            pageImages.Add(buffer.ToArray());
-        }
-
-        var pdf = new PdfVolumeComposer().Compose(pageImages, ScanDpi);
-
-        // The other half of the live bug: this used to write into MediaStore.Downloads,
-        // which the owner reported as "scans vanish into Downloads". A scan is a document
-        // and files with documents. Documents/ is not a legal RELATIVE_PATH for the
-        // Downloads collection (that one must sit under Download/), so the insert goes to
-        // the Files collection instead.
-        var entry = CaptureFiling.Scan("Scan", DateTime.Now);
-        var values = new ContentValues();
-        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, entry.DisplayName);
-        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, entry.MimeType);
-        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, entry.RelativePath);
-        var target = ContentResolver!.Insert(
-            Android.Provider.MediaStore.Files.GetContentUri("external")!, values);
-        if (target is null)
-        {
-            ShowStatus("Could not file that scan.");
-            return;
-        }
-
-        using (var output = ContentResolver.OpenOutputStream(target)!)
-        {
-            output.Write(pdf, 0, pdf.Length);
-        }
-
-        ShowStatus($"Scan saved to Documents · {TimeFormats.Clock12(DateTime.Now)}");
-        ShowCaptureBar();
     }
 }

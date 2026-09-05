@@ -14,6 +14,16 @@ public enum ScanDestination
 }
 
 /// <summary>
+/// One page in the tray: what it is, and when it was scanned.
+///
+/// <para>The reference is opaque — a content URI on the phone, a plain string in the tests.
+/// The Domain never opens one, so it does not need to know what it is. The time is here
+/// because the tray screen lists pages as "Page 2 · scanned 4:39 PM", which is the only way
+/// to tell two near-identical sheets apart when a long scan goes wrong.</para>
+/// </summary>
+public readonly record struct ScanPage(string Reference, DateTime ScannedAt);
+
+/// <summary>
 /// A scan in progress: the door it came through, and the pages gathered so far.
 ///
 /// <para><b>Why Plate assembles the document itself.</b> ML Kit's document scanner caps a
@@ -41,7 +51,7 @@ public sealed record ScanTray
     /// </summary>
     public const int PagesPerScannerRun = 50;
 
-    private ScanTray(ScanDestination destination, IReadOnlyList<string> pages)
+    private ScanTray(ScanDestination destination, IReadOnlyList<ScanPage> pages)
     {
         Destination = destination;
         Pages = pages;
@@ -53,8 +63,8 @@ public sealed record ScanTray
     /// <summary>Where this document is going, decided before the first page was scanned.</summary>
     public ScanDestination Destination { get; }
 
-    /// <summary>The pages, in the order they were scanned.</summary>
-    public IReadOnlyList<string> Pages { get; }
+    /// <summary>The pages, in the order they will be bound into the document.</summary>
+    public IReadOnlyList<ScanPage> Pages { get; }
 
     public int Count => Pages.Count;
 
@@ -65,8 +75,38 @@ public sealed record ScanTray
     /// back nothing — or null, which ML Kit's nullable page list makes the ordinary way to
     /// see it — and changes nothing.
     /// </summary>
-    public ScanTray Add(IEnumerable<string>? pageReferences) =>
-        pageReferences is null ? this : new ScanTray(Destination, [.. Pages, .. pageReferences]);
+    public ScanTray Add(IEnumerable<string>? pageReferences, DateTime? scannedAt = null)
+    {
+        if (pageReferences is null)
+        {
+            return this;
+        }
+
+        var when = scannedAt ?? DateTime.Now;
+        return new ScanTray(Destination, [.. Pages, .. pageReferences.Select(r => new ScanPage(r, when))]);
+    }
+
+    /// <summary>
+    /// Moves one page to another position, carrying its scan time with it. Scanning a stack
+    /// out of order is ordinary, and a single misfed sheet must not cost the whole document.
+    /// A move that goes nowhere — the first page up, the last page down, an index that is no
+    /// longer there — leaves the tray alone rather than throwing away a scan in progress.
+    /// </summary>
+    public ScanTray Move(int from, int to)
+    {
+        if (from == to || !InRange(from) || !InRange(to))
+        {
+            return this;
+        }
+
+        var moved = new List<ScanPage>(Pages);
+        var page = moved[from];
+        moved.RemoveAt(from);
+        moved.Insert(to, page);
+        return new ScanTray(Destination, moved);
+    }
+
+    private bool InRange(int index) => index >= 0 && index < Pages.Count;
 
     /// <summary>
     /// Drops one page. An index that is no longer there is a no-op rather than a throw: two
@@ -80,7 +120,7 @@ public sealed record ScanTray
             return this;
         }
 
-        var kept = new List<string>(Pages);
+        var kept = new List<ScanPage>(Pages);
         kept.RemoveAt(index);
         return new ScanTray(Destination, kept);
     }
