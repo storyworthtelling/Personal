@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Flyleaf</RootNamespace>
+    <ApplicationId>com.storyworthtelling.focusphone.launcher</ApplicationId>
+    <ApplicationTitle>Flyleaf</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
+    <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
+    <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+  </ItemGroup>
+</Project>
