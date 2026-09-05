@@ -50,6 +50,24 @@ public sealed class GhostArchive
     /// Ghosts matching a filter. One filter spans the Mailbox and Filed alike (§7), so
     /// someone filed last week is still findable without remembering that you filed them.
     /// </summary>
+    /// <summary>
+    /// What <b>Filed</b> shows: ghosts matching the query whose undo window has closed.
+    ///
+    /// A message filed a second ago is deliberately in neither list — gone from the
+    /// Mailbox, not yet in Filed. Seeing it arrive in Filed while the fold is still
+    /// offering to put it back reads as the app having already decided, and the owner
+    /// said as much: it "does read as broken".
+    ///
+    /// This hides a ghost from one screen. It never withholds one from <see cref="All"/>,
+    /// which is what the archive, the Drive backup and the owed-delete retry read: the
+    /// live row is deleted the moment filing happens, so inside that window the ghost is
+    /// the only copy of the message anywhere.
+    /// </summary>
+    public IReadOnlyList<Ghost> Settled(string query, DateTimeOffset now, TimeSpan undoWindow) =>
+        Matching(query)
+            .Where(ghost => ghost.FiledAtUtc + undoWindow <= now)
+            .ToList();
+
     public IReadOnlyList<Ghost> Matching(string query)
     {
         var trimmed = query.Trim();

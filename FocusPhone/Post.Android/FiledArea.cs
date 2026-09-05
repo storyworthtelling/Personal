@@ -34,7 +34,16 @@ public sealed class FiledArea(Activity host) : PostArea(host)
         try
         {
             using var database = TimelineDatabase.Open(Host);
-            ghosts = database.Filing.LoadArchive().Matching(query);
+            var archive = database.Filing.LoadArchive();
+            var window = TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
+            var now = DateTimeOffset.UtcNow;
+
+            // Settled, not merely archived: a message filed seconds ago is deliberately in
+            // neither list while its undo window is open. Arriving in Filed under a fold
+            // still offering to put it back reads as the app having already decided.
+            ghosts = archive.Settled(query, now, window);
+
+            ShowWhatIsStillSettling(archive, now, window);
         }
         catch (Exception e)
         {
@@ -42,6 +51,34 @@ public sealed class FiledArea(Activity host) : PostArea(host)
             PostDiagnostics.LogWarning("Filing", "Could not read the archive", e);
             ghosts = [];
         }
+    }
+
+    // Something filed while this screen is open would otherwise not appear until the owner
+    // navigated away and back — they would watch it vanish from the Mailbox and never see
+    // it land, which is the same "where did it go" the settling rule exists to prevent.
+    // So when anything is still inside its window, come back once the earliest one settles.
+    private void ShowWhatIsStillSettling(GhostArchive archive, DateTimeOffset now, TimeSpan window)
+    {
+        var earliest = archive.All
+            .Select(ghost => ghost.FiledAtUtc + window)
+            .Where(settlesAt => settlesAt > now)
+            .DefaultIfEmpty(default)
+            .Min();
+
+        if (earliest == default)
+        {
+            return;
+        }
+
+        // Bounded by the window itself: a ghost stamped in the future (a clock that moved,
+        // a restored backup) would otherwise reschedule this for ever.
+        var wait = (long)(earliest - now).TotalMilliseconds + 1;
+        if (wait > (long)window.TotalMilliseconds)
+        {
+            return;
+        }
+
+        new Android.OS.Handler(Android.OS.Looper.MainLooper!).PostDelayed(Invalidate, wait);
     }
 
     public override View BuildView()
