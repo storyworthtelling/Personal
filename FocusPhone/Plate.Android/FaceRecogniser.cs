@@ -1,4 +1,3 @@
-using Android.Content;
 using Android.Graphics;
 using Codex.Domain.Plate;
 using Xamarin.Google.MLKit.Vision.Common;
@@ -29,7 +28,7 @@ public interface IFaceEmbedder
 /// <para>None of this leaves the phone. Claude will not name a person in an image, and a
 /// Darkroom picture has not been uploaded anywhere to be asked about in the first place.</para>
 /// </summary>
-public sealed class FaceRecogniser(Context context, IFaceEmbedder embedder)
+public sealed class FaceRecogniser(IFaceEmbedder embedder)
 {
     /// <summary>
     /// A face smaller than this is a bystander in the background, not the subject. Embedding

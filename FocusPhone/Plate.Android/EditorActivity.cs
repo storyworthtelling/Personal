@@ -78,7 +78,7 @@ public class EditorActivity : AppCompatActivity
         // when it has not: faces are still found, the fold simply does not appear, and the
         // caption can still be written by hand.
         var embedder = new TfLiteFaceEmbedder(this);
-        recogniser = new FaceRecogniser(this, embedder.IsReady ? embedder : new NoFaceEmbedder());
+        recogniser = new FaceRecogniser(embedder.IsReady ? embedder : new NoFaceEmbedder());
         faces = new FaceBookStore(this);
         rolodex = new Rolodex(this);
 
