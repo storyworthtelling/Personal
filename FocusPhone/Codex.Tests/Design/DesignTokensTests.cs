@@ -107,6 +107,28 @@ public class DesignTokensTests
         Assert.True(ratio >= minimum, $"{tier} on Paper is {ratio:F2}:1, below {minimum}:1");
     }
 
+    // Plate's ladder, against the same floors Post's is held to. The ink-on-cloth row is
+    // the one Post does not need: Plate inverts the framing to ink on a LIGHT binding
+    // (§12), so Ink has to clear AA on the ground tier rather than PaperBright on the deep.
+    [Theory]
+    [InlineData("#7A4F7B", 3.0)]  // marks and UI, incl. the lit binder tab
+    [InlineData("#613F62", 4.5)]  // identity-colored text at any size
+    [InlineData("#442D44", 7.0)]  // the deep tier, body-text safe
+    public void PlateIdentityTextTiersClearContrastOnPaper(string tier, double minimum)
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(tier, DesignTokens.Paper);
+        Assert.True(ratio >= minimum, $"{tier} on Paper is {ratio:F2}:1, below {minimum}:1");
+    }
+
+    [Fact]
+    public void PlateInkFramingClearsContrastOnItsLightBinding()
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, DesignTokens.Identity.Plate.Ground);
+        Assert.True(ratio >= 4.5,
+            $"Ink on Plate's binding cloth is {ratio:F2}:1, below AA — the inverted framing "
+            + "(rule, brackets and lettering) would not be legible on the cover.");
+    }
+
     // §3's actual rule: an identity hue is sampled, then CHECKED against the semantic
     // roles it will sit near, and moved if it crowds one — so a tab never reads as a
     // status. That is a claim about degrees on the OKLCH wheel, and it was previously
@@ -120,6 +142,8 @@ public class DesignTokensTests
     [InlineData("#C9803A")] [InlineData("#B4552F")] [InlineData("#8A4A22")]  // Flyleaf
     [InlineData("#93ABA5")] [InlineData("#436A61")]                          // Score
     [InlineData("#A1A1C7")] [InlineData("#5C5894")]                          // Post
+    [InlineData("#C8B5C8")] [InlineData("#B69BB6")] [InlineData("#7A4F7B")]  // Plate
+    [InlineData("#613F62")] [InlineData("#442D44")]
     public void IdentityTiersStayClearOfEverySemanticRole(string identityTier)
     {
         const double MinimumSeparation = 20.0;
