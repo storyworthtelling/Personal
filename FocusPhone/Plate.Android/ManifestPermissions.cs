@@ -13,3 +13,7 @@ using Android.App;
 // Needed to launch Google Photos (GetLaunchIntentForPackage) under Android 11+
 // package-visibility filtering. Sideloaded app, so QUERY_ALL_PACKAGES is fine.
 [assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]
+
+// The vault and the reMarkable are both network. Nothing Plate captures leaves the phone
+// by this route without the owner choosing a destination first.
+[assembly: UsesPermission(Manifest.Permission.Internet)]
