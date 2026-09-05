@@ -37,6 +37,7 @@ public partial class SetupPage : ContentPage
         UpdateRemarkableStatus();
         UpdateGoogleStatus();
         SigningInfoLabel.Text = SigningInfoText();
+        BuildInfoLabel.Text = BuildInfoText();
 
         var migrationError = SettingsStore.LastMigrationError;
         MigrationErrorCard.IsVisible = !string.IsNullOrEmpty(migrationError);
@@ -305,6 +306,20 @@ public partial class SetupPage : ContentPage
 
     private static string SigningInfoText() =>
         $"package: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}";
+
+    // The installed build, readable on the locked-down phone (no access to system app info). The build
+    // string is the versionCode the GitHub update channel compares, so this is what confirms an update landed.
+    private static string BuildInfoText()
+    {
+        try
+        {
+            return $"Canonizer {AppInfo.Current.VersionString} ({AppInfo.Current.BuildString}) · {AppInfo.Current.PackageName}";
+        }
+        catch
+        {
+            return $"Canonizer · {AppSigningInfo.PackageName}";
+        }
+    }
 
     private async void OnGoogleSignInClicked(object sender, EventArgs e)
     {

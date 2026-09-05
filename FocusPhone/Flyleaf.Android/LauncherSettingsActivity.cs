@@ -5,6 +5,7 @@ using Android.Content;
 using Android.Content.PM;
 using Android.Net.Wifi;
 using Android.OS;
+using Android.Telephony;
 using Android.Views;
 using Android.Widget;
 using Codex.Domain.Apps;
@@ -23,6 +24,14 @@ namespace Flyleaf;
 /// passphrase), and an Admin row that leads into the gated UnlockActivity for
 /// the escape-hatch controls.
 ///
+/// Repainted to the Paper &amp; Ink kit (the approved P5 mockup): a Serif in-page
+/// header with a <b>neutral Settings-gray</b> marker underline — Settings is the one
+/// screen that looks the same in every app, so it wears the neutral mark rather than
+/// Flyleaf's identity hue (DESIGN.md §9), exactly like Post and Score — Serif group
+/// labels, and each group drawn as a hairline-ruled card of rows over the paper grain
+/// (the theme's window background). A small mono build-number line sits at the foot so
+/// an update is visible even when nothing else changed.
+///
 /// Built imperatively with PaperUi and rendered through a single Render() so the
 /// power countdown and the force-close undo row can rebuild in place. Every
 /// device action is best-effort: on a phone where this app isn't the device
@@ -33,11 +42,11 @@ namespace Flyleaf;
 /// system panels for the actions with no first-party device-owner API — join a Wi-Fi
 /// network, pair a Bluetooth device, and name a hotspot — each opened as a specific
 /// Activity (which the lockdown permits) with an inline-status fallback when a panel
-/// isn't resolvable. Fully-editable hotspot SSID/password is system-privileged, so that
-/// one may show a read-only SSID under the lockdown — confirm on-device. There is still
-/// no power-off API (only reboot). This also adds the Shelves (#11) group: create /
-/// rename / reorder / remove the tray category shelves, a new shelf getting an AI-drawn
-/// bookend glyph (shared key) with a pencil-monogram fallback.
+/// isn't resolvable. Mobile data is a direct On/Off toggle (replacing the old airplane
+/// deep-link); like the other radios it is best-effort — on a device that doesn't grant
+/// the call, it says so rather than pretend. This also carries the Shelves (#11) group:
+/// create / rename / reorder / remove the tray category shelves, a new shelf getting an
+/// AI-drawn bookend glyph (shared key) with a pencil-monogram fallback.
 /// </summary>
 [Activity(
     Label = "Settings",
@@ -71,8 +80,8 @@ public class LauncherSettingsActivity : Activity
 
         var scroll = new ScrollView(this);
         content = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
-        content.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X12), edge, edge);
+        var edge = Dp(DesignTokens.Shape.ScreenEdgeDp);
+        content.SetPadding(edge, Dp(DesignTokens.Space.X12), edge, edge);
         scroll.AddView(content);
         root.AddView(scroll, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
@@ -119,7 +128,9 @@ public class LauncherSettingsActivity : Activity
         content!.RemoveAllViews();
         actionBarHost!.RemoveAllViews();
 
-        content.AddView(PaperUi.PageHeader(this, "Settings"), MatchWrap());
+        // §7: every screen opens with the Serif title + a full-width marker underline.
+        // Settings takes the neutral resolved mark (like Post/Score), not Flyleaf's amber.
+        content.AddView(PaperUi.ScreenHeader(this, "Settings", PaperTheme.ResolvedMark), MatchWrap());
 
         RenderConnectivity();
         RenderApps();
@@ -137,9 +148,11 @@ public class LauncherSettingsActivity : Activity
         {
             var status = PaperUi.Secondary(this, inlineStatus);
             var statusParams = MatchWrap();
-            statusParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
+            statusParams.TopMargin = Dp(DesignTokens.Space.X4);
             content.AddView(status, statusParams);
         }
+
+        RenderBuildNumber();
 
         var save = PaperUi.PrimaryButton(this, "Save", SaveVaultPassphrase);
         actionBarHost.AddView(PaperUi.BottomBar(this, save));
@@ -150,14 +163,14 @@ public class LauncherSettingsActivity : Activity
         }
     }
 
-    // ---- Connectivity: Wi-Fi + Bluetooth toggles ------------------------------
+    // ---- Connectivity: Wi-Fi / mobile data / Bluetooth + scoped deep-links -----
 
     private void RenderConnectivity()
     {
-        AddGroupLabel("Connectivity");
+        var card = StartGroup("Connectivity");
 
         var wifi = (WifiManager?)GetSystemService(WifiService);
-        AddToggleRow("Wi-Fi", wifi?.IsWifiEnabled ?? false, on =>
+        AddToggleRow(card, "Wi-Fi", null, wifi?.IsWifiEnabled ?? false, on =>
         {
             // SetWifiEnabled is deprecated for ordinary apps on Android 10+, but the device owner is
             // exempt from that block — this is the reliable device-owner path.
@@ -170,9 +183,43 @@ public class LauncherSettingsActivity : Activity
                 Render();
             }
         });
+        AddNavRow(card, "Choose a network…", null,
+            () => OpenSystemPanel(Android.Provider.Settings.ActionWifiSettings, "Wi-Fi settings"));
+
+        // Mobile data On/Off. There is no device-owner API for this, and toggling data needs
+        // MODIFY_PHONE_STATE / carrier privileges the lockdown doesn't grant, so this is best-effort:
+        // it attempts the call and, where the platform declines, says so instead of pretending.
+        var telephony = (TelephonyManager?)GetSystemService(TelephonyService);
+        var dataOn = false;
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+        {
+            // Java's isDataEnabled()/setDataEnabled() bind as one get/set property, DataEnabled.
+#pragma warning disable CA1422, CS0618
+            try { dataOn = telephony?.DataEnabled ?? false; } catch (Exception) { dataOn = false; }
+#pragma warning restore CA1422, CS0618
+        }
+        var carrier = telephony?.NetworkOperatorName;
+        AddToggleRow(card, "Mobile data", string.IsNullOrEmpty(carrier) ? null : carrier, dataOn, on =>
+        {
+            try
+            {
+                if (Build.VERSION.SdkInt < BuildVersionCodes.O || telephony is null)
+                {
+                    throw new InvalidOperationException("needs Android 8+");
+                }
+#pragma warning disable CA1422, CS0618
+                telephony.DataEnabled = on;
+#pragma warning restore CA1422, CS0618
+            }
+            catch (Exception)
+            {
+                inlineStatus = "Couldn't change mobile data on this device. Try Choose a network for the mobile-data panel.";
+                Render();
+            }
+        });
 
         var bluetooth = ((BluetoothManager?)GetSystemService(BluetoothService))?.Adapter;
-        AddToggleRow("Bluetooth", bluetooth?.IsEnabled ?? false, on =>
+        AddToggleRow(card, "Bluetooth", null, bluetooth?.IsEnabled ?? false, on =>
         {
             // Enable/Disable is deprecated on recent Android and returns false when the platform declines;
             // surface that rather than pretend it worked (best-effort, pending an on-device spike).
@@ -185,23 +232,14 @@ public class LauncherSettingsActivity : Activity
                 Render();
             }
         });
+        AddNavRow(card, "Pair a device…", null,
+            () => OpenSystemPanel(Android.Provider.Settings.ActionBluetoothSettings, "Bluetooth settings"));
 
-        // Joining a new Wi-Fi network, pairing a Bluetooth device, and naming a hotspot all need the
-        // system panels (no first-party device-owner API), so open the scoped settings screen for each.
-        // The lockdown blocks the general Settings/shade, but the launcher may start a specific panel.
-        AddContentButton(PaperUi.SecondaryButton(this, "Choose a Wi-Fi network…",
-            () => OpenSystemPanel(Android.Provider.Settings.ActionWifiSettings, "Wi-Fi settings")));
-        AddContentButton(PaperUi.SecondaryButton(this, "Pair a Bluetooth device…",
-            () => OpenSystemPanel(Android.Provider.Settings.ActionBluetoothSettings, "Bluetooth settings")));
         // Fully-editable hotspot SSID/password is system-privileged; the tether panel is the reachable
         // path (confirm on-device — it may show a read-only SSID under the lockdown).
-        AddContentButton(PaperUi.SecondaryButton(this, "Set up a hotspot (name + password)…",
+        AddNavRow(card, "Set up a hotspot (name + password)…", null,
             () => OpenSystemPanel("android.settings.TETHER_SETTINGS", "hotspot settings",
-                fallback: Android.Provider.Settings.ActionWirelessSettings)));
-        // Airplane mode has no toggle API; the scoped panel is the reachable path (the shade that
-        // would normally toggle it is disabled under the lockdown).
-        AddContentButton(PaperUi.SecondaryButton(this, "Airplane mode…",
-            () => OpenSystemPanel(Android.Provider.Settings.ActionAirplaneModeSettings, "airplane-mode settings")));
+                fallback: Android.Provider.Settings.ActionWirelessSettings));
     }
 
     // Opens a specific system settings panel by action; on a device where it isn't resolvable, tries an
@@ -228,8 +266,8 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderApps()
     {
-        AddGroupLabel("Apps");
-        AddContentButton(PaperUi.SecondaryButton(this, "Force-close an app", ShowForceClosePicker));
+        var card = StartGroup("Apps");
+        AddNavRow(card, "Force-close an app", "Stop one that's misbehaving", ShowForceClosePicker);
     }
 
     private void ShowForceClosePicker()
@@ -306,7 +344,7 @@ public class LauncherSettingsActivity : Activity
             Render();
         }));
         var rowParams = MatchWrap();
-        rowParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
+        rowParams.TopMargin = Dp(DesignTokens.Space.X4);
         content!.AddView(row, rowParams);
     }
 
@@ -327,8 +365,8 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderUpdates()
     {
-        AddGroupLabel("Updates");
-        AddContentButton(PaperUi.SecondaryButton(this, "Install from GitHub now", InstallFromGitHubNow));
+        var card = StartGroup("Updates");
+        AddNavRow(card, "Install from GitHub now", null, InstallFromGitHubNow);
 
         // Show whether the 6-hour channel is actually running and what it last did,
         // so a silent failure (rejected token, signature-mismatched install) is visible.
@@ -337,11 +375,11 @@ public class LauncherSettingsActivity : Activity
         if (lastRun is { } runUtc && statusStore.LastSummary is { } summary)
         {
             var when = RelativeTime.Format(runUtc.ToLocalTime(), DateTime.Now);
-            AddBody($"Last checked {when}: {summary}");
+            AddCardCaption($"Last checked {when}: {summary}", progress: true);
         }
         else
         {
-            AddBody("The channel checks every 6 hours. It hasn't run yet on this phone.");
+            AddCardCaption("The channel checks every 6 hours. It hasn't run yet on this phone.");
         }
     }
 
@@ -369,31 +407,29 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderPower()
     {
-        AddGroupLabel("Power");
+        var card = StartGroup("Power");
 
         if (restart!.IsRunning)
         {
-            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-            row.SetGravity(GravityFlags.CenterVertical);
+            var row = BeginRow(card);
             var seconds = (int)Math.Ceiling(restart.Remaining.TotalSeconds);
             var timer = PaperUi.Countdown(this);
             timer.Text = $"0:{seconds:D2}";
             row.AddView(timer, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-            row.AddView(PaperUi.SecondaryButton(this, "Cancel", () =>
+            row.AddView(PaperUi.QuietButton(this, "Cancel", () =>
             {
                 restart.Cancel();
                 Render();
             }));
-            content!.AddView(row, MatchWrap());
-            AddBody("Restarting when the countdown ends.");
+            AddCardCaption("Restarting when the countdown ends.");
         }
         else
         {
-            AddContentButton(PaperUi.DestructiveButton(this, "Restart", () =>
+            AddNavRow(card, "Restart", "Counts down in place — no dialog", () =>
             {
                 restart!.Start();
                 Render();
-            }));
+            });
         }
     }
 
@@ -401,15 +437,31 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderVault()
     {
-        AddGroupLabel("Secrets vault");
+        var card = StartGroup("Secrets vault");
+
+        var block = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        block.SetPadding(Dp(DesignTokens.Space.X4), Dp(DesignTokens.Space.X3),
+            Dp(DesignTokens.Space.X4), Dp(DesignTokens.Space.X4));
+
+        block.AddView(PaperUi.Body(this, "Vault passphrase"), MatchWrap());
+
         // Shown in the clear (not a password field): it is the one secret NOT kept in the vault, so being
         // able to read and copy it is exactly what lets the owner set the same passphrase in every app.
         passphraseField = PaperUi.MonoField(this, "Choose a passphrase");
         passphraseField.Text = VaultPassphraseStore.Passphrase;
-        content!.AddView(passphraseField, Spaced(0, DesignTokens.Space.X1));
-        content.AddView(PaperUi.Secondary(this,
+        var fieldParams = MatchWrap();
+        fieldParams.TopMargin = Dp(DesignTokens.Space.X2);
+        block.AddView(passphraseField, fieldParams);
+
+        var helper = PaperUi.Secondary(this,
             "Encrypts the shared Drive backup of this phone's keys so a reset can restore them. " +
-            "Shown in the clear so you can copy it into your other apps."), Spaced(0, DesignTokens.Space.X4));
+            "Shown in the clear so you can copy it into your other apps.");
+        helper.TextSize = DesignTokens.TypeSp.Label;
+        var helperParams = MatchWrap();
+        helperParams.TopMargin = Dp(DesignTokens.Space.X2);
+        block.AddView(helper, helperParams);
+
+        card.AddView(block, MatchWrap());
     }
 
     private void SaveVaultPassphrase()
@@ -425,51 +477,62 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderAdvanced()
     {
-        AddGroupLabel("Advanced");
-        AddContentButton(PaperUi.SecondaryButton(this, "Admin (device-owner controls)…",
-            () => StartActivity(new Intent(this, typeof(UnlockActivity)))));
+        var card = StartGroup("Advanced");
+        AddNavRow(card, "Admin (device-owner controls)…", null,
+            () => StartActivity(new Intent(this, typeof(UnlockActivity))));
     }
 
     // ---- Shelves (#11): create / rename / reorder / remove the tray categories -
 
     private void RenderShelves()
     {
-        AddGroupLabel("Shelves");
-        AddBody("The category shelves your apps sort onto. New shelves get an engraved glyph — " +
-            "AI-drawn from the name when a key's set, a pencil monogram otherwise.");
-
-        // The AI glyph reads the shared Claude key from the encrypted vault on Drive, which needs a Google
-        // sign-in. Without it there was no path to sign in, so the glyph stayed a monogram (P5-27).
-        if (Codex.Ui.Voice.VoiceGoogleAccount.IsSignedIn)
-        {
-            AddBody($"Signed in with Google as {Codex.Ui.Voice.VoiceGoogleAccount.Email} — AI glyphs enabled.");
-        }
-        else
-        {
-            AddContentButton(PaperUi.SecondaryButton(this, "Sign in with Google (for AI shelf glyphs)", SignInWithGoogle));
-        }
+        var card = StartGroup("Shelves");
 
         var catalog = new CategoryStore(this).Load();
         var ids = catalog.Categories.Select(c => c.Id).ToList();
         foreach (var category in catalog.Categories)
         {
-            content!.AddView(BuildShelfRow(category, ids), Spaced(0, DesignTokens.Space.X1));
+            AddShelfRow(card, category, ids);
         }
+        AddShelfAddRow(card);
 
-        newShelfField = new EditText(this) { Hint = "New shelf name" };
-        newShelfField.SetTextColor(PaperTheme.Ink);
-        newShelfField.SetHintTextColor(PaperTheme.InkMuted);
-        newShelfField.Typeface = PaperTheme.SerifRegular(this);
-        content!.AddView(newShelfField, Spaced(DesignTokens.Space.X2, DesignTokens.Space.X1));
-        AddContentButton(PaperUi.SecondaryButton(this, "Add a shelf", () => AddShelf(newShelfField.Text)));
+        AddCardCaption("The category shelves your apps sort onto. New shelves get an engraved glyph — " +
+            "AI-drawn from the name when you're signed in with Google, a pencil monogram otherwise.");
+
+        // The AI glyph reads the shared Claude key from the encrypted vault on Drive, which needs a Google
+        // sign-in. Without it there was no path to sign in, so the glyph stayed a monogram (P5-27).
+        if (VoiceGoogleAccount.IsSignedIn)
+        {
+            AddCardCaption($"Signed in with Google as {VoiceGoogleAccount.Email} — AI glyphs enabled.");
+        }
+        else
+        {
+            var signIn = PaperUi.SecondaryButton(this, "Sign in with Google (for AI shelf glyphs)", SignInWithGoogle);
+            var lp = MatchWrap();
+            lp.TopMargin = Dp(DesignTokens.Space.X2);
+            content!.AddView(signIn, lp);
+        }
     }
 
-    private View BuildShelfRow(Category category, List<string> orderedIds)
+    private void AddShelfRow(LinearLayout card, Category category, List<string> orderedIds)
     {
-        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        row.SetGravity(GravityFlags.CenterVertical);
-        row.AddView(PaperUi.QuietButton(this, category.Name, () => RenameShelf(category)),
-            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        var row = BeginRow(card);
+
+        // A small bronze chip with the shelf's pencil monogram — a settings-scale stand-in for the
+        // engraved bookend the shelf carries in the tray.
+        var glyph = PaperUi.Secondary(this, ShelfGlyphMaker.Monogram(category.Name));
+        glyph.Gravity = GravityFlags.Center;
+        glyph.SetTextColor(PaperTheme.Paper);
+        glyph.Typeface = PaperTheme.SerifSemibold(this);
+        glyph.Background = PaperUi.Fill(this, PaperTheme.Bronze, DesignTokens.Shape.HairlineDp * 3);
+        var glyphParams = new LinearLayout.LayoutParams(Dp(28), Dp(32)) { MarginEnd = Dp(DesignTokens.Space.X3) };
+        row.AddView(glyph, glyphParams);
+
+        var name = PaperUi.Body(this, category.Name);
+        name.Clickable = true;
+        name.Click += (_, _) => RenameShelf(category);
+        row.AddView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+
         var index = orderedIds.IndexOf(category.Id);
         if (index > 0)
         {
@@ -480,7 +543,17 @@ public class LauncherSettingsActivity : Activity
             row.AddView(PaperUi.QuietButton(this, "↓", () => MoveShelf(category.Id, +1)));
         }
         row.AddView(PaperUi.QuietButton(this, "Remove", () => RemoveShelf(category.Id)));
-        return row;
+    }
+
+    private void AddShelfAddRow(LinearLayout card)
+    {
+        var row = BeginRow(card);
+        newShelfField = new EditText(this) { Hint = "New shelf name" };
+        newShelfField.SetTextColor(PaperTheme.Ink);
+        newShelfField.SetHintTextColor(PaperTheme.InkMuted);
+        newShelfField.Typeface = PaperTheme.SerifRegular(this);
+        row.AddView(newShelfField, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        row.AddView(PaperUi.QuietButton(this, "Add", () => AddShelf(newShelfField.Text)));
     }
 
     private async void SignInWithGoogle()
@@ -499,9 +572,9 @@ public class LauncherSettingsActivity : Activity
     protected override void OnActivityResult(int requestCode, Result resultCode, Android.Content.Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode == Codex.Ui.Voice.VoiceGoogleAccount.RequestCode)
+        if (requestCode == VoiceGoogleAccount.RequestCode)
         {
-            Codex.Ui.Voice.VoiceGoogleAccount.HandleChooserResult(resultCode, data);
+            VoiceGoogleAccount.HandleChooserResult(resultCode, data);
         }
     }
 
@@ -584,43 +657,125 @@ public class LauncherSettingsActivity : Activity
         Render();
     }
 
-    // ---- Shared building blocks ----------------------------------------------
+    // ---- Build number ---------------------------------------------------------
 
-    private void AddToggleRow(string label, bool isOn, Action<bool> onChange)
+    // A quiet mono line at the foot: version name + package id, so it's obvious an update landed
+    // even when nothing visible changed. Reads the real versionName off the installed package.
+    private void RenderBuildNumber()
     {
+        string version;
+        try
+        {
+            version = PackageManager!.GetPackageInfo(PackageName!, (PackageInfoFlags)0)?.VersionName ?? "?";
+        }
+        catch (Exception)
+        {
+            version = "?";
+        }
+
+        var line = PaperUi.Secondary(this, $"Flyleaf {version} · {PackageName}");
+        line.Typeface = PaperTheme.Mono(this);
+        line.TextSize = DesignTokens.TypeSp.Label;
+        line.SetTextColor(PaperTheme.InkMuted);
+        line.Gravity = GravityFlags.CenterHorizontal;
+        var lp = MatchWrap();
+        lp.TopMargin = Dp(DesignTokens.Space.X8);
+        content!.AddView(line, lp);
+    }
+
+    // ---- Card building blocks -------------------------------------------------
+
+    // Opens a group: a Serif group label, then an empty hairline-ruled card (paper-bright over the
+    // paper grain) that the Render* methods fill with rows.
+    private LinearLayout StartGroup(string label)
+    {
+        var labelView = PaperUi.Secondary(this, label);
+        labelView.TextSize = DesignTokens.TypeSp.Body;
+        labelView.Typeface = PaperTheme.SerifSemibold(this);
+        labelView.SetTextColor(PaperTheme.Ink);
+        var labelParams = MatchWrap();
+        labelParams.TopMargin = Dp(DesignTokens.Space.X6);
+        labelParams.BottomMargin = Dp(DesignTokens.Space.X2);
+        content!.AddView(labelView, labelParams);
+
+        var card = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        card.Background = PaperUi.Outline(this, PaperTheme.PaperBright, PaperTheme.Hairline, DesignTokens.Shape.RadiusCard);
+        content.AddView(card, MatchWrap());
+        return card;
+    }
+
+    // A padded horizontal row inside a card, with a hairline divider above it when it isn't the first.
+    private LinearLayout BeginRow(LinearLayout card)
+    {
+        if (card.ChildCount > 0)
+        {
+            var divider = new View(this);
+            divider.SetBackgroundColor(PaperTheme.Hairline);
+            card.AddView(divider, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, Dp(DesignTokens.Shape.HairlineDp)));
+        }
         var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         row.SetGravity(GravityFlags.CenterVertical);
-        row.AddView(PaperUi.Body(this, label),
-            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        // Index 0 = On, 1 = Off; start on the segment matching the current radio state.
-        row.AddView(PaperUi.SegmentedToggle(this, "On", "Off", index => onChange(index == 0), isOn ? 0 : 1));
-        content!.AddView(row, Spaced(0, DesignTokens.Space.X2));
+        row.SetPadding(Dp(DesignTokens.Space.X4), Dp(DesignTokens.Space.X3),
+            Dp(DesignTokens.Space.X4), Dp(DesignTokens.Space.X3));
+        card.AddView(row, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+        return row;
     }
 
-    private void AddGroupLabel(string text)
+    // A card row with a title (and optional description), returned so the caller can append a trailing
+    // control. The text column takes the leftover width.
+    private LinearLayout AddCardRow(LinearLayout card, string title, string? desc)
     {
-        var label = PaperUi.Secondary(this, text);
-        label.TextSize = DesignTokens.TypeSp.Label;
-        label.Typeface = PaperTheme.SansSemibold(this);
-        label.SetTextColor(PaperTheme.InkMuted);
-        var labelParams = MatchWrap();
-        labelParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X6);
-        labelParams.BottomMargin = PaperTheme.Dp(this, DesignTokens.Space.X2);
-        content!.AddView(label, labelParams);
+        var row = BeginRow(card);
+        var column = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        column.AddView(PaperUi.Body(this, title), MatchWrap());
+        if (!string.IsNullOrEmpty(desc))
+        {
+            var descView = PaperUi.Secondary(this, desc!);
+            descView.TextSize = DesignTokens.TypeSp.Label;
+            var descParams = MatchWrap();
+            descParams.TopMargin = Dp(DesignTokens.Space.X1);
+            column.AddView(descView, descParams);
+        }
+        row.AddView(column, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        return row;
     }
 
-    private void AddBody(string text)
+    // A tappable row that leads somewhere: a chevron on the right and the whole row acts as the tap.
+    private void AddNavRow(LinearLayout card, string title, string? desc, Action onClick)
+    {
+        var row = AddCardRow(card, title, desc);
+        var chevron = PaperUi.Secondary(this, "›");
+        chevron.SetTextColor(PaperTheme.InkMuted);
+        row.AddView(chevron, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
+        row.Clickable = true;
+        row.Click += (_, _) => onClick();
+    }
+
+    // A row with an On/Off segmented control (the kit's toggle, §8 highlighter wash — not an iOS switch).
+    private void AddToggleRow(LinearLayout card, string title, string? desc, bool isOn, Action<bool> onChange)
+    {
+        var row = AddCardRow(card, title, desc);
+        var toggle = PaperUi.Segmented(this, ["On", "Off"], index => onChange(index == 0), isOn ? 0 : 1, PaperTheme.Accent);
+        // The segmented cells are equal-weight, so the control needs a bounded width to lay out.
+        row.AddView(toggle, new LinearLayout.LayoutParams(Dp(128), ViewGroup.LayoutParams.WrapContent));
+    }
+
+    // A quiet caption beneath a card — a status sentence (DESIGN.md §7), optionally in the
+    // In-progress hue for "last checked …" style lines.
+    private void AddCardCaption(string text, bool progress = false)
     {
         var view = PaperUi.Secondary(this, text);
-        view.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X2), 0, 0);
-        content!.AddView(view, MatchWrap());
-    }
-
-    private void AddContentButton(Button button)
-    {
-        var layoutParams = MatchWrap();
-        layoutParams.BottomMargin = PaperTheme.Dp(this, DesignTokens.Space.X2);
-        content!.AddView(button, layoutParams);
+        view.TextSize = DesignTokens.TypeSp.Label;
+        if (progress)
+        {
+            view.SetTextColor(PaperTheme.ProgressText);
+        }
+        var lp = MatchWrap();
+        lp.TopMargin = Dp(DesignTokens.Space.X2);
+        content!.AddView(view, lp);
     }
 
     private void ScheduleRefresh()
@@ -637,12 +792,7 @@ public class LauncherSettingsActivity : Activity
         }, 1000);
     }
 
-    private LinearLayout.LayoutParams Spaced(int topDp, int bottomDp) =>
-        new(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
-        {
-            TopMargin = PaperTheme.Dp(this, topDp),
-            BottomMargin = PaperTheme.Dp(this, bottomDp),
-        };
+    private int Dp(int value) => PaperTheme.Dp(this, value);
 
     private static LinearLayout.LayoutParams MatchWrap() =>
         new(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
