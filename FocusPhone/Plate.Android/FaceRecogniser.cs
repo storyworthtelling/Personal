@@ -39,6 +39,24 @@ public sealed class FaceRecogniser(Context context, IFaceEmbedder embedder)
 
     public bool CanRecognise => embedder.IsReady;
 
+    // Nested rather than file-scoped: a file-scoped type gets a mangled name with angle
+    // brackets in it, and anything deriving from Java.Lang.Object needs a generated Java
+    // peer class — whose name would then be invalid Java. The build says so in twelve
+    // javac errors that never mention the word "file".
+    private sealed class Found(TaskCompletionSource<Java.Lang.Object?> waiting)
+        : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
+    {
+        public void OnSuccess(Java.Lang.Object? result) => waiting.TrySetResult(result);
+    }
+
+    private sealed class NotFound(TaskCompletionSource<Java.Lang.Object?> waiting)
+        : Java.Lang.Object, Android.Gms.Tasks.IOnFailureListener
+    {
+        // A failure is "no faces", not an exception: the caller is a screen the owner is
+        // already looking at.
+        public void OnFailure(Java.Lang.Exception e) => waiting.TrySetResult(null);
+    }
+
     /// <summary>
     /// Every face in the picture, largest first, each with the crop it came from. Empty when
     /// there are none, when detection fails, or when the phone cannot run it — all of which
@@ -103,20 +121,6 @@ public sealed class FaceRecogniser(Context context, IFaceEmbedder embedder)
             return [];
         }
     }
-}
-
-file sealed class Found(TaskCompletionSource<Java.Lang.Object?> waiting)
-    : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
-{
-    public void OnSuccess(Java.Lang.Object? result) => waiting.TrySetResult(result);
-}
-
-file sealed class NotFound(TaskCompletionSource<Java.Lang.Object?> waiting)
-    : Java.Lang.Object, Android.Gms.Tasks.IOnFailureListener
-{
-    // A failure is "no faces", not an exception: the caller is a screen the owner is
-    // already looking at.
-    public void OnFailure(Java.Lang.Exception e) => waiting.TrySetResult(null);
 }
 
 /// <summary>One face in a picture: the crop, and its numbers if a model could produce them.</summary>
