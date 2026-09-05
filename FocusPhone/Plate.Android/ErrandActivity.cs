@@ -105,7 +105,7 @@ public class ErrandActivity : AppCompatActivity
 
         var page = new LinearLayout(this) { Orientation = Orientation.Vertical };
         page.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        page.AddView(PaperUi.ScreenHeader(this, Title(), PaperTheme.PlateMark));
+        page.AddView(PaperUi.ScreenHeader(this, Heading(), PaperTheme.PlateMark));
         page.AddView(PaperUi.Secondary(this, Asked()));
 
         if (errand == Errand.ShowImage)
@@ -151,7 +151,7 @@ public class ErrandActivity : AppCompatActivity
         return image;
     }
 
-    private string Title() => errand switch
+    private string Heading() => errand switch
     {
         Errand.Photo => "A picture",
         Errand.Video => "A video",

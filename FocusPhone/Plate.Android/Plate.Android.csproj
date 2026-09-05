@@ -15,11 +15,24 @@
   <ItemGroup>
     <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
     <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
+    <!-- The Darkroom's caption client lives here with the suite's other Claude clients.
+         Flyleaf, Score and Post all reference this already; Plate was the only head that
+         did not, because until the Darkroom it had nothing in it. -->
+    <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
     <!-- The shared page-composition library: Plate assembles its own scan PDF because ML Kit's
          scanner caps a run at 50 pages and the owner wants longer. PdfVolumeComposer is the
          same assembler Canonizer and DailyLoader use, and IPaperDelivery is the reMarkable
          root upload, so one reference serves both halves of a scan's life. -->
     <ProjectReference Include="..\..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The face-embedding model and the BSD-3-Clause notice its licence requires be
+         reproduced with any binary distribution. Explicit rather than relying on a default
+         glob, because a model that silently stops being packaged looks exactly like a model
+         that is working and finding nobody. -->
+    <AndroidAsset Include="Assets\face-embedder.tflite" />
+    <AndroidAsset Include="Assets\face-embedder-LICENSE.txt" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,5 +50,13 @@
     <!-- Reading a card or a statement when another app asks. On-device OCR: nothing Plate
          is handed to read leaves the phone to be recognised. -->
     <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" Version="116.0.1.9" />
+    <!-- Finding faces. ML Kit DETECTS a face; it does not say whose it is, so recognition
+         needs an embedding model behind IFaceEmbedder — see FaceRecogniser. -->
+    <PackageReference Include="Xamarin.Google.MLKit.FaceDetection" Version="116.1.7.9" />
+    <!-- Running the face-embedding model. The model FILE is deliberately not in this repo:
+         which one to ship carries a licence and a training-data provenance, and the faces
+         being matched are the owner's friends. Absent, TfLiteFaceEmbedder reports not-ready
+         and the head still finds faces and still takes a hand-written name. -->
+    <PackageReference Include="Xamarin.TensorFlow.Lite" Version="2.16.1.10" />
   </ItemGroup>
 </Project>

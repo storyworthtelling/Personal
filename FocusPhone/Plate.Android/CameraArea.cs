@@ -131,21 +131,17 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
             return;
         }
 
-        // WHERE this lands is the phase's live bug, and it is decided in Codex.Domain
-        // (CaptureFiling) rather than here: without RELATIVE_PATH the Images collection
-        // files under its default Pictures/, and Google Photos backs up DCIM/Camera while
-        // treating every other device folder as opt-in — so every photo this app ever took
-        // was on the phone and outside backup.
-        var entry = CaptureFiling.Photo(DateTime.Now);
-        var values = new ContentValues();
-        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, entry.DisplayName);
-        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, entry.MimeType);
-        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, entry.RelativePath);
-        var options = new ImageCapture.OutputFileOptions.Builder(
-            Host.ContentResolver!, Android.Provider.MediaStore.Images.Media.ExternalContentUri!,
-            values).Build();
-
-        capture.TakePicture(options, ContextCompat.GetMainExecutor(Host), new CaptureCallback(this));
+        // The reversed spine. A capture does NOT go to the camera roll here: it goes to
+        // Plate's own private folder and waits in the Darkroom until the owner chooses it.
+        // Writing it into MediaStore at the shutter would put it straight into Google Photos
+        // and leave nothing to choose between, which is the whole point of the room.
+        //
+        // The Photos fix has not been abandoned, only moved — the DCIM/Camera insert now
+        // happens at send time, in DarkroomArea.
+        var file = shell.DarkroomFiles.NewFile("jpg");
+        var options = new ImageCapture.OutputFileOptions.Builder(file).Build();
+        capture.TakePicture(options, ContextCompat.GetMainExecutor(Host),
+            new CaptureCallback(this, file));
     }
 
     private void StartVideo()
@@ -234,12 +230,17 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         }
     }
 
-    private sealed class CaptureCallback(CameraArea area)
+    private sealed class CaptureCallback(CameraArea area, Java.IO.File file)
         : Java.Lang.Object, ImageCapture.IOnImageSavedCallback
     {
         public void OnImageSaved(ImageCapture.OutputFileResults? results) =>
-            area.Host.RunOnUiThread(() => area.ShowStatus(
-                $"Photo saved to your camera roll · {TimeFormats.Clock12(DateTime.Now)}"));
+            area.Host.RunOnUiThread(() =>
+            {
+                area.shell.Kept(DarkroomItem.Photo(file.Name!, DateTime.Now));
+                // §7 bans a success toast, so the shutter's only answer is this line. It
+                // says where the picture went, and it did NOT go to the camera roll.
+                area.ShowStatus($"In the Darkroom · {TimeFormats.Clock12(DateTime.Now)}");
+            });
 
         // §7: a failure surfaces inline, in the same line the success uses. It used to be a
         // toast, which is the one place the owner cannot go back and read.
