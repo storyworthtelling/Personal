@@ -354,21 +354,16 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             output.Write(pdf, 0, pdf.Length);
         }
 
-        Hand(held.Destination, target, entry.DisplayName);
+        Hand(held.Destination, target, entry.DisplayName, pdf);
     }
 
     // The delivery is hybrid, and which half applies is decided in Codex.Domain
     // (ScanDelivery) rather than here.
-    private void Hand(ScanDestination destination, Android.Net.Uri document, string title)
+    private void Hand(ScanDestination destination, Android.Net.Uri document, string title, byte[] pdf)
     {
         if (ScanDelivery.RouteFor(destination) != DeliveryRoute.ShareIntent)
         {
-            // The reMarkable goes through the shared library, which is not wired on this
-            // head yet. Saying so is better than a share sheet that cannot reach a tablet.
-            ShowStatus($"Saved to Documents · {TimeFormats.Clock12(DateTime.Now)}. "
-                + "The reMarkable is not paired yet.");
-            tray = null;
-            Invalidate();
+            SendToRemarkable(title, pdf);
             return;
         }
 
@@ -386,12 +381,43 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             Host.StartActivity(share);
             ShowStatus($"Handed over · {TimeFormats.Clock12(DateTime.Now)}");
             tray = null;
+            face = Face.Doors;
             Invalidate();
         }
         catch (ActivityNotFoundException)
         {
             ShowStatus($"Saved to Documents · {TimeFormats.Clock12(DateTime.Now)}. "
                 + "That app is not installed.");
+        }
+    }
+
+    // The one destination that is not another app on the phone. It is also the only one
+    // that can say whether it arrived: a share intent is fire-and-forget, so Drive and Post
+    // get "handed over" while this gets a real answer either way.
+    private async void SendToRemarkable(string title, byte[] pdf)
+    {
+        if (!PlateRemarkable.IsPaired)
+        {
+            ShowStatus($"Saved to Documents · {TimeFormats.Clock12(DateTime.Now)}. "
+                + "Pair the reMarkable in Settings to send it there.");
+            return;
+        }
+
+        // §8: loading is a status sentence, not a spinner.
+        ShowStatus("Sending to the reMarkable…");
+        try
+        {
+            await shell.Remarkable.DeliverToRoot(title, pdf);
+            ShowStatus($"On the reMarkable · {TimeFormats.Clock12(DateTime.Now)}");
+            tray = null;
+            face = Face.Doors;
+            Invalidate();
+        }
+        catch (Exception e)
+        {
+            // The PDF is already filed under Documents, so nothing is lost — which is what
+            // makes it safe to say plainly what went wrong instead of retrying blind.
+            ShowStatus($"Saved to Documents, but the reMarkable refused it: {e.Message}");
         }
     }
 
