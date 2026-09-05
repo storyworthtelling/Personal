@@ -16,16 +16,24 @@ public class TidalSignInFailureTests
             "TIDAL device_authorization refused the request with 400 BadRequest: " +
             "invalid_request — Client is not a Limited Input Device client");
 
-        Assert.Contains("isn't registered", said, StringComparison.OrdinalIgnoreCase);
+        // The point is that it names TIDAL's refusal rather than the network, and does
+        // not offer a retry. The exact wording moved once already and may again.
+        Assert.Contains("TIDAL", said, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("reach", said, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("try again", said, StringComparison.OrdinalIgnoreCase);
     }
 
+    // The first version of this sent the owner to the developer portal to enable the
+    // flow. There is nothing there to enable — TIDAL's Android SDK documents the
+    // device flow as "(Only available for TIDAL internally developed applications for
+    // now)" — so that text sent them looking for a setting that does not exist.
     [Fact]
-    public void Describe_TellsYouWhereTheFixIs()
+    public void Describe_DoesNotSendYouHuntingForASettingThatDoesNotExist()
     {
         var said = TidalSignInFailure.Describe("invalid_request — Client is not a Limited Input Device client");
 
-        Assert.Contains("developer", said, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("portal", said, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("own apps", said, StringComparison.OrdinalIgnoreCase);
     }
 
     // Wrong credentials are the owner's to fix too, and are a different fix.
