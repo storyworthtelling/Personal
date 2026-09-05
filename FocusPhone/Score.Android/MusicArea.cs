@@ -21,6 +21,12 @@ public sealed class MusicArea : ScoreArea
 {
     private readonly MusicLibrary library;
     private MusicView view = MusicView.Menu;
+
+    // What is open below the list. An album has a screen of its own (the approved
+    // Screen 2, fourth frame); an artist or a genre narrows the song list rather than
+    // getting a screen nobody has drawn.
+    private Album? openAlbum;
+    private (MusicView Axis, string Name)? narrowed;
     private string query = string.Empty;
     private PlaylistEditor? editor;
     private string? generating;
@@ -51,6 +57,17 @@ public sealed class MusicArea : ScoreArea
         if (editor is not null)
         {
             editor = null;
+            Invalidate();
+            return true;
+        }
+
+        // An open album, or a narrowed axis, is a level below its list — back returns
+        // to the list rather than all the way to the menu.
+        if (openAlbum is not null || narrowed is not null)
+        {
+            openAlbum = null;
+            narrowed = null;
+            query = string.Empty;
             Invalidate();
             return true;
         }
@@ -174,18 +191,24 @@ public sealed class MusicArea : ScoreArea
         var catalog = library.Catalog;
         switch (view)
         {
+            case MusicView.Artists when narrowed is { } artist:
+                return BuildNarrowed(artist.Name, catalog.TracksByArtist(artist.Name));
+
             case MusicView.Artists:
                 var artists = catalog.Artists();
                 return Browse(artists.Count,
                     [.. artists.Select(artist => (new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"), artist.Name))],
-                    name => library.PlayTracks(catalog.TracksByArtist(name), 0),
+                    name => Narrow(MusicView.Artists, name),
                     name => library.PlayShuffled(catalog.TracksByArtist(name)));
+
+            case MusicView.Albums when openAlbum is { } album:
+                return BuildAlbum(album);
 
             case MusicView.Albums:
                 var albums = catalog.Albums();
                 return Browse(albums.Count,
                     [.. albums.Select(album => (new PaperListRow(album.Name, album.AlbumArtist, album.ArtRef), album))],
-                    album => library.PlayTracks(catalog.TracksInAlbum(album.AlbumArtist, album.Name), 0),
+                    Open,
                     album => ShowAlbumActions(album.Name, catalog.TracksInAlbum(album.AlbumArtist, album.Name)),
                     asCovers: true);
 
@@ -197,11 +220,14 @@ public sealed class MusicArea : ScoreArea
                     ShowTrackActions,
                     idOf: track => track.Id);
 
+            case MusicView.Genres when narrowed is { } genre:
+                return BuildNarrowed(genre.Name, catalog.TracksInGenre(genre.Name));
+
             case MusicView.Genres:
                 var genres = catalog.Genres();
                 return Browse(genres.Count,
                     [.. genres.Select(genre => (new PaperListRow(genre), genre))],
-                    genre => library.PlayTracks(catalog.TracksInGenre(genre), 0),
+                    genre => Narrow(MusicView.Genres, genre),
                     genre => library.PlayShuffled(catalog.TracksInGenre(genre)));
 
             case MusicView.Playlists:
@@ -303,8 +329,81 @@ public sealed class MusicArea : ScoreArea
     private void ShowAlbumActions(string name, IReadOnlyList<Track> tracks)
     {
         ActionCard.Show(Host, Overlay, name, $"{tracks.Count} tracks",
-            new CardAction("Shuffle", () => library.PlayShuffled(tracks), Lead: true),
+            new CardAction("Play", () => library.PlayTracks(tracks, 0), Lead: true),
+            new CardAction("Shuffle", () => library.PlayShuffled(tracks)),
             new CardAction("Download", () => Download(name, tracks)));
+    }
+
+    private void Open(Album album)
+    {
+        openAlbum = album;
+        query = string.Empty; // the filter belonged to the list of albums, not this one
+        Invalidate();
+    }
+
+    private void Narrow(MusicView axis, string name)
+    {
+        narrowed = (axis, name);
+        query = string.Empty;
+        Invalidate();
+    }
+
+    /// <summary>
+    /// The album, opened (the approved Screen 2, fourth frame). Tapping an album used
+    /// to start playing it, which meant the library had a browse axis you could not
+    /// browse — the tracks were only ever reachable through Songs.
+    ///
+    /// The header is the 104dp art block the owner chose over the 56dp alternative,
+    /// with the artist beside it because an album carries a second name its title does
+    /// not. The track rows carry no artwork at all: this list is already scoped to one
+    /// record, so every row would repeat the same picture (DESIGN.md §7, Artwork slot).
+    /// </summary>
+    private View BuildAlbum(Album album)
+    {
+        var tracks = library.Catalog.TracksInAlbum(album.AlbumArtist, album.Name);
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+
+        var head = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
+        var side = PaperTheme.Dp(Host, ArtworkWindow.DetailSizeDp);
+        var art = new ArtworkWindow(Host);
+        art.SetArtwork(CoverCache.Get(album.ArtRef, side));
+        head.AddView(art, new LinearLayout.LayoutParams(side, side));
+
+        var names = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        names.SetGravity(GravityFlags.CenterVertical);
+        names.SetPadding(PaperTheme.Dp(Host, DesignTokens.Space.X4), 0, 0, 0);
+        names.AddView(PaperUi.Heading(Host, album.Name));
+        names.AddView(PaperUi.Secondary(Host, album.AlbumArtist));
+        names.AddView(PaperUi.Secondary(Host, $"{tracks.Count} tracks"));
+        head.AddView(names, new LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+
+        head.SetPadding(0, 0, 0, PaperTheme.Dp(Host, DesignTokens.Space.X4));
+        column.AddView(head);
+
+        column.AddView(PaperUi.List(Host,
+            [.. tracks.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist))],
+            position => library.PlayTracks(tracks, position),
+            position => ShowTrackActions(tracks[position])));
+
+        return column;
+    }
+
+    /// <summary>
+    /// An artist or a genre, narrowed to its tracks. Deliberately the song list rather
+    /// than a screen of its own: neither was ever drawn, and reusing an approved
+    /// surface scoped to one name is honest where inventing two screens is not.
+    /// </summary>
+    private View BuildNarrowed(string name, IReadOnlyList<Track> tracks)
+    {
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        column.AddView(PaperUi.Heading(Host, name));
+        column.AddView(PaperUi.Secondary(Host, $"{tracks.Count} tracks"));
+        column.AddView(PaperUi.List(Host,
+            [.. tracks.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist, track.ArtRef))],
+            position => library.PlayTracks(tracks, position),
+            position => ShowTrackActions(tracks[position])));
+        return column;
     }
 
     private void ShowTrackActions(Track track)
