@@ -1,0 +1,253 @@
+name: Build Post APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'FocusPhone/Post.Android/**'
+      - 'FocusPhone/gmbridge/**'
+      - 'FocusPhone/Codex.GmBridge.Binding/**'
+      - 'FocusPhone/Codex.Ui.Android/**'
+      - 'FocusPhone/Codex.Domain/**'
+      - 'FocusPhone/Codex.Infrastructure/**'
+      - 'FocusPhone/Codex.Tests/**'
+      - 'Storyworthtelling.Updates/**'
+      - 'Storyworthtelling.Voice/**'
+      - '.github/workflows/build-post.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android heads, which would require the Android workload.
+      - name: Run tests
+        run: dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    # actions: write lets the prune step delete artifacts from older runs;
+    # contents: write lets the rolling-release step publish the signed APK.
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Post is plain .NET-for-Android (not MAUI), so the lighter 'android'
+      # workload is sufficient.
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      # In-app texting: build the gomobile shim over libgm (gmbridge/bridge.go)
+      # into gmbridge.aar, which Codex.GmBridge.Binding turns into a C# binding
+      # Post calls. Needs Go + the runner's Android NDK. This moved here from
+      # build-flyleaf.yml with the head: no other head touches the bridge.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Build gmbridge.aar (gomobile)
+        working-directory: FocusPhone/gmbridge
+        run: |
+          set -e
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_ROOT}"
+          echo "Using Android NDK at $ANDROID_NDK_HOME"
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          gomobile init || true
+          ./build.sh
+
+      # Prove the .aar binds to C# before the head consumes it — grep the log
+      # for "=== GMBRIDGE BINDING ===".
+      - name: GmBridge binding check
+        working-directory: FocusPhone
+        run: |
+          echo "=== GMBRIDGE BINDING ==="
+          dotnet build Codex.GmBridge.Binding -c Release
+          echo "=== END GMBRIDGE BINDING ==="
+
+      # Post signs with the same shared repo keystore as every other head, so the
+      # whole suite carries one signature — required both for the device-owner
+      # silent-update channel and for this build to install IN PLACE over the
+      # Communication head it renames.
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/focusphone.keystore
+
+      - name: Build signed APK
+        working-directory: FocusPhone
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          # This workflow's run_number restarts at 1, but the head it renames has
+          # been shipping versionCodes of 100000 + build-flyleaf's run_number (in
+          # the mid-90s at the split). A bare 100000 + RUN_NUMBER would therefore
+          # look OLDER than what is installed and be rejected by the update
+          # channel, so the floor steps to 200000 — clear of everything the
+          # Communication head ever shipped, with headroom to spare.
+          VERSION_CODE=$((200000 + RUN_NUMBER))
+          # Post graduates from the 0.1 Communication pilot to a 1.x major.
+          DISPLAY_VERSION="1.0.$RUN_NUMBER"
+          echo "::group::Publishing Post.Android (versionCode $VERSION_CODE, version $DISPLAY_VERSION)"
+          dotnet publish Post.Android -f net10.0-android -c Release \
+            -p:ApplicationVersion=$VERSION_CODE \
+            -p:ApplicationDisplayVersion=$DISPLAY_VERSION \
+            -p:AndroidPackageFormat=apk \
+            -p:AndroidKeyStore=true \
+            -p:AndroidSigningKeyStore=/tmp/focusphone.keystore \
+            -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }} \
+            -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }} \
+            -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
+          echo "::endgroup::"
+
+      # The APK carries the frozen ApplicationId, not the project name — that is
+      # what makes this an in-place upgrade rather than a second app on the
+      # phone. Fatal, because getting it wrong is invisible until the device has
+      # two icons and one of them has no history.
+      - name: APP ID CHECK
+        working-directory: FocusPhone
+        run: |
+          set -e
+          echo "=== APP ID CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          APK=$(ls -1 Post.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          echo "--- $APK"
+          BADGING=$("$AAPT2" dump badging "$APK")
+          echo "$BADGING" | head -2
+          echo "$BADGING" | grep -q "name='com.storyworthtelling.focusphone.communication'" || {
+            echo "FAIL: Post's APK does not carry the frozen communication ApplicationId."
+            exit 1
+          }
+          echo "ok: frozen ApplicationId present"
+          echo "=== END APP ID CHECK ==="
+
+      # ROLE_SMS is what lets Post send or delete a text at all, and an app that does
+      # not qualify is SILENTLY absent from the "default SMS app" list: the consent
+      # dialog simply never appears. Qualification is decided by resolving intents
+      # against the shipped manifest, so it is checked HERE, on the built APK — a
+      # source-level guard passed while the artifact was wrong once already, which is
+      # how the mimeType on SMS_DELIVER survived to a device.
+      #
+      # Fatal: an APK that cannot take the role is not worth installing.
+      - name: SMS ROLE CHECK
+        working-directory: FocusPhone
+        run: |
+          set -e
+          echo "=== SMS ROLE CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          APK=$(ls -1 Post.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          echo "--- $APK"
+          XML=$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK")
+
+          for ACTION in \
+            android.provider.Telephony.SMS_DELIVER \
+            android.provider.Telephony.WAP_PUSH_DELIVER \
+            android.intent.action.RESPOND_VIA_MESSAGE \
+            android.intent.action.SENDTO; do
+            echo "$XML" | grep -q "$ACTION" || {
+              echo "FAIL: $ACTION is not in the shipped manifest; Post cannot hold the SMS role."
+              exit 1
+            }
+            echo "ok: $ACTION"
+          done
+
+          # The SMS_DELIVER filter must carry NO data type. Android resolves a bare,
+          # untyped Intent(SMS_DELIVER_ACTION) against it, and an untyped intent cannot
+          # match a typed filter, so a mimeType here disqualifies Post with nothing said.
+          # Read the filter block that follows the SMS_DELIVER action and fail on any
+          # mimeType inside it.
+          echo "$XML" | awk '
+            /android.provider.Telephony.SMS_DELIVER/ { inFilter = 1; next }
+            inFilter && /E: (action|category|data)/ { element = $2 }
+            inFilter && element == "data" && /mimeType/ { print "MIMETYPE"; exit }
+            inFilter && /E: (receiver|activity|service|intent-filter)/ { exit }
+          ' | grep -q MIMETYPE && {
+            echo "FAIL: the SMS_DELIVER filter declares a data mimeType. An untyped"
+            echo "      Intent(SMS_DELIVER_ACTION) cannot match it, so Post is silently"
+            echo "      disqualified from the SMS role and never receives a text."
+            exit 1
+          }
+          echo "ok: SMS_DELIVER filter carries no data type"
+          echo "=== END SMS ROLE CHECK ==="
+
+      # Prove the Paper & Ink launcher icon is packaged (same rationale as the
+      # other heads' ICON CHECK: don't trust "it built"). Print-only; grep the
+      # log for "=== ICON CHECK ===".
+      - name: ICON CHECK
+        continue-on-error: true
+        working-directory: FocusPhone
+        run: |
+          set +e
+          echo "=== ICON CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          APK=$(ls -1 Post.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          echo "--- $APK"
+          "$AAPT2" dump badging "$APK" 2>/dev/null | grep -Ei 'application(-icon)?:' || echo "(no icon line)"
+          unzip -l "$APK" | grep -Ei 'mipmap.*appicon' | head -4 || echo "(no appicon entries)"
+          echo "=== END ICON CHECK ==="
+
+      # Fatal: prove the six shared fonts are packaged at the exact internal path
+      # PaperTheme.Load reads them from (assets/fonts/<name>.ttf). Counting
+      # ".ttf" is not enough — a Link separator bug can pack them under a wrong
+      # literal name so Assets.Open fails and the head crashes on launch.
+      - name: FONT CHECK
+        working-directory: FocusPhone
+        run: |
+          set -e
+          echo "=== FONT CHECK ==="
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular"
+          APK=$(ls -1 Post.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          echo "--- $APK"
+          ENTRIES=$(unzip -l "$APK")
+          for font in $FONTS; do
+            if ! echo "$ENTRIES" | grep -q "assets/fonts/$font.ttf"; then
+              echo "FAIL: Post is missing assets/fonts/$font.ttf"
+              echo "$ENTRIES" | grep -i '\.ttf' || echo "(no .ttf entries at all)"
+              exit 1
+            fi
+          done
+          echo "ok: all six fonts at assets/fonts/"
+          echo "=== END FONT CHECK ==="
+
+      # Keep only the latest run's artifacts: delete artifacts from older runs of
+      # this workflow before uploading, which also frees storage so the upload succeeds.
+      - name: Prune old artifacts
+        uses: ./.github/actions/prune-old-artifacts
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Post-Android
+          path: FocusPhone/Post.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      # Publish the signed head to the rolling "apps-latest" release the phone's
+      # update channel installs from. main only — feature-branch builds must never
+      # reach the device. The asset name is derived from the frozen ApplicationId,
+      # so this clobbers the Communication asset build-flyleaf used to publish
+      # rather than leaving a stale duplicate beside it.
+      - name: Publish to rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/publish-rolling-release
+        with:
+          apks: FocusPhone/Post.Android/bin/Release/net10.0-android/publish/*-Signed.apk

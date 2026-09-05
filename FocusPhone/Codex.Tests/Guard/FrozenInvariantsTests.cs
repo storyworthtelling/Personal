@@ -1,0 +1,717 @@
+using Codex.Domain.Policy;
+using Xunit;
+
+namespace Codex.Tests.Guard;
+
+/// <summary>
+/// The in-place-upgrade guard for the Flyleaf (P5) rename pilot. The launcher head
+/// rebrands FocusPhone.* → Codex.* and Launcher → Flyleaf, but an installed device
+/// only upgrades in place — no uninstall, no re-pairing, the device-owner update
+/// channel still recognizing it — while a handful of identifiers stay byte-identical.
+/// These tests fail if any of them drift, so the rename can never silently break the
+/// home role or the update channel. The assertions read the repo by content (not by
+/// project/namespace names), so they keep protecting the same invariants after the
+/// folders and namespaces are renamed.
+/// </summary>
+public class FrozenInvariantsTests
+{
+    // The app id and owner namespace are the load-bearing constants; a device
+    // recognizes an update only when the package name is unchanged.
+    [Fact]
+    public void LauncherAppIdAndOwnerPrefixAreFrozen()
+    {
+        Assert.Equal("com.storyworthtelling.focusphone.launcher", PolicyContext.LauncherPackage);
+        Assert.Equal("com.storyworthtelling.", PolicyContext.OwnerPackagePrefix);
+        Assert.Equal("com.storyworthtelling.focusphone.communication", PolicyContext.CommunicationPackage);
+        Assert.Equal("com.storyworthtelling.focusphone.camera", PolicyContext.PlatePackage);
+        Assert.Equal("com.storyworthtelling.focusphone.audio", PolicyContext.AudioPackage);
+    }
+
+    // Exactly one head declares the frozen ApplicationId — the launcher. The rename
+    // may move/rename the csproj, but the literal must survive it.
+    [Fact]
+    public void LauncherCsprojDeclaresFrozenApplicationId()
+    {
+        var declaring = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains($"<ApplicationId>{PolicyContext.LauncherPackage}</ApplicationId>", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(declaring.Count == 1,
+            $"Exactly one csproj must declare the frozen launcher ApplicationId " +
+            $"'{PolicyContext.LauncherPackage}'; found {declaring.Count}:\n" +
+            string.Join("\n", declaring.Select(RepoRelative)));
+    }
+
+    // The home Activity must keep MainLauncher + CategoryHome, or Flyleaf stops being
+    // the device home app after the upgrade.
+    [Fact]
+    public void HomeActivityKeepsLauncherAndHomeIntent()
+    {
+        var declaresHome = EnumerateRepoFiles("*.cs").Any(file =>
+        {
+            var source = File.ReadAllText(file);
+            return source.Contains("MainLauncher = true", StringComparison.Ordinal)
+                && source.Contains("Intent.CategoryHome", StringComparison.Ordinal);
+        });
+
+        Assert.True(declaresHome,
+            "No Activity declares 'MainLauncher = true' with 'Intent.CategoryHome' — " +
+            "the rebranded launcher would no longer register as the device home app.");
+    }
+
+    // The update channel stays the 'apps-latest' rolling release, matched by the owner
+    // namespace (not by APK filename), so renaming workflows/assets can't break it.
+    [Fact]
+    public void UpdateChannelIsAppsLatestByOwnerNamespace()
+    {
+        var githubRoot = Path.Combine(RepoRoot(), ".github");
+        var mentionsAppsLatest = Directory
+            .EnumerateFiles(githubRoot, "*.yml", SearchOption.AllDirectories)
+            .Any(file => File.ReadAllText(file).Contains("apps-latest", StringComparison.Ordinal));
+
+        Assert.True(mentionsAppsLatest,
+            "The 'apps-latest' rolling-release tag is gone from .github — the device-owner update channel would break.");
+
+        // The install decision is package-id based: an owner app upgrades, a stray package is skipped.
+        var upgraded = Storyworthtelling.Updates.UpdateScope.Decide(
+            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage,
+            [new Storyworthtelling.Updates.InstallCandidate(PolicyContext.LauncherPackage, 2)],
+            new Dictionary<string, long> { [PolicyContext.LauncherPackage] = 1 });
+        Assert.Single(upgraded);
+
+        var skipped = Storyworthtelling.Updates.UpdateScope.Decide(
+            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage,
+            [new Storyworthtelling.Updates.InstallCandidate("com.example.other", 9)],
+            new Dictionary<string, long>());
+        Assert.Empty(skipped);
+    }
+
+    // The device-owner binding is keyed to the admin RECEIVER's component name, and the
+    // notification-listener grant to the listener SERVICE's — both provisioned once (adb /
+    // QR) against the original names. The rename moved these classes to `namespace Flyleaf`,
+    // so their manifest `Name=` must stay the literal old component name, or an upgraded
+    // device silently loses device-owner control / notification access. This is exactly why
+    // those two classes are NOT renamed; the guard fails if either component name drifts.
+    [Fact]
+    public void DeviceAdminAndNotificationListenerComponentNamesAreFrozen()
+    {
+        var adminComponent = $"{PolicyContext.LauncherPackage}.FocusDeviceAdminReceiver";
+        var listenerComponent = $"{PolicyContext.LauncherPackage}.TileNotificationListener";
+
+        Assert.Equal(1, CountCsFilesDeclaring(adminComponent, "Name ="));
+        Assert.Equal(1, CountCsFilesDeclaring(listenerComponent, "Name ="));
+    }
+
+    private static int CountCsFilesDeclaring(string componentName, string attributeHint) =>
+        EnumerateRepoFiles("*.cs").Count(file =>
+        {
+            var source = File.ReadAllText(file);
+            return source.Contains($"\"{componentName}\"", StringComparison.Ordinal)
+                && source.Contains(attributeHint, StringComparison.Ordinal);
+        });
+
+    // The owner namespace is the update channel's whole trust boundary, and it now
+    // lives in the shared update library — Codex.Domain keeps its own copy so it
+    // stays dependency-free, which means the two can drift. This is the guard that
+    // says they cannot.
+    [Fact]
+    public void OwnerPrefixMatchesTheSharedUpdateLibrary()
+    {
+        Assert.Equal(Storyworthtelling.Updates.SuiteApps.OwnerPackagePrefix, PolicyContext.OwnerPackagePrefix);
+    }
+
+    // ---- Score (P6): the same invariants, for the second head through the rename ----
+
+    // Exactly one head declares the frozen audio ApplicationId. Score renames its
+    // folder, csproj and namespace; the package name is what a device matches an
+    // update against, so it survives all three.
+    [Fact]
+    public void AudioCsprojDeclaresFrozenApplicationId()
+    {
+        var declaring = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains($"<ApplicationId>{PolicyContext.AudioPackage}</ApplicationId>", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(declaring.Count == 1,
+            $"Exactly one csproj must declare the frozen audio ApplicationId " +
+            $"'{PolicyContext.AudioPackage}'; found {declaring.Count}:\n" +
+            string.Join("\n", declaring.Select(RepoRelative)));
+    }
+
+    // Three registered component names outlive the process that registered them: the
+    // media session's foreground SERVICE, which a device may already be running across
+    // the upgrade; the WorkManager WORKER, whose scheduled request is persisted by
+    // class name in WorkManager's own database; and the DOWNLOAD service, which is a
+    // foreground service that can likewise be mid-fetch when the upgrade lands.
+    // Renaming any of them strands the thing that refers to it — a service
+    // notification, a download in flight, or a Friday run that silently never fires
+    // again. This is why those classes carry an explicit Name/Register rather than
+    // taking the namespace default.
+    [Fact]
+    public void RegisteredComponentNamesAreFrozen()
+    {
+        Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.PlaybackService", "Name ="));
+        Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.FridayPicksWorker", "Register("));
+        Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.DownloadService", "Name ="));
+
+        // Score's own update worker, for the phone with no custodian. Persisted by
+        // class name in WorkManager's database exactly as the Friday picks worker is,
+        // so a rename strands a scheduled run that then silently never fires.
+        Assert.Equal(1, CountCsFilesDeclaring($"{PolicyContext.AudioPackage}.ScoreUpdateWorker", "Register("));
+    }
+
+    // Every on-device store the head owns, by SharedPreferences file name. The file
+    // name is the only handle Android gives you on the data, so a renamed constant
+    // reads as an empty app — no subscriptions, no resume points, no equalizer.
+    //
+    // Playlists are the sharpest case, because unlike the queues and the episode cache
+    // they are not re-derivable from anything: a hand-made list exists nowhere else.
+    // Downloads are the next sharpest — the files survive a rename, but the dates do
+    // not, and without them the sweep has no idea what has been held too long.
+    //
+    // Every prefs name in the repo is unique across all four heads, so "declared
+    // exactly once" catches both a rename and a drop without this test needing to know
+    // which folder the head lives in.
+    [Fact]
+    public void AudioPreferenceFileNamesAreFrozen()
+    {
+        string[] frozen =
+        [
+            "artwork", "downloads", "equalizer", "fridayPicks", "listeningHistory",
+            "music", "music-queue", "playlists", "podcast-queue", "podcastEpisodeCache",
+            "podcastProgress", "podcastSettings", "podcastSubscriptions", "podcasts",
+            "scoreUpdateStatus",
+        ];
+
+        var declared = EnumerateRepoFiles("*.cs")
+            .SelectMany(file => PreferenceNames(File.ReadAllText(file)))
+            .ToList();
+
+        var missing = frozen.Where(name => declared.Count(found => found == name) != 1).ToList();
+
+        Assert.True(missing.Count == 0,
+            "These SharedPreferences file names must each be declared exactly once — a rename " +
+            "orphans the data behind them: " + string.Join(", ", missing));
+    }
+
+    // Matches any constant whose name ends in PreferencesName, so a class holding
+    // more than one — the two queue stores — is still fully covered.
+    private static IEnumerable<string> PreferenceNames(string source)
+    {
+        const string Declaration = "PreferencesName = \"";
+        var index = source.IndexOf(Declaration, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            var start = index + Declaration.Length;
+            var end = source.IndexOf('"', start);
+            if (end < 0)
+            {
+                yield break;
+            }
+            yield return source[start..end];
+            index = source.IndexOf(Declaration, end, StringComparison.Ordinal);
+        }
+    }
+
+    // The two Drive files the head reads its own backups back out of, found by NAME.
+    // Rename either and the restore finds nothing — the library and the taste profile
+    // are still sitting in Drive under the old name, invisible.
+    [Fact]
+    public void AudioDriveFileNamesAreFrozen()
+    {
+        Assert.Equal("focusphone-audio-library.json", Codex.Infrastructure.Podcasts.DriveAudioLibraryStore.FileName);
+        Assert.Equal("storyworthtelling-taste.json", Codex.Infrastructure.Music.DriveTasteProfileStore.FileName);
+    }
+
+    // The heads sign with the one shared repo keystore, so they share a single
+    // signature the update channel accepts across the suite. Asserted by capability
+    // (shared keystore + alias driving a signed Android build), not by head name, so
+    // the rename can't spuriously trip it.
+    [Fact]
+    public void HeadsSignWithTheSharedKeystore()
+    {
+        var signingWorkflow = Directory
+            .EnumerateFiles(Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml")
+            .Select(File.ReadAllText)
+            .FirstOrDefault(text =>
+                text.Contains("secrets.KEYSTORE_BASE64", StringComparison.Ordinal)
+                && text.Contains("AndroidSigningKeyStore", StringComparison.Ordinal));
+
+        Assert.True(signingWorkflow is not null,
+            "No workflow signs an Android head with the shared secrets.KEYSTORE_BASE64 keystore.");
+        Assert.Contains("secrets.KEY_ALIAS", signingWorkflow!, StringComparison.Ordinal);
+    }
+
+    // ---- Post (P7): the same invariants, for the third head through the rename ----
+
+    // Exactly one head declares the frozen communication ApplicationId. Post renames
+    // its folder, csproj and namespace; the package name is what a device matches an
+    // update against, so it survives all three.
+    [Fact]
+    public void CommunicationCsprojDeclaresFrozenApplicationId()
+    {
+        var declaring = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains($"<ApplicationId>{PolicyContext.CommunicationPackage}</ApplicationId>", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(declaring.Count == 1,
+            $"Exactly one csproj must declare the frozen communication ApplicationId " +
+            $"'{PolicyContext.CommunicationPackage}'; found {declaring.Count}:\n" +
+            string.Join("\n", declaring.Select(RepoRelative)));
+    }
+
+    // The head's two SharedPreferences files hold the mail account and the sync
+    // watermark. The rename moves them to postal names, which is only safe because a
+    // one-time copy-across reads the old files first — so the OLD literals must keep
+    // existing somewhere in the source. Delete the migration and the credentials are
+    // orphaned on device with no error: the app simply looks unconfigured.
+    [Fact]
+    public void CommunicationPreferenceMigrationLiteralsSurvive()
+    {
+        string[] frozen = ["account", "emailSync"];
+
+        var missing = frozen
+            .Where(name => CountCsFilesContaining($"\"{name}\"") == 0)
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "These original SharedPreferences file names must stay in the source so the one-time " +
+            "copy-across to the postal names can still find them: " + string.Join(", ", missing));
+    }
+
+    // The timeline database is named once, and that name is the only handle Android
+    // gives you on the file. Renaming it reads as a device with no history — and once
+    // the ghost archive lands, the history is no longer re-derivable from the sources.
+    [Fact]
+    public void TimelineDatabaseFileNameIsFrozen()
+    {
+        Assert.Equal(1, CountCsFilesContaining("\"timeline.db\""));
+    }
+
+    // The notification listener's access is granted once during provisioning against
+    // this component name, and the listener is KEPT after the rename as the fallback
+    // path for RCS (which never reaches the SMS provider). Renaming the class would
+    // revoke listener access silently on the next upgrade.
+    [Fact]
+    public void MessageBridgeListenerComponentNameIsFrozen()
+    {
+        Assert.Equal(1, CountCsFilesDeclaring(
+            $"{PolicyContext.CommunicationPackage}.MessageBridgeListener", "Name ="));
+    }
+
+    // The periodic email sync is enqueued with ExistingPeriodicWorkPolicy.Keep, so on
+    // an upgraded device the request WorkManager already persisted wins — and it names
+    // the worker by JNI class name. Move the class and Keep hands the sync to a name
+    // that no longer resolves: it never runs again, and nothing says so. The class is
+    // therefore Registered under its pre-rename name, and the two unique work names
+    // are frozen alongside it, since those are what Keep and Replace match on.
+    [Fact]
+    public void EmailSyncWorkerRegistrationAndWorkNamesAreFrozen()
+    {
+        Assert.Equal(1, CountCsFilesDeclaring(
+            $"{PolicyContext.CommunicationPackage}.EmailSyncWorker", "Register("));
+        Assert.Equal(1, CountCsFilesContaining("\"focusphone-email-sync\""));
+        Assert.Equal(1, CountCsFilesContaining("\"focusphone-email-sync-once\""));
+    }
+
+    // Every owner-namespace head must actually reach the rolling release, or the
+    // device-owner update channel never sees it. This is not hypothetical: the
+    // publish step used to match heads with a `FocusPhone.*.Android` glob, which
+    // silently stopped matching a head each time one was renamed — it missed Flyleaf,
+    // and then missed Score for an entire phase. A workflow that builds a head but
+    // does not publish it looks completely healthy from the outside, which is exactly
+    // what a guard is for.
+    [Fact]
+    public void EveryOwnerHeadIsPublishedToTheRollingRelease()
+    {
+        var publishSteps = Directory
+            .EnumerateFiles(Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml")
+            .Select(File.ReadAllText)
+            .Where(text => text.Contains("publish-rolling-release", StringComparison.Ordinal))
+            .ToList();
+
+        var unpublished = EnumerateRepoFiles("*.csproj")
+            .Where(file => File.ReadAllText(file)
+                .Contains("<ApplicationId>com.storyworthtelling.", StringComparison.Ordinal))
+            .Select(file => Path.GetDirectoryName(RepoRelative(file))!.Replace(Path.DirectorySeparatorChar, '/'))
+            .Where(directory => !publishSteps.Any(text =>
+                text.Contains($"{directory}/bin/Release/net10.0-android/publish/", StringComparison.Ordinal)))
+            .ToList();
+
+        Assert.True(unpublished.Count == 0,
+            "These heads declare an owner-namespace ApplicationId but no workflow publishes their " +
+            "signed APK to the apps-latest rolling release, so the phone will never install them: " +
+            string.Join(", ", unpublished));
+    }
+
+    // Android will not even OFFER Post the SMS role unless all four of these components
+    // are declared WITH their intent filters. An app missing one is simply absent from the
+    // "default SMS app" list, with nothing anywhere saying why — the same class of silent
+    // disqualification as the device-admin receiver in P5, and the reason this is a guard.
+    //
+    // Losing the role is not cosmetic: without it Post cannot send a text or delete one
+    // for real, which is half of what this phase exists to fix.
+    //
+    // The filter has to be found inside an [IntentFilter] attribute, not merely somewhere
+    // in the file. The first version of this test looked for the action string anywhere in
+    // the declaring file and passed happily with the attribute deleted, because the action
+    // is also the value of the constant the attribute referred to.
+    [Fact]
+    public void SmsRoleComponentsAreDeclaredWithTheirFilters()
+    {
+        (string Component, string Filter)[] required =
+        [
+            ("SmsDeliverReceiver", "SmsDeliver"),
+            ("MmsDeliverReceiver", "WapPushDeliver"),
+            ("RespondViaMessageService", "RespondViaMessage"),
+            ("SmsSendToActivity", "ActionSendto"),
+        ];
+
+        var sources = EnumerateRepoFiles("*.cs").Select(File.ReadAllText).ToList();
+
+        var missing = required.Where(component => !sources.Any(source =>
+                source.Contains($"\"{PolicyContext.CommunicationPackage}.{component.Component}\"", StringComparison.Ordinal)
+                && IntentFilters(source).Any(filter => filter.Contains(component.Filter, StringComparison.Ordinal))))
+            .Select(component => component.Component)
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "These components are what qualify Post for the SMS role; without every one of them, filter " +
+            "included, the phone will not offer it the role and nothing will say so: " + string.Join(", ", missing));
+    }
+
+    // Declaring the four components is necessary and NOT sufficient. Android decides
+    // whether Post may hold the SMS role by RESOLVING intents against those filters
+    // (SmsApplication.getApplicationCollectionInternal), and it resolves a BARE
+    // Intent(SMS_DELIVER_ACTION) — no data, no type. An intent carrying no type cannot
+    // match a filter that declares one: IntentFilter returns NO_MATCH_TYPE. So a data
+    // mimeType on the SMS_DELIVER filter silently disqualifies the app.
+    //
+    // Nothing reports it. Post simply never appears in the "default SMS app" list, and
+    // CreateRequestRoleIntent then finishes with no UI at all — the owner taps "Make Post
+    // the texting app" and the phone does nothing whatsoever. It also means the receiver
+    // would never fire for a real incoming text, because the system broadcasts that
+    // untyped too.
+    //
+    // WAP_PUSH_DELIVER is the mirror image: it is resolved WITH the MMS type, and a
+    // filter without that type is the one that fails to match.
+    [Fact]
+    public void TheSmsDeliverFilterCarriesNoDataTypeAndTheMmsOneDoes()
+    {
+        var source = EnumerateRepoFiles("*.cs")
+            .Select(File.ReadAllText)
+            .Single(text => text.Contains(
+                $"\"{PolicyContext.CommunicationPackage}.SmsDeliverReceiver\"", StringComparison.Ordinal));
+
+        var smsFilter = IntentFilters(source)
+            .Single(filter => filter.Contains("SmsDeliver", StringComparison.Ordinal)
+                && !filter.Contains("WapPushDeliver", StringComparison.Ordinal));
+
+        Assert.False(smsFilter.Contains("DataMimeType", StringComparison.Ordinal),
+            "The SMS_DELIVER filter must declare no data type. Android resolves a bare "
+            + "Intent(SMS_DELIVER_ACTION) against it, and an untyped intent never matches a typed "
+            + "filter — so a mimeType here disqualifies Post from the SMS role with nothing said, "
+            + "and stops incoming texts reaching the receiver at all. Filter was: " + smsFilter);
+
+        var mmsFilter = IntentFilters(source)
+            .Single(filter => filter.Contains("WapPushDeliver", StringComparison.Ordinal));
+
+        Assert.Contains("application/vnd.wap.mms-message", mmsFilter, StringComparison.Ordinal);
+    }
+
+    // The share-target filter is the only way Google's Call Notes can reach Post: it
+    // exports through the share sheet and nowhere else. Invisible when missing and silent
+    // when it goes — the note simply never arrives and the owner is left typing it.
+    //
+    // Matched on the attribute rather than on the file, and on ActionSend as a whole
+    // token: an earlier version of this looked for "Intent.ActionSend" anywhere in the
+    // source and passed happily on Intent.ActionSendto, which is a different filter on a
+    // different component.
+    [Fact]
+    public void CallNoteShareTargetIsDeclared()
+    {
+        var declared = EnumerateRepoFiles("*.cs")
+            .Select(File.ReadAllText)
+            .SelectMany(IntentFilters)
+            .Any(filter =>
+                filter.Contains("Intent.ActionSend]", StringComparison.Ordinal)
+                && filter.Contains("\"text/plain\"", StringComparison.Ordinal));
+
+        Assert.True(declared,
+            "No component declares an ACTION_SEND / text/plain filter — Call Notes has no way into Post.");
+    }
+
+    // ---- Plate (P8), Release A: the guardrails ----
+
+    /// <summary>
+    /// P8 renames the Camera head to Plate <b>in place</b>, so the package id must not move:
+    /// a device recognizes an update only when the package name is unchanged, and the
+    /// device-owner update channel installs by package id. The C# identifier is renamed to
+    /// PlatePackage; the VALUE is frozen and stays the pre-rename one forever.
+    ///
+    /// It must also live in exactly ONE place. Before P8 the literal was copied into five
+    /// files and only the Domain constant was guarded, so four copies could drift silently —
+    /// including the two in Post that its handoff to Plate depends on.
+    /// </summary>
+    [Fact]
+    public void PlatePackageIdIsFrozenAndAppearsOnlyInTheDomainConstant()
+    {
+        Assert.Equal("com.storyworthtelling.focusphone.camera", PolicyContext.PlatePackage);
+
+        // Two files may hold the literal: the Domain constant that defines it, and this
+        // guard, which has to spell it out to freeze it. Everything else references the
+        // constant.
+        var stray = EnumerateRepoFiles("*.cs")
+            .Where(file => File.ReadAllText(file).Contains(PolicyContext.PlatePackage, StringComparison.Ordinal))
+            .Select(RepoRelative)
+            .Where(path => !path.EndsWith("PolicyContext.cs", StringComparison.Ordinal)
+                && !path.EndsWith("FrozenInvariantsTests.cs", StringComparison.Ordinal))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(stray.Count == 0,
+            "The Plate package id is copied instead of referenced. Every one of these should use "
+            + $"PolicyContext.PlatePackage:\n{string.Join("\n", stray)}");
+    }
+
+    /// <summary>
+    /// Every Android head named in a workflow must exist on disk. This is the bug that meant
+    /// Score never reached the rolling release, caught mechanically instead of by remembering:
+    /// build-flyleaf.yml names its heads in six places (a paths: trigger, three shell loops
+    /// and two publish paths), and a rename that misses one leaves the workflow either failing
+    /// on a folder that is gone or quietly publishing nothing.
+    /// </summary>
+    [Fact]
+    public void EveryAndroidHeadNamedInAWorkflowExistsOnDisk()
+    {
+        // A project token, with or without a folder prefix. The trailing guard keeps
+        // Xamarin.AndroidX.* package references out, and net10.0-android is lower case.
+        var token = new System.Text.RegularExpressions.Regex(
+            @"(?<![A-Za-z0-9_.\-])(?:[A-Za-z0-9_]+/)?(?<name>[A-Za-z0-9_.]+\.Android)(?![A-Za-z0-9_.])");
+
+        var missing = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var workflow in Directory.EnumerateFiles(
+                     Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml"))
+        {
+            foreach (System.Text.RegularExpressions.Match match in token.Matches(File.ReadAllText(workflow)))
+            {
+                var name = match.Groups["name"].Value;
+                if (!Directory.EnumerateDirectories(RepoRoot(), name, SearchOption.AllDirectories).Any())
+                {
+                    missing.Add($"{Path.GetFileName(workflow)} names {name}, which does not exist");
+                }
+            }
+        }
+
+        Assert.True(missing.Count == 0,
+            "A workflow builds or publishes a head that is not on disk:\n" + string.Join("\n", missing));
+    }
+
+    /// <summary>
+    /// Plate ships from its own workflow, because it is the only head that needs
+    /// dl.google.com at build time and so is the slowest and flakiest build in the repo —
+    /// isolating it means a binding failure stops shipping Plate rather than Flyleaf and
+    /// Score too. Four things about that workflow are load-bearing enough to freeze.
+    /// </summary>
+    [Fact]
+    public void PlateWorkflowShipsThroughTheUpdateChannelWithAMonotonicVersionCode()
+    {
+        var path = Path.Combine(RepoRoot(), ".github", "workflows", "build-plate.yml");
+        Assert.True(File.Exists(path), "build-plate.yml is missing — Plate would never reach the update channel.");
+        var workflow = File.ReadAllText(path);
+
+        // The rolling release the device-owner update channel installs from.
+        Assert.Contains("publish-rolling-release", workflow, StringComparison.Ordinal);
+
+        // This workflow's run_number restarts at 1 while the head has already shipped at up
+        // to 100000 + 108. A lower code is rejected outright by the update channel, so the
+        // floor has to clear everything build-flyleaf.yml ever published for Camera.
+        Assert.Contains("200000 + RUN_NUMBER", workflow, StringComparison.Ordinal);
+
+        // The runner's default JDK is 17. Score's TIDAL binding was compiled to class-file
+        // major 65 and javac refused it; Plate's ML Kit bindings are the same kind of
+        // third-party .aar and Plate cannot be compiled locally at all, so there would be no
+        // warning before a red build.
+        Assert.Contains("setup-java", workflow, StringComparison.Ordinal);
+        Assert.Contains("java-version: '21'", workflow, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// All EIGHT fonts, not the six the other workflows check. Codex.Ui.Android globs
+    /// Fonts/*.ttf so every font ships, but the FONT CHECK exists because a Link-separator
+    /// bug can pack one under a wrong literal name and Assets.Open then fails silently at
+    /// runtime. The two the older checks omit are the two most visible in the suite:
+    /// SourceSerif4-Black, which every PaperUi.ScreenHeader renders in, and
+    /// PinyonScript-Regular, which is the owner's voice.
+    /// </summary>
+    [Fact]
+    public void PlateWorkflowChecksEveryPackagedFont()
+    {
+        var workflow = File.ReadAllText(
+            Path.Combine(RepoRoot(), ".github", "workflows", "build-plate.yml"));
+
+        // Read the FONTS= list itself, not the file. Scanning the whole workflow made this
+        // guard pass with the bug present: the comment above the step names the two fonts
+        // the older checks omit, so deleting one from the list changed nothing. A guard has
+        // to look at the thing that runs, not at prose about it.
+        var declared = System.Text.RegularExpressions.Regex.Match(workflow, @"FONTS=""(?<list>[^""]*)""");
+        Assert.True(declared.Success, "build-plate.yml has no FONTS=\"…\" list for the FONT CHECK to iterate.");
+        var checkedFonts = declared.Groups["list"].Value
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var packaged = Directory.EnumerateFiles(Path.Combine(RepoRoot(), "Fonts"), "*.ttf")
+            .Select(Path.GetFileNameWithoutExtension)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        var unchecked_ = packaged
+            .Where(name => !checkedFonts.Contains(name!))
+            .ToList();
+
+        Assert.True(unchecked_.Count == 0,
+            "build-plate.yml's FONT CHECK does not name every font in /Fonts, so a misfiled one "
+            + $"would ship broken:\n{string.Join("\n", unchecked_)}");
+    }
+
+    // Every [IntentFilter(...)] attribute in a source file, as text.
+    private static IEnumerable<string> IntentFilters(string source)
+    {
+        const string Attribute = "[IntentFilter(";
+        var index = source.IndexOf(Attribute, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            var depth = 0;
+            var end = index + Attribute.Length - 1;
+            for (; end < source.Length; end++)
+            {
+                if (source[end] == '(')
+                {
+                    depth++;
+                }
+                else if (source[end] == ')' && --depth == 0)
+                {
+                    break;
+                }
+            }
+            yield return source[index..Math.Min(end + 1, source.Length)];
+            index = source.IndexOf(Attribute, Math.Min(end + 1, source.Length), StringComparison.Ordinal);
+        }
+    }
+    private static int CountCsFilesContaining(string literal) =>
+        EnumerateRepoFiles("*.cs").Count(file =>
+            File.ReadAllText(file).Contains(literal, StringComparison.Ordinal));
+
+    // ---- repo helpers (root = the ancestor holding .github; survives the rename) ----
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, ".github")))
+        {
+            dir = dir.Parent;
+        }
+        return dir?.FullName
+            ?? throw new DirectoryNotFoundException("Could not locate the repo root (.github) above " + AppContext.BaseDirectory);
+    }
+
+    private static string RepoRelative(string file) => Path.GetRelativePath(RepoRoot(), file);
+
+    private static IEnumerable<string> EnumerateRepoFiles(string pattern)
+    {
+        foreach (var file in Directory.EnumerateFiles(RepoRoot(), pattern, SearchOption.AllDirectories))
+        {
+            var parts = file.Split(Path.DirectorySeparatorChar);
+            if (parts.Any(part => part is "obj" or "bin" or ".git"))
+            {
+                continue;
+            }
+            yield return file;
+        }
+    }
+    [Fact]
+    public void TheSuiteHasExactlyOneSettingsGlyph()
+    {
+        // Post and Score each carried a byte-identical copy of area_settings.xml, which is
+        // how a shared kit stops being shared: the third head to want it copies it again,
+        // and the day the glyph changes, two of the three quietly keep the old one. It lives
+        // in Codex.Ui.Android, whose resources every head already merges — the Paper theme's
+        // window background is a drawable from that same folder.
+        var glyphs = EnumerateRepoFiles("area_settings.xml").Select(RepoRelative).Order().ToList();
+
+        Assert.True(glyphs.Count == 1,
+            "The Settings glyph must live once, in the shared kit. Found:\n" + string.Join("\n", glyphs));
+        Assert.Contains("Codex.Ui.Android", glyphs[0], StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Plate declares the full camera component set so nothing on this phone opens a
+    /// different camera, and adds the two reads another app can ask it for.
+    ///
+    /// <para>This is the ROLE_SMS shape from P7 with the same trap: <b>Android silently
+    /// omits an app missing a component</b>, with no warning — it simply never appears in
+    /// the list of apps that can take a picture. So the assertion reads the
+    /// <c>[IntentFilter]</c> attributes themselves rather than the file, which is the exact
+    /// hole a P7 guard fell through: it passed with the attribute deleted, because the
+    /// action string was also present in a comment.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("android.media.action.IMAGE_CAPTURE")]
+    [InlineData("android.media.action.IMAGE_CAPTURE_SECURE")]
+    [InlineData("android.media.action.VIDEO_CAPTURE")]
+    [InlineData("android.media.action.STILL_IMAGE_CAMERA")]
+    [InlineData("android.media.action.STILL_IMAGE_CAMERA_SECURE")]
+    [InlineData("com.storyworthtelling.plate.action.READ_CARD")]
+    [InlineData("com.storyworthtelling.plate.action.READ_STATEMENT")]
+    public void PlateDeclaresEveryCameraComponentWithItsIntentFilter(string action)
+    {
+        // The constants are referenced by name in the attributes, so the filter text holds
+        // the identifier rather than the literal; either spelling counts as declared.
+        var constant = "Errands." + action.Split('.').Last()
+            .Split('_')
+            .Select(word => char.ToUpperInvariant(word[0]) + word[1..].ToLowerInvariant())
+            .Aggregate(string.Empty, (all, word) => all + word);
+
+        var declared = EnumerateRepoFiles("*.cs")
+            .Where(file => RepoRelative(file).Contains("Plate.Android", StringComparison.Ordinal))
+            .SelectMany(file => IntentFilters(File.ReadAllText(file)))
+            .Any(filter =>
+                filter.Contains(action, StringComparison.Ordinal)
+                || filter.Contains(constant, StringComparison.Ordinal)
+                || filter.Contains(ReadRequestMember(action), StringComparison.Ordinal));
+
+        Assert.True(declared,
+            $"No Plate component declares an [IntentFilter] for {action}. Android will "
+            + "silently leave Plate out of the list of apps that can do this, with no warning.");
+    }
+
+    /// <summary>
+    /// Post's attachment route. Without this filter, Attachments.cs setting the package
+    /// produces an activity-not-found rather than a picture.
+    /// </summary>
+    [Fact]
+    public void PlateDeclaresTheImageViewFilterPostsAttachmentsDependOn()
+    {
+        var declared = EnumerateRepoFiles("*.cs")
+            .Where(file => RepoRelative(file).Contains("Plate.Android", StringComparison.Ordinal))
+            .SelectMany(file => IntentFilters(File.ReadAllText(file)))
+            .Any(filter =>
+                filter.Contains("Intent.ActionView", StringComparison.Ordinal)
+                && filter.Contains("\"image/*\"", StringComparison.Ordinal));
+
+        Assert.True(declared,
+            "Plate declares no ACTION_VIEW image/* filter, so Post handing over an "
+            + "attachment gets an activity-not-found rather than a picture.");
+    }
+
+    private static string ReadRequestMember(string action) => action switch
+    {
+        "com.storyworthtelling.plate.action.READ_CARD" => "ReadRequest.ReadCard",
+        "com.storyworthtelling.plate.action.READ_STATEMENT" => "ReadRequest.ReadStatement",
+        _ => action,
+    };
+
+}

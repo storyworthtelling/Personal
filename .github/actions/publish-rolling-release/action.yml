@@ -1,0 +1,40 @@
+name: Publish signed APKs to the rolling release
+description: >
+  Upload signed APKs to the single rolling "apps-latest" GitHub Release that the
+  FocusPhone launcher's device-owner update channel installs from. A new sibling
+  app rides the channel by adding one step that calls this action with its signed
+  APK glob (gate it to main); the phone installs it on the next update check,
+  because the channel takes any owner-namespace (com.storyworthtelling.*) app that
+  is newer than what's installed — or not installed at all.
+inputs:
+  apks:
+    description: Space/newline-separated globs of signed *-Signed.apk files to upload.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Upload to apps-latest release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        shopt -s nullglob
+        files=(${{ inputs.apks }})
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "No signed APKs matched: ${{ inputs.apks }}"
+          exit 1
+        fi
+        echo "Publishing to the apps-latest release:"
+        printf '  %s\n' "${files[@]}"
+        # One shared rolling release across every app workflow, so releases/latest
+        # always carries the current APK of each. Create it once, then clobber this
+        # app's own asset(s) on subsequent builds; other apps' assets are untouched.
+        if gh release view apps-latest >/dev/null 2>&1; then
+          gh release upload apps-latest "${files[@]}" --clobber
+        else
+          gh release create apps-latest \
+            --title "Storyworthtelling apps (latest)" \
+            --notes "Rolling release of the latest signed APKs. The FocusPhone launcher's device-owner update channel installs owner-namespace (com.storyworthtelling.*) apps from here." \
+            --latest \
+            "${files[@]}"
+        fi
