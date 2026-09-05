@@ -116,6 +116,22 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
             new("scope", Scope),
         ]), cancellationToken);
 
+    /// <summary>
+    /// Exchanges the authorization code the browser redirect carried for tokens,
+    /// proving the exchange belongs to the sign-in that started it by sending the
+    /// PKCE verifier — the secret the redirect could not carry.
+    /// </summary>
+    public Task<TidalTokenPollResult> ExchangeCodeAsync(
+        string clientId, string clientSecret, string code, string codeVerifier, string redirectUri,
+        CancellationToken cancellationToken) =>
+        PostToken(clientId, clientSecret, new FormUrlEncodedContent([
+            new("client_id", clientId),
+            new("grant_type", "authorization_code"),
+            new("code", code),
+            new("code_verifier", codeVerifier),
+            new("redirect_uri", redirectUri),
+        ]), cancellationToken);
+
     /// <summary>Exchanges the long-lived refresh token stored from pairing for a fresh
     /// access token. Called once per session, the same shape as a reMarkable device
     /// token being exchanged for a short-lived user JWT.</summary>
