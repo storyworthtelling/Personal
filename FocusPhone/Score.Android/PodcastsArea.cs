@@ -27,6 +27,7 @@ public sealed class PodcastsArea : ScoreArea
     private readonly PlaybackSettingsStore settingsStore;
     private readonly SubscriptionStore subscriptionStore;
     private readonly EpisodeCacheStore episodeCache;
+    private readonly PodcastArtworkCache artwork;
     private readonly QueueStore queueStore;
     private readonly PodcastLibrarySync librarySync;
     private readonly PlaybackQueue queue = new();
@@ -71,6 +72,7 @@ public sealed class PodcastsArea : ScoreArea
         settingsStore = new PlaybackSettingsStore(host);
         subscriptionStore = new SubscriptionStore(host);
         episodeCache = new EpisodeCacheStore(host);
+        artwork = new PodcastArtworkCache(host);
         queueStore = QueueStore.ForPodcasts(host);
         downloads = new DownloadStore(host);
         queue.ReplaceWith(queueStore.Load()); // restore the queue built in a previous session (pruned to live episodes on render)
@@ -921,6 +923,37 @@ public sealed class PodcastsArea : ScoreArea
 
         RecomputeDoneAndRebuild();
         Invalidate();
+
+        // Artwork last, and never blocking the shelf: the episodes are already on
+        // screen by now, and a show whose art will not fetch is a show with a
+        // bookplate rather than a show that failed.
+        await FetchArtworkAsync(byFeed);
+    }
+
+    /// <summary>
+    /// Brings each show's artwork down to disk so the rows can decode it. The feed
+    /// has always carried it — nothing had ever fetched it, which is why art appeared
+    /// only for shows whose audio happened to embed its own.
+    /// </summary>
+    private async Task FetchArtworkAsync(IReadOnlyDictionary<string, IReadOnlyList<Episode>> byFeed)
+    {
+        var wanted = byFeed
+            .Where(feed => artwork.ExistingPath(feed.Key) is null)
+            .Select(feed => (FeedId: feed.Key,
+                Url: feed.Value.Select(episode => episode.ImageUrl)
+                    .FirstOrDefault(url => !string.IsNullOrWhiteSpace(url))))
+            .Where(feed => feed.Url is not null)
+            .ToList();
+
+        if (wanted.Count == 0)
+        {
+            return;
+        }
+
+        await Task.WhenAll(wanted.Select(feed =>
+            artwork.PathAsync(feed.FeedId, feed.Url, CancellationToken.None)));
+
+        Invalidate(); // the rows can decode it now
     }
 
     // Fetches one feed, folding the family of expected feed failures into a result rather than throwing, so
