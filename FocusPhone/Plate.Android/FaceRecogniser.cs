@@ -68,7 +68,9 @@ public sealed class FaceRecogniser(Context context, IFaceEmbedder embedder)
         {
             var options = new FaceDetectorOptions.Builder()
                 .SetPerformanceMode(FaceDetectorOptions.PerformanceModeAccurate)
-                .SetLandmarkMode(FaceDetectorOptions.LandmarkModeNone)
+                // Landmarks ON, for one reason: a face embedder is markedly more accurate
+                // on an eye-aligned crop, and the eyes are how we level it.
+                .SetLandmarkMode(FaceDetectorOptions.LandmarkModeAll)
                 .SetContourMode(FaceDetectorOptions.ContourModeNone)
                 .SetMinFaceSize(0.1f)
                 .Build();
@@ -109,7 +111,12 @@ public sealed class FaceRecogniser(Context context, IFaceEmbedder embedder)
                 }
 
                 var crop = Bitmap.CreateBitmap(picture, left, top, width, height)!;
-                found.Add(new FoundFace(crop, embedder.Embed(crop)));
+                var levelled = Level(crop, face);
+                found.Add(new FoundFace(levelled, embedder.Embed(levelled)));
+                if (!ReferenceEquals(levelled, crop))
+                {
+                    crop.Recycle();
+                }
             }
 
             return [.. found.OrderByDescending(entry => entry.Crop.Width * entry.Crop.Height)];
@@ -120,6 +127,32 @@ public sealed class FaceRecogniser(Context context, IFaceEmbedder embedder)
             Android.Util.Log.Warn("Plate", $"Face detection did not run: {e.Message}");
             return [];
         }
+    }
+
+    /// <summary>
+    /// Rotates the crop so the eyes are level. Face embedders are trained on aligned faces
+    /// and lose real accuracy without it — a head tilted thirty degrees reads as a different
+    /// person often enough to matter. Returns the crop untouched when the landmarks are not
+    /// there or the tilt is too small to be worth resampling for.
+    /// </summary>
+    private static Bitmap Level(Bitmap crop, Face face)
+    {
+        var left = face.GetLandmark(FaceLandmark.LeftEye)?.Position;
+        var right = face.GetLandmark(FaceLandmark.RightEye)?.Position;
+        if (left is null || right is null)
+        {
+            return crop;
+        }
+
+        var degrees = Math.Atan2(right.Y - left.Y, right.X - left.X) * 180 / Math.PI;
+        if (Math.Abs(degrees) < 2)
+        {
+            return crop;
+        }
+
+        var matrix = new Matrix();
+        matrix.PostRotate(-(float)degrees, crop.Width / 2f, crop.Height / 2f);
+        return Bitmap.CreateBitmap(crop, 0, 0, crop.Width, crop.Height, matrix, filter: true)!;
     }
 }
 

@@ -44,5 +44,10 @@
     <!-- Finding faces. ML Kit DETECTS a face; it does not say whose it is, so recognition
          needs an embedding model behind IFaceEmbedder — see FaceRecogniser. -->
     <PackageReference Include="Xamarin.Google.MLKit.FaceDetection" Version="116.1.7.9" />
+    <!-- Running the face-embedding model. The model FILE is deliberately not in this repo:
+         which one to ship carries a licence and a training-data provenance, and the faces
+         being matched are the owner's friends. Absent, TfLiteFaceEmbedder reports not-ready
+         and the head still finds faces and still takes a hand-written name. -->
+    <PackageReference Include="Xamarin.TensorFlow.Lite" Version="2.16.1.10" />
   </ItemGroup>
 </Project>
