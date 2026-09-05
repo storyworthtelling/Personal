@@ -350,6 +350,8 @@ public class ThreadActivity : Activity
             Filing.Unfile(this, item.SourceId);
             LoadItems();
         });
+
+        Syncs.After(this, PostAction.Filed);
     }
 
     // A date this correspondence proposed, waiting behind the fold. Offered, never written
@@ -589,6 +591,7 @@ public class ThreadActivity : Activity
                 {
                     SmsSender.Send(this, number, text);
                     LoadItems();
+                    Syncs.After(this, PostAction.Sent);
                 }
                 catch (Exception e)
                 {
@@ -623,6 +626,7 @@ public class ThreadActivity : Activity
                 {
                     EchoOutgoing(conversationId, number, text);
                     LoadItems();
+                    Syncs.After(this, PostAction.Sent);
                 }
                 else
                 {

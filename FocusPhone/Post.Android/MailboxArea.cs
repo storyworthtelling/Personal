@@ -381,6 +381,11 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             }
             ReloadThreads();
         });
+
+        // Filing owes a delete at the source. Carry it out as soon as the undo window
+        // closes rather than leaving it for the next screen-open: mail that stays in the
+        // inbox after being filed is what makes filing look like it does not work.
+        Syncs.After(Host, PostAction.Filed);
     }
 
     private IReadOnlyList<TimelineItem> ItemsFor(string contactKey) =>
