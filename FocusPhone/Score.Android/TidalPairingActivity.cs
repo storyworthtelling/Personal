@@ -142,7 +142,7 @@ public class TidalPairingActivity : Activity
         TidalDeviceAuthorization authorization;
         try
         {
-            authorization = await client.RequestDeviceCodeAsync(clientId, CancellationToken.None);
+            authorization = await client.RequestDeviceCodeAsync(clientId, clientSecret, CancellationToken.None);
         }
         catch (Exception e)
         {
