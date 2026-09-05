@@ -49,9 +49,41 @@ public static class AdaptiveIconRenderer
             }
         }
 
+        if (spec.CoverImage is not null)
+        {
+            written.Add(WritePng(
+                Path.Combine(repoRoot, spec.CoverImage.Replace('/', Path.DirectorySeparatorChar)),
+                RenderCover(spec, CoverPx, ground)));
+        }
+
         ground?.Dispose();
         plate?.Dispose();
         return written;
+    }
+
+    // Big enough for the shelf's 96dp-wide book at xxxhdpi without resampling artefacts,
+    // small enough that the committed PNG stays sane next to the painted covers.
+    private const int CoverPx = 512;
+
+    // The shelf cover: the painted ground with the glyph on it, at natural scale.
+    //
+    // No safe-zone zoom, unlike the launcher icon — nothing masks this into a circle,
+    // and Score's keyboard is drawn to run off both edges, so zooming would crop the
+    // curve rather than protect it.
+    private static byte[] RenderCover(IconSpec spec, int px, SKBitmap? ground)
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(px, px));
+        if (ground is not null)
+        {
+            surface.Canvas.DrawBitmap(ground, new SKRect(0, 0, px, px));
+        }
+        else
+        {
+            surface.Canvas.Clear(SKColor.Parse(spec.BackgroundHex));
+        }
+
+        spec.Glyph(surface.Canvas, px);
+        return Encode(surface);
     }
 
     public static string WritePreview(string directory, IconSpec spec, int size = 1024)

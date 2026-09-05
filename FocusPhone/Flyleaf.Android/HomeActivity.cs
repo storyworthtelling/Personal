@@ -491,6 +491,9 @@ public class HomeActivity : Activity
         public int Cloth(string packageKey) =>
             Android.Graphics.Color.ParseColor(BookClothPalette.ForPackage(packageKey)).ToArgb();
 
+        public bool MarksInvertToInk(string packageKey) =>
+            BookClothPalette.MarksInvertToInk(BookClothPalette.ForPackage(packageKey));
+
         public bool HasNotification(string packageKey) => notifications().Contains(packageKey);
 
         private Drawable? TryLoad(string package)

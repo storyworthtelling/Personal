@@ -25,10 +25,7 @@ public class RssFeedClient
     private static readonly XNamespace Content = "http://purl.org/rss/1.0/modules/content/";
     private static readonly XNamespace Atom = "http://www.w3.org/2005/Atom";
 
-    // Several podcast CDNs answer 403, or serve a redirect page instead of the
-    // feed, to a client that sends no User-Agent — and .NET sends none by default.
-    // Identify ourselves here rather than leaving each caller to remember.
-    private const string UserAgent = "FocusPhone-Podcasts/1.0 (+https://storyworthtelling.com)";
+    private const string UserAgent = PodcastHttp.UserAgent;
 
     private readonly HttpClient http;
 

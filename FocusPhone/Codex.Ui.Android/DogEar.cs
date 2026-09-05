@@ -244,16 +244,46 @@ public static class DogEar
             base.OnDraw(canvas);
             float w = Width, h = Height;
 
-            // The triangular fold (top-right).
+            // A dog-ear is TWO triangles, and shipping only the first is what made this
+            // read as a coloured corner tag rather than a folded page.
+            //
+            // The crease runs (0,0) to (w,h). Above it is the HOLE: the part of the page
+            // that is no longer there, so what shows is whatever the fold is carrying.
+            // Below it is the FLAP: that same corner turned over and lying back across
+            // the page, which is why it is paper — you are looking at the back of the
+            // sheet — and why it is the half nearer the reader.
             using var underside = new Paint { AntiAlias = true, Color = hue };
-            using var tri = new Android.Graphics.Path();
-            tri.MoveTo(w, 0);
-            tri.LineTo(0, 0);
-            tri.LineTo(w, h);
-            tri.Close();
-            canvas.DrawPath(tri, underside);
+            using var hole = new Android.Graphics.Path();
+            hole.MoveTo(w, 0);
+            hole.LineTo(0, 0);
+            hole.LineTo(w, h);
+            hole.Close();
+            canvas.DrawPath(hole, underside);
 
-            // A soft diagonal shadow along the fold line for depth.
+            // The flap: the corner reflected across the crease. For a square fold the
+            // corner at (w,0) lands at (0,h), which is what makes the turned-down
+            // triangle the mirror of the hole rather than a second copy of it.
+            using var flap = new Android.Graphics.Path();
+            flap.MoveTo(0, 0);
+            flap.LineTo(w, h);
+            flap.LineTo(0, h);
+            flap.Close();
+
+            using var back = new Paint { AntiAlias = true };
+            // Lit along the crease and falling away toward the loose tip: a flat fill
+            // reads as a triangle sitting on the page, a graded one as paper lifting
+            // off it. Perpendicular to the crease, so the light follows the fold.
+            back.SetShader(new LinearGradient(
+                w * 0.5f, h * 0.5f, 0, h,
+                PaperTheme.PaperBright, PaperTheme.PaperShade, Shader.TileMode.Clamp!));
+            canvas.DrawPath(flap, back);
+
+            // The flap's own edge, so it separates from the page it is lying on.
+            using var lip = new Paint { AntiAlias = true, StrokeWidth = density, Color = PaperTheme.Hairline };
+            lip.SetStyle(Paint.Style.Stroke);
+            canvas.DrawPath(flap, lip);
+
+            // The crease itself, darkest where the two halves meet.
             using var shadow = new Paint { AntiAlias = true, StrokeWidth = 2 * density };
             shadow.SetStyle(Paint.Style.Stroke);
             shadow.Color = new Color(PaperTheme.Ink.R, PaperTheme.Ink.G, PaperTheme.Ink.B, (byte)60);

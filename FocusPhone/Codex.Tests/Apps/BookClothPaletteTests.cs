@@ -53,4 +53,49 @@ public class BookClothPaletteTests
             BookClothPalette.ForPackage("com.storyworthtelling.ledger"),
             BookClothPalette.For("com.storyworthtelling.ledger"));
     }
+
+    // DESIGN.md §12: "Score's binding is cream linen with the rule, flourishes and
+    // lettering inverted to ink — chosen because it is the only light book on the
+    // shelf and so is findable at a glance." The shelf shipped it in hashed walnut,
+    // because the per-app binding map existed but was empty.
+    [Fact]
+    public void ForPackage_BindsScoreInCreamLinenRatherThanAHashedTone()
+    {
+        Assert.Equal(DesignTokens.PaperShade, BookClothPalette.ForPackage(HomeFeatureSet.AudioPackage));
+    }
+
+    [Fact]
+    public void ForPackage_StillHashesAnAppWithNoChosenBinding()
+    {
+        var unbound = BookClothPalette.ForPackage("com.example.nothing");
+
+        Assert.Contains(unbound, BookClothPalette.Cloths);
+    }
+
+    // The plate's rule, corner flourishes, keyline and title are drawn in one ink.
+    // On a dark cloth that ink is paper; on a light one it has to invert, or a cream
+    // book carries cream lettering on cream linen and cannot be read at all.
+    [Fact]
+    public void MarksInvertToInk_OnALightBinding()
+    {
+        Assert.True(BookClothPalette.MarksInvertToInk(DesignTokens.PaperShade));
+        Assert.True(BookClothPalette.MarksInvertToInk(DesignTokens.Paper));
+        Assert.True(BookClothPalette.MarksInvertToInk(DesignTokens.PaperBright));
+    }
+
+    [Fact]
+    public void MarksStayPaper_OnEveryDarkClothTheShelfCanPick()
+    {
+        foreach (var cloth in BookClothPalette.Cloths.Where(c => c != DesignTokens.PaperShade))
+        {
+            Assert.False(BookClothPalette.MarksInvertToInk(cloth), cloth);
+        }
+    }
+
+    [Fact]
+    public void MarksInvertToInk_IsConsistentWithTheBindingScoreActuallyGets()
+    {
+        Assert.True(BookClothPalette.MarksInvertToInk(
+            BookClothPalette.ForPackage(HomeFeatureSet.AudioPackage)));
+    }
 }

@@ -128,9 +128,12 @@ public sealed class MusicTasteService
         }
     }
 
-    /// <summary>Picks the weekly "New for you" set as a raw selection (title + ids) for the worker to persist.</summary>
-    public async Task<DiscoverySelection> FridayPicksAsync(
-        IReadOnlyList<Track> catalog, int maxTracks, string? note, CancellationToken cancellationToken)
+    /// <summary>
+    /// The week's crate: records the owner does <b>not</b> have, named, for the worker
+    /// to persist. <paramref name="owned"/> is taste evidence and an exclusion list.
+    /// </summary>
+    public async Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
+        IReadOnlyList<Track> owned, int maxPicks, string? note, CancellationToken cancellationToken)
     {
         try
         {
@@ -138,14 +141,14 @@ public sealed class MusicTasteService
             var profile = await store.LoadAsync(cancellationToken);
             if (profile.IsEmpty)
             {
-                return DiscoverySelection.Empty; // no taste learned yet -> nothing to surface
+                return []; // no taste learned yet -> nothing to recommend against
             }
 
-            return await discovery.FridayPicksAsync(profile, catalog, maxTracks, note, cancellationToken);
+            return await discovery.WeeklyDiscoveriesAsync(profile, owned, maxPicks, note, cancellationToken);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            return DiscoverySelection.Empty;
+            return [];
         }
     }
 }

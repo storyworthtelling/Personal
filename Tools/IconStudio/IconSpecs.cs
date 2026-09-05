@@ -20,6 +20,15 @@ namespace IconStudio;
 /// the glyph, which draws the frame over it.
 /// </param>
 /// <param name="PlateInset">How far in from each edge the window sits, as a fraction of the layer.</param>
+/// <param name="CoverImage">
+/// Where to write the shelf cover — the art Flyleaf paints into a book's illustration
+/// window, repo-relative. It is the ground and the glyph and nothing else: the plate's
+/// frame, corners and title belong to the shelf, which draws them around this.
+///
+/// It exists because the cover shipped as the bare ground wash with no keyboard on it,
+/// which is what a hand-placed export of the background layer looks like. Generating it
+/// from the same spec as the icon is what stops the two drifting apart again.
+/// </param>
 public sealed record IconSpec(
     string App,
     string ResourceRoot,
@@ -29,7 +38,8 @@ public sealed record IconSpec(
     string BackgroundHex = Tokens.PaperHex,
     string? GroundImage = null,
     string? PlateImage = null,
-    float PlateInset = Glyphs.PlateInset);
+    float PlateInset = Glyphs.PlateInset,
+    string? CoverImage = null);
 
 public static class IconSpecs
 {
@@ -38,7 +48,8 @@ public static class IconSpecs
         new("FocusPhone.Launcher", "FocusPhone/Flyleaf.Android/Resources", "appicon", false, Glyphs.Bookplate, Tokens.FlyleafWarmHex),
         new("Plate", "FocusPhone/Plate.Android/Resources", "appicon", false, Glyphs.Lens),
         new("Score", "FocusPhone/Score.Android/Resources", "appicon", false, Glyphs.Keyboard,
-            Tokens.ScoreGroundHex, GroundImage: "Branding/score-ground.png"),
+            Tokens.ScoreGroundHex, GroundImage: "Branding/score-ground.png",
+            CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_score.png"),
         // Post's icon IS its cover: the indigo binding as the ground, the mid-century mailbox
         // painting set into the illustration window, and mitred brackets at the corners.
         new("Post", "FocusPhone/Post.Android/Resources", "appicon", false, Glyphs.PostPlate,

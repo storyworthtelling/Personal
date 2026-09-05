@@ -323,6 +323,12 @@ public class BookshelfView : View
     {
         var cloth = new Color(art.Cloth(item.Key));
 
+        // Rule, flourishes, keyline and title share one ink. Paper reads on every dark
+        // binding and vanishes on a light one, so the cloth decides (DESIGN.md §12 —
+        // Score's cream linen inverts its marks to ink for exactly this reason).
+        var inverted = art.MarksInvertToInk(item.Key);
+        var marks = inverted ? PaperTheme.Ink : PaperTheme.Paper;
+
         // 1. Binding cloth fills the whole plate (a hair of vertical grade for depth).
         using (var fill = new Paint { AntiAlias = true })
         {
@@ -331,12 +337,12 @@ public class BookshelfView : View
         }
 
         // 2. Fine light rule inset ~4.7%, then mitred-bracket corners.
-        using (var rule = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 180), StrokeWidth = 1.3f * density })
+        using (var rule = new Paint { AntiAlias = true, Color = WithAlpha(marks, 180), StrokeWidth = 1.3f * density })
         {
             rule.SetStyle(Paint.Style.Stroke);
             canvas.DrawRect(Inset(rect, rect.Width() * 0.047f), rule);
         }
-        DrawMitredBrackets(canvas, Inset(rect, rect.Width() * 0.072f));
+        DrawMitredBrackets(canvas, Inset(rect, rect.Width() * 0.072f), marks);
 
         // 3. Illustration window (near-square), the painting or the icon filling it, keyline-framed.
         var winLeft = rect.Left + rect.Width() * 0.1375f;
@@ -371,30 +377,30 @@ public class BookshelfView : View
             }
         }
         canvas.Restore();
-        using (var keyline = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 235), StrokeWidth = 1.2f * density })
+        using (var keyline = new Paint { AntiAlias = true, Color = WithAlpha(marks, 235), StrokeWidth = 1.2f * density })
         {
             keyline.SetStyle(Paint.Style.Stroke);
             canvas.DrawRect(window, keyline);
         }
 
         // 4. Title on the cloth below the window — light ink with a soft dark halo so it reads on any cloth.
-        DrawTitleOnCloth(canvas, art.Label(item.Key),
+        DrawTitleOnCloth(canvas, art.Label(item.Key), marks, inverted,
             rect.Left + 6 * density, window.Bottom, rect.Right - 6 * density, rect.Bottom - 6 * density);
     }
 
     // Two nested right-angle brackets at each corner, drawn once and mirrored into all four (the mockup's
     // "mitred-bracket" motif), in the light cloth-rule ink.
-    private void DrawMitredBrackets(Canvas canvas, RectF r)
+    private void DrawMitredBrackets(Canvas canvas, RectF r, Color marks)
     {
         var leg = r.Width() * 0.13f;
         var step = 4 * density;
         void Bracket(float cx, float cy, float sx, float sy)
         {
-            using var outer = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 235), StrokeWidth = 2.2f * density };
+            using var outer = new Paint { AntiAlias = true, Color = WithAlpha(marks, 235), StrokeWidth = 2.2f * density };
             outer.SetStyle(Paint.Style.Stroke); outer.StrokeCap = Paint.Cap.Square;
             canvas.DrawLine(cx, cy + sy * leg, cx, cy, outer);
             canvas.DrawLine(cx, cy, cx + sx * leg, cy, outer);
-            using var inner = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.Paper, 140), StrokeWidth = 1.2f * density };
+            using var inner = new Paint { AntiAlias = true, Color = WithAlpha(marks, 140), StrokeWidth = 1.2f * density };
             inner.SetStyle(Paint.Style.Stroke); inner.StrokeCap = Paint.Cap.Square;
             canvas.DrawLine(cx + sx * step, cy + sy * (leg * 0.6f + step), cx + sx * step, cy + sy * step, inner);
             canvas.DrawLine(cx + sx * step, cy + sy * step, cx + sx * (leg * 0.6f + step), cy + sy * step, inner);
@@ -405,12 +411,17 @@ public class BookshelfView : View
         Bracket(r.Right, r.Bottom, -1, -1);
     }
 
-    private void DrawTitleOnCloth(Canvas canvas, string label, float left, float top, float right, float bottom)
+    private void DrawTitleOnCloth(
+        Canvas canvas, string label, Color marks, bool inverted,
+        float left, float top, float right, float bottom)
     {
-        using var text = new Paint(PaintFlags.AntiAlias) { Color = WithAlpha(PaperTheme.Paper, 245), TextAlign = Paint.Align.Center };
+        using var text = new Paint(PaintFlags.AntiAlias) { Color = WithAlpha(marks, 245), TextAlign = Paint.Align.Center };
         text.SetTypeface(PaperTheme.SerifSemibold(Context!));
         text.TextSize = Math.Min((bottom - top) * 0.40f, 13 * density);
-        text.SetShadowLayer(2f * density, 0, 0.5f * density, WithAlpha(PaperTheme.Ink, 160));
+        // The halo is the opposite of the lettering, so it lifts the title off the cloth
+        // either way round rather than smudging ink into ink.
+        text.SetShadowLayer(2f * density, 0, 0.5f * density,
+            WithAlpha(inverted ? PaperTheme.Paper : PaperTheme.Ink, 160));
         var trimmed = Ellipsize(label, text, left, right);
         canvas.DrawText(trimmed, (left + right) / 2, (top + bottom) / 2 + text.TextSize / 3f, text);
     }
