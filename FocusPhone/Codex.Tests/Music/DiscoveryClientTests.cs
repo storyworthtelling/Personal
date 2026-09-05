@@ -47,15 +47,54 @@ public class DiscoveryClientTests
     }
 
     [Fact]
-    public async Task FridayPicks_ParsesSelection()
+    public async Task WeeklyDiscoveries_ParsesNamedPicksWithTheirReasons()
     {
         var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse(
-            """Here you go: {"title":"New for you","trackIds":["a"]}"""));
+            """Here you go: {"picks":[{"title":"Blue in Green","artist":"Bill Evans","why":"the quiet end of what you play"}]}"""));
 
-        var selection = await Client(handler).FridayPicksAsync(Profile(), Catalog, 12, note: null, CancellationToken.None);
+        var picks = await Client(handler).WeeklyDiscoveriesAsync(
+            Profile(), Catalog, 12, note: null, CancellationToken.None);
 
-        Assert.Equal("New for you", selection.Title);
-        Assert.Equal(["a"], selection.TrackIds);
+        var pick = Assert.Single(picks);
+        Assert.Equal("Blue in Green", pick.Title);
+        Assert.Equal("Bill Evans", pick.Artist);
+        Assert.Equal("the quiet end of what you play", pick.Why);
+    }
+
+    // The crate is records the listener does NOT have. The instruction says so, and
+    // this is the part that does not depend on the model having listened.
+    [Fact]
+    public async Task WeeklyDiscoveries_DropsAPickTheLibraryAlreadyHas()
+    {
+        var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse(
+            """{"picks":[{"title":"So What","artist":"Miles Davis","why":"you would like it"},{"title":"Blue in Green","artist":"Bill Evans","why":"adjacent"}]}"""));
+
+        var picks = await Client(handler).WeeklyDiscoveriesAsync(
+            Profile(), Catalog, 12, note: null, CancellationToken.None);
+
+        Assert.Equal("Blue in Green", Assert.Single(picks).Title);
+    }
+
+    [Fact]
+    public async Task WeeklyDiscoveries_TellsTheModelTheLibraryIsWhatToAvoid()
+    {
+        var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse("""{"picks":[]}"""));
+
+        await Client(handler).WeeklyDiscoveriesAsync(Profile(), Catalog, 12, note: null, CancellationToken.None);
+
+        var body = handler.RequestBodies.Single();
+        Assert.Contains("do NOT own", body);
+        Assert.Contains("AVOID recommending", body);
+        Assert.Contains("Peace Piece", body); // the library reached the model as evidence
+    }
+
+    [Fact]
+    public async Task WeeklyDiscoveries_OnAGarbledReply_IsEmptyRatherThanThrowing()
+    {
+        var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse("no json"));
+
+        Assert.Empty(await Client(handler).WeeklyDiscoveriesAsync(
+            Profile(), Catalog, 12, note: null, CancellationToken.None));
     }
 
     [Fact]

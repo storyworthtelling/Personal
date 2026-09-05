@@ -87,8 +87,12 @@ public static class FilterMatch
     /// Lower-case, trimmed, and stripped of combining marks — "Bartók" and "bartok"
     /// fold to the same thing. Decomposing first is what separates a letter from its
     /// accent so the accent can be dropped.
+    ///
+    /// Public because it is the suite's one normal form: anything deriving a stable
+    /// key for a title or an artist has to fold it the same way this matcher does, or
+    /// the key and the comparison quietly disagree about what is the same record.
     /// </summary>
-    private static string Fold(string? value)
+    public static string Fold(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
