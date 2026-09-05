@@ -56,9 +56,15 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
         column.AddView(PaperUi.SecondaryButton(Host, "Manage downloads",
             () => Host.StartActivity(new Android.Content.Intent(Host, typeof(DownloadsActivity)))));
 
-        Group(column, "Sound");
-        column.AddView(PaperUi.SecondaryButton(Host, "Equalizer",
-            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(EqualizerActivity)))));
+        // Only where there is one. A phone with no equalizer had a Sound group whose
+        // single button led to a screen that said so — a row spent telling you it is
+        // useless, on the screen whose rule is that a working thing takes almost no space.
+        if (AudioEffects.HasEqualizer)
+        {
+            Group(column, "Sound");
+            column.AddView(PaperUi.SecondaryButton(Host, "Equalizer",
+                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(EqualizerActivity)))));
+        }
 
         Group(column, "Podcasts");
         column.AddView(PaperUi.SecondaryButton(Host, "Manage subscriptions",
