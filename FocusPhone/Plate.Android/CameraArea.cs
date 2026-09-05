@@ -2,6 +2,7 @@ using Android.Content;
 using Android.Views;
 using Android.Widget;
 using AndroidX.Camera.Core;
+using AndroidX.Camera.Video;
 using AndroidX.Camera.View;
 using AndroidX.Core.Content;
 using Codex.Domain.Design;
@@ -37,14 +38,18 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
         previewView = new PreviewView(Host);
-        var window = new FrameLayout(Host)
+        // Measured to the ratio the sensor is reading out, never to the space left over.
+        var window = new RatioFrame(Host)
         {
             Background = PaperUi.Outline(Host, PaperTheme.PaperShade, PaperTheme.Ink, 0),
         };
+        window.SetRatio(shell.Camera.Ratio);
         window.AddView(previewView, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
         column.AddView(window, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        column.AddView(QuietControls());
 
         // Quiet inline status. §7 bans success toasts, so the shutter's only answer is this
         // line appearing under the window.
@@ -61,9 +66,38 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         return column;
     }
 
-    public override View BuildBottomBar() =>
-        PaperUi.BottomBar(Host,
+    // §7 keeps one primary action per screen, so the settings that change what the shutter
+    // does are a quiet row under the window rather than four more buttons in the bar.
+    private View QuietControls()
+    {
+        var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
+        var camera = shell.Camera;
+
+        row.AddView(PaperUi.QuietButton(Host,
+            camera.Ratio == CaptureRatio.ThreeFour ? "3:4" : "9:16",
+            () => { camera.Rebind(ratio: CaptureFormat.NextRatio(camera.Ratio)); Invalidate(); }));
+
+        row.AddView(PaperUi.QuietButton(Host,
+            camera.Lens == Lens.Front ? "Front" : "Back",
+            () => { camera.Rebind(lens: CaptureFormat.NextLens(camera.Lens)); Invalidate(); }));
+
+        // Absent rather than disabled on the front lens: this phone has no front-facing
+        // flash, and a button that does nothing is worse than one that is not there.
+        if (CaptureFormat.HasFlash(camera.Lens))
+        {
+            row.AddView(PaperUi.QuietButton(Host, $"Flash {camera.Flash}".ToLowerInvariant(),
+                () => { camera.Rebind(flash: CaptureFormat.NextFlash(camera.Flash)); Invalidate(); }));
+        }
+
+        return row;
+    }
+
+    public override View BuildBottomBar() => shell.Camera.IsRecording
+        ? PaperUi.BottomBar(Host,
+            PaperUi.DestructiveButton(Host, "Stop", StopVideo))
+        : PaperUi.BottomBar(Host,
             PaperUi.PrimaryButton(Host, "Capture", TakePhoto),
+            PaperUi.SecondaryButton(Host, "Video", StartVideo),
             PaperUi.SecondaryButton(Host, "Photos", OpenGooglePhotos));
 
     public override void OnShown(bool nowShowing)
@@ -114,6 +148,50 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         capture.TakePicture(options, ContextCompat.GetMainExecutor(Host), new CaptureCallback(this));
     }
 
+    private void StartVideo()
+    {
+        if (shell.Camera.Video is not { } video)
+        {
+            ShowStatus("The camera is not ready yet.");
+            return;
+        }
+
+        // A video is a moment like any other, so it files in the same camera roll the photos
+        // do — splitting it out would put half of what Plate captures outside the folder
+        // Google Photos actually backs up.
+        var entry = CaptureFiling.Video(DateTime.Now);
+        var values = new ContentValues();
+        values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, entry.DisplayName);
+        values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, entry.MimeType);
+        values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, entry.RelativePath);
+
+        var options = new MediaStoreOutputOptions.Builder(
+            Host.ContentResolver!, Android.Provider.MediaStore.Video.Media.ExternalContentUri!)
+            .SetContentValues(values)
+            .Build();
+
+        var pending = ((Recorder)video.Output!).PrepareRecording(Host, options);
+        if (Host.CheckSelfPermission(Android.Manifest.Permission.RecordAudio)
+            == Android.Content.PM.Permission.Granted)
+        {
+            // Sound is the point of most of these. Without the permission the recording
+            // still runs, silently, rather than refusing to start.
+            pending = pending.WithAudioEnabled();
+        }
+
+        shell.Camera.Recording = pending.Start(
+            ContextCompat.GetMainExecutor(Host), new RecordListener(this));
+        ShowStatus("Recording…");
+        Invalidate();
+    }
+
+    private void StopVideo()
+    {
+        shell.Camera.Recording?.Stop();
+        shell.Camera.Recording = null;
+        Invalidate();
+    }
+
     private void OpenGooglePhotos()
     {
         var intent = Host.PackageManager!.GetLaunchIntentForPackage("com.google.android.apps.photos");
@@ -133,6 +211,27 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         }
         statusLine.Text = message;
         statusLine.Visibility = ViewStates.Visible;
+    }
+
+    private sealed class RecordListener(CameraArea area)
+        : Java.Lang.Object, AndroidX.Core.Util.IConsumer
+    {
+        public void Accept(Java.Lang.Object? value)
+        {
+            if (value is not VideoRecordEvent.Finalize finished)
+            {
+                return;
+            }
+
+            area.Host.RunOnUiThread(() =>
+            {
+                area.shell.Camera.Recording = null;
+                area.ShowStatus(finished.HasError
+                    ? $"That recording did not save: {finished.Cause?.Message}"
+                    : $"Video saved to your camera roll · {TimeFormats.Clock12(DateTime.Now)}");
+                area.Invalidate();
+            });
+        }
     }
 
     private sealed class CaptureCallback(CameraArea area)

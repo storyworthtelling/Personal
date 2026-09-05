@@ -17,3 +17,7 @@ using Android.App;
 // The vault and the reMarkable are both network. Nothing Plate captures leaves the phone
 // by this route without the owner choosing a destination first.
 [assembly: UsesPermission(Manifest.Permission.Internet)]
+
+// Sound on a video. A sensor permission, so it is asked for at the runtime dialog like
+// CAMERA; refused, a recording still runs, silently, rather than refusing to start.
+[assembly: UsesPermission(Manifest.Permission.RecordAudio)]
