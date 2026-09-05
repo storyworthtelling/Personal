@@ -26,10 +26,16 @@ public static class TidalSignInFailure
         var text = failure ?? string.Empty;
 
         // TIDAL's own words for "this client may not use the device-code grant".
+        //
+        // Deliberately does NOT send the owner to the developer portal to switch
+        // something on, which is what this first said. There is nothing there to
+        // switch: TIDAL's Android SDK documents the device flow as "(Only available
+        // for TIDAL internally developed applications for now)". Helper text that
+        // states a fix which does not exist is the same dead end as offering a retry
+        // that cannot work — it just takes longer to discover.
         if (Mentions(text, "Limited Input Device"))
         {
-            return "This TIDAL app isn't registered for sign-in from a device like this. " +
-                   "It needs enabling in TIDAL's developer portal.";
+            return "TIDAL only allows this kind of sign-in for its own apps. Score needs a different one.";
         }
 
         if (Mentions(text, "invalid_client") || Mentions(text, "unauthorized_client"))
