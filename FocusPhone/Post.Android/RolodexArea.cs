@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
+using Codex.Domain.Policy;
 using Codex.Domain.Timeline;
 using Codex.Ui;
 
@@ -172,7 +173,7 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
         Host.StartActivity(plate);
     }
 
-    private const string PlatePackage = "com.storyworthtelling.focusphone.camera";
+    private const string PlatePackage = PolicyContext.PlatePackage;
 
     private static string Reachable(ContactPicker.Person person)
     {

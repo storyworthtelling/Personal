@@ -51,10 +51,19 @@ public static class PaperTheme
     public static readonly Color PostMark = Color.ParseColor(DesignTokens.Identity.Post.Mark);
     public static readonly Color PostText = Color.ParseColor(DesignTokens.Identity.Post.Text);
     public static readonly Color PostDeep = Color.ParseColor(DesignTokens.Identity.Post.Deep);
+    public static readonly Color PlateFill = Color.ParseColor(DesignTokens.Identity.Plate.Fill);
+    public static readonly Color PlateGround = Color.ParseColor(DesignTokens.Identity.Plate.Ground);
+    public static readonly Color PlateMark = Color.ParseColor(DesignTokens.Identity.Plate.Mark);
+    public static readonly Color PlateText = Color.ParseColor(DesignTokens.Identity.Plate.Text);
+    public static readonly Color PlateDeep = Color.ParseColor(DesignTokens.Identity.Plate.Deep);
 
     // The fill tiers exist here because §9 cuts an inactive binder tab from its area's
     // own cloth, which is exactly that tier. Resolved is the neutral every app's
     // Settings tab takes, so the one area they all share looks the same everywhere.
+    // Reference is Plate's Scan tab: a scan is a document being referred to, not an act in
+    // progress, and §9 lets a middle area draw on a semantic role rather than invent a hue.
+    public static readonly Color ReferenceFill = Color.ParseColor(DesignTokens.ReferenceFill);
+    public static readonly Color ReferenceMark = Color.ParseColor(DesignTokens.ReferenceMark);
     public static readonly Color ResolvedFill = Color.ParseColor(DesignTokens.ResolvedFill);
     public static readonly Color ResolvedMark = Color.ParseColor(DesignTokens.ResolvedMark);
     public static readonly Color CautionFill = Color.ParseColor(DesignTokens.CautionFill);
