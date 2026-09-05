@@ -323,7 +323,8 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         var pageImages = new List<byte[]>(held.Count);
         foreach (var page in held.Pages)
         {
-            using var input = Host.ContentResolver!.OpenInputStream(Android.Net.Uri.Parse(page)!)!;
+            using var input = Host.ContentResolver!.OpenInputStream(
+                Android.Net.Uri.Parse(page.Reference)!)!;
             using var buffer = new MemoryStream();
             input.CopyTo(buffer);
             pageImages.Add(buffer.ToArray());

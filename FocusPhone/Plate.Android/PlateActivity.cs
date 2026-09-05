@@ -73,10 +73,19 @@ public class PlateActivity : AppCompatActivity
 
         SetContentView(BuildLayout());
 
-        if (CheckSelfPermission(Android.Manifest.Permission.Camera)
-            != Android.Content.PM.Permission.Granted)
+        var wanted = new[]
         {
-            RequestPermissions([Android.Manifest.Permission.Camera], 0);
+            Android.Manifest.Permission.Camera,
+            // Sound on a video. Refused, recording still works — silently.
+            Android.Manifest.Permission.RecordAudio,
+        };
+        var toRequest = wanted
+            .Where(permission => CheckSelfPermission(permission)
+                != Android.Content.PM.Permission.Granted)
+            .ToArray();
+        if (toRequest.Length > 0)
+        {
+            RequestPermissions(toRequest, 0);
         }
 
         // After a reinstall or the cutover's factory reset, refill the reMarkable pairing
