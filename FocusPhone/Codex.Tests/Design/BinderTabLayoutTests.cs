@@ -56,6 +56,11 @@ public class BinderTabLayoutTests
     // The strip is top-aligned under the header, not centred (§9). A centred strip
     // moves every tab whenever an area is added or removed; a top-aligned one keeps
     // each tab where the hand last found it, which is the whole point of a binder.
+    //
+    // Top-aligned here means the strip hangs from a fixed lead-in of one tab rather
+    // than floating in the middle of the well — not that it is flush at zero. When
+    // the tabs shrink to fit, the lead-in shrinks with them, which is why this is
+    // stated against the tab's own height and not against a constant.
     [Theory]
     [InlineData(2)]
     [InlineData(4)]
@@ -65,7 +70,7 @@ public class BinderTabLayoutTests
     {
         var tabs = BinderTabLayout.Compute(count, wellHeightDp: 680);
 
-        Assert.Equal(0, tabs[0].TopDp);
+        Assert.Equal(tabs[0].HeightDp, tabs[0].TopDp);
     }
 
     // The corollary, and the reason it matters: an app that gains or loses an area
@@ -143,5 +148,66 @@ public class BinderTabLayoutTests
     public void ANegativeCount_Throws()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => BinderTabLayout.Compute(-1, 680));
+    }
+
+    // On device the first tab sat flush against the header, which made Music — the
+    // first area, and so the tab that returns Music to its root — awkward to hit.
+    // The strip now starts one tab height down (owner's call: not centred, but about
+    // a tab down), which is a lead-in you can see rather than a margin you cannot.
+    [Fact]
+    public void Compute_StartsTheStripATabHeightDown()
+    {
+        var strip = BinderTabLayout.Compute(6, 800);
+
+        Assert.Equal(strip[0].HeightDp, strip[0].TopDp);
+    }
+
+    // Not centred: the lead-in is fixed at one tab, so adding an area does not slide
+    // the strip up the way a centred one would.
+    [Fact]
+    public void Compute_LeadsInByATabWhateverTheCount()
+    {
+        foreach (var count in new[] { 2, 4, 6 })
+        {
+            var strip = BinderTabLayout.Compute(count, 800);
+
+            Assert.Equal(strip[0].HeightDp, strip[0].TopDp);
+        }
+    }
+
+    [Fact]
+    public void Compute_SpacesEveryTabEvenlyIncludingTheFirst()
+    {
+        var strip = BinderTabLayout.Compute(6, 800);
+
+        for (var i = 1; i < strip.Count; i++)
+        {
+            Assert.Equal(BinderTabLayout.GapDp, strip[i].TopDp - strip[i - 1].BottomDp);
+        }
+    }
+
+    // The lead-in is space the strip has to pay for, or six tabs silently overflow
+    // the well they were just measured to fit.
+    [Fact]
+    public void Compute_CountsTheLeadInWhenDecidingWhetherItFits()
+    {
+        foreach (var well in new[] { 400, 500, 560, 680, 800 })
+        {
+            var strip = BinderTabLayout.Compute(6, well);
+
+            Assert.True(strip.Scrolls || strip[^1].BottomDp <= well,
+                $"In a {well}dp well the strip ends at {strip[^1].BottomDp}dp without reporting a scroll");
+        }
+    }
+
+    [Fact]
+    public void Compute_KeepsEveryTabAtOrAboveTheTouchMinimum()
+    {
+        foreach (var wellHeight in new[] { 300, 480, 640, 800, 1200 })
+        {
+            var strip = BinderTabLayout.Compute(6, wellHeight);
+
+            Assert.All(strip, tab => Assert.True(tab.HeightDp >= DesignTokens.Shape.TouchTargetDp));
+        }
     }
 }
