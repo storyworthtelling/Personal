@@ -479,18 +479,16 @@ public sealed class DiscoverArea : ScoreArea
 
     private IReadOnlyList<CratePick> ResolvePicks()
     {
-        var selection = picksStore.LoadSelection();
-        if (selection.TrackIds.Count == 0)
-        {
-            return [];
-        }
-
-        // Re-resolved against the live catalog every time, so a track that has left
-        // the library leaves the crate with it rather than sitting there unplayable.
-        var playlist = PlaylistPlan.Resolve(
-            selection.Title, selection.TrackIds, library.Catalog.Songs(), FridayStack.Largest);
-        return [.. playlist.Tracks.Select(track =>
-            new CratePick(track.Id, track.DisplayTitle, track.DisplayArtist, track.ArtRef))];
+        // Records the owner does not have, so there is nothing in the library to
+        // resolve them against — they are shown as the recommender named them, and
+        // Save to library is what goes and finds one.
+        //
+        // Filtered against the library again on the way out as well as on the way in,
+        // because a crate is a week old by the end of its run and the owner may have
+        // bought one of its records in the meantime; a crate offering to add something
+        // now on the shelf is the failure this whole path was built wrong around.
+        return [.. Discoveries.Unowned(picksStore.LoadPicks(), library.Catalog.Songs())
+            .Select(pick => new CratePick(Discoveries.Key(pick), pick.Title, pick.Artist))];
     }
 
     // Never a dead end: say which of the three reasons it is.
