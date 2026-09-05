@@ -53,38 +53,41 @@ public class FridayPicksWorker : Worker
         // The week's strikes go in before the crate is replaced. This is the batching
         // that keeps a veto from being a rating: it lands once, on the stack's own
         // cycle, rather than the moment it is tapped.
-        taste.FoldVetoesAsync(VetoedPicks(store, catalog), CancellationToken.None).GetAwaiter().GetResult();
+        taste.FoldVetoesAsync(VetoedPicks(store), CancellationToken.None).GetAwaiter().GetResult();
 
         // What the workout ran short of, if anything. Read once and cleared, so a
         // tempo the owner tried twice does not stack up into a demand.
         var gap = MusicSettingsStore.TempoGap;
         MusicSettingsStore.TempoGap = null;
 
-        var selection = taste.FridayPicksAsync(
+        // The catalog goes in as evidence and as an exclusion list, and what comes
+        // back is records the owner does NOT have. It used to go in as the source, so
+        // the crate could only ever offer to add something already on the shelf.
+        var picks = taste.WeeklyDiscoveriesAsync(
             catalog, MusicSettingsStore.FridayStackSize, gap, CancellationToken.None).GetAwaiter().GetResult();
-        if (selection.TrackIds.Count > 0)
+        if (picks.Count > 0)
         {
-            store.Save(selection, DateTimeOffset.Now);
+            store.Save(picks, DateTimeOffset.Now);
         }
 
         return Result.InvokeSuccess();
     }
 
-    // The outgoing crate's struck records, named. Resolved against the live catalog
-    // like everything else the shelf shows, so an id whose track has since gone
-    // simply is not folded rather than going in as a blank.
-    private static IReadOnlyList<CratePick> VetoedPicks(FridayPicksStore store, IReadOnlyList<Track> catalog)
+    // The outgoing crate's struck records, named. They are read back out of the
+    // crate itself rather than resolved against the library, because a struck record
+    // is by definition one the owner does not have — there is nothing to resolve it
+    // against, which is what the old lookup was quietly failing to do.
+    private static IReadOnlyList<CratePick> VetoedPicks(FridayPicksStore store)
     {
-        var struck = store.Vetoed;
+        var struck = store.Vetoed.ToHashSet(StringComparer.Ordinal);
         if (struck.Count == 0)
         {
             return [];
         }
 
-        var byId = catalog.ToDictionary(track => track.Id);
-        return [.. struck.Where(byId.ContainsKey)
-            .Select(id => byId[id])
-            .Select(track => new CratePick(track.Id, track.DisplayTitle, track.DisplayArtist, track.ArtRef))];
+        return [.. store.LoadPicks()
+            .Where(pick => struck.Contains(Discoveries.Key(pick)))
+            .Select(pick => new CratePick(Discoveries.Key(pick), pick.Title, pick.Artist))];
     }
 
     /// <summary>The daily backbone (network-connected); Keep so relaunches don't reset a pending run.</summary>
