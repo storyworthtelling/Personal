@@ -24,9 +24,15 @@ public record PolicyContext(
 
     public const string LauncherPackage = "com.storyworthtelling.focusphone.launcher";
     public const string CommunicationPackage = "com.storyworthtelling.focusphone.communication";
-    public const string CameraPackage = "com.storyworthtelling.focusphone.camera";
+    // Frozen: the head is renamed to Plate IN PLACE, so the package id never moves.
+    public const string PlatePackage = "com.storyworthtelling.focusphone.camera";
     public const string AudioPackage = "com.storyworthtelling.focusphone.audio";
     public const string PlayStorePackage = "com.android.vending";
+
+    // Google Drive. Not first-party and not allowlisted for the owner to browse — it is here
+    // only as a share target: Plate hands a finished scan to it rather than acquiring a Drive
+    // API client and a write scope of its own.
+    public const string DrivePackage = "com.google.android.apps.docs";
 
     // The two hard-restricted permissions the Communication app needs to read
     // the system text and call-log stores. These are the canonical Android
@@ -47,7 +53,7 @@ public record PolicyContext(
     {
         LauncherPackage,
         CommunicationPackage,
-        CameraPackage,
+        PlatePackage,
         AudioPackage,
     };
 

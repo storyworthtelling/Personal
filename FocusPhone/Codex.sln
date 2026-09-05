@@ -13,7 +13,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flyleaf.Android", "Flyleaf.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Post.Android", "Post.Android\Post.Android.csproj", "{25F880BC-DBE3-4291-AE71-84E560C21F6A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FocusPhone.Camera.Android", "FocusPhone.Camera.Android\FocusPhone.Camera.Android.csproj", "{EA0AE816-1C63-45B5-B76F-A9828F9D09EB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Plate.Android", "Plate.Android\Plate.Android.csproj", "{EA0AE816-1C63-45B5-B76F-A9828F9D09EB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Score.Android", "Score.Android\Score.Android.csproj", "{A57E5999-3A89-487F-9517-A2D9F67169AB}"
 EndProject

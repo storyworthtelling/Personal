@@ -1,6 +1,7 @@
 using Android.App;
 using Android.Content;
 using Android.Widget;
+using Codex.Domain.Policy;
 using Codex.Domain.Post;
 using Codex.Domain.Timeline;
 using Codex.Ui;
@@ -95,7 +96,7 @@ internal static class Attachments
         }
     }
 
-    private const string PlatePackage = "com.storyworthtelling.focusphone.camera";
+    private const string PlatePackage = PolicyContext.PlatePackage;
 
     // The activity's own content frame, so a notice folds the corner of the page the owner
     // is looking at rather than of some other one.

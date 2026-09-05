@@ -1,4 +1,5 @@
 using Android.Content;
+using Codex.Domain.Policy;
 
 namespace Flyleaf;
 
@@ -9,7 +10,7 @@ namespace Flyleaf;
 public record Tile(string Name, string IconResourceName, string[] NotificationPackages)
 {
     public const string CommunicationPackage = "com.storyworthtelling.focusphone.communication";
-    public const string CameraPackage = "com.storyworthtelling.focusphone.camera";
+    public const string CameraPackage = PolicyContext.PlatePackage;
     public const string AudioPackage = "com.storyworthtelling.focusphone.audio";
     public const string DrivePackage = "com.google.android.apps.docs";
     public const string GeminiPackage = "com.google.android.apps.bard";

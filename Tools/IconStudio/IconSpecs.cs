@@ -36,7 +36,7 @@ public static class IconSpecs
     public static readonly IReadOnlyList<IconSpec> All =
     [
         new("FocusPhone.Launcher", "FocusPhone/Flyleaf.Android/Resources", "appicon", false, Glyphs.Bookplate, Tokens.FlyleafWarmHex),
-        new("FocusPhone.Camera", "FocusPhone/FocusPhone.Camera.Android/Resources", "appicon", false, Glyphs.Lens),
+        new("Plate", "FocusPhone/Plate.Android/Resources", "appicon", false, Glyphs.Lens),
         new("Score", "FocusPhone/Score.Android/Resources", "appicon", false, Glyphs.Keyboard,
             Tokens.ScoreGroundHex, GroundImage: "Branding/score-ground.png"),
         // Post's icon IS its cover: the indigo binding as the ground, the mid-century mailbox

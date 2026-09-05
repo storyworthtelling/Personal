@@ -12,7 +12,7 @@ public sealed record HomeFeatureSet(IReadOnlyList<string> Packages)
     // Canonical package ids for the default featured six (Gemini dropped; Google Home added).
     // Tile.cs adopts these when the home renderer is rebuilt (Phase D UI).
     public const string CommunicationPackage = "com.storyworthtelling.focusphone.communication";
-    public const string CameraPackage = "com.storyworthtelling.focusphone.camera";
+    public const string CameraPackage = Policy.PolicyContext.PlatePackage;
     public const string AudioPackage = "com.storyworthtelling.focusphone.audio";
     public const string DrivePackage = "com.google.android.apps.docs";
     public const string GoogleHomePackage = "com.google.android.apps.chromecast.app";

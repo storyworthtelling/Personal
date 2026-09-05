@@ -63,12 +63,17 @@ public static class DesignTokens
         /// Score — teal-slate, sampled from the ribbon cover and laddered into the
         /// role model's five tiers.
         ///
-        /// The hue was nudged from the as-painted 174 degrees to 165, by rotating the
-        /// painting rather than re-prompting it, so the paper texture and pigment
-        /// blooms are exactly as painted and only the hue moved. That shift is
-        /// load-bearing: at 174 it sat 13 degrees from the in-progress status teal,
-        /// which is too close for a set whose whole job is to not read as a status.
-        /// At 165 the separation is 21 degrees.
+        /// The hue was nudged off the as-painted one by ROTATING the painting rather
+        /// than re-prompting it, so the paper texture and pigment blooms are exactly as
+        /// painted and only the hue moved. That shift is load-bearing: as painted it sat
+        /// too close to the in-progress status teal for a set whose whole job is to not
+        /// read as a status.
+        ///
+        /// What SHIPPED, measured back out of Mark through Oklch.FromHex, is 178 degrees
+        /// — 29 clear of the in-progress teal at 207. Earlier revisions of this comment
+        /// said the move was 174 to 165 for 21 degrees of separation; DESIGN.md §3
+        /// records that none of those three figures matches the committed ladder or the
+        /// role wheel. The outcome was always sound; the narrative was not.
         /// </summary>
         public static class Score
         {
@@ -101,6 +106,36 @@ public static class DesignTokens
             public const string Mark = "#5C5894";
             public const string Text = "#494676";
             public const string Deep = "#333252";
+        }
+
+        /// <summary>
+        /// Plate — magenta, and the only identity in the suite that the app's own art
+        /// picked unprompted.
+        ///
+        /// Twelve cover studies were generated from their subjects with no colour named
+        /// in any prompt. Eleven landed between 47 and 102 degrees, the warm band the
+        /// caution ochre and Flyleaf's amber already occupy, because photography is
+        /// sepia however you render it. The twelfth was the same lens-and-tree subject
+        /// as the chosen cover, regenerated under identical wording, and it measured
+        /// 326.5 — free wheel space — because its coating flare came out magenta where
+        /// the chosen cover's dust is warm. So this is sampled from Plate's own art and
+        /// needs no departure from §3's route; Post's remains the only one.
+        ///
+        /// Lightnesses match Score's and Post's ladder exactly; peak chroma is 0.085,
+        /// between Score's muted 0.047 and Post's vivid 0.095.
+        ///
+        /// The BINDING is the light Ground tier with the framing inverted to ink, not
+        /// Post's deep cloth with cream: §12 warns that a binding harmonising with its
+        /// art makes the book hardest to pick out of the row, and Plate's cover art is a
+        /// near-black lens. That is Score's construction, chosen for Score's reason.
+        /// </summary>
+        public static class Plate
+        {
+            public const string Fill = "#C8B5C8";
+            public const string Ground = "#B69BB6";
+            public const string Mark = "#7A4F7B";
+            public const string Text = "#613F62";
+            public const string Deep = "#442D44";
         }
     }
 

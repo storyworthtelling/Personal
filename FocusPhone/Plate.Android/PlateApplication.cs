@@ -2,17 +2,17 @@ using Android.App;
 using Android.Runtime;
 using Codex.Ui;
 
-namespace FocusPhone.Camera;
+namespace Plate;
 
 /// <summary>
 /// Application entry point. The Camera head previously had none; it exists so
 /// the crash reporter is installed before the camera stack starts in
-/// <c>CameraActivity.OnCreate</c>. Icon attributes mirror the other heads.
+/// <c>PlateActivity.OnCreate</c>. Icon attributes mirror the other heads.
 /// </summary>
 [Application(Icon = "@mipmap/appicon", RoundIcon = "@mipmap/appicon_round")]
-public class CameraApplication : Application
+public class PlateApplication : Application
 {
-    public CameraApplication(IntPtr handle, JniHandleOwnership ownership)
+    public PlateApplication(IntPtr handle, JniHandleOwnership ownership)
         : base(handle, ownership)
     {
     }
@@ -20,6 +20,6 @@ public class CameraApplication : Application
     public override void OnCreate()
     {
         base.OnCreate();
-        CrashReporter.Install(this, "Camera");
+        CrashReporter.Install(this, "Plate");
     }
 }
