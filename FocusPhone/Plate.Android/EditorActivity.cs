@@ -74,7 +74,11 @@ public class EditorActivity : AppCompatActivity
         // Recognition is local and optional: ML Kit finds the faces, and naming one needs an
         // embedding model this phone may not have. Without it the faces are still found and
         // the owner can still write the name themselves.
-        recogniser = new FaceRecogniser(this, new NoFaceEmbedder());
+        // The real embedder when a model has been shipped in assets, and an honest nothing
+        // when it has not: faces are still found, the fold simply does not appear, and the
+        // caption can still be written by hand.
+        var embedder = new TfLiteFaceEmbedder(this);
+        recogniser = new FaceRecogniser(this, embedder.IsReady ? embedder : new NoFaceEmbedder());
         faces = new FaceBookStore(this);
         rolodex = new Rolodex(this);
 
