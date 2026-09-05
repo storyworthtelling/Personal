@@ -6,6 +6,7 @@ using Android.Widget;
 using AndroidX.AppCompat.App;
 using Codex.Domain.Design;
 using Codex.Domain.Plate;
+using Codex.Infrastructure.Plate;
 using Codex.Ui;
 using Codex.Ui.Voice;
 
@@ -264,8 +265,90 @@ public class PlateActivity : AppCompatActivity
         }
     }
 
-    /// <summary>The captions. Wired in the next increment.</summary>
-    private Task CaptionSoon() => Task.CompletedTask;
+    /// <summary>
+    /// Asks Claude for the line over the waiting pictures.
+    ///
+    /// <para>Debounced by a plain guard rather than a timer: a burst is the ordinary way to
+    /// fill this room, and one call per shutter press would be several calls for one
+    /// decision. Anything that goes wrong is simply no line — a caption is a pleasant extra
+    /// on a screen full of the owner's own pictures, never a reason the room fails.</para>
+    ///
+    /// <para>It cannot name anyone: Claude refuses to identify people in images. Where a name
+    /// belongs, it comes from the Rolodex or from the owner writing it themselves.</para>
+    /// </summary>
+    private async Task CaptionSoon()
+    {
+        if (captioning)
+        {
+            return;
+        }
+
+        captioning = true;
+        try
+        {
+            // Let a burst finish before asking about it.
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            var waiting = Room.Items
+                .Where(item => item.Kind == DarkroomKind.Photo)
+                .Take(DarkroomCaptionClient.MostPictures)
+                .ToList();
+            if (waiting.Count == 0)
+            {
+                return;
+            }
+
+            var jpegs = new List<byte[]>(waiting.Count);
+            foreach (var item in waiting)
+            {
+                var file = DarkroomFiles.FileFor(item);
+                if (file.Exists())
+                {
+                    jpegs.Add(await System.IO.File.ReadAllBytesAsync(file.AbsolutePath!));
+                }
+            }
+
+            // The shared Claude key, read live out of the encrypted vault — there are no
+            // per-app key screens in this suite, and Plate is not about to be the first.
+            var voiceOptions = VoiceOptionsAccess.ForHead(Account.GetAccessToken, "Plate");
+            await voiceOptions.RefreshAsync(CancellationToken.None);
+
+            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+            var client = new DarkroomCaptionClient(http, voiceOptions);
+            var line = await client.CaptionAsync(jpegs, CancellationToken.None);
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return;
+            }
+
+            RunOnUiThread(() =>
+            {
+                Room = Room.WithCaption(waiting[0].Id, line);
+                RenderContent();
+            });
+        }
+        catch
+        {
+            // No line. Never a crash on the room the owner just opened.
+        }
+        finally
+        {
+            captioning = false;
+        }
+    }
+
+    private bool captioning;
+
+    /// <summary>
+    /// The owner writes the line themselves. The model will not name a person in a picture,
+    /// so where a name belongs this is how it gets there — and it is the answer whenever the
+    /// machine's line is simply wrong.
+    /// </summary>
+    public void CaptionByHand(DarkroomItem item, string caption)
+    {
+        Room = Room.WithCaption(item.Id, caption);
+        RenderContent();
+    }
 
     private View BuildLayout()
     {
