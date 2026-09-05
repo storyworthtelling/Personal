@@ -15,6 +15,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
     <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
+    <!-- The Darkroom's caption client lives here with the suite's other Claude clients.
+         Flyleaf, Score and Post all reference this already; Plate was the only head that
+         did not, because until the Darkroom it had nothing in it. -->
+    <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
     <!-- The shared page-composition library: Plate assembles its own scan PDF because ML Kit's
          scanner caps a run at 50 pages and the owner wants longer. PdfVolumeComposer is the
          same assembler Canonizer and DailyLoader use, and IPaperDelivery is the reMarkable
