@@ -49,6 +49,10 @@ public class EditorActivity : AppCompatActivity
 
     private ImageView? window;
     private LinearLayout? toolRow;
+    private FrameLayout? overlay;
+    private FaceRecogniser recogniser = null!;
+    private FaceBookStore faces = null!;
+    private Rolodex rolodex = null!;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -67,8 +71,16 @@ public class EditorActivity : AppCompatActivity
             return;
         }
 
+        // Recognition is local and optional: ML Kit finds the faces, and naming one needs an
+        // embedding model this phone may not have. Without it the faces are still found and
+        // the owner can still write the name themselves.
+        recogniser = new FaceRecogniser(this, new NoFaceEmbedder());
+        faces = new FaceBookStore(this);
+        rolodex = new Rolodex(this);
+
         SetContentView(BuildLayout());
         Repaint();
+        _ = LookForFaces();
     }
 
     private View BuildLayout()
@@ -106,12 +118,59 @@ public class EditorActivity : AppCompatActivity
             page.AddView(PaperUi.Voice(this, caption));
         }
 
-        root.AddView(page, new LinearLayout.LayoutParams(
+        // The frame a dog-ear folds into, over the page rather than beside it.
+        overlay = new FrameLayout(this);
+        overlay.AddView(page, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        root.AddView(overlay, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Send", Send),
             PaperUi.DestructiveButton(this, "Delete", Delete)));
         return root;
+    }
+
+    /// <summary>
+    /// Offers a name for a face, once, as a question. It never files anything by itself: a
+    /// wrong suggestion costs a tap, and a suggestion accepted silently costs a picture
+    /// filed under the wrong person.
+    /// </summary>
+    private async Task LookForFaces()
+    {
+        if (original is null)
+        {
+            return;
+        }
+
+        var found = await recogniser.FindAsync(original);
+        var face = found.FirstOrDefault(entry => entry.CanBeMatched);
+        if (face is null)
+        {
+            foreach (var entry in found)
+            {
+                entry.Crop.Recycle();
+            }
+            return;
+        }
+
+        var book = faces.Load();
+        var match = book.Nearest(face.Descriptor);
+        if (!match.IsSomeone || overlay is null)
+        {
+            return;
+        }
+
+        // §13: something waiting, not something to interrupt with. The fold carries it.
+        DogEar.SetNotice(this, overlay, "face", new DogEar.Notice(
+            $"Is this {match.Name}?",
+            "Saying yes teaches it. Saying nothing changes nothing.",
+            PaperTheme.ProgressMark,
+            "Yes, that is them",
+            () =>
+            {
+                faces.Save(book.Learn(match.ContactId, match.Name, face.Descriptor));
+                DogEar.SetNotice(this, overlay, "face", null);
+            }));
     }
 
     private void BuildToolRow()

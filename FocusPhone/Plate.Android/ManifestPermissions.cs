@@ -21,3 +21,7 @@ using Android.App;
 // Sound on a video. A sensor permission, so it is asked for at the runtime dialog like
 // CAMERA; refused, a recording still runs, silently, rather than refusing to start.
 [assembly: UsesPermission(Manifest.Permission.RecordAudio)]
+
+// The Rolodex: names for the faces Plate finds, and the contact photos it learns them from.
+// Read-only, and nothing it reads leaves the phone.
+[assembly: UsesPermission(Manifest.Permission.ReadContacts)]
