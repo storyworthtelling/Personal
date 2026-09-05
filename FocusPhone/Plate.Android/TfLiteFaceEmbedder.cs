@@ -41,7 +41,7 @@ public sealed class TfLiteFaceEmbedder : IFaceEmbedder, IDisposable
             using var asset = context.Assets!.OpenFd(AssetName);
             using var stream = asset.CreateInputStream()!;
             var model = ByteBuffer.AllocateDirect((int)asset.Length)!;
-            model.Order(ByteOrder.NativeOrder());
+            model.Order(ByteOrder.NativeOrder()!);
 
             var bytes = new byte[asset.Length];
             var read = 0;
@@ -85,7 +85,7 @@ public sealed class TfLiteFaceEmbedder : IFaceEmbedder, IDisposable
         {
             using var scaled = Bitmap.CreateScaledBitmap(face, InputSize, InputSize, filter: true)!;
             var input = ByteBuffer.AllocateDirect(InputSize * InputSize * 3 * sizeof(float))!;
-            input.Order(ByteOrder.NativeOrder());
+            input.Order(ByteOrder.NativeOrder()!);
 
             var pixels = new int[InputSize * InputSize];
             scaled.GetPixels(pixels, 0, InputSize, 0, 0, InputSize, InputSize);
@@ -99,14 +99,15 @@ public sealed class TfLiteFaceEmbedder : IFaceEmbedder, IDisposable
             input.Rewind();
 
             var output = ByteBuffer.AllocateDirect(outputLength * sizeof(float))!;
-            output.Order(ByteOrder.NativeOrder());
+            output.Order(ByteOrder.NativeOrder()!);
             interpreter.Run(input, output);
-            output.Rewind();
 
+            // Absolute reads by byte offset: the binding exposes GetFloat(int) and not the
+            // relative overload, so the buffer position is never advanced and never matters.
             var embedding = new float[outputLength];
             for (var i = 0; i < outputLength; i++)
             {
-                embedding[i] = output.GetFloat();
+                embedding[i] = output.GetFloat(i * sizeof(float));
             }
 
             // L2-normalised, which is what cosine distance assumes and what makes one
