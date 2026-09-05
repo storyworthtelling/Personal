@@ -148,7 +148,11 @@ public class TidalPairingActivity : Activity
         {
             AudioDiagnostics.LogWarning(
                 "TidalPairingActivity", "Requesting a TIDAL device code failed.", e);
-            status = "Couldn't reach TIDAL. Try again in a moment.";
+
+            // The trace goes to Diagnostics; the screen gets the one sentence that says
+            // what to do about it. Offering a retry for something a retry cannot fix
+            // sends the owner round a loop instead of to the screen that settles it.
+            status = TidalSignInFailure.Describe(e.Message);
             Render();
             return;
         }
