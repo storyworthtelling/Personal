@@ -1,3 +1,4 @@
+using Codex.Domain.Design;
 using Android.Views;
 using Codex.Domain.Audio;
 using Codex.Domain.Music;
@@ -95,23 +96,41 @@ public sealed class DiscoverArea : ScoreArea
         return false;
     }
 
+    /// <summary>
+    /// Discover carries the hourly voice line as well as the crate's own note (owner's
+    /// call). The mockups had settled the seat on Music and Podcasts only, on the
+    /// reasoning that one pick at a time means one line of calligraphy — so this is a
+    /// deliberate change to that, not a drift from it.
+    /// </summary>
+    public override bool ShowsVoice => results.Count == 0 && trackResults.Count == 0;
+
     public override View BuildView()
     {
         var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
-        layout.AddView(BuildSearch());
-        layout.AddView(results.Count > 0 ? BuildResults() : BuildCrate());
-        layout.AddView(BuildTrackSearch());
+        Section(layout, BuildSearch());
+        Section(layout, results.Count > 0 ? BuildResults() : BuildCrate());
+        Section(layout, BuildTrackSearch());
         if (trackResults.Count > 0)
         {
-            layout.AddView(BuildTrackResults());
+            Section(layout, BuildTrackResults());
         }
 
-        layout.AddView(BuildGenius());
+        Section(layout, BuildGenius());
 
         var scroll = new ScrollView(Host);
         scroll.AddView(layout);
         return scroll;
     }
+
+    // Two search fields, a crate and a disclosure stacked with no air between them is
+    // what made this screen read as squeezed. §5's rhythm, applied once per section
+    // rather than left to whatever each block happened to pad itself with.
+    private void Section(LinearLayout layout, View view) =>
+        layout.AddView(view, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+        {
+            BottomMargin = PaperTheme.Dp(Host, DesignTokens.Space.X6),
+        });
 
     private View BuildSearch()
     {
@@ -508,11 +527,12 @@ public sealed class DiscoverArea : ScoreArea
     {
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         column.AddView(PaperUi.SecondaryButton(Host, GeniusToggleLabel(), ToggleListeningGenius));
+        // The disclosure stays — what leaves the phone is the owner's to know — but four
+        // sentences of it under the crate was most of the screen. Kept to what is
+        // load-bearing: what it learns from, what leaves, and what off means.
         column.AddView(PaperUi.Secondary(Host,
-            "Listening Genius learns your taste on this phone from what you play — nothing you rate — and " +
-            "sends a short summary to Claude with your key to describe it. Records you pass on here are the " +
-            "one exception: they're written to the summary once a week, with the crate they came from. Turn " +
-            "it off any time; that also clears what's been gathered."));
+            "Learns from what you play, never what you rate, and sends a short summary to Claude to " +
+            "describe it. Records you pass on join that summary weekly. Off clears what it gathered."));
         return column;
     }
 

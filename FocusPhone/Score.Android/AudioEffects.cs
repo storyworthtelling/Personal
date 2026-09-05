@@ -11,6 +11,39 @@ namespace Score;
 /// </summary>
 public sealed class AudioEffects : IDisposable
 {
+    private static bool? hasEqualizer;
+
+    /// <summary>
+    /// Whether this device offers an equalizer at all. Plenty do not, and the ones
+    /// that do not throw when asked rather than reporting zero bands — so the only
+    /// honest way to know is to open one and see.
+    ///
+    /// Probed once and remembered: it is a property of the hardware, and it is asked
+    /// on every render of the settings screen.
+    /// </summary>
+    public static bool HasEqualizer
+    {
+        get
+        {
+            if (hasEqualizer is { } known)
+            {
+                return known;
+            }
+
+            try
+            {
+                using var probe = new Equalizer(0, 0);
+                hasEqualizer = probe.NumberOfBands > 0;
+            }
+            catch (Exception e) when (e is Java.Lang.RuntimeException or Java.Lang.UnsupportedOperationException)
+            {
+                hasEqualizer = false;
+            }
+
+            return hasEqualizer.Value;
+        }
+    }
+
     private Equalizer? equalizer;
     private LoudnessEnhancer? loudness;
     private int sessionId = -1;
