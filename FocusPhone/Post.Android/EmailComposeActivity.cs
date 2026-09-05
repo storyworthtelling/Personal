@@ -163,6 +163,10 @@ public class EmailComposeActivity : Activity
             {
                 await new Codex.Infrastructure.Email.GmailClient(account.GmailAddress!, account.GmailAppPassword!)
                     .SendAsync(to, subjectText, bodyText, cc: ccList, attachmentPaths: paths, inReplyTo: inReplyTo);
+                // The sent copy lives at the source, so fetch it rather than wait for the
+                // next screen-open: a reply that does not appear in the correspondence
+                // reads as a reply that did not send.
+                Syncs.After(this, Codex.Domain.Post.PostAction.Sent);
                 RunOnUiThread(() =>
                 {
                     Toast.MakeText(this, "Sent.", ToastLength.Short)!.Show();
