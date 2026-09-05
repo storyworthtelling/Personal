@@ -30,6 +30,8 @@ public static class PaperTheme
     public static readonly Color ActionText = Color.ParseColor(DesignTokens.ActionText);
     public static readonly Color ProblemMark = Color.ParseColor(DesignTokens.ProblemMark);
     public static readonly Color CautionMark = Color.ParseColor(DesignTokens.CautionMark);
+    public static readonly Color ProgressFill = Color.ParseColor(DesignTokens.ProgressFill);
+    public static readonly Color ProgressMark = Color.ParseColor(DesignTokens.ProgressMark);
     public static readonly Color ProgressText = Color.ParseColor(DesignTokens.ProgressText);
 
     // Flyleaf's realistic bookshelf surface (a scoped DESIGN.md §1/§5 exception): warm identity
