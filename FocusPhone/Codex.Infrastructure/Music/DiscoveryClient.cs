@@ -27,12 +27,14 @@ public sealed class DiscoveryClient : IDiscoveryClient
         "{\"title\":string,\"trackIds\":[string]}. title = a short playlist name. trackIds = the chosen ids " +
         "in play order, at most the requested count. No prose outside the JSON.";
 
-    private const string FridayInstruction =
-        "You are assembling a quiet weekly \"New for you\" set from ONE listener's own library, to resurface " +
-        "things that fit their taste. You are given their TASTE PROFILE and a CATALOG (each track: id, title, " +
-        "artist, genre). Pick a small set that suits their taste, honoring what they avoid, favoring variety " +
-        "over their most-played. Use ONLY ids present in the catalog. Respond with ONLY a JSON object: " +
-        "{\"title\":string,\"trackIds\":[string]}. No prose outside the JSON.";
+    private const string DiscoveriesInstruction =
+        "You are filling ONE listener's weekly crate: records they do NOT own and might like. You are given " +
+        "their TASTE PROFILE and a sample of the LIBRARY THEY ALREADY HAVE. The library is evidence of what " +
+        "they like and a list of what to AVOID recommending — never pick from it, and do not pick another " +
+        "release of a record it already contains. Favour variety and things adjacent to their taste rather " +
+        "than the safest possible match, and honour what they avoid. Give each pick a SHORT reason in one " +
+        "plain clause, said to the listener. Respond with ONLY a JSON object: " +
+        "{\"picks\":[{\"title\":string,\"artist\":string,\"why\":string}]}. No prose outside the JSON.";
 
     private readonly HttpClient httpClient;
     private readonly IOptions<VoiceOptions> optionsAccessor;
@@ -53,15 +55,41 @@ public sealed class DiscoveryClient : IDiscoveryClient
         return Choose(PlaylistInstruction, userContent, cancellationToken);
     }
 
-    public Task<DiscoverySelection> FridayPicksAsync(
-        TasteProfile profile, IReadOnlyList<Track> catalog, int maxTracks,
+    public async Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
+        TasteProfile profile, IReadOnlyList<Track> owned, int maxTracks,
         string? note, CancellationToken cancellationToken)
     {
         var userContent =
             $"TASTE PROFILE (JSON):\n{ProfileJson(profile)}\n\n" +
-            $"CATALOG (JSON):\n{CatalogJson(catalog)}\n\nMAX TRACKS: {maxTracks}" +
+            $"LIBRARY THEY ALREADY HAVE (JSON):\n{CatalogJson(owned)}\n\nMAX PICKS: {maxTracks}" +
             (string.IsNullOrWhiteSpace(note) ? string.Empty : $"\n\nTHE SHELF IS SHORT OF: {note}");
-        return Choose(FridayInstruction, userContent, cancellationToken);
+
+        var reply = await SendMessage(DiscoveriesInstruction, userContent, cancellationToken);
+        var json = ExtractObject(reply);
+        if (json is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            var dto = JsonSerializer.Deserialize<DiscoveriesDto>(json, CaseInsensitive);
+            var picks = dto?.Picks ?? [];
+
+            // Excluded here as well as asked for in the instruction. Asking is worth
+            // doing and is not worth trusting: a recommender handed someone's
+            // favourite artists will happily name their favourite records back.
+            return Discoveries.Unowned(
+                picks.Select(pick => new Recommendation(
+                    pick.Title?.Trim() ?? string.Empty,
+                    pick.Artist?.Trim() ?? string.Empty,
+                    string.IsNullOrWhiteSpace(pick.Why) ? null : pick.Why.Trim())),
+                owned);
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private async Task<DiscoverySelection> Choose(string instruction, string userContent, CancellationToken cancellationToken)
@@ -207,5 +235,17 @@ public sealed class DiscoveryClient : IDiscoveryClient
     {
         public string? Title { get; set; }
         public List<string>? TrackIds { get; set; }
+    }
+
+    private sealed class DiscoveriesDto
+    {
+        public List<PickDto>? Picks { get; set; }
+    }
+
+    private sealed class PickDto
+    {
+        public string? Title { get; set; }
+        public string? Artist { get; set; }
+        public string? Why { get; set; }
     }
 }

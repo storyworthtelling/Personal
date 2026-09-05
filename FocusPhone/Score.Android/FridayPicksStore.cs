@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Android.Content;
+using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 
 namespace Score;
@@ -64,21 +65,29 @@ public class FridayPicksStore
         set => preferences.Edit()!.PutString(VetoedKey, JsonSerializer.Serialize(value, SerializerOptions))!.Apply();
     }
 
-    public DiscoverySelection LoadSelection()
+    /// <summary>
+    /// The week's picks. Records the owner does not have, so they are held by name
+    /// rather than by a library id — there is no id for something not in the library,
+    /// which is what the old shape got wrong.
+    /// </summary>
+    public IReadOnlyList<Recommendation> LoadPicks()
     {
         var json = preferences.GetString(SelectionKey, null);
         if (string.IsNullOrWhiteSpace(json))
         {
-            return DiscoverySelection.Empty;
+            return [];
         }
 
         try
         {
-            return JsonSerializer.Deserialize<DiscoverySelection>(json, SerializerOptions) ?? DiscoverySelection.Empty;
+            // A crate written by the previous shape was a title plus library ids. It
+            // cannot be converted into records the owner does not own, so it reads as
+            // empty and Friday fills it properly.
+            return JsonSerializer.Deserialize<List<Recommendation>>(json, SerializerOptions) ?? [];
         }
         catch (JsonException)
         {
-            return DiscoverySelection.Empty;
+            return [];
         }
     }
 
@@ -87,9 +96,9 @@ public class FridayPicksStore
     /// Friday replaces Friday, nothing carries over, and a veto held over from a run
     /// that is gone must not colour the new one.
     /// </summary>
-    public void Save(DiscoverySelection selection, DateTimeOffset generatedUtc) =>
+    public void Save(IReadOnlyList<Recommendation> picks, DateTimeOffset generatedUtc) =>
         preferences.Edit()!
-            .PutString(SelectionKey, JsonSerializer.Serialize(selection, SerializerOptions))!
+            .PutString(SelectionKey, JsonSerializer.Serialize(picks, SerializerOptions))!
             .PutLong(GeneratedKey, generatedUtc.UtcTicks)!
             .PutString(VetoedKey, JsonSerializer.Serialize(Array.Empty<string>(), SerializerOptions))!
             .Apply();
