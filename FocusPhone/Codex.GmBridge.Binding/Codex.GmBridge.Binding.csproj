@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- gmbridge.aar is produced by ../gmbridge/build.sh (requires the Android
+       NDK + gomobile) and is not committed. The Communication app references
+       this project only once the .aar exists; until then tier-2/3 messaging
+       paths carry the feature. -->
+  <ItemGroup Condition="Exists('..\gmbridge\gmbridge.aar')">
+    <AndroidLibrary Include="..\gmbridge\gmbridge.aar" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The shared self-update library, referenced by every com.storyworthtelling app that installs itself
+    from the repo's rolling GitHub release. It owns the decisions — which assets an app should install,
+    what a run's outcome means, and how that reads as a status line — behind seams for the two things
+    that genuinely differ per app and per platform: where release assets come from, and how an APK gets
+    installed. Pure .NET, no Android APIs, so any head references it directly and the desktop test build
+    compiles it without the Android workload. Targets net10.0, like the other shared libraries.
+
+    Extracted from Flyleaf's UpdateService, which had been the only implementation and therefore the
+    only place the rules existed.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Updates</RootNamespace>
+  </PropertyGroup>
+
+</Project>
