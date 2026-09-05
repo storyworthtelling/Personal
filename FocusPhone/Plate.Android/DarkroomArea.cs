@@ -143,11 +143,54 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
         frame.LongClickable = true;
         frame.LongClick += (_, _) =>
         {
-            choosing = true;
-            shell.Room = shell.Room.Choose(item.Id);
-            Invalidate();
+            if (choosing)
+            {
+                // Already culling — a long-press is just another pick.
+                shell.Room = shell.Room.Choose(item.Id);
+                Invalidate();
+                return;
+            }
+            ShowPhotoActions(item);
         };
         return frame;
+    }
+
+    private void ShowPhotoActions(DarkroomItem item)
+    {
+        ActionCard.Show(Host, Overlay, "This one",
+            TimeFormats.Clock12(item.CapturedAt),
+            new CardAction("Open it", () => Open(item), Lead: true),
+            new CardAction("Start choosing", () =>
+            {
+                // How a cull actually begins: you see the bad one first.
+                choosing = true;
+                shell.Room = shell.Room.Choose(item.Id);
+                Invalidate();
+            }),
+            new CardAction("Write the caption", () => WriteCaption(item),
+                Detail: "The model will not name anyone in a picture."));
+    }
+
+    // The owner's own words. Where a name belongs, this is how it gets there — and it is the
+    // answer whenever the machine's line is simply wrong.
+    private void WriteCaption(DarkroomItem item)
+    {
+        var field = PaperUi.Field(Host, "in your own words");
+        field.Text = item.Caption;
+
+        var card = PaperUi.HairlineCard(Host);
+        card.AddView(PaperUi.Label(Host, "Caption"));
+        card.AddView(field);
+        card.AddView(PaperUi.PrimaryButton(Host, "Keep it", () =>
+        {
+            ActionCard.Dismiss(Overlay);
+            shell.CaptionByHand(item, field.Text ?? string.Empty);
+        }));
+
+        ActionCard.Dismiss(Overlay);
+        var holder = new FrameLayout(Host);
+        holder.AddView(card);
+        Overlay.AddView(holder);
     }
 
     private View ScanRow(DarkroomItem scan)
