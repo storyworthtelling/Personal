@@ -27,6 +27,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The face-embedding model and the BSD-3-Clause notice its licence requires be
+         reproduced with any binary distribution. Explicit rather than relying on a default
+         glob, because a model that silently stops being packaged looks exactly like a model
+         that is working and finding nobody. -->
+    <AndroidAsset Include="Assets\face-embedder.tflite" />
+    <AndroidAsset Include="Assets\face-embedder-LICENSE.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.Camera.Camera2" Version="1.5.1.2" />
     <PackageReference Include="Xamarin.AndroidX.Camera.Lifecycle" Version="1.5.1.2" />
     <PackageReference Include="Xamarin.AndroidX.Camera.View" Version="1.5.1.2" />

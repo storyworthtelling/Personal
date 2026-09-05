@@ -38,8 +38,21 @@ public readonly record struct FaceMatch(string ContactId, string Name)
 public sealed record FaceBook
 {
     /// <summary>
-    /// How close counts as the same person. Generous on purpose: the answer is a question the
-    /// owner confirms, not a filing decision made behind their back.
+    /// How close counts as the same person, as a cosine distance on L2-normalised
+    /// embeddings. Generous on purpose: the answer is a question the owner confirms, not a
+    /// filing decision made behind their back.
+    ///
+    /// <para><b>This number is assumed, not measured, and it is the phase's one un-evidenced
+    /// constant.</b> It is the usual operating point for ArcFace-family models on real
+    /// faces, which EdgeFace is. Synthetic inputs proved uninformative for setting it —
+    /// the model has never seen anything like them and maps them all to nearly one point,
+    /// so distances there sit around 0.001 rather than anywhere near this — which is
+    /// precisely why it has to be measured against the owner's own contact photos on a real
+    /// phone. The on-device test plan carries that as an explicit step.</para>
+    ///
+    /// <para>If it is wrong it will be wrong in a visible way: too high and everyone is
+    /// suggested as the same person, too low and nobody is ever recognised. Both are obvious
+    /// within a few pictures, and neither files anything without being asked.</para>
     /// </summary>
     public const double SameFace = 0.62;
 
