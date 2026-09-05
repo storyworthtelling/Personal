@@ -6,6 +6,7 @@ using Android.Widget;
 using AndroidX.AppCompat.App;
 using Codex.Domain.Design;
 using Codex.Ui;
+using Codex.Ui.Voice;
 
 namespace Plate;
 
@@ -33,6 +34,14 @@ public class PlateActivity : AppCompatActivity
     /// <summary>The one holder of the camera. Areas ask it for a preview; nobody else binds.</summary>
     public PlateCamera Camera { get; private set; } = null!;
 
+    // One Google sign-in for the whole head, and it exists for one reason: the encrypted
+    // secrets vault, which is where the reMarkable's device token comes back from after a
+    // reset. Plate has no account of its own and wants none.
+    public VoiceGoogleAccount Account { get; } = new();
+
+    /// <summary>The tablet. Scan's third door, and the only one that is not another app.</summary>
+    public PlateRemarkable Remarkable { get; private set; } = null!;
+
     private PlateArea[] areas = [];
     private int activeIndex;
 
@@ -49,6 +58,7 @@ public class PlateActivity : AppCompatActivity
         PaperTransitions.Apply(this);
 
         Camera = new PlateCamera(this);
+        Remarkable = new PlateRemarkable(Account);
         areas =
         [
             new CameraArea(this),
@@ -68,6 +78,11 @@ public class PlateActivity : AppCompatActivity
         {
             RequestPermissions([Android.Manifest.Permission.Camera], 0);
         }
+
+        // After a reinstall or the cutover's factory reset, refill the reMarkable pairing
+        // from the shared vault. Best-effort and off the UI thread; Settings pairs by hand
+        // when it cannot happen.
+        _ = Remarkable.RestoreFromVault();
 
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
@@ -197,6 +212,11 @@ public class PlateActivity : AppCompatActivity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == VoiceGoogleAccount.RequestCode)
+        {
+            VoiceGoogleAccount.HandleChooserResult(resultCode, data);
+        }
+
         foreach (var area in areas)
         {
             area.OnActivityResult(requestCode, resultCode, data);
