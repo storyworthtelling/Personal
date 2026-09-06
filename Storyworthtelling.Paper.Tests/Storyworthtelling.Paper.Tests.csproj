@@ -15,6 +15,10 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <!-- The Linux Skia natives the composition mechanics need to run under test/CI. -->
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+    <!-- Reads the produced PDF back. The vector claim is that the pages carry real TEXT rather than a
+         picture of text, and the only way to assert that is to extract it — the same reader Canonizer
+         already uses to ingest PDF manuscripts, at the same version. -->
+    <PackageReference Include="PdfPig" Version="0.1.10" />
   </ItemGroup>
 
   <ItemGroup>
