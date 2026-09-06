@@ -59,7 +59,7 @@ public sealed class VaultSync
             SettingsStore.ClaudeApiKey = result.Vault.Claude.ApiKey;
         if (string.IsNullOrEmpty(SettingsStore.GeminiApiKey) && !string.IsNullOrEmpty(result.Vault.Gemini.ApiKey))
             SettingsStore.GeminiApiKey = result.Vault.Gemini.ApiKey;
-        // The reMarkable token may have been paired in a sibling app (e.g. DailyLoader) — restore it so
+        // The reMarkable token may have been paired in a sibling app (e.g. Foreword) — restore it so
         // Canonizer delivers without a separate pairing.
         if (string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken) && !string.IsNullOrEmpty(result.Vault.Remarkable.DeviceToken))
             SettingsStore.RemarkableDeviceToken = result.Vault.Remarkable.DeviceToken;
