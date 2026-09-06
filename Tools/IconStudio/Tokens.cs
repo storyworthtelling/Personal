@@ -40,6 +40,19 @@ public static class Tokens
     public static readonly SKColor PostMark = SKColor.Parse(PostMarkHex);
     public static readonly SKColor PostDeep = SKColor.Parse(PostDeepHex);
 
+    // Plate's identity (magenta, the one hue in the suite the app's own art picked
+    // unprompted — DESIGN.md §3). Unlike Post, Plate's BINDING is the LIGHT ground tier
+    // with the framing inverted to ink: its cover art is a near-black lens carrying almost
+    // no chroma, so §12's "a binding that harmonises with its art makes the book hardest to
+    // pick out of the row" points the other way here. That is Score's construction.
+    public const string PlateGroundHex = "#B69BB6";
+    public const string PlateMarkHex = "#7A4F7B";
+    public const string PlateDeepHex = "#442D44";
+
+    public static readonly SKColor PlateGround = SKColor.Parse(PlateGroundHex);
+    public static readonly SKColor PlateMark = SKColor.Parse(PlateMarkHex);
+    public static readonly SKColor PlateDeep = SKColor.Parse(PlateDeepHex);
+
     public static readonly SKColor FlyleafWarm = SKColor.Parse(FlyleafWarmHex);
     public static readonly SKColor FlyleafMark = SKColor.Parse(FlyleafMarkHex);
     public static readonly SKColor FlyleafDeep = SKColor.Parse(FlyleafDeepHex);
