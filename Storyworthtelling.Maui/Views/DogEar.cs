@@ -94,7 +94,11 @@ public sealed class FoldDrawable : IDrawable
 
         // A small back-turn arrow, and ONLY on the undo fold: it is what says this one reverses
         // the act rather than turning to something waiting.
-        canvas.Font = new Font("SerifSemibold", FontWeights.SemiBold, FontStyleType.Normal);
+        // Microsoft.Maui.Font (the font registry's) and Microsoft.Maui.Graphics.Font (the canvas's)
+        // are both in scope here, and the bare name is a compile error, not a warning — the same
+        // CS0104 that sat in Codex.Ui.Android for weeks because CI was the only thing compiling it.
+        canvas.Font = new Microsoft.Maui.Graphics.Font(
+            "SerifSemibold", FontWeights.SemiBold, FontStyleType.Normal);
         canvas.FontSize = ArrowSize;
         canvas.FontColor = token("Paper");
         canvas.DrawString("↶", w * 0.66f, h * 0.42f, HorizontalAlignment.Center);
