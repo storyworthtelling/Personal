@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The shared Paper & Ink kit for the MAUI heads — Foreword, Ledger and Canonizer — and the MAUI
+    half of what Codex.Ui.Android already is for the four native FocusPhone heads.
+
+    It exists because the suite had the design system twice and only enforced it once. PaperUi and
+    PaperTheme carry the role table for the native heads and are guarded; the MAUI heads each kept a
+    private copy of the same table in their own DesignTokens.xaml, hand-typed, with the leak-guard
+    checking each copy against ANOTHER hand-typed copy in its own test. Both copies can be wrong
+    together, and were: Display drew in Serif Semibold where the table says Serif Black, the Label
+    role took the wrong ink, the owner's voice had no style at all, and every button in every MAUI
+    app was still the retired terracotta.
+
+    Unlike the other shared libraries this one cannot be built without the MAUI/Android workload, so
+    its tests read it by content from Storyworthtelling.Maui.Tests (net10.0) and check it against
+    Storyworthtelling.Paper's generated tokens BY REFERENCE — never against another typed copy.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <UseMaui>true</UseMaui>
+    <SingleProject>false</SingleProject>
+    <RootNamespace>Storyworthtelling.Maui</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- The eight shared fonts travel WITH the kit rather than being re-declared per head: an app that
+       registers an alias for a font it did not package gets no error, just the system face. -->
+  <ItemGroup>
+    <MauiFont Include="..\Fonts\*.ttf" />
+    <MauiXaml Update="Resources\Styles\*.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+  </ItemGroup>
+
+</Project>
