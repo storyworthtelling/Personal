@@ -25,6 +25,26 @@ public class CalendarPdfComposerTests
             End = Today.ToDateTime(new TimeOnly(endHour, 0))
         };
 
+    /// <summary>
+    /// An event strip is tall enough for its own title.
+    ///
+    /// <para>The literal it replaced was 11 points, fitted to an 8-point face. The registered ladder
+    /// puts the event face at 9.75, whose line is taller than that — so the old constant would have
+    /// clipped every title on the busiest page in the app, and clipped it silently: the page still
+    /// renders, still paginates, and still passes a test that counts pages.</para>
+    /// </summary>
+    [Fact]
+    public void AnEventStripIsTallerThanTheTextInIt()
+    {
+        var font = SkiaPageLayout.Sans(Storyworthtelling.Paper.PaperTypeScale.Label);
+
+        var line = SkiaPageLayout.LineHeight(font);
+        var strip = CalendarPdfComposer.StripHeight(font);
+
+        Assert.True(strip > line, $"A {strip}pt strip cannot hold a {line}pt line.");
+        Assert.True(strip > 11, $"The old fixed height was 11pt and the text now needs {line}pt.");
+    }
+
     [Fact]
     public void Compose_ProducesTwoPages_TimelineThenOutlook()
     {
