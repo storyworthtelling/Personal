@@ -2,7 +2,7 @@
 
   <!--
     The shared reMarkable delivery library, referenced by every com.storyworthtelling app that pushes
-    documents to the owner's reMarkable tablet (DailyLoader, Canonizer, …). It owns the whole cloud path:
+    documents to the owner's reMarkable tablet (Foreword, Canonizer, …). It owns the whole cloud path:
     one-time device-code registration, device-token → per-session-JWT exchange, and document upload / list /
     download / trash. Pure .NET (HttpClient + System.Text.Json), no MAUI/Android APIs, so any Android head
     references it directly and the desktop test builds compile it without the Android workload. Targets

@@ -21,7 +21,7 @@
     <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
     <!-- The shared page-composition library: Plate assembles its own scan PDF because ML Kit's
          scanner caps a run at 50 pages and the owner wants longer. PdfVolumeComposer is the
-         same assembler Canonizer and DailyLoader use, and IPaperDelivery is the reMarkable
+         same assembler Canonizer and Foreword use, and IPaperDelivery is the reMarkable
          root upload, so one reference serves both halves of a scan's life. -->
     <ProjectReference Include="..\..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
   </ItemGroup>

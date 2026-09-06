@@ -242,7 +242,7 @@ public static class Glyphs
         canvas.DrawLine(startX - spacing * 0.4f, c + half, startX + 3 * spacing + spacing * 0.4f, c - half, accent);
     }
 
-    /// <summary>DailyLoader: folded sheet, terracotta dog-ear.</summary>
+    /// <summary>Foreword: folded sheet, terracotta dog-ear.</summary>
     public static void FoldedPaper(SKCanvas canvas, float s)
     {
         using var ink = InkStroke(s);

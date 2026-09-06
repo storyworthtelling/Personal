@@ -15,12 +15,12 @@ namespace Plate;
 /// <para><b>The delivery goes to the account root</b>, not into a folder of Plate's own.
 /// That is a risk reduction rather than a simplification: the repo records the reMarkable
 /// v2 cloud path as reconstructed and not live-verified, and the folder/collection wire
-/// format especially so. The plain root upload is the one part of that library DailyLoader
+/// format especially so. The plain root upload is the one part of that library Foreword
 /// has actually exercised, so Plate depends on nothing else.</para>
 ///
 /// <para>The device token is the reset-survival credential — a one-time pairing that would
 /// otherwise have to be repeated on every wipe — so it lives in the shared vault and is
-/// restored from there, exactly as DailyLoader and Canonizer restore it. Pairing in any one
+/// restored from there, exactly as Foreword and Canonizer restore it. Pairing in any one
 /// of the three is enough for all of them.</para>
 /// </summary>
 public sealed class PlateRemarkable(VoiceGoogleAccount account)

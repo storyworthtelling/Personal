@@ -5,9 +5,9 @@ on:
   push:
     branches: [main, 'claude/**']
     paths:
-      - 'DailyLoader/DailyLoader.Android/**'
-      - 'DailyLoader/DailyLoader.Infrastructure/**'
-      - 'DailyLoader/DailyLoader.Domain/**'
+      - 'Foreword/Foreword.Android/**'
+      - 'Foreword/Foreword.Infrastructure/**'
+      - 'Foreword/Foreword.Domain/**'
       # Shared libraries that ship in the APK (referenced by Infrastructure/head), so a change rebuilds it.
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Remarkable/**'
@@ -56,9 +56,9 @@ jobs:
           band: 7
 
       - name: Build APK
-        working-directory: DailyLoader
+        working-directory: Foreword
         run: >
-          dotnet publish DailyLoader.Android -f net10.0-android -c Release
+          dotnet publish Foreword.Android -f net10.0-android -c Release
           -p:ApplicationVersion=${{ steps.version.outputs.code }}
           -p:AndroidKeyStore=true
           -p:AndroidSigningKeyStore=/tmp/dailyloader.keystore
@@ -71,12 +71,12 @@ jobs:
       # under Platforms/Android/Resources is silently dropped and android:icon resolves to empty; a plain
       # "it built" hid that. This gate reads the resolved android:icon back out of the APK.
       - name: ICON+FONT CHECK
-        working-directory: DailyLoader
+        working-directory: Foreword
         run: |
           set +e
           echo "=== ICON+FONT CHECK ==="
-          APK=$(ls -1 DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(ls -1 DailyLoader.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+          APK=$(ls -1 Foreword.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls -1 Foreword.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
           echo "APK: $APK"
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
           [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
@@ -100,8 +100,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Daily-Loader-Android
-          path: DailyLoader/DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          name: Foreword-Android
+          path: Foreword/Foreword.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
 
@@ -113,4 +113,4 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/publish-rolling-release
         with:
-          apks: DailyLoader/DailyLoader.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          apks: Foreword/Foreword.Android/bin/Release/net10.0-android/publish/*-Signed.apk

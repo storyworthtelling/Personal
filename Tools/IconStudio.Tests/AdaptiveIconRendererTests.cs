@@ -40,7 +40,7 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal(4, IconSpecs.All.Count(s => s.ResourceRoot.StartsWith("FocusPhone/")));
         Assert.Equal(IconSpecs.All.Count, IconSpecs.All.Select(s => s.ResourceRoot).Distinct().Count());
         Assert.Contains(IconSpecs.All, s => s.App == "Canonizer" && s.Name == "appicon");
-        Assert.Contains(IconSpecs.All, s => s.App == "DailyLoader" && s.Name == "ic_launcher");
+        Assert.Contains(IconSpecs.All, s => s.App == "Foreword" && s.Name == "ic_launcher");
         Assert.Contains(IconSpecs.All, s => s.App == "Ledger" && s.Name == "appicon");
     }
 

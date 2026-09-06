@@ -4,7 +4,7 @@ namespace Storyboarder.Android;
 
 // Captures the background pipeline's log output to a file so it can be viewed and shared from the
 // Settings page to diagnose problems (a stalled conversion, repeated retries, a rate-limit wall).
-// Modeled on DailyLoader's DeliveryFileLogger, but the Storyboarder pipeline runs for days, so the
+// Modeled on Foreword's DeliveryFileLogger, but the Storyboarder pipeline runs for days, so the
 // file is size-capped with a single rolled backup instead of growing without bound.
 public sealed class PipelineFileLogger : ILoggerProvider, ILogger
 {
