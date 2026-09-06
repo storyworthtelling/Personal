@@ -171,6 +171,42 @@ public class ForewordInvariantsTests
         Assert.Contains("java-version: '21'", workflow, StringComparison.Ordinal);
     }
 
+    // ---- G16: the version the owner reads ----
+
+    /// <summary>
+    /// The Settings foot line prints the <i>versionName</i>, and the mockups draw it as
+    /// <c>Foreword 2.0.512 · com.storyworthtelling.dailyloader</c>. So the display version is the
+    /// P9 <b>2.0.x</b> line, not the UTC build stamp this csproj inherited from DailyLoader.
+    ///
+    /// <para>Both halves matter and neither is checked by anything else. The csproj carries the
+    /// local fallback, which is what a developer build shows; the workflow injects the build
+    /// number, which is what every phone shows. Get the second one wrong and every install in the
+    /// channel's history reads <c>2.0.0</c> — a foot line that cannot answer the one question it
+    /// exists for, and nothing anywhere fails.</para>
+    ///
+    /// <para>Written against the timestamp expression that was actually here
+    /// (<c>UtcNow.ToString('yyyy.MM.dd.HHmm')</c>): monotonic, correct, and unreadable — nobody
+    /// can say "I'm on 2026.09.06.1432" out loud, and it is not what the mockup draws.</para>
+    /// </summary>
+    [Fact]
+    public void TheDisplayVersionIsTheTwoPointOhLine()
+    {
+        var head = Path.Combine(AppRoot(), "Foreword.Android", "Foreword.Android.csproj");
+        var csproj = File.ReadAllText(head);
+
+        var declared = System.Text.RegularExpressions.Regex.Match(
+            csproj, @"<ApplicationDisplayVersion>(?<value>[^<]*)</ApplicationDisplayVersion>");
+
+        Assert.True(declared.Success, "The head declares no <ApplicationDisplayVersion>.");
+        Assert.StartsWith("2.0.", declared.Groups["value"].Value, StringComparison.Ordinal);
+
+        var workflow = File.ReadAllText(RepoFile(".github/workflows/build-android.yml"));
+        Assert.Contains(
+            "-p:ApplicationDisplayVersion=2.0.${{ github.run_number }}",
+            workflow,
+            StringComparison.Ordinal);
+    }
+
     // ---- helpers ----
 
     private static string ComponentSource(string typeName)

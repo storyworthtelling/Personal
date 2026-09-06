@@ -184,8 +184,9 @@ Deliberately almost empty. It exists so the rename cannot break the update chann
   persisted by class name. Check for anything else with the same property before renaming a namespace.
 - Freeze all nine `CredentialStore` preference keys (they derive from `nameof`, so a rename silently
   loses the value) with migrate-on-read.
-- versionCode: **major 2**, keeping the monotonic UTC-timestamp scheme. The P7/P8 `floor + run_number`
-  guardrail is *wrong here* and would brick updates.
+- versionCode: **band 7** of the suite formula settled in Pre-A (`band × 100,000,000 + minutes since
+  2020-01-01 UTC`), which keeps the monotonic UTC-timestamp scheme and clears DailyLoader's old
+  ~609,000,000 codes. The P7/P8 `floor + run_number` guardrail is *wrong here* and would brick updates.
 - Pin JDK 21 in the workflow.
 - Painted icon + on-device label, from the artifact's Identity section.
 - **All guards from §4 below.**
@@ -193,9 +194,13 @@ Deliberately almost empty. It exists so the rename cannot break the update chann
   on the device, and these are the screens that show whether it worked.
 → *Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c — `S1`, `S2`, `F1`, and the Identity section for the icon.*
 
-> The owner will uninstall DailyLoader before this lands, so there is no in-place upgrade left to
-> prove. A clean install wipes all nine preference values including the vault passphrase; the vault
-> restore is what Release A actually demonstrates.
+> **Reversed at Pre-A, and recorded here rather than edited away.** The plan assumed the owner would
+> uninstall DailyLoader first, because no versionCode scheme was known that could clear its old
+> ~609,000,000 timestamp codes. Pre-A's band formula does exactly that at band 7, so **the owner does
+> not uninstall**: the in-place upgrade is back on the table and is the main thing Release A has to
+> demonstrate. That also saves the vault passphrase, which a clean install would have wiped along with
+> the other eight preference values — so the vault restore is now a *second* thing to prove on a
+> phone that has been reset, not the only thing Release A can show.
 
 ### Release B — The shared MAUI kit
 `Storyworthtelling.Maui`: the binder tab strip, dog-ear, status line, list rows, accordion, card

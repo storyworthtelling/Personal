@@ -140,7 +140,10 @@ surfacing anything that cannot be built as drawn rather than substituting:
 - APK builds in CI via `.github/workflows/build-android.yml`; artifact **Foreword-Android**.
   versionCode is **band 7** of the shared formula (see Self-update above) — chosen to clear
   DailyLoader's old ~609,000,000 timestamp codes so the app upgrades **in place**. The band is
-  not the version the owner sees: the display version is 2.0.x.
+  not the version the owner sees: the display version is **2.0.x** (`2.0.<run_number>`, injected by
+  the workflow), which is the string the Settings foot line prints. The mockups draw it as
+  `Foreword 2.0.512 · com.storyworthtelling.dailyloader`, and a guard keeps the csproj and the
+  workflow on that line — a build stamp there would be monotonic but unreadable.
 - **The rename froze five things, and every one of them is invisible** — nothing fails at build
   time if they move, and nothing fails loudly at run time either; the app just quietly stops
   delivering, or comes up with empty settings. `Foreword.Tests/Guard/ForewordInvariantsTests.cs`
