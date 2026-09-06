@@ -25,8 +25,10 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal("#CA662D", Tokens.ForewordSunriseHex);
     }
 
-    // A paper-background app (not Flyleaf, whose ground is the warm identity hue).
-    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Plate");
+    // A paper-background app. Not one of the four FocusPhone heads: every one of them now
+    // stands on its own identity ground, Plate included since its cover landed, so picking a
+    // head here would test the flat-paper path against a spec that no longer uses it.
+    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Canonizer");
     private static IconSpec FlyleafSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Launcher");
     private static IconSpec ForewordSpec => IconSpecs.All.First(s => s.App == "Foreword");
 
@@ -291,12 +293,17 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void LineArtGlyphsDrawInkAndExactlyOneTerracottaDetail()
     {
-        // Score, Post and Foreword are deliberately not in this set. Each one's icon IS its
-        // cover — a keyboard on a painted ground, a mailbox painting set into an indigo plate,
-        // an engraved doorstep set into a sunrise one — rather than an ink glyph on paper, so
-        // none has an ink line to count or a terracotta detail to find. Their covers are
-        // checked by their own tests instead.
-        foreach (var spec in IconSpecs.All.Where(s => s.App is not ("Score" or "Post" or "Foreword")))
+        // Score, Post, Plate and Foreword are deliberately not in this set. Each one's icon IS
+        // its cover — a keyboard on a painted ground, a mailbox painting set into an indigo
+        // plate, a lens set into a mauve one, an engraved doorstep set into a sunrise one —
+        // rather than an ink glyph on paper, so none has an ink line to count or a terracotta
+        // detail to find. Their covers are checked by their own tests instead.
+        //
+        // Plate joined them when its cover landed, and the pixel this test stopped finding is
+        // the point: it was counting the terracotta dot on Glyphs.Lens, the pre-rebrand Camera
+        // icon in an accent P4 retired. DESIGN.md §12 says a cover carries "no single accent
+        // detail", so a cover that still had one would be the bug.
+        foreach (var spec in IconSpecs.All.Where(s => s.App is not ("Score" or "Post" or "Plate" or "Foreword")))
         {
             using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);
