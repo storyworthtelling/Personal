@@ -46,7 +46,14 @@ public static class IconSpecs
     public static readonly IReadOnlyList<IconSpec> All =
     [
         new("FocusPhone.Launcher", "FocusPhone/Flyleaf.Android/Resources", "appicon", false, Glyphs.Bookplate, Tokens.FlyleafWarmHex),
-        new("Plate", "FocusPhone/Plate.Android/Resources", "appicon", false, Glyphs.Lens),
+        // Plate's icon IS its cover, like Post's: the light mauve binding as the ground, the
+        // chosen lens study set into the illustration window, mitred brackets in ink. It shipped
+        // its whole rebrand still wearing Glyphs.Lens on plain paper — the pre-rebrand Camera
+        // icon, in the retired terracotta — because the art was chosen at gate 3 and never
+        // committed. CoverImage is what puts the same picture on the Flyleaf shelf.
+        new("Plate", "FocusPhone/Plate.Android/Resources", "appicon", false, Glyphs.PlatePlate,
+            Tokens.PlateGroundHex, PlateImage: "Branding/plate-cover.jpg",
+            CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_plate.png"),
         new("Score", "FocusPhone/Score.Android/Resources", "appicon", false, Glyphs.Keyboard,
             Tokens.ScoreGroundHex, GroundImage: "Branding/score-ground.png",
             CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_score.png"),

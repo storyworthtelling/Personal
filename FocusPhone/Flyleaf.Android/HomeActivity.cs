@@ -451,8 +451,11 @@ public class HomeActivity : Activity
         private static readonly Dictionary<string, int> CoverResources = new()
         {
             // The heads' full-bleed source paintings (the same art the launcher icons were cropped from),
-            // filling the bookplate window. Camera has none yet (its rebrand isn't coded) -> icon fallback.
+            // filling the bookplate window. Every featured package needs an entry: without one the book
+            // silently falls back to the launcher icon, which looks like a design choice rather than a
+            // gap — guarded by FrozenInvariantsTests so the next head cannot ship that way.
             [HomeFeatureSet.CommunicationPackage] = Resource.Drawable.cover_post,
+            [HomeFeatureSet.CameraPackage] = Resource.Drawable.cover_plate,
             [HomeFeatureSet.AudioPackage] = Resource.Drawable.cover_score,
             [HomeFeatureSet.MapsPackage] = Resource.Drawable.cover_maps,
             [HomeFeatureSet.DrivePackage] = Resource.Drawable.cover_drive,
