@@ -3,9 +3,28 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Foreword.Android.Pages.SetupPage"
              Title="Settings">
-    <Grid RowDefinitions="*,Auto">
-    <ScrollView Grid.Row="0">
-        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="16">
+    <!--
+        S1 in the mockups, built on Flyleaf's LauncherSettingsActivity furniture so the two
+        screens are recognisably the same screen: a Serif group label over a hairline-ruled card,
+        rows divided by hairlines, a Body title over a Label description, a chevron on anything
+        that leads somewhere, and the quiet caption UNDER the card.
+
+        Two rules shape what is here at all:
+
+        A WORKING CREDENTIAL DOES NOT APPEAR. Not collapsed to a "Working" line — absent. The
+        vault backs a key up and restores it, so a healthy one has nothing to ask and nothing to
+        show; the row itself is the clutter. "Needs you" is a whole group that does not exist on
+        a good morning.
+
+        THERE IS NO SAVE. Every value commits as it changes, which is §5's inline state change
+        and the rule Score gives for its own vault field: leaving by a tab never blurs anything,
+        so a Save button is one that usually does nothing. Score's SettingsArea refuses those on
+        principle, which is also why there is no "check for updates" and no "re-read calendars".
+
+        Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c
+    -->
+    <ScrollView>
+        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
 
             <HorizontalStackLayout Spacing="12">
                 <Image Source="owner_medallion.png" WidthRequest="48" HeightRequest="48"
@@ -13,104 +32,120 @@
                 <Label Text="Settings" Style="{StaticResource DisplayLabel}" VerticalOptions="Center" />
             </HorizontalStackLayout>
 
-            <Label Text="A working key stays put — it's backed up to the vault and restored automatically, so its field only appears when a key is missing or a call with it was just rejected."
-                   Style="{StaticResource SecondaryLabel}" Margin="0,8,0,0" />
+            <!-- ==== Delivery ========================================================== -->
+            <Label Text="Delivery" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout>
+                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Every morning at" Style="{StaticResource CardRowTitle}"
+                               VerticalOptions="Center" />
+                        <Label x:Name="DeliveryTimeLabel" Grid.Column="1" Style="{StaticResource CardRowValue}" />
+                    </Grid>
+                    <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Goes to" Style="{StaticResource CardRowTitle}" />
+                            <Label x:Name="DestinationLabel" Style="{StaticResource CardRowDescription}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+            <Label x:Name="LastDeliveryCaption" Style="{StaticResource CardCaption}" />
 
-            <Label Text="NYT-S cookie" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Grid x:Name="NytCookieStatusRow" ColumnDefinitions="*,Auto" IsVisible="False">
-                <Label x:Name="NytCookieStatusLabel" Grid.Column="0" VerticalOptions="Center"
-                       Style="{StaticResource SecondaryLabel}" />
-                <Button x:Name="NytCookieReplaceButton" Grid.Column="1" Text="Replace"
-                        Style="{StaticResource QuietButton}" Clicked="OnReplaceNytCookieClicked" />
-            </Grid>
-            <VerticalStackLayout x:Name="NytCookieFields" Spacing="8" IsVisible="False">
-                <Entry x:Name="NytCookieEntry"
-                       Placeholder="Paste NYT-S cookie value here"
-                       Style="{StaticResource MonoEntry}" />
-                <Label Text="Log into nytimes.com in Chrome, open DevTools → Application → Cookies → copy the NYT-S value."
-                       Style="{StaticResource SecondaryLabel}" />
-            </VerticalStackLayout>
+            <!-- ==== Needs you: absent unless something is actually broken ============== -->
+            <Label x:Name="NeedsYouLabel" Text="Needs you" Style="{StaticResource GroupLabelProblem}"
+                   IsVisible="False" />
+            <Border x:Name="NeedsYouCard" Style="{StaticResource GroupCard}" IsVisible="False">
+                <VerticalStackLayout x:Name="NeedsYouRows" />
+            </Border>
 
-            <Label Text="NYT API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Grid x:Name="NytApiKeyStatusRow" ColumnDefinitions="*,Auto" IsVisible="False">
-                <Label x:Name="NytApiKeyStatusLabel" Grid.Column="0" VerticalOptions="Center"
-                       Style="{StaticResource SecondaryLabel}" />
-                <Button x:Name="NytApiKeyReplaceButton" Grid.Column="1" Text="Replace"
-                        Style="{StaticResource QuietButton}" Clicked="OnReplaceNytApiKeyClicked" />
-            </Grid>
-            <VerticalStackLayout x:Name="NytApiKeyFields" Spacing="8" IsVisible="False">
-                <Entry x:Name="NytApiKeyEntry"
-                       Placeholder="Paste NYT API key here"
-                       Style="{StaticResource MonoEntry}" />
-                <Label Text="From developer.nytimes.com — used to fetch the top stories list."
-                       Style="{StaticResource SecondaryLabel}" />
-            </VerticalStackLayout>
+            <!-- ==== Where it goes ===================================================== -->
+            <Label Text="Where it goes" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout>
+                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="reMarkable" Style="{StaticResource CardRowTitle}" />
+                            <Label x:Name="RemarkableStatusLabel" Style="{StaticResource CardRowDescription}" />
+                        </VerticalStackLayout>
+                        <Button x:Name="RemarkableReplaceButton" Grid.Column="1" Text="Pair"
+                                Style="{StaticResource QuietButton}" Clicked="OnReplaceRemarkableClicked" />
+                    </Grid>
+                    <VerticalStackLayout x:Name="RemarkableFields" Padding="16,0,16,12" Spacing="8"
+                                         IsVisible="False">
+                        <Entry x:Name="RemarkableTokenEntry" Placeholder="One-time code"
+                               Style="{StaticResource MonoEntry}" />
+                        <Label Text="Visit my.remarkable.com/device/mobile/connect for a one-time code, then tap Register."
+                               Style="{StaticResource SecondaryLabel}" />
+                        <Button Text="Register reMarkable device" Style="{StaticResource SecondaryButton}"
+                                Clicked="OnRegisterRemarkableClicked" />
+                    </VerticalStackLayout>
+                    <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Google" Style="{StaticResource CardRowTitle}" />
+                            <Label x:Name="GoogleStatusLabel" Style="{StaticResource CardRowDescription}" />
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="Sign in" Style="{StaticResource QuietButton}"
+                                Clicked="OnGoogleSignInClicked" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
 
-            <Label Text="reMarkable device token" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Grid x:Name="RemarkableStatusRow" ColumnDefinitions="*,Auto" IsVisible="False">
-                <Label x:Name="RemarkableStatusLabel" Grid.Column="0" VerticalOptions="Center"
-                       Style="{StaticResource SecondaryLabel}" />
-                <Button x:Name="RemarkableReplaceButton" Grid.Column="1" Text="Replace"
-                        Style="{StaticResource QuietButton}" Clicked="OnReplaceRemarkableClicked" />
-            </Grid>
-            <VerticalStackLayout x:Name="RemarkableFields" Spacing="8" IsVisible="False">
-                <Entry x:Name="RemarkableTokenEntry"
-                       Placeholder="Paste device token, or use Register below"
-                       Style="{StaticResource MonoEntry}" />
-                <Label Text="Visit my.remarkable.com/device/mobile/connect for a one-time code, then tap Register below."
-                       Style="{StaticResource SecondaryLabel}" />
-                <Button Text="Register reMarkable device"
-                        Clicked="OnRegisterRemarkableClicked"
-                        Style="{StaticResource SecondaryButton}" />
-            </VerticalStackLayout>
+            <!-- ==== Secrets vault ====================================================== -->
+            <Label Text="Secrets vault" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout Padding="16,12,16,16" Spacing="8">
+                    <Label Text="Vault passphrase" Style="{StaticResource CardRowTitle}" />
+                    <Label Text="The one secret that is not in the vault — set the same passphrase in every app and each restores its own keys. Shown in the clear on purpose, so it can be read back and copied."
+                           Style="{StaticResource CardRowDescription}" />
+                    <!-- Shown in the clear, never a password field: it has to be read back into the
+                         other apps, and Android blocks clipboard copy on a password-typed entry. -->
+                    <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
+                           Style="{StaticResource MonoEntry}" TextChanged="OnVaultPassphraseChanged" />
+                </VerticalStackLayout>
+            </Border>
 
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
-
-            <Label Text="Google" Style="{StaticResource FieldLabel}" />
-            <Label Text="Sign in with the Google account already on this phone to sync your calendars and tasks. Grant the calendar and tasks permissions when prompted."
-                   Style="{StaticResource SecondaryLabel}" />
-            <Button Text="Sign in with Google"
-                    Clicked="OnGoogleSignInClicked"
-                    Style="{StaticResource SecondaryButton}" />
-            <Label x:Name="GoogleStatusLabel" Style="{StaticResource SecondaryLabel}" />
-
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
-
-            <Label Text="Secrets vault" Style="{StaticResource FieldLabel}" />
-            <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys — here, your NYT cookie and key, the reMarkable token, and the Anthropic key. Set the same passphrase in each app; after a factory reset or reinstall, sign in with Google above and your keys restore automatically. Needs the Google sign-in above."
-                   Style="{StaticResource SecondaryLabel}" />
-            <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
-                   Style="{StaticResource MonoEntry}" Margin="0,8,0,0" />
-            <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
-                   Style="{StaticResource SecondaryLabel}" />
-
-            <Label Text="Anthropic API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Grid x:Name="AnthropicStatusRow" ColumnDefinitions="*,Auto" IsVisible="False">
-                <Label x:Name="AnthropicStatusLabel" Grid.Column="0" VerticalOptions="Center"
-                       Style="{StaticResource SecondaryLabel}" />
-                <Button x:Name="AnthropicReplaceButton" Grid.Column="1" Text="Replace"
-                        Style="{StaticResource QuietButton}" Clicked="OnReplaceAnthropicClicked" />
-            </Grid>
-            <VerticalStackLayout x:Name="AnthropicFields" Spacing="8" IsVisible="False">
-                <Entry x:Name="AnthropicKeyEntry"
-                       Placeholder="sk-ant-..."
-                       Style="{StaticResource MonoEntry}" />
-                <Label Text="Optional — transcribes hand-written notes back into your calendar/tasks. Read-back is skipped if blank."
-                       Style="{StaticResource SecondaryLabel}" />
-            </VerticalStackLayout>
-
-            <Label Text="Calendar mapping (JSON)" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Editor x:Name="CalendarMappingEditor"
-                    AutoSize="TextChanges"
-                    HeightRequest="120"
-                    FontFamily="Mono"
-                    FontSize="{StaticResource MonoSize}"
-                    BackgroundColor="{StaticResource PaperDeep}"
-                    TextColor="{StaticResource Ink}"
-                    PlaceholderColor="{StaticResource InkMuted}" />
-            <Label Text="Optional — maps calendar ids to columns (Matt/Ashley/Gwen/Eva/Watch) and sets the Family calendar id. Leave blank to default everything to Matt with Gwen/Eva keyword routing."
-                   Style="{StaticResource SecondaryLabel}" />
-
+            <!-- ==== Advanced =========================================================== -->
+            <Label Text="Advanced" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout>
+                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Send a test page to the reMarkable" Style="{StaticResource CardRowTitle}" />
+                            <Label Text="One sheet, now" Style="{StaticResource CardRowDescription}" />
+                        </VerticalStackLayout>
+                        <Button x:Name="TestPageButton" Grid.Column="1" Text="Send"
+                                Style="{StaticResource QuietButton}" Clicked="OnSendTestPageClicked" />
+                    </Grid>
+                    <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+                    <!--
+                        The mockup's S1 has no calendar mapping, because by then C1 replaces it.
+                        C1 is release D, so removing this now would strand the setting with no
+                        way to edit it at all. It stays, plainly labelled as temporary, and goes
+                        when its replacement exists.
+                    -->
+                    <VerticalStackLayout Padding="16,12" Spacing="8">
+                        <Label Text="Calendar mapping (JSON)" Style="{StaticResource CardRowTitle}" />
+                        <Label Text="Temporary. Replaced by the Calendar screen; until then this is the only way to change it."
+                               Style="{StaticResource CardRowDescription}" />
+                        <Editor x:Name="CalendarMappingEditor" AutoSize="TextChanges" HeightRequest="120"
+                                Style="{StaticResource MonoEditor}" TextChanged="OnCalendarMappingChanged" />
+                    </VerticalStackLayout>
+                    <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnDiagnosticsClicked" />
+                        </Grid.GestureRecognizers>
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Diagnostics" Style="{StaticResource CardRowTitle}" />
+                            <Label Text="Problems captured on this device" Style="{StaticResource CardRowDescription}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
 
             <!-- The quiet foot line: which build is actually on the phone. The update channel
                  installs silently and most updates change nothing visible, so without it
@@ -122,13 +157,4 @@
                    Margin="0,32,0,0" />
         </VerticalStackLayout>
     </ScrollView>
-
-    <!-- Pinned bottom bar (DESIGN.md §7). -->
-    <VerticalStackLayout Grid.Row="1">
-        <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
-        <Grid Padding="24,12">
-            <Button Text="Save settings" Clicked="OnSaveClicked" />
-        </Grid>
-    </VerticalStackLayout>
-    </Grid>
 </ContentPage>

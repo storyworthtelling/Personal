@@ -1,5 +1,3 @@
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Foreword.Domain.Health;
@@ -8,6 +6,19 @@ using Storyworthtelling.Voice.Secrets;
 
 namespace Foreword.Android.Pages;
 
+/// <summary>
+/// S1. Settings, on Flyleaf's group/card furniture.
+///
+/// <para>Two rules decide what is on it. <b>A working credential does not appear at all</b> —
+/// not collapsed to a "Working" line, absent: the vault backs a key up and restores it, so a
+/// healthy one has nothing to ask and nothing to show, and the row itself is the clutter. The
+/// coloured <i>Needs you</i> group is built here rather than in XAML precisely because on a good
+/// morning it has nothing in it and does not exist.</para>
+///
+/// <para><b>And there is no Save.</b> Every value commits as it changes, which is §5's inline
+/// state change and the reason Score gives for its own vault field: leaving a screen never
+/// blurs anything reliably, so a Save button is one that usually does nothing.</para>
+/// </summary>
 public partial class SetupPage : ContentPage
 {
     public SetupPage()
@@ -16,104 +27,152 @@ public partial class SetupPage : ContentPage
 
         // The one shared formatter, so every app's foot line reads identically.
         BuildLineLabel.Text = Storyworthtelling.Updates.BuildLine.Format(
-            "Daily Loader", Microsoft.Maui.ApplicationModel.AppInfo.Current.VersionString,
+            "Foreword", Microsoft.Maui.ApplicationModel.AppInfo.Current.VersionString,
             Microsoft.Maui.ApplicationModel.AppInfo.Current.PackageName);
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        // Pre-fill the (usually hidden) key entries so a save never wipes a stored key; ApplyCredentialFields
-        // then decides which fields to actually show based on each key's last-known health.
-        NytCookieEntry.Text = CredentialStore.NytSessionCookie;
-        NytApiKeyEntry.Text = CredentialStore.NytApiKey;
-        RemarkableTokenEntry.Text = CredentialStore.RemarkableDeviceToken;
-        AnthropicKeyEntry.Text = CredentialStore.AnthropicApiKey;
-        ApplyCredentialFields();
-        CalendarMappingEditor.Text = CredentialStore.CalendarMappingJson;
-        VaultPassphraseEntry.Text = CredentialStore.VaultPassphrase;
+
+        // Read from the worker's own constants, so the screen cannot state a delivery time the
+        // schedule does not use.
+        var scheduled = new DateTime(1, 1, 1, DeliveryWorker.DeliveryHour, DeliveryWorker.DeliveryMinute, 0);
+        DeliveryTimeLabel.Text = scheduled.ToString("h:mm tt").ToLowerInvariant();
+
+        DestinationLabel.Text = string.IsNullOrEmpty(CredentialStore.GoogleAccountEmail)
+            ? "Your reMarkable"
+            : $"Your reMarkable · {CredentialStore.GoogleAccountEmail}";
+
+        LastDeliveryCaption.Text = CredentialStore.LastDeliverySummary;
+
+        RemarkableStatusLabel.Text = string.IsNullOrEmpty(CredentialStore.RemarkableDeviceToken)
+            ? "Not paired — documents are built and held until it is"
+            : "Paired";
+        RemarkableReplaceButton.Text = string.IsNullOrEmpty(CredentialStore.RemarkableDeviceToken)
+            ? "Pair"
+            : "Re-pair";
+
         GoogleStatusLabel.Text = CredentialStore.IsGoogleConfigured
-            ? $"Signed in as {CredentialStore.GoogleAccountEmail} ✓"
+            ? CredentialStore.GoogleAccountEmail
             : "Not signed in";
+
+        VaultPassphraseEntry.Text = CredentialStore.VaultPassphrase;
+        CalendarMappingEditor.Text = CredentialStore.CalendarMappingJson;
+
+        BuildNeedsYou();
     }
 
-    // Shows each key field only when there's something to do: no key stored yet, or a live call with the
-    // stored key was just rejected. A working key collapses to a "Working ✓" line with a Replace button, so
-    // the screen stays quiet and the raw key isn't left on display (the vault keeps the backup).
-    private void ApplyCredentialFields()
+    // ---- Needs you =========================================================
+
+    /// <summary>
+    /// One row per credential that is missing or was just rejected, and nothing at all when
+    /// none is. <see cref="CredentialFieldState.Decide"/> already computes exactly this; what
+    /// changed in P9 is that a healthy key now collapses to <i>nothing</i> rather than to a
+    /// "Working ✓" line.
+    /// </summary>
+    private void BuildNeedsYou()
     {
+        NeedsYouRows.Clear();
         var report = CredentialHealth();
-        ApplyCredentialField(CredentialIds.NytCookie, report, CredentialStore.NytSessionCookie,
-            NytCookieStatusRow, NytCookieStatusLabel, NytCookieReplaceButton, NytCookieFields);
-        ApplyCredentialField(CredentialIds.NytApiKey, report, CredentialStore.NytApiKey,
-            NytApiKeyStatusRow, NytApiKeyStatusLabel, NytApiKeyReplaceButton, NytApiKeyFields);
-        ApplyCredentialField(CredentialIds.Remarkable, report, CredentialStore.RemarkableDeviceToken,
-            RemarkableStatusRow, RemarkableStatusLabel, RemarkableReplaceButton, RemarkableFields);
-        ApplyCredentialField(CredentialIds.Anthropic, report, CredentialStore.AnthropicApiKey,
-            AnthropicStatusRow, AnthropicStatusLabel, AnthropicReplaceButton, AnthropicFields);
+
+        var wanted = new (string Id, string Title, string Hint, Func<string> Read, Action<string> Write)[]
+        {
+            (CredentialIds.NytCookie, "New York Times — session cookie",
+                "Log into nytimes.com, open DevTools → Application → Cookies, copy the NYT-S value.",
+                () => CredentialStore.NytSessionCookie, v => CredentialStore.NytSessionCookie = v),
+            (CredentialIds.NytApiKey, "New York Times — API key",
+                "From developer.nytimes.com. Used to fetch the top stories list.",
+                () => CredentialStore.NytApiKey, v => CredentialStore.NytApiKey = v),
+            (CredentialIds.Anthropic, "Claude — handwriting",
+                "Optional. Without it, notes written on the paper are not read back.",
+                () => CredentialStore.AnthropicApiKey, v => CredentialStore.AnthropicApiKey = v),
+        };
+
+        var shown = 0;
+        foreach (var (id, title, hint, read, write) in wanted)
+        {
+            var state = CredentialFieldState.Decide(!string.IsNullOrEmpty(read()), report.Get(id));
+            if (!state.ShowEntry)
+            {
+                continue;
+            }
+
+            if (shown > 0)
+            {
+                NeedsYouRows.Add(new BoxView
+                {
+                    HeightRequest = 1,
+                    Color = LookupColor("Hairline"),
+                });
+            }
+
+            NeedsYouRows.Add(BuildNeedsYouRow(title, state.StatusText, hint, read(), write));
+            shown++;
+        }
+
+        NeedsYouLabel.IsVisible = shown > 0;
+        NeedsYouCard.IsVisible = shown > 0;
+    }
+
+    private View BuildNeedsYouRow(
+        string title, string status, string hint, string current, Action<string> write)
+    {
+        var entry = new Entry
+        {
+            Text = current,
+            Placeholder = "Paste it here",
+            Style = LookupStyle("MonoEntry"),
+        };
+
+        // Committed as it is typed. There is no Save on this screen, so anything waiting for
+        // one would be lost by leaving — which, for a credential the owner has just pasted in,
+        // is the worst possible moment to lose it.
+        entry.TextChanged += (_, e) => write(e.NewTextValue?.Trim() ?? string.Empty);
+        entry.Unfocused += async (_, _) => await PublishToVaultAsync();
+
+        return new VerticalStackLayout
+        {
+            Padding = new Thickness(16, 12),
+            Spacing = 8,
+            Children =
+            {
+                new Label { Text = title, Style = LookupStyle("CardRowTitle"), TextColor = LookupColor("Accent") },
+                new Label { Text = status, Style = LookupStyle("CardRowDescription") },
+                entry,
+                new Label { Text = hint, Style = LookupStyle("CardRowDescription") },
+            },
+        };
     }
 
     private static CredentialHealthReport CredentialHealth() =>
         IPlatformApplication.Current!.Services.GetRequiredService<CredentialHealthStore>().Load();
 
-    private void ApplyCredentialField(
-        string credentialId, CredentialHealthReport report, string storedValue,
-        Grid statusRow, Label statusLabel, Button replaceButton, View fields)
-    {
-        var state = CredentialFieldState.Decide(!string.IsNullOrEmpty(storedValue), report.Get(credentialId));
-        fields.IsVisible = state.ShowEntry;
-        statusRow.IsVisible = !state.ShowEntry || state.IsWarning;
-        replaceButton.IsVisible = !state.ShowEntry;
-        statusLabel.Text = state.StatusText;
-        statusLabel.Style = LookupStyle(state.IsWarning ? "ErrorLabel" : "SecondaryLabel");
-    }
-
-    // Styles live in the app-wide merged dictionaries, which a page's own Resources indexer doesn't search;
-    // TryGetValue on the application resources walks the merged dictionaries.
+    // Styles and colours live in the app-wide merged dictionaries, which a page's own Resources
+    // indexer does not search; TryGetValue on the application resources walks them.
     private static Style? LookupStyle(string key) =>
         Application.Current?.Resources.TryGetValue(key, out var value) == true ? value as Style : null;
 
-    private void OnReplaceNytCookieClicked(object sender, EventArgs e) =>
-        RevealEntry(NytCookieStatusRow, NytCookieFields, NytCookieEntry);
+    private static Color LookupColor(string key) =>
+        Application.Current?.Resources.TryGetValue(key, out var value) == true && value is Color color
+            ? color
+            : Colors.Transparent;
 
-    private void OnReplaceNytApiKeyClicked(object sender, EventArgs e) =>
-        RevealEntry(NytApiKeyStatusRow, NytApiKeyFields, NytApiKeyEntry);
+    // ---- Vault =============================================================
 
-    private void OnReplaceRemarkableClicked(object sender, EventArgs e) =>
-        RevealEntry(RemarkableStatusRow, RemarkableFields, RemarkableTokenEntry);
-
-    private void OnReplaceAnthropicClicked(object sender, EventArgs e) =>
-        RevealEntry(AnthropicStatusRow, AnthropicFields, AnthropicKeyEntry);
-
-    // Deliberate rotation of a working key: hide the status row and open the field (kept empty so the new
-    // value is typed fresh rather than edited over the old one).
-    private static void RevealEntry(Grid statusRow, View fields, Entry entry)
+    private void OnVaultPassphraseChanged(object sender, TextChangedEventArgs e)
     {
-        statusRow.IsVisible = false;
-        entry.Text = string.Empty;
-        fields.IsVisible = true;
-        entry.Focus();
+        // Persisted as it is typed rather than on blur, exactly as Score does: leaving this
+        // screen never reliably blurs the field, and the passphrase is the one secret the vault
+        // cannot restore if it is lost.
+        CredentialStore.VaultPassphrase = e.NewTextValue ?? string.Empty;
     }
 
-    private async void OnSaveClicked(object sender, EventArgs e)
-    {
-        CredentialStore.NytSessionCookie = NytCookieEntry.Text?.Trim() ?? string.Empty;
-        CredentialStore.NytApiKey = NytApiKeyEntry.Text?.Trim() ?? string.Empty;
-        CredentialStore.RemarkableDeviceToken = RemarkableTokenEntry.Text?.Trim() ?? string.Empty;
-        CredentialStore.AnthropicApiKey = AnthropicKeyEntry.Text?.Trim() ?? string.Empty;
-        CredentialStore.CalendarMappingJson = CalendarMappingEditor.Text?.Trim() ?? string.Empty;
-        CredentialStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
-
-        // Back up the credentials to the encrypted Drive vault. They already work locally; a failed publish
-        // now surfaces (a silently-skipped backup is what left the vault empty after the cutover) instead of
-        // vanishing.
-        await PublishToVaultAsync();
-        // Success is the state change: saving returns home (DESIGN.md §7).
-        await Navigation.PopAsync();
-    }
-
-    // Publishes and, only when a passphrase was set but the backup didn't land, tells the owner. A
-    // no-passphrase skip stays quiet (the app just isn't in the vault yet).
+    /// <summary>
+    /// Publishes this app's section to the encrypted Drive vault, and speaks up only when a
+    /// passphrase was set and the backup still did not land. A no-passphrase skip stays quiet:
+    /// the app simply is not in the vault yet.
+    /// </summary>
     private async Task PublishToVaultAsync()
     {
         SecretsVaultPublishResult result;
@@ -121,15 +180,68 @@ public partial class SetupPage : ContentPage
         {
             var sync = IPlatformApplication.Current!.Services.GetService<VaultSync>();
             if (sync is null)
+            {
                 return;
+            }
+
             result = await sync.PublishAsync(CancellationToken.None);
         }
         catch (Exception ex)
         {
             result = SecretsVaultPublishResult.WriteFailed(ex.Message);
         }
+
         if (result.NeedsAttention)
+        {
             await DisplayAlert("Vault backup didn't complete", result.Message, "OK");
+        }
+    }
+
+    // ---- Where it goes =====================================================
+
+    private void OnReplaceRemarkableClicked(object sender, EventArgs e)
+    {
+        RemarkableFields.IsVisible = !RemarkableFields.IsVisible;
+        if (RemarkableFields.IsVisible)
+        {
+            RemarkableTokenEntry.Focus();
+        }
+    }
+
+    private async void OnRegisterRemarkableClicked(object sender, EventArgs e)
+    {
+        var code = RemarkableTokenEntry.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        try
+        {
+            // Pair through the shared library rather than an inline POST.
+            var registration = IPlatformApplication.Current!.Services
+                .GetRequiredService<Storyworthtelling.Remarkable.IRemarkableRegistration>();
+            var token = await registration.Register(code);
+
+            CredentialStore.RemarkableDeviceToken = token;
+            // Back up the freshly paired token so a later reset does not force re-registration.
+            await PublishToVaultAsync();
+
+            // Success is the state change, not an alert: the row now says Paired.
+            RemarkableFields.IsVisible = false;
+            RemarkableTokenEntry.Text = string.Empty;
+            RemarkableStatusLabel.Text = "Paired";
+            RemarkableReplaceButton.Text = "Re-pair";
+        }
+        catch (HttpRequestException ex)
+        {
+            RemarkableStatusLabel.Text =
+                $"Pairing refused ({(int?)ex.StatusCode}) — the code may have expired. Ask for a new one.";
+        }
+        catch (Exception ex)
+        {
+            RemarkableStatusLabel.Text = $"Pairing failed — {ex.Message}";
+        }
     }
 
     private async void OnGoogleSignInClicked(object sender, EventArgs e)
@@ -137,23 +249,21 @@ public partial class SetupPage : ContentPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            await DisplayAlert("Google", "Could not start sign-in (no active window).", "OK");
+            GoogleStatusLabel.Text = "Could not start sign-in — no active window.";
             return;
         }
 
         try
         {
             var email = await Foreword.Android.Google.DeviceAccountSignIn.SignIn(activity);
-            GoogleStatusLabel.Text = $"Signed in as {email} ✓";
-            // The status line below the button is the state change.
-            GoogleStatusLabel.Text = $"Signed in as {email}.";
+            GoogleStatusLabel.Text = email;
+            DestinationLabel.Text = $"Your reMarkable · {email}";
         }
         catch (Exception ex)
         {
             var fullMessage = FlattenException(ex);
-            GoogleStatusLabel.Text = "Sign-in failed";
+            GoogleStatusLabel.Text = "Sign-in failed — details copied to the clipboard.";
             await Clipboard.SetTextAsync(fullMessage);
-            await DisplayAlert("Google Sign-in Failed (copied to clipboard)", fullMessage, "OK");
         }
     }
 
@@ -165,45 +275,45 @@ public partial class SetupPage : ContentPage
         {
             parts.AppendLine(current.Message);
             if (!string.IsNullOrWhiteSpace(current.StackTrace))
+            {
                 parts.AppendLine(current.StackTrace);
+            }
+
             current = current.InnerException;
-            if (current != null) parts.AppendLine("Caused by:");
+            if (current != null)
+            {
+                parts.AppendLine("Caused by:");
+            }
         }
+
         return parts.ToString().Trim();
     }
 
-    private async void OnRegisterRemarkableClicked(object sender, EventArgs e)
+    // ---- Advanced ==========================================================
+
+    private async void OnSendTestPageClicked(object sender, EventArgs e)
     {
-        var code = await DisplayPromptAsync(
-            "Register reMarkable",
-            "Visit my.remarkable.com/device/mobile/connect and enter the one-time code:",
-            placeholder: "e.g. abcdefgh");
-
-        if (string.IsNullOrWhiteSpace(code)) return;
-
+        // Exists for the on-device test plan: waiting until 6:30 tomorrow to find out whether
+        // pairing worked is not a test, it is a wait.
+        TestPageButton.Text = "Sending…";
         try
         {
-            // Pair through the shared library instead of an inline POST.
-            var registration = IPlatformApplication.Current!.Services
-                .GetRequiredService<Storyworthtelling.Remarkable.IRemarkableRegistration>();
-            var token = await registration.Register(code);
-
-            CredentialStore.RemarkableDeviceToken = token;
-            RemarkableTokenEntry.Text = token;
-            // Back up the freshly paired token so a later reset doesn't force re-registration.
-            await PublishToVaultAsync();
-            await DisplayAlert("Registered!", "Device registered and token saved.", "OK");
-        }
-        catch (HttpRequestException ex)
-        {
-            await DisplayAlert("Registration Failed",
-                $"Server returned {(int?)ex.StatusCode}. Check your code and try again.", "OK");
+            var delivery = IPlatformApplication.Current!.Services
+                .GetRequiredService<Foreword.Infrastructure.Delivery.CrosswordDeliveryService>();
+            var outcome = await delivery.DeliverDailyPuzzle(DateOnly.FromDateTime(DateTime.Today));
+            TestPageButton.Text = "Send";
+            LastDeliveryCaption.Text = outcome;
         }
         catch (Exception ex)
         {
-            var fullMessage = FlattenException(ex);
-            await Clipboard.SetTextAsync(fullMessage);
-            await DisplayAlert("Error (copied to clipboard)", fullMessage, "OK");
+            TestPageButton.Text = "Send";
+            LastDeliveryCaption.Text = $"Test page failed — {ex.Message}";
         }
     }
+
+    private void OnCalendarMappingChanged(object sender, TextChangedEventArgs e) =>
+        CredentialStore.CalendarMappingJson = e.NewTextValue?.Trim() ?? string.Empty;
+
+    private async void OnDiagnosticsClicked(object sender, EventArgs e) =>
+        await Navigation.PushAsync(new DiagnosticsPage());
 }
