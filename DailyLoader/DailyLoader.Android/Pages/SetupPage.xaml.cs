@@ -13,6 +13,11 @@ public partial class SetupPage : ContentPage
     public SetupPage()
     {
         InitializeComponent();
+
+        // The one shared formatter, so every app's foot line reads identically.
+        BuildLineLabel.Text = Storyworthtelling.Updates.BuildLine.Format(
+            "Daily Loader", Microsoft.Maui.ApplicationModel.AppInfo.Current.VersionString,
+            Microsoft.Maui.ApplicationModel.AppInfo.Current.PackageName);
     }
 
     protected override void OnAppearing()

@@ -77,6 +77,8 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
         column.AddView(PaperUi.SecondaryButton(Host, "Recent failures",
             () => Host.StartActivity(new Android.Content.Intent(Host, typeof(AudioDiagnosticsActivity)))));
 
+        column.AddView(PaperUi.BuildNumber(Host, "Score"), BuildLineParams());
+
         var scroll = new ScrollView(Host);
         scroll.AddView(column);
         return scroll;
@@ -163,6 +165,17 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
         row.AddView(text, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         row.AddView(PaperUi.QuietButton(Host, action, onAction));
         return row;
+    }
+
+    // The quiet foot line: which build is actually on the phone. The channel installs
+    // silently and most updates change nothing visible, so without it "did that land?" has
+    // no answer on the device.
+    private LinearLayout.LayoutParams BuildLineParams()
+    {
+        var lp = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+        lp.TopMargin = PaperTheme.Dp(Host, DesignTokens.Space.X8);
+        return lp;
     }
 
     private void Group(LinearLayout column, string name)

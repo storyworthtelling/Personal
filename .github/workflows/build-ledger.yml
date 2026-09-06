@@ -63,11 +63,17 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/ledger.keystore
 
+      - name: Compute versionCode
+        id: version
+        uses: ./.github/actions/version-code
+        with:
+          band: 1
+
       - name: Build APK
         working-directory: Ledger
         run: >
           dotnet publish Ledger.Android -f net10.0-android -c Release
-          -p:ApplicationVersion=${{ github.run_number }}
+          -p:ApplicationVersion=${{ steps.version.outputs.code }}
           -p:ApplicationDisplayVersion=0.1.${{ github.run_number }}
           -p:AndroidPackageFormat=apk
           -p:AndroidKeyStore=true

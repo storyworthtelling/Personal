@@ -38,10 +38,19 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/dailyloader.keystore
 
+      - name: Compute versionCode
+        id: version
+        uses: ./.github/actions/version-code
+        with:
+          # Band 7 clears the ~609,000,000 codes the old csproj timestamp scheme reached, so
+          # this app keeps upgrading in place. The band is not the version the owner sees.
+          band: 7
+
       - name: Build APK
         working-directory: DailyLoader
         run: >
           dotnet publish DailyLoader.Android -f net10.0-android -c Release
+          -p:ApplicationVersion=${{ steps.version.outputs.code }}
           -p:AndroidKeyStore=true
           -p:AndroidSigningKeyStore=/tmp/dailyloader.keystore
           -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }}
@@ -89,9 +98,8 @@ jobs:
 
       # Publish the signed APK to the rolling "apps-latest" release the phone's
       # update channel installs from. main only — feature-branch builds must never
-      # reach the device. No ApplicationVersion override here: DailyLoader already
-      # self-versions its versionCode from a UTC timestamp (monotonic), so the
-      # channel's per-app newer-than check works without run_number.
+      # reach the device. The versionCode comes from the shared version-code action
+      # like every other app now; the csproj's own UTC-timestamp scheme is gone.
       - name: Publish to rolling GitHub Release
         if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/publish-rolling-release
