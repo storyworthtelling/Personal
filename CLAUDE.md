@@ -108,6 +108,16 @@ it. It is now a decision with time passed in. The test project compiles those fi
 (`<Compile Include="..\Storyworthtelling.Maui\...">`), so the real types are exercised — the kit's
 own TFM makes a project reference impossible.
 
+**The components so far** are the binder tab strip and the dog-ear. The strip is the *native*
+shape by decision — a glyph over a horizontal label filling the 66dp gutter, the same component
+Score and Post draw — so all five apps reach for one divider; `BinderArea` carries **two** glyph
+sources rather than one tinted at runtime, because MAUI has no equivalent of Android's
+`SetColorFilter` and the only ready answer is a toolkit dependency. The dog-ear is Post's `FoldView`
+geometry member for member (two triangles: the **hole** showing what the fold carries, and the
+**flap**, the corner turned over and lying back across the page), painted through a `GraphicsView`
+`IDrawable`; `DogEarState` decides, the view paints and owns the clock — the state takes time as an
+argument, which is what makes it testable.
+
 The kit is `net10.0-android`, so `build-shared-libs` can only run its **tests**; its compilation is proven by the heads that reference it, which is why `Storyworthtelling.Maui/**` is in `build-android.yml`'s path filter and why the guards read files rather than load types. Tests: `dotnet test Storyworthtelling.Maui.Tests/Storyworthtelling.Maui.Tests.csproj` — palette against `PaperColorTokens` **by reflection**, the type ladder against `Codex.Domain`'s own source file, every `FontFamily` against what `PaperFonts` registers, the nine roles' faces and inks, Serif Italic's single role, no letterspacing, buttons at Label size. **Not yet verified:** no screen drawn from the kit has been opened on a device.
 
 ### Self-update (cross-cutting)
