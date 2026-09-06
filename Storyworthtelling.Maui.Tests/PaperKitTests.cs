@@ -192,6 +192,37 @@ public class PaperKitTests
         Assert.True(wrong.Count == 0, string.Join("\n", wrong));
     }
 
+    /// <summary>
+    /// Paper.xaml is the kit's only token file, so no colour hex appears anywhere else in it —
+    /// views included. A view that mixes its own colour is how a component starts drifting from
+    /// the table it is supposed to be an instance of.
+    /// </summary>
+    [Fact]
+    public void NoColourHexOutsideTheDictionary()
+    {
+        var offenders = new List<string>();
+        var kit = Path.Combine(RepoRoot(), "Storyworthtelling.Maui");
+
+        foreach (var file in Directory.EnumerateFiles(kit, "*.*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(kit, file);
+            if (relative.Split(Path.DirectorySeparatorChar).Any(part => part is "obj" or "bin")
+                || Path.GetExtension(file) is not (".cs" or ".xaml")
+                || relative.EndsWith("Paper.xaml", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (Regex.IsMatch(File.ReadAllText(file), @"#[0-9A-Fa-f]{6,8}\b"))
+            {
+                offenders.Add(relative);
+            }
+        }
+
+        Assert.True(offenders.Count == 0,
+            "Colour hex outside the kit's registered token file:\n" + string.Join("\n", offenders));
+    }
+
     // ---- reading the kit ----
 
     private static IEnumerable<(string Key, string Hex)> Colours() =>
