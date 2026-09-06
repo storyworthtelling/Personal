@@ -38,6 +38,15 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/dailyloader.keystore
 
+      # The runner's default JDK is 17. PR #161 fixed exactly this failure on Flyleaf after the
+      # runner inherited 17 and javac refused a class-file major 65 binding. Pinned here before
+      # anything in this app needs it, rather than after a red build explains why.
+      - name: Pin JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Compute versionCode
         id: version
         uses: ./.github/actions/version-code

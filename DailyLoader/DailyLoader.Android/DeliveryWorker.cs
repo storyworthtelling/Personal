@@ -1,11 +1,19 @@
 using Android.Content;
 using AndroidX.Work;
 using Microsoft.Extensions.DependencyInjection;
+using DailyLoader.Domain.Identity;
 using DailyLoader.Infrastructure.Delivery;
 
 namespace DailyLoader.Android;
 
-[global::Android.Runtime.Register("com.storyworthtelling.dailyloader.DeliveryWorker")]
+// WorkManager persists the JAVA class name of a scheduled worker, and Schedule enqueues with
+// ExistingPeriodicWorkPolicy.Keep — so a phone that already has work scheduled keeps a row
+// naming this class. If the rename moved it, WorkManager would wake up, fail to instantiate a
+// class that no longer exists, and the mornings would simply stop: no crash the owner sees, and
+// no log they can reach after the cutover. So the registered name keeps "dailyloader" in it
+// forever, even though everything around it now says Foreword. It is an address, not a
+// description.
+[global::Android.Runtime.Register(ForewordIdentity.ApplicationId + ".DeliveryWorker")]
 public class DeliveryWorker : Worker
 {
     public DeliveryWorker(Context context, WorkerParameters parameters)

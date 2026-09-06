@@ -2,10 +2,17 @@ using Android.App;
 using Android.Content.PM;
 using AndroidX.Work;
 using Microsoft.Extensions.DependencyInjection;
+using DailyLoader.Domain.Identity;
 using Microsoft.Maui;
 
 namespace DailyLoader.Android.Platforms.Android;
 
+// Without this, .NET for Android generates the Java name from the assembly and namespace, so
+// the rename would move it. The manifest is regenerated each build and a launcher resolves
+// MAIN/LAUNCHER at launch time, so this is far less dangerous than the worker above — but
+// pinning it costs one attribute and makes the name a decision rather than a side effect of
+// where the class happens to live.
+[global::Android.Runtime.Register(ForewordIdentity.ApplicationId + ".MainActivity")]
 [Activity(
     Theme = "@style/Maui.SplashTheme",
     MainLauncher = true,
