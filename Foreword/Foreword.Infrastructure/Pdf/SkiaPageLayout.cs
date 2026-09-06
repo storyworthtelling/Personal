@@ -6,22 +6,31 @@ namespace Foreword.Infrastructure.Pdf;
 // How text is placed inside a box — mirrors the PdfSharp XStringFormats the composers used.
 internal enum TextAlign { TopLeft, TopCenter, TopRight, Center }
 
-// The bespoke Skia layout engine for Foreword's documents, replacing the PdfSharp-vector PdfLayout.
-// It draws in POINT units by scaling each page canvas by RenderDpi/72, so every measurement and font size in
-// the composers stays the same numbers as the old PdfSharp code — the page is US Letter in points exactly as
-// before. Each page is an SKSurface snapshotted to a PNG; ToPdf() wraps the PNGs with the shared
-// PdfVolumeComposer. Ground stays white (the newspaper look).
+// The bespoke Skia layout engine for Foreword's documents.
+//
+// It draws in POINT units, which is what a PDF's user space already is — so the composers' measurements and
+// font sizes are the same numbers they have always been, and nothing here scales. Pages go straight to the
+// shared VectorPdfSink, so the text in a delivered document IS text: selectable, searchable, and rendered by
+// the tablet at whatever its panel actually is.
+//
+// It used to snapshot each page to a 150-DPI PNG and wrap the PNGs with PdfVolumeComposer — a picture of a
+// page. That cost roughly ten times the bytes on a full page and was resampled twice on e-ink, which is what
+// made small type look soft. The draw calls below are unchanged by the move; only where they land is
+// different. Ground stays white (the newspaper look).
 internal sealed class SkiaPageLayout : IDisposable
 {
     public const double Margin = 54; // 0.75 inch in points
 
-    private const int RenderDpi = 150;
-    private const float Scale = RenderDpi / 72f;
+    // The sheets go to the owner's reMarkable Paper Pro. Ink, the muted ink and the hairline come
+    // from the shared palette at that profile rather than from Skia's named colours: the bible's ink
+    // is a warm near-black and its hairline a paper cream, and the pure black on pure grey the
+    // composers used is a colder document that merely looks plausible.
+    public static readonly SKColor Ink = PaperPalette.Resolve(PaperRole.Ink, DeviceColorProfile.PaperPro);
+    public static readonly SKColor InkMuted = PaperPalette.Resolve(PaperRole.InkMuted, DeviceColorProfile.PaperPro);
+    public static readonly SKColor Hairline = PaperPalette.Resolve(PaperRole.Hairline, DeviceColorProfile.PaperPro);
 
-    private readonly bool landscape;
-    private readonly List<byte[]> pages = new();
+    private readonly VectorPdfSink sink = new();
 
-    private SKSurface surface = null!;
     private SKCanvas canvas = null!;
 
     public double PageWidth { get; }
@@ -32,7 +41,6 @@ internal sealed class SkiaPageLayout : IDisposable
 
     public SkiaPageLayout(bool landscape = false)
     {
-        this.landscape = landscape;
         PageWidth = landscape ? 792 : 612;   // US Letter in points
         PageHeight = landscape ? 612 : 792;
         StartPage();
@@ -54,8 +62,7 @@ internal sealed class SkiaPageLayout : IDisposable
 
     public void NewPage()
     {
-        SnapshotCurrent();
-        surface.Dispose();
+        sink.EndPage();
         StartPage();
     }
 
@@ -82,7 +89,7 @@ internal sealed class SkiaPageLayout : IDisposable
         if (string.IsNullOrEmpty(text))
             return;
 
-        using var paint = new SKPaint { Color = color ?? SKColors.Black, IsAntialias = true };
+        using var paint = new SKPaint { Color = color ?? Ink, IsAntialias = true };
         font.GetFontMetrics(out var m);
         var width = font.MeasureText(text);
 
@@ -177,38 +184,28 @@ internal sealed class SkiaPageLayout : IDisposable
     // ---- PDF assembly ----
     public byte[] ToPdf()
     {
-        SnapshotCurrent();
-        surface.Dispose();
-        var composer = new PdfVolumeComposer();
-        return composer.Compose(pages, RenderDpi);
+        sink.EndPage();
+        return sink.Close();
     }
 
-    public void Dispose() => surface?.Dispose();
+    public void Dispose() => sink.Dispose();
 
     // ---- internals ----
     private void StartPage()
     {
-        var info = new SKImageInfo(
-            (int)Math.Ceiling(PageWidth * Scale),
-            (int)Math.Ceiling(PageHeight * Scale));
-        surface = SKSurface.Create(info);
-        canvas = surface.Canvas;
+        // No scale: a PDF's user space is already 1/72 inch, which is the unit every measurement in
+        // the composers is written in. The raster path only scaled because a bitmap has pixels.
+        canvas = sink.BeginPage((float)PageWidth, (float)PageHeight);
+        // The ground stays white — the newspaper look, decided rather than inherited. The device's
+        // own warm ground is what PaperRole.Ground would give, and swapping to it is a design
+        // decision for the owner, not a tidy-up.
         canvas.Clear(SKColors.White);
-        canvas.Scale(Scale); // draw in point space from here on
         Y = Margin;
-    }
-
-    private void SnapshotCurrent()
-    {
-        canvas.Flush();
-        using var image = surface.Snapshot();
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        pages.Add(data.ToArray());
     }
 
     private static SKRect Rect(double x, double y, double w, double h) =>
         new((float)x, (float)y, (float)(x + w), (float)(y + h));
 
-    // The page count produced so far (snapshotted pages plus the one in progress). For tests.
-    public int PageCountInProgress => pages.Count + 1;
+    // The page count produced so far, including the one in progress. For tests.
+    public int PageCountInProgress => sink.PageCount;
 }
