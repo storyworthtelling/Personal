@@ -150,32 +150,43 @@ public class UnlockActivity : Activity
         // installing the owner's own app updates shouldn't require the 6-hour admin gate.
         AddContentButton(PaperUi.SecondaryButton(this, "Install APK from Downloads…", PickApkToInstall));
 
-        if (cutover!.IsRunning)
+        // The finalize-cutover control appears only while there's still work to do. Its one job is to
+        // disable debugging permanently, so once that's done the button retires for a done-state line
+        // (the flag the enforcement itself reads is the source of truth).
+        var lockedDown = new BlocklistStore(this).DebuggingLockedDown;
+        switch (CutoverStatus.Decide(lockedDown, cutover!.IsRunning))
         {
-            // The live cutover countdown: Cascadia seconds + Cancel beside it.
-            var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-            row.SetGravity(GravityFlags.CenterVertical);
-            var seconds = (int)Math.Ceiling(cutover.Remaining.TotalSeconds);
-            var timer = PaperUi.Countdown(this);
-            timer.Text = $"0:{seconds:D2}";
-            row.AddView(timer, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-            row.AddView(PaperUi.SecondaryButton(this, "Cancel", () =>
-            {
-                cutover.Cancel();
-                Render();
-            }));
-            var rowParams = MatchWrap();
-            rowParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
-            content!.AddView(row, rowParams);
-            AddBody("Disabling debugging when the countdown ends. ADB access becomes impossible; only a recovery-mode factory reset undoes the lockdown.");
-        }
-        else
-        {
-            AddContentButton(PaperUi.DestructiveButton(this, "Finalize cutover: disable debugging permanently", () =>
-            {
-                cutover.Start();
-                Render();
-            }));
+            case CutoverPrompt.Countdown:
+                // The live cutover countdown: Cascadia seconds + Cancel beside it.
+                var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+                row.SetGravity(GravityFlags.CenterVertical);
+                var seconds = (int)Math.Ceiling(cutover.Remaining.TotalSeconds);
+                var timer = PaperUi.Countdown(this);
+                timer.Text = $"0:{seconds:D2}";
+                row.AddView(timer, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+                row.AddView(PaperUi.SecondaryButton(this, "Cancel", () =>
+                {
+                    cutover.Cancel();
+                    Render();
+                }));
+                var rowParams = MatchWrap();
+                rowParams.TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X4);
+                content!.AddView(row, rowParams);
+                AddBody("Disabling debugging when the countdown ends. ADB access becomes impossible; only a recovery-mode factory reset undoes the lockdown.");
+                break;
+
+            case CutoverPrompt.Finalize:
+                AddContentButton(PaperUi.DestructiveButton(this, "Finalize cutover: disable debugging permanently", () =>
+                {
+                    cutover.Start();
+                    Render();
+                }));
+                break;
+
+            case CutoverPrompt.Complete:
+                // Fully cut over: nothing left to finalize, so no button — just a quiet done-state line.
+                AddBody("Cutover complete — debugging is permanently disabled.");
+                break;
         }
 
         if (inlineStatus is not null)
