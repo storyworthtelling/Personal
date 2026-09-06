@@ -36,6 +36,18 @@ public static class Tokens
     public const string PostMarkHex = "#5C5894";
     public const string PostDeepHex = "#333252";
 
+    // Foreword's identity: sunrise, OKLCH hue 47°, locked at gate 3. The icon is its cover —
+    // the engraved doorstep set into a window on this ground. It sits between Flyleaf's warm
+    // 38.6° and the accent terracotta, which is deliberate: the two apps are neighbours in the
+    // morning and their covers were chosen to read as the same library.
+    public const string ForewordGroundHex = "#DFA277";
+    public const string ForewordSunriseHex = "#CA662D";
+    public const string ForewordDeepHex = "#6E3512";
+
+    public static readonly SKColor ForewordGround = SKColor.Parse(ForewordGroundHex);
+    public static readonly SKColor ForewordSunrise = SKColor.Parse(ForewordSunriseHex);
+    public static readonly SKColor ForewordDeep = SKColor.Parse(ForewordDeepHex);
+
     public static readonly SKColor PostGround = SKColor.Parse(PostGroundHex);
     public static readonly SKColor PostMark = SKColor.Parse(PostMarkHex);
     public static readonly SKColor PostDeep = SKColor.Parse(PostDeepHex);

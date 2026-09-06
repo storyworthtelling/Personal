@@ -4,7 +4,7 @@ namespace Storyworthtelling.Paper;
 
 /// <summary>
 /// The unified delivery seam for a finished, already-rendered PDF: the reMarkable path (root upload — the
-/// proven DailyLoader path) and the Drive-beside-source archive behind one interface, so every app delivers
+/// proven Foreword path) and the Drive-beside-source archive behind one interface, so every app delivers
 /// the same way. The colour profile of the bytes is chosen by the caller via <see cref="DeliveryProfilePolicy"/>
 /// before rendering; this seam is a byte-pipe. Either transport may be absent on a given head (no reMarkable
 /// pairing, or the Drive write scope not yet granted), reported by the capability flags so the caller can skip

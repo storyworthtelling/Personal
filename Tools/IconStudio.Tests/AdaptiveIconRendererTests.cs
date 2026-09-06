@@ -22,11 +22,13 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal("#33322B", Tokens.InkHex);
         Assert.Equal("#C2542F", Tokens.AccentHex);
         Assert.Equal("#C9803A", Tokens.FlyleafWarmHex);
+        Assert.Equal("#CA662D", Tokens.ForewordSunriseHex);
     }
 
     // A paper-background app (not Flyleaf, whose ground is the warm identity hue).
     private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Plate");
     private static IconSpec FlyleafSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Launcher");
+    private static IconSpec ForewordSpec => IconSpecs.All.First(s => s.App == "Foreword");
 
     [Fact]
     public void SpecsCoverAllApps()
@@ -40,7 +42,7 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal(4, IconSpecs.All.Count(s => s.ResourceRoot.StartsWith("FocusPhone/")));
         Assert.Equal(IconSpecs.All.Count, IconSpecs.All.Select(s => s.ResourceRoot).Distinct().Count());
         Assert.Contains(IconSpecs.All, s => s.App == "Canonizer" && s.Name == "appicon");
-        Assert.Contains(IconSpecs.All, s => s.App == "DailyLoader" && s.Name == "ic_launcher");
+        Assert.Contains(IconSpecs.All, s => s.App == "Foreword" && s.Name == "ic_launcher");
         Assert.Contains(IconSpecs.All, s => s.App == "Ledger" && s.Name == "appicon");
     }
 
@@ -172,6 +174,87 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal(Tokens.FlyleafWarm, legacy.GetPixel(2, 2));
     }
 
+    [Fact]
+    public void ForewordBackground_IsTheSunriseIdentityGround()
+    {
+        var spec = ForewordSpec;
+        SeedGrounds();
+        AdaptiveIconRenderer.Write(root, spec);
+        var xml = File.ReadAllText(Path.Combine(
+            root, spec.ResourceRoot.Replace('/', Path.DirectorySeparatorChar),
+            "drawable", $"{spec.Name}_background.xml"));
+
+        Assert.Contains(Tokens.ForewordSunriseHex, xml);
+        Assert.DoesNotContain("gradient", xml);
+    }
+
+    /// <summary>
+    /// Foreword's cover sits in a far larger window than Post's, and that is the whole
+    /// difference between the two icons. The engraving is the subject: at Post's 0.325 inset
+    /// the doorstep, the newspaper and the door all land inside a third of the tile and read
+    /// as a smudge at 48dp.
+    /// </summary>
+    [Fact]
+    public void ForewordSetsItsCoverIntoAMuchLargerWindowThanPost()
+    {
+        var post = IconSpecs.All.Single(s => s.App == "Post");
+
+        Assert.Equal(0.12f, ForewordSpec.PlateInset);
+        Assert.True(ForewordSpec.PlateInset < post.PlateInset / 2f,
+            "Foreword's window has drifted back toward Post's, which is what made the engraving illegible.");
+    }
+
+    /// <summary>
+    /// And why it has no framing. At a 0.12 inset the corners are far outside an adaptive
+    /// icon's round-mask safe zone, so brackets there would be sliced off — leaving the plate
+    /// with broken framing rather than none, which reads as a rendering bug. The frame goes so
+    /// the picture can be big.
+    /// </summary>
+    [Fact]
+    public void ForewordsPlateDrawsNoFramingOutsideItsWindow()
+    {
+        using var foreword = GlyphOnly(ForewordSpec);
+        using var post = GlyphOnly(IconSpecs.All.Single(s => s.App == "Post"));
+
+        Assert.True(InkOutsideWindow(post, IconSpecs.All.Single(s => s.App == "Post").PlateInset) > 0,
+            "Post is the control here: it is supposed to have framing outside its window.");
+        Assert.Equal(0, InkOutsideWindow(foreword, ForewordSpec.PlateInset));
+    }
+
+    // The glyph layer alone, with no ground and no plate art beneath it.
+    private static SKBitmap GlyphOnly(IconSpec spec)
+    {
+        var bitmap = new SKBitmap(432, 432, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.Transparent);
+            spec.Glyph(canvas, 432f);
+        }
+        return bitmap;
+    }
+
+    // Anything drawn beyond the window's own keyline — a frame, brackets, a rule.
+    private static int InkOutsideWindow(SKBitmap glyph, float inset)
+    {
+        // A pixel of slack around the keyline itself, which is drawn ON the window edge.
+        var edge = glyph.Width * inset;
+        var slack = glyph.Width * 0.02f;
+        var count = 0;
+        for (var y = 0; y < glyph.Height; y++)
+        {
+            for (var x = 0; x < glyph.Width; x++)
+            {
+                var outside = x < edge - slack || y < edge - slack
+                    || x > glyph.Width - edge + slack || y > glyph.Height - edge + slack;
+                if (outside && glyph.GetPixel(x, y).Alpha > 8)
+                {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     [Theory]
     [InlineData("mdpi", 108, 48)]
     [InlineData("xxxhdpi", 432, 192)]
@@ -208,11 +291,12 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void LineArtGlyphsDrawInkAndExactlyOneTerracottaDetail()
     {
-        // Score and Post are deliberately not in this set. Each one's icon IS its cover —
-        // a keyboard on a painted ground, a mailbox painting set into an indigo plate —
-        // rather than an ink glyph on paper, so neither has an ink line to count or a
-        // terracotta detail to find. Their covers are checked by their own tests instead.
-        foreach (var spec in IconSpecs.All.Where(s => s.App is not ("Score" or "Post")))
+        // Score, Post and Foreword are deliberately not in this set. Each one's icon IS its
+        // cover — a keyboard on a painted ground, a mailbox painting set into an indigo plate,
+        // an engraved doorstep set into a sunrise one — rather than an ink glyph on paper, so
+        // none has an ink line to count or a terracotta detail to find. Their covers are
+        // checked by their own tests instead.
+        foreach (var spec in IconSpecs.All.Where(s => s.App is not ("Score" or "Post" or "Foreword")))
         {
             using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);
