@@ -128,7 +128,7 @@ public class DogEar : GraphicsView
     public DogEar(DogEarState state)
     {
         this.state = state;
-        painter = new FoldDrawable(Token);
+        painter = new FoldDrawable(PaperResources.Colour);
         Drawable = painter;
 
         WidthRequest = SizeDp;
@@ -200,10 +200,4 @@ public class DogEar : GraphicsView
         }
     }
 
-    private static Color Token(string key) =>
-        Application.Current?.Resources.TryGetValue(key, out var value) == true && value is Color colour
-            ? colour
-            : throw new InvalidOperationException(
-                $"The Paper & Ink kit is not merged: no resource named '{key}'. A head adds "
-                + "Resources.MergedDictionaries.Add(new PaperKit()) in its App constructor.");
 }
