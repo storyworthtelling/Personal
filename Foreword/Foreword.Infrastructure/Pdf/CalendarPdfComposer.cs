@@ -2,6 +2,7 @@ using SkiaSharp;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
 
+using Foreword.Domain.Calendar;
 using Storyworthtelling.Paper;
 
 namespace Foreword.Infrastructure.Pdf;
@@ -19,8 +20,21 @@ public class CalendarPdfComposer : ICalendarPdfComposer
     private const double HandwritingReserve = 130;
 
     // Event-box fills, kept as RGB components (as the PdfSharp version was) — not hex string literals.
-    private static readonly SKColor AllDayFill = new(230, 230, 245); // lavender
-    private static readonly SKColor TimedFill = new(225, 238, 225);  // green
+    // The three fills, as roles at the WASH tier in the document profile — the highlighter band
+    // DESIGN.md §3 puts behind full-strength ink, which is exactly what an event box is.
+    //
+    // They were a lavender and a green mixed by hand (230,230,245 and 225,238,225), no more part of
+    // the palette than the named greys were and harder to notice, because a mixed colour reads as
+    // deliberate. The colour guard only looked for SKColors. and walked straight past them.
+    //
+    // Reference for a thing that frames the day, Action for a real commitment in it, Resolved for
+    // the work block, which is a backdrop rather than something to look at.
+    private static readonly SKColor AllDayFill =
+        PaperPalette.ResolveRole(ColorRole.Reference, ColorTier.Wash, UiColorProfile.DocumentColor);
+    private static readonly SKColor TimedFill =
+        PaperPalette.ResolveRole(ColorRole.Action, ColorTier.Wash, UiColorProfile.DocumentColor);
+    private static readonly SKColor ContainerFill =
+        PaperPalette.ResolveRole(ColorRole.Resolved, ColorTier.Wash, UiColorProfile.DocumentColor);
 
     private static readonly PersonColumn[] Columns =
         [PersonColumn.Matt, PersonColumn.Ashley, PersonColumn.Gwen, PersonColumn.Eva, PersonColumn.Watch];
@@ -107,23 +121,36 @@ public class CalendarPdfComposer : ICalendarPdfComposer
             allDayOffset[col] += stripHeight + 1;
         }
 
-        // Timed events positioned by start/end within the timeline.
-        foreach (var e in agenda.Events.Where(e => !e.IsAllDay))
+        // Timed events, one column at a time so overlapping events share the width rather than
+        // paint over each other (B2), and so a work block is drawn first, behind what is inside it
+        // (B3). EventLanes decides both; this only lays the answer out.
+        for (var col = 0; col < Columns.Length; col++)
         {
-            var col = ColumnIndex(e.Column);
-            if (col < 0) continue;
-            var startOffset = HoursFromStart(e.Start);
-            var endOffset = HoursFromStart(e.End);
-            if (endOffset <= 0 || startOffset >= HourSpan)
-                continue; // entirely outside the visible window
+            var inColumn = agenda.Events
+                .Where(e => !e.IsAllDay && ColumnIndex(e.Column) == col)
+                .ToList();
 
-            startOffset = Math.Clamp(startOffset, 0, HourSpan);
-            endOffset = Math.Clamp(endOffset, 0, HourSpan);
+            foreach (var placed in EventLanes.Place(inColumn))
+            {
+                var e = placed.Event;
+                var startOffset = HoursFromStart(e.Start);
+                var endOffset = HoursFromStart(e.End);
+                if (endOffset <= 0 || startOffset >= HourSpan)
+                    continue; // entirely outside the visible window
 
-            var y = timelineTop + startOffset * hourHeight;
-            var height = Math.Max(stripHeight, (endOffset - startOffset) * hourHeight);
-            var x = colsLeft + col * colWidth;
-            DrawEventBox(layout, x + 1, y, colWidth - 2, height, e.Title, eventFont, TimedFill);
+                startOffset = Math.Clamp(startOffset, 0, HourSpan);
+                endOffset = Math.Clamp(endOffset, 0, HourSpan);
+
+                var y = timelineTop + startOffset * hourHeight;
+                var height = Math.Max(stripHeight, (endOffset - startOffset) * hourHeight);
+
+                // A container spans the column; everything else takes its lane's share of it.
+                var laneWidth = (colWidth - 2) / placed.Lanes;
+                var x = colsLeft + col * colWidth + 1 + placed.Lane * laneWidth;
+
+                DrawEventBox(layout, x, y, laneWidth, height, e.Title, eventFont,
+                    placed.IsContainer ? ContainerFill : TimedFill, placed.IsContainer);
+            }
         }
 
         layout.MoveTo(gridBottom);
@@ -167,12 +194,20 @@ public class CalendarPdfComposer : ICalendarPdfComposer
     }
 
     private static void DrawEventBox(
-        SkiaPageLayout layout, double x, double y, double width, double height, string title, SKFont font, SKColor fill)
+        SkiaPageLayout layout, double x, double y, double width, double height, string title,
+        SKFont font, SKColor fill, bool isContainer = false)
     {
         layout.DrawRect(x, y, width, height, stroke: SkiaPageLayout.InkMuted, strokeWidth: 0.4f, fill: fill);
+
+        // A container is a backdrop, so its own label sits at the FOOT of the box, out of the way of
+        // the meetings drawn on top of it. Putting it at the head is what made the nine-to-five look
+        // like an event that had swallowed the day.
+        var textY = isContainer ? y + height - stripHeightFor(font) : y + 1;
         layout.DrawText(layout.Truncate(title, font, width - 4), font,
-            x + 2, y + 1, width - 4, Math.Min(height, 12), TextAlign.TopLeft);
+            x + 2, textY, width - 4, Math.Min(height, stripHeightFor(font)), TextAlign.TopLeft);
     }
+
+    private static double stripHeightFor(SKFont font) => SkiaPageLayout.LineHeight(font);
 
     private static int ColumnIndex(PersonColumn column) => Array.IndexOf(Columns, column);
 
