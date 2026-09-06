@@ -2,12 +2,12 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Foreword.Android.Pages.MainPage"
-             Title="Morning Brief">
+             Title="Foreword">
     <Grid RowDefinitions="*,Auto">
         <ScrollView Grid.Row="0">
             <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="20" VerticalOptions="Center">
 
-                <Label Text="Morning brief"
+                <Label Text="Foreword"
                        Style="{StaticResource DisplayLabel}"
                        HorizontalOptions="Center" />
 
@@ -23,12 +23,27 @@
                        HorizontalOptions="Center"
                        HorizontalTextAlignment="Center" />
 
-                <Border x:Name="ConfigWarningLabel"
-                        Style="{StaticResource WarningCard}" IsVisible="False">
-                    <Label Text="Add your credentials in Settings to start delivering."
-                           FontSize="{StaticResource SecondarySize}"
+                <!--
+                    F1 in the mockups. Not a wizard and not a blocking step: one card of what
+                    Foreword has and what it is still waiting for, and it is USEFUL PART-WAY.
+                    With Google alone it can already build the day from the calendar and tasks;
+                    an unpaired reMarkable does not stop the morning, the documents are built
+                    and held. So the card lists state rather than demanding completion, and
+                    disappears once there is nothing left to say.
+
+                    It is also the screen the vault earns its keep on: on a phone that has been
+                    reset, rows go green before the owner touches anything.
+                -->
+                <VerticalStackLayout x:Name="FirstRunSection" IsVisible="False" Spacing="0">
+                    <Label x:Name="FirstRunIntro"
+                           Style="{StaticResource SecondaryLabel}"
                            HorizontalTextAlignment="Center" />
-                </Border>
+                    <Border Style="{StaticResource GroupCard}" Margin="0,12,0,0">
+                        <VerticalStackLayout x:Name="FirstRunRows" />
+                    </Border>
+                    <Label x:Name="FirstRunCaption" Style="{StaticResource CardCaption}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
 
                 <Border x:Name="BatteryWarningLabel"
                         Style="{StaticResource WarningCard}" IsVisible="False">

@@ -36,6 +36,30 @@ public class DesignTokenTests
             ?? throw new DirectoryNotFoundException("Could not locate Foreword.sln above " + AppContext.BaseDirectory);
     }
 
+    /// <summary>
+    /// The type ladder, which had drifted. DESIGN.md &sect;4's reworked scale — "bigger, more
+    /// contrast at the top" — reached the native <c>DesignTokens.TypeSp</c> (Display 44, Title 28)
+    /// and never reached the MAUI dictionaries, which still carried the pre-rework 34 and 24. The
+    /// gap is invisible until two apps are put side by side, and P9's mockups are drawn at 44, so
+    /// building them 1:1 needs the ladder the bible actually registers.
+    /// </summary>
+    [Fact]
+    public void DesignTokensXamlMatchesTheBibleTypeLadder()
+    {
+        var xaml = File.ReadAllText(Path.Combine(
+            Root(), "Foreword.Android", "Resources", "Styles", "DesignTokens.xaml"));
+
+        foreach (var (key, size) in new (string, string)[]
+                 {
+                     ("DisplaySize", "44"), ("TitleSize", "28"), ("HeadingSize", "18"),
+                     ("BodySize", "16"), ("SecondarySize", "14"), ("LabelSize", "13"),
+                     ("MonoSize", "14"),
+                 })
+        {
+            Assert.Contains($"<x:Double x:Key=\"{key}\">{size}</x:Double>", xaml, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public void DesignTokensXamlMatchesTheBiblePalette()
     {
