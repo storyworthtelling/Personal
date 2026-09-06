@@ -221,3 +221,65 @@ public class VersionCodeTests
             > 699_999_999);
     }
 }
+
+/// <summary>
+/// A project that names this library in its code must reference it.
+///
+/// <para>Written after the obvious happened: three MAUI heads were given code calling
+/// <see cref="BuildLine"/> without a ProjectReference, and CI caught it as
+/// <c>CS0234: the type or namespace name 'Updates' does not exist</c>. The compiler is the real
+/// guard — but the MAUI heads cannot be compiled without the maui-android workload, which this
+/// sandbox does not have, so nothing local said a word. This test does, by reading the projects
+/// themselves.</para>
+/// </summary>
+public class ProjectReferenceTests
+{
+    [Fact]
+    public void EveryProjectThatNamesTheUpdateLibraryReferencesIt()
+    {
+        var root = RepoRoot();
+        var missing = new List<string>();
+
+        foreach (var project in Directory.GetFiles(root, "*.csproj", SearchOption.AllDirectories))
+        {
+            var directory = Path.GetDirectoryName(project)!;
+            if (directory.Contains($"{Path.DirectorySeparatorChar}Storyworthtelling.Updates", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var sources = Directory.GetFiles(directory, "*.cs", SearchOption.AllDirectories)
+                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                    && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+
+            var namesIt = sources.Any(f => File.ReadAllText(f)
+                .Contains("Storyworthtelling.Updates", StringComparison.Ordinal));
+            if (!namesIt)
+            {
+                continue;
+            }
+
+            var references = File.ReadAllText(project);
+            if (!references.Contains("Storyworthtelling.Updates.csproj", StringComparison.Ordinal))
+            {
+                missing.Add(Path.GetRelativePath(root, project));
+            }
+        }
+
+        Assert.True(missing.Count == 0,
+            "These projects use Storyworthtelling.Updates without referencing it, which fails as CS0234 "
+            + $"in CI and cannot be caught locally for a MAUI head:\n{string.Join("\n", missing)}");
+    }
+
+    private static string RepoRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, ".github")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return directory!.FullName;
+    }
+}
