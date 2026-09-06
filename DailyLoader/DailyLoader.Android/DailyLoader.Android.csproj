@@ -34,6 +34,7 @@
          shared profile + Claude key from Drive (brings Google.Apis.Drive.v3/Auth transitively). -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 
   <!-- The shared Paper & Ink fonts (aliases registered in MauiProgram). -->

@@ -34,6 +34,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Storyboarder.Domain\Storyboarder.Domain.csproj" />
     <ProjectReference Include="..\Storyboarder.Infrastructure\Storyboarder.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 
   <!-- The shared Paper & Ink fonts (aliases registered in MauiProgram). The CI
