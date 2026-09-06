@@ -20,7 +20,7 @@ public class TimeHelperParityTests
         {
             Path.Combine(repoRoot, "FocusPhone", "Codex.Domain", relativePath),
             Path.Combine(repoRoot, "Storyboarder", "Storyboarder.Domain", relativePath),
-            Path.Combine(repoRoot, "DailyLoader", "DailyLoader.Domain", relativePath),
+            Path.Combine(repoRoot, "Foreword", "Foreword.Domain", relativePath),
         };
         var normalized = copies
             .Select(File.ReadAllText)

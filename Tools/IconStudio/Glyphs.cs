@@ -242,7 +242,7 @@ public static class Glyphs
         canvas.DrawLine(startX - spacing * 0.4f, c + half, startX + 3 * spacing + spacing * 0.4f, c - half, accent);
     }
 
-    /// <summary>DailyLoader: folded sheet, terracotta dog-ear.</summary>
+    /// <summary>Foreword: folded sheet, terracotta dog-ear.</summary>
     public static void FoldedPaper(SKCanvas canvas, float s)
     {
         using var ink = InkStroke(s);
@@ -321,6 +321,9 @@ public static class Glyphs
     /// </summary>
     public const float PlateInset = 0.325f;
 
+    /// <summary>Foreword's window, far wider than Post's — see <see cref="ForewordPlate"/>.</summary>
+    public const float ForewordPlateInset = 0.12f;
+
     /// <summary>
     /// Post's cover, as the launcher icon: §12's ex-libris plate with the mailbox painting
     /// already set into the window by the renderer. This draws what goes AROUND it — the
@@ -332,6 +335,48 @@ public static class Glyphs
     /// top-left, never a rotation — rotating an asymmetric corner through 90 degrees gives
     /// a pinwheel with no mirror line, which reads wrong on a plate (§12).
     /// </summary>
+    /// <summary>
+    /// Foreword's plate: the window keyline, and nothing else.
+    ///
+    /// <para>Post's icon frames its painting with mitred brackets; this one deliberately does
+    /// not, and the two decisions come from the same constraint pointing opposite ways. An
+    /// adaptive icon's round mask keeps only the central 72 of 108, so framing survives only
+    /// while it stays inside that circle. Post's window is small enough (0.325 inset) to leave
+    /// room for brackets inside it.</para>
+    ///
+    /// <para>Foreword's window is not: the engraving has to be large to be legible at 48dp — a
+    /// doorstep, a rolled newspaper and a door all inside a third of the tile read as a smudge —
+    /// so its inset is 0.12, and brackets there would be sliced off by the mask. Broken framing
+    /// reads as a rendering fault; no framing reads as a picture. The frame goes so the picture
+    /// can be big.</para>
+    ///
+    /// <para>Measured, so the claim is not larger than the fact: at 0.12 an adaptive launcher's
+    /// mask crops <i>inside</i> this keyline, so on the phone's home screen the icon reads as a
+    /// full-bleed engraving and neither the keyline nor the sunrise ground is visible. The
+    /// keyline does show on the legacy square <c>ic_launcher.png</c>, at its very edge. The
+    /// ground is still declared: it is what a launcher shows behind the foreground during its
+    /// zoom and parallax, and what any consumer of values/colors.xml reads.</para>
+    /// </summary>
+    public static void ForewordPlate(SKCanvas canvas, float s)
+    {
+        using var cream = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = s * 0.011f,
+            StrokeCap = SKStrokeCap.Butt,
+            StrokeJoin = SKStrokeJoin.Miter,
+            Color = Tokens.Paper,
+            IsAntialias = true,
+        };
+
+        // Exactly the rect the renderer put the engraving in, so the keyline reads as the
+        // window's own edge rather than as a border floating near it.
+        var window = new SKRect(
+            s * ForewordPlateInset, s * ForewordPlateInset,
+            s * (1f - ForewordPlateInset), s * (1f - ForewordPlateInset));
+        canvas.DrawRect(window, cream);
+    }
+
     public static void PostPlate(SKCanvas canvas, float s)
     {
         using var cream = new SKPaint

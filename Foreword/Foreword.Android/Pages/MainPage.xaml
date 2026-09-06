@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Foreword.Android.Pages.MainPage"
+             Title="Foreword">
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="20" VerticalOptions="Center">
+
+                <Label Text="Foreword"
+                       Style="{StaticResource DisplayLabel}"
+                       HorizontalOptions="Center" />
+
+                <!-- A greeting in the owner's voice when a shared profile exists; hidden otherwise. -->
+                <Label x:Name="WelcomeLabel"
+                       Style="{StaticResource SecondaryLabel}"
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center"
+                       IsVisible="False" />
+
+                <Label x:Name="StatusLabel"
+                       Style="{StaticResource StatusLine}"
+                       HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center" />
+
+                <!--
+                    F1 in the mockups. Not a wizard and not a blocking step: one card of what
+                    Foreword has and what it is still waiting for, and it is USEFUL PART-WAY.
+                    With Google alone it can already build the day from the calendar and tasks;
+                    an unpaired reMarkable does not stop the morning, the documents are built
+                    and held. So the card lists state rather than demanding completion, and
+                    disappears once there is nothing left to say.
+
+                    It is also the screen the vault earns its keep on: on a phone that has been
+                    reset, rows go green before the owner touches anything.
+                -->
+                <VerticalStackLayout x:Name="FirstRunSection" IsVisible="False" Spacing="0">
+                    <Label x:Name="FirstRunIntro"
+                           Style="{StaticResource SecondaryLabel}"
+                           HorizontalTextAlignment="Center" />
+                    <Border Style="{StaticResource GroupCard}" Margin="0,12,0,0">
+                        <VerticalStackLayout x:Name="FirstRunRows" />
+                    </Border>
+                    <Label x:Name="FirstRunCaption" Style="{StaticResource CardCaption}"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+
+                <Border x:Name="BatteryWarningLabel"
+                        Style="{StaticResource WarningCard}" IsVisible="False">
+                    <Label Text="Battery optimization is on — automatic delivery may be blocked."
+                           FontSize="{StaticResource SecondarySize}"
+                           HorizontalTextAlignment="Center" />
+                </Border>
+
+                <Button x:Name="BatterySettingsButton"
+                        Text="Fix battery optimization"
+                        Clicked="OnBatterySettingsClicked"
+                        Style="{StaticResource SecondaryButton}"
+                        IsVisible="False"
+                        HorizontalOptions="Fill" />
+
+                <Button x:Name="DeliveryLogButton"
+                        Text="View delivery log"
+                        Clicked="OnDeliveryLogClicked"
+                        Style="{StaticResource QuietButton}"
+                        IsVisible="False"
+                        HorizontalOptions="Fill" />
+
+                <Button x:Name="CrashLogButton"
+                        Text="View crash log"
+                        Clicked="OnCrashLogClicked"
+                        Style="{StaticResource DestructiveButton}"
+                        IsVisible="False"
+                        HorizontalOptions="Fill" />
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Pinned bottom bar (DESIGN.md §7). -->
+        <VerticalStackLayout Grid.Row="1">
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Padding="24,12">
+                <Button Grid.Column="0" x:Name="DeliverNowButton" Text="Deliver now"
+                        Clicked="OnDeliverNowClicked" />
+                <Button Grid.Column="1" Text="Settings" Clicked="OnSettingsClicked"
+                        Style="{StaticResource QuietButton}" />
+            </Grid>
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

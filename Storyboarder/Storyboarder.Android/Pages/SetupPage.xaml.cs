@@ -275,7 +275,7 @@ public partial class SetupPage : ContentPage
     private async void OnCrashLogClicked(object sender, EventArgs e) =>
         await ShowLog("Crash log", CrashLogPath, () => System.IO.File.Delete(CrashLogPath));
 
-    // Shared View & copy / Share / Clear flow for a diagnostic log file (mirrors DailyLoader). The
+    // Shared View & copy / Share / Clear flow for a diagnostic log file (mirrors Foreword). The
     // buttons stay visible even when a log is empty, so the crash log is always reachable.
     private async Task ShowLog(string title, string path, Action clear)
     {
