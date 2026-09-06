@@ -98,6 +98,16 @@ A shared **`Storyworthtelling.Maui`** library (repo root, own `.csproj` + `.Test
 
 **It exists because the design system was written twice and enforced once.** Each MAUI head kept a private copy of the palette and a leak-guard test holding a *second* hand-typed copy to check it against, so both could be wrong together — and were. Four live bugs came out of the first parity run against `PaperColorTokens`: the accent was still the **retired terracotta** (`#C2542F`) rather than the Action role's pine, **Display** drew in Serif Semibold where DESIGN.md §4 gives every screen header Serif **Black**, the **Label** role took the full ink instead of the muted one, and the **owner's voice had no style at all**. The last two share a cause worth remembering: `SourceSerif4-Black.ttf` and `PinyonScript-Regular.ttf` shipped inside every APK with **no alias registered**, and an unregistered family is not an error in MAUI — the platform substitutes the system face and says nothing.
 
+**The pure halves are pulled out and tested for real.** `Layout/BinderTabLayout` and
+`DesignTokens` (Space + Shape only — type sizes stay in the registered `Paper.xaml`) are copies of
+`Codex.Domain`'s, kept identical by a **source-level** parity guard rather than by a test that
+restates a few remembered values. `State/DogEarState` is new: DESIGN.md §13's rule that an undo
+**outranks** a waiting notice and hands the corner back when its window closes had only ever existed
+inside the native view, tangled with the host layout, a weak table and a `Handler`, so nothing tested
+it. It is now a decision with time passed in. The test project compiles those files directly
+(`<Compile Include="..\Storyworthtelling.Maui\...">`), so the real types are exercised — the kit's
+own TFM makes a project reference impossible.
+
 The kit is `net10.0-android`, so `build-shared-libs` can only run its **tests**; its compilation is proven by the heads that reference it, which is why `Storyworthtelling.Maui/**` is in `build-android.yml`'s path filter and why the guards read files rather than load types. Tests: `dotnet test Storyworthtelling.Maui.Tests/Storyworthtelling.Maui.Tests.csproj` — palette against `PaperColorTokens` **by reflection**, the type ladder against `Codex.Domain`'s own source file, every `FontFamily` against what `PaperFonts` registers, the nine roles' faces and inks, Serif Italic's single role, no letterspacing, buttons at Label size. **Not yet verified:** no screen drawn from the kit has been opened on a device.
 
 ### Self-update (cross-cutting)
