@@ -40,15 +40,12 @@ public static class MauiProgram
         // registered anymore.
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>()
-            .ConfigureFonts(fonts =>
-            {
-                fonts.AddFont("SourceSerif4-Regular.ttf", "Serif");
-                fonts.AddFont("SourceSerif4-Semibold.ttf", "SerifSemibold");
-                fonts.AddFont("SourceSerif4-Italic.ttf", "SerifItalic");
-                fonts.AddFont("SourceSans3-Regular.ttf", "Sans");
-                fonts.AddFont("SourceSans3-Semibold.ttf", "SansSemibold");
-                fonts.AddFont("CascadiaCode-Regular.ttf", "Mono");
-            });
+            // All eight faces, under the aliases the role table names. This head used to list six
+            // of them itself; Serif Black and Pinyon Script shipped inside the APK with no alias,
+            // so Display could not draw in the face DESIGN.md §4 gives it and the owner's voice had
+            // nowhere to live. An unregistered family is not an error in MAUI — the platform
+            // substitutes the system face and says nothing.
+            .ConfigureFonts(Storyworthtelling.Maui.PaperFonts.Register);
 
         builder.Services.AddSingleton<IOptions<NytOptions>>(
             _ => new LiveOptions<NytOptions>(() => new NytOptions { SessionCookie = CredentialStore.NytSessionCookie }));

@@ -359,12 +359,15 @@ Only these may contain color hex or type-size literals:
 | Project | Token files |
 |---|---|
 | Shared: Paper | The OKLCH **source spec** (`Storyworthtelling.Paper/PaletteSpec.cs` + `Oklch.cs`) and the generated `PaperColorTokens.cs` it emits (roles × tiers × App/Document profiles + gray ramp) |
-| Per-app | `*/Design/DesignTokens.cs` + `Resources/Styles/DesignTokens.xaml` — **thin generated re-exports** of the shared tokens (still leak-guard-scanned) |
+| Shared: MAUI kit | `Storyworthtelling.Maui/Resources/Styles/Paper.xaml` — the role table and component styles for the MAUI heads, the counterpart of `Codex.Ui.Android`'s `PaperUi`/`PaperTheme`. Checked against `PaperColorTokens` **by reflection**, not against a second typed copy |
+| Per-app | `*/Design/DesignTokens.cs` + `Resources/Styles/DesignTokens.xaml` — **thin generated re-exports** of the shared tokens (still leak-guard-scanned). **A MAUI head that has adopted the kit above has no token file at all** and is scanned for hexes everywhere; Ledger and Canonizer still carry their own and adopt the kit at their own phases |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
 | Fonts | `/Fonts` — Source Serif 4 (incl. **Black**), Source Sans 3, Cascadia Code, **Pinyon Script** (all OFL) |
 | Branding | `/Branding/owner.png` (owner-supplied) |
 
 **Tests (build-failing):** the **contrast** table (all role×tier×profile ≥ AA vs the worst textured/washed pixel); **screen↔document role parity** (every role resolves in both profiles); **generated↔committed parity** (a fresh generator run equals the committed tokens); the **material-legibility** cap; and C#↔XAML parity. A change to this bible is a change to the source spec and the tests, in the same commit.
+
+**A private copy of the palette per app was how the MAUI side drifted, and the drift was invisible.** Each MAUI head kept its own `DesignTokens.xaml` and its own leak-guard test holding a *second* hand-typed copy of the same values to check it against, so both could be wrong in the same way — and were: the accent was still the retired terracotta long after §4 retired it, Display drew in Semibold where §4 gives every screen header Serif **Black**, the Label role took the full ink, and the owner's voice had no style anywhere. Nothing failed, because nothing compared either copy to the generated source. The kit's guards therefore check the palette against `PaperColorTokens` by reflection and the type ladder against the native tokens' own source file; a typed expected value is the failure mode, not the test.
 
 **The per-app identity ladders are the exception, and are covered differently.** They are hand-committed rather than emitted by `PaletteSpec`, so generated↔committed parity does not reach them — which is how §3's account of Score's hue drifted from the hex it describes without anything failing. The compensating control is the **hue-separation guard** (§3): every committed identity tier is read back through `Oklch.FromHex` and measured against `PaletteSpec.RoleWheel`, so a ladder that crowds a role, or a role that moves onto a ladder, fails the build. Bringing the ladders under the generator proper is open work.
 
