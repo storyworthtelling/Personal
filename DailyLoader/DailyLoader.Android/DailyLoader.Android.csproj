@@ -6,10 +6,14 @@
     <RootNamespace>DailyLoader.Android</RootNamespace>
     <ApplicationId>com.storyworthtelling.dailyloader</ApplicationId>
     <ApplicationTitle>Daily Loader</ApplicationTitle>
-    <!-- yyyyMMddHHmm overflows Android's int32 versionCode limit (2,147,483,647).
-         Using last digit of year keeps the 9-digit result within range. -->
-    <_VersionYearDigit>$([MSBuild]::Modulo($([System.DateTime]::UtcNow.Year), 10))</_VersionYearDigit>
-    <ApplicationVersion>$(_VersionYearDigit)$([System.DateTime]::UtcNow.ToString('MMddHHmm'))</ApplicationVersion>
+    <!-- versionCode comes from the shared .github/actions/version-code action (band 7), like
+         every other app in the suite: band * 100,000,000 + minutes since 2020-01-01 UTC. This
+         value is only the fallback for a local build; CI always overrides it with -p. It used
+         to be a yearDigit + MMddHHmm timestamp computed here, which was correct but was the one
+         app doing its own thing — and a second implementation of the same rule is how the two
+         run_number floors drifted. Storyworthtelling.Updates.SuiteVersionBands records the band
+         and guards that it clears what this package has already shipped. -->
+    <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>$([System.DateTime]::UtcNow.ToString('yyyy.MM.dd.HHmm'))</ApplicationDisplayVersion>
     <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
     <Nullable>enable</Nullable>
@@ -30,6 +34,7 @@
          shared profile + Claude key from Drive (brings Google.Apis.Drive.v3/Auth transitively). -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 
   <!-- The shared Paper & Ink fonts (aliases registered in MauiProgram). -->

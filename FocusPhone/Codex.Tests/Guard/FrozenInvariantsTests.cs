@@ -121,6 +121,80 @@ public class FrozenInvariantsTests
         Assert.Equal(Storyworthtelling.Updates.SuiteApps.OwnerPackagePrefix, PolicyContext.OwnerPackagePrefix);
     }
 
+    /// <summary>
+    /// Every Settings screen ends with the build line. There is no adb after the cutover and
+    /// the channel installs silently, so this line is the only way to answer "did that update
+    /// land?" on the device — and most updates change nothing else visible. Flyleaf had it and
+    /// no other head did, which meant six of the seven apps could not answer that question at
+    /// all. Checked by content rather than by class name so a rename does not quietly drop it.
+    /// </summary>
+    [Fact]
+    public void EverySettingsScreenEndsWithTheBuildLine()
+    {
+        var settingsScreens = EnumerateRepoFiles("*.cs")
+            .Where(file =>
+            {
+                var name = Path.GetFileName(file);
+                return name.Equals("SettingsArea.cs", StringComparison.Ordinal)
+                    || name.Equals("LauncherSettingsActivity.cs", StringComparison.Ordinal);
+            })
+            .ToList();
+
+        Assert.NotEmpty(settingsScreens);
+
+        var missing = settingsScreens
+            .Where(file => !File.ReadAllText(file).Contains("PaperUi.BuildNumber", StringComparison.Ordinal))
+            .Select(RepoRelative)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "These Settings screens do not show the app version, so an update that changes nothing "
+            + $"visible is indistinguishable from no update at all:\n{string.Join("\n", missing)}");
+    }
+
+    /// <summary>
+    /// The shared library's versionCode band table names every app by package, and it cannot
+    /// reference PolicyContext to do it. This is what stops the two copies drifting: a band
+    /// recorded against a package id that no longer matches the frozen one would guard nothing,
+    /// silently, while still passing its own tests.
+    /// </summary>
+    [Fact]
+    public void EveryFocusPhonePackageInTheBandTableMatchesTheDomainConstant()
+    {
+        var banded = Storyworthtelling.Updates.SuiteVersionBands.All
+            .Select(app => app.Package)
+            .ToList();
+
+        Assert.Contains(PolicyContext.LauncherPackage, banded);
+        Assert.Contains(PolicyContext.AudioPackage, banded);
+        Assert.Contains(PolicyContext.CommunicationPackage, banded);
+        Assert.Contains(PolicyContext.PlatePackage, banded);
+    }
+
+    /// <summary>
+    /// Every head that ships through the channel needs a band, or it falls back to whatever
+    /// its csproj happens to say and its updates stop without anything failing. This catches
+    /// the app that gets added to a workflow but not to the table.
+    /// </summary>
+    [Fact]
+    public void EveryPublishedFocusPhoneHeadHasABand()
+    {
+        var banded = Storyworthtelling.Updates.SuiteVersionBands.All
+            .Select(app => app.Package)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var package in new[]
+                 {
+                     PolicyContext.LauncherPackage, PolicyContext.AudioPackage,
+                     PolicyContext.CommunicationPackage, PolicyContext.PlatePackage,
+                 })
+        {
+            Assert.True(banded.Contains(package),
+                $"{package} ships through the update channel but has no versionCode band.");
+        }
+    }
+
     // ---- Score (P6): the same invariants, for the second head through the rename ----
 
     // Exactly one head declares the frozen audio ApplicationId. Score renames its
@@ -461,14 +535,20 @@ public class FrozenInvariantsTests
     {
         Assert.Equal("com.storyworthtelling.focusphone.camera", PolicyContext.PlatePackage);
 
-        // Two files may hold the literal: the Domain constant that defines it, and this
-        // guard, which has to spell it out to freeze it. Everything else references the
-        // constant.
+        // Three files may hold the literal: the Domain constant that defines it, this guard,
+        // which has to spell it out to freeze it, and the shared update library's band table —
+        // Storyworthtelling.Updates cannot reference Codex.Domain (Domain is deliberately
+        // dependency-free, and the MAUI apps that share the library have no Codex.Domain at
+        // all), so it keeps its own copy, kept identical by
+        // EveryFocusPhonePackageInTheBandTableMatchesTheDomainConstant below. Everything else
+        // references the constant.
         var stray = EnumerateRepoFiles("*.cs")
             .Where(file => File.ReadAllText(file).Contains(PolicyContext.PlatePackage, StringComparison.Ordinal))
             .Select(RepoRelative)
             .Where(path => !path.EndsWith("PolicyContext.cs", StringComparison.Ordinal)
-                && !path.EndsWith("FrozenInvariantsTests.cs", StringComparison.Ordinal))
+                && !path.EndsWith("FrozenInvariantsTests.cs", StringComparison.Ordinal)
+                && !path.EndsWith("VersionCode.cs", StringComparison.Ordinal)
+                && !path.EndsWith("VersionCodeTests.cs", StringComparison.Ordinal))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToList();
 
@@ -526,10 +606,16 @@ public class FrozenInvariantsTests
         // The rolling release the device-owner update channel installs from.
         Assert.Contains("publish-rolling-release", workflow, StringComparison.Ordinal);
 
-        // This workflow's run_number restarts at 1 while the head has already shipped at up
-        // to 100000 + 108. A lower code is rejected outright by the update channel, so the
-        // floor has to clear everything build-flyleaf.yml ever published for Camera.
-        Assert.Contains("200000 + RUN_NUMBER", workflow, StringComparison.Ordinal);
+        // versionCode used to be a floor plus this workflow's run_number, because the
+        // run_number restarts at 1 when a workflow is renamed or split and a lower code is
+        // rejected outright by the update channel. That floor needed bumping twice — once for
+        // build-flyleaf.yml, once again when Post and Plate were split out — so the whole
+        // suite now shares one formula that has no counter in it at all:
+        // band * 100,000,000 + minutes since 2020-01-01 UTC, computed by one composite action.
+        // Storyworthtelling.Updates.SuiteVersionBands records Plate's band and guards that it
+        // clears the 200,030 this package has already shipped.
+        Assert.Contains("./.github/actions/version-code", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("RUN_NUMBER))", workflow, StringComparison.Ordinal);
 
         // The runner's default JDK is 17. Score's TIDAL binding was compiled to class-file
         // major 65 and javac refused it; Plate's ML Kit bindings are the same kind of
