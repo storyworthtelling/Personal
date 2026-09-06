@@ -77,18 +77,18 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/focusphone.keystore
 
+      - name: Compute versionCode
+        id: version
+        uses: ./.github/actions/version-code
+        with:
+          band: 1
+
       - name: Build signed APKs
         working-directory: FocusPhone
         env:
           RUN_NUMBER: ${{ github.run_number }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
-          # versionCode is the workflow run_number. Renaming build-focusphone.yml ->
-          # build-flyleaf.yml reset that counter (the old workflow reached ~132; this
-          # one restarted near 1), so a bare run_number would look OLDER than the
-          # installed builds and be rejected by the device-owner update channel. Floor
-          # the code well above the old counter so versionCode stays monotonic across
-          # the rename for every head.
-          VERSION_CODE=$((100000 + RUN_NUMBER))
           for proj in Flyleaf.Android Score.Android; do
             # Flyleaf graduates from the 0.1 pilot to a 1.x major; the other heads stay 0.1.
             case "$proj" in

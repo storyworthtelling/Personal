@@ -6,10 +6,14 @@
     <RootNamespace>Ledger.Android</RootNamespace>
     <ApplicationId>com.storyworthtelling.ledger</ApplicationId>
     <ApplicationTitle>Ledger</ApplicationTitle>
-    <!-- yyyyMMddHHmm overflows Android's int32 versionCode limit; the last year digit keeps the
-         9-digit result in range (matches Storyboarder/DailyLoader). -->
-    <_VersionYearDigit>$([MSBuild]::Modulo($([System.DateTime]::UtcNow.Year), 10))</_VersionYearDigit>
-    <ApplicationVersion>$(_VersionYearDigit)$([System.DateTime]::UtcNow.ToString('MMddHHmm'))</ApplicationVersion>
+    <!-- versionCode comes from the shared .github/actions/version-code action (band 1), like
+         every other app in the suite: band * 100,000,000 + minutes since 2020-01-01 UTC. This
+         value is only the fallback for a local build; CI always overrides it with -p. It used to
+         be a yearDigit + MMddHHmm timestamp computed here, which CI overrode with a bare
+         run_number — so the two disagreed by seven orders of magnitude, and a locally built
+         release APK could never be updated by a CI one. Storyworthtelling.Updates.SuiteVersionBands
+         records the band and guards that it clears what this package has already shipped. -->
+    <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>$([System.DateTime]::UtcNow.ToString('yyyy.MM.dd.HHmm'))</ApplicationDisplayVersion>
     <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
     <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
@@ -31,6 +35,7 @@
     <!-- Shared owner's-voice library: Ledger reads the shared profile + key from Drive to greet the
          owner in their voice (degrading to neutral copy when unavailable). -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 
   <!-- Google Drive read access for the shared voice profile/config (device-account sign-in). -->

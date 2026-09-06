@@ -84,6 +84,15 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         note.SetPadding(0, gap, 0, gap);
         column.AddView(note);
 
+        // The quiet foot line: which build is actually on the phone. The channel installs
+        // silently and most updates change nothing visible, so without it "did that land?"
+        // has no answer on the device.
+        var buildLine = PaperUi.BuildNumber(Host, "Plate");
+        var buildParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+        buildParams.TopMargin = PaperTheme.Dp(Host, DesignTokens.Space.X8);
+        column.AddView(buildLine, buildParams);
+
         scroll.AddView(column);
         return scroll;
     }
