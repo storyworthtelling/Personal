@@ -332,7 +332,22 @@ public static class Glyphs
     /// top-left, never a rotation — rotating an asymmetric corner through 90 degrees gives
     /// a pinwheel with no mirror line, which reads wrong on a plate (§12).
     /// </summary>
-    public static void PostPlate(SKCanvas canvas, float s)
+    public static void PostPlate(SKCanvas canvas, float s) => CoverPlate(canvas, s, Tokens.Paper);
+
+    /// <summary>
+    /// Plate's cover, as the launcher icon. The same anatomy as Post's, with the framing
+    /// <b>inverted to ink</b>: Plate's binding is the LIGHT ground tier, where Post's is deep
+    /// indigo, so cream framing would vanish into the cloth instead of drawing the window.
+    /// DESIGN.md §12 sets the binding per app and lets it contrast its own art; Plate's art is
+    /// a near-black lens, which is why the cloth is light and the frame is dark.
+    /// </summary>
+    public static void PlatePlate(SKCanvas canvas, float s) => CoverPlate(canvas, s, Tokens.Ink);
+
+    // The shared ex-libris treatment: a window keyline on exactly the rect the renderer put
+    // the painting in, and four mitred brackets around it. One implementation rather than one
+    // per app, because the geometry below (the round-mask inset especially) is reasoning that
+    // must not be re-derived — and re-derived slightly differently — for each new cover.
+    private static void CoverPlate(SKCanvas canvas, float s, SKColor frameColor)
     {
         using var cream = new SKPaint
         {
@@ -340,7 +355,7 @@ public static class Glyphs
             StrokeWidth = s * 0.011f,
             StrokeCap = SKStrokeCap.Butt,
             StrokeJoin = SKStrokeJoin.Miter,
-            Color = Tokens.Paper,
+            Color = frameColor,
             IsAntialias = true,
         };
         using var hair = new SKPaint
@@ -348,7 +363,7 @@ public static class Glyphs
             Style = SKPaintStyle.Stroke,
             StrokeWidth = s * 0.006f,
             StrokeJoin = SKStrokeJoin.Miter,
-            Color = Tokens.Paper.WithAlpha(150),
+            Color = frameColor.WithAlpha(150),
             IsAntialias = true,
         };
 
