@@ -26,4 +26,14 @@
     <ProjectReference Include="..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
   </ItemGroup>
 
+  <!-- The kit's PURE files, compiled straight into this project. The kit itself is
+       net10.0-android and cannot be referenced from here, but its geometry and its state rules
+       carry no MAUI types — so they are tested as real code rather than as text. Anything that
+       touches a MAUI type stays out of this list and is checked by content instead. -->
+  <ItemGroup>
+    <Compile Include="..\Storyworthtelling.Maui\DesignTokens.cs" Link="Kit\DesignTokens.cs" />
+    <Compile Include="..\Storyworthtelling.Maui\Layout\*.cs" Link="Kit\Layout\%(Filename)%(Extension)" />
+    <Compile Include="..\Storyworthtelling.Maui\State\*.cs" Link="Kit\State\%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>
