@@ -26,7 +26,7 @@ public sealed class VaultSync
         {
             Nyt = new NytSecrets(CredentialStore.NytSessionCookie, CredentialStore.NytApiKey),
             Remarkable = new RemarkableSecrets(CredentialStore.RemarkableDeviceToken),
-            DailyLoader = new DailyLoaderSecrets(CredentialStore.AnthropicApiKey, CredentialStore.CalendarMappingJson),
+            Foreword = new ForewordSecrets(CredentialStore.AnthropicApiKey, CredentialStore.CalendarMappingJson),
             // Fold this session's captured Drive file ids into the shared map (id wins per name).
             DriveFileIds = MergeIds(v.DriveFileIds, fileIdStore.Snapshot())
         }, cancellationToken);
@@ -56,8 +56,8 @@ public sealed class VaultSync
         FillIfEmpty(CredentialStore.NytSessionCookie, vaultData.Nyt.SessionCookie, v => CredentialStore.NytSessionCookie = v);
         FillIfEmpty(CredentialStore.NytApiKey, vaultData.Nyt.ApiKey, v => CredentialStore.NytApiKey = v);
         FillIfEmpty(CredentialStore.RemarkableDeviceToken, vaultData.Remarkable.DeviceToken, v => CredentialStore.RemarkableDeviceToken = v);
-        FillIfEmpty(CredentialStore.AnthropicApiKey, vaultData.DailyLoader.AnthropicApiKey, v => CredentialStore.AnthropicApiKey = v);
-        FillIfEmpty(CredentialStore.CalendarMappingJson, vaultData.DailyLoader.CalendarMappingJson, v => CredentialStore.CalendarMappingJson = v);
+        FillIfEmpty(CredentialStore.AnthropicApiKey, vaultData.Foreword.AnthropicApiKey, v => CredentialStore.AnthropicApiKey = v);
+        FillIfEmpty(CredentialStore.CalendarMappingJson, vaultData.Foreword.CalendarMappingJson, v => CredentialStore.CalendarMappingJson = v);
     }
 
     private static void FillIfEmpty(string current, string fromVault, Action<string> set)
