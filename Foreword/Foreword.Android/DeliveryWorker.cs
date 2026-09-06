@@ -24,6 +24,12 @@ public class DeliveryWorker : Worker
     // "morning brief" rename; changing it would orphan the scheduled work or double-schedule.
     private const string WorkName = "crossword-delivery";
 
+    // When the morning goes out, in local time. Public so Settings can SHOW the time the
+    // schedule actually uses rather than a number typed into a label, which is how a screen
+    // ends up confidently stating something the app does not do.
+    public const int DeliveryHour = 10;
+    public const int DeliveryMinute = 45;
+
     public override Result DoWork()
     {
         if (!CredentialStore.IsConfigured)
@@ -65,7 +71,7 @@ public class DeliveryWorker : Worker
                 Java.Lang.Class.FromType(typeof(DeliveryWorker)),
                 24,
                 Java.Util.Concurrent.TimeUnit.Hours!)
-            .SetInitialDelay(DelayUntilNext(hour: 10, minute: 45), Java.Util.Concurrent.TimeUnit.Milliseconds!)
+            .SetInitialDelay(DelayUntilNext(DeliveryHour, DeliveryMinute), Java.Util.Concurrent.TimeUnit.Milliseconds!)
             .AddTag(WorkName)
             .Build();
 
