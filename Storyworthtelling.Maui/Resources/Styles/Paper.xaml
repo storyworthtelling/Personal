@@ -33,6 +33,14 @@
     <!-- "The pen": signatures, editorial marks, and the colour of the owner's voice. -->
     <Color x:Key="InkBlue">#2C3E5E</Color>
 
+    <!-- The mark tier of the roles a dog-ear can carry (DESIGN.md §3). Only the four the fold
+         actually names: a role in the dictionary that nothing draws is a colour waiting to be
+         misused. The palette guard checks each of these against PaperColorTokens by name. -->
+    <Color x:Key="ProblemMark">#9E434B</Color>
+    <Color x:Key="CautionMark">#805F00</Color>
+    <Color x:Key="ResolvedMark">#68645E</Color>
+    <Color x:Key="ActionMark">#38734A</Color>
+
     <!-- Type scale, DESIGN.md §4's reworked ladder, kept in step with the native DesignTokens.TypeSp
          by a test that reads that file rather than restating it. Display and Title were 34 and 24 in
          the MAUI dictionaries: the reworked, bigger scale reached the native tokens and never
