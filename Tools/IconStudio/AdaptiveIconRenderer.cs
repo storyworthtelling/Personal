@@ -53,7 +53,7 @@ public static class AdaptiveIconRenderer
         {
             written.Add(WritePng(
                 Path.Combine(repoRoot, spec.CoverImage.Replace('/', Path.DirectorySeparatorChar)),
-                RenderCover(spec, CoverPx, ground)));
+                RenderCover(spec, CoverPx, ground, plate)));
         }
 
         ground?.Dispose();
@@ -70,9 +70,20 @@ public static class AdaptiveIconRenderer
     // No safe-zone zoom, unlike the launcher icon — nothing masks this into a circle,
     // and Score's keyboard is drawn to run off both edges, so zooming would crop the
     // curve rather than protect it.
-    private static byte[] RenderCover(IconSpec spec, int px, SKBitmap? ground)
+    private static byte[] RenderCover(IconSpec spec, int px, SKBitmap? ground, SKBitmap? plate)
     {
         using var surface = SKSurface.Create(new SKImageInfo(px, px));
+
+        // A spec with PlateImage already HAS its window illustration: the painting is the
+        // whole of what the shelf wants, and the shelf draws the bookplate around it. Baking
+        // this spec's own frame in would put a second keyline and a second set of brackets
+        // inside the shelf's, at a different scale. So the art goes down alone.
+        if (plate is not null)
+        {
+            surface.Canvas.DrawBitmap(plate, CentreSquare(plate), new SKRect(0, 0, px, px));
+            return Encode(surface);
+        }
+
         if (ground is not null)
         {
             surface.Canvas.DrawBitmap(ground, new SKRect(0, 0, px, px));
@@ -84,6 +95,16 @@ public static class AdaptiveIconRenderer
 
         spec.Glyph(surface.Canvas, px);
         return Encode(surface);
+    }
+
+    // The largest centred square of a bitmap, so art of any aspect fills a square window
+    // without being stretched.
+    private static SKRect CentreSquare(SKBitmap bitmap)
+    {
+        var side = Math.Min(bitmap.Width, bitmap.Height);
+        return new SKRect(
+            (bitmap.Width - side) / 2f, (bitmap.Height - side) / 2f,
+            (bitmap.Width + side) / 2f, (bitmap.Height + side) / 2f);
     }
 
     public static string WritePreview(string directory, IconSpec spec, int size = 1024)
@@ -139,11 +160,7 @@ public static class AdaptiveIconRenderer
 
         var inset = px * spec.PlateInset;
         var window = new SKRect(inset, inset, px - inset, px - inset);
-        var side = Math.Min(plate.Width, plate.Height);
-        var source = new SKRect(
-            (plate.Width - side) / 2f, (plate.Height - side) / 2f,
-            (plate.Width + side) / 2f, (plate.Height + side) / 2f);
-        canvas.DrawBitmap(plate, source, window);
+        canvas.DrawBitmap(plate, CentreSquare(plate), window);
     }
 
     // The cover art set into the window, if the spec has one.
