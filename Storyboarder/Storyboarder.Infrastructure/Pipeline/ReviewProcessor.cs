@@ -1120,7 +1120,7 @@ public sealed class ReviewProcessor : IPipelineStep
     }
 
     // Delivers the finished report to the ROOT of the owner's reMarkable tablet — the same proven path
-    // DailyLoader's daily delivery uses. (It previously uploaded into a "Canonizer" collection via
+    // Foreword's daily delivery uses. (It previously uploaded into a "Canonizer" collection via
     // EnsureFolder + a folder-parented upload, but that folder/collection wire format was reconstructed and
     // never verified against the live cloud; it silently delivered nothing. Root delivery is the fix.)
     // Best-effort and independent of Drive: a failure never blocks the review from finishing. Returns a

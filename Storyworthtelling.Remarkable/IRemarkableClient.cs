@@ -1,7 +1,7 @@
 namespace Storyworthtelling.Remarkable;
 
 // The reMarkable cloud document API, shared across apps. Bidirectional: upload (delivery) plus list /
-// download / trash (used by DailyLoader to locate and retire yesterday's documents).
+// download / trash (used by Foreword to locate and retire yesterday's documents).
 public interface IRemarkableClient
 {
     // Uploads a PDF as a document at the account root (the original behavior).

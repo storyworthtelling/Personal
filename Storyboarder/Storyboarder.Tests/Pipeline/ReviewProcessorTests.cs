@@ -327,7 +327,7 @@ public class ReviewProcessorTests : IDisposable
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
 
-        // Delivery rides the proven root path DailyLoader uses (the "Canonizer" folder path relied on a
+        // Delivery rides the proven root path Foreword uses (the "Canonizer" folder path relied on a
         // reMarkable wire format never verified against the live cloud, and silently delivered nothing).
         remarkable.Verify(r => r.Upload(It.Is<string>(t => t.Contains("Analysis")), It.IsAny<byte[]>()), Times.Once);
         remarkable.Verify(r => r.EnsureFolder(It.IsAny<string>()), Times.Never);

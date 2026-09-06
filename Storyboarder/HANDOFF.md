@@ -31,10 +31,10 @@ dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj -p:Storybo
 ```
 
 **Baseline: 287 passing, 0 failing** (Phase 5 landed) — plus `Storyworthtelling.Remarkable.Tests` (12) and
-DailyLoader's suite. Run these before every commit. Never commit a red suite. `dotnet ef` is installed but
+Foreword's suite. Run these before every commit. Never commit a red suite. `dotnet ef` is installed but
 not on PATH in a fresh container — `export PATH="$PATH:$HOME/.dotnet/tools"` before `dotnet ef migrations
-add …`. DailyLoader is now on .NET 10 like the rest of the repo, so its tests build and run here directly
-(`-p:DailyLoaderTfms=net10.0` to skip the Android head).
+add …`. Foreword is now on .NET 10 like the rest of the repo, so its tests build and run here directly
+(`-p:ForewordTfms=net10.0` to skip the Android head).
 
 The Android head needs the MAUI/Android workload + an Android SDK, neither present in a fresh
 container. Run `Storyboarder/scripts/setup-android-build.sh` once (installs the workload from nuget,
@@ -138,7 +138,7 @@ built in-session.
 
 ## 3d. What Phase 4 delivered (shared reMarkable delivery)
 
-Phase 4 (§8 of the brief) extracts DailyLoader's reMarkable code into a suite-shared library and delivers
+Phase 4 (§8 of the brief) extracts Foreword's reMarkable code into a suite-shared library and delivers
 Canonizer's report to the tablet:
 
 - **`Storyworthtelling.Remarkable`** — a new shared library (repo root, net10.0, mirrors
@@ -146,7 +146,7 @@ Canonizer's report to the tablet:
   (upload root + folder overload, `EnsureFolder`, list/download/trash), `RemarkableAuthService` (device
   token → session JWT + health), `IRemarkableRegistration` (the device-code pairing), `RemarkableOptions`,
   `RemarkableDoc`, `RemarkableCredentialId`.
-- **DailyLoader migrated onto it** — deleted its local `Remarkable/` copy, repointed namespaces, pairs via
+- **Foreword migrated onto it** — deleted its local `Remarkable/` copy, repointed namespaces, pairs via
   `IRemarkableRegistration`. Its uploads stay at the account root (the root `Upload` overload), so its
   behavior and tests are unchanged.
 - **Canonizer delivery** — the `Archiving` stage delivers the report to a **"Canonizer" folder** through
@@ -154,11 +154,11 @@ Canonizer's report to the tablet:
   and independently of the Drive upload. `BookAnalysis.DeliveredToRemarkable` marks it settled (delivered or
   given up) so a broken token can't wedge a review. Off by default (`ArchiveOptions.DeliverToRemarkable`,
   needs a device-code pairing); the head has a Settings pairing section + toggle and vault publish/restore
-  of the token (shared with DailyLoader).
+  of the token (shared with Foreword).
 
 Schema via the `Phase4RemarkableDelivery` migration. The reMarkable v2 path — especially the **folder wire
 format** — is reconstructed-not-verified; the tests pin the shape we send, the first live run verifies the
-cloud accepts it. The Android heads (Canonizer's `SetupPage`/DI, DailyLoader's) are compile-checked in CI,
+cloud accepts it. The Android heads (Canonizer's `SetupPage`/DI, Foreword's) are compile-checked in CI,
 not built in-session.
 
 ## 4. Traps that still apply
