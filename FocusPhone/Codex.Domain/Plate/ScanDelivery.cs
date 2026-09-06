@@ -19,7 +19,7 @@ public enum DeliveryRoute
 /// them rather than acquiring a Drive API client and a <c>drive</c> write scope of its own.
 /// The reMarkable has no app to share to, so it goes through
 /// <c>Storyworthtelling.Paper.IPaperDelivery</c> — and to the account <b>root</b>, using the
-/// plain upload DailyLoader has exercised all along rather than the folder overload, whose
+/// plain upload Foreword has exercised all along rather than the folder overload, whose
 /// wire format the repo still records as reconstructed and not live-verified.</para>
 /// </summary>
 public static class ScanDelivery

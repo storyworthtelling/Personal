@@ -24,7 +24,7 @@ public class ScanDeliveryTests
     public void TheRemarkableGoesThroughTheSharedLibraryToTheRoot()
     {
         // There is no reMarkable app to share to. The one route is the shared library's
-        // plain root upload — the overload DailyLoader has actually exercised — rather than
+        // plain root upload — the overload Foreword has actually exercised — rather than
         // EnsureFolder plus the folder overload, whose wire format is still reconstructed.
         Assert.Equal(DeliveryRoute.RemarkableRoot, ScanDelivery.RouteFor(ScanDestination.Remarkable));
     }
