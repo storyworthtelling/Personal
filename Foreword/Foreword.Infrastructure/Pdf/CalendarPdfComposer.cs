@@ -113,12 +113,14 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         var allDayOffset = new double[Columns.Length];
         foreach (var e in agenda.Events.Where(e => e.IsAllDay))
         {
-            var col = ColumnIndex(e.Column);
-            if (col < 0) continue;
-            var x = colsLeft + col * colWidth;
-            var y = timelineTop + allDayOffset[col];
-            DrawEventBox(layout, x + 1, y, colWidth - 2, stripHeight, e.Title, eventFont, AllDayFill);
-            allDayOffset[col] += stripHeight + 1;
+            // Once in EVERY column it belongs to (D31). One event can be several people's.
+            foreach (var col in e.Columns.Select(ColumnIndex).Where(c => c >= 0).Distinct())
+            {
+                var x = colsLeft + col * colWidth;
+                var y = timelineTop + allDayOffset[col];
+                DrawEventBox(layout, x + 1, y, colWidth - 2, stripHeight, e.Title, eventFont, AllDayFill);
+                allDayOffset[col] += stripHeight + 1;
+            }
         }
 
         // Timed events, one column at a time so overlapping events share the width rather than
@@ -127,7 +129,7 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         for (var col = 0; col < Columns.Length; col++)
         {
             var inColumn = agenda.Events
-                .Where(e => !e.IsAllDay && ColumnIndex(e.Column) == col)
+                .Where(e => !e.IsAllDay && e.Columns.Any(c => ColumnIndex(c) == col))
                 .ToList();
 
             foreach (var placed in EventLanes.Place(inColumn))
@@ -185,7 +187,7 @@ public class CalendarPdfComposer : ICalendarPdfComposer
                 foreach (var e in dayEvents)
                 {
                     var time = e.IsAllDay ? "All day" : e.Start.ToString("h:mm tt");
-                    layout.DrawWrapped($"    • {time} — {e.Title} ({e.Column})", itemFont);
+                    layout.DrawWrapped($"    • {time} — {e.Title} ({Who(e)})", itemFont);
                 }
             }
 
@@ -206,6 +208,15 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         layout.DrawText(layout.Truncate(title, font, width - 4), font,
             x + 2, textY, width - 4, Math.Min(height, stripHeightFor(font)), TextAlign.TopLeft);
     }
+
+    /// <summary>
+    /// Who an event is for, as the outlook prints it. Everybody reads as "Everyone" rather than as
+    /// four names, which is what a whole-family event actually means and a third of a line shorter.
+    /// </summary>
+    private static string Who(CalendarEvent e) =>
+        ColumnSet.People.All(e.Columns.Contains)
+            ? "Everyone"
+            : string.Join(", ", e.Columns);
 
     private static double stripHeightFor(SKFont font) => SkiaPageLayout.LineHeight(font);
 
