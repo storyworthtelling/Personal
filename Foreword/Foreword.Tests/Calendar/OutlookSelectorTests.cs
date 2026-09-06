@@ -17,7 +17,7 @@ public class OutlookSelectorTests
         new()
         {
             Title = title,
-            Column = column,
+            Columns = [column],
             Kind = kind,
             Recurrence = recurrence,
             RecurrenceCount = recurrenceCount,

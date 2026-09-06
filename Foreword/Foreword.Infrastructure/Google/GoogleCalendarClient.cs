@@ -133,7 +133,16 @@ public class GoogleCalendarClient : IGoogleCalendarClient
             End = end,
             IsAllDay = isAllDay,
             Recurrence = recurrence,
-            RecurrenceCount = count
+            RecurrenceCount = count,
+
+            // Who was invited. Read FIRST when splitting a shared calendar (D31), because an
+            // invited address is a fact about who is going where a name in a title is a heuristic.
+            // ResponseStatus is deliberately not carried: a family that never answers an invitation
+            // would otherwise get nothing, which is the common case rather than an edge one.
+            Guests = e.Attendees?
+                .Select(a => a.Email)
+                .Where(email => !string.IsNullOrWhiteSpace(email))
+                .ToList() ?? [],
         };
     }
 

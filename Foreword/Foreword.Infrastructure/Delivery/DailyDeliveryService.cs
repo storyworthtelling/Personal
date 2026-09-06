@@ -128,7 +128,7 @@ public class DailyDeliveryService(
         await googleCalendar.AddEvent(new CalendarEvent
         {
             Title = note.Text,
-            Column = note.Column ?? PersonColumn.Matt,
+            Columns = [note.Column ?? PersonColumn.Matt],
             Start = start,
             End = isAllDay ? start.Date.AddDays(1) : start.AddHours(1),
             IsAllDay = isAllDay

@@ -18,8 +18,15 @@ public class CalendarMappingOptions
     // Column used for events on a calendar that isn't explicitly mapped.
     public PersonColumn DefaultColumn { get; set; } = PersonColumn.Matt;
 
-    // Title keywords that route a Family-calendar event to a kid's column during the
-    // transition before they have dedicated calendars.
+    // Title keywords per person, used when nobody is invited to an event on a shared calendar.
+    // All four, not just the children: an event on a shared calendar can name either parent, and
+    // matching only two of the four is how "Matt and Ashley to dinner" fell through to the default.
     public List<string> GwenKeywords { get; set; } = ["Gwen"];
     public List<string> EvaKeywords { get; set; } = ["Eva"];
+    public List<string> MattKeywords { get; set; } = ["Matt"];
+    public List<string> AshleyKeywords { get; set; } = ["Ashley"];
+
+    // Each person's email addresses. Read FIRST when splitting a shared calendar (D31): an invited
+    // address is a fact about who is going, where a name in a title is a heuristic.
+    public Dictionary<PersonColumn, List<string>> PersonAddresses { get; set; } = new();
 }

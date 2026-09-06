@@ -1,10 +1,22 @@
 using Microsoft.Extensions.Options;
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
 
 namespace Foreword.Infrastructure.Calendar;
 
-// Assigns each calendar event to one of the five columns using the configured mapping,
-// with Family-calendar events routed to Gwen/Eva by title keyword.
+/// <summary>
+/// Assigns each event the <b>set</b> of columns it belongs to (D31).
+///
+/// <para>It used to return one column and stop at the first name it recognised, which is how "Gwen
+/// and Eva to swimming" became Gwen's alone. The decision itself now lives in
+/// <see cref="ColumnSet"/>, which is pure and tested; this reads the configuration and hands it
+/// over.</para>
+///
+/// <para><b>Split-by-name is available to every calendar</b> (D33), not only the one family id: a
+/// calendar is <i>shared</i> when it has no column of its own, and any calendar can be left that
+/// way. The single <c>FamilyCalendarId</c> is kept as a shorthand for the one that already exists,
+/// so an existing configuration keeps working without being rewritten.</para>
+/// </summary>
 public class CalendarColumnMapper
 {
     private readonly CalendarMappingOptions options;
@@ -18,33 +30,41 @@ public class CalendarColumnMapper
     {
         var list = events.ToList();
         foreach (var calendarEvent in list)
-            calendarEvent.Column = Resolve(calendarEvent);
+        {
+            calendarEvent.Columns = Resolve(calendarEvent);
+        }
+
         return list;
     }
 
-    public PersonColumn Resolve(CalendarEvent calendarEvent)
+    public IReadOnlyList<PersonColumn> Resolve(CalendarEvent calendarEvent) =>
+        ColumnSet.Resolve(calendarEvent, RoutingFor(calendarEvent.SourceCalendarId));
+
+    private ColumnRouting RoutingFor(string calendarId)
     {
-        var calendarId = calendarEvent.SourceCalendarId;
+        // Shared: no column of its own, so its events are split by who is named on them. The old
+        // FamilyCalendarId is one way to say that; leaving a calendar unmapped is the other, which
+        // is what makes D33 a one-field change rather than a new mechanism.
+        var isShared = !string.IsNullOrEmpty(options.FamilyCalendarId)
+            && calendarId == options.FamilyCalendarId;
 
-        if (!string.IsNullOrEmpty(options.FamilyCalendarId) && calendarId == options.FamilyCalendarId)
-            return ResolveFamily(calendarEvent.Title);
+        PersonColumn? column = isShared ? null
+            : options.CalendarColumns.TryGetValue(calendarId, out var mapped) ? mapped
+            : options.DefaultColumn;
 
-        if (options.CalendarColumns.TryGetValue(calendarId, out var column))
-            return column;
-
-        return options.DefaultColumn;
+        return new ColumnRouting(column, Addresses(), Names(), options.DefaultColumn);
     }
 
-    private PersonColumn ResolveFamily(string title)
-    {
-        if (ContainsAny(title, options.GwenKeywords))
-            return PersonColumn.Gwen;
-        if (ContainsAny(title, options.EvaKeywords))
-            return PersonColumn.Eva;
-        return options.DefaultColumn;
-    }
+    private IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Addresses() =>
+        options.PersonAddresses.ToDictionary(
+            pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value);
 
-    private static bool ContainsAny(string title, IEnumerable<string> keywords) =>
-        keywords.Any(k => !string.IsNullOrEmpty(k)
-            && title.Contains(k, StringComparison.OrdinalIgnoreCase));
+    private IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Names() =>
+        new Dictionary<PersonColumn, IReadOnlyList<string>>
+        {
+            [PersonColumn.Gwen] = options.GwenKeywords,
+            [PersonColumn.Eva] = options.EvaKeywords,
+            [PersonColumn.Matt] = options.MattKeywords,
+            [PersonColumn.Ashley] = options.AshleyKeywords,
+        };
 }

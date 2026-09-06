@@ -75,7 +75,7 @@ public class DailyDeliveryServiceTests
 
         await CreateService().DeliverDailyDocuments(Date);
 
-        calendar.Verify(c => c.AddEvent(It.Is<CalendarEvent>(e => e.Title == "Eva recital" && e.Column == PersonColumn.Eva)), Times.Once);
+        calendar.Verify(c => c.AddEvent(It.Is<CalendarEvent>(e => e.Title == "Eva recital" && e.Columns.Contains(PersonColumn.Eva))), Times.Once);
     }
 
     [Fact]
