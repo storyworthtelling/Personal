@@ -92,6 +92,55 @@ public class BookClothPaletteTests
         }
     }
 
+    /// <summary>
+    /// The suite's own books are bound deliberately, never by the hash.
+    ///
+    /// The hash exists so a shelf of third-party apps reads as a set of bound books; it is
+    /// not a design decision, and for our own heads it actively fights one. Plate's book was
+    /// bound in Shelf.WalnutLight — a bookcase MATERIAL tone, so the book was the same colour
+    /// as the shelf it stood on. Post drew InkBlue and happened to look about right, which is
+    /// exactly why this needs a test rather than an eye: a hash that lands well by luck is
+    /// indistinguishable from a choice until it doesn't.
+    /// </summary>
+    [Fact]
+    public void EverySuiteBookOnTheHomeShelfIsBoundDeliberately()
+    {
+        var shelfMaterials = new HashSet<string>(BookClothPalette.Cloths
+            .Where(cloth => cloth == DesignTokens.Shelf.WalnutLight));
+
+        var hashed = HomeFeatureSet.Default.Packages
+            .Where(package => package.StartsWith("com.storyworthtelling.", StringComparison.Ordinal))
+            .Where(package => BookClothPalette.ForPackage(package) == BookClothPalette.For(package))
+            .ToList();
+
+        Assert.True(hashed.Count == 0,
+            "These suite books take whatever cloth the hash lands on rather than a chosen "
+            + "binding: " + string.Join(", ", hashed));
+
+        // And none of ours is bound in the bookcase's own timber.
+        foreach (var package in HomeFeatureSet.Default.Packages
+            .Where(p => p.StartsWith("com.storyworthtelling.", StringComparison.Ordinal)))
+        {
+            Assert.DoesNotContain(BookClothPalette.ForPackage(package), shelfMaterials);
+        }
+    }
+
+    /// <summary>
+    /// The two constructions the bindings were chosen for, asserted as behaviour rather than
+    /// as a hex. Plate is bound light so its marks invert to ink (Domain's Identity.Plate
+    /// comment says exactly this); Post is bound deep so its marks stay cream against the
+    /// warm painting. Pinning the outcome means a future cloth change that quietly flips
+    /// either one has to argue with a test.
+    /// </summary>
+    [Fact]
+    public void PlateInvertsItsMarksToInkAndPostDoesNot()
+    {
+        Assert.True(BookClothPalette.MarksInvertToInk(
+            BookClothPalette.ForPackage(HomeFeatureSet.CameraPackage)));
+        Assert.False(BookClothPalette.MarksInvertToInk(
+            BookClothPalette.ForPackage(HomeFeatureSet.CommunicationPackage)));
+    }
+
     [Fact]
     public void MarksInvertToInk_IsConsistentWithTheBindingScoreActuallyGets()
     {
