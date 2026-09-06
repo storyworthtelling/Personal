@@ -1,6 +1,8 @@
 using SkiaSharp;
 using Foreword.Domain.Models;
 
+using Storyworthtelling.Paper;
+
 namespace Foreword.Infrastructure.Pdf;
 
 // Draws the bottom "write below" area shared by the calendar and checklist documents:
@@ -12,10 +14,10 @@ internal static class HandwritingRegion
 
     public static void Draw(SkiaPageLayout layout, string prompt, IReadOnlyList<ParsedNote> carryovers)
     {
-        var labelFont = SkiaPageLayout.Sans(11, bold: true);
+        var labelFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary, bold: true);
         // The prior design used an italic sans for notes; the embedded font set has no sans italic, so this
         // stays upright — a small, intentional deviation on secondary text.
-        var noteFont = SkiaPageLayout.Sans(10);
+        var noteFont = SkiaPageLayout.Sans(PaperTypeScale.Label);
 
         // Ensure there is room for a usable region; otherwise start a fresh page.
         if (layout.BottomY - layout.Y < MinRegionHeight + 40)
@@ -38,6 +40,6 @@ internal static class HandwritingRegion
         var top = layout.Y;
         var height = layout.BottomY - top;
         layout.DrawRect(SkiaPageLayout.Margin, top, layout.ContentWidth, height,
-            stroke: SKColors.Gray, strokeWidth: 0.75f);
+            stroke: SkiaPageLayout.InkMuted, strokeWidth: 0.75f);
     }
 }

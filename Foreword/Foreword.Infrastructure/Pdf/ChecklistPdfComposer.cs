@@ -2,6 +2,8 @@ using SkiaSharp;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
 
+using Storyworthtelling.Paper;
+
 namespace Foreword.Infrastructure.Pdf;
 
 // Renders the daily to-do checklist: the user's Google Tasks as checkbox lines, with a
@@ -17,9 +19,9 @@ public class ChecklistPdfComposer : IChecklistPdfComposer
     {
         using var layout = new SkiaPageLayout();
 
-        var titleFont = SkiaPageLayout.Sans(20, bold: true);
-        var dateFont = SkiaPageLayout.Sans(12);
-        var itemFont = SkiaPageLayout.Sans(12);
+        var titleFont = SkiaPageLayout.Sans(PaperTypeScale.Title, bold: true);
+        var dateFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary);
+        var itemFont = SkiaPageLayout.Sans(PaperTypeScale.Body);
 
         layout.DrawCentered("To-Do Checklist", titleFont, 26);
         layout.DrawCentered(date.ToDateTime(TimeOnly.MinValue).ToString("dddd, MMMM d, yyyy"), dateFont, 18);
@@ -41,7 +43,7 @@ public class ChecklistPdfComposer : IChecklistPdfComposer
         layout.NewPageIfNeeded(22);
 
         layout.DrawRect(SkiaPageLayout.Margin, layout.Y + 2, BoxSize, BoxSize,
-            stroke: SKColors.Black, strokeWidth: 1f);
+            stroke: SkiaPageLayout.Ink, strokeWidth: 1f);
 
         var text = task.Due is { } due ? $"{task.Title}  (due {due:MMM d})" : task.Title;
         var textLeft = SkiaPageLayout.Margin + BoxSize + 8;

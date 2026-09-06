@@ -3,6 +3,8 @@ using SkiaSharp;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
 
+using Storyworthtelling.Paper;
+
 namespace Foreword.Infrastructure.Pdf;
 
 // Renders the morning news pages with SkiaSharp (via SkiaPageLayout), then concatenates the external
@@ -26,17 +28,19 @@ public class PdfComposer : IPdfComposer
     {
         using var layout = new SkiaPageLayout();
 
-        var h1Font = SkiaPageLayout.Sans(22, bold: true);
-        var dateFont = SkiaPageLayout.Sans(11);
-        var artFont = SkiaPageLayout.Sans(16, bold: true);
-        var metaFont = SkiaPageLayout.Sans(9);   // was italic; no embedded sans italic (upright now)
-        var bodyFont = SkiaPageLayout.Sans(11);
+        // Roles, not point sizes (D30). Each is the screen ladder at PaperTypeScale.Ratio, so the
+        // sheet and the app move together and neither carries a scale of its own.
+        var h1Font = SkiaPageLayout.Sans(PaperTypeScale.Title, bold: true);
+        var dateFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary);
+        var artFont = SkiaPageLayout.Sans(PaperTypeScale.Heading, bold: true);
+        var metaFont = SkiaPageLayout.Sans(PaperTypeScale.Label);   // was italic; no embedded sans italic
+        var bodyFont = SkiaPageLayout.Sans(PaperTypeScale.Body);
 
         // Header
         layout.DrawCentered("The New York Times", h1Font, 28);
         layout.DrawCentered(DateTime.Today.ToString("MMMM d, yyyy"), dateFont, 18);
         layout.DrawLine(SkiaPageLayout.Margin, layout.Y,
-            SkiaPageLayout.Margin + layout.ContentWidth, layout.Y, SKColors.Black, 1.5f);
+            SkiaPageLayout.Margin + layout.ContentWidth, layout.Y, SkiaPageLayout.Ink, 1.5f);
         layout.Advance(14);
 
         for (var i = 0; i < articles.Count; i++)
@@ -72,7 +76,7 @@ public class PdfComposer : IPdfComposer
                 layout.Advance(8);
                 layout.NewPageIfNeeded(20);
                 layout.DrawLine(SkiaPageLayout.Margin, layout.Y,
-                    SkiaPageLayout.Margin + layout.ContentWidth, layout.Y, SKColors.LightGray, 0.5f);
+                    SkiaPageLayout.Margin + layout.ContentWidth, layout.Y, SkiaPageLayout.Hairline, 0.5f);
                 layout.Advance(12);
             }
         }
