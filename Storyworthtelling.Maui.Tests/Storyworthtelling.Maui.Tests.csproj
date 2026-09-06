@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Reads the kit by content, because the kit itself needs the MAUI/Android workload and this
+       suite has to run without it. The Storyworthtelling.Paper reference is the point: the palette
+       is asserted against the GENERATED tokens by reflection, so no hand-typed copy sits on the
+       expected side where it can be wrong in the same way as the code. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
+  </ItemGroup>
+
+</Project>
