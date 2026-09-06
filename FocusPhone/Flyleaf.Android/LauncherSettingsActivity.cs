@@ -152,7 +152,12 @@ public class LauncherSettingsActivity : Activity
             content.AddView(status, statusParams);
         }
 
-        RenderBuildNumber();
+        // The build line is PaperUi's now, so every head shows the same one. It used to be a
+        // private method here and nowhere else, which is why six of seven apps had none.
+        var buildLine = PaperUi.BuildNumber(this, "Flyleaf");
+        var buildParams = MatchWrap();
+        buildParams.TopMargin = Dp(DesignTokens.Space.X8);
+        content.AddView(buildLine, buildParams);
 
         var save = PaperUi.PrimaryButton(this, "Save", SaveVaultPassphrase);
         actionBarHost.AddView(PaperUi.BottomBar(this, save));
@@ -655,32 +660,6 @@ public class LauncherSettingsActivity : Activity
         (ids[index], ids[target]) = (ids[target], ids[index]);
         store.Save(catalog.Reordered(ids));
         Render();
-    }
-
-    // ---- Build number ---------------------------------------------------------
-
-    // A quiet mono line at the foot: version name + package id, so it's obvious an update landed
-    // even when nothing visible changed. Reads the real versionName off the installed package.
-    private void RenderBuildNumber()
-    {
-        string version;
-        try
-        {
-            version = PackageManager!.GetPackageInfo(PackageName!, (PackageInfoFlags)0)?.VersionName ?? "?";
-        }
-        catch (Exception)
-        {
-            version = "?";
-        }
-
-        var line = PaperUi.Secondary(this, $"Flyleaf {version} · {PackageName}");
-        line.Typeface = PaperTheme.Mono(this);
-        line.TextSize = DesignTokens.TypeSp.Label;
-        line.SetTextColor(PaperTheme.InkMuted);
-        line.Gravity = GravityFlags.CenterHorizontal;
-        var lp = MatchWrap();
-        lp.TopMargin = Dp(DesignTokens.Space.X8);
-        content!.AddView(line, lp);
     }
 
     // ---- Card building blocks -------------------------------------------------

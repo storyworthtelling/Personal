@@ -93,18 +93,18 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/focusphone.keystore
 
+      - name: Compute versionCode
+        id: version
+        uses: ./.github/actions/version-code
+        with:
+          band: 1
+
       - name: Build signed APK
         working-directory: FocusPhone
         env:
           RUN_NUMBER: ${{ github.run_number }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
-          # This workflow's run_number restarts at 1, but the head it renames has
-          # been shipping versionCodes of 100000 + build-flyleaf's run_number (in
-          # the mid-90s at the split). A bare 100000 + RUN_NUMBER would therefore
-          # look OLDER than what is installed and be rejected by the update
-          # channel, so the floor steps to 200000 — clear of everything the
-          # Communication head ever shipped, with headroom to spare.
-          VERSION_CODE=$((200000 + RUN_NUMBER))
           # Post graduates from the 0.1 Communication pilot to a 1.x major.
           DISPLAY_VERSION="1.0.$RUN_NUMBER"
           echo "::group::Publishing Post.Android (versionCode $VERSION_CODE, version $DISPLAY_VERSION)"
