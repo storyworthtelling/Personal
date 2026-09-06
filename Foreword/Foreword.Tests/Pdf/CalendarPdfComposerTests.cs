@@ -20,7 +20,7 @@ public class CalendarPdfComposerTests
         new()
         {
             Title = title,
-            Column = column,
+            Columns = [column],
             Start = Today.ToDateTime(new TimeOnly(startHour, 0)),
             End = Today.ToDateTime(new TimeOnly(endHour, 0))
         };

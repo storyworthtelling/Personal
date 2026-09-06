@@ -31,7 +31,7 @@ public class WorkScheduleAugmenter
             result.Add(new CalendarEvent
             {
                 Title = shift.Title,
-                Column = shift.Person,
+                Columns = [shift.Person],
                 Kind = EventKind.WorkBlock,
                 Start = date.ToDateTime(ParseTime(shift.Start)),
                 End = date.ToDateTime(ParseTime(shift.End))
@@ -52,7 +52,7 @@ public class WorkScheduleAugmenter
 
     private bool HasOffDay(IEnumerable<CalendarEvent> events, PersonColumn person, DateOnly date) =>
         events.Any(e => e.Kind == EventKind.OffDay
-            && e.Column == person
+            && e.Columns.Contains(person)
             && DateOnly.FromDateTime(e.Start) == date);
 
     private bool IsOffTitle(string title) =>
