@@ -19,6 +19,8 @@ on:
       - 'Storyworthtelling.Google.Tests/**'
       - 'Storyworthtelling.Updates/**'
       - 'Storyworthtelling.Updates.Tests/**'
+      - 'Storyworthtelling.Maui/**'
+      - 'Storyworthtelling.Maui.Tests/**'
       - '.github/workflows/build-shared-libs.yml'
 
 jobs:
@@ -34,6 +36,11 @@ jobs:
 
       # Each shared lib is pure net10.0 (no Android workload). Test whichever test projects exist — Google
       # arrives in a later P3 increment, so its test project is exercised only once present.
+      #
+      # Storyworthtelling.Maui is the exception and deliberately so: the kit itself is net10.0-android and
+      # cannot be built here at all, so only its TESTS run, and they read the kit by content. Its
+      # compilation is proven by the heads that reference it (build-android). That is a real gap in what
+      # this job can promise, and it is the reason the kit's guards read files rather than load types.
       - name: Test shared libraries
         run: |
           set -e
@@ -42,7 +49,8 @@ jobs:
             Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj \
             Storyworthtelling.Paper.Tests/Storyworthtelling.Paper.Tests.csproj \
             Storyworthtelling.Google.Tests/Storyworthtelling.Google.Tests.csproj \
-            Storyworthtelling.Updates.Tests/Storyworthtelling.Updates.Tests.csproj ; do
+            Storyworthtelling.Updates.Tests/Storyworthtelling.Updates.Tests.csproj \
+            Storyworthtelling.Maui.Tests/Storyworthtelling.Maui.Tests.csproj ; do
             if [ -f "$proj" ]; then
               echo "== dotnet test $proj =="
               dotnet test "$proj"
