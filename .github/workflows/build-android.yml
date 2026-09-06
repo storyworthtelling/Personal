@@ -60,6 +60,7 @@ jobs:
         run: >
           dotnet publish Foreword.Android -f net10.0-android -c Release
           -p:ApplicationVersion=${{ steps.version.outputs.code }}
+          -p:ApplicationDisplayVersion=2.0.${{ github.run_number }}
           -p:AndroidKeyStore=true
           -p:AndroidSigningKeyStore=/tmp/dailyloader.keystore
           -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }}

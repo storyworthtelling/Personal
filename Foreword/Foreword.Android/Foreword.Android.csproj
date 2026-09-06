@@ -16,7 +16,12 @@
          run_number floors drifted. Storyworthtelling.Updates.SuiteVersionBands records the band
          and guards that it clears what this package has already shipped. -->
     <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>$([System.DateTime]::UtcNow.ToString('yyyy.MM.dd.HHmm'))</ApplicationDisplayVersion>
+    <!-- The version the OWNER reads, printed by the Settings foot line. P9 is the 2.0 line, and
+         the mockups draw it as "Foreword 2.0.512 · com.storyworthtelling.dailyloader". CI replaces
+         the last part with the workflow's run number; this value is only what a local build shows.
+         It used to be a UTC build stamp, which was monotonic and correct and unreadable — nobody
+         says "I'm on 2026.09.06.1432" out loud, and the foot line exists to be read back. -->
+    <ApplicationDisplayVersion>2.0.0</ApplicationDisplayVersion>
     <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
