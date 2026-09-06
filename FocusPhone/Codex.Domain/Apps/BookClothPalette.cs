@@ -41,7 +41,19 @@ public static class BookClothPalette
     private static readonly IReadOnlyDictionary<string, string> Bindings =
         new Dictionary<string, string>
         {
+            // Score: cream linen. The only light book in the row, and so the findable one.
             [HomeFeatureSet.AudioPackage] = DesignTokens.PaperShade,
+
+            // Post: deep indigo, against its warm mailbox painting. DESIGN.md §3 records that
+            // Post's identity hue is sampled from this CLOTH rather than from the art, because
+            // the contrast is where the book's only cool colour lives.
+            [HomeFeatureSet.CommunicationPackage] = DesignTokens.Identity.Post.Deep,
+
+            // Plate: the light mauve ground tier, with the marks inverting to ink by luminance.
+            // Score's construction, chosen for Score's reason — Plate's cover art is a
+            // near-black lens, and §12 warns that a binding harmonising with its art makes the
+            // book the hardest of six to pick out of the row.
+            [HomeFeatureSet.CameraPackage] = DesignTokens.Identity.Plate.Ground,
         };
 
     /// <summary>The cloth tone (a DesignTokens hex string) for a package — the binding it was
