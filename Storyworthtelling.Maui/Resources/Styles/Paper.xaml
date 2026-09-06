@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!-- Paper & Ink design tokens and component styles. Mirrors DESIGN.md at the
-     repo root; Foreword.Tests/Design/DesignTokenTests keeps the palette
-     honest against the bible's values. -->
+<!-- The Paper & Ink role table and component styles for every MAUI head — the MAUI half of what
+     Codex.Ui.Android's PaperUi/PaperTheme are for the native ones. A REGISTERED TOKEN FILE
+     (DESIGN.md §16): colour hexes and type sizes may appear here and nowhere else on this side of
+     the suite.
+
+     Storyworthtelling.Maui.Tests checks it against Storyworthtelling.Paper's GENERATED tokens by
+     reflection rather than against a table typed into the test. That distinction is the reason this
+     file exists: each MAUI head used to keep its own copy of the palette and its own test holding a
+     second copy of the same values, so both could be wrong together — and were, for as long as
+     nobody put two of the apps side by side. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                    x:Class="Storyworthtelling.Maui.PaperKit">
 
     <!-- Palette -->
     <Color x:Key="Paper">#FAF8F2</Color>
@@ -14,14 +22,36 @@
     <Color x:Key="Ink">#33322B</Color>
     <Color x:Key="InkSoft">#6B6759</Color>
     <Color x:Key="InkMuted">#8A8578</Color>
-    <Color x:Key="Accent">#C2542F</Color>
-    <Color x:Key="AccentDeep">#9C4023</Color>
+    <!-- The Action role (pine). DESIGN.md §4 retires terracotta EVERYWHERE and §3 makes the accent
+         a semantic role rather than a decoration; the native heads moved at their rebrand phases and
+         the MAUI heads did not, so every button in all three was still #C2542F. PaperColorTokens
+         keeps the old Accent constant so existing renderers do not break, which is exactly why the
+         name alone could not be trusted to say which value was current. -->
+    <Color x:Key="Accent">#38734A</Color>
+    <Color x:Key="AccentDeep">#174025</Color>
 
-    <!-- Type scale, DESIGN.md §4's reworked ladder. Display and Title were 34 and 24 here,
-         the pre-rework values: the bigger scale reached the native DesignTokens.TypeSp and
-         never reached the MAUI dictionaries. Ledger's and Canonizer's still carry the old
-         pair — a suite-wide divergence, reported rather than fixed here because those apps
-         are outside this release. -->
+    <!-- "The pen": signatures, editorial marks, and the colour of the owner's voice. -->
+    <Color x:Key="InkBlue">#2C3E5E</Color>
+
+    <!-- The mark tier of the roles a dog-ear can carry (DESIGN.md §3). Only the four the fold
+         actually names: a role in the dictionary that nothing draws is a colour waiting to be
+         misused. The palette guard checks each of these against PaperColorTokens by name. -->
+    <Color x:Key="ProblemMark">#9E434B</Color>
+    <Color x:Key="CautionMark">#805F00</Color>
+    <Color x:Key="ResolvedMark">#68645E</Color>
+    <Color x:Key="ActionMark">#38734A</Color>
+
+    <!-- The wash tier: the mark at PaperColorTokens.WashAlpha (77 of 255 = 4D), which is what §8's
+         Selected state paints behind full-strength ink. Written as ARGB rather than mixed in code
+         so it stays inside the token file — and the palette guard composes it from the mark and the
+         alpha rather than trusting the eight digits. -->
+    <Color x:Key="ActionWash">#4D38734A</Color>
+
+    <!-- Type scale, DESIGN.md §4's reworked ladder, kept in step with the native DesignTokens.TypeSp
+         by a test that reads that file rather than restating it. Display and Title were 34 and 24 in
+         the MAUI dictionaries: the reworked, bigger scale reached the native tokens and never
+         crossed over. Ledger's and Canonizer's private dictionaries still carry the old pair; they
+         adopt the kit at their own phases. -->
     <x:Double x:Key="DisplaySize">44</x:Double>
     <x:Double x:Key="TitleSize">28</x:Double>
     <x:Double x:Key="HeadingSize">18</x:Double>
@@ -29,6 +59,7 @@
     <x:Double x:Key="SecondarySize">14</x:Double>
     <x:Double x:Key="LabelSize">13</x:Double>
     <x:Double x:Key="MonoSize">14</x:Double>
+    <x:Double x:Key="VoiceSize">26</x:Double>
 
     <!-- Layout -->
     <Thickness x:Key="ScreenPadding">24</Thickness>
@@ -44,8 +75,12 @@
         <Setter Property="FontSize" Value="{StaticResource BodySize}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
     </Style>
+    <!-- Serif BLACK, the face DESIGN.md §4 reserves for every screen header. The MAUI heads drew it
+         in Semibold, which was not a choice: Source Serif 4 Black is one of the two faces in /Fonts
+         that shipped inside every APK with no alias registered for it, so it was unreachable and
+         nothing said so. -->
     <Style x:Key="DisplayLabel" TargetType="Label">
-        <Setter Property="FontFamily" Value="SerifSemibold" />
+        <Setter Property="FontFamily" Value="SerifBlack" />
         <Setter Property="FontSize" Value="{StaticResource DisplaySize}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
     </Style>
@@ -64,10 +99,12 @@
         <Setter Property="FontSize" Value="{StaticResource SecondarySize}" />
         <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
     </Style>
+    <!-- The Label role: Sans Semibold at 13 in the MUTED ink. It carried the full ink here, which
+         reads as a slightly heavy screen rather than as a mistake — the quietest kind of drift. -->
     <Style x:Key="FieldLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="SansSemibold" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
     </Style>
     <Style x:Key="MonoLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="Mono" />
@@ -79,6 +116,14 @@
         <Setter Property="FontSize" Value="{StaticResource BodySize}" />
         <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
         <Setter Property="HorizontalTextAlignment" Value="Center" />
+    </Style>
+    <!-- The owner's voice: Pinyon Script at 26 in the pen's blue. The ninth role, and the only one
+         with no style anywhere in MAUI — Pinyon shipped in every APK unregistered, so an app that
+         wanted to speak in the owner's hand had nothing to ask for. -->
+    <Style x:Key="VoiceLabel" TargetType="Label">
+        <Setter Property="FontFamily" Value="Script" />
+        <Setter Property="FontSize" Value="{StaticResource VoiceSize}" />
+        <Setter Property="TextColor" Value="{StaticResource InkBlue}" />
     </Style>
     <Style x:Key="ErrorLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="Sans" />

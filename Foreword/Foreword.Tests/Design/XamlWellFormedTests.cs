@@ -14,8 +14,10 @@ namespace Foreword.Tests.Design;
 /// hyphen inside a comment. Nothing in the editor complains and the page simply fails to
 /// build.</para>
 ///
-/// <para>It checks well-formedness only. Whether a <c>StaticResource</c> resolves, or a handler
-/// named in XAML exists in the code-behind, is the compiler's job and stays CI's to answer.</para>
+/// <para>The other two tests here reach further than well-formedness, because the compiler cannot
+/// help with either: a style applied to the wrong control throws when the page opens rather than
+/// when it builds, and since the styles moved into the shared kit that mismatch now spans an
+/// assembly boundary, where nothing checks it at all.</para>
 /// </summary>
 public class XamlWellFormedTests
 {
@@ -60,7 +62,7 @@ public class XamlWellFormedTests
     public void EveryStyleIsAppliedToItsTargetType()
     {
         var targets = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var dictionary in XamlFiles().Where(f => f.Contains("Styles", StringComparison.Ordinal)))
+        foreach (var dictionary in KitDictionaries())
         {
             foreach (Match m in Regex.Matches(
                 File.ReadAllText(dictionary),
@@ -73,7 +75,7 @@ public class XamlWellFormedTests
         Assert.NotEmpty(targets);
 
         var wrong = new List<string>();
-        foreach (var page in XamlFiles().Where(f => !f.Contains("Styles", StringComparison.Ordinal)))
+        foreach (var page in XamlFiles())
         {
             var text = File.ReadAllText(page);
             foreach (Match m in Regex.Matches(
@@ -118,6 +120,24 @@ public class XamlWellFormedTests
         Assert.True(missing.Count == 0,
             "These handlers are named in XAML but not defined in the code-behind:\n"
             + string.Join("\n", missing));
+    }
+
+    /// <summary>
+    /// The styles live in the shared <c>Storyworthtelling.Maui</c> kit now, not in this app, so the
+    /// TargetTypes have to be read from there. Looked up by repository rather than by solution: the
+    /// kit sits beside the app, not inside it.
+    /// </summary>
+    private static IEnumerable<string> KitDictionaries()
+    {
+        var kit = new DirectoryInfo(Root());
+        while (kit is not null && !Directory.Exists(Path.Combine(kit.FullName, "Storyworthtelling.Maui")))
+        {
+            kit = kit.Parent;
+        }
+
+        Assert.True(kit is not null, "Could not find Storyworthtelling.Maui above " + Root());
+        return Directory.EnumerateFiles(
+            Path.Combine(kit!.FullName, "Storyworthtelling.Maui"), "*.xaml", SearchOption.AllDirectories);
     }
 
     private static IEnumerable<string> XamlFiles() =>

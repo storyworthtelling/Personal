@@ -8,6 +8,15 @@ on:
       - 'Foreword/Foreword.Android/**'
       - 'Foreword/Foreword.Infrastructure/**'
       - 'Foreword/Foreword.Domain/**'
+      # The shared Paper & Ink kit. It is net10.0-android, so build-shared-libs can only run its
+      # tests — this head is the only thing in the repo that COMPILES it, and without this line a
+      # change to the kit would never rebuild the app that proves it builds.
+      #
+      # The other shared libraries this head references (Voice, Remarkable, Updates) are still not
+      # listed, which is the same gap: a change to one of them does not rebuild Foreword. They at
+      # least compile under build-shared-libs, so nothing is wholly unproven; noted rather than
+      # fixed across every app workflow here.
+      - 'Storyworthtelling.Maui/**'
       # Shared libraries that ship in the APK (referenced by Infrastructure/head), so a change rebuilds it.
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Remarkable/**'

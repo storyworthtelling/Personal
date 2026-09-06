@@ -10,7 +10,7 @@ Personal projects repository — primarily background automation apps, with occa
 
 **`DESIGN.md` at the repo root is the Paper & Ink design bible** — the single source of truth for palette, typography, motion, materiality, spacing, components, PDF page specs, icon specs, voice, and accessibility across every project. Rules that matter when writing code:
 
-- **No color hex or type-size literals outside the registered token files** (DESIGN.md §16). Leak-guard unit tests in every project enforce this; consume tokens instead (`Codex.Domain.Design.DesignTokens` + `Codex.Ui.Android` `PaperUi`/`PaperTheme` for FocusPhone, `Storyboarder.Domain.Design.DesignTokens` + `Resources/Styles/DesignTokens.xaml` styles for the MAUI apps).
+- **No color hex or type-size literals outside the registered token files** (DESIGN.md §16). Leak-guard unit tests in every project enforce this; consume tokens instead (`Codex.Domain.Design.DesignTokens` + `Codex.Ui.Android` `PaperUi`/`PaperTheme` for FocusPhone, and the shared **`Storyworthtelling.Maui`** kit for the MAUI apps — Foreword has adopted it and so has no token file of its own; Ledger and Canonizer still carry `Storyboarder.Domain.Design.DesignTokens` + their own `Resources/Styles/DesignTokens.xaml` and adopt the kit at their own phases).
 - The **eight** shared fonts live in `/Fonts` (Source Serif 4 — Regular, Semibold, Italic and **Black** — Source Sans 3 Regular and Semibold, Cascadia Code, and **Pinyon Script**, the calligraphy hand DESIGN.md §4 reserves for the owner's voice; static TTFs, OFL). Note that the FONT CHECK in `build-flyleaf.yml` and `build-post.yml` names only six of them, omitting Serif Black (every screen header) and Pinyon Script (the voice); `build-plate.yml` checks all eight. Native heads package them as assets via `Codex.Ui.Android`; MAUI heads via `<MauiFont>`; the Skia renderers via embedded resources (`EmbeddedTypefaces`).
 - **Interaction rules are load-bearing** (DESIGN.md §5–§11): success is an inline state change (no success toasts/alerts), destructive acts are undo-first (an `UndoBar` window, not a confirm dialog), loading is a status sentence not a spinner, primary actions live in a pinned bottom bar, screens open with a Serif in-page header, time is 12-hour and list timestamps are relative (`RelativeTime`/`TimeFormats`, duplicated per Domain and kept identical by a parity test).
 - **Generated artifacts** (icons, the paper-grain tile, the owner branding medallion) are all produced by the committed **`Tools/IconStudio`** console: `dotnet run --project Tools/IconStudio -- --repo-root .` (tests: `dotnet test Tools/IconStudio.sln`). Never hand-edit generated resources. **Owner photo swap:** drop a square image at `/Branding/owner.png` and rerun IconStudio — it circle-masks the photo into the medallion for every consumer (PDF covers + settings screens) and never clobbers an existing `owner.png`.
@@ -91,6 +91,40 @@ An **Android (MAUI) app** — user-facing name **Canonizer** — that reads a no
 ### reMarkable delivery (cross-cutting)
 
 A shared **`Storyworthtelling.Remarkable`** library (repo root, its own `.csproj` + `.Tests`, **targets `net10.0`** like `Storyworthtelling.Voice` — every head is now net10.0-android — with `Microsoft.Extensions.Options` kept at 9.0.0 (net10-compatible) and a reference to `Storyworthtelling.Voice` for the credential-health seam) owns the whole reMarkable cloud path so every app that pushes documents to the owner's tablet shares one implementation. Pieces: `IRemarkableClient`/`RemarkableStorageClient` (bidirectional — `Upload` root **and** a folder overload that sets `parent` in the `rm-meta`, `EnsureFolder(name)` find-or-create a collection, plus `ListRecent`/`DownloadByTitle`/`MoveToTrash`), `IRemarkableAuthProvider`/`RemarkableAuthService` (exchanges the long-lived **device token** for a per-session user JWT, cached to expiry, reporting health via `ICredentialHealthSink` under `RemarkableCredentialId.Value = "remarkable"`), `IRemarkableRegistration`/`RemarkableRegistrationClient` (the one-time device-code pairing POST), `RemarkableOptions` (the device token, read live), `JwtPayload`, `RemarkableDoc`. Extracted from Foreword in Phase 4 — **Foreword now references this library** instead of its own copy (its uploads stay at the account root via the root `Upload` overload; Canonizer uses the folder overload). The device token lives in the shared vault's `RemarkableSecrets.DeviceToken`, so pairing once in **either** app lets the other restore it. Tests: `dotnet test Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj` (fake HTTP). **Not yet done:** the reMarkable v2 cloud path — especially the **folder/collection** wire format — is reconstructed-not-live-verified; the first real device run is the verification.
+
+### The MAUI kit (cross-cutting)
+
+A shared **`Storyworthtelling.Maui`** library (repo root, own `.csproj` + `.Tests`) carries the Paper & Ink role table, the component styles and the eight fonts for the MAUI heads — the counterpart of `Codex.Ui.Android`'s `PaperUi`/`PaperTheme`, which had no MAUI equivalent. Pieces: `Resources/Styles/Paper.xaml` (a **registered token file**, DESIGN.md §19, carrying an `x:Class` so a head can merge it — a XAML `Source=` resolves only inside its own assembly, so heads do `Resources.MergedDictionaries.Add(new PaperKit())` in `App.xaml.cs`), and `PaperFonts.Register` (passed straight to `ConfigureFonts`).
+
+**It exists because the design system was written twice and enforced once.** Each MAUI head kept a private copy of the palette and a leak-guard test holding a *second* hand-typed copy to check it against, so both could be wrong together — and were. Four live bugs came out of the first parity run against `PaperColorTokens`: the accent was still the **retired terracotta** (`#C2542F`) rather than the Action role's pine, **Display** drew in Serif Semibold where DESIGN.md §4 gives every screen header Serif **Black**, the **Label** role took the full ink instead of the muted one, and the **owner's voice had no style at all**. The last two share a cause worth remembering: `SourceSerif4-Black.ttf` and `PinyonScript-Regular.ttf` shipped inside every APK with **no alias registered**, and an unregistered family is not an error in MAUI — the platform substitutes the system face and says nothing.
+
+**The pure halves are pulled out and tested for real.** `Layout/BinderTabLayout` and
+`DesignTokens` (Space + Shape only — type sizes stay in the registered `Paper.xaml`) are copies of
+`Codex.Domain`'s, kept identical by a **source-level** parity guard rather than by a test that
+restates a few remembered values. `State/DogEarState` is new: DESIGN.md §13's rule that an undo
+**outranks** a waiting notice and hands the corner back when its window closes had only ever existed
+inside the native view, tangled with the host layout, a weak table and a `Handler`, so nothing tested
+it. It is now a decision with time passed in. The test project compiles those files directly
+(`<Compile Include="..\Storyworthtelling.Maui\...">`), so the real types are exercised — the kit's
+own TFM makes a project reference impossible.
+
+**The components** are the binder tab strip, the dog-ear, list rows with the §7 checkbox, and the
+accordion picker; the status line and card groups are styles in the dictionary. The strip is the *native*
+shape by decision — a glyph over a horizontal label filling the 66dp gutter, the same component
+Score and Post draw — so all five apps reach for one divider; `BinderArea` carries **two** glyph
+sources rather than one tinted at runtime, because MAUI has no equivalent of Android's
+`SetColorFilter` and the only ready answer is a toolkit dependency. The dog-ear is Post's `FoldView`
+geometry member for member (two triangles: the **hole** showing what the fold carries, and the
+**flap**, the corner turned over and lying back across the page), painted through a `GraphicsView`
+`IDrawable`; `DogEarState` decides, the view paints and owns the clock — the state takes time as an
+argument, which is what makes it testable. Every view reads its tokens through
+**`PaperResources.Token`**, one place because the rule is easy to get subtly wrong: a
+`ResourceDictionary`'s indexer looks only at its own entries while `TryGetValue` walks what has been
+merged in, so the indexer appears to work until the kit is the only source left. The **wash** tier
+lives in the dictionary as 8-digit ARGB and the palette guard *composes* it from the role's mark and
+`PaperColorTokens.WashAlpha` rather than trusting the digits.
+
+The kit is `net10.0-android`, so `build-shared-libs` can only run its **tests**; its compilation is proven by the heads that reference it, which is why `Storyworthtelling.Maui/**` is in `build-android.yml`'s path filter and why the guards read files rather than load types. Tests: `dotnet test Storyworthtelling.Maui.Tests/Storyworthtelling.Maui.Tests.csproj` — palette against `PaperColorTokens` **by reflection**, the type ladder against `Codex.Domain`'s own source file, every `FontFamily` against what `PaperFonts` registers, the nine roles' faces and inks, Serif Italic's single role, no letterspacing, buttons at Label size. **Not yet verified:** no screen drawn from the kit has been opened on a device.
 
 ### Self-update (cross-cutting)
 
