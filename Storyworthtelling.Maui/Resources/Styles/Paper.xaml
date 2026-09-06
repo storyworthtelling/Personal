@@ -41,6 +41,12 @@
     <Color x:Key="ResolvedMark">#68645E</Color>
     <Color x:Key="ActionMark">#38734A</Color>
 
+    <!-- The wash tier: the mark at PaperColorTokens.WashAlpha (77 of 255 = 4D), which is what §8's
+         Selected state paints behind full-strength ink. Written as ARGB rather than mixed in code
+         so it stays inside the token file — and the palette guard composes it from the mark and the
+         alpha rather than trusting the eight digits. -->
+    <Color x:Key="ActionWash">#4D38734A</Color>
+
     <!-- Type scale, DESIGN.md §4's reworked ladder, kept in step with the native DesignTokens.TypeSp
          by a test that reads that file rather than restating it. Display and Title were 34 and 24 in
          the MAUI dictionaries: the reworked, bigger scale reached the native tokens and never

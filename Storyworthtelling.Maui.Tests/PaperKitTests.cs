@@ -40,6 +40,21 @@ public class PaperKitTests
         var wrong = new List<string>();
         foreach (var (key, hex) in Colours())
         {
+            // A wash is not its own value: §3 defines it as the role's mark at WashAlpha, so it is
+            // composed here rather than compared to eight digits somebody typed. A hand-mixed wash
+            // that looks about right is exactly what this catches.
+            if (key.EndsWith("Wash", StringComparison.Ordinal))
+            {
+                var mark = Hex(key[..^4] + "Mark");
+                var alpha = PaperColorTokens.WashAlpha.ToString("X2");
+                if (mark is not null && hex != "#" + alpha + mark[1..])
+                {
+                    wrong.Add($"{key} is {hex}, but the mark at WashAlpha is #{alpha}{mark[1..]}");
+                }
+
+                continue;
+            }
+
             var constant = expected.TryGetValue(key, out var mapped) ? mapped : key;
             var field = typeof(PaperColorTokens).GetField(constant, BindingFlags.Public | BindingFlags.Static);
 
@@ -225,8 +240,12 @@ public class PaperKitTests
 
     // ---- reading the kit ----
 
+    private static string? Hex(string constant) =>
+        (typeof(PaperColorTokens).GetField(constant, BindingFlags.Public | BindingFlags.Static)
+            ?.GetValue(null) as string)?.ToUpperInvariant();
+
     private static IEnumerable<(string Key, string Hex)> Colours() =>
-        Regex.Matches(Dictionary(), @"<Color x:Key=""(?<key>\w+)"">(?<hex>#[0-9A-Fa-f]{6})</Color>")
+        Regex.Matches(Dictionary(), @"<Color x:Key=""(?<key>\w+)"">(?<hex>#[0-9A-Fa-f]{6,8})</Color>")
             .Select(m => (m.Groups["key"].Value, m.Groups["hex"].Value.ToUpperInvariant()));
 
     /// <summary>Kit key ("DisplaySize") to the native constant name ("Display") and its value.</summary>
