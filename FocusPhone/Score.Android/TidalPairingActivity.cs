@@ -12,11 +12,21 @@ using Storyworthtelling.Voice.Secrets;
 namespace Score;
 
 /// <summary>
-/// TIDAL's device-code sign-in (RFC 8628): the screen shows a short code and a link,
-/// the owner approves it on another device's browser, and this polls until that
-/// approval lands — the same shape a smart-TV app's "go to tv.example.com/pair"
-/// screen takes, chosen for exactly the reason those exist: a locked-down phone
-/// browser is a worse place to type a TIDAL password than a laptop already signed in.
+/// TIDAL sign-in: the browser flow (authorization code + PKCE).
+///
+/// This was the device-code flow (RFC 8628) — a short code typed on a laptop, no
+/// browser on the phone — which is by far the better shape for a locked-down device.
+/// TIDAL refuses it: "Client is not a Limited Input Device client", and their own
+/// Android SDK documents that flow as available to TIDAL's internal apps only. So the
+/// phone opens a browser after all, and the lockdown is what makes that acceptable:
+/// the launcher un-suspends the system browser for OAuth Custom Tabs only, against an
+/// allowlist of identity hosts, with everything else blocked. The same door the
+/// GitHub sign-in goes through.
+///
+/// The security that the device flow got from having no redirect at all, this gets
+/// from PKCE: the code comes back through a URL any app could in principle receive,
+/// and is worthless without the verifier, which never leaves. The state is checked
+/// before the code is exchanged, so a code from somewhere else cannot be spent here.
 ///
 /// The result is a refresh token, saved to <see cref="TidalAccountStore"/> —
 /// <see cref="PlaybackService"/> reads it from there on its next launch to build the
@@ -24,19 +34,33 @@ namespace Score;
 /// <see cref="PlaybackService"/> directly; a fresh sign-in takes effect on the next
 /// cold start, the same way most of this app's vault-backed settings do.
 ///
-/// One status sentence carries the whole flow (§6: no spinners), and the code itself
-/// is the one thing on screen worth a monospace face — it is meant to be typed
-/// somewhere else character-for-character.
+/// One status sentence carries the whole flow (§6: no spinners).
+///
+/// SingleTask, and the intent filter, are what bring the redirect back into THIS
+/// screen rather than a second copy of it with none of the flow's state in it — the
+/// verifier and the state live in this instance and nowhere else.
 /// </summary>
-[Activity(Label = "TIDAL", Theme = "@style/Theme.FocusPhone.Paper")]
+[Activity(
+    Label = "TIDAL",
+    Theme = "@style/Theme.FocusPhone.Paper",
+    LaunchMode = Android.Content.PM.LaunchMode.SingleTask,
+    Exported = true)]
+[IntentFilter(
+    [Intent.ActionView],
+    Categories = [Intent.CategoryDefault, Intent.CategoryBrowsable],
+    DataScheme = "com.storyworthtelling.focusphone.audio",
+    DataHost = "tidal-auth")]
 public class TidalPairingActivity : Activity
 {
     private LinearLayout body = null!;
     private string status = string.Empty;
-    private string? code;
-    private string? verificationUri;
     private bool signedIn;
     private CancellationTokenSource? pairing;
+
+    // The half of the sign-in that must never travel. Held for the round trip out to
+    // the browser and back, and cleared the moment it is spent or abandoned.
+    private PkceCodes? codes;
+    private string? expectedState;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -45,6 +69,18 @@ public class TidalPairingActivity : Activity
         signedIn = new TidalAccountStore(this).Load() is not null;
         SetContentView(BuildLayout());
         Render();
+    }
+
+    // The browser hands the redirect back here rather than starting a new screen,
+    // because SingleTask keeps the instance holding the verifier.
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        Intent = intent;
+        if (intent?.Data is { } data)
+        {
+            _ = FinishSignInAsync(data.ToString());
+        }
     }
 
     protected override void OnDestroy()
@@ -89,19 +125,10 @@ public class TidalPairingActivity : Activity
             body.AddView(PaperUi.Secondary(this, status));
         }
 
-        if (code is { Length: > 0 })
-        {
-            body.AddView(PaperUi.Mono(this, code));
-            if (verificationUri is { Length: > 0 })
-            {
-                body.AddView(PaperUi.SecondaryButton(this, verificationUri,
-                    () => StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(verificationUri)))));
-            }
-        }
-        else
-        {
-            body.AddView(PaperUi.PrimaryButton(this, "Get a code", () => _ = StartPairingAsync()));
-        }
+        body.AddView(PaperUi.Secondary(this,
+            "Signing in opens TIDAL's own page in a browser. It is the only sign-in TIDAL " +
+            "offers an app like this one."));
+        body.AddView(PaperUi.PrimaryButton(this, "Sign in to TIDAL", () => _ = StartSignInAsync()));
     }
 
     private void SignOut()
@@ -111,84 +138,171 @@ public class TidalPairingActivity : Activity
         _ = new TidalAccountSync(this).SignOutAsync(CancellationToken.None);
         signedIn = false;
         status = string.Empty;
-        code = null;
-        verificationUri = null;
+        Forget();
         Render();
     }
 
-    private async Task StartPairingAsync()
+    private async Task StartSignInAsync()
     {
         status = "Reading TIDAL app credentials…"; // §6: loading is a sentence
         Render();
 
-        var vaultAccess = new SecretsVaultAccess(
-            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
-            () => ScoreIdentity.Account);
-        var vaultResult = await vaultAccess.Service.LoadAsync(CancellationToken.None);
-        if (vaultResult.Status != SecretsVaultStatus.Loaded || string.IsNullOrEmpty(vaultResult.Vault.Tidal.ClientId))
+        var credentials = await ReadCredentialsAsync();
+        if (credentials is not ({ Length: > 0 } clientId, var clientSecret))
         {
             status = "TIDAL app credentials aren't set up yet.";
             Render();
             return;
         }
 
-        var clientId = vaultResult.Vault.Tidal.ClientId;
-        var clientSecret = vaultResult.Vault.Tidal.ClientSecret;
-        var client = new TidalDeviceAuthClient(new HttpClient());
+        // Generated per sign-in and held only in this instance. Anything already in
+        // flight is abandoned rather than left to race the new one back.
+        Forget();
+        codes = PkceCodes.Create();
+        expectedState = TidalSignIn.NewState();
 
-        status = "Getting a code…";
-        Render();
+        var url = TidalSignIn.AuthorizeUrl(clientId, TidalSignIn.RedirectUri, codes.Challenge, expectedState);
 
-        TidalDeviceAuthorization authorization;
         try
         {
-            authorization = await client.RequestDeviceCodeAsync(clientId, clientSecret, CancellationToken.None);
+            OpenInBrowser(url);
+            status = "Finish signing in, and TIDAL will send you back here.";
         }
-        catch (Exception e)
+        catch (ActivityNotFoundException e)
         {
-            AudioDiagnostics.LogWarning(
-                "TidalPairingActivity", "Requesting a TIDAL device code failed.", e);
-            status = "Couldn't reach TIDAL. Try again in a moment.";
+            // On the locked phone the browser is suspended except for this; if it is
+            // gone entirely there is nothing to fall back to, and saying so beats a
+            // screen that looks like it is still waiting.
+            AudioDiagnostics.LogWarning("TidalPairingActivity", "No browser to sign in with.", e);
+            Forget();
+            status = "There's no browser on this phone to sign in with.";
+        }
+
+        // The client secret is not held across the round trip — it is re-read from the
+        // vault when the redirect comes back, so it is in memory for two short windows
+        // rather than for however long the owner spends typing a password.
+        _ = clientSecret;
+        Render();
+    }
+
+    private async Task FinishSignInAsync(string redirect)
+    {
+        if (codes is not { } pkce || expectedState is not { } state)
+        {
+            // A redirect with no sign-in waiting for it — a stale link, or a second
+            // one after the first was spent. Nothing to do, and nothing to alarm about.
+            return;
+        }
+
+        var result = OAuthRedirect.Read(redirect, state);
+        if (result.Status != OAuthRedirectStatus.Authorized || result.Code is not { } code)
+        {
+            if (result.Status != OAuthRedirectStatus.Declined)
+            {
+                AudioDiagnostics.LogWarning(
+                    "TidalPairingActivity", $"TIDAL sign-in came back unusable: {result.Error}");
+            }
+
+            Forget();
+            status = result.Status switch
+            {
+                OAuthRedirectStatus.Declined => "Sign-in was cancelled.",
+                OAuthRedirectStatus.StateMismatch => "That sign-in didn't match the one this screen started.",
+                _ => "Something went wrong signing in to TIDAL. Try again.",
+            };
             Render();
             return;
         }
 
-        code = authorization.UserCode;
-        verificationUri = authorization.VerificationUriComplete;
-        status = "Enter this code, then come back here.";
+        status = "Finishing sign-in…";
         Render();
 
-        pairing?.Cancel();
-        pairing = new CancellationTokenSource();
-        var result = await client.PollUntilAuthorizedAsync(
-            clientId, clientSecret, authorization.DeviceCode,
-            authorization.Interval, authorization.ExpiresIn,
-            (delay, ct) => Task.Delay(delay, ct), pairing.Token);
-
-        if (result.Status == TidalTokenPollStatus.Success && !string.IsNullOrEmpty(result.RefreshToken))
+        var credentials = await ReadCredentialsAsync();
+        if (credentials is not ({ Length: > 0 } clientId, var clientSecret))
         {
-            var account = new TidalAccount(result.UserId ?? "", result.RefreshToken);
+            Forget();
+            status = "TIDAL app credentials aren't set up yet.";
+            Render();
+            return;
+        }
+
+        TidalTokenPollResult exchanged;
+        try
+        {
+            using var http = new HttpClient();
+            exchanged = await new TidalDeviceAuthClient(http).ExchangeCodeAsync(
+                clientId, clientSecret, code, pkce.Verifier, TidalSignIn.RedirectUri, CancellationToken.None);
+        }
+        catch (Exception e)
+        {
+            AudioDiagnostics.LogWarning("TidalPairingActivity", "Exchanging the TIDAL code failed.", e);
+            Forget();
+            status = TidalSignInFailure.Describe(e.Message);
+            Render();
+            return;
+        }
+
+        // Spent either way: a code is single-use, and a verifier that outlives its
+        // exchange is a secret kept for no reason.
+        Forget();
+
+        if (exchanged.Status == TidalTokenPollStatus.Success && !string.IsNullOrEmpty(exchanged.RefreshToken))
+        {
+            var account = new TidalAccount(exchanged.UserId ?? "", exchanged.RefreshToken);
             new TidalAccountStore(this).Save(account);
 
             // Mirrored into this person's own vault so a factory reset costs a
-            // passphrase rather than another pairing. Best-effort, off the UI thread.
+            // passphrase rather than another sign-in. Best-effort, off the UI thread.
             _ = new TidalAccountSync(this).BackUpAsync(account, CancellationToken.None);
             signedIn = true;
-            code = null;
-            verificationUri = null;
             status = string.Empty;
             Render();
             return;
         }
 
-        code = null;
-        verificationUri = null;
-        status = result.Status switch
-        {
-            TidalTokenPollStatus.Denied => "That code was declined. Get a new one to try again.",
-            TidalTokenPollStatus.Expired => "That code expired before it was approved. Get a new one.",
-            _ => "Something went wrong signing in to TIDAL. Try again.",
-        };
+        AudioDiagnostics.LogWarning(
+            "TidalPairingActivity", $"TIDAL refused the code exchange: {exchanged.Status}.");
+        status = "TIDAL wouldn't complete the sign-in. Try again.";
         Render();
+    }
+
+    private async Task<(string ClientId, string ClientSecret)?> ReadCredentialsAsync()
+    {
+        var vaultAccess = new SecretsVaultAccess(
+            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
+            () => ScoreIdentity.Account);
+        var vaultResult = await vaultAccess.Service.LoadAsync(CancellationToken.None);
+
+        return vaultResult.Status == SecretsVaultStatus.Loaded
+            ? (vaultResult.Vault.Tidal.ClientId, vaultResult.Vault.Tidal.ClientSecret)
+            : null;
+    }
+
+    /// <summary>
+    /// A Custom Tab rather than a browser window: it closes itself on the redirect and
+    /// never becomes a place to browse from. The launcher's policy un-suspends the
+    /// system browser for exactly this and blocks every URL outside the identity
+    /// allowlist, so the tab can reach TIDAL's login and nothing else.
+    /// </summary>
+    private void OpenInBrowser(string url)
+    {
+        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(url));
+
+        // The Custom Tabs handshake, without taking the AndroidX Browser dependency for
+        // one extra: these are the extras a supporting browser reads, and one that does
+        // not simply opens the page as an ordinary view.
+        intent.PutExtra("android.support.customtabs.extra.SESSION", (Bundle?)null);
+        intent.PutExtra("android.support.customtabs.extra.TOOLBAR_COLOR", PaperTheme.Paper.ToArgb());
+        intent.AddFlags(ActivityFlags.NoHistory);
+        StartActivity(intent);
+    }
+
+    // Drops the flow's secrets. Called when a sign-in is spent, abandoned, or replaced.
+    private void Forget()
+    {
+        pairing?.Cancel();
+        pairing = null;
+        codes = null;
+        expectedState = null;
     }
 }
