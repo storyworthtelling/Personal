@@ -60,7 +60,7 @@ public static class IconSpecs
         // default (`Resources`). Emitting here is what actually gets the mipmaps packaged (see the two heads'
         // csproj comments and CLAUDE.md); the launcher icon is then wired via [Application(Icon=...)].
         new("Canonizer", "Storyboarder/Storyboarder.Android/Resources", "appicon", true, Glyphs.PenNib),
-        new("DailyLoader", "DailyLoader/DailyLoader.Android/Resources", "ic_launcher", true, Glyphs.FoldedPaper),
+        new("Foreword", "Foreword/Foreword.Android/Resources", "ic_launcher", true, Glyphs.FoldedPaper),
         new("Ledger", "Ledger/Ledger.Android/Resources", "appicon", true, Glyphs.Ledger),
     ];
 }
