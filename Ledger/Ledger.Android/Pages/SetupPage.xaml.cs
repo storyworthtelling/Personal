@@ -26,6 +26,11 @@ public partial class SetupPage : ContentPage
     public SetupPage(AccountService accounts, IPlaidClient plaid, VaultSync vaultSync)
     {
         InitializeComponent();
+
+        // The one shared formatter, so every app's foot line reads identically.
+        BuildLineLabel.Text = Storyworthtelling.Updates.BuildLine.Format(
+            "Ledger", Microsoft.Maui.ApplicationModel.AppInfo.Current.VersionString,
+            Microsoft.Maui.ApplicationModel.AppInfo.Current.PackageName);
         this.accounts = accounts;
         this.plaid = plaid;
         this.vaultSync = vaultSync;

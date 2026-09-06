@@ -111,6 +111,15 @@
             <Label Text="Optional — maps calendar ids to columns (Matt/Ashley/Gwen/Eva/Watch) and sets the Family calendar id. Leave blank to default everything to Matt with Gwen/Eva keyword routing."
                    Style="{StaticResource SecondaryLabel}" />
 
+
+            <!-- The quiet foot line: which build is actually on the phone. The update channel
+                 installs silently and most updates change nothing visible, so without it
+                 "did that land?" has no answer on the device. Matches Flyleaf's, via the one
+                 shared Storyworthtelling.Updates.BuildLine formatter. -->
+            <Label x:Name="BuildLineLabel"
+                   Style="{StaticResource MonoLabel}"
+                   HorizontalOptions="Center"
+                   Margin="0,32,0,0" />
         </VerticalStackLayout>
     </ScrollView>
 

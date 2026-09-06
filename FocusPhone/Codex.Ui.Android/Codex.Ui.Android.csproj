@@ -12,6 +12,7 @@
     <!-- Shared owner's-voice library: every head greets the owner in their voice, reading the shared
          profile + Claude key from Drive and degrading to neutral copy when unavailable. -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 
   <!-- Google Drive read access for the shared voice profile/config. -->

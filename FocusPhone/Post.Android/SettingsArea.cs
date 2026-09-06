@@ -131,6 +131,15 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
             "Backs up your Gmail credentials to your Google Drive, encrypted. Restores after a reset. " +
             "Shown in the clear so you can copy it into your other apps.");
 
+        // The quiet foot line: which build is actually on the phone. The channel installs
+        // silently and most updates change nothing visible, so without it "did that land?"
+        // has no answer on the device.
+        var buildLine = PaperUi.BuildNumber(Host, "Post");
+        var buildParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+        buildParams.TopMargin = PaperTheme.Dp(Host, DesignTokens.Space.X8);
+        layout.AddView(buildLine, buildParams);
+
         scroll.AddView(layout);
         return scroll;
     }

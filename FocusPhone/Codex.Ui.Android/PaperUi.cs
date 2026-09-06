@@ -1,10 +1,13 @@
+using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Graphics;
 using Android.Graphics.Drawables;
 using Android.Text;
 using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
+using Storyworthtelling.Updates;
 
 namespace Codex.Ui;
 
@@ -405,6 +408,40 @@ public static class PaperUi
         // state on open (e.g. a radio that is already off) without acting on it.
         Paint(initialIndex);
         return row;
+    }
+
+    /// <summary>
+    /// The quiet line at the foot of a Settings screen: app name, versionName, package id, in
+    /// mono, centred, at Label size.
+    ///
+    /// <para>It answers one question the device cannot otherwise answer. There is no adb after
+    /// the cutover and the update channel installs silently, so an update that changes nothing
+    /// visible — which is most of them — is indistinguishable from no update at all. Flyleaf had
+    /// this line and the other heads did not; it lives here now so all of them share one
+    /// implementation and one wording.</para>
+    ///
+    /// <para>It shows the <i>versionName</i>, not the versionCode: the code is the update
+    /// channel's business, the name is the owner's. A package manager that refuses prints
+    /// <c>?</c> rather than a blank, so a failed lookup does not read as an app with no version.
+    /// </para>
+    /// </summary>
+    public static TextView BuildNumber(Activity activity, string appName)
+    {
+        string? versionName = null;
+        try
+        {
+            versionName = activity.PackageManager?
+                .GetPackageInfo(activity.PackageName!, (PackageInfoFlags)0)?.VersionName;
+        }
+        catch (Exception)
+        {
+            // A refusal here must never take the Settings screen down with it.
+        }
+
+        var line = Text(activity, BuildLine.Format(appName, versionName, activity.PackageName),
+            DesignTokens.TypeSp.Label, PaperTheme.InkMuted, PaperTheme.Mono(activity));
+        line.Gravity = GravityFlags.CenterHorizontal;
+        return line;
     }
 
     /// <summary>

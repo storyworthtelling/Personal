@@ -1,0 +1,60 @@
+name: Compute the Android versionCode
+description: >
+  The suite's one versionCode formula: band × 100,000,000 + minutes since 2020-01-01 UTC.
+
+  versionCode used to be the workflow's run_number, which meant renaming a workflow reset it
+  and the next build looked OLDER than what was installed — rejected silently by the update
+  channel, and forever, because a restarted counter never catches up. That happened when
+  build-focusphone.yml became build-flyleaf.yml (fixed with a 100000 floor) and again when Post
+  and Plate were split into their own workflows (fixed with a 200000 floor). A floor is a
+  ratchet; it only works while somebody remembers to bump it before the rename ships.
+
+  So this depends on no counter. Wall-clock minutes only go forward whatever happens to a
+  workflow file, and the band gives each app a numbering space chosen once to clear whatever it
+  has already shipped. A band is NOT the version the owner sees — Foreword displays 2.0.x while
+  sitting in band 7, because it has to clear DailyLoader's old timestamp codes (~609,000,000)
+  to upgrade in place rather than needing an uninstall.
+
+  Kept identical to Storyworthtelling.Updates/VersionCode.cs, which holds the same formula for
+  the guard that every band clears what its app already shipped. VersionCodeTests asserts the
+  constants in this file match that one.
+inputs:
+  band:
+    description: The app's numbering space, 1-20. See SuiteVersionBands in Storyworthtelling.Updates.
+    required: true
+outputs:
+  code:
+    description: The computed versionCode.
+    value: ${{ steps.compute.outputs.code }}
+runs:
+  using: composite
+  steps:
+    - id: compute
+      shell: bash
+      env:
+        BAND: ${{ inputs.band }}
+      run: |
+        set -euo pipefail
+
+        BAND_SIZE=100000000
+        MIN_BAND=1
+        # Band 20 tops out at 2,099,999,999, inside Android's signed 32-bit versionCode;
+        # band 21 would not, and Android mangles an out-of-range code rather than refusing.
+        MAX_BAND=20
+
+        if [ "$BAND" -lt "$MIN_BAND" ] || [ "$BAND" -gt "$MAX_BAND" ]; then
+          echo "::error::versionCode band $BAND is outside $MIN_BAND-$MAX_BAND."
+          exit 1
+        fi
+
+        EPOCH=$(date -u -d '2020-01-01 00:00:00' +%s)
+        MINUTES=$(( ( $(date -u +%s) - EPOCH ) / 60 ))
+
+        if [ "$MINUTES" -lt 0 ] || [ "$MINUTES" -ge "$BAND_SIZE" ]; then
+          echo "::error::$MINUTES minutes since the epoch does not fit a band."
+          exit 1
+        fi
+
+        CODE=$(( BAND * BAND_SIZE + MINUTES ))
+        echo "code=$CODE" >> "$GITHUB_OUTPUT"
+        echo "versionCode $CODE (band $BAND, $MINUTES minutes since 2020-01-01 UTC)"
