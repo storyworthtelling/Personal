@@ -77,7 +77,7 @@ public class BinderTabs : ContentView
         }
 
         // The page edge: the line the tabs are clipped at, running the full height.
-        var edge = new BoxView { Color = Token<Color>("Hairline") };
+        var edge = new BoxView { Color = PaperResources.Colour("Hairline") };
         AbsoluteLayout.SetLayoutBounds(edge, new Rect(0, 0, DesignTokens.Shape.HairlineDp, Height));
         strip.Children.Add(edge);
 
@@ -102,7 +102,7 @@ public class BinderTabs : ContentView
         // On the page-coloured active tab the hue is the only thing marking the area, so it goes in
         // the ink. On the coloured cloth of an inactive tab the cloth is already saying it, and
         // colouring the label too would leave a strip that reads as a row of disabled buttons.
-        var tint = active ? area.Hue : Token<Color>("Ink");
+        var tint = active ? area.Hue : PaperResources.Colour("Ink");
 
         // TWO sources rather than one tinted at runtime. MAUI has no equivalent of Android's
         // ImageView.SetColorFilter, and the only ready answer is a community toolkit behaviour —
@@ -118,7 +118,7 @@ public class BinderTabs : ContentView
         var label = new Label
         {
             Text = area.Label,
-            Style = Token<Style>("FieldLabel"),
+            Style = PaperResources.Token<Style>("FieldLabel"),
             TextColor = tint,
             LineBreakMode = LineBreakMode.NoWrap,
             HorizontalTextAlignment = TextAlignment.Center,
@@ -136,8 +136,8 @@ public class BinderTabs : ContentView
         var tab = new Border
         {
             Content = column,
-            BackgroundColor = active ? Token<Color>("Paper") : area.Cloth,
-            Stroke = Token<Color>("Hairline"),
+            BackgroundColor = active ? PaperResources.Colour("Paper") : area.Cloth,
+            Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = DesignTokens.Shape.HairlineDp,
             StrokeShape = new RoundRectangle
             {
@@ -152,15 +152,4 @@ public class BinderTabs : ContentView
         return tab;
     }
 
-    /// <summary>
-    /// Reads a token out of the merged dictionaries. The kit's dictionary is merged into the
-    /// application's, and <c>TryGetValue</c> is what walks a merged dictionary — the indexer looks
-    /// only at a dictionary's own entries.
-    /// </summary>
-    private static T Token<T>(string key) where T : class =>
-        Application.Current?.Resources.TryGetValue(key, out var value) == true && value is T typed
-            ? typed
-            : throw new InvalidOperationException(
-                $"The Paper & Ink kit is not merged: no resource named '{key}'. A head adds "
-                + "Resources.MergedDictionaries.Add(new PaperKit()) in its App constructor.");
 }
