@@ -36,6 +36,13 @@ public class CalendarEvent
     // carried: a family that never answers an invitation would otherwise get nothing.
     public IReadOnlyList<string> Guests { get; init; } = [];
 
+    // How long the drive to Location takes, in minutes, or null when nobody has measured it. Drawn
+    // as a band before the event so the day's REAL occupancy is visible — a four o'clock that is
+    // really a twenty-five-minute drive from a three-thirty is a conflict the grid otherwise shows
+    // as two comfortable boxes with a gap between them. Null draws nothing: a band of invented
+    // length would make the day look occupied by something nobody measured.
+    public int? TravelMinutes { get; set; }
+
     // WHICH COLUMNS the event belongs to — a set, because one event can belong to several people
     // (D31). "Wren and Linden to swimming" is one event in two columns, not two events and not a guess
     // between them. Assigned by CalendarColumnMapper via ColumnSet.Resolve, and never empty: an

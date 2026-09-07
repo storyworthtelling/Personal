@@ -46,6 +46,30 @@ public class CalendarPdfComposerTests
     }
 
     /// <summary>
+    /// An unreachable drive is FLAGGED, not merely drawn. This asserts the page renders at all with
+    /// travel on it — the band is geometry, so the honest end of this test is the eye, and it is in
+    /// the on-device document. What it does catch is a band that throws or paginates the page away.
+    /// </summary>
+    [Fact]
+    public void ADriveDrawsWithoutDisturbingThePage()
+    {
+        var soccer = TimedEvent(PersonColumn.Jordan, 16, 17, "Soccer practice");
+        soccer.TravelMinutes = 25;
+
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events = [TimedEvent(PersonColumn.Jordan, 15, 16, "Vet"), soccer],
+        };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        Assert.Equal(2, PageCount(pdf));
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        Assert.Contains("Soccer practice", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// B2's other half, on the page: a fourth event in the same hour is written under the grid
     /// rather than squeezed into a box a few characters wide. The owner asked for all of them.
     /// </summary>

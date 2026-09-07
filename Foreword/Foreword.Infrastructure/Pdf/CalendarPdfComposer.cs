@@ -33,6 +33,10 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         PaperPalette.ResolveRole(ColorRole.Reference, ColorTier.Wash, UiColorProfile.DocumentColor);
     private static readonly SKColor TimedFill =
         PaperPalette.ResolveRole(ColorRole.Action, ColorTier.Wash, UiColorProfile.DocumentColor);
+    // An unreachable drive is a caution, not a problem: the calendar is not wrong, the day is.
+    private static readonly SKColor UnreachableMark =
+        PaperPalette.ResolveRole(ColorRole.Caution, ColorTier.Mark, UiColorProfile.DocumentColor);
+
     private static readonly SKColor ContainerFill =
         PaperPalette.ResolveRole(ColorRole.Resolved, ColorTier.Wash, UiColorProfile.DocumentColor);
 
@@ -152,6 +156,37 @@ public class CalendarPdfComposer : ICalendarPdfComposer
                 SkiaPageLayout.InkMuted);
         }
 
+        // The drive before an event, drawn as a hatched band in its column (Gate 1 · Q74). Under
+        // the events, so a band never hides one; an unreachable drive takes the caution hue,
+        // because that one is worth interrupting the page for.
+        for (var col = 0; col < Columns.Length; col++)
+        {
+            var inColumn = timed.Where(e => e.Columns.Any(c => ColumnIndex(c) == col)).ToList();
+
+            foreach (var travel in TravelPlan.For(inColumn, e => e.TravelMinutes))
+            {
+                if (Window(travel.Event, hourHeight, timelineTop, stripHeight) is not { } at)
+                {
+                    continue;
+                }
+
+                var height = travel.Minutes / 60.0 * hourHeight;
+                var top = at.Y - height;
+                if (top < timelineTop)
+                {
+                    // Clipped at the top of the day rather than drawn above it: a band that ran off
+                    // the grid would read as part of the header.
+                    height -= timelineTop - top;
+                    top = timelineTop;
+                }
+
+                if (height <= 0) continue;
+
+                DrawTravelBand(layout, colsLeft + col * colWidth + 1, top, colWidth - 2, height,
+                    travel.Unreachable);
+            }
+        }
+
         // Everything else, one column at a time so overlapping events share the width rather than
         // paint over each other (B2), and so a work block is drawn first, behind what sits inside it
         // (B3). EventLanes decides both; this only lays the answer out.
@@ -268,6 +303,31 @@ public class CalendarPdfComposer : ICalendarPdfComposer
             }
 
             layout.Advance(6);
+        }
+    }
+
+    /// <summary>
+    /// The drive: a hatched band rather than a filled one, so it reads as time spoken for rather
+    /// than as an event. Hatching is drawn as diagonal rules because a fill of any strength would
+    /// compete with the boxes it sits under.
+    /// </summary>
+    private static void DrawTravelBand(
+        SkiaPageLayout layout, double x, double y, double width, double height, bool unreachable)
+    {
+        var ink = unreachable ? UnreachableMark : SkiaPageLayout.InkMuted;
+
+        layout.DrawRect(x, y, width, height, stroke: ink, strokeWidth: 0.4f);
+
+        // Diagonals at a fixed spacing, clipped to the band by starting each where it enters.
+        const double spacing = 4;
+        for (var offset = 0.0; offset < width + height; offset += spacing)
+        {
+            var x1 = x + Math.Min(offset, width);
+            var y1 = y + Math.Max(0, offset - width);
+            var x2 = x + Math.Max(0, offset - height);
+            var y2 = y + Math.Min(offset, height);
+
+            layout.DrawLine(x1, y1, x2, y2, ink, 0.3f);
         }
     }
 
