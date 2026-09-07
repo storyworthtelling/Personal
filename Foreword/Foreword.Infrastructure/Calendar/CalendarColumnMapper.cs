@@ -37,6 +37,21 @@ public class CalendarColumnMapper
         return list;
     }
 
+    /// <summary>
+    /// The calendars the owner has actually mapped — explicitly, or as the shared one. Anything else
+    /// is held rather than printed into the default column (D34).
+    /// </summary>
+    public IReadOnlySet<string> KnownCalendars()
+    {
+        var known = new HashSet<string>(options.CalendarColumns.Keys, StringComparer.Ordinal);
+        if (!string.IsNullOrEmpty(options.FamilyCalendarId))
+        {
+            known.Add(options.FamilyCalendarId);
+        }
+
+        return known;
+    }
+
     public IReadOnlyList<PersonColumn> Resolve(CalendarEvent calendarEvent) =>
         ColumnSet.Resolve(calendarEvent, RoutingFor(calendarEvent.SourceCalendarId));
 
