@@ -123,28 +123,47 @@ public class CalendarPdfComposer : ICalendarPdfComposer
             }
         }
 
-        // Timed events, one column at a time so overlapping events share the width rather than
-        // paint over each other (B2), and so a work block is drawn first, behind what is inside it
+        // A shared event that can have one box gets one box (D32): the people are side by side and
+        // alone in their hour, so it reads as one thing several of them are doing. Drawn before the
+        // per-column pass so the columns it spans do not also draw it.
+        var timed = agenda.Events.Where(e => !e.IsAllDay).ToList();
+        var spanned = timed.Where(e => SharedEventMode.Spans(e, timed)).ToList();
+
+        foreach (var e in spanned)
+        {
+            var cols = e.Columns.Select(ColumnIndex).Where(c => c >= 0).Order().ToList();
+            if (cols.Count == 0) continue;
+
+            if (Window(e, hourHeight, timelineTop, stripHeight) is not { } window) continue;
+            var (y, height) = window;
+
+            var x = colsLeft + cols[0] * colWidth;
+            DrawEventBox(layout, x + 1, y, colWidth * cols.Count - 2, height, e.Title, eventFont, TimedFill);
+
+            // The corner tag names who it is for. A spanning box already shows WHICH columns, so
+            // the tag is confirmation rather than the only signal — which is why it is allowed to
+            // be truncated away on a narrow span rather than pushing the title out.
+            layout.DrawText(layout.Truncate(Who(e), eventFont, colWidth * cols.Count - 4), eventFont,
+                x + 1, y + 1, colWidth * cols.Count - 4, stripHeight, TextAlign.TopRight,
+                SkiaPageLayout.InkMuted);
+        }
+
+        // Everything else, one column at a time so overlapping events share the width rather than
+        // paint over each other (B2), and so a work block is drawn first, behind what sits inside it
         // (B3). EventLanes decides both; this only lays the answer out.
         for (var col = 0; col < Columns.Length; col++)
         {
-            var inColumn = agenda.Events
-                .Where(e => !e.IsAllDay && e.Columns.Any(c => ColumnIndex(c) == col))
+            var inColumn = timed
+                .Where(e => !spanned.Contains(e) && e.Columns.Any(c => ColumnIndex(c) == col))
                 .ToList();
 
             foreach (var placed in EventLanes.Place(inColumn))
             {
                 var e = placed.Event;
-                var startOffset = HoursFromStart(e.Start);
-                var endOffset = HoursFromStart(e.End);
-                if (endOffset <= 0 || startOffset >= HourSpan)
+                if (Window(e, hourHeight, timelineTop, stripHeight) is not { } window)
                     continue; // entirely outside the visible window
 
-                startOffset = Math.Clamp(startOffset, 0, HourSpan);
-                endOffset = Math.Clamp(endOffset, 0, HourSpan);
-
-                var y = timelineTop + startOffset * hourHeight;
-                var height = Math.Max(stripHeight, (endOffset - startOffset) * hourHeight);
+                var (y, height) = window;
 
                 // A container spans the column; everything else takes its lane's share of it.
                 var laneWidth = (colWidth - 2) / placed.Lanes;
@@ -152,7 +171,32 @@ public class CalendarPdfComposer : ICalendarPdfComposer
 
                 DrawEventBox(layout, x, y, laneWidth, height, e.Title, eventFont,
                     placed.IsContainer ? ContainerFill : TimedFill, placed.IsContainer);
+
+                // A shared event drawn per column says who else is there (D32), under its title and
+                // only if the box is tall enough to hold a second line — a "with" line that pushed
+                // the title out would cost more than it explains.
+                var with = SharedEventMode.WithLine(e, Columns[col]);
+                if (with.Length > 0 && !placed.IsContainer && height >= stripHeight * 2)
+                {
+                    layout.DrawText(layout.Truncate(with, eventFont, laneWidth - 4), eventFont,
+                        x + 2, y + stripHeight, laneWidth - 4, stripHeight, TextAlign.TopLeft,
+                        SkiaPageLayout.InkMuted);
+                }
             }
+        }
+
+        // Held calendars are named on the page (D34). Under the grid, in the muted ink, because it
+        // is a note about the page rather than part of the day — but ON the page, because a held
+        // calendar the owner cannot see is the same silence the holding exists to end.
+        if (agenda.HeldCalendars.Count > 0)
+        {
+            layout.MoveTo(gridBottom + 2);
+            layout.DrawText(
+                layout.Truncate(
+                    $"Not printed — no column yet: {string.Join(", ", agenda.HeldCalendars)}",
+                    hourFont, layout.ContentWidth),
+                hourFont, SkiaPageLayout.Margin, layout.Y, layout.ContentWidth, stripHeight,
+                TextAlign.TopLeft, SkiaPageLayout.InkMuted);
         }
 
         layout.MoveTo(gridBottom);
@@ -207,6 +251,28 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         var textY = isContainer ? y + height - stripHeightFor(font) : y + 1;
         layout.DrawText(layout.Truncate(title, font, width - 4), font,
             x + 2, textY, width - 4, Math.Min(height, stripHeightFor(font)), TextAlign.TopLeft);
+    }
+
+    /// <summary>
+    /// Where an event sits in the timeline, or null if it falls entirely outside the visible window.
+    /// Shared by both drawing modes so a spanning box and a per-column box cannot disagree about
+    /// when the same event is.
+    /// </summary>
+    private static (double Y, double Height)? Window(
+        CalendarEvent e, double hourHeight, double timelineTop, double stripHeight)
+    {
+        var startOffset = HoursFromStart(e.Start);
+        var endOffset = HoursFromStart(e.End);
+        if (endOffset <= 0 || startOffset >= HourSpan)
+        {
+            return null;
+        }
+
+        startOffset = Math.Clamp(startOffset, 0, HourSpan);
+        endOffset = Math.Clamp(endOffset, 0, HourSpan);
+
+        return (timelineTop + startOffset * hourHeight,
+            Math.Max(stripHeight, (endOffset - startOffset) * hourHeight));
     }
 
     /// <summary>

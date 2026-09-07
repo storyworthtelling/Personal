@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Foreword.Domain.Interfaces;
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Handwriting;
@@ -68,9 +69,21 @@ public class DailyDeliveryService(
 
     private async Task<DayAgenda> BuildAgenda(DateOnly date)
     {
-        var events = columnMapper.Assign(await googleCalendar.GetEventsForDay(date));
-        var augmented = workAugmenter.Augment(events, date);
-        return new DayAgenda { Date = date, Events = augmented };
+        var events = await googleCalendar.GetEventsForDay(date);
+
+        // An unmapped calendar is held rather than printed into the default column (D34), and named
+        // on the page. Held BEFORE the columns are assigned: a calendar nobody has mapped has no
+        // column to be assigned to, and the old fallback is exactly the bug.
+        var split = HeldCalendars.Split(events, columnMapper.KnownCalendars());
+        if (split.Held.Count > 0)
+        {
+            logger.LogInformation(
+                "Holding {Count} unmapped calendar(s): {Calendars}",
+                split.Held.Count, string.Join(", ", split.Held));
+        }
+
+        var augmented = workAugmenter.Augment(columnMapper.Assign(split.Printed), date);
+        return new DayAgenda { Date = date, Events = augmented, HeldCalendars = split.Held };
     }
 
     private async Task<IReadOnlyList<CalendarEvent>> BuildOutlook(DateOnly date)

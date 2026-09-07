@@ -45,6 +45,38 @@ public class CalendarPdfComposerTests
         Assert.True(strip > 11, $"The old fixed height was 11pt and the text now needs {line}pt.");
     }
 
+    /// <summary>
+    /// D34, at the point it actually matters: a held calendar is NAMED on the page. Holding it
+    /// silently would just be the old bug with the events missing instead of misfiled.
+    /// </summary>
+    [Fact]
+    public void AHeldCalendarIsNamedOnThePage()
+    {
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events = [],
+            HeldCalendars = ["scouts@group"],
+        };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        Assert.Contains("scouts@group", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>Nothing held, nothing said: the page carries no note about calendars.</summary>
+    [Fact]
+    public void NothingIsSaidWhenNothingIsHeld()
+    {
+        var agenda = new DayAgenda { Date = Today, Events = [] };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        Assert.DoesNotContain("no column yet", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Compose_ProducesTwoPages_TimelineThenOutlook()
     {
