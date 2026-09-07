@@ -60,6 +60,28 @@
                 <VerticalStackLayout x:Name="NeedsYouRows" />
             </Border>
 
+            <!-- ==== Calendars ========================================================= -->
+            <!--
+                The JSON editor that used to sit in Advanced is GONE. It was a mono Editor where the
+                owner hand-typed CalendarMappingOptions — opaque Google ids paired with column names,
+                no validation, no way to know what you had. C1 replaces it with the real names, which
+                cost no new API work: ListCalendars() already returned them and nothing had ever
+                called it.
+            -->
+            <Label Text="Calendars" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnCalendarsClicked" />
+                    </Grid.GestureRecognizers>
+                    <VerticalStackLayout Grid.Column="0">
+                        <Label Text="Which calendar feeds which column" Style="{StaticResource CardRowTitle}" />
+                        <Label x:Name="CalendarSummaryLabel" Style="{StaticResource CardRowDescription}" />
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
+                </Grid>
+            </Border>
+
             <!-- ==== Where it goes ===================================================== -->
             <Label Text="Where it goes" Style="{StaticResource GroupLabel}" />
             <Border Style="{StaticResource GroupCard}">
@@ -119,20 +141,6 @@
                         <Button x:Name="TestPageButton" Grid.Column="1" Text="Send"
                                 Style="{StaticResource QuietButton}" Clicked="OnSendTestPageClicked" />
                     </Grid>
-                    <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
-                    <!--
-                        The mockup's S1 has no calendar mapping, because by then C1 replaces it.
-                        C1 is release D, so removing this now would strand the setting with no
-                        way to edit it at all. It stays, plainly labelled as temporary, and goes
-                        when its replacement exists.
-                    -->
-                    <VerticalStackLayout Padding="16,12" Spacing="8">
-                        <Label Text="Calendar mapping (JSON)" Style="{StaticResource CardRowTitle}" />
-                        <Label Text="Temporary. Replaced by the Calendar screen; until then this is the only way to change it."
-                               Style="{StaticResource CardRowDescription}" />
-                        <Editor x:Name="CalendarMappingEditor" AutoSize="TextChanges" HeightRequest="120"
-                                Style="{StaticResource MonoEditor}" TextChanged="OnCalendarMappingChanged" />
-                    </VerticalStackLayout>
                     <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
                     <Grid Padding="16,12" ColumnDefinitions="*,Auto">
                         <Grid.GestureRecognizers>

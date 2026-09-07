@@ -52,6 +52,23 @@ public static class CredentialStore
     // the one credential deliberately NOT kept in the vault — wiped by a factory reset and re-entered once
     // here, which then unlocks restoring the NYT cookie/key, the reMarkable token, and the Anthropic key
     // from Drive. Empty means this app doesn't yet participate in the vault.
+    // The work shifts and the off-day words. WorkScheduleOptions was hardcoded with no screen at
+    // all — Matt 08:00–16:00, Ashley 08:00–15:30 — so changing a shift meant changing a default and
+    // building the app. C1's foot edits this.
+    public static string WorkScheduleJson
+    {
+        get => Preferences.Get(PreferenceKeys.WorkScheduleJson, string.Empty);
+        set => Preferences.Set(PreferenceKeys.WorkScheduleJson, value);
+    }
+
+    // Which calendar ids were present when the list was last opened, so a calendar shared with the
+    // owner overnight can be shown as new without anything being pressed.
+    public static string SeenCalendarIds
+    {
+        get => Preferences.Get(PreferenceKeys.SeenCalendarIds, string.Empty);
+        set => Preferences.Set(PreferenceKeys.SeenCalendarIds, value);
+    }
+
     public static string VaultPassphrase
     {
         get => Preferences.Get(PreferenceKeys.VaultPassphrase, string.Empty);

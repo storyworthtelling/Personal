@@ -186,6 +186,21 @@ surfacing anything that cannot be built as drawn rather than substituting:
   the workflow), which is the string the Settings foot line prints. The mockups draw it as
   `Foreword 2.0.512 · com.storyworthtelling.dailyloader`, and a guard keeps the csproj and the
   workflow on that line — a build stamp there would be monotonic but unreadable.
+- **The calendar page (P9 Release D)** is the owner's top priority and carried two live bugs with
+  one cause. `WorkScheduleAugmenter` **appends** the synthetic nine-to-five to the day's events, so
+  it drew last — an opaque box over every meeting inside it (**B3**); overlapping events had no
+  collision detection at all, so the later one painted over the earlier (**B2**). `EventLanes`
+  (pure, `Foreword.Domain/Calendar`) decides both: overlapping events share the column by lane, a
+  work block is a **container** drawn first and taking no lane, and anything past
+  `LegibleLanes = 2` falls to an **Also today** list under the grid rather than being squeezed to a
+  three-character box. `CalendarEvent.Column` became **`Columns`, a set** (**D31**), resolved from
+  guests → every name in the title → nobody-named-on-a-shared-calendar-means-everybody;
+  `SharedEventMode` picks between one spanning box and a box per column with a "with …" line
+  (**D32**). An **unmapped** calendar is held and named on the page (**D34**); one the owner
+  answered with "not printed" is dropped silently, which is the difference between them.
+  **`CalendarMappingCodec` is the one place the stored shape is decided** — it must register
+  `JsonStringEnumConverter`, because every column in every document already on a phone is the word
+  "Matt", never the number 0, and the vault carries a copy of that document under a frozen key.
 - **The rename froze five things, and every one of them is invisible** — nothing fails at build
   time if they move, and nothing fails loudly at run time either; the app just quietly stops
   delivering, or comes up with empty settings. `Foreword.Tests/Guard/ForewordInvariantsTests.cs`
