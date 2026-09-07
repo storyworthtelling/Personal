@@ -46,6 +46,49 @@ public class CalendarPdfComposerTests
     }
 
     /// <summary>
+    /// B2's other half, on the page: a fourth event in the same hour is written under the grid
+    /// rather than squeezed into a box a few characters wide. The owner asked for all of them.
+    /// </summary>
+    [Fact]
+    public void AnEventPastTheLegibleWidthIsWrittenUnderTheGrid()
+    {
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events =
+            [
+                TimedEvent(PersonColumn.Rowan, 9, 10, "First"),
+                TimedEvent(PersonColumn.Rowan, 9, 10, "Second"),
+                TimedEvent(PersonColumn.Rowan, 9, 10, "Third"),
+            ],
+        };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        var page = document.GetPage(1).Text;
+
+        Assert.Contains("Also today", page, StringComparison.Ordinal);
+        Assert.Contains("Third", page, StringComparison.Ordinal);
+    }
+
+    /// <summary>Nothing overflows on an ordinary day, so the page says nothing about it.</summary>
+    [Fact]
+    public void AnOrdinaryDayHasNoAlsoTodayList()
+    {
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events = [TimedEvent(PersonColumn.Rowan, 9, 10, "Standup")],
+        };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        Assert.DoesNotContain("Also today", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// D34, at the point it actually matters: a held calendar is NAMED on the page. Holding it
     /// silently would just be the old bug with the events missing instead of misfiled.
     /// </summary>
