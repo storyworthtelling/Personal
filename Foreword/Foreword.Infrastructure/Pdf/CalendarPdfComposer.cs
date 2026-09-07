@@ -126,6 +126,10 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         // A shared event that can have one box gets one box (D32): the people are side by side and
         // alone in their hour, so it reads as one thing several of them are doing. Drawn before the
         // per-column pass so the columns it spans do not also draw it.
+        // What could not be drawn legibly, written down under the grid instead. The owner asked for
+        // all of them however many, and a list in full beats a box nobody can read.
+        var alsoToday = new List<(CalendarEvent Event, PersonColumn Column)>();
+
         var timed = agenda.Events.Where(e => !e.IsAllDay).ToList();
         var spanned = timed.Where(e => SharedEventMode.Spans(e, timed)).ToList();
 
@@ -157,7 +161,15 @@ public class CalendarPdfComposer : ICalendarPdfComposer
                 .Where(e => !spanned.Contains(e) && e.Columns.Any(c => ColumnIndex(c) == col))
                 .ToList();
 
-            foreach (var placed in EventLanes.Place(inColumn))
+            var laid = EventLanes.Place(inColumn);
+
+            // Anything past the legible width is written down instead of drawn (B2's other half).
+            foreach (var extra in EventLanes.Overflow(laid))
+            {
+                alsoToday.Add((extra.Event, Columns[col]));
+            }
+
+            foreach (var placed in EventLanes.Drawn(laid))
             {
                 var e = placed.Event;
                 if (Window(e, hourHeight, timelineTop, stripHeight) is not { } window)
@@ -185,12 +197,32 @@ public class CalendarPdfComposer : ICalendarPdfComposer
             }
         }
 
+        // "Also today": everything the grid could not hold at a legible width, in full, in time
+        // order. Under the grid rather than in it, because it is a list rather than a shape.
+        if (alsoToday.Count > 0)
+        {
+            layout.MoveTo(gridBottom + 2);
+            layout.DrawText("Also today", eventFont, SkiaPageLayout.Margin, layout.Y,
+                layout.ContentWidth, stripHeight, TextAlign.TopLeft, SkiaPageLayout.InkMuted);
+            layout.Advance(stripHeight);
+
+            foreach (var (e, column) in alsoToday.OrderBy(x => x.Event.Start))
+            {
+                var time = e.Start.ToString("h:mm");
+                layout.DrawText(
+                    layout.Truncate($"{time}  {e.Title} — {column}", eventFont, layout.ContentWidth),
+                    eventFont, SkiaPageLayout.Margin, layout.Y, layout.ContentWidth, stripHeight,
+                    TextAlign.TopLeft);
+                layout.Advance(stripHeight);
+            }
+        }
+
         // Held calendars are named on the page (D34). Under the grid, in the muted ink, because it
         // is a note about the page rather than part of the day — but ON the page, because a held
         // calendar the owner cannot see is the same silence the holding exists to end.
         if (agenda.HeldCalendars.Count > 0)
         {
-            layout.MoveTo(gridBottom + 2);
+            layout.MoveTo(Math.Max(layout.Y, gridBottom + 2));
             layout.DrawText(
                 layout.Truncate(
                     $"Not printed — no column yet: {string.Join(", ", agenda.HeldCalendars)}",
