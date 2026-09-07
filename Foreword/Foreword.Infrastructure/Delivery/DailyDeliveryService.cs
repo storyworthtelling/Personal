@@ -74,7 +74,12 @@ public class DailyDeliveryService(
         // An unmapped calendar is held rather than printed into the default column (D34), and named
         // on the page. Held BEFORE the columns are assigned: a calendar nobody has mapped has no
         // column to be assigned to, and the old fallback is exactly the bug.
-        var split = HeldCalendars.Split(events, columnMapper.KnownCalendars());
+        // A calendar the owner has answered with "not printed" is dropped SILENTLY. That is the
+        // difference between it and an unmapped one: this has been looked at and decided, so saying
+        // so every morning would be nagging about a settled question.
+        var wanted = events.Where(e => !columnMapper.IsNotPrinted(e.SourceCalendarId)).ToList();
+
+        var split = HeldCalendars.Split(wanted, columnMapper.KnownCalendars());
         if (split.Held.Count > 0)
         {
             logger.LogInformation(

@@ -12,8 +12,22 @@ public class CalendarMappingOptions
     // owning person; etc.
     public Dictionary<string, PersonColumn> CalendarColumns { get; set; } = new();
 
-    // The shared Family calendar whose events are routed to Wren/Linden by title keyword.
+    // The shared Family calendar whose events are routed by title keyword. Kept as a shorthand for
+    // the one that already exists, so a configuration written before D33 still works untouched;
+    // SplitCalendars is the general form.
     public string FamilyCalendarId { get; set; } = string.Empty;
+
+    // Split by name, for ANY calendar (D33) — a one-field generalisation of FamilyCalendarId rather
+    // than a new mechanism.
+    public List<string> SplitCalendars { get; set; } = [];
+
+    // Calendars whose events belong to the whole family: every column, without needing a name in
+    // the title. A holiday calendar is the case.
+    public List<string> EveryoneCalendars { get; set; } = [];
+
+    // Calendars the owner has decided not to print. Distinct from an UNMAPPED calendar, which is
+    // held and named (D34): this one has been looked at and answered, so it says nothing.
+    public List<string> NotPrintedCalendars { get; set; } = [];
 
     // Column used for events on a calendar that isn't explicitly mapped.
     public PersonColumn DefaultColumn { get; set; } = PersonColumn.Rowan;

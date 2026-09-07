@@ -25,7 +25,9 @@ public class WorkScheduleAugmenter
 
         foreach (var shift in options.Shifts)
         {
-            if (HasOffDay(result, shift.Person, date))
+            // A shift that has been turned off is kept in the settings but not drawn, so turning it
+            // back on does not mean typing the hours again.
+            if (!shift.Enabled || HasOffDay(result, shift.Person, date))
                 continue;
 
             result.Add(new CalendarEvent

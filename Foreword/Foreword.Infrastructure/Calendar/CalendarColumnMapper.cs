@@ -49,26 +49,49 @@ public class CalendarColumnMapper
             known.Add(options.FamilyCalendarId);
         }
 
+        // A calendar the owner answered is known, whatever the answer was — including "not
+        // printed". Holding a calendar they have already told the app to ignore would be nagging.
+        known.UnionWith(options.SplitCalendars);
+        known.UnionWith(options.EveryoneCalendars);
+        known.UnionWith(options.NotPrintedCalendars);
+
         return known;
     }
 
     public IReadOnlyList<PersonColumn> Resolve(CalendarEvent calendarEvent) =>
-        ColumnSet.Resolve(calendarEvent, RoutingFor(calendarEvent.SourceCalendarId));
+        IsEveryone(calendarEvent.SourceCalendarId)
+            ? ColumnSet.People
+            : ColumnSet.Resolve(calendarEvent, RoutingFor(calendarEvent.SourceCalendarId));
 
     private ColumnRouting RoutingFor(string calendarId)
     {
-        // Shared: no column of its own, so its events are split by who is named on them. The old
-        // FamilyCalendarId is one way to say that; leaving a calendar unmapped is the other, which
-        // is what makes D33 a one-field change rather than a new mechanism.
-        var isShared = !string.IsNullOrEmpty(options.FamilyCalendarId)
-            && calendarId == options.FamilyCalendarId;
+        // Shared: no column of its own, so its events are split by who is named on them. Any
+        // calendar can be, which is what makes D33 a one-field change rather than a new mechanism;
+        // FamilyCalendarId is the shorthand for the one that already exists.
+        if (IsSplit(calendarId))
+        {
+            return new ColumnRouting(Column: null, Addresses(), Names(), options.DefaultColumn);
+        }
 
-        PersonColumn? column = isShared ? null
-            : options.CalendarColumns.TryGetValue(calendarId, out var mapped) ? mapped
+        PersonColumn? column = options.CalendarColumns.TryGetValue(calendarId, out var mapped)
+            ? mapped
             : options.DefaultColumn;
 
         return new ColumnRouting(column, Addresses(), Names(), options.DefaultColumn);
     }
+
+    /// <summary>Calendars whose events belong to everybody without anyone being named.</summary>
+    public bool IsEveryone(string calendarId) => options.EveryoneCalendars.Contains(calendarId);
+
+    /// <summary>
+    /// Calendars the owner has looked at and decided not to print. Distinct from an <b>unmapped</b>
+    /// calendar, which is held and named (D34): this one has been answered, so it says nothing.
+    /// </summary>
+    public bool IsNotPrinted(string calendarId) => options.NotPrintedCalendars.Contains(calendarId);
+
+    private bool IsSplit(string calendarId) =>
+        (!string.IsNullOrEmpty(options.FamilyCalendarId) && calendarId == options.FamilyCalendarId)
+        || options.SplitCalendars.Contains(calendarId);
 
     private IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Addresses() =>
         options.PersonAddresses.ToDictionary(
