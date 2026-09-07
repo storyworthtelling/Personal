@@ -61,9 +61,22 @@ public static class MauiProgram
         builder.Services.AddSingleton<IOptions<AnthropicOptions>>(
             _ => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions { ApiKey = CredentialStore.AnthropicApiKey }));
         builder.Services.AddSingleton<IOptions<CalendarMappingOptions>>(
-            _ => new LiveOptions<CalendarMappingOptions>(() => ParseMapping(CredentialStore.CalendarMappingJson)));
+            _ => new LiveOptions<CalendarMappingOptions>(() =>
+            {
+                var settings = new CalendarSettings();
+                settings.Reload();
+                return settings.Mapping;
+            }));
+        // Read from the settings the calendar screen writes. It was `new WorkScheduleOptions()` —
+        // hardcoded, with no screen at all, so changing a shift meant changing a default and
+        // building the app.
         builder.Services.AddSingleton<IOptions<WorkScheduleOptions>>(
-            _ => new LiveOptions<WorkScheduleOptions>(() => new WorkScheduleOptions()));
+            _ => new LiveOptions<WorkScheduleOptions>(() =>
+            {
+                var settings = new CalendarSettings();
+                settings.Reload();
+                return settings.Work;
+            }));
 
         // AndroidMessageHandler routes through Android's HttpsURLConnection (Java layer),
         // which is required for SELinux to permit network access. SocketsHttpHandler

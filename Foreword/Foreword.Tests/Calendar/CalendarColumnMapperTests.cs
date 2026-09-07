@@ -109,6 +109,58 @@ public class CalendarColumnMapperTests
         Assert.Equal([PersonColumn.Linden], mapper.Resolve(invited));
     }
 
+    /// <summary>D33: split by name is available to any calendar, not only the family one.</summary>
+    [Fact]
+    public void Resolve_AnyCalendarCanBeSplitByName()
+    {
+        var mapper = CreateMapper(new CalendarMappingOptions
+        {
+            SplitCalendars = { "scouts@group" },
+        });
+
+        Assert.Equal(
+            [PersonColumn.Wren, PersonColumn.Linden],
+            mapper.Resolve(Event("scouts@group", "Wren and Linden to the pack meeting")));
+    }
+
+    /// <summary>
+    /// An "everyone" calendar needs nobody named. A holiday calendar is the case: the day is the
+    /// whole family's without anyone being invited to it.
+    /// </summary>
+    [Fact]
+    public void Resolve_AnEveryoneCalendarGoesToEveryColumn()
+    {
+        var mapper = CreateMapper(new CalendarMappingOptions
+        {
+            EveryoneCalendars = { "holidays@group" },
+        });
+
+        Assert.Equal(ColumnSet.People, mapper.Resolve(Event("holidays@group", "Thanksgiving")));
+    }
+
+    /// <summary>
+    /// A calendar the owner has answered is KNOWN, whatever the answer was — including "not
+    /// printed". Holding a calendar they have already told the app to ignore would be nagging.
+    /// </summary>
+    [Fact]
+    public void KnownCalendars_IncludesEveryCalendarTheOwnerHasAnswered()
+    {
+        var mapper = CreateMapper(new CalendarMappingOptions
+        {
+            CalendarColumns = { ["rowan@work"] = PersonColumn.Rowan },
+            FamilyCalendarId = "family@group",
+            SplitCalendars = { "scouts@group" },
+            EveryoneCalendars = { "holidays@group" },
+            NotPrintedCalendars = { "spam@group" },
+        });
+
+        var known = mapper.KnownCalendars();
+
+        Assert.Equal(
+            new[] { "family@group", "holidays@group", "rowan@work", "scouts@group", "spam@group" },
+            known.Order(StringComparer.Ordinal));
+    }
+
     [Fact]
     public void Assign_SetsColumnOnEveryEvent()
     {

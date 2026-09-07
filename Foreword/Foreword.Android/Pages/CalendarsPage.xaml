@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Foreword.Android.Pages.CalendarsPage"
+             Title="Calendars">
+    <!--
+        C1 in the mockups: which calendar feeds which column.
+
+        THIS SCREEN REPLACES A JSON EDITOR. The mapping was a mono Editor on the Setup page where
+        the owner hand-typed CalendarMappingOptions as JSON — opaque Google ids paired with column
+        names, no validation, and no way to know what you had. This is that, as a list, with the
+        real names: IGoogleCalendarClient.ListCalendars() already returned id to summary and NOTHING
+        HAS EVER CALLED IT. It was written for this screen and never wired to one, so the names cost
+        no new API work.
+
+        THERE IS NO REFRESH BUTTON. The calendar list is re-read every morning anyway, so a manual
+        one would usually show the same list — the kind of button Score's settings refuses on
+        principle. What a new calendar gets instead is the "Arrived since you last looked" group,
+        which needs nothing pressed.
+
+        Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c
+    -->
+    <ScrollView>
+        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
+
+            <Label Text="Calendars" Style="{StaticResource DisplayLabel}" />
+
+            <Label x:Name="StatusLabel" Style="{StaticResource StatusLine}" Margin="0,8,0,0" />
+
+            <!-- The groups are built in code: how many calendars there are, and which of them are
+                 new, is not known until Google answers. -->
+            <VerticalStackLayout x:Name="Groups" />
+
+            <Label Text="Names come from Google — you never type an id."
+                   Style="{StaticResource CardCaption}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
