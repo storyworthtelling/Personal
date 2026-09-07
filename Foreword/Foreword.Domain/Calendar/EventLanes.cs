@@ -33,6 +33,27 @@ public readonly record struct PlacedEvent(CalendarEvent Event, int Lane, int Lan
 public static class EventLanes
 {
     /// <summary>
+    /// How many boxes a column can hold and still be read. A fifth of a US Letter page is about
+    /// ninety points wide; halved is forty-five, which holds a few words at the printed label size.
+    /// A third of it is three characters, which is a different way of losing the event.
+    ///
+    /// <para>So beyond this the extras fall to <i>Also today</i> — the owner asked for all of them,
+    /// however many, and a list in full is a better answer than a box nobody can read.</para>
+    /// </summary>
+    public const int LegibleLanes = 2;
+
+    /// <summary>The events that are drawn on the grid: containers, and anything inside the width.</summary>
+    public static IReadOnlyList<PlacedEvent> Drawn(IReadOnlyList<PlacedEvent> placed) =>
+        placed.Where(p => p.IsContainer || p.Lane < LegibleLanes).ToList();
+
+    /// <summary>
+    /// The events written into <i>Also today</i> instead. Never a container: the work block is the
+    /// backdrop, and one listed under the day would read as something squeezed out of its own hours.
+    /// </summary>
+    public static IReadOnlyList<PlacedEvent> Overflow(IReadOnlyList<PlacedEvent> placed) =>
+        placed.Where(p => !p.IsContainer && p.Lane >= LegibleLanes).ToList();
+
+    /// <summary>
     /// Places every event, containers first and in draw order. Nothing is ever dropped: an event
     /// the owner put in the calendar is on the page, whatever it overlaps.
     /// </summary>
@@ -103,7 +124,10 @@ public static class EventLanes
     {
         foreach (var (e, lane) in cluster)
         {
-            placed.Add(new PlacedEvent(e, lane, Math.Max(lanes, 1), IsContainer: false));
+            // Sized to what is DRAWN, not to what the cluster contains: three at once means two
+            // half-width boxes and one line in the list, never three boxes at a third each.
+            placed.Add(new PlacedEvent(
+                e, lane, Math.Clamp(lanes, 1, LegibleLanes), IsContainer: false));
         }
     }
 }
