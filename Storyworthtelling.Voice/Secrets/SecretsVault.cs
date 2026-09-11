@@ -36,6 +36,13 @@ public sealed record SecretsVault
 
     public MusicSecrets Music { get; init; } = new();
 
+    // Google Maps Platform. ONE key, because Maps Platform bills a project rather than a product:
+    // routes, weather, pollen and air quality are the same credential with different APIs enabled on
+    // it. Four fields would invite four places to paste the same string and three of them to go
+    // stale. The house is here beside it because it is the other thing every one of those calls
+    // needs — where the family's day starts, and where the weather is.
+    public MapsSecrets Maps { get; init; } = new();
+
     // Score's TIDAL APP credentials — the registered developer app, which is one thing
     // the household owns however many people listen. The per-person half of TIDAL (the
     // refresh token that carries someone's subscription) is deliberately NOT here: see
@@ -108,6 +115,15 @@ public sealed record PlaidSecrets(
 public sealed record PlaidItem(string ItemId = "", string AccessToken = "", string Name = "");
 
 public sealed record NytSecrets(string SessionCookie = "", string ApiKey = "");
+
+// The Maps Platform key and the household's address. Coordinates rather than only the address
+// because the weather, pollen and air-quality APIs take a point and the Routes API takes text: the
+// address is what a drive is measured from, the point is what the forecast is for.
+public sealed record MapsSecrets(
+    string ApiKey = "",
+    string HomeAddress = "",
+    double HomeLatitude = 0,
+    double HomeLongitude = 0);
 
 public sealed record RemarkableSecrets(string DeviceToken = "");
 
