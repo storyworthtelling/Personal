@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Foreword.Domain.Interfaces;
+using Foreword.Domain.Brief;
 using Foreword.Domain.Models;
 using Storyworthtelling.Remarkable;
 
@@ -62,26 +63,45 @@ public class CrosswordDeliveryService(
         if (allStories.Count == 0)
             return (crosswordBytes, "puzzle only — no stories returned by API");
 
+        // Deduplicated and ordered before anything is fetched: a story that appears under Home and
+        // again under its own section was being fetched twice AND printed twice, so the owner
+        // counted eight stories and found seven.
+        var stories = BriefSelection.Choose(allStories);
+
         var articles = new List<ArticleContent>();
-        foreach (var story in allStories)
+        foreach (var story in stories)
         {
             try
             {
                 var article = await articleClient.GetArticle(story.Url);
                 logger.LogInformation("[FULL ARTICLE] {Title} — {Blocks} block(s)", article.Title, article.Body.Count);
-                articles.Add(article);
+
+                // The fetcher can succeed and return nothing usable, which reads on the page exactly
+                // like a story with no words in it. That is the abstract's case too.
+                if (article.Body.OfType<TextBlock>().Any(b => !string.IsNullOrWhiteSpace(b.Text)))
+                {
+                    articles.Add(article);
+                    continue;
+                }
+
+                logger.LogWarning("[EMPTY ARTICLE] {Title} fetched with no text", story.Title);
+                Fallback(story);
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "[ABSTRACT FALLBACK] {Title}: {Error}", story.Title, ex.Message);
-                if (!string.IsNullOrEmpty(story.Abstract))
-                    articles.Add(new ArticleContent
-                    {
-                        Title = story.Title,
-                        Byline = story.Byline,
-                        Section = story.Section,
-                        Body = [new TextBlock { Text = story.Abstract }]
-                    });
+                Fallback(story);
+            }
+        }
+
+        // The abstract standing in for a story that did not fetch — MARKED, so the page can say so
+        // (bug B1). A story with no abstract either is dropped rather than printed as a headline
+        // over white space, which is a fault printed at full size rather than a story.
+        void Fallback(TopStory story)
+        {
+            if (BriefSelection.FromAbstract(story) is { } stub)
+            {
+                articles.Add(stub);
             }
         }
 
@@ -92,7 +112,12 @@ public class CrosswordDeliveryService(
         {
             logger.LogInformation("Composing {Count} articles with crossword for {Date}", articles.Count, date);
             var composed = pdfComposer.Compose(articles, crosswordBytes);
-            return (composed, $"{articles.Count} article(s) + puzzle");
+
+            // The status sentence counts the ones that fell back, so a morning of failed fetches is
+            // visible on the Settings screen rather than only in a log nobody opens.
+            var stubs = articles.Count(article => article.AbstractOnly);
+            var note = stubs == 0 ? string.Empty : $" ({stubs} abstract-only)";
+            return (composed, $"{articles.Count} article(s){note} + puzzle");
         }
         catch (Exception ex)
         {
