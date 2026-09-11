@@ -67,6 +67,10 @@ public static class PreferenceKeys
     public const string HomeLatitude = "HomeLatitude";
     public const string HomeLongitude = "HomeLongitude";
 
+    // Foreword's own tasks — the rules Google Tasks cannot express — and the away pause.
+    public const string TasksJson = "TasksJson";
+    public const string AwayJson = "AwayJson";
+
     /// <summary>
     /// The nine keys a phone was <b>already storing</b> before the rename. These are what may never
     /// move: the guard freezes this list exactly, in order.
@@ -92,6 +96,6 @@ public static class PreferenceKeys
     public static IReadOnlyList<string> All { get; } =
         [
             .. Frozen, WorkScheduleJson, SeenCalendarIds, ScheduledDeliveryTime,
-            MapsApiKey, HomeAddress, HomeLatitude, HomeLongitude,
+            MapsApiKey, HomeAddress, HomeLatitude, HomeLongitude, TasksJson, AwayJson,
         ];
 }

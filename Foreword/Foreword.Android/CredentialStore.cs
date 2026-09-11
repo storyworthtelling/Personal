@@ -106,6 +106,20 @@ public static class CredentialStore
         set => Preferences.Set(PreferenceKeys.HomeLongitude, value);
     }
 
+    // Foreword's own rules and smart tasks. Google's once tasks are NOT here — they are mirrored
+    // from Google so the two can never disagree about a title or a date.
+    public static string TasksJson
+    {
+        get => Preferences.Get(PreferenceKeys.TasksJson, string.Empty);
+        set => Preferences.Set(PreferenceKeys.TasksJson, value);
+    }
+
+    public static string AwayJson
+    {
+        get => Preferences.Get(PreferenceKeys.AwayJson, string.Empty);
+        set => Preferences.Set(PreferenceKeys.AwayJson, value);
+    }
+
     public static string VaultPassphrase
     {
         get => Preferences.Get(PreferenceKeys.VaultPassphrase, string.Empty);

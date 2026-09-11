@@ -77,14 +77,15 @@ public class SampleDayTests
             ],
             Tasks =
             [
-                Printed("Vitamins"),
-                Printed("Mow the lawn", day.AddDays(-1)),
-                Printed("Read the brief"),
+                Printed("Vitamins", kind: TaskKind.Rule),
+                Printed("Mow the lawn", note: "moved from Saturday \u2014 not enough dry hours",
+                    kind: TaskKind.Smart),
+                Printed("Read the brief", kind: TaskKind.Rule),
                 Printed("Call Mom"),
-                Printed("Book Linden\u2019s orthodontist follow-up"),
+                Printed("Book Linden\u2019s orthodontist follow-up", due: day.AddDays(5)),
                 Printed("Pick up the dry cleaning"),
                 Printed("Order Wren\u2019s cleats"),
-                Printed("Bins out"),
+                Printed("Bins out", note: "collection is Monday", kind: TaskKind.Rule),
                 Printed("Sign Wren\u2019s permission slip tonight"),
             ],
             Weather = new WeatherReport
