@@ -6,11 +6,13 @@ using Microsoft.Extensions.Options;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using Foreword.Domain.Interfaces;
+using Foreword.Infrastructure.Brief;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Delivery;
 using Foreword.Infrastructure.Google;
 using Foreword.Infrastructure.Handwriting;
 using Foreword.Infrastructure.Maps;
+using Foreword.Infrastructure.Tasks;
 using Foreword.Infrastructure.Nyt;
 using Foreword.Infrastructure.Pdf;
 using Foreword.Android.Google;
@@ -114,6 +116,15 @@ public static class MauiProgram
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         builder.Services.AddTransient<IPdfComposer, PdfComposer>();
+
+        // The brief's own sources. Both keyless (F14, F15) and both quiet on failure — a comic and
+        // a factoid are the two most skippable things in the document.
+        builder.Services.AddSingleton<IBriefPreferences, BriefSettings>();
+        builder.Services.AddHttpClient<IComicClient, XkcdClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<IHistoryClient, WikipediaHistoryClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+
         builder.Services.AddTransient<CrosswordDeliveryService>();
 
         // Calendar + checklist feature. Tokens come from the device account via AccountManager;
@@ -129,6 +140,10 @@ public static class MauiProgram
         builder.Services.AddTransient<WorkScheduleAugmenter>();
         builder.Services.AddTransient<IOutlookSelector, OutlookSelector>();
         builder.Services.AddTransient<IDayPdfComposer, DayPdfComposer>();
+        builder.Services.AddSingleton<ITaskStore, TaskStore>();
+        builder.Services.AddTransient<TaskEditor>();
+        builder.Services.AddHttpClient<ITaskReadingClient, ClaudeTaskReader>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         // Maps Platform: the drives on the calendar page and everything on the weather page. Both

@@ -298,6 +298,16 @@
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
     </Style>
+    <!-- Segmented control (DESIGN.md §8): named options in one row, the picked one washed.
+         SemiBold is set on the picked segment at run time, so this is the resting face. -->
+    <Style x:Key="SegmentLabel" TargetType="Label">
+        <Setter Property="FontFamily" Value="Sans" />
+        <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
+        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+        <Setter Property="VerticalTextAlignment" Value="Center" />
+    </Style>
+
     <Style x:Key="ChipLabelError" TargetType="Label">
         <Setter Property="FontFamily" Value="SansSemibold" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />

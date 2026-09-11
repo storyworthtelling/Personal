@@ -4,6 +4,7 @@ using Moq;
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Document;
 using Foreword.Domain.Interfaces;
+using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Calendar;
@@ -28,6 +29,8 @@ public class DailyDeliveryServiceTests
     private readonly Mock<IRouteClient> routes = new();
     private readonly Mock<IHandwritingExtractor> handwriting = new();
     private readonly Mock<IRemarkableClient> remarkable = new();
+    private readonly Mock<ITaskReadingClient> taskReader = new();
+    private readonly FakeTaskStore taskStore = new();
 
     public DailyDeliveryServiceTests()
     {
@@ -41,6 +44,7 @@ public class DailyDeliveryServiceTests
             .ReturnsAsync(TravelLegs.None);
         // No prior documents by default.
         remarkable.Setup(r => r.DownloadByTitle(It.IsAny<string>())).ReturnsAsync((RemarkableDoc?)null);
+        taskReader.Setup(r => r.Read(It.IsAny<string>())).ReturnsAsync((ForewordTask?)null);
     }
 
     private DailyDeliveryService CreateService() =>
@@ -48,11 +52,26 @@ public class DailyDeliveryServiceTests
             new CalendarColumnMapper(Options.Create(new CalendarMappingOptions())),
             new WorkScheduleAugmenter(Options.Create(new WorkScheduleOptions())),
             new OutlookSelector(),
-            dayComposer.Object, weather.Object, routes.Object,
+            taskStore,
+            taskReader.Object, dayComposer.Object, weather.Object, routes.Object,
             handwriting.Object, remarkable.Object,
             Options.Create(new AnthropicOptions { ConfidenceThreshold = 0.6 }),
             Options.Create(new GoogleOptions()),
             NullLogger<DailyDeliveryService>.Instance);
+
+    /// <summary>Foreword's own rules. Empty unless a test puts something in it.</summary>
+    private sealed class FakeTaskStore : ITaskStore
+    {
+        private readonly Dictionary<string, ForewordTask> tasks = [];
+
+        public IReadOnlyList<ForewordTask> All() => [.. tasks.Values];
+
+        public void Save(ForewordTask task) => tasks[task.Id] = task;
+
+        public void Delete(string id) => tasks.Remove(id);
+
+        public AwayPause Away { get; set; } = AwayPause.None;
+    }
 
     private void SetupYesterdayDoc(string title, string id, IReadOnlyList<ParsedNote> notes)
     {
@@ -110,6 +129,60 @@ public class DailyDeliveryServiceTests
 
         tasks.Verify(t => t.AddTask("renew passport", It.IsAny<DateOnly?>()), Times.Once);
         remarkable.Verify(r => r.MoveToTrash("day-y"), Times.Once);
+    }
+
+    /// <summary>
+    /// A rule typed on a dead network becomes a rule on the next run that reaches Claude, without
+    /// anyone retyping it — and it keeps its id, so the task the owner has been looking at on the
+    /// list screen is the one that changes rather than one vanishing and another appearing.
+    /// </summary>
+    [Fact]
+    public async Task ASentenceThatCouldNotBeReadBeforeIsReadAgain()
+    {
+        taskStore.Save(new ForewordTask
+        {
+            Id = "kept",
+            Title = "mow the lawn this weekend if dry",
+            Kind = TaskKind.Once,
+            Unparsed = true,
+            Written = "mow the lawn this weekend if dry",
+        });
+
+        taskReader.Setup(r => r.Read("mow the lawn this weekend if dry"))
+            .ReturnsAsync(new ForewordTask
+            {
+                Id = "fresh", Title = "Mow the lawn", Kind = TaskKind.Smart,
+                Window = TaskWindow.Weekend, DryHoursNeeded = 3,
+            });
+
+        await CreateService().DeliverDailyDocuments(Date);
+
+        var stored = Assert.Single(taskStore.All());
+        Assert.Equal("kept", stored.Id);
+        Assert.Equal(TaskKind.Smart, stored.Kind);
+        Assert.False(stored.Unparsed);
+    }
+
+    /// <summary>
+    /// And when it still cannot be read, it stays exactly as written and is tried again tomorrow.
+    /// Losing it here would lose the sentence on the second bad morning rather than the first.
+    /// </summary>
+    [Fact]
+    public async Task ASentenceThatStillCannotBeReadIsKept()
+    {
+        taskStore.Save(new ForewordTask
+        {
+            Id = "kept", Title = "mow the lawn", Kind = TaskKind.Once,
+            Unparsed = true, Written = "mow the lawn",
+        });
+
+        taskReader.Setup(r => r.Read(It.IsAny<string>())).ThrowsAsync(new HttpRequestException("down"));
+
+        await CreateService().DeliverDailyDocuments(Date);
+
+        var stored = Assert.Single(taskStore.All());
+        Assert.True(stored.Unparsed);
+        Assert.Equal("mow the lawn", stored.Written);
     }
 
     /// <summary>

@@ -96,23 +96,48 @@ public class XamlWellFormedTests
     }
 
     /// <summary>
-    /// Every handler named in XAML exists in the page's code-behind. The compiler catches this,
-    /// but only in CI, because this head needs the MAUI workload to build at all.
+    /// Every handler named in XAML exists in the page's code-behind. The compiler catches this, but
+    /// only in CI, because this head needs the MAUI workload to build at all — so on a machine that
+    /// cannot build the head, this test is the only thing standing between a typo and a crash on
+    /// launch.
+    ///
+    /// <para>It used to enumerate the events it knew about — Clicked, Tapped, TextChanged,
+    /// Unfocused, Toggled — and so it silently ignored every other one. A <c>DateSelected</c>
+    /// handler that did not exist passed this test green, which is the exact failure the test is
+    /// for. An allowlist of event names cannot work here: the list is MAUI's, it is long, and
+    /// nothing reminds anyone to extend it when a screen uses a new control.</para>
+    ///
+    /// <para>So it is inverted. <b>Any</b> attribute whose value reads as a handler — the repo names
+    /// every one <c>OnSomething</c> — is checked, and the few attributes that legitimately carry
+    /// prose are excluded instead. That way a new event is covered by default and the failure mode
+    /// is an occasional complaint about a label rather than an event nobody checks.</para>
     /// </summary>
     [Fact]
     public void EveryXamlHandlerExistsInItsCodeBehind()
     {
+        // Attributes that carry words a person reads, where "On…" is a sentence rather than a
+        // handler. "On call", "Once this weekend".
+        string[] prose = ["Text", "Placeholder", "Title", "ToolTip", "StyleId", "AutomationId"];
+
         var missing = new List<string>();
+
         foreach (var page in XamlFiles().Where(f => File.Exists(f + ".cs")))
         {
             var code = File.ReadAllText(page + ".cs");
+
             foreach (Match m in Regex.Matches(
-                File.ReadAllText(page), @"(?:Clicked|Tapped|TextChanged|Unfocused|Toggled)=""(?<handler>[A-Za-z_][A-Za-z0-9_]*)"""))
+                File.ReadAllText(page),
+                @"(?<attr>[A-Za-z][A-Za-z0-9_.]*)=""(?<handler>On[A-Z][A-Za-z0-9_]*)"""))
             {
+                if (prose.Contains(m.Groups["attr"].Value, StringComparer.Ordinal))
+                {
+                    continue;
+                }
+
                 var handler = m.Groups["handler"].Value;
                 if (!code.Contains($"void {handler}(", StringComparison.Ordinal))
                 {
-                    missing.Add($"{Path.GetFileName(page)}: {handler}");
+                    missing.Add($"{Path.GetFileName(page)}: {m.Groups["attr"].Value}=\"{handler}\"");
                 }
             }
         }
