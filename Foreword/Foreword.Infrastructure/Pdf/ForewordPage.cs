@@ -24,7 +24,8 @@ internal static class ForewordPage
     private static readonly SKColor Identity = AppIdentityTokens.ForewordSunrise;
 
     public static void Draw(
-        SkiaPageLayout layout, DateOnly date, string voice, IReadOnlyList<BriefSection> sections)
+        SkiaPageLayout layout, DateOnly date, string voice, IReadOnlyList<BriefSection> sections,
+        HistoryNote? history = null)
     {
         var kickerFont = SkiaPageLayout.Sans(PaperTypeScale.Label, bold: true);
         var nameFont = SkiaPageLayout.Serif(PaperTypeScale.Display, black: true);
@@ -59,6 +60,7 @@ internal static class ForewordPage
             }
         }
 
+        DrawHistory(layout, history);
         DrawContents(layout, sections);
         DrawMakersMark(layout, sections.Count > 0);
     }
@@ -82,6 +84,41 @@ internal static class ForewordPage
         26 => "twenty-sixth", 27 => "twenty-seventh", 28 => "twenty-eighth",
         29 => "twenty-ninth", 30 => "thirtieth", _ => "thirty-first",
     };
+
+    /// <summary>
+    /// One thing that happened on this date, under the voice.
+    ///
+    /// <para>Set apart and quiet: it is the one line on the document that is neither the owner's
+    /// day nor their reading, and it earns its place by being short. Nothing is drawn when nothing
+    /// qualified — an empty heading over a blank line is worse than no heading.</para>
+    /// </summary>
+    private static void DrawHistory(SkiaPageLayout layout, HistoryNote? history)
+    {
+        if (history is null)
+        {
+            return;
+        }
+
+        var yearFont = SkiaPageLayout.Serif(PaperTypeScale.Heading);
+        var textFont = SkiaPageLayout.Serif(PaperTypeScale.Body);
+
+        layout.Advance(24);
+        layout.DrawCentered(history.Year.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            yearFont, SkiaPageLayout.LineHeight(yearFont) + 2);
+
+        // Held to a narrower measure than the page, so it reads as an aside rather than as a
+        // paragraph of the brief.
+        var measure = layout.ContentWidth * 0.72;
+        var left = SkiaPageLayout.Margin + (layout.ContentWidth - measure) / 2;
+
+        foreach (var line in SkiaText.Wrap(textFont, history.Text, (float)measure))
+        {
+            layout.DrawText(line, textFont, left, layout.Y, measure,
+                SkiaPageLayout.LineHeight(textFont, 1.4), TextAlign.TopCenter,
+                SkiaPageLayout.InkSoft);
+            layout.Advance(SkiaPageLayout.LineHeight(textFont, 1.4));
+        }
+    }
 
     /// <summary>
     /// The contents, at the foot. Measured from the bottom rather than flowed from the voice, so a

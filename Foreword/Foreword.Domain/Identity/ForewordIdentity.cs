@@ -71,6 +71,17 @@ public static class PreferenceKeys
     public const string TasksJson = "TasksJson";
     public const string AwayJson = "AwayJson";
 
+    // Where the brief comes from: the feed list, and how much of the paper it carries.
+    public const string FeedsJson = "FeedsJson";
+    public const string NewsCount = "NewsCount";
+    public const string OpinionCount = "OpinionCount";
+
+    // The highest xkcd number already printed. "Whatever you have not seen" needs a mark.
+    public const string SeenComic = "SeenComic";
+
+    // The reading taste profile's local copy. The canonical one is Drive JSON (D29).
+    public const string TasteJson = "TasteJson";
+
     /// <summary>
     /// The nine keys a phone was <b>already storing</b> before the rename. These are what may never
     /// move: the guard freezes this list exactly, in order.
@@ -97,5 +108,6 @@ public static class PreferenceKeys
         [
             .. Frozen, WorkScheduleJson, SeenCalendarIds, ScheduledDeliveryTime,
             MapsApiKey, HomeAddress, HomeLatitude, HomeLongitude, TasksJson, AwayJson,
+            FeedsJson, NewsCount, OpinionCount, SeenComic, TasteJson,
         ];
 }
