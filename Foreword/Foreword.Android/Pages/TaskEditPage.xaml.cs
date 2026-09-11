@@ -329,9 +329,21 @@ internal static class CommittingControls
         return entry;
     }
 
+    /// <summary>
+    /// <c>DateChangedEventArgs.NewDate</c> is nullable in this MAUI version. A cleared date commits
+    /// nothing rather than committing today: "due today" and "no date" are different tasks, and
+    /// guessing between them on the owner's behalf is the wrong way round.
+    /// </summary>
     public static DatePicker Committing(this DatePicker picker, Action<DateTime> commit)
     {
-        picker.DateSelected += (_, e) => commit(e.NewDate);
+        picker.DateSelected += (_, e) =>
+        {
+            if (e.NewDate is { } date)
+            {
+                commit(date);
+            }
+        };
+
         return picker;
     }
 }

@@ -100,12 +100,20 @@ public partial class AwayPage : ContentPage
         return control;
     }
 
+    /// <summary>
+    /// <c>DatePicker.Date</c> is nullable in this MAUI version, so a picker with no date set is a
+    /// trip with no date rather than one silently starting today — which would pause the mornings
+    /// nobody asked to pause.
+    /// </summary>
     private void OnDatesChanged(object sender, DateChangedEventArgs e) =>
         Commit(store.Away with
         {
-            From = DateOnly.FromDateTime(FromPicker.Date),
-            Until = DateOnly.FromDateTime(UntilPicker.Date),
+            From = Picked(FromPicker),
+            Until = Picked(UntilPicker),
         });
+
+    private static DateOnly? Picked(DatePicker picker) =>
+        picker.Date is { } date ? DateOnly.FromDateTime(date) : null;
 
     /// <summary>
     /// Clearing the dates rather than a separate "away" flag, because away IS the date range — a

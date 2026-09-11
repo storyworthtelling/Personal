@@ -174,6 +174,16 @@ documents (The Day, The Brief, Prayer). Gate deliverables live in the project fo
 surfacing anything that cannot be built as drawn rather than substituting:
 `https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c`
 
+- **Checking a MAUI member without the workload.** The Android head cannot be compiled here, so CI
+  was finding one API mistake per round — `DatePicker.Date` and `DateChangedEventArgs.NewDate` are
+  `DateTime?`, and `Grid` has *both* a static `SetColumn(BindableObject, int)` and an instance
+  `SetColumn(IView, int)`, so the unqualified call binds to the instance one and will not compile
+  from a static context. The signatures can be read locally instead: pull
+  `Microsoft.Maui.Controls.Core`, `Microsoft.Maui.Core` and `Microsoft.Maui.Graphics` from nuget.org
+  (flat-container URLs), unzip them, and reflect over `lib/net10.0-android*/` with a
+  `MetadataLoadContext` — the runtime directory (`dotnet --list-runtimes`) has to be in the resolver
+  path, and `Microsoft.Maui.Controls` itself is a metapackage carrying no assemblies. That is the
+  standing "read member names out of the package's own metadata" rule, made possible for this head.
 - Tests: `dotnet test Foreword/Foreword.Tests/Foreword.Tests.csproj -p:ForewordTfms=net10.0`
   (the switch builds Infrastructure for the desktop TFM only, so the suite runs without the
   MAUI/Android workload). The Android head cannot be compiled in a network-restricted sandbox —
