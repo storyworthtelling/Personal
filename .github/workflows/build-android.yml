@@ -23,7 +23,31 @@ on:
       - '.github/workflows/build-android.yml'
 
 jobs:
+  # Foreword's suite had never run in CI. This workflow built the APK, read the icon back out of it
+  # and published it to the rolling release — and ran no tests, so every guard in the app (the frozen
+  # package id, the delivery worker's registered name, the vault's wire key, the XAML checks, the
+  # design tokens) was enforced only by somebody remembering to run them locally. A green build meant
+  # "it compiles", in the tone of a workflow that had checked something.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android head, which would need the MAUI/Android workload. The -p:ForewordTfms switch
+      # keeps Infrastructure single-targeted at net10.0, exactly as the local command does.
+      - name: Run tests
+        run: >
+          dotnet test Foreword/Foreword.Tests/Foreword.Tests.csproj
+          -p:ForewordTfms=net10.0
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     # actions: write lets the prune step delete artifacts from older runs;
     # contents: write lets the rolling-release step publish the signed APK.
