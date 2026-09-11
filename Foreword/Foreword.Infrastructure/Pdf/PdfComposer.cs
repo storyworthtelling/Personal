@@ -18,27 +18,68 @@ public class PdfComposer : IPdfComposer
         this.logger = logger;
     }
 
-    public byte[] Compose(IReadOnlyList<ArticleContent> articles, byte[] crosswordPdfBytes)
+    public byte[] Compose(IReadOnlyList<ArticleContent> articles, byte[] crosswordPdfBytes) =>
+        Compose(articles, crosswordPdfBytes, DateOnly.FromDateTime(DateTime.Today), string.Empty);
+
+    /// <summary>
+    /// The whole brief: the foreword page, the stories, then the puzzle.
+    /// </summary>
+    public byte[] Compose(
+        IReadOnlyList<ArticleContent> articles, byte[] crosswordPdfBytes, DateOnly date, string voice)
     {
-        var newsPdfBytes = ComposeNews(articles);
+        // The contents can only be written once the pages exist, so the stories are composed first
+        // and their page count read back — a contents page that guessed its own lengths would be
+        // wrong on exactly the mornings a story ran long.
+        var storyPages = PdfMerger.PageCount(ComposeNews(articles));
+
+        var sections = new List<Domain.Brief.BriefSection>
+        {
+            new("The news", articles.Count(a => !Opinion(a)), storyPages),
+            new("Opinion", articles.Count(Opinion), 0),
+            new("The crossword", null, PdfMerger.PageCount(crosswordPdfBytes)),
+        };
+
+        var newsPdfBytes = ComposeNews(
+            articles, layout => ForewordPage.Draw(layout, date, voice, sections));
+
         return newsPdfBytes.Length == 0
             ? crosswordPdfBytes
             : PdfMerger.Merge(newsPdfBytes, crosswordPdfBytes);
     }
+
+    private static bool Opinion(ArticleContent article) =>
+        article.Section.Contains("Opinion", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The news pages (B2). <b>One story per page</b>, full measure, no columns — at reMarkable size
     /// a two-column measure runs to about thirty characters, well under the sixty-odd a reader
     /// wants. Internal so the pages can be read back and checked without merging a puzzle onto them.
     /// </summary>
-    internal byte[] ComposeNews(IReadOnlyList<ArticleContent> articles)
+    internal byte[] ComposeNews(IReadOnlyList<ArticleContent> articles) =>
+        ComposeNews(articles, foreword: null);
+
+    /// <summary>
+    /// The news pages, optionally opening with the foreword page (B1).
+    /// </summary>
+    internal byte[] ComposeNews(
+        IReadOnlyList<ArticleContent> articles, Action<SkiaPageLayout>? foreword)
     {
-        if (articles.Count == 0)
+        if (articles.Count == 0 && foreword is null)
         {
             return [];
         }
 
         using var layout = new SkiaPageLayout();
+
+        if (foreword is not null)
+        {
+            foreword(layout);
+
+            if (articles.Count > 0)
+            {
+                layout.NewPage();
+            }
+        }
 
         // Positions within each section, so the folio can say "1 of 8" — the question a stack of
         // single-story pages otherwise raises, which is how much of the news is left.
