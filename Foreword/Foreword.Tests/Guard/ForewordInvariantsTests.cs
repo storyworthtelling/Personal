@@ -144,7 +144,20 @@ public class ForewordInvariantsTests
             "LastDeliveryOutcome",
             "LastDeliveryAtUtc",
         ],
-            PreferenceKeys.All);
+            PreferenceKeys.Frozen);
+    }
+
+    /// <summary>
+    /// Keys added after the rename sit <b>after</b> the frozen nine and do not disturb them. A key
+    /// nobody has ever written to has nothing to lose by changing, so freezing new settings for
+    /// their own sake would make this guard about bookkeeping rather than about not orphaning a
+    /// value that already exists on a device.
+    /// </summary>
+    [Fact]
+    public void NewKeysDoNotDisturbTheFrozenOnes()
+    {
+        Assert.Equal(PreferenceKeys.Frozen, PreferenceKeys.All.Take(PreferenceKeys.Frozen.Count));
+        Assert.True(PreferenceKeys.All.Count >= PreferenceKeys.Frozen.Count);
     }
 
     [Fact]

@@ -12,14 +12,35 @@ public class CalendarMappingOptions
     // owning person; etc.
     public Dictionary<string, PersonColumn> CalendarColumns { get; set; } = new();
 
-    // The shared Family calendar whose events are routed to Gwen/Eva by title keyword.
+    // The shared Family calendar whose events are routed by title keyword. Kept as a shorthand for
+    // the one that already exists, so a configuration written before D33 still works untouched;
+    // SplitCalendars is the general form.
     public string FamilyCalendarId { get; set; } = string.Empty;
+
+    // Split by name, for ANY calendar (D33) — a one-field generalisation of FamilyCalendarId rather
+    // than a new mechanism.
+    public List<string> SplitCalendars { get; set; } = [];
+
+    // Calendars whose events belong to the whole family: every column, without needing a name in
+    // the title. A holiday calendar is the case.
+    public List<string> EveryoneCalendars { get; set; } = [];
+
+    // Calendars the owner has decided not to print. Distinct from an UNMAPPED calendar, which is
+    // held and named (D34): this one has been looked at and answered, so it says nothing.
+    public List<string> NotPrintedCalendars { get; set; } = [];
 
     // Column used for events on a calendar that isn't explicitly mapped.
     public PersonColumn DefaultColumn { get; set; } = PersonColumn.Matt;
 
-    // Title keywords that route a Family-calendar event to a kid's column during the
-    // transition before they have dedicated calendars.
+    // Title keywords per person, used when nobody is invited to an event on a shared calendar.
+    // All four, not just the children: an event on a shared calendar can name either parent, and
+    // matching only two of the four is how "Matt and Ashley to dinner" fell through to the default.
     public List<string> GwenKeywords { get; set; } = ["Gwen"];
     public List<string> EvaKeywords { get; set; } = ["Eva"];
+    public List<string> MattKeywords { get; set; } = ["Matt"];
+    public List<string> AshleyKeywords { get; set; } = ["Ashley"];
+
+    // Each person's email addresses. Read FIRST when splitting a shared calendar (D31): an invited
+    // address is a fact about who is going, where a name in a title is a heuristic.
+    public Dictionary<PersonColumn, List<string>> PersonAddresses { get; set; } = new();
 }

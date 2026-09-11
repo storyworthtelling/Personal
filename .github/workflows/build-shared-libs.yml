@@ -22,6 +22,10 @@ on:
       - 'Storyworthtelling.Maui/**'
       - 'Storyworthtelling.Maui.Tests/**'
       - '.github/workflows/build-shared-libs.yml'
+      # The guards in Updates.Tests read the OTHER workflows — that every root test project is run
+      # here, and that every app workflow runs its own app's tests. A change to one of those files
+      # has to be able to trip them, or the guard only fires by luck.
+      - '.github/workflows/build-*.yml'
 
 jobs:
   test:

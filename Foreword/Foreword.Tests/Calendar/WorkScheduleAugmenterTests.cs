@@ -17,7 +17,7 @@ public class WorkScheduleAugmenterTests
         new()
         {
             Title = title,
-            Column = column,
+            Columns = [column],
             IsAllDay = true,
             Start = date.ToDateTime(TimeOnly.MinValue),
             End = date.ToDateTime(TimeOnly.MinValue).AddDays(1)
@@ -29,8 +29,8 @@ public class WorkScheduleAugmenterTests
         var result = CreateAugmenter().Augment([], Weekday);
 
         var blocks = result.Where(e => e.Kind == EventKind.WorkBlock).ToList();
-        Assert.Contains(blocks, b => b.Column == PersonColumn.Matt);
-        Assert.Contains(blocks, b => b.Column == PersonColumn.Ashley);
+        Assert.Contains(blocks, b => b.Columns.Contains(PersonColumn.Matt));
+        Assert.Contains(blocks, b => b.Columns.Contains(PersonColumn.Ashley));
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public class WorkScheduleAugmenterTests
     {
         var result = CreateAugmenter().Augment([], Weekday);
 
-        var matt = result.Single(e => e.Kind == EventKind.WorkBlock && e.Column == PersonColumn.Matt);
+        var matt = result.Single(e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(PersonColumn.Matt));
         Assert.Equal(new TimeOnly(8, 0), TimeOnly.FromDateTime(matt.Start));
         Assert.Equal(new TimeOnly(16, 0), TimeOnly.FromDateTime(matt.End));
     }
@@ -48,7 +48,7 @@ public class WorkScheduleAugmenterTests
     {
         var result = CreateAugmenter().Augment([], Weekday);
 
-        var ashley = result.Single(e => e.Kind == EventKind.WorkBlock && e.Column == PersonColumn.Ashley);
+        var ashley = result.Single(e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(PersonColumn.Ashley));
         Assert.Equal(new TimeOnly(8, 0), TimeOnly.FromDateTime(ashley.Start));
         Assert.Equal(new TimeOnly(15, 30), TimeOnly.FromDateTime(ashley.End));
     }
@@ -68,8 +68,8 @@ public class WorkScheduleAugmenterTests
 
         var result = CreateAugmenter().Augment([off], Weekday);
 
-        Assert.DoesNotContain(result, e => e.Kind == EventKind.WorkBlock && e.Column == PersonColumn.Matt);
-        Assert.Contains(result, e => e.Kind == EventKind.WorkBlock && e.Column == PersonColumn.Ashley);
+        Assert.DoesNotContain(result, e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(PersonColumn.Matt));
+        Assert.Contains(result, e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(PersonColumn.Ashley));
     }
 
     [Fact]

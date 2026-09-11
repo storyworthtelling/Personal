@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Foreword.Domain.Interfaces;
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Handwriting;
@@ -68,9 +69,26 @@ public class DailyDeliveryService(
 
     private async Task<DayAgenda> BuildAgenda(DateOnly date)
     {
-        var events = columnMapper.Assign(await googleCalendar.GetEventsForDay(date));
-        var augmented = workAugmenter.Augment(events, date);
-        return new DayAgenda { Date = date, Events = augmented };
+        var events = await googleCalendar.GetEventsForDay(date);
+
+        // An unmapped calendar is held rather than printed into the default column (D34), and named
+        // on the page. Held BEFORE the columns are assigned: a calendar nobody has mapped has no
+        // column to be assigned to, and the old fallback is exactly the bug.
+        // A calendar the owner has answered with "not printed" is dropped SILENTLY. That is the
+        // difference between it and an unmapped one: this has been looked at and decided, so saying
+        // so every morning would be nagging about a settled question.
+        var wanted = events.Where(e => !columnMapper.IsNotPrinted(e.SourceCalendarId)).ToList();
+
+        var split = HeldCalendars.Split(wanted, columnMapper.KnownCalendars());
+        if (split.Held.Count > 0)
+        {
+            logger.LogInformation(
+                "Holding {Count} unmapped calendar(s): {Calendars}",
+                split.Held.Count, string.Join(", ", split.Held));
+        }
+
+        var augmented = workAugmenter.Augment(columnMapper.Assign(split.Printed), date);
+        return new DayAgenda { Date = date, Events = augmented, HeldCalendars = split.Held };
     }
 
     private async Task<IReadOnlyList<CalendarEvent>> BuildOutlook(DateOnly date)
@@ -128,7 +146,7 @@ public class DailyDeliveryService(
         await googleCalendar.AddEvent(new CalendarEvent
         {
             Title = note.Text,
-            Column = note.Column ?? PersonColumn.Matt,
+            Columns = [note.Column ?? PersonColumn.Matt],
             Start = start,
             End = isAllDay ? start.Date.AddDays(1) : start.AddHours(1),
             IsAllDay = isAllDay

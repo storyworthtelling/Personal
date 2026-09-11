@@ -58,7 +58,17 @@ public partial class SetupPage : ContentPage
             : "Not signed in";
 
         VaultPassphraseEntry.Text = CredentialStore.VaultPassphrase;
-        CalendarMappingEditor.Text = CredentialStore.CalendarMappingJson;
+
+        var mapped = new CalendarSettings();
+        mapped.Reload();
+        var count = mapped.Mapping.CalendarColumns.Count
+            + mapped.Mapping.SplitCalendars.Count
+            + mapped.Mapping.EveryoneCalendars.Count
+            + mapped.Mapping.NotPrintedCalendars.Count
+            + (string.IsNullOrEmpty(mapped.Mapping.FamilyCalendarId) ? 0 : 1);
+        CalendarSummaryLabel.Text = count == 0
+            ? "None set up yet — nothing will print"
+            : $"{count} set up";
 
         BuildNeedsYou();
     }
@@ -311,8 +321,8 @@ public partial class SetupPage : ContentPage
         }
     }
 
-    private void OnCalendarMappingChanged(object sender, TextChangedEventArgs e) =>
-        CredentialStore.CalendarMappingJson = e.NewTextValue?.Trim() ?? string.Empty;
+    private async void OnCalendarsClicked(object sender, EventArgs e) =>
+        await Navigation.PushAsync(new CalendarsPage());
 
     private async void OnDiagnosticsClicked(object sender, EventArgs e) =>
         await Navigation.PushAsync(new DiagnosticsPage());
