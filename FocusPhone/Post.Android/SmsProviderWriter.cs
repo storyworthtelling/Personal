@@ -18,12 +18,17 @@ namespace Post;
 /// </summary>
 internal static class SmsProviderWriter
 {
-    public static void PersistIncoming(Context context, Intent intent)
+    /// <summary>
+    /// Persists the incoming text and returns who it was from and what it said, so the
+    /// caller can raise the notification the provider write itself has no opinion about.
+    /// Null when the intent carried no message parts.
+    /// </summary>
+    public static IncomingSms? PersistIncoming(Context context, Intent intent)
     {
         var messages = Telephony.Sms.Intents.GetMessagesFromIntent(intent);
         if (messages is null || messages.Length == 0)
         {
-            return;
+            return null;
         }
 
         // A long text arrives as several parts of one message; the provider holds one row
@@ -42,5 +47,9 @@ internal static class SmsProviderWriter
         values.Put(Telephony.TextBasedSmsColumns.Seen, 0);
 
         context.ContentResolver?.Insert(Telephony.Sms.Inbox.ContentUri!, values);
+
+        return new IncomingSms(first.OriginatingAddress, body);
     }
 }
+
+internal sealed record IncomingSms(string? Address, string Body);
