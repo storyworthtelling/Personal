@@ -119,6 +119,79 @@ public class EventLanesTests
         Assert.Equal(1, block.Lanes);
     }
 
+    /// <summary>
+    /// A meeting inside the work block has to LOOK inside it.
+    ///
+    /// <para>Taking no lane from it was only half the answer. A container and the meeting inside it
+    /// are then drawn at the same width, one exactly on top of the other — so a nine-to-ten standup
+    /// covers the top of the nine-to-five rather than sitting within it, and the band reads as
+    /// something the meeting interrupted rather than as the day it belongs to. The mockup nests the
+    /// child inside its band; that nesting is a fact about the event, so it is decided here.</para>
+    /// </summary>
+    [Fact]
+    public void AMeetingWhollyInsideAWorkBlockIsMarkedAsNested()
+    {
+        var placed = EventLanes.Place([At(9, 10, "Standup"), At(9, 17, "Work", EventKind.WorkBlock)]);
+
+        Assert.True(placed.Single(p => p.Event.Title == "Standup").IsNested);
+    }
+
+    /// <summary>
+    /// An appointment that <b>breaks</b> the band is not nested — it belongs to the day rather than
+    /// to the work, and the mockup draws it at full column width over the gap it makes. The
+    /// distinction is containment, not overlap: a dentist that runs past the end of the block is a
+    /// different thing from a meeting within it, and drawing them alike is how a day that was
+    /// interrupted looks like a day that went to plan.
+    /// </summary>
+    [Fact]
+    public void AnAppointmentThatBreaksTheBandIsNotNested()
+    {
+        var placed = EventLanes.Place(
+        [
+            At(16, 18, "Dentist"),
+            At(9, 17, "Work", EventKind.WorkBlock),
+        ]);
+
+        Assert.False(placed.Single(p => p.Event.Title == "Dentist").IsNested);
+    }
+
+    [Fact]
+    public void SomethingOutsideTheWorkingDayIsNotNested()
+    {
+        var placed = EventLanes.Place(
+        [
+            At(19, 20, "Dinner"),
+            At(9, 17, "Work", EventKind.WorkBlock),
+        ]);
+
+        Assert.False(placed.Single(p => p.Event.Title == "Dinner").IsNested);
+    }
+
+    /// <summary>A container is not nested inside itself, or inside another one.</summary>
+    [Fact]
+    public void AContainerIsNeverNested()
+    {
+        var placed = EventLanes.Place([At(9, 17, "Work", EventKind.WorkBlock)]);
+
+        Assert.False(placed.Single().IsNested);
+    }
+
+    /// <summary>
+    /// An event exactly filling the block's hours still counts as inside it. A nine-to-five meeting
+    /// on a nine-to-five day is a day spent in one meeting, which is a thing that happens.
+    /// </summary>
+    [Fact]
+    public void AnEventFillingTheBlockExactlyIsStillInsideIt()
+    {
+        var placed = EventLanes.Place(
+        [
+            At(9, 17, "Offsite"),
+            At(9, 17, "Work", EventKind.WorkBlock),
+        ]);
+
+        Assert.True(placed.Single(p => p.Event.Title == "Offsite").IsNested);
+    }
+
     [Fact]
     public void ContainersAreDrawnBeforeEverythingElse()
     {

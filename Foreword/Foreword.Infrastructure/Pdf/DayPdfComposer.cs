@@ -27,6 +27,11 @@ public class DayPdfComposer : IDayPdfComposer
     private const double HeaderHeight = 18;
     private const double HandwritingReserve = 130;
 
+    // How far a meeting sits inside its work block: more on the left than the right, so the band's
+    // own edge stays visible down the side the eye reads from.
+    private const double NestIndent = 7;
+    private const double NestInset = 4;
+
     // Event-box fills, kept as RGB components (as the PdfSharp version was) — not hex string literals.
     // The three fills, as roles at the WASH tier in the document profile — the highlighter band
     // DESIGN.md §3 puts behind full-strength ink, which is exactly what an event box is.
@@ -263,6 +268,19 @@ public class DayPdfComposer : IDayPdfComposer
                 // A container spans the column; everything else takes its lane's share of it.
                 var laneWidth = (colWidth - 2) / placed.Lanes;
                 var x = colsLeft + col * colWidth + 1 + placed.Lane * laneWidth;
+
+                // A meeting inside the work block is drawn INSIDE it, indented from the band's own
+                // edges. Taking no lane from the block was only half of B3: without the indent the
+                // two are drawn at the same width, one exactly over the other, so a nine-to-ten
+                // standup covers the top of the nine-to-five instead of sitting in it — and the
+                // band reads as something the meeting interrupted rather than as the day it
+                // belongs to. An appointment that BREAKS the band is deliberately not indented: it
+                // belongs to the day rather than to the work, and is drawn over the gap it makes.
+                if (placed.IsNested)
+                {
+                    x += NestIndent;
+                    laneWidth -= NestIndent + NestInset;
+                }
 
                 DrawEventBox(layout, x, y, laneWidth, height, e.Title, eventFont,
                     placed.IsContainer ? ContainerFill : TimedFill, placed.IsContainer);

@@ -348,6 +348,42 @@ public class DayPdfComposerTests
         Assert.DoesNotContain("quiet Sunday", silent.GetPage(1).Text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A meeting inside the work block is drawn inside it — checked on the finished page by where
+    /// its letters actually land, since "looks nested" is otherwise a claim no test can make.
+    ///
+    /// <para>The standup's text starts further in than the band's own label, which is what an indent
+    /// looks like from the outside. Without it the two are drawn at the same width, one exactly over
+    /// the other, and the band reads as something the meeting interrupted rather than as the day it
+    /// belongs to.</para>
+    /// </summary>
+    [Fact]
+    public void AMeetingInsideTheWorkBlockIsDrawnInsideIt()
+    {
+        var work = TimedEvent(PersonColumn.Matt, 9, 17, "Work");
+        work.Kind = EventKind.WorkBlock;
+
+        var pdf = composer.Compose(new DayDocument
+        {
+            Date = Today,
+            Agenda = new DayAgenda
+            {
+                Date = Today,
+                Events = [work, TimedEvent(PersonColumn.Matt, 9, 10, "Standup")],
+            },
+        });
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        var words = document.GetPage(1).GetWords().ToList();
+
+        var band = words.Single(w => w.Text == "Work").BoundingBox.Left;
+        var meeting = words.Single(w => w.Text == "Standup").BoundingBox.Left;
+
+        Assert.True(meeting > band,
+            $"The standup starts at {meeting:0.#} and the band's label at {band:0.#} — the meeting "
+            + "is drawn at the band's own edge rather than inside it.");
+    }
+
     private static WeatherReport Forecast() => new()
     {
         Today = new TodayWeather
