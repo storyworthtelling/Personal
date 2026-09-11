@@ -27,6 +27,7 @@ internal sealed class SkiaPageLayout : IDisposable
     // composers used is a colder document that merely looks plausible.
     public static readonly SKColor Ink = PaperPalette.Resolve(PaperRole.Ink, DeviceColorProfile.PaperPro);
     public static readonly SKColor InkMuted = PaperPalette.Resolve(PaperRole.InkMuted, DeviceColorProfile.PaperPro);
+    public static readonly SKColor InkSoft = PaperPalette.Resolve(PaperRole.InkSoft, DeviceColorProfile.PaperPro);
     public static readonly SKColor Hairline = PaperPalette.Resolve(PaperRole.Hairline, DeviceColorProfile.PaperPro);
 
     // The sheet itself. It was white — the newspaper look, decided rather than inherited — and the
@@ -58,6 +59,19 @@ internal sealed class SkiaPageLayout : IDisposable
         var typeface = bold ? EmbeddedTypefaces.SansSemibold : EmbeddedTypefaces.SansRegular;
         return new SKFont(typeface, size) { Edging = SKFontEdging.Antialias, Subpixel = true };
     }
+
+    public static SKFont Serif(float size, bool black = false)
+    {
+        var typeface = black ? EmbeddedTypefaces.SerifBlack : EmbeddedTypefaces.SerifSemibold;
+        return new SKFont(typeface, size) { Edging = SKFontEdging.Antialias, Subpixel = true };
+    }
+
+    /// <summary>
+    /// Pinyon Script — the owner's voice, and nothing else (DESIGN.md §4). Every other line on a
+    /// sheet is Serif or Sans; this hand is what marks a sentence as theirs rather than the app's.
+    /// </summary>
+    public static SKFont Script(float size) =>
+        new(EmbeddedTypefaces.Script, size) { Edging = SKFontEdging.Antialias, Subpixel = true };
 
     // ---- Pagination ----
     public void NewPageIfNeeded(double spaceNeeded)
@@ -131,6 +145,35 @@ internal sealed class SkiaPageLayout : IDisposable
         }
     }
 
+    /// <summary>
+    /// Wraps text inside a box and returns the height it used. Bounded by <paramref name="maxLines"/>,
+    /// with the last line truncated if it runs on — a box on a composed page has a size decided
+    /// before the text is known, and text that quietly runs past it is not clipped by Skia: it is
+    /// drawn, off the edge of the sheet or under whatever is painted next.
+    /// </summary>
+    public double MeasureWrappedIn(string text, SKFont font, double width,
+        int maxLines, double lineSpacing = 1.15) =>
+        Math.Min(SkiaText.Wrap(font, text, (float)width).Count, maxLines)
+        * LineHeight(font, lineSpacing);
+
+    public double DrawWrappedIn(string text, SKFont font, double x, double y, double width,
+        int maxLines, SKColor? color = null, double lineSpacing = 1.15)
+    {
+        var lineHeight = LineHeight(font, lineSpacing);
+        var lines = SkiaText.Wrap(font, text, (float)width);
+        var drawn = 0.0;
+
+        for (var i = 0; i < lines.Count && i < maxLines; i++)
+        {
+            var last = i == maxLines - 1 && lines.Count > maxLines;
+            DrawText(last ? Truncate(lines[i], font, width) : lines[i], font,
+                Rect(x, y + drawn, width, lineHeight), TextAlign.TopLeft, color);
+            drawn += lineHeight;
+        }
+
+        return drawn;
+    }
+
     public string Truncate(string text, SKFont font, double maxWidth)
     {
         if (font.MeasureText(text) <= maxWidth || text.Length == 0)
@@ -165,6 +208,49 @@ internal sealed class SkiaPageLayout : IDisposable
             };
             canvas.DrawRect(rect, strokePaint);
         }
+    }
+
+    /// <summary>
+    /// A rectangle with rounded corners on <b>one side only</b>, which is the binder-tab shape
+    /// (§10): square on the page side so the seam closes, rounded on the outer side.
+    /// </summary>
+    public void DrawTabRect(double x, double y, double w, double h,
+        float radius, bool roundRight, SKColor fill, SKColor stroke, float strokeWidth)
+    {
+        var rect = Rect(x, y, w, h);
+        var zero = new SKPoint(0, 0);
+        var round = new SKPoint(radius, radius);
+
+        // Clockwise from the top left, as SKRoundRect takes them.
+        var corners = roundRight
+            ? new[] { zero, round, round, zero }
+            : new[] { round, zero, zero, round };
+
+        using var shape = new SKRoundRect();
+        shape.SetRectRadii(rect, corners);
+
+        using var fillPaint = new SKPaint { Color = fill, IsAntialias = true, Style = SKPaintStyle.Fill };
+        canvas.DrawRoundRect(shape, fillPaint);
+
+        using var strokePaint = new SKPaint
+        {
+            Color = stroke, StrokeWidth = strokeWidth, IsAntialias = true, Style = SKPaintStyle.Stroke,
+        };
+        canvas.DrawRoundRect(shape, strokePaint);
+    }
+
+    /// <summary>
+    /// Draws <paramref name="draw"/> rotated about a point, with the origin moved there — for a
+    /// label that runs down a tab. The canvas state is saved and restored, so a caller cannot leave
+    /// the page rotated for everything after it.
+    /// </summary>
+    public void Rotated(double x, double y, float degrees, Action draw)
+    {
+        canvas.Save();
+        canvas.Translate((float)x, (float)y);
+        canvas.RotateDegrees(degrees);
+        draw();
+        canvas.Restore();
     }
 
     public void DrawImage(byte[] png, double x, double y, double w, double h)
