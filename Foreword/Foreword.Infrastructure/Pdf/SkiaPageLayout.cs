@@ -29,6 +29,12 @@ internal sealed class SkiaPageLayout : IDisposable
     public static readonly SKColor InkMuted = PaperPalette.Resolve(PaperRole.InkMuted, DeviceColorProfile.PaperPro);
     public static readonly SKColor Hairline = PaperPalette.Resolve(PaperRole.Hairline, DeviceColorProfile.PaperPro);
 
+    // The sheet itself. It was white — the newspaper look, decided rather than inherited — and the
+    // owner has since chosen the device's own warm ground instead, so a page in the hand and the
+    // same page on the tablet are the same colour rather than two shades of nearly-white lying
+    // next to each other.
+    public static readonly SKColor Ground = PaperPalette.Resolve(PaperRole.Ground, DeviceColorProfile.PaperPro);
+
     private readonly VectorPdfSink sink = new();
 
     private SKCanvas canvas = null!;
@@ -196,10 +202,7 @@ internal sealed class SkiaPageLayout : IDisposable
         // No scale: a PDF's user space is already 1/72 inch, which is the unit every measurement in
         // the composers is written in. The raster path only scaled because a bitmap has pixels.
         canvas = sink.BeginPage((float)PageWidth, (float)PageHeight);
-        // The ground stays white — the newspaper look, decided rather than inherited. The device's
-        // own warm ground is what PaperRole.Ground would give, and swapping to it is a design
-        // decision for the owner, not a tidy-up.
-        canvas.Clear(SKColors.White);
+        canvas.Clear(Ground);
         Y = Margin;
     }
 

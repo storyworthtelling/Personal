@@ -48,9 +48,12 @@ public class PrintedTypeScaleTests
     /// near-black and its hairline a paper-cream grey; pure black on a rule of pure grey is a
     /// different, colder document that happens to look plausible, which is why nothing caught it.
     ///
-    /// <para>The ground is the one exemption and it is deliberate: the sheets are drawn white for
-    /// the newspaper look rather than on the device's warm ground, which is a design decision
-    /// standing until the owner says otherwise.</para>
+    /// <para>The ground <b>was</b> the one exemption — the sheets were drawn white for the
+    /// newspaper look rather than on the device's warm ground, a design decision left standing
+    /// until the owner said otherwise. They have: the sheets take the device's warm ground, so the
+    /// exemption is gone and the guard covers every colour in the folder without an escape hatch.
+    /// White is the cheapest colour in the world to reach for; leaving the hole open would have
+    /// meant the next ground drawn in it was never asked about.</para>
     ///
     /// <para><b>It also catches a hand-mixed colour</b>, which the first version of this guard did
     /// not. It looked only for <c>SKColors.</c> and passed happily over
@@ -70,11 +73,6 @@ public class PrintedTypeScaleTests
 
             foreach (Match match in Regex.Matches(source, @"SKColors\.(?<name>\w+)"))
             {
-                if (match.Groups["name"].Value == "White")
-                {
-                    continue;   // the ground, exempted above
-                }
-
                 offenders.Add($"{Path.GetFileName(file)}: {match.Value}");
             }
 
