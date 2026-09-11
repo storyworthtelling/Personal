@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Calendar;
+using Foreword.Domain.Document;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Handwriting;
@@ -10,8 +11,8 @@ using Storyworthtelling.Remarkable;
 
 namespace Foreword.Infrastructure.Delivery;
 
-// Orchestrates the daily calendar + checklist delivery: reads back yesterday's hand-written
-// notes, builds today's agenda/outlook/tasks, uploads the two new documents, and trashes
+// Orchestrates the morning delivery: reads back yesterday's hand-written notes, builds today's
+// agenda, outlook, tasks, weather and travel, uploads ONE four-page document, and trashes
 // yesterday's once today's upload succeeds.
 public class DailyDeliveryService(
     IGoogleCalendarClient googleCalendar,
@@ -19,8 +20,9 @@ public class DailyDeliveryService(
     CalendarColumnMapper columnMapper,
     WorkScheduleAugmenter workAugmenter,
     IOutlookSelector outlookSelector,
-    ICalendarPdfComposer calendarComposer,
-    IChecklistPdfComposer checklistComposer,
+    IDayPdfComposer dayComposer,
+    IWeatherClient weather,
+    IRouteClient routes,
     IHandwritingExtractor handwriting,
     IRemarkableClient remarkable,
     IOptions<AnthropicOptions> anthropicOptions,
@@ -34,19 +36,24 @@ public class DailyDeliveryService(
         var (carryovers, yesterdayDocIds) = await ReadBackYesterday(date);
 
         var agenda = await BuildAgenda(date);
+        agenda.Travel = await MeasureTravel(agenda);
         var outlook = await BuildOutlook(date);
         var tasks = await googleTasks.GetMyTasks();
 
-        var calendarPdf = calendarComposer.Compose(agenda, outlook, carryovers);
-        var checklistPdf = checklistComposer.Compose(tasks, date, carryovers);
+        var document = new DayDocument
+        {
+            Date = date,
+            Agenda = agenda,
+            Outlook = outlook,
+            Tasks = tasks,
+            Weather = await ReadWeather(date),
+            UnreadableCarryovers = carryovers,
+        };
 
-        var calendarUploaded = await TryUpload(CalendarTitle(date), calendarPdf);
-        var checklistUploaded = await TryUpload(ChecklistTitle(date), checklistPdf);
-
-        if (calendarUploaded && checklistUploaded)
+        if (await TryUpload(DayTitles.Document(date), dayComposer.Compose(document)))
             await TrashDocs(yesterdayDocIds);
         else
-            logger.LogWarning("Skipping trash of yesterday's documents because an upload failed for {Date}", date);
+            logger.LogWarning("Skipping trash of yesterday's documents because the upload failed for {Date}", date);
     }
 
     // Creates the Gwen and Eva calendars if they do not yet exist. Called once at startup.
@@ -105,8 +112,11 @@ public class DailyDeliveryService(
         var docIds = new List<string>();
         var threshold = anthropicOptions.Value.ConfidenceThreshold;
 
-        // Best-effort: a failure here (e.g. the reMarkable read path) must not block today's docs.
-        foreach (var title in new[] { CalendarTitle(yesterday), ChecklistTitle(yesterday) })
+        // Best-effort: a failure here (e.g. the reMarkable read path) must not block today's
+        // document. Every title yesterday's sheets might be under, including the two the old
+        // build used — see DayTitles.ToReadBack, which is what stops the merge silently
+        // abandoning whatever was written on the morning it ships.
+        foreach (var title in DayTitles.ToReadBack(yesterday))
         {
             try
             {
@@ -185,6 +195,61 @@ public class DailyDeliveryService(
         }
     }
 
-    private static string CalendarTitle(DateOnly date) => $"Daily Calendar {date:yyyy-MM-dd}";
-    private static string ChecklistTitle(DateOnly date) => $"Daily Checklist {date:yyyy-MM-dd}";
+    /// <summary>
+    /// The weather, or nothing. Four calls behind one seam, none of which is worth the morning: a
+    /// document with no weather page content still carries the day, and the day is the point.
+    /// </summary>
+    private async Task<Domain.Weather.WeatherReport> ReadWeather(DateOnly date)
+    {
+        try
+        {
+            return await weather.GetReport(date);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Weather read failed for {Date}", date);
+            return Domain.Weather.WeatherReport.Nothing;
+        }
+    }
+
+    /// <summary>
+    /// The drives today's columns actually need, measured once.
+    ///
+    /// <para>TravelPlan works out which legs a person's day requires; this asks the router for
+    /// exactly those. Every column is walked separately, because a drive starts where THAT person's
+    /// day has left them — the parent coming in from work and the child coming out of school are
+    /// making two different journeys to the same field.</para>
+    /// </summary>
+    private async Task<TravelTable> MeasureTravel(DayAgenda agenda)
+    {
+        try
+        {
+            var home = TravelTable.NothingMeasured.Home;
+            var legs = new List<(string From, string To)>();
+
+            foreach (var column in ColumnSet.People)
+            {
+                var day = agenda.Events.Where(e => e.Columns.Contains(column)).ToList();
+
+                // Asked with no route table, so every located event reports the leg it would need.
+                foreach (var travel in TravelPlan.For(day, home, (_, _) => 1))
+                {
+                    legs.Add((travel.From, travel.Event.Location!.Trim()));
+                }
+            }
+
+            if (legs.Count == 0)
+            {
+                return TravelTable.NothingMeasured;
+            }
+
+            var measured = await routes.Measure(legs, agenda.Date.ToDateTime(TimeOnly.MinValue));
+            return measured.AsTable(home);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Travel times could not be measured for {Date}", agenda.Date);
+            return TravelTable.NothingMeasured;
+        }
+    }
 }
