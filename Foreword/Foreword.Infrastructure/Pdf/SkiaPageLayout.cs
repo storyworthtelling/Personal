@@ -263,6 +263,42 @@ internal sealed class SkiaPageLayout : IDisposable
         canvas.Restore();
     }
 
+    /// <summary>
+    /// A bitmap circle-masked into a disc with a hairline ring — the owner's medallion (§13).
+    ///
+    /// <para>Masked when drawn rather than pre-masked as an asset, so the source stays a plain
+    /// square photograph and swapping it is dropping in a file.</para>
+    /// </summary>
+    public void DrawCircularBitmap(SKBitmap bitmap, double x, double y, double size)
+    {
+        var dest = Rect(x, y, size, size);
+        var radius = (float)size / 2f;
+        var centre = new SKPoint(dest.MidX, dest.MidY);
+
+        canvas.Save();
+        canvas.ClipPath(CirclePath(centre, radius), antialias: true);
+
+        // DrawImage rather than DrawBitmap: only the image overloads take sampling options, and a
+        // photograph scaled to 96 points without a resampler is a photograph with jagged edges.
+        using var image = SKImage.FromBitmap(bitmap);
+        using var paint = new SKPaint { IsAntialias = true };
+        canvas.DrawImage(image, dest, new SKSamplingOptions(SKCubicResampler.Mitchell), paint);
+        canvas.Restore();
+
+        using var ring = new SKPaint
+        {
+            Color = Hairline, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1f,
+        };
+        canvas.DrawCircle(centre, radius, ring);
+    }
+
+    private static SKPath CirclePath(SKPoint centre, float radius)
+    {
+        var path = new SKPath();
+        path.AddCircle(centre.X, centre.Y, radius);
+        return path;
+    }
+
     public void DrawImage(byte[] png, double x, double y, double w, double h)
     {
         using var image = SKImage.FromEncodedData(png);

@@ -17,6 +17,31 @@ internal static class PdfMerger
         return outputStream.ToArray();
     }
 
+    /// <summary>
+    /// How many pages a PDF has, for the contents page — which can only be written once the pages
+    /// it describes exist. A contents that guessed its own lengths would be wrong on exactly the
+    /// mornings a story ran long.
+    /// </summary>
+    public static int PageCount(byte[] pdfBytes)
+    {
+        if (pdfBytes.Length == 0)
+        {
+            return 0;
+        }
+
+        try
+        {
+            using var stream = new MemoryStream(pdfBytes);
+            return PdfReader.Open(stream, PdfDocumentOpenMode.InformationOnly).PageCount;
+        }
+        catch (Exception)
+        {
+            // A puzzle PDF that will not open is already a problem the caller handles; a contents
+            // line of zero pages is a better answer here than taking the morning down.
+            return 0;
+        }
+    }
+
     private static void AppendPages(PdfDocument output, byte[] pdfBytes)
     {
         using var stream = new MemoryStream(pdfBytes);
