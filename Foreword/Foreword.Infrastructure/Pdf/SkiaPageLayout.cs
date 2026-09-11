@@ -80,9 +80,19 @@ internal sealed class SkiaPageLayout : IDisposable
             NewPage();
     }
 
+    /// <summary>
+    /// Drawn at the foot of every page just before it closes — a folio, a running head.
+    ///
+    /// <para>A footer cannot be written after the fact: Skia closes a PDF page and it is gone, so
+    /// there is no going back to stamp one on. It has to be drawn while the page is still open,
+    /// which is what this is for. Set it before the page's content and it lands on that page and
+    /// every one the content runs on to.</para>
+    /// </summary>
+    public Action<SkiaPageLayout>? Footer { get; set; }
+
     public void NewPage()
     {
-        sink.EndPage();
+        ClosePage();
         StartPage();
     }
 
@@ -292,8 +302,24 @@ internal sealed class SkiaPageLayout : IDisposable
 
     public byte[] ToPdf()
     {
-        sink.EndPage();
+        ClosePage();
         return sink.Close();
+    }
+
+    /// <summary>
+    /// Ends the page in progress, drawing the footer first. The cursor is saved and restored around
+    /// it so a footer cannot move the caller's place — it is furniture, not content.
+    /// </summary>
+    private void ClosePage()
+    {
+        if (Footer is { } footer)
+        {
+            var y = Y;
+            footer(this);
+            Y = y;
+        }
+
+        sink.EndPage();
     }
 
     public void Dispose() => sink.Dispose();
