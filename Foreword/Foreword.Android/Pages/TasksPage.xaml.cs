@@ -113,7 +113,10 @@ public partial class TasksPage : ContentPage
             },
         };
 
-        Grid.SetColumn(row.Children[1], 1);
+        // Cast, because Grid has BOTH a static SetColumn(BindableObject, int) and an instance
+        // SetColumn(IView, int) from IGridLayout — and Children[1] is an IView, so the unqualified
+        // call binds to the instance one and will not compile from a static context.
+        Grid.SetColumn((BindableObject)row.Children[1], 1);
 
         var tap = new TapGestureRecognizer();
         tap.Tapped += async (_, _) => await Navigation.PushAsync(new TaskEditPage(task));
