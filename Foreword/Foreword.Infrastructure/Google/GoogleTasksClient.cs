@@ -54,6 +54,31 @@ public class GoogleTasksClient : IGoogleTasksClient
     }
 
     /// <summary>
+    /// Writes a once task's title and due date back (D37). Both ids, because the API addresses a
+    /// task as lists/{tasklist}/tasks/{task} — read from the published reference, not remembered.
+    /// </summary>
+    public async Task UpdateTask(string listId, string taskId, string title, DateOnly? due)
+    {
+        var service = factory.CreateTasksService();
+
+        // Patch rather than update: the API supports patch semantics here, and sending a whole task
+        // built from what Foreword happens to know would blank every field it does not carry.
+        var patch = new GoogleTask
+        {
+            Title = title,
+            Due = due is { } d ? d.ToString("yyyy-MM-dd'T'00:00:00.000'Z'") : null,
+        };
+
+        await service.Tasks.Patch(patch, listId, taskId).ExecuteAsync();
+    }
+
+    public async Task DeleteTask(string listId, string taskId)
+    {
+        var service = factory.CreateTasksService();
+        await service.Tasks.Delete(listId, taskId).ExecuteAsync();
+    }
+
+    /// <summary>
     /// Internal rather than private so it can be tested for real. Both ids are kept because the API
     /// addresses a task as lists/{tasklist}/tasks/{task}, and an edit written back to half an
     /// address goes nowhere.

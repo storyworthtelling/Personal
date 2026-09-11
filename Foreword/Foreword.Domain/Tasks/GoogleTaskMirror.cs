@@ -24,6 +24,7 @@ public static class GoogleTaskMirror
             // whole thing the mirror exists to prevent.
             Id = task.Id,
             GoogleTaskId = task.Id,
+            GoogleListId = task.ListId,
             Title = task.Title,
             Kind = TaskKind.Once,
             Due = task.Due,
