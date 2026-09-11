@@ -22,6 +22,7 @@ public class DailyDeliveryService(
     WorkScheduleAugmenter workAugmenter,
     IOutlookSelector outlookSelector,
     ITaskStore taskStore,
+    ITaskReadingClient taskReader,
     IDayPdfComposer dayComposer,
     IWeatherClient weather,
     IRouteClient routes,
@@ -220,10 +221,50 @@ public class DailyDeliveryService(
             logger.LogWarning(ex, "Could not read Google tasks for {Date}", date);
         }
 
+        await ReadWhatCouldNotBeReadBefore();
+
         var everything = GoogleTaskMirror.Merge(taskStore.All(), google);
 
         return TaskPlacement.ForToday(
             everything, date, DryHoursForecast.From(weather), taskStore.Away);
+    }
+
+    /// <summary>
+    /// Reads again the sentences that could not be read when they were written.
+    ///
+    /// <para>A rule typed on a dead network is kept as the owner wrote it and prints as a plain
+    /// once task, so the morning it was written for is not lost. This is the other half of that
+    /// promise: on the next run that reaches Claude it becomes the rule they meant, without anyone
+    /// retyping it.</para>
+    ///
+    /// <para>The id is carried across rather than replaced, so the task the owner has been looking
+    /// at on the list screen is the one that changes, rather than one quietly vanishing and another
+    /// appearing beside it.</para>
+    /// </summary>
+    private async Task ReadWhatCouldNotBeReadBefore()
+    {
+        foreach (var unparsed in taskStore.All().Where(task => task.Unparsed))
+        {
+            if (string.IsNullOrWhiteSpace(unparsed.Written))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (await taskReader.Read(unparsed.Written) is { } read)
+                {
+                    taskStore.Save(read with { Id = unparsed.Id, Unparsed = false });
+                    logger.LogInformation("Read a task that could not be read before: {Title}", read.Title);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Still unreadable. It keeps printing as written and is tried again tomorrow, which
+                // is the whole point of keeping the sentence.
+                logger.LogWarning(ex, "Could not read task {Id} again", unparsed.Id);
+            }
+        }
     }
 
     /// <summary>
