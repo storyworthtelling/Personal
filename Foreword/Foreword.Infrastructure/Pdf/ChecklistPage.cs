@@ -1,5 +1,4 @@
 using SkiaSharp;
-using Foreword.Domain.Models;
 using Foreword.Domain.Tasks;
 using Storyworthtelling.Paper;
 
@@ -23,8 +22,9 @@ internal static class ChecklistPage
     private const double RowHeight = 20;
     private const double BoxSize = 9;
     private const double AddStripHeight = 86;
+    private const double NoteHeight = 10;
 
-    public static void Draw(SkiaPageLayout layout, IReadOnlyList<TodoItem> tasks, string voice)
+    public static void Draw(SkiaPageLayout layout, IReadOnlyList<PrintedTask> tasks, string voice)
     {
         if (!string.IsNullOrWhiteSpace(voice))
         {
@@ -44,7 +44,7 @@ internal static class ChecklistPage
         for (var i = 0; i < bands.Length; i++)
         {
             DrawBand(layout, bands[i],
-                [.. tasks.Where(task => TaskBands.For(task) == bands[i])],
+                [.. tasks.Where(printed => TaskBands.For(printed.Task) == bands[i])],
                 SkiaPageLayout.Margin + i * (width + BandGap), top, width, bottom);
         }
 
@@ -52,7 +52,7 @@ internal static class ChecklistPage
     }
 
     private static void DrawBand(
-        SkiaPageLayout layout, TaskBand band, IReadOnlyList<TodoItem> tasks,
+        SkiaPageLayout layout, TaskBand band, IReadOnlyList<PrintedTask> tasks,
         double x, double top, double width, double bottom)
     {
         var headingFont = SkiaPageLayout.Sans(PaperTypeScale.Label, bold: true);
@@ -67,9 +67,13 @@ internal static class ChecklistPage
 
         var y = top + 18;
 
-        foreach (var task in tasks)
+        foreach (var printed in tasks)
         {
-            if (y + RowHeight > bottom)
+            // A note needs a second line, and a row without one does not reserve the space.
+            var hasNote = printed.Note.Length > 0;
+            var rowHeight = hasNote ? RowHeight + NoteHeight : RowHeight;
+
+            if (y + rowHeight > bottom)
             {
                 break;
             }
@@ -79,20 +83,31 @@ internal static class ChecklistPage
             layout.DrawRect(x, y + 5, BoxSize, BoxSize,
                 stroke: SkiaPageLayout.Ink, strokeWidth: 0.7f);
 
-            var kind = TaskBands.Kind(task);
+            var kind = TaskBands.Kind(printed.Task);
             var kindWidth = layout.MeasureText(kind, kindFont) + 4;
             var textLeft = x + BoxSize + 6;
+            var textWidth = width - BoxSize - 6 - kindWidth;
 
             layout.DrawText(
-                layout.Truncate(task.Title, taskFont, width - BoxSize - 6 - kindWidth),
-                taskFont, textLeft, y + 3, width - BoxSize - 6 - kindWidth, RowHeight - 4,
-                TextAlign.TopLeft);
+                layout.Truncate(printed.Task.Title, taskFont, textWidth),
+                taskFont, textLeft, y + 3, textWidth, RowHeight - 4, TextAlign.TopLeft);
 
             layout.DrawText(kind, kindFont, x, y + 5, width, 11, TextAlign.TopRight,
                 SkiaPageLayout.InkMuted);
 
-            layout.DrawLine(x, y + RowHeight, x + width, y + RowHeight, SkiaPageLayout.Hairline, 0.5f);
-            y += RowHeight;
+            // Why it is here today. A list that schedules itself and will not explain itself is one
+            // nobody trusts twice — and this is the line that explains it, on the task rather than
+            // in a log the owner cannot reach from the page.
+            if (hasNote)
+            {
+                layout.DrawText(
+                    layout.Truncate(printed.Note, kindFont, width - BoxSize - 6),
+                    kindFont, textLeft, y + RowHeight - 4, width - BoxSize - 6, NoteHeight,
+                    TextAlign.TopLeft, SkiaPageLayout.InkMuted);
+            }
+
+            layout.DrawLine(x, y + rowHeight, x + width, y + rowHeight, SkiaPageLayout.Hairline, 0.5f);
+            y += rowHeight;
         }
 
         if (tasks.Count == 0)

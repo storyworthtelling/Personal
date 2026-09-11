@@ -4,6 +4,7 @@ using Foreword.Domain.Interfaces;
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Document;
 using Foreword.Domain.Models;
+using Foreword.Domain.Tasks;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Handwriting;
 using Foreword.Infrastructure.Google;
@@ -20,6 +21,8 @@ public class DailyDeliveryService(
     CalendarColumnMapper columnMapper,
     WorkScheduleAugmenter workAugmenter,
     IOutlookSelector outlookSelector,
+    ITaskStore taskStore,
+    ITaskReadingClient taskReader,
     IDayPdfComposer dayComposer,
     IWeatherClient weather,
     IRouteClient routes,
@@ -38,7 +41,8 @@ public class DailyDeliveryService(
         var agenda = await BuildAgenda(date);
         agenda.Travel = await MeasureTravel(agenda);
         var outlook = await BuildOutlook(date);
-        var tasks = await googleTasks.GetMyTasks();
+        var weather = await ReadWeather(date);
+        var tasks = await PlaceTasks(date, weather);
 
         var document = new DayDocument
         {
@@ -46,7 +50,7 @@ public class DailyDeliveryService(
             Agenda = agenda,
             Outlook = outlook,
             Tasks = tasks,
-            Weather = await ReadWeather(date),
+            Weather = weather,
             UnreadableCarryovers = carryovers,
         };
 
@@ -191,6 +195,74 @@ public class DailyDeliveryService(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Could not trash previous document {Id}", id);
+            }
+        }
+    }
+
+    /// <summary>
+    /// What prints on the checklist this morning.
+    ///
+    /// <para>Foreword's own rules and Google's tasks are merged into ONE list first (T3's "one list,
+    /// not three" as a fact about the data rather than an arrangement on a page), then placed: the
+    /// smart ones choose their own day from the forecast, the season and their preference, and the
+    /// recurring ones sit out the mornings the owner is away.</para>
+    /// </summary>
+    private async Task<IReadOnlyList<PrintedTask>> PlaceTasks(
+        DateOnly date, Domain.Weather.WeatherReport weather)
+    {
+        IReadOnlyList<TodoItem> google = [];
+        try
+        {
+            google = await googleTasks.GetMyTasks();
+        }
+        catch (Exception ex)
+        {
+            // Google's half can fail without costing Foreword's own rules, which are on the phone.
+            logger.LogWarning(ex, "Could not read Google tasks for {Date}", date);
+        }
+
+        await ReadWhatCouldNotBeReadBefore();
+
+        var everything = GoogleTaskMirror.Merge(taskStore.All(), google);
+
+        return TaskPlacement.ForToday(
+            everything, date, DryHoursForecast.From(weather), taskStore.Away);
+    }
+
+    /// <summary>
+    /// Reads again the sentences that could not be read when they were written.
+    ///
+    /// <para>A rule typed on a dead network is kept as the owner wrote it and prints as a plain
+    /// once task, so the morning it was written for is not lost. This is the other half of that
+    /// promise: on the next run that reaches Claude it becomes the rule they meant, without anyone
+    /// retyping it.</para>
+    ///
+    /// <para>The id is carried across rather than replaced, so the task the owner has been looking
+    /// at on the list screen is the one that changes, rather than one quietly vanishing and another
+    /// appearing beside it.</para>
+    /// </summary>
+    private async Task ReadWhatCouldNotBeReadBefore()
+    {
+        foreach (var unparsed in taskStore.All().Where(task => task.Unparsed))
+        {
+            if (string.IsNullOrWhiteSpace(unparsed.Written))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (await taskReader.Read(unparsed.Written) is { } read)
+                {
+                    taskStore.Save(read with { Id = unparsed.Id, Unparsed = false });
+                    logger.LogInformation("Read a task that could not be read before: {Title}", read.Title);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Still unreadable. It keeps printing as written and is tried again tomorrow, which
+                // is the whole point of keeping the sentence.
+                logger.LogWarning(ex, "Could not read task {Id} again", unparsed.Id);
             }
         }
     }

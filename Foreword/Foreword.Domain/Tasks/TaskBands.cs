@@ -1,6 +1,4 @@
-using System.Globalization;
 using System.Text.RegularExpressions;
-using Foreword.Domain.Models;
 
 namespace Foreword.Domain.Tasks;
 
@@ -28,7 +26,7 @@ public static partial class TaskBands
     private static readonly string[] EveningWords =
         ["evening", "tonight", "bins", "dinner", "bedtime", "lock up", "trash"];
 
-    public static TaskBand For(TodoItem task)
+    public static TaskBand For(ForewordTask task)
     {
         if (Mentions(task.Title, MorningWords)) return TaskBand.Morning;
         if (Mentions(task.Title, EveningWords)) return TaskBand.Evening;
@@ -44,30 +42,16 @@ public static partial class TaskBands
     };
 
     /// <summary>
-    /// What the line says about a task that is not new. A list that silently re-presents yesterday's
-    /// undone work looks like a list that invented it.
-    ///
-    /// <para>Past a week the day name is dropped for a date: "moved from Tuesday" about something
-    /// eleven days old reads as <i>this</i> Tuesday, which is worse than saying nothing.</para>
+    /// What the marker at the right of the line says: how the task <b>behaves</b>, not where it came
+    /// from (T3). A rule repeats on a simple schedule, a smart task places itself, a once task
+    /// happens and is gone — and those are three different things to see coming on a page.
     /// </summary>
-    public static string Note(TodoItem task, DateOnly today)
+    public static string Kind(ForewordTask task) => task.Kind switch
     {
-        if (task.Due is not { } due || due >= today)
-        {
-            return string.Empty;
-        }
-
-        return today.DayNumber - due.DayNumber <= 7
-            ? $"moved from {due.DayOfWeek}"
-            : $"moved from {due.ToDateTime(TimeOnly.MinValue).ToString("MMM d", CultureInfo.InvariantCulture)}";
-    }
-
-    /// <summary>
-    /// Standing, smart or a one-off. There is nothing to read it from yet — a Google Task is a title
-    /// and a date — so it is empty rather than guessed. Labelling every line "task" would be a
-    /// column of one repeated word, which is worse than no column.
-    /// </summary>
-    public static string Kind(TodoItem task) => string.Empty;
+        TaskKind.Rule => "rule",
+        TaskKind.Smart => "smart",
+        _ => "once",
+    };
 
     /// <summary>
     /// Whole words only. "bin" inside "binder" or "combine" is how a keyword rule quietly files half
