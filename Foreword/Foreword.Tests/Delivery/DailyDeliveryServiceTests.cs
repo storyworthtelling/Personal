@@ -4,6 +4,7 @@ using Moq;
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Document;
 using Foreword.Domain.Interfaces;
+using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Calendar;
@@ -48,11 +49,29 @@ public class DailyDeliveryServiceTests
             new CalendarColumnMapper(Options.Create(new CalendarMappingOptions())),
             new WorkScheduleAugmenter(Options.Create(new WorkScheduleOptions())),
             new OutlookSelector(),
+            new FakeTaskStore(),
             dayComposer.Object, weather.Object, routes.Object,
             handwriting.Object, remarkable.Object,
             Options.Create(new AnthropicOptions { ConfidenceThreshold = 0.6 }),
             Options.Create(new GoogleOptions()),
             NullLogger<DailyDeliveryService>.Instance);
+
+    /// <summary>Foreword's own rules, of which the tests have none — the placement engine is
+    /// tested on its own, and this is about the delivery orchestration.</summary>
+    private sealed class FakeTaskStore : ITaskStore
+    {
+        public IReadOnlyList<ForewordTask> All() => [];
+
+        public void Save(ForewordTask task)
+        {
+        }
+
+        public void Delete(string id)
+        {
+        }
+
+        public AwayPause Away { get; set; } = AwayPause.None;
+    }
 
     private void SetupYesterdayDoc(string title, string id, IReadOnlyList<ParsedNote> notes)
     {

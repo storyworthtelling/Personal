@@ -1,4 +1,3 @@
-using Foreword.Domain.Models;
 using Foreword.Domain.Tasks;
 using Xunit;
 
@@ -13,8 +12,8 @@ public class TaskBandsTests
 {
     private static readonly DateOnly Today = new(2026, 9, 13);
 
-    private static TodoItem Task(string title, DateOnly? due = null) =>
-        new() { Title = title, Due = due };
+    private static ForewordTask Task(string title, TaskKind kind = TaskKind.Once) =>
+        new() { Id = title, Title = title, Kind = kind };
 
     [Fact]
     public void MostThingsHappenDuringTheDay()
@@ -66,43 +65,14 @@ public class TaskBandsTests
     }
 
     /// <summary>
-    /// A task that was due earlier carries its reason on the line, because a list that silently
-    /// re-presents yesterday's undone work looks like a list that invented it.
+    /// The marker says how the task behaves rather than where it came from. Origin is not the
+    /// interesting thing about a task on a page — what it will do next morning is.
     /// </summary>
     [Fact]
-    public void AnOverdueTaskSaysWhereItCameFrom()
+    public void TheKindIsTheBehaviour()
     {
-        Assert.Equal("moved from Saturday",
-            TaskBands.Note(Task("Mow the lawn", Today.AddDays(-1)), Today));
-    }
-
-    [Fact]
-    public void ATaskDueTodayOrLaterCarriesNoNote()
-    {
-        Assert.Equal(string.Empty, TaskBands.Note(Task("Call Mom", Today), Today));
-        Assert.Equal(string.Empty, TaskBands.Note(Task("Call Mom", Today.AddDays(3)), Today));
-        Assert.Equal(string.Empty, TaskBands.Note(Task("Call Mom"), Today));
-    }
-
-    /// <summary>
-    /// Past a week the day name stops being useful — "moved from Tuesday" about something eleven
-    /// days old reads as this Tuesday, which is worse than a date.
-    /// </summary>
-    [Fact]
-    public void SomethingOlderThanAWeekIsDatedRatherThanNamed()
-    {
-        Assert.Equal("moved from Aug 30",
-            TaskBands.Note(Task("Mow the lawn", new DateOnly(2026, 8, 30)), Today));
-    }
-
-    /// <summary>
-    /// The kind marker — standing, smart, or a one-off — has no source yet: a Google Task is a
-    /// title and a date. It is empty rather than guessed, so the page draws nothing rather than
-    /// labelling everything "task", which would be a column of one repeated word.
-    /// </summary>
-    [Fact]
-    public void TheKindIsEmptyUntilThereIsSomethingToReadItFrom()
-    {
-        Assert.Equal(string.Empty, TaskBands.Kind(Task("Call Mom")));
+        Assert.Equal("rule", TaskBands.Kind(Task("Vitamins", TaskKind.Rule)));
+        Assert.Equal("smart", TaskBands.Kind(Task("Mow the lawn", TaskKind.Smart)));
+        Assert.Equal("once", TaskBands.Kind(Task("Call Mom")));
     }
 }
