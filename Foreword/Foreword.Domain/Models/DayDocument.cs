@@ -1,3 +1,4 @@
+using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 
 namespace Foreword.Domain.Models;
@@ -17,7 +18,11 @@ public sealed record DayDocument
     /// <summary>The seven-day outlook: non-routine events only.</summary>
     public IReadOnlyList<CalendarEvent> Outlook { get; init; } = [];
 
-    public IReadOnlyList<TodoItem> Tasks { get; init; } = [];
+    /// <summary>
+    /// What prints this morning, already placed — the smart tasks have chosen their day and each
+    /// carries the line that says why it is here.
+    /// </summary>
+    public IReadOnlyList<PrintedTask> Tasks { get; init; } = [];
 
     /// <summary>What came back from the weather calls, which may be nothing at all.</summary>
     public WeatherReport Weather { get; init; } = WeatherReport.Nothing;

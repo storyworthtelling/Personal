@@ -23,9 +23,17 @@ public class GoogleTasksClient : IGoogleTasksClient
         foreach (var list in lists)
         {
             var request = service.Tasks.List(list.Id);
-            request.ShowCompleted = false;
+
+            // BOTH flags. The reference says it in as many words: "showHidden must also be True to
+            // show tasks completed in first party clients, such as the web UI and Google's mobile
+            // apps" — which is exactly the case T3 is about. Set one and not the other and nothing
+            // fails: the request succeeds, the list comes back, and the closed task is simply
+            // absent, so Foreword draws the day as though it had never existed.
+            request.ShowCompleted = true;
+            request.ShowHidden = true;
+
             var tasks = (await request.ExecuteAsync()).Items ?? [];
-            items.AddRange(tasks.Select(ToTodoItem));
+            items.AddRange(tasks.Select(task => ToTodoItem(task, list.Id)));
         }
 
         return items;
@@ -45,8 +53,15 @@ public class GoogleTasksClient : IGoogleTasksClient
         await service.Tasks.Insert(task, "@default").ExecuteAsync();
     }
 
-    private static TodoItem ToTodoItem(GoogleTask task) => new()
+    /// <summary>
+    /// Internal rather than private so it can be tested for real. Both ids are kept because the API
+    /// addresses a task as lists/{tasklist}/tasks/{task}, and an edit written back to half an
+    /// address goes nowhere.
+    /// </summary>
+    internal static TodoItem ToTodoItem(GoogleTask task, string listId) => new()
     {
+        Id = task.Id ?? string.Empty,
+        ListId = listId,
         Title = task.Title ?? "(untitled)",
         Completed = string.Equals(task.Status, "completed", StringComparison.OrdinalIgnoreCase),
         Due = DateTimeOffset.TryParse(task.Due, out var d) ? DateOnly.FromDateTime(d.Date) : null
