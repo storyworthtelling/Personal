@@ -10,7 +10,16 @@ namespace Foreword.Domain.Calendar;
 /// Whether this is a backdrop the rest of the day is drawn <i>inside</i> — a work block — rather
 /// than something competing for space.
 /// </param>
-public readonly record struct PlacedEvent(CalendarEvent Event, int Lane, int Lanes, bool IsContainer);
+/// <param name="IsNested">
+/// Whether this event falls wholly within a container, and so should be drawn <i>inside</i> it.
+///
+/// <para>Taking no lane from the block was only half of B3. Without this the container and the
+/// meeting within it are drawn at the same width, one exactly over the other, so a nine-to-ten
+/// standup covers the top of the nine-to-five rather than sitting in it — and the band reads as
+/// something the meeting interrupted rather than as the day it belongs to.</para>
+/// </param>
+public readonly record struct PlacedEvent(
+    CalendarEvent Event, int Lane, int Lanes, bool IsContainer, bool IsNested = false);
 
 /// <summary>
 /// Where the events in one column go, so that two of them never land on top of each other
@@ -71,8 +80,21 @@ public static class EventLanes
             .ThenBy(e => e.Title, StringComparer.Ordinal)
             .ToList();
 
-        return [.. containers, .. Lanes(rest)];
+        var blocks = events.Where(IsContainer).ToList();
+
+        return [.. containers, .. Lanes(rest).Select(p => p with { IsNested = Inside(p.Event, blocks) })];
     }
+
+    /// <summary>
+    /// Whether an event belongs to a block rather than merely overlapping one.
+    ///
+    /// <para>Containment, not overlap, and the difference matters on the page: a meeting within the
+    /// working day is drawn inside the band, while an appointment that runs past the end of it
+    /// <b>breaks</b> the band and is drawn at full column width over the gap. Drawing them alike is
+    /// how a day that was interrupted comes out looking like a day that went to plan.</para>
+    /// </summary>
+    private static bool Inside(CalendarEvent e, IReadOnlyList<CalendarEvent> blocks) =>
+        blocks.Any(block => e.Start >= block.Start && e.End <= block.End);
 
     private static bool IsContainer(CalendarEvent e) =>
         e.Kind is EventKind.WorkBlock or EventKind.SchoolBlock;

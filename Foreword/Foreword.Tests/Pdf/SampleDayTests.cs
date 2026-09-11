@@ -22,11 +22,13 @@ public class SampleDayTests
 
         var day = new DateOnly(2026, 9, 13);
 
-        CalendarEvent At(PersonColumn column, int from, int to, string title, string? where = null) => new()
+        CalendarEvent At(PersonColumn column, int from, int to, string title,
+            string? where = null, EventKind kind = EventKind.Normal) => new()
         {
             Title = title,
             Location = where,
             Columns = [column],
+            Kind = kind,
             Start = day.ToDateTime(new TimeOnly(from, 0)),
             End = day.ToDateTime(new TimeOnly(to, 0)),
         };
@@ -36,10 +38,12 @@ public class SampleDayTests
             Date = day,
             Events =
             [
-                At(PersonColumn.Rowan, 9, 12, "Work", "The office"),
+                At(PersonColumn.Rowan, 9, 12, "Work", "The office", EventKind.WorkBlock),
                 At(PersonColumn.Rowan, 9, 10, "Standup"),
-                At(PersonColumn.Rowan, 13, 17, "Work", "The office"),
-                At(PersonColumn.Jordan, 9, 15, "Work"),
+                At(PersonColumn.Rowan, 13, 17, "Work", "The office", EventKind.WorkBlock),
+                At(PersonColumn.Rowan, 14, 15, "Release review"),
+                At(PersonColumn.Jordan, 9, 15, "Work", null, EventKind.WorkBlock),
+                At(PersonColumn.Jordan, 10, 11, "Team sync"),
                 At(PersonColumn.Jordan, 15, 16, "Vet — Ruby"),
                 At(PersonColumn.Wren, 8, 15, "School", "The school"),
                 At(PersonColumn.Wren, 16, 17, "Soccer practice", "Veterans Park"),
