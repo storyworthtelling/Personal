@@ -46,6 +46,8 @@ public partial class CalendarSplitPage : ContentPage
             AddWordRow(person);
         }
 
+        RenderAddresses();
+
         AddRule();
         Words.Add(new Grid
         {
@@ -69,6 +71,64 @@ public partial class CalendarSplitPage : ContentPage
                         },
                     },
                 },
+            },
+        });
+    }
+
+    private void RenderAddresses()
+    {
+        Addresses.Clear();
+
+        // The two who have one. An address field for Wren or Linden could never match anything and
+        // would never say so — see PersonIdentity, and the guard that pins this loop.
+        foreach (var person in PersonIdentity.WithMailboxes)
+        {
+            AddAddressRow(person);
+        }
+    }
+
+    private void AddAddressRow(PersonColumn person)
+    {
+        if (Addresses.Count > 0)
+        {
+            Addresses.Add(new BoxView { HeightRequest = DesignTokens.Shape.HairlineDp,
+                Color = PaperResources.Colour("Hairline") });
+        }
+
+        if (!settings.Mapping.PersonAddresses.TryGetValue(person, out var addresses))
+        {
+            addresses = [];
+            settings.Mapping.PersonAddresses[person] = addresses;
+        }
+
+        var entry = new Entry
+        {
+            Text = string.Join(", ", addresses),
+            Placeholder = "name@example.com",
+            Keyboard = Keyboard.Email,
+            Style = PaperResources.Token<Style>("MonoEntry"),
+        };
+
+        entry.TextChanged += (_, e) =>
+        {
+            addresses.Clear();
+            addresses.AddRange((e.NewTextValue ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            settings.SaveMapping();
+        };
+
+        Addresses.Add(new VerticalStackLayout
+        {
+            Padding = new Thickness(16, 12),
+            Spacing = DesignTokens.Space.X2,
+            Children =
+            {
+                new Label
+                {
+                    Text = $"{person} — invited as",
+                    Style = PaperResources.Token<Style>("CardRowTitle"),
+                },
+                entry,
             },
         });
     }

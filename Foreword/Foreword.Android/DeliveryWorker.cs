@@ -1,6 +1,7 @@
 using Android.Content;
 using AndroidX.Work;
 using Microsoft.Extensions.DependencyInjection;
+using Foreword.Domain.Delivery;
 using Foreword.Domain.Identity;
 using Foreword.Infrastructure.Delivery;
 
@@ -27,8 +28,8 @@ public class DeliveryWorker : Worker
     // When the morning goes out, in local time. Public so Settings can SHOW the time the
     // schedule actually uses rather than a number typed into a label, which is how a screen
     // ends up confidently stating something the app does not do.
-    public const int DeliveryHour = 10;
-    public const int DeliveryMinute = 45;
+    public const int DeliveryHour = 6;
+    public const int DeliveryMinute = 30;
 
     public override Result DoWork()
     {
@@ -67,6 +68,19 @@ public class DeliveryWorker : Worker
 
     public static void Schedule(Context context)
     {
+        // Keep (not Update) so app re-launches don't reset the initial delay on a
+        // pending-but-never-run job — that would starve a fresh install whose owner opens the app
+        // after the morning window, pushing the first delivery to tomorrow again and again.
+        //
+        // What Keep also freezes is the TIME. A phone that has run an older build holds a row
+        // scheduled for that build's hour, and moving the constant moves nothing: the schedule
+        // goes on firing at the old time while Settings prints the new one. So the app remembers
+        // the time the work was actually scheduled for, and replaces the work only when the two
+        // disagree — which keeps Keep's protection and thaws what Keep froze.
+        var wanted = DeliverySchedule.Stamp(DeliveryHour, DeliveryMinute);
+        var replacing = DeliverySchedule.Decide(DeliveryHour, DeliveryMinute,
+            CredentialStore.ScheduledDeliveryTime) == SchedulePolicy.Replace;
+
         var request = (PeriodicWorkRequest) new PeriodicWorkRequest.Builder(
                 Java.Lang.Class.FromType(typeof(DeliveryWorker)),
                 24,
@@ -75,23 +89,20 @@ public class DeliveryWorker : Worker
             .AddTag(WorkName)
             .Build();
 
-        // Keep (not Update) so app re-launches don't reset the initial delay on a
-        // pending-but-never-run job. Update only helps after the first run (when
-        // WorkManager uses periodStartTime, not initialDelay), so it buys nothing
-        // for drift correction while breaking fresh installs where the user opens
-        // the app after the delivery window.
         WorkManager.GetInstance(context)
             .EnqueueUniquePeriodicWork(WorkName,
-                ExistingPeriodicWorkPolicy.Keep,
+                replacing
+                    ? ExistingPeriodicWorkPolicy.CancelAndReenqueue
+                    : ExistingPeriodicWorkPolicy.Keep,
                 request);
+
+        // Written after the enqueue, so a throw above leaves the stamp disagreeing and the next
+        // launch tries again rather than recording a schedule that was never made.
+        CredentialStore.ScheduledDeliveryTime = wanted;
     }
 
-    private static long DelayUntilNext(int hour, int minute)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var target = new DateTimeOffset(now.Year, now.Month, now.Day, hour, minute, 0, TimeSpan.Zero);
-        if (target <= now)
-            target = target.AddDays(1);
-        return (long)(target - now).TotalMilliseconds;
-    }
+    // The phone's own clock, so the hour means the hour the owner reads on the Settings screen.
+    // DeliverySchedule.DelayUntilNext carries the reasoning and the tests.
+    private static long DelayUntilNext(int hour, int minute) =>
+        (long) DeliverySchedule.DelayUntilNext(DateTimeOffset.Now, hour, minute).TotalMilliseconds;
 }

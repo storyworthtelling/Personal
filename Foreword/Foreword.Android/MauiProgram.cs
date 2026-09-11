@@ -10,6 +10,7 @@ using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Delivery;
 using Foreword.Infrastructure.Google;
 using Foreword.Infrastructure.Handwriting;
+using Foreword.Infrastructure.Maps;
 using Foreword.Infrastructure.Nyt;
 using Foreword.Infrastructure.Pdf;
 using Foreword.Android.Google;
@@ -58,6 +59,14 @@ public static class MauiProgram
         // carries the non-secret settings (time zone, target calendar, kid calendar names).
         builder.Services.AddSingleton<IOptions<GoogleOptions>>(
             _ => new LiveOptions<GoogleOptions>(() => new GoogleOptions()));
+        builder.Services.AddSingleton<IOptions<MapsOptions>>(
+            _ => new LiveOptions<MapsOptions>(() => new MapsOptions
+            {
+                ApiKey = CredentialStore.MapsApiKey,
+                HomeAddress = CredentialStore.HomeAddress,
+                HomeLatitude = CredentialStore.HomeLatitude,
+                HomeLongitude = CredentialStore.HomeLongitude,
+            }));
         builder.Services.AddSingleton<IOptions<AnthropicOptions>>(
             _ => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions { ApiKey = CredentialStore.AnthropicApiKey }));
         builder.Services.AddSingleton<IOptions<CalendarMappingOptions>>(
@@ -119,9 +128,14 @@ public static class MauiProgram
         builder.Services.AddTransient<CalendarColumnMapper>();
         builder.Services.AddTransient<WorkScheduleAugmenter>();
         builder.Services.AddTransient<IOutlookSelector, OutlookSelector>();
-        builder.Services.AddTransient<ICalendarPdfComposer, CalendarPdfComposer>();
-        builder.Services.AddTransient<IChecklistPdfComposer, ChecklistPdfComposer>();
+        builder.Services.AddTransient<IDayPdfComposer, DayPdfComposer>();
         builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // Maps Platform: the drives on the calendar page and everything on the weather page. Both
+        // degrade to nothing without a key, so the morning still goes out before one is entered.
+        builder.Services.AddHttpClient<IWeatherClient, GoogleWeatherClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<IRouteClient, GoogleRoutesClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddTransient<DailyDeliveryService>();
 

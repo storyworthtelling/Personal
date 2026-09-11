@@ -69,6 +69,43 @@ public static class CredentialStore
         set => Preferences.Set(PreferenceKeys.SeenCalendarIds, value);
     }
 
+    // The time the scheduled work is actually set for, which is not always the time the app wants:
+    // WorkManager keeps the schedule a phone already holds, so this is how a moved delivery time
+    // reaches a phone that has run an older build.
+    public static string ScheduledDeliveryTime
+    {
+        get => Preferences.Get(PreferenceKeys.ScheduledDeliveryTime, string.Empty);
+        set => Preferences.Set(PreferenceKeys.ScheduledDeliveryTime, value);
+    }
+
+    // The Maps Platform key — one key, four APIs (routes, weather, pollen, air quality), because
+    // Maps Platform bills a project rather than a product.
+    public static string MapsApiKey
+    {
+        get => Preferences.Get(PreferenceKeys.MapsApiKey, string.Empty);
+        set => Preferences.Set(PreferenceKeys.MapsApiKey, value);
+    }
+
+    // The house. As text for the router, which takes an address, and as a point for the forecast,
+    // which takes coordinates.
+    public static string HomeAddress
+    {
+        get => Preferences.Get(PreferenceKeys.HomeAddress, string.Empty);
+        set => Preferences.Set(PreferenceKeys.HomeAddress, value);
+    }
+
+    public static double HomeLatitude
+    {
+        get => Preferences.Get(PreferenceKeys.HomeLatitude, 0d);
+        set => Preferences.Set(PreferenceKeys.HomeLatitude, value);
+    }
+
+    public static double HomeLongitude
+    {
+        get => Preferences.Get(PreferenceKeys.HomeLongitude, 0d);
+        set => Preferences.Set(PreferenceKeys.HomeLongitude, value);
+    }
+
     public static string VaultPassphrase
     {
         get => Preferences.Get(PreferenceKeys.VaultPassphrase, string.Empty);

@@ -11,4 +11,9 @@ public static class CredentialIds
     // reports this credential's health, and the settings screen reads it back by this id.
     public const string Remarkable = "remarkable";
     public const string Anthropic = "anthropic";
+
+    // One id for the whole Maps Platform key, because it IS one key: routes, weather, pollen and
+    // air quality are the same credential with different APIs enabled on it, so a rejection from
+    // any of them is the same rejection.
+    public const string Maps = "maps";
 }
