@@ -70,8 +70,75 @@ public partial class SetupPage : ContentPage
             ? "None set up yet — nothing will print"
             : $"{count} set up";
 
+        RenderMaps();
         BuildNeedsYou();
     }
+
+    // ---- Weather & drives ==================================================
+
+    /// <summary>
+    /// The Maps key field follows the same rule as every other credential in the suite: it is shown
+    /// only when it is missing or a live call with it was just rejected, and a working key collapses
+    /// to a line and a Replace button. A key that works is a done state, not something to keep on
+    /// screen — the vault backs it up, so it never has to be read back off this page.
+    /// </summary>
+    private void RenderMaps()
+    {
+        var state = CredentialFieldState.Decide(
+            !string.IsNullOrEmpty(CredentialStore.MapsApiKey),
+            CredentialHealth().Get(CredentialIds.Maps));
+
+        MapsKeyBlock.IsVisible = state.ShowEntry || replacingMapsKey;
+        MapsKeyWorkingRow.IsVisible = !state.ShowEntry && !replacingMapsKey;
+
+        if (MapsKeyBlock.IsVisible)
+        {
+            MapsKeyEntry.Text = CredentialStore.MapsApiKey;
+        }
+
+        HomeAddressEntry.Text = CredentialStore.HomeAddress;
+        HomePointEntry.Text = CredentialStore.HomeLatitude == 0 && CredentialStore.HomeLongitude == 0
+            ? string.Empty
+            : $"{CredentialStore.HomeLatitude}, {CredentialStore.HomeLongitude}";
+    }
+
+    private void OnReplaceMapsKey(object sender, EventArgs e)
+    {
+        replacingMapsKey = true;
+        RenderMaps();
+        MapsKeyEntry.Focus();
+    }
+
+    /// <summary>
+    /// Committed as it is typed, like every other field on this screen — there is no Save, and a
+    /// value the owner typed and then navigated away from is exactly the one they meant to set.
+    /// </summary>
+    private void OnMapsKeyChanged(object sender, TextChangedEventArgs e) =>
+        CredentialStore.MapsApiKey = (e.NewTextValue ?? string.Empty).Trim();
+
+    private void OnHomeAddressChanged(object sender, TextChangedEventArgs e) =>
+        CredentialStore.HomeAddress = (e.NewTextValue ?? string.Empty).Trim();
+
+    /// <summary>
+    /// "40.8259, -74.2090" — one field rather than two, because a point is one thing to copy out of
+    /// a map and two fields is two chances to paste half of it. A value that is not a pair is
+    /// ignored rather than half-applied: a latitude saved without its longitude would put the
+    /// household's forecast on a meridian.
+    /// </summary>
+    private void OnHomePointChanged(object sender, TextChangedEventArgs e)
+    {
+        var parts = (e.NewTextValue ?? string.Empty).Split(',', StringSplitOptions.TrimEntries);
+
+        if (parts.Length == 2
+            && double.TryParse(parts[0], System.Globalization.CultureInfo.InvariantCulture, out var latitude)
+            && double.TryParse(parts[1], System.Globalization.CultureInfo.InvariantCulture, out var longitude))
+        {
+            CredentialStore.HomeLatitude = latitude;
+            CredentialStore.HomeLongitude = longitude;
+        }
+    }
+
+    private bool replacingMapsKey;
 
     // ---- Needs you =========================================================
 
