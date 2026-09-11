@@ -11,6 +11,7 @@ using Foreword.Infrastructure.Delivery;
 using Foreword.Infrastructure.Google;
 using Foreword.Infrastructure.Handwriting;
 using Foreword.Infrastructure.Maps;
+using Foreword.Infrastructure.Tasks;
 using Foreword.Infrastructure.Nyt;
 using Foreword.Infrastructure.Pdf;
 using Foreword.Android.Google;
@@ -129,6 +130,9 @@ public static class MauiProgram
         builder.Services.AddTransient<WorkScheduleAugmenter>();
         builder.Services.AddTransient<IOutlookSelector, OutlookSelector>();
         builder.Services.AddTransient<IDayPdfComposer, DayPdfComposer>();
+        builder.Services.AddSingleton<ITaskStore, TaskStore>();
+        builder.Services.AddHttpClient<ITaskReadingClient, ClaudeTaskReader>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         // Maps Platform: the drives on the calendar page and everything on the weather page. Both
