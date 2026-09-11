@@ -384,6 +384,62 @@ public class DayPdfComposerTests
             + "is drawn at the band's own edge rather than inside it.");
     }
 
+    /// <summary>
+    /// The foot is two columns, side by side. They answer opposite questions — what the day already
+    /// holds that the grid could not draw, and empty space for something that is not today's — and
+    /// stacking them buries whichever is second under whatever length the first happened to be.
+    /// </summary>
+    [Fact]
+    public void TheFootPutsTheListAndTheWriteOnSpaceSideBySide()
+    {
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events =
+            [
+                // Four at once: two are drawn, two fall to the list.
+                TimedEvent(PersonColumn.Rowan, 9, 10, "First"),
+                TimedEvent(PersonColumn.Rowan, 9, 10, "Second"),
+                TimedEvent(PersonColumn.Rowan, 9, 10, "Third"),
+                TimedEvent(PersonColumn.Rowan, 9, 10, "Fourth"),
+            ],
+        };
+
+        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        var words = document.GetPage(1).GetWords().ToList();
+
+        var list = words.Single(w => w.Text == "Also").BoundingBox;
+        var writeOn = words.Single(w => w.Text == "Future").BoundingBox;
+
+        // Same line, different columns — not one under the other.
+        Assert.True(writeOn.Left > list.Right,
+            $"The write-on heading starts at {writeOn.Left:0.#}, left of where the list ends at {list.Right:0.#}.");
+        Assert.True(Math.Abs(writeOn.Bottom - list.Bottom) < 2,
+            "The two headings are on different lines, so the columns are stacked rather than side by side.");
+    }
+
+    /// <summary>
+    /// Yesterday's unreadable handwriting is listed so it can be written again. It is the only copy
+    /// left — the sheet it was on is trashed once today's lands — so dropping it silently loses
+    /// whatever the owner wrote.
+    /// </summary>
+    [Fact]
+    public void UnreadableCarryoversAreListedForReEntry()
+    {
+        var pdf = composer.Compose(new DayDocument
+        {
+            Date = Today,
+            Agenda = new DayAgenda { Date = Today, Events = [] },
+            UnreadableCarryovers = [new ParsedNote { Text = "illegible scribble", Confidence = 0.2 }],
+        });
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+
+        Assert.Contains("illegible scribble", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
     private static WeatherReport Forecast() => new()
     {
         Today = new TodayWeather
