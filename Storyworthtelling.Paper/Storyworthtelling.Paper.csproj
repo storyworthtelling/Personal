@@ -24,8 +24,7 @@
   <!-- The shared Paper & Ink fonts, embedded for the Skia renderers (identical on the desktop test
        TFM and on device, exactly as Storyboarder.Infrastructure embedded them before extraction). -->
   <ItemGroup>
-    <EmbeddedResource Include="..\Fonts\SourceSerif4-*.ttf;..\Fonts\SourceSans3-*.ttf"
-                      Link="Fonts\%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\Fonts\*.ttf" Link="Fonts\%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

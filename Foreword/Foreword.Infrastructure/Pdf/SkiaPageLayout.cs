@@ -188,6 +188,22 @@ internal sealed class SkiaPageLayout : IDisposable
     }
 
     // ---- PDF assembly ----
+    /// <summary>
+    /// Names this page as a link destination. Paired with <see cref="LinkTo"/> through
+    /// <c>SectionTabs.Destination</c>, because the two ends agreeing is the whole of it: a link to
+    /// a name nothing anchors is a perfectly valid PDF that does nothing when touched.
+    /// </summary>
+    public void Anchor(string destination) =>
+        canvas.DrawNamedDestinationAnnotation(new SKPoint(0, 0), destination);
+
+    /// <summary>
+    /// Makes a rectangle of this page a link to a named destination. Coordinates are the top-left
+    /// page points every composer is written in; Skia flips them into the PDF's own bottom-left
+    /// space, which is why nothing here does it by hand.
+    /// </summary>
+    public void LinkTo(double x, double y, double w, double h, string destination) =>
+        canvas.DrawLinkDestinationAnnotation(Rect(x, y, w, h), destination);
+
     public byte[] ToPdf()
     {
         sink.EndPage();
