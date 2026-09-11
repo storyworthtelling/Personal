@@ -54,6 +54,13 @@ public static class PreferenceKeys
     public const string SeenCalendarIds = "SeenCalendarIds";
 
     /// <summary>
+    /// The time the periodic delivery work was actually scheduled for, so moving the delivery time
+    /// in code can replace a schedule the phone is already holding. See
+    /// <see cref="Foreword.Domain.Delivery.DeliverySchedule"/>.
+    /// </summary>
+    public const string ScheduledDeliveryTime = "ScheduledDeliveryTime";
+
+    /// <summary>
     /// The nine keys a phone was <b>already storing</b> before the rename. These are what may never
     /// move: the guard freezes this list exactly, in order.
     ///
@@ -76,5 +83,5 @@ public static class PreferenceKeys
 
     /// <summary>Every key this app stores, frozen or not.</summary>
     public static IReadOnlyList<string> All { get; } =
-        [.. Frozen, WorkScheduleJson, SeenCalendarIds];
+        [.. Frozen, WorkScheduleJson, SeenCalendarIds, ScheduledDeliveryTime];
 }
