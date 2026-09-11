@@ -1,6 +1,7 @@
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Document;
 using Foreword.Domain.Models;
+using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 using Foreword.Infrastructure.Pdf;
 using UglyToad.PdfPig;
@@ -121,14 +122,25 @@ public class DayPageBoundsTests
             Outlook = [At(PersonColumn.Eva, 16, 17, "Eva — orthodontist follow-up appointment")],
             Tasks =
             [
-                new TodoItem { Title = "Vitamins" },
-                new TodoItem { Title = "Mow the lawn", Due = Day.AddDays(-1) },
-                new TodoItem { Title = "Book Eva's orthodontist follow-up appointment" },
-                new TodoItem { Title = "Bins out" },
+                Printed("Vitamins"),
+                Printed("Mow the lawn", Day.AddDays(-1)),
+                Printed("Book Eva's orthodontist follow-up appointment"),
+                Printed("Bins out"),
             ],
             Weather = Forecast(),
         });
     }
+
+    // A task already placed for today, which is what the page draws. The placement engine has its
+    // own tests; these are about the drawing.
+    private static PrintedTask Printed(string title, DateOnly? due = null, string note = "") =>
+        new(new ForewordTask
+        {
+            Id = title,
+            Title = title,
+            Kind = TaskKind.Once,
+            Due = due,
+        }, note);
 
     private static WeatherReport Forecast() => new()
     {

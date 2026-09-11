@@ -4,6 +4,7 @@ using Foreword.Domain.Interfaces;
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Document;
 using Foreword.Domain.Models;
+using Foreword.Domain.Tasks;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Handwriting;
 using Foreword.Infrastructure.Google;
@@ -20,6 +21,7 @@ public class DailyDeliveryService(
     CalendarColumnMapper columnMapper,
     WorkScheduleAugmenter workAugmenter,
     IOutlookSelector outlookSelector,
+    ITaskStore taskStore,
     IDayPdfComposer dayComposer,
     IWeatherClient weather,
     IRouteClient routes,
@@ -38,7 +40,8 @@ public class DailyDeliveryService(
         var agenda = await BuildAgenda(date);
         agenda.Travel = await MeasureTravel(agenda);
         var outlook = await BuildOutlook(date);
-        var tasks = await googleTasks.GetMyTasks();
+        var weather = await ReadWeather(date);
+        var tasks = await PlaceTasks(date, weather);
 
         var document = new DayDocument
         {
@@ -46,7 +49,7 @@ public class DailyDeliveryService(
             Agenda = agenda,
             Outlook = outlook,
             Tasks = tasks,
-            Weather = await ReadWeather(date),
+            Weather = weather,
             UnreadableCarryovers = carryovers,
         };
 
@@ -193,6 +196,34 @@ public class DailyDeliveryService(
                 logger.LogWarning(ex, "Could not trash previous document {Id}", id);
             }
         }
+    }
+
+    /// <summary>
+    /// What prints on the checklist this morning.
+    ///
+    /// <para>Foreword's own rules and Google's tasks are merged into ONE list first (T3's "one list,
+    /// not three" as a fact about the data rather than an arrangement on a page), then placed: the
+    /// smart ones choose their own day from the forecast, the season and their preference, and the
+    /// recurring ones sit out the mornings the owner is away.</para>
+    /// </summary>
+    private async Task<IReadOnlyList<PrintedTask>> PlaceTasks(
+        DateOnly date, Domain.Weather.WeatherReport weather)
+    {
+        IReadOnlyList<TodoItem> google = [];
+        try
+        {
+            google = await googleTasks.GetMyTasks();
+        }
+        catch (Exception ex)
+        {
+            // Google's half can fail without costing Foreword's own rules, which are on the phone.
+            logger.LogWarning(ex, "Could not read Google tasks for {Date}", date);
+        }
+
+        var everything = GoogleTaskMirror.Merge(taskStore.All(), google);
+
+        return TaskPlacement.ForToday(
+            everything, date, DryHoursForecast.From(weather), taskStore.Away);
     }
 
     /// <summary>
