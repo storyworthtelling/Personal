@@ -163,7 +163,10 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         {
             var inColumn = timed.Where(e => e.Columns.Any(c => ColumnIndex(c) == col)).ToList();
 
-            foreach (var travel in TravelPlan.For(inColumn, e => e.TravelMinutes))
+            // Per column, so each person's drive starts where THEIR day has left them — and so an
+            // event both a child and a driving parent are on gets a band in both their columns,
+            // each measured from where that person actually is.
+            foreach (var travel in TravelPlan.For(inColumn, agenda.Travel.Home, agenda.Travel.Minutes))
             {
                 if (Window(travel.Event, hourHeight, timelineTop, stripHeight) is not { } at)
                 {
