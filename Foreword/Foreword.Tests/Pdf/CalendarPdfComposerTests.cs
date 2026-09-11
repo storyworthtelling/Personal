@@ -20,7 +20,7 @@ public class CalendarPdfComposerTests
         new()
         {
             Title = title,
-            Column = column,
+            Columns = [column],
             Start = Today.ToDateTime(new TimeOnly(startHour, 0)),
             End = Today.ToDateTime(new TimeOnly(endHour, 0))
         };
@@ -43,6 +43,105 @@ public class CalendarPdfComposerTests
 
         Assert.True(strip > line, $"A {strip}pt strip cannot hold a {line}pt line.");
         Assert.True(strip > 11, $"The old fixed height was 11pt and the text now needs {line}pt.");
+    }
+
+    /// <summary>
+    /// An unreachable drive is FLAGGED, not merely drawn. This asserts the page renders at all with
+    /// travel on it — the band is geometry, so the honest end of this test is the eye, and it is in
+    /// the on-device document. What it does catch is a band that throws or paginates the page away.
+    /// </summary>
+    [Fact]
+    public void ADriveDrawsWithoutDisturbingThePage()
+    {
+        var soccer = TimedEvent(PersonColumn.Jordan, 16, 17, "Soccer practice");
+        soccer.TravelMinutes = 25;
+
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events = [TimedEvent(PersonColumn.Jordan, 15, 16, "Vet"), soccer],
+        };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        Assert.Equal(2, PageCount(pdf));
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        Assert.Contains("Soccer practice", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// B2's other half, on the page: a fourth event in the same hour is written under the grid
+    /// rather than squeezed into a box a few characters wide. The owner asked for all of them.
+    /// </summary>
+    [Fact]
+    public void AnEventPastTheLegibleWidthIsWrittenUnderTheGrid()
+    {
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events =
+            [
+                TimedEvent(PersonColumn.Rowan, 9, 10, "First"),
+                TimedEvent(PersonColumn.Rowan, 9, 10, "Second"),
+                TimedEvent(PersonColumn.Rowan, 9, 10, "Third"),
+            ],
+        };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        var page = document.GetPage(1).Text;
+
+        Assert.Contains("Also today", page, StringComparison.Ordinal);
+        Assert.Contains("Third", page, StringComparison.Ordinal);
+    }
+
+    /// <summary>Nothing overflows on an ordinary day, so the page says nothing about it.</summary>
+    [Fact]
+    public void AnOrdinaryDayHasNoAlsoTodayList()
+    {
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events = [TimedEvent(PersonColumn.Rowan, 9, 10, "Standup")],
+        };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        Assert.DoesNotContain("Also today", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// D34, at the point it actually matters: a held calendar is NAMED on the page. Holding it
+    /// silently would just be the old bug with the events missing instead of misfiled.
+    /// </summary>
+    [Fact]
+    public void AHeldCalendarIsNamedOnThePage()
+    {
+        var agenda = new DayAgenda
+        {
+            Date = Today,
+            Events = [],
+            HeldCalendars = ["scouts@group"],
+        };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        Assert.Contains("scouts@group", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>Nothing held, nothing said: the page carries no note about calendars.</summary>
+    [Fact]
+    public void NothingIsSaidWhenNothingIsHeld()
+    {
+        var agenda = new DayAgenda { Date = Today, Events = [] };
+
+        var pdf = composer.Compose(agenda, [], []);
+
+        using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
+        Assert.DoesNotContain("no column yet", document.GetPage(1).Text, StringComparison.Ordinal);
     }
 
     [Fact]

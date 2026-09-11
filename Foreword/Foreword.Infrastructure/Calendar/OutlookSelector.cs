@@ -22,7 +22,7 @@ public class OutlookSelector : IOutlookSelector
             return false;
 
         // Sports and TV (the Watch column) are routine entertainment, not schedule deviations.
-        if (e.Column == PersonColumn.Watch)
+        if (e.Columns.Contains(PersonColumn.Watch))
             return false;
 
         return !IsHighFrequencyRecurring(e);

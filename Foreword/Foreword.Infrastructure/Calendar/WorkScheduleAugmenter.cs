@@ -25,13 +25,15 @@ public class WorkScheduleAugmenter
 
         foreach (var shift in options.Shifts)
         {
-            if (HasOffDay(result, shift.Person, date))
+            // A shift that has been turned off is kept in the settings but not drawn, so turning it
+            // back on does not mean typing the hours again.
+            if (!shift.Enabled || HasOffDay(result, shift.Person, date))
                 continue;
 
             result.Add(new CalendarEvent
             {
                 Title = shift.Title,
-                Column = shift.Person,
+                Columns = [shift.Person],
                 Kind = EventKind.WorkBlock,
                 Start = date.ToDateTime(ParseTime(shift.Start)),
                 End = date.ToDateTime(ParseTime(shift.End))
@@ -52,7 +54,7 @@ public class WorkScheduleAugmenter
 
     private bool HasOffDay(IEnumerable<CalendarEvent> events, PersonColumn person, DateOnly date) =>
         events.Any(e => e.Kind == EventKind.OffDay
-            && e.Column == person
+            && e.Columns.Contains(person)
             && DateOnly.FromDateTime(e.Start) == date);
 
     private bool IsOffTitle(string title) =>
