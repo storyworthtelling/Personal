@@ -48,8 +48,20 @@ public static class PreferenceKeys
     public const string LastDeliveryOutcome = "LastDeliveryOutcome";
     public const string LastDeliveryAtUtc = "LastDeliveryAtUtc";
 
-    /// <summary>Every key, in declaration order, so the guard can freeze the whole set.</summary>
-    public static IReadOnlyList<string> All { get; } =
+    // Added in P9. New keys are allowed; the nine above are what may never move, because a phone is
+    // already storing values under them. A new key has nothing to lose — nobody has written to it.
+    public const string WorkScheduleJson = "WorkScheduleJson";
+    public const string SeenCalendarIds = "SeenCalendarIds";
+
+    /// <summary>
+    /// The nine keys a phone was <b>already storing</b> before the rename. These are what may never
+    /// move: the guard freezes this list exactly, in order.
+    ///
+    /// <para>Keys added afterwards are not here and do not need to be. A key nobody has ever
+    /// written to has nothing to lose by changing — the freeze is about not orphaning a value that
+    /// already exists on a device, not about never adding a setting.</para>
+    /// </summary>
+    public static IReadOnlyList<string> Frozen { get; } =
     [
         NytSessionCookie,
         NytApiKey,
@@ -61,4 +73,8 @@ public static class PreferenceKeys
         LastDeliveryOutcome,
         LastDeliveryAtUtc,
     ];
+
+    /// <summary>Every key this app stores, frozen or not.</summary>
+    public static IReadOnlyList<string> All { get; } =
+        [.. Frozen, WorkScheduleJson, SeenCalendarIds];
 }

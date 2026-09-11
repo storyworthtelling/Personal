@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Foreword.Android.Pages.CalendarSplitPage"
+             Title="Split by name">
+    <!--
+        C3: splitting one calendar by name. An event goes to EVERY column whose word its title
+        contains — not the first, which is the bug D31 exists to fix.
+
+        The foot shows the rule running against the events actually on the calendar this morning,
+        because keyword routing fails quietly and a rule you cannot see failing is one you will not
+        fix. Adding a word is the only edit; there is no regex, because a regex you get wrong is
+        silent too.
+
+        Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c
+    -->
+    <ScrollView>
+        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
+
+            <Label x:Name="NameLabel" Style="{StaticResource DisplayLabel}" />
+            <Label Text="An event goes to every column whose word its title contains."
+                   Style="{StaticResource CardCaption}" />
+
+            <Border Style="{StaticResource GroupCard}" Margin="0,16,0,0">
+                <VerticalStackLayout x:Name="Words" />
+            </Border>
+
+            <Label Text="This morning" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout x:Name="Preview" />
+            </Border>
+            <Label x:Name="PreviewCaption" Style="{StaticResource CardCaption}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -31,8 +31,23 @@ public class CalendarEvent
     // The originating Google calendar id; used by the column mapper and for routing.
     public string SourceCalendarId { get; init; } = string.Empty;
 
-    // Which column the event belongs to. Assigned by CalendarColumnMapper.
-    public PersonColumn Column { get; set; }
+    // The invited addresses. An invited address is a FACT about who is going, where a name in a
+    // title is a heuristic — which is why D31 reads these first. ResponseStatus is deliberately not
+    // carried: a family that never answers an invitation would otherwise get nothing.
+    public IReadOnlyList<string> Guests { get; init; } = [];
+
+    // How long the drive to Location takes, in minutes, or null when nobody has measured it. Drawn
+    // as a band before the event so the day's REAL occupancy is visible — a four o'clock that is
+    // really a twenty-five-minute drive from a three-thirty is a conflict the grid otherwise shows
+    // as two comfortable boxes with a gap between them. Null draws nothing: a band of invented
+    // length would make the day look occupied by something nobody measured.
+    public int? TravelMinutes { get; set; }
+
+    // WHICH COLUMNS the event belongs to — a set, because one event can belong to several people
+    // (D31). "Wren and Linden to swimming" is one event in two columns, not two events and not a guess
+    // between them. Assigned by CalendarColumnMapper via ColumnSet.Resolve, and never empty: an
+    // event in the calendar and on no page is the one outcome worse than being in the wrong column.
+    public IReadOnlyList<PersonColumn> Columns { get; set; } = [PersonColumn.Rowan];
 
     // Classification used by the outlook selector and work-block augmentation.
     public EventKind Kind { get; set; } = EventKind.Normal;

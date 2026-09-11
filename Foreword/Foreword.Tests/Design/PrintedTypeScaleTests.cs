@@ -51,6 +51,12 @@ public class PrintedTypeScaleTests
     /// <para>The ground is the one exemption and it is deliberate: the sheets are drawn white for
     /// the newspaper look rather than on the device's warm ground, which is a design decision
     /// standing until the owner says otherwise.</para>
+    ///
+    /// <para><b>It also catches a hand-mixed colour</b>, which the first version of this guard did
+    /// not. It looked only for <c>SKColors.</c> and passed happily over
+    /// <c>new SKColor(230, 230, 245)</c> and <c>new SKColor(225, 238, 225)</c> — a lavender and a
+    /// green sitting in the calendar composer, no more part of the palette than the named greys and
+    /// harder to spot, because they read as deliberate.</para>
     /// </summary>
     [Fact]
     public void NoComposerNamesAColourInsteadOfARole()
@@ -60,13 +66,20 @@ public class PrintedTypeScaleTests
         foreach (var file in Directory.EnumerateFiles(
             Path.Combine(Root(), "Foreword.Infrastructure", "Pdf"), "*.cs"))
         {
-            foreach (Match match in Regex.Matches(File.ReadAllText(file), @"SKColors\.(?<name>\w+)"))
+            var source = File.ReadAllText(file);
+
+            foreach (Match match in Regex.Matches(source, @"SKColors\.(?<name>\w+)"))
             {
                 if (match.Groups["name"].Value == "White")
                 {
                     continue;   // the ground, exempted above
                 }
 
+                offenders.Add($"{Path.GetFileName(file)}: {match.Value}");
+            }
+
+            foreach (Match match in Regex.Matches(source, @"new SKColor\([^)]*\d[^)]*\)"))
+            {
                 offenders.Add($"{Path.GetFileName(file)}: {match.Value}");
             }
         }
