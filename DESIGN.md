@@ -359,11 +359,12 @@ Only these may contain color hex or type-size literals:
 | Project | Token files |
 |---|---|
 | Shared: Paper | The OKLCH **source spec** (`Storyworthtelling.Paper/PaletteSpec.cs` + `Oklch.cs`) and the generated `PaperColorTokens.cs` it emits (roles × tiers × App/Document profiles + gray ramp) |
+| Shared: app identity | `Storyworthtelling.Paper/AppIdentityTokens.cs` — each app's **identity** hue for what a printed page signs with it (a document rule, the app's name in the owner's hand, a tab's cloth). Not the role palette: a role says what something *means*, an identity says *whose* it is, and nothing here may stand in for a role. Held to `Tools/IconStudio/Tokens.cs` — the source, where the hue was chosen — by parity test, because a console application is not something a library can reference |
 | Shared: printed type | `Storyworthtelling.Paper/PaperTypeScale.cs` — the **printed** ladder, in points, derived from the screen ladder by one registered ratio (D30). Not a second scale: a guard multiplies the native sp ladder, read from its own source, and asserts these are the answers |
 | Shared: MAUI kit | `Storyworthtelling.Maui/Resources/Styles/Paper.xaml` — the role table and component styles for the MAUI heads, the counterpart of `Codex.Ui.Android`'s `PaperUi`/`PaperTheme`. Checked against `PaperColorTokens` **by reflection**, not against a second typed copy |
 | Per-app | `*/Design/DesignTokens.cs` + `Resources/Styles/DesignTokens.xaml` — **thin generated re-exports** of the shared tokens (still leak-guard-scanned). **A MAUI head that has adopted the kit above has no token file at all** and is scanned for hexes everywhere; Ledger and Canonizer still carry their own and adopt the kit at their own phases |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
-| Fonts | `/Fonts` — Source Serif 4 (incl. **Black**), Source Sans 3, Cascadia Code, **Pinyon Script** (all OFL) |
+| Fonts | `/Fonts` — Source Serif 4 (incl. **Black**), Source Sans 3, Cascadia Code, **Pinyon Script** (all OFL). All eight are embedded in `Storyworthtelling.Paper` for the Skia renderers, held by a guard: a face the printing library cannot load is not an error — Skia substitutes one and says nothing, and the page is already printed by the time anyone looks |
 | Branding | `/Branding/owner.png` (owner-supplied) |
 
 **Tests (build-failing):** the **contrast** table (all role×tier×profile ≥ AA vs the worst textured/washed pixel); **screen↔document role parity** (every role resolves in both profiles); **generated↔committed parity** (a fresh generator run equals the committed tokens); the **material-legibility** cap; and C#↔XAML parity. A change to this bible is a change to the source spec and the tests, in the same commit.

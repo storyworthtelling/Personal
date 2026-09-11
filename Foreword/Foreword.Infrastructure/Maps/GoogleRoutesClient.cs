@@ -3,8 +3,10 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Foreword.Domain.Health;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Weather;
+using Storyworthtelling.Voice.Health;
 
 namespace Foreword.Infrastructure.Maps;
 
@@ -21,7 +23,10 @@ namespace Foreword.Infrastructure.Maps;
 /// no fields on them — so every drive would come back unmeasured, no error anywhere, and the page
 /// would look exactly like a day with no driving in it.</para>
 /// </summary>
-public class GoogleRoutesClient(HttpClient httpClient, IOptions<MapsOptions> options) : IRouteClient
+public class GoogleRoutesClient(
+    HttpClient httpClient,
+    IOptions<MapsOptions> options,
+    ICredentialHealthSink? healthSink = null) : IRouteClient
 {
     private const string Endpoint = "https://routes.googleapis.com/directions/v2:computeRoutes";
     private const string FieldMask = "routes.duration,routes.distanceMeters";
@@ -66,9 +71,18 @@ public class GoogleRoutesClient(HttpClient httpClient, IOptions<MapsOptions> opt
             var response = await httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {
+                // Only a rejection flags the key; a throttle or a 500 is what a working key does on
+                // a bad morning, and one of those should not put a "paste your key" box on screen.
+                if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, null))
+                {
+                    healthSink?.MarkFailing(
+                        CredentialIds.Maps, $"{(int)response.StatusCode} {response.StatusCode}");
+                }
+
                 return null;
             }
 
+            healthSink?.MarkOk(CredentialIds.Maps);
             return Read(await response.Content.ReadAsStringAsync());
         }
         catch (HttpRequestException)

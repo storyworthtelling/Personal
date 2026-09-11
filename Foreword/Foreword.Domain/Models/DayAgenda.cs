@@ -14,5 +14,5 @@ public class DayAgenda
     // than on each event because a drive has two ends and the columns do not share them: the same
     // field is a different drive from the office than it is from the school. A day nobody measured
     // simply draws no bands.
-    public Calendar.TravelTable Travel { get; init; } = Calendar.TravelTable.NothingMeasured;
+    public Calendar.TravelTable Travel { get; set; } = Calendar.TravelTable.NothingMeasured;
 }

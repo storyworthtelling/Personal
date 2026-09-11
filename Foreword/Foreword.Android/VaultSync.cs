@@ -27,6 +27,13 @@ public sealed class VaultSync
             Nyt = new NytSecrets(CredentialStore.NytSessionCookie, CredentialStore.NytApiKey),
             Remarkable = new RemarkableSecrets(CredentialStore.RemarkableDeviceToken),
             Foreword = new ForewordSecrets(CredentialStore.AnthropicApiKey, CredentialStore.CalendarMappingJson),
+            // The Maps key is shared rather than Foreword's own: it bills a project, and the house
+            // beside it is the household's address, not this app's setting.
+            Maps = new MapsSecrets(
+                CredentialStore.MapsApiKey,
+                CredentialStore.HomeAddress,
+                CredentialStore.HomeLatitude,
+                CredentialStore.HomeLongitude),
             // Fold this session's captured Drive file ids into the shared map (id wins per name).
             DriveFileIds = MergeIds(v.DriveFileIds, fileIdStore.Snapshot())
         }, cancellationToken);
@@ -58,6 +65,17 @@ public sealed class VaultSync
         FillIfEmpty(CredentialStore.RemarkableDeviceToken, vaultData.Remarkable.DeviceToken, v => CredentialStore.RemarkableDeviceToken = v);
         FillIfEmpty(CredentialStore.AnthropicApiKey, vaultData.Foreword.AnthropicApiKey, v => CredentialStore.AnthropicApiKey = v);
         FillIfEmpty(CredentialStore.CalendarMappingJson, vaultData.Foreword.CalendarMappingJson, v => CredentialStore.CalendarMappingJson = v);
+        FillIfEmpty(CredentialStore.MapsApiKey, vaultData.Maps.ApiKey, v => CredentialStore.MapsApiKey = v);
+        FillIfEmpty(CredentialStore.HomeAddress, vaultData.Maps.HomeAddress, v => CredentialStore.HomeAddress = v);
+
+        // The house's point is two numbers, and zero is a real coordinate — it just happens to be in
+        // the Atlantic. "Not set" is therefore both of them being zero, not either one.
+        if (CredentialStore.HomeLatitude == 0 && CredentialStore.HomeLongitude == 0
+            && (vaultData.Maps.HomeLatitude != 0 || vaultData.Maps.HomeLongitude != 0))
+        {
+            CredentialStore.HomeLatitude = vaultData.Maps.HomeLatitude;
+            CredentialStore.HomeLongitude = vaultData.Maps.HomeLongitude;
+        }
     }
 
     private static void FillIfEmpty(string current, string fromVault, Action<string> set)

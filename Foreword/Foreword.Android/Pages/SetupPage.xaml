@@ -82,6 +82,48 @@
                 </Grid>
             </Border>
 
+            <!-- ==== Weather & drives =================================================
+                 One key for four Maps Platform APIs — routes, weather, pollen, air quality —
+                 because Maps Platform bills a project rather than a product. The house is here
+                 beside it because it is what every one of those calls needs: where the day starts
+                 and where the forecast is. Shown in the clear rather than masked only for the
+                 vault passphrase; this is a key, so it follows the masked rule.
+            -->
+            <Label Text="Weather &amp; drives" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout>
+                    <VerticalStackLayout x:Name="MapsKeyBlock" Padding="16,12" Spacing="8">
+                        <Label Text="Google Maps Platform key" Style="{StaticResource CardRowTitle}" />
+                        <Entry x:Name="MapsKeyEntry" Placeholder="Paste the key" TextChanged="OnMapsKeyChanged"
+                               IsPassword="True" Style="{StaticResource MonoEntry}" />
+                        <Label Text="Enable Routes, Weather, Pollen and Air Quality on the same project."
+                               Style="{StaticResource CardRowDescription}" />
+                    </VerticalStackLayout>
+
+                    <Grid x:Name="MapsKeyWorkingRow" Padding="16,12" ColumnDefinitions="*,Auto"
+                          IsVisible="False">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Maps key" Style="{StaticResource CardRowTitle}" />
+                            <Label Text="Working ✓" Style="{StaticResource CardRowDescription}" />
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="Replace" Clicked="OnReplaceMapsKey"
+                                Style="{StaticResource QuietButton}" />
+                    </Grid>
+
+                    <VerticalStackLayout Padding="16,12" Spacing="8">
+                        <Label Text="Home" Style="{StaticResource CardRowTitle}" />
+                        <Entry x:Name="HomeAddressEntry" Placeholder="Street, town" TextChanged="OnHomeAddressChanged"
+                               Style="{StaticResource MonoEntry}" />
+                        <Label Text="Every drive is measured from wherever that person's day has left them, and from here at the start of the morning."
+                               Style="{StaticResource CardRowDescription}" />
+                        <Entry x:Name="HomePointEntry" Placeholder="Latitude, longitude" TextChanged="OnHomePointChanged"
+                               Style="{StaticResource MonoEntry}" />
+                        <Label Text="The forecast needs a point rather than an address."
+                               Style="{StaticResource CardRowDescription}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+
             <!-- ==== Where it goes ===================================================== -->
             <Label Text="Where it goes" Style="{StaticResource GroupLabel}" />
             <Border Style="{StaticResource GroupCard}">

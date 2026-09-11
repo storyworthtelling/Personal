@@ -2,8 +2,10 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Foreword.Domain.Health;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Weather;
+using Storyworthtelling.Voice.Health;
 
 namespace Foreword.Infrastructure.Maps;
 
@@ -18,7 +20,10 @@ namespace Foreword.Infrastructure.Maps;
 /// <para>Every field name here was read out of the published reference rather than remembered. A
 /// JSON reader that guesses does not throw: it returns an empty page and no error at all.</para>
 /// </summary>
-public class GoogleWeatherClient(HttpClient httpClient, IOptions<MapsOptions> options) : IWeatherClient
+public class GoogleWeatherClient(
+    HttpClient httpClient,
+    IOptions<MapsOptions> options,
+    ICredentialHealthSink? healthSink = null) : IWeatherClient
 {
     private const string WeatherBase = "https://weather.googleapis.com/v1";
     private const string PollenBase = "https://pollen.googleapis.com/v1";
@@ -98,9 +103,11 @@ public class GoogleWeatherClient(HttpClient httpClient, IOptions<MapsOptions> op
             var response = await httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode)
             {
+                Report(response);
                 return null;
             }
 
+            healthSink?.MarkOk(CredentialIds.Maps);
             return Parse(await response.Content.ReadAsStringAsync());
         }
         catch (HttpRequestException)
@@ -121,9 +128,11 @@ public class GoogleWeatherClient(HttpClient httpClient, IOptions<MapsOptions> op
                 url, new StringContent(body, Encoding.UTF8, "application/json"));
             if (!response.IsSuccessStatusCode)
             {
+                Report(response);
                 return null;
             }
 
+            healthSink?.MarkOk(CredentialIds.Maps);
             return Parse(await response.Content.ReadAsStringAsync());
         }
         catch (HttpRequestException)
@@ -133,6 +142,19 @@ public class GoogleWeatherClient(HttpClient httpClient, IOptions<MapsOptions> op
         catch (TaskCanceledException)
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Only a rejection flags the key. Throttling, a 500 and a dropped connection are all things a
+    /// working key does on a bad morning, and revealing the field for one of them would put a
+    /// "paste your key" box on the settings screen every time Google had a wobble.
+    /// </summary>
+    private void Report(HttpResponseMessage response)
+    {
+        if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, null))
+        {
+            healthSink?.MarkFailing(CredentialIds.Maps, $"{(int)response.StatusCode} {response.StatusCode}");
         }
     }
 
