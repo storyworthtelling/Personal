@@ -1,3 +1,4 @@
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Pdf;
 using PdfSharp.Pdf.IO;
@@ -16,10 +17,12 @@ public class CalendarPdfComposerTests
         return PdfReader.Open(stream, PdfDocumentOpenMode.InformationOnly).PageCount;
     }
 
-    private static CalendarEvent TimedEvent(PersonColumn column, int startHour, int endHour, string title) =>
+    private static CalendarEvent TimedEvent(PersonColumn column, int startHour, int endHour,
+        string title, string? location = null) =>
         new()
         {
             Title = title,
+            Location = location,
             Columns = [column],
             Start = Today.ToDateTime(new TimeOnly(startHour, 0)),
             End = Today.ToDateTime(new TimeOnly(endHour, 0))
@@ -53,13 +56,13 @@ public class CalendarPdfComposerTests
     [Fact]
     public void ADriveDrawsWithoutDisturbingThePage()
     {
-        var soccer = TimedEvent(PersonColumn.Jordan, 16, 17, "Soccer practice");
-        soccer.TravelMinutes = 25;
+        var soccer = TimedEvent(PersonColumn.Jordan, 16, 17, "Soccer practice", "Veterans Park");
 
         var agenda = new DayAgenda
         {
             Date = Today,
             Events = [TimedEvent(PersonColumn.Jordan, 15, 16, "Vet"), soccer],
+            Travel = TravelTable.Of("Home", [("Home", "Veterans Park", 25)]),
         };
 
         var pdf = composer.Compose(agenda, [], []);
