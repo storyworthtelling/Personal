@@ -82,6 +82,21 @@
                 </Grid>
             </Border>
 
+            <!-- ==== Sources ========================================================== -->
+            <Label Text="The brief" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSourcesClicked" />
+                    </Grid.GestureRecognizers>
+                    <VerticalStackLayout Grid.Column="0">
+                        <Label Text="Where the brief comes from" Style="{StaticResource CardRowTitle}" />
+                        <Label x:Name="SourcesSummaryLabel" Style="{StaticResource CardRowDescription}" />
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
+                </Grid>
+            </Border>
+
             <!-- ==== Weather & drives =================================================
                  One key for four Maps Platform APIs — routes, weather, pollen, air quality —
                  because Maps Platform bills a project rather than a product. The house is here

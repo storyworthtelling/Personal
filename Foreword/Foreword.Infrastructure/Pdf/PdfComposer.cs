@@ -22,11 +22,19 @@ public class PdfComposer : IPdfComposer
         Compose(articles, crosswordPdfBytes, DateOnly.FromDateTime(DateTime.Today), string.Empty);
 
     /// <summary>
-    /// The whole brief: the foreword page, the stories, then the puzzle.
+    /// The whole brief: the foreword page, the stories, the comic, then the puzzle. The comic is
+    /// last before the puzzle because that is where it belongs — the thing you read when you have
+    /// finished reading.
     /// </summary>
     public byte[] Compose(
-        IReadOnlyList<ArticleContent> articles, byte[] crosswordPdfBytes, DateOnly date, string voice)
+        IReadOnlyList<ArticleContent> articles,
+        byte[] crosswordPdfBytes,
+        DateOnly date,
+        string voice,
+        IReadOnlyList<Domain.Brief.ComicStrip>? comics = null,
+        Domain.Brief.HistoryNote? history = null)
     {
+        comics ??= [];
         // The contents can only be written once the pages exist, so the stories are composed first
         // and their page count read back — a contents page that guessed its own lengths would be
         // wrong on exactly the mornings a story ran long.
@@ -36,11 +44,15 @@ public class PdfComposer : IPdfComposer
         {
             new("The news", articles.Count(a => !Opinion(a)), storyPages),
             new("Opinion", articles.Count(Opinion), 0),
+            new("xkcd", comics.Count, comics.Count),
             new("The crossword", null, PdfMerger.PageCount(crosswordPdfBytes)),
         };
 
         var newsPdfBytes = ComposeNews(
-            articles, layout => ForewordPage.Draw(layout, date, voice, sections));
+            articles,
+            layout => ForewordPage.Draw(layout, date, voice, sections, history),
+            comics,
+            crosswordFollows: crosswordPdfBytes.Length > 0);
 
         return newsPdfBytes.Length == 0
             ? crosswordPdfBytes
@@ -56,29 +68,31 @@ public class PdfComposer : IPdfComposer
     /// wants. Internal so the pages can be read back and checked without merging a puzzle onto them.
     /// </summary>
     internal byte[] ComposeNews(IReadOnlyList<ArticleContent> articles) =>
-        ComposeNews(articles, foreword: null);
+        ComposeNews(articles, foreword: null, comics: [], crosswordFollows: false);
 
     /// <summary>
-    /// The news pages, optionally opening with the foreword page (B1).
+    /// The news pages, optionally opening with the foreword page (B1) and closing with the comic
+    /// (B3).
     /// </summary>
     internal byte[] ComposeNews(
-        IReadOnlyList<ArticleContent> articles, Action<SkiaPageLayout>? foreword)
+        IReadOnlyList<ArticleContent> articles,
+        Action<SkiaPageLayout>? foreword,
+        IReadOnlyList<Domain.Brief.ComicStrip> comics,
+        bool crosswordFollows)
     {
-        if (articles.Count == 0 && foreword is null)
+        if (articles.Count == 0 && foreword is null && comics.Count == 0)
         {
             return [];
         }
 
         using var layout = new SkiaPageLayout();
 
+        var started = false;
+
         if (foreword is not null)
         {
             foreword(layout);
-
-            if (articles.Count > 0)
-            {
-                layout.NewPage();
-            }
+            started = true;
         }
 
         // Positions within each section, so the folio can say "1 of 8" — the question a stack of
@@ -90,10 +104,12 @@ public class PdfComposer : IPdfComposer
 
         for (var i = 0; i < articles.Count; i++)
         {
-            if (i > 0)
+            if (started)
             {
                 layout.NewPage();
             }
+
+            started = true;
 
             var article = articles[i];
             var section = Folio(article);
@@ -110,6 +126,18 @@ public class PdfComposer : IPdfComposer
                 TextAlign.TopLeft, SkiaPageLayout.InkMuted);
 
             DrawArticle(layout, article);
+        }
+
+        // The comic, last. Its own footer, so the folio stops naming the news.
+        foreach (var strip in comics)
+        {
+            if (started)
+            {
+                layout.NewPage();
+            }
+
+            started = true;
+            ComicPage.Draw(layout, strip, crosswordFollows);
         }
 
         return layout.ToPdf();

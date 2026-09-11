@@ -120,6 +120,40 @@ public static class CredentialStore
         set => Preferences.Set(PreferenceKeys.AwayJson, value);
     }
 
+    public static string FeedsJson
+    {
+        get => Preferences.Get(PreferenceKeys.FeedsJson, string.Empty);
+        set => Preferences.Set(PreferenceKeys.FeedsJson, value);
+    }
+
+    // The defaults are the counts the brief has always used, so a phone that has never opened the
+    // Sources screen keeps the paper it already had.
+    public static int NewsCount
+    {
+        get => Preferences.Get(PreferenceKeys.NewsCount, 5);
+        set => Preferences.Set(PreferenceKeys.NewsCount, value);
+    }
+
+    public static int OpinionCount
+    {
+        get => Preferences.Get(PreferenceKeys.OpinionCount, 3);
+        set => Preferences.Set(PreferenceKeys.OpinionCount, value);
+    }
+
+    // The highest xkcd already printed. Zero means never — which the selection reads as a fresh
+    // install and seeds on the latest rather than printing the archive.
+    public static int SeenComic
+    {
+        get => Preferences.Get(PreferenceKeys.SeenComic, 0);
+        set => Preferences.Set(PreferenceKeys.SeenComic, value);
+    }
+
+    public static string TasteJson
+    {
+        get => Preferences.Get(PreferenceKeys.TasteJson, string.Empty);
+        set => Preferences.Set(PreferenceKeys.TasteJson, value);
+    }
+
     public static string VaultPassphrase
     {
         get => Preferences.Get(PreferenceKeys.VaultPassphrase, string.Empty);

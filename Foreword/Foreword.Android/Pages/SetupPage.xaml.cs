@@ -71,8 +71,29 @@ public partial class SetupPage : ContentPage
             : $"{count} set up";
 
         RenderMaps();
+        RenderSources();
         BuildNeedsYou();
     }
+
+    // ---- The brief =========================================================
+
+    private void RenderSources()
+    {
+        var brief = new BriefSettings();
+        brief.Reload();
+
+        var feeds = brief.Feeds.Count;
+        var refusing = brief.Feeds.Count(feed => feed.FailingSince is not null);
+
+        SourcesSummaryLabel.Text = feeds == 0
+            ? $"{brief.NewsCount + brief.OpinionCount} stories from the paper · no feeds yet"
+            : refusing == 0
+                ? $"{brief.NewsCount + brief.OpinionCount} from the paper · {feeds} feed{(feeds == 1 ? "" : "s")}"
+                : $"{brief.NewsCount + brief.OpinionCount} from the paper · {feeds} feeds, {refusing} refusing";
+    }
+
+    private async void OnSourcesClicked(object sender, EventArgs e) =>
+        await Navigation.PushAsync(new SourcesPage());
 
     // ---- Weather & drives ==================================================
 
