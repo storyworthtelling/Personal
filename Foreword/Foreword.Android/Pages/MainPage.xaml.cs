@@ -255,6 +255,9 @@ public partial class MainPage : ContentPage
         return parts.ToString().Trim();
     }
 
+    private async void OnTasksClicked(object sender, EventArgs e) =>
+        await Navigation.PushAsync(new TasksPage());
+
     private async void OnSettingsClicked(object sender, EventArgs e)
     {
         await Navigation.PushAsync(

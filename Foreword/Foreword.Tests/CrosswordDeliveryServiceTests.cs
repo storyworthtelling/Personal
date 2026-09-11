@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Foreword.Domain.Brief;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Delivery;
@@ -15,6 +16,9 @@ public class CrosswordDeliveryServiceTests
     private readonly Mock<INytTopStoriesClient> topStoriesClient = new();
     private readonly Mock<INytArticleClient> articleClient = new();
     private readonly Mock<IPdfComposer> pdfComposer = new();
+    private readonly Mock<IComicClient> comics = new();
+    private readonly Mock<IHistoryClient> history = new();
+    private readonly FakePreferences preferences = new();
 
     private static readonly TopStory FakeNewsStory = new()
     {
@@ -26,14 +30,43 @@ public class CrosswordDeliveryServiceTests
         Title = "Opinion", Byline = "By B", Section = "Opinion", Url = "https://nytimes.com/opinion",
         Abstract = "Opinion summary."
     };
+    // A body with words in it. An ArticleContent with an EMPTY body now falls back to the abstract
+    // — a fetch that succeeds and returns nothing usable reads on the page exactly like a story
+    // with no words in it — so a fixture with no body would exercise the fallback rather than the
+    // full-article path it was written for. See ...FallsBackWhenTheFetchReturnsNoText below.
     private static readonly ArticleContent FakeArticle = new()
     {
-        Title = "News", Byline = "By A", Section = "U.S.", Body = []
+        Title = "News", Byline = "By A", Section = "U.S.",
+        Body = [new TextBlock { Text = "The full text of the story." }]
     };
+
+    public CrosswordDeliveryServiceTests()
+    {
+        // Neither extra is set up by default, so every existing test exercises the brief WITHOUT a
+        // comic or a factoid — which is the morning where they could not be reached, and the one
+        // that must still deliver.
+        comics.Setup(c => c.Latest()).ReturnsAsync((int?)null);
+        history.Setup(h => h.OnThisDay(It.IsAny<DateOnly>())).ReturnsAsync([]);
+    }
 
     private CrosswordDeliveryService CreateService() =>
         new(nytClient.Object, remarkableClient.Object, topStoriesClient.Object,
-            articleClient.Object, pdfComposer.Object, NullLogger<CrosswordDeliveryService>.Instance);
+            articleClient.Object, pdfComposer.Object, preferences, comics.Object, history.Object,
+            NullLogger<CrosswordDeliveryService>.Instance);
+
+    /// <summary>The Sources screen's values, at their defaults.</summary>
+    private sealed class FakePreferences : IBriefPreferences
+    {
+        public int NewsCount { get; set; } = 5;
+        public int OpinionCount { get; set; } = 3;
+        public IReadOnlyList<Feed> Feeds { get; set; } = [];
+        public int SeenComic { get; set; }
+        public ReadingTaste Taste { get; set; } = ReadingTaste.Empty;
+
+        public void FeedsAfterAMorning(IReadOnlyCollection<string> failed, DateOnly today)
+        {
+        }
+    }
 
     [Fact]
     public async Task DeliverDailyPuzzle_DownloadsPuzzleForGivenDate()
@@ -42,7 +75,10 @@ public class CrosswordDeliveryServiceTests
         nytClient.Setup(c => c.DownloadDailyPuzzle(date)).ReturnsAsync([1, 2, 3]);
         topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([]);
         topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([]);
-        pdfComposer.Setup(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>())).Returns([9]);
+        pdfComposer.Setup(c => c.Compose(
+            It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()))
+            .Returns([9]);
 
         await CreateService().DeliverDailyPuzzle(date);
 
@@ -56,7 +92,10 @@ public class CrosswordDeliveryServiceTests
         nytClient.Setup(c => c.DownloadDailyPuzzle(date)).ReturnsAsync([1]);
         topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([]);
         topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([]);
-        pdfComposer.Setup(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>())).Returns([9]);
+        pdfComposer.Setup(c => c.Compose(
+            It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()))
+            .Returns([9]);
 
         await CreateService().DeliverDailyPuzzle(date);
 
@@ -72,7 +111,10 @@ public class CrosswordDeliveryServiceTests
         topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([FakeNewsStory]);
         topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([FakeOpinionStory]);
         articleClient.Setup(c => c.GetArticle(It.IsAny<string>())).ReturnsAsync(FakeArticle);
-        pdfComposer.Setup(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>())).Returns([9]);
+        pdfComposer.Setup(c => c.Compose(
+            It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()))
+            .Returns([9]);
 
         await CreateService().DeliverDailyPuzzle(date);
 
@@ -90,7 +132,9 @@ public class CrosswordDeliveryServiceTests
         topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([FakeNewsStory]);
         topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([]);
         articleClient.Setup(c => c.GetArticle(FakeNewsStory.Url)).ReturnsAsync(FakeArticle);
-        pdfComposer.Setup(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), crosswordBytes))
+        pdfComposer.Setup(c => c.Compose(
+                It.IsAny<IReadOnlyList<ArticleContent>>(), crosswordBytes, It.IsAny<DateOnly>(),
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()))
             .Returns(composedBytes);
 
         await CreateService().DeliverDailyPuzzle(date);
@@ -105,7 +149,10 @@ public class CrosswordDeliveryServiceTests
         nytClient.Setup(c => c.DownloadDailyPuzzle(date)).ReturnsAsync([1]);
         topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([]);
         topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([]);
-        pdfComposer.Setup(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>())).Returns([9]);
+        pdfComposer.Setup(c => c.Compose(
+            It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()))
+            .Returns([9]);
 
         await CreateService().DeliverDailyPuzzle(date);
 
@@ -122,7 +169,10 @@ public class CrosswordDeliveryServiceTests
         nytClient.Setup(c => c.DownloadDailyPuzzle(date)).ReturnsAsync([1]);
         topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([]);
         topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([]);
-        pdfComposer.Setup(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>())).Returns([9]);
+        pdfComposer.Setup(c => c.Compose(
+            It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()))
+            .Returns([9]);
 
         await CreateService().DeliverDailyPuzzle(date);
 
@@ -158,7 +208,35 @@ public class CrosswordDeliveryServiceTests
         await CreateService().DeliverDailyPuzzle(date);
 
         remarkableClient.Verify(c => c.Upload(It.IsAny<string>(), crosswordBytes), Times.Once);
-        pdfComposer.Verify(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>()), Times.Never);
+        pdfComposer.Verify(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
+            It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()), Times.Never);
+    }
+
+    /// <summary>
+    /// A fetch can SUCCEED and return nothing usable — an empty body reads on the page exactly like
+    /// a story with no words in it, which is the same failure wearing a success code. It falls back
+    /// to the abstract and is marked, like any other failed fetch (bug B1).
+    /// </summary>
+    [Fact]
+    public async Task DeliverDailyPuzzle_FallsBackWhenTheFetchReturnsNoText()
+    {
+        var date = new DateOnly(2025, 4, 14);
+        nytClient.Setup(c => c.DownloadDailyPuzzle(date)).ReturnsAsync([1]);
+        topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([FakeNewsStory]);
+        topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([]);
+        articleClient.Setup(c => c.GetArticle(FakeNewsStory.Url)).ReturnsAsync(
+            new ArticleContent { Title = "News", Byline = "By A", Section = "U.S.", Body = [] });
+        pdfComposer.Setup(c => c.Compose(
+                It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()))
+            .Returns([9]);
+
+        await CreateService().DeliverDailyPuzzle(date);
+
+        pdfComposer.Verify(c => c.Compose(
+            It.Is<IReadOnlyList<ArticleContent>>(list => list.Single().AbstractOnly),
+            It.IsAny<byte[]>(), It.IsAny<DateOnly>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()), Times.Once);
     }
 
     [Fact]
@@ -181,7 +259,8 @@ public class CrosswordDeliveryServiceTests
                 list[0].Title == FakeNewsStory.Title &&
                 list[0].Body.Count == 1 &&
                 ((TextBlock)list[0].Body[0]).Text == FakeNewsStory.Abstract),
-            crosswordBytes), Times.Once);
+            crosswordBytes, It.IsAny<DateOnly>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()), Times.Once);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using Foreword.Domain.Models;
+using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 using Foreword.Infrastructure.Pdf;
 using Xunit;
@@ -11,6 +12,10 @@ namespace Foreword.Tests.Pdf;
 /// </summary>
 public class SampleDayTests
 {
+    private static PrintedTask Printed(string title, DateOnly? due = null, string note = "",
+        TaskKind kind = TaskKind.Once) =>
+        new(new ForewordTask { Id = title, Title = title, Kind = kind, Due = due }, note);
+
     [Fact]
     public void WriteSample()
     {
@@ -72,15 +77,16 @@ public class SampleDayTests
             ],
             Tasks =
             [
-                new TodoItem { Title = "Vitamins" },
-                new TodoItem { Title = "Mow the lawn", Due = day.AddDays(-1) },
-                new TodoItem { Title = "Read the brief" },
-                new TodoItem { Title = "Call Mom" },
-                new TodoItem { Title = "Book Linden\u2019s orthodontist follow-up" },
-                new TodoItem { Title = "Pick up the dry cleaning" },
-                new TodoItem { Title = "Order Wren\u2019s cleats" },
-                new TodoItem { Title = "Bins out" },
-                new TodoItem { Title = "Sign Wren\u2019s permission slip tonight" },
+                Printed("Vitamins", kind: TaskKind.Rule),
+                Printed("Mow the lawn", note: "moved from Saturday \u2014 not enough dry hours",
+                    kind: TaskKind.Smart),
+                Printed("Read the brief", kind: TaskKind.Rule),
+                Printed("Call Mom"),
+                Printed("Book Linden\u2019s orthodontist follow-up", due: day.AddDays(5)),
+                Printed("Pick up the dry cleaning"),
+                Printed("Order Wren\u2019s cleats"),
+                Printed("Bins out", note: "collection is Monday", kind: TaskKind.Rule),
+                Printed("Sign Wren\u2019s permission slip tonight"),
             ],
             Weather = new WeatherReport
             {

@@ -1,5 +1,6 @@
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
+using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 using Foreword.Infrastructure.Pdf;
 using PdfSharp.Pdf.IO;
@@ -227,7 +228,7 @@ public class DayPdfComposerTests
             Date = Today,
             Agenda = new DayAgenda { Date = Today, Events = [TimedEvent(PersonColumn.Rowan, 9, 10, "Standup")] },
             Outlook = [TimedEvent(PersonColumn.Jordan, 12, 13, "Dentist")],
-            Tasks = [new TodoItem { Title = "Call Mom" }],
+            Tasks = [Printed("Call Mom")],
             Weather = Forecast(),
         });
 
@@ -268,7 +269,7 @@ public class DayPdfComposerTests
             Date = Today,
             Agenda = new DayAgenda { Date = Today, Events = [] },
             Weather = Forecast(),
-            Tasks = [new TodoItem { Title = "Call Mom" }],
+            Tasks = [Printed("Call Mom")],
         });
 
         using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
@@ -292,9 +293,9 @@ public class DayPdfComposerTests
             Agenda = new DayAgenda { Date = Today, Events = [] },
             Tasks =
             [
-                new TodoItem { Title = "Vitamins" },
-                new TodoItem { Title = "Call Mom" },
-                new TodoItem { Title = "Bins out" },
+                Printed("Vitamins"),
+                Printed("Call Mom"),
+                Printed("Bins out"),
             ],
         });
 
@@ -439,6 +440,17 @@ public class DayPdfComposerTests
 
         Assert.Contains("illegible scribble", document.GetPage(1).Text, StringComparison.Ordinal);
     }
+
+    // A task already placed for today, which is what the page draws. The placement engine has its
+    // own tests; these are about the drawing.
+    private static PrintedTask Printed(string title, DateOnly? due = null, string note = "") =>
+        new(new ForewordTask
+        {
+            Id = title,
+            Title = title,
+            Kind = TaskKind.Once,
+            Due = due,
+        }, note);
 
     private static WeatherReport Forecast() => new()
     {
