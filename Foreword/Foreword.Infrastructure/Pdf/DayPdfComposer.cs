@@ -3,14 +3,22 @@ using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
 
 using Foreword.Domain.Calendar;
+using Foreword.Domain.Document;
+using Foreword.Domain.Weather;
 using Storyworthtelling.Paper;
 
 namespace Foreword.Infrastructure.Pdf;
 
-// Renders the daily calendar: page 1 is a five-column timeline (6 AM-10 PM) with a
-// handwriting region at the bottom; page 2 is a seven-day outlook of non-routine events.
-// Rendered with SkiaSharp via SkiaPageLayout.
-public class CalendarPdfComposer : ICalendarPdfComposer
+/// <summary>
+/// The Day — one four-page landscape document: the timeline, the weather, the outlook, the
+/// checklist, bound together by the binder tabs down the right edge of every page.
+///
+/// <para>It was two documents. The calendar and the checklist were composed and uploaded
+/// separately, which meant two things to find in the tablet's list every morning, two to trash the
+/// next day, and no way to get from one to the other. P9 binds them, adds the weather page the
+/// day's decisions actually turn on, and makes every page's tab strip a real PDF link.</para>
+/// </summary>
+public class DayPdfComposer : IDayPdfComposer
 {
     private const int StartHour = 6;
     private const int EndHour = 22;
@@ -18,6 +26,11 @@ public class CalendarPdfComposer : ICalendarPdfComposer
     private const double HourGutter = 46;
     private const double HeaderHeight = 18;
     private const double HandwritingReserve = 130;
+
+    // How far a meeting sits inside its work block: more on the left than the right, so the band's
+    // own edge stays visible down the side the eye reads from.
+    private const double NestIndent = 7;
+    private const double NestInset = 4;
 
     // Event-box fills, kept as RGB components (as the PdfSharp version was) — not hex string literals.
     // The three fills, as roles at the WASH tier in the document profile — the highlighter band
@@ -40,23 +53,60 @@ public class CalendarPdfComposer : ICalendarPdfComposer
     private static readonly SKColor ContainerFill =
         PaperPalette.ResolveRole(ColorRole.Resolved, ColorTier.Wash, UiColorProfile.DocumentColor);
 
+    // A weekend column on the outlook, tinted so the shape of the week reads before a word does.
+    private static readonly SKColor OffDayFill =
+        PaperPalette.ResolveRole(ColorRole.Resolved, ColorTier.Wash, UiColorProfile.DocumentColor);
+
     private static readonly PersonColumn[] Columns =
         [PersonColumn.Rowan, PersonColumn.Jordan, PersonColumn.Wren, PersonColumn.Linden, PersonColumn.Watch];
 
-    public byte[] Compose(
-        DayAgenda today,
-        IReadOnlyList<CalendarEvent> outlook,
-        IReadOnlyList<ParsedNote> unreadableCarryovers)
+    public byte[] Compose(DayDocument document)
     {
         using var layout = new SkiaPageLayout(landscape: true);
 
-        DrawTimelinePage(layout, today);
-        HandwritingRegion.Draw(layout, "Future events — write below:", unreadableCarryovers);
+        // Page 1 — the day itself.
+        DayPageFurniture.Draw(layout, DaySection.Day, DayTitles.PageHeading(document.Date));
+        DrawVoice(layout, document.Voice);
+        DrawTimelinePage(layout, document.Agenda, document.UnreadableCarryovers);
 
+        // Page 2 — the weather, on the timeline's own 6am-10pm axis so an event and the weather at
+        // that hour line up vertically across the two sheets.
         layout.NewPage();
-        DrawOutlookPage(layout, today.Date, outlook);
+        DayPageFurniture.Draw(layout, DaySection.Weather, "Weather");
+        WeatherPage.Draw(layout, document.Weather);
+
+        // Page 3 — the week ahead.
+        layout.NewPage();
+        DayPageFurniture.Draw(layout, DaySection.Outlook, "The week ahead");
+        DrawOutlookPage(layout, document.Date, document.Outlook);
+
+        // Page 4 — the checklist. Ticking happens here and nowhere else: Foreword has no tick
+        // control anywhere in the app.
+        layout.NewPage();
+        DayPageFurniture.Draw(layout, DaySection.Checklist, "Checklist");
+        ChecklistPage.Draw(layout, document.Tasks, document.ChecklistVoice);
 
         return layout.ToPdf();
+    }
+
+    /// <summary>
+    /// The narrator's line, in the owner's own hand. Nothing is drawn when there is none — a
+    /// neutral sentence in the script face would be the app impersonating them, which is worse than
+    /// a page that simply opens on the grid.
+    /// </summary>
+    private static void DrawVoice(SkiaPageLayout layout, string voice)
+    {
+        if (string.IsNullOrWhiteSpace(voice))
+        {
+            return;
+        }
+
+        var font = SkiaPageLayout.Script(PaperTypeScale.Title);
+        layout.Advance(4);
+        layout.DrawText(voice, font, SkiaPageLayout.Margin, layout.Y,
+            DayPageFurniture.ContentWidth(layout), SkiaPageLayout.LineHeight(font),
+            TextAlign.TopLeft);
+        layout.Advance(SkiaPageLayout.LineHeight(font) + 4);
     }
 
     /// <summary>
@@ -70,7 +120,8 @@ public class CalendarPdfComposer : ICalendarPdfComposer
     /// </summary>
     internal static float StripHeight(SKFont eventFont) => (float)SkiaPageLayout.LineHeight(eventFont) + 2;
 
-    private static void DrawTimelinePage(SkiaPageLayout layout, DayAgenda agenda)
+    private static void DrawTimelinePage(
+        SkiaPageLayout layout, DayAgenda agenda, IReadOnlyList<ParsedNote> unreadableCarryovers)
     {
         var titleFont = SkiaPageLayout.Sans(PaperTypeScale.Title, bold: true);
         var headerFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary, bold: true);
@@ -79,11 +130,10 @@ public class CalendarPdfComposer : ICalendarPdfComposer
 
         var stripHeight = StripHeight(eventFont);
 
-        layout.DrawCentered(agenda.Date.ToDateTime(TimeOnly.MinValue).ToString("dddd, MMMM d, yyyy"), titleFont, 22);
-
         var gridTop = layout.Y;
         var gridLeft = SkiaPageLayout.Margin;
-        var gridRight = SkiaPageLayout.Margin + layout.ContentWidth;
+        // Stops clear of the binder edge rather than running under the tab strip.
+        var gridRight = DayPageFurniture.ContentRight(layout);
         var colsLeft = gridLeft + HourGutter;
         var colWidth = (gridRight - colsLeft) / Columns.Length;
         var timelineTop = gridTop + HeaderHeight;
@@ -163,7 +213,10 @@ public class CalendarPdfComposer : ICalendarPdfComposer
         {
             var inColumn = timed.Where(e => e.Columns.Any(c => ColumnIndex(c) == col)).ToList();
 
-            foreach (var travel in TravelPlan.For(inColumn, e => e.TravelMinutes))
+            // Per column, so each person's drive starts where THEIR day has left them — and so an
+            // event both a child and a driving parent are on gets a band in both their columns,
+            // each measured from where that person actually is.
+            foreach (var travel in TravelPlan.For(inColumn, agenda.Travel.Home, agenda.Travel.Minutes))
             {
                 if (Window(travel.Event, hourHeight, timelineTop, stripHeight) is not { } at)
                 {
@@ -216,6 +269,19 @@ public class CalendarPdfComposer : ICalendarPdfComposer
                 var laneWidth = (colWidth - 2) / placed.Lanes;
                 var x = colsLeft + col * colWidth + 1 + placed.Lane * laneWidth;
 
+                // A meeting inside the work block is drawn INSIDE it, indented from the band's own
+                // edges. Taking no lane from the block was only half of B3: without the indent the
+                // two are drawn at the same width, one exactly over the other, so a nine-to-ten
+                // standup covers the top of the nine-to-five instead of sitting in it — and the
+                // band reads as something the meeting interrupted rather than as the day it
+                // belongs to. An appointment that BREAKS the band is deliberately not indented: it
+                // belongs to the day rather than to the work, and is drawn over the gap it makes.
+                if (placed.IsNested)
+                {
+                    x += NestIndent;
+                    laneWidth -= NestIndent + NestInset;
+                }
+
                 DrawEventBox(layout, x, y, laneWidth, height, e.Title, eventFont,
                     placed.IsContainer ? ContainerFill : TimedFill, placed.IsContainer);
 
@@ -232,78 +298,98 @@ public class CalendarPdfComposer : ICalendarPdfComposer
             }
         }
 
-        // "Also today": everything the grid could not hold at a legible width, in full, in time
-        // order. Under the grid rather than in it, because it is a list rather than a shape.
-        if (alsoToday.Count > 0)
-        {
-            layout.MoveTo(gridBottom + 2);
-            layout.DrawText("Also today", eventFont, SkiaPageLayout.Margin, layout.Y,
-                layout.ContentWidth, stripHeight, TextAlign.TopLeft, SkiaPageLayout.InkMuted);
-            layout.Advance(stripHeight);
-
-            foreach (var (e, column) in alsoToday.OrderBy(x => x.Event.Start))
-            {
-                var time = e.Start.ToString("h:mm");
-                layout.DrawText(
-                    layout.Truncate($"{time}  {e.Title} — {column}", eventFont, layout.ContentWidth),
-                    eventFont, SkiaPageLayout.Margin, layout.Y, layout.ContentWidth, stripHeight,
-                    TextAlign.TopLeft);
-                layout.Advance(stripHeight);
-            }
-        }
-
-        // Held calendars are named on the page (D34). Under the grid, in the muted ink, because it
-        // is a note about the page rather than part of the day — but ON the page, because a held
-        // calendar the owner cannot see is the same silence the holding exists to end.
-        if (agenda.HeldCalendars.Count > 0)
-        {
-            layout.MoveTo(Math.Max(layout.Y, gridBottom + 2));
-            layout.DrawText(
-                layout.Truncate(
-                    $"Not printed — no column yet: {string.Join(", ", agenda.HeldCalendars)}",
-                    hourFont, layout.ContentWidth),
-                hourFont, SkiaPageLayout.Margin, layout.Y, layout.ContentWidth, stripHeight,
-                TextAlign.TopLeft, SkiaPageLayout.InkMuted);
-        }
-
-        layout.MoveTo(gridBottom);
+        // The foot: what did not fit, what could not be read, and ruled space for future events.
+        DayFoot.Draw(layout, gridBottom + 6, alsoToday, agenda.HeldCalendars, unreadableCarryovers);
     }
 
-    private static void DrawOutlookPage(SkiaPageLayout layout, DateOnly today, IReadOnlyList<CalendarEvent> outlook)
+    /// <summary>
+    /// The week ahead as seven columns rather than a list (D3): the shape of the week is the point,
+    /// and a list of seven headings with two items under each hides it. Non-routine only — the
+    /// selector has already dropped the recurring standup, so a column with nothing in it means a
+    /// genuinely ordinary day and is allowed to say so.
+    ///
+    /// <para>There is no write-on space here. A future event is written once, on the ruled lines at
+    /// the foot of the Day page, so there is only ever one place to put a pen.</para>
+    /// </summary>
+    private static void DrawOutlookPage(
+        SkiaPageLayout layout, DateOnly today, IReadOnlyList<CalendarEvent> outlook)
     {
-        var titleFont = SkiaPageLayout.Sans(PaperTypeScale.Title, bold: true);
-        var dayFont = SkiaPageLayout.Sans(PaperTypeScale.Body, bold: true);
-        var itemFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary);
+        var dayFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary, bold: true);
+        var dateFont = SkiaPageLayout.Sans(PaperTypeScale.Label);
+        var itemFont = SkiaPageLayout.Sans(PaperTypeScale.Label);
+        var noneFont = SkiaPageLayout.Sans(PaperTypeScale.Label);
 
-        layout.DrawCentered("7-Day Outlook", titleFont, 24);
-        layout.Advance(6);
+        const int Days = 7;
+        const double Gap = 7;
+        const double HeaderHeight = 14;
+        const double ItemGap = 3;
+        const double RuleWidth = 2;
 
-        for (var d = 0; d < 7; d++)
+        var left = SkiaPageLayout.Margin;
+        var top = layout.Y + 4;
+        var width = (DayPageFurniture.ContentWidth(layout) - Gap * (Days - 1)) / Days;
+        var height = layout.BottomY - top;
+
+        for (var d = 0; d < Days; d++)
         {
             var date = today.AddDays(d);
+            var x = left + d * (width + Gap);
+            var weekend = date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+
+            // An off day carries a tinted ground, so the shape of the week is visible before a
+            // single word on it is read.
+            layout.DrawRect(x, top, width, height,
+                fill: weekend ? OffDayFill : null,
+                stroke: SkiaPageLayout.Hairline, strokeWidth: 0.5f);
+
+            layout.DrawText(date.ToString("ddd"), dayFont, x + 4, top + 3,
+                width - 8, HeaderHeight, TextAlign.TopLeft);
+            layout.DrawText(date.ToString("MMM d"), dateFont, x + 4, top + 3,
+                width - 8, HeaderHeight, TextAlign.TopRight, SkiaPageLayout.InkMuted);
+            layout.DrawLine(x, top + HeaderHeight + 3, x + width, top + HeaderHeight + 3,
+                SkiaPageLayout.Hairline, 0.5f);
+
             var dayEvents = outlook
                 .Where(e => DateOnly.FromDateTime(e.Start) == date)
                 .OrderBy(e => e.Start)
                 .ToList();
 
-            layout.NewPageIfNeeded(20);
-            layout.DrawWrapped(date.ToDateTime(TimeOnly.MinValue).ToString("dddd, MMMM d"), dayFont);
+            var y = top + HeaderHeight + 7;
 
             if (dayEvents.Count == 0)
             {
-                layout.DrawWrapped("    — nothing out of the ordinary", itemFont);
-            }
-            else
-            {
-                foreach (var e in dayEvents)
-                {
-                    var time = e.IsAllDay ? "All day" : e.Start.ToString("h:mm tt");
-                    layout.DrawWrapped($"    • {time} — {e.Title} ({Who(e)})", itemFont);
-                }
+                // Wrapped, not drawn flat: a column is 94 points wide and this sentence is not.
+                layout.DrawWrappedIn("nothing out of the ordinary", noneFont, x + 4, y,
+                    width - 8, maxLines: 3, SkiaPageLayout.InkMuted);
+                continue;
             }
 
-            layout.Advance(6);
+            foreach (var e in dayEvents)
+            {
+                var text = e.IsAllDay ? e.Title : $"{e.Start:h:mm} {e.Title}";
+                var textWidth = width - 12 - RuleWidth;
+
+                // Measured before it is drawn, so an item that will not fit is left out rather
+                // than drawn off the bottom of its column — and measured by WRAPPING it, since a
+                // height guessed from the string's own width is right until the first word too
+                // long to share a line.
+                var itemHeight = layout.MeasureWrappedIn(text, itemFont, textWidth, maxLines: 3);
+
+                if (y + itemHeight > top + height - 4)
+                {
+                    break;
+                }
+
+                // The left rule is the column the event belongs to, so a week's worth of "whose is
+                // this" is answered by colour rather than by reading every line.
+                layout.DrawRect(x + 4, y, RuleWidth, itemHeight, fill: ColumnMark(e));
+                layout.DrawWrappedIn(text, itemFont, x + 4 + RuleWidth + 3, y, textWidth, maxLines: 3);
+
+                y += itemHeight + ItemGap;
+            }
         }
+
+        layout.MoveTo(layout.BottomY);
     }
 
     /// <summary>
@@ -371,6 +457,23 @@ public class CalendarPdfComposer : ICalendarPdfComposer
     /// Who an event is for, as the outlook prints it. Everybody reads as "Everyone" rather than as
     /// four names, which is what a whole-family event actually means and a third of a line shorter.
     /// </summary>
+    /// <summary>
+    /// The hue of the column an event belongs to (§9), for the rule down the left of an outlook
+    /// item. An event in several columns takes the first, because a two-colour rule two points wide
+    /// is a smudge rather than a signal.
+    /// </summary>
+    private static SKColor ColumnMark(CalendarEvent e) =>
+        PaperPalette.ResolveRole(
+            (e.Columns.FirstOrDefault()) switch
+            {
+                PersonColumn.Rowan => ColorRole.Action,
+                PersonColumn.Jordan => ColorRole.Reference,
+                PersonColumn.Wren => ColorRole.Positive,
+                PersonColumn.Linden => ColorRole.Caution,
+                _ => ColorRole.Resolved,
+            },
+            ColorTier.Mark, UiColorProfile.DocumentColor);
+
     private static string Who(CalendarEvent e) =>
         ColumnSet.People.All(e.Columns.Contains)
             ? "Everyone"

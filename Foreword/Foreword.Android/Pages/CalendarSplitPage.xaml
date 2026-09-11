@@ -25,6 +25,13 @@
                 <VerticalStackLayout x:Name="Words" />
             </Border>
 
+            <Label Text="Invited addresses" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout x:Name="Addresses" />
+            </Border>
+            <Label Text="An invitation is a fact where a name in a title is a guess, so an address is read first. Wren and Linden have no address of their own — their events arrive on their own calendars."
+                   Style="{StaticResource CardCaption}" />
+
             <Label Text="This morning" Style="{StaticResource GroupLabel}" />
             <Border Style="{StaticResource GroupCard}">
                 <VerticalStackLayout x:Name="Preview" />
