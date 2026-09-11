@@ -69,6 +69,15 @@ public static class CredentialStore
         set => Preferences.Set(PreferenceKeys.SeenCalendarIds, value);
     }
 
+    // The time the scheduled work is actually set for, which is not always the time the app wants:
+    // WorkManager keeps the schedule a phone already holds, so this is how a moved delivery time
+    // reaches a phone that has run an older build.
+    public static string ScheduledDeliveryTime
+    {
+        get => Preferences.Get(PreferenceKeys.ScheduledDeliveryTime, string.Empty);
+        set => Preferences.Set(PreferenceKeys.ScheduledDeliveryTime, value);
+    }
+
     public static string VaultPassphrase
     {
         get => Preferences.Get(PreferenceKeys.VaultPassphrase, string.Empty);
