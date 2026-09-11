@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
 using Foreword.Domain.Interfaces;
+using Foreword.Infrastructure.Brief;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Delivery;
 using Foreword.Infrastructure.Google;
@@ -115,6 +116,15 @@ public static class MauiProgram
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 
         builder.Services.AddTransient<IPdfComposer, PdfComposer>();
+
+        // The brief's own sources. Both keyless (F14, F15) and both quiet on failure — a comic and
+        // a factoid are the two most skippable things in the document.
+        builder.Services.AddSingleton<IBriefPreferences, BriefSettings>();
+        builder.Services.AddHttpClient<IComicClient, XkcdClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<IHistoryClient, WikipediaHistoryClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+
         builder.Services.AddTransient<CrosswordDeliveryService>();
 
         // Calendar + checklist feature. Tokens come from the device account via AccountManager;

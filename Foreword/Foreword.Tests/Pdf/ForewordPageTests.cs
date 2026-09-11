@@ -1,3 +1,4 @@
+using Foreword.Domain.Brief;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Pdf;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -29,6 +30,18 @@ public class ForewordPageTests
     private static byte[] Brief(string voice, params ArticleContent[] articles) =>
         new PdfComposer(NullLogger<PdfComposer>.Instance)
             .Compose(articles, Puzzle(), Sunday, voice);
+
+    private static byte[] Brief(
+        string voice, IReadOnlyList<ComicStrip> comics, HistoryNote? history,
+        params ArticleContent[] articles) =>
+        new PdfComposer(NullLogger<PdfComposer>.Instance)
+            .Compose(articles, Puzzle(), Sunday, voice, comics, history);
+
+    /// <summary>A one-pixel PNG, so the comic page has a real image to lay out.</summary>
+    private static ComicStrip Strip() => new(3297, "OH Scale",
+        "To access distant parts of the project, I built a passenger train inside each rail.",
+        Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="));
 
     /// <summary>A stand-in for the crossword: a real two-page PDF, so the contents can count it.</summary>
     private static byte[] Puzzle()
@@ -120,6 +133,78 @@ public class ForewordPageTests
 
         Assert.Equal(3, document.NumberOfPages);
         Assert.Contains("Sunday, the sixth", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The comic is last before the puzzle — the thing you read when you have finished reading —
+    /// and its folio says so, because a reader who has just finished the news wants to know whether
+    /// there is more paper coming.
+    /// </summary>
+    [Fact]
+    public void TheComicComesAfterTheStoriesAndBeforeThePuzzle()
+    {
+        using var document = PdfDocument.Open(new MemoryStream(
+            Brief("A quiet Sunday.", [Strip()], null, Article("The river towns"))));
+
+        Assert.Equal(5, document.NumberOfPages);
+        Assert.Contains("The river towns", document.GetPage(2).Text, StringComparison.Ordinal);
+        Assert.Contains("XKCD", document.GetPage(3).Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("then the crossword", document.GetPage(3).Text, StringComparison.Ordinal);
+        Assert.Contains("Puzzle page one", document.GetPage(4).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The hover text is ON the page. On paper there is nothing to hover, and the hover text is the
+    /// second joke — a printed xkcd without it is half a comic.
+    /// </summary>
+    [Fact]
+    public void TheHoverTextIsPrintedUnderTheStrip()
+    {
+        using var document = PdfDocument.Open(new MemoryStream(
+            Brief("A quiet Sunday.", [Strip()], null, Article("One"))));
+
+        Assert.Contains("passenger train inside each rail", document.GetPage(3).Text,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheContentsCountTheComic()
+    {
+        using var document = PdfDocument.Open(new MemoryStream(
+            Brief("A quiet Sunday.", [Strip()], null, Article("One"))));
+
+        Assert.Contains("xkcd", document.GetPage(1).Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// No comic, no page. A brief on a morning xkcd could not be reached is shorter, not broken —
+    /// and an empty keylined box would read as a strip that failed to draw.
+    /// </summary>
+    [Fact]
+    public void NoComicMeansNoComicPage()
+    {
+        using var document = PdfDocument.Open(new MemoryStream(
+            Brief("A quiet Sunday.", [], null, Article("One"))));
+
+        Assert.Equal(4, document.NumberOfPages);
+        Assert.DoesNotContain("XKCD", document.GetPage(2).Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The factoid is on the foreword page when there is one, and absent when there is not — an
+    /// empty heading over a blank line is worse than no heading.
+    /// </summary>
+    [Fact]
+    public void TheFactoidIsPrintedOnlyWhenThereIsOne()
+    {
+        using var with = PdfDocument.Open(new MemoryStream(Brief("A quiet Sunday.", [],
+            new HistoryNote(1297, "The Battle of Stirling Bridge is fought."), Article("One"))));
+        using var without = PdfDocument.Open(new MemoryStream(
+            Brief("A quiet Sunday.", [], null, Article("One"))));
+
+        Assert.Contains("Stirling Bridge", with.GetPage(1).Text, StringComparison.Ordinal);
+        Assert.Contains("1297", with.GetPage(1).Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stirling", without.GetPage(1).Text, StringComparison.Ordinal);
     }
 
     /// <summary>

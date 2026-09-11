@@ -12,6 +12,9 @@ public class CrosswordDeliveryService(
     INytTopStoriesClient topStoriesClient,
     INytArticleClient articleClient,
     IPdfComposer pdfComposer,
+    IBriefPreferences preferences,
+    IComicClient comics,
+    IHistoryClient history,
     ILogger<CrosswordDeliveryService> logger)
 {
     // Returns a human-readable summary of what was delivered, e.g. "8 articles + puzzle"
@@ -41,6 +44,36 @@ public class CrosswordDeliveryService(
         await remarkableClient.Upload(title, pdfBytes);
     }
 
+    /// <summary>
+    /// The strips the owner has not seen. Everything OFFERED is marked seen, not just what fitted —
+    /// otherwise the same backlog is offered tomorrow and the cap becomes a queue that never drains.
+    /// </summary>
+    private async Task<IReadOnlyList<ComicStrip>> ReadComics()
+    {
+        if (await comics.Latest() is not { } latest)
+        {
+            return [];
+        }
+
+        var seen = preferences.SeenComic;
+        var wanted = ComicSelection.Unseen(latest, seen == 0 ? [] : [seen], max: 3);
+
+        var strips = new List<ComicStrip>();
+        foreach (var number in wanted)
+        {
+            if (await comics.Get(number) is { } strip)
+            {
+                strips.Add(strip);
+            }
+        }
+
+        preferences.SeenComic = ComicSelection.HighWaterMark(latest, wanted);
+        return strips;
+    }
+
+    private async Task<HistoryNote?> ReadHistory(DateOnly date) =>
+        HistoryNoteChoice.Pick(await history.OnThisDay(date), date);
+
     public static bool IsFirstSundayOfMonth(DateOnly date) =>
         date.DayOfWeek == DayOfWeek.Sunday && date.Day <= 7;
 
@@ -49,8 +82,9 @@ public class CrosswordDeliveryService(
         List<TopStory> allStories;
         try
         {
-            var newsTask = topStoriesClient.GetTopNewsStories(5);
-            var opinionTask = topStoriesClient.GetTopOpinionArticles(3);
+            // The counts the owner set on the Sources screen, not constants in here.
+            var newsTask = topStoriesClient.GetTopNewsStories(preferences.NewsCount);
+            var opinionTask = topStoriesClient.GetTopOpinionArticles(preferences.OpinionCount);
             await Task.WhenAll(newsTask, opinionTask);
             allStories = newsTask.Result.Concat(opinionTask.Result).ToList();
         }
@@ -66,7 +100,10 @@ public class CrosswordDeliveryService(
         // Deduplicated and ordered before anything is fetched: a story that appears under Home and
         // again under its own section was being fetched twice AND printed twice, so the owner
         // counted eight stories and found seven.
-        var stories = BriefSelection.Choose(allStories);
+        // Deduplicated and ordered, then RANKED by taste — which moves a story up or down and never
+        // drops one (D29). A profile that filtered would quietly narrow the brief to what the owner
+        // already agrees with, and they asked for one story they would disagree with.
+        var stories = ReadingTaste.Rank(BriefSelection.Choose(allStories), preferences.Taste);
 
         var articles = new List<ArticleContent>();
         foreach (var story in stories)
@@ -111,7 +148,12 @@ public class CrosswordDeliveryService(
         try
         {
             logger.LogInformation("Composing {Count} articles with crossword for {Date}", articles.Count, date);
-            var composed = pdfComposer.Compose(articles, crosswordBytes);
+
+            var strips = await ReadComics();
+            var factoid = await ReadHistory(date);
+
+            var composed = pdfComposer.Compose(
+                articles, crosswordBytes, date, voice: string.Empty, strips, factoid);
 
             // The status sentence counts the ones that fell back, so a morning of failed fetches is
             // visible on the Settings screen rather than only in a log nobody opens.
