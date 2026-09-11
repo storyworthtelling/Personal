@@ -91,6 +91,12 @@ public sealed record ForewordTask
 
     // ---- a once task ----
     public string? GoogleTaskId { get; init; }
+
+    /// <summary>
+    /// The list it lives in. Half the address — the API addresses a task as
+    /// <c>lists/{tasklist}/tasks/{task}</c>, so an edit written back without it goes nowhere.
+    /// </summary>
+    public string? GoogleListId { get; init; }
     public DateOnly? Due { get; init; }
 
     /// <summary>

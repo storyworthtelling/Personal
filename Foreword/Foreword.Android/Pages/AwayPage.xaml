@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Foreword.Android.Pages.AwayPage"
+             Title="Away">
+    <!--
+        A1 in the mockups: the pause.
+
+        AWAY IS A DATE RANGE, NOT A MODE. The one thing the owner asked for that Google Tasks cannot
+        express. A recurring task that fires while you are away is worse than useless: it prints on a
+        page you are not reading and comes back as a backlog you did not fail to do.
+
+        THE IMPORTANT LINE IS THE CAPTION — a paused task is not late and does not pile up. The
+        mornings simply pass and the one after is ordinary.
+
+        What is NOT paused matters as much: the morning still goes out, because a holiday is exactly
+        when a day sheet earns its place; and anything with a date of its own keeps printing, because
+        it did not come from a rule.
+
+        The toggles are the kit's segmented control, not switches (§8), and there is no Save — each
+        one commits as it is tapped.
+
+        Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c
+    -->
+    <ScrollView>
+        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
+
+            <Label Text="Away" Style="{StaticResource DisplayLabel}" />
+
+            <Label Text="Dates" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout>
+                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                        <Label Text="From" Style="{StaticResource CardRowTitle}"
+                               VerticalOptions="Center" />
+                        <DatePicker Grid.Column="1" x:Name="FromPicker"
+                                    DateSelected="OnDatesChanged" />
+                    </Grid>
+                    <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                        <Label Text="Until" Style="{StaticResource CardRowTitle}"
+                               VerticalOptions="Center" />
+                        <DatePicker Grid.Column="1" x:Name="UntilPicker"
+                                    DateSelected="OnDatesChanged" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+            <Label x:Name="MorningsLabel" Style="{StaticResource CardCaption}" />
+
+            <Label Text="While you are away" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout x:Name="Toggles" />
+            </Border>
+
+            <Label Text="A paused task is not late and does not pile up: the mornings simply pass. Anything with a date of its own still prints."
+                   Style="{StaticResource CardCaption}" />
+
+            <Button Text="Not going anywhere" Clicked="OnClearClicked"
+                    Style="{StaticResource QuietButton}" HorizontalOptions="Start"
+                    Margin="0,24,0,0" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -131,6 +131,7 @@ public static class MauiProgram
         builder.Services.AddTransient<IOutlookSelector, OutlookSelector>();
         builder.Services.AddTransient<IDayPdfComposer, DayPdfComposer>();
         builder.Services.AddSingleton<ITaskStore, TaskStore>();
+        builder.Services.AddTransient<TaskEditor>();
         builder.Services.AddHttpClient<ITaskReadingClient, ClaudeTaskReader>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>()
