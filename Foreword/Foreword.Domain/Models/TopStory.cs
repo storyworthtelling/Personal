@@ -1,6 +1,6 @@
 namespace Foreword.Domain.Models;
 
-public class TopStory
+public record TopStory
 {
     public required string Title { get; init; }
     public required string Byline { get; init; }
