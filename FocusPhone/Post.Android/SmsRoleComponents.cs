@@ -35,6 +35,11 @@ internal static class SmsRoleComponents
 /// — silently, and unrecoverably for anything received while it was skipped.
 ///
 /// The provider is the durable record; Post's own timeline cache is rebuilt from it.
+///
+/// Notifying the owner is Post's job too, for the same reason: Google Messages used to
+/// raise the notification (and the buzz) for every incoming text, and it stops seeing SMS
+/// broadcasts the moment Post takes the role. <see cref="SmsNotifications"/> is what
+/// replaces it.
 /// </summary>
 [BroadcastReceiver(
     Name = "com.storyworthtelling.focusphone.communication.SmsDeliverReceiver",
@@ -56,7 +61,11 @@ public class SmsDeliverReceiver : BroadcastReceiver
 
         try
         {
-            SmsProviderWriter.PersistIncoming(context, intent);
+            var incoming = SmsProviderWriter.PersistIncoming(context, intent);
+            if (incoming is not null)
+            {
+                SmsNotifications.NotifyIncoming(context, incoming);
+            }
         }
         catch (Exception e)
         {
