@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Foreword.Android.Pages.TaskReadBackPage"
+             Title="New task">
+    <!--
+        T4 in the mockups: what it understood.
+
+        A parsed rule is shown back BEFORE it is saved. What it understood is rendered as fields,
+        including the two consequences the owner would not have said out loud — when the decision
+        gets made, and what happens when no day qualifies. Nothing is stored until they accept, so a
+        misparse can never quietly schedule the wrong thing.
+
+        Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c
+    -->
+    <Grid RowDefinitions="*,Auto">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
+
+                <Label Text="New task" Style="{StaticResource DisplayLabel}" />
+
+                <Label Text="You wrote" Style="{StaticResource GroupLabel}" />
+                <Border Style="{StaticResource GroupCard}">
+                    <Label x:Name="WrittenLabel" Padding="16,12"
+                           Style="{StaticResource CardRowTitle}" />
+                </Border>
+
+                <Label Text="What that means" Style="{StaticResource GroupLabel}" />
+                <Border Style="{StaticResource GroupCard}">
+                    <VerticalStackLayout x:Name="Fields" />
+                </Border>
+
+                <Label Text="Nothing is saved until you accept this."
+                       Style="{StaticResource CardCaption}" />
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <VerticalStackLayout Grid.Row="1">
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Padding="24,12">
+                <Button Grid.Column="0" Text="Accept" Clicked="OnAcceptClicked" />
+                <Button Grid.Column="1" Text="Edit" Clicked="OnEditClicked"
+                        Style="{StaticResource SecondaryButton}" />
+            </Grid>
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
