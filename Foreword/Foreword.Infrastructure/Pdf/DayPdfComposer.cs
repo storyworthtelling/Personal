@@ -67,8 +67,7 @@ public class DayPdfComposer : IDayPdfComposer
         // Page 1 — the day itself.
         DayPageFurniture.Draw(layout, DaySection.Day, DayTitles.PageHeading(document.Date));
         DrawVoice(layout, document.Voice);
-        DrawTimelinePage(layout, document.Agenda);
-        HandwritingRegion.Draw(layout, "Future events — write below:", document.UnreadableCarryovers);
+        DrawTimelinePage(layout, document.Agenda, document.UnreadableCarryovers);
 
         // Page 2 — the weather, on the timeline's own 6am-10pm axis so an event and the weather at
         // that hour line up vertically across the two sheets.
@@ -121,7 +120,8 @@ public class DayPdfComposer : IDayPdfComposer
     /// </summary>
     internal static float StripHeight(SKFont eventFont) => (float)SkiaPageLayout.LineHeight(eventFont) + 2;
 
-    private static void DrawTimelinePage(SkiaPageLayout layout, DayAgenda agenda)
+    private static void DrawTimelinePage(
+        SkiaPageLayout layout, DayAgenda agenda, IReadOnlyList<ParsedNote> unreadableCarryovers)
     {
         var titleFont = SkiaPageLayout.Sans(PaperTypeScale.Title, bold: true);
         var headerFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary, bold: true);
@@ -298,41 +298,8 @@ public class DayPdfComposer : IDayPdfComposer
             }
         }
 
-        // "Also today": everything the grid could not hold at a legible width, in full, in time
-        // order. Under the grid rather than in it, because it is a list rather than a shape.
-        if (alsoToday.Count > 0)
-        {
-            layout.MoveTo(gridBottom + 2);
-            layout.DrawText("Also today", eventFont, SkiaPageLayout.Margin, layout.Y,
-                layout.ContentWidth, stripHeight, TextAlign.TopLeft, SkiaPageLayout.InkMuted);
-            layout.Advance(stripHeight);
-
-            foreach (var (e, column) in alsoToday.OrderBy(x => x.Event.Start))
-            {
-                var time = e.Start.ToString("h:mm");
-                layout.DrawText(
-                    layout.Truncate($"{time}  {e.Title} — {column}", eventFont, layout.ContentWidth),
-                    eventFont, SkiaPageLayout.Margin, layout.Y, layout.ContentWidth, stripHeight,
-                    TextAlign.TopLeft);
-                layout.Advance(stripHeight);
-            }
-        }
-
-        // Held calendars are named on the page (D34). Under the grid, in the muted ink, because it
-        // is a note about the page rather than part of the day — but ON the page, because a held
-        // calendar the owner cannot see is the same silence the holding exists to end.
-        if (agenda.HeldCalendars.Count > 0)
-        {
-            layout.MoveTo(Math.Max(layout.Y, gridBottom + 2));
-            layout.DrawText(
-                layout.Truncate(
-                    $"Not printed — no column yet: {string.Join(", ", agenda.HeldCalendars)}",
-                    hourFont, layout.ContentWidth),
-                hourFont, SkiaPageLayout.Margin, layout.Y, layout.ContentWidth, stripHeight,
-                TextAlign.TopLeft, SkiaPageLayout.InkMuted);
-        }
-
-        layout.MoveTo(gridBottom);
+        // The foot: what did not fit, what could not be read, and ruled space for future events.
+        DayFoot.Draw(layout, gridBottom + 6, alsoToday, agenda.HeldCalendars, unreadableCarryovers);
     }
 
     /// <summary>
