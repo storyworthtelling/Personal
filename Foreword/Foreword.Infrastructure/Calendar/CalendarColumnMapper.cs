@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Options;
 using Foreword.Domain.Calendar;
+using Foreword.Domain.Install;
 using Foreword.Domain.Models;
+using Foreword.Infrastructure.Install;
 
 namespace Foreword.Infrastructure.Calendar;
 
@@ -21,10 +23,25 @@ public class CalendarColumnMapper
 {
     private readonly CalendarMappingOptions options;
 
-    public CalendarColumnMapper(IOptions<CalendarMappingOptions> options)
+    private readonly InstallOptions install;
+
+    public CalendarColumnMapper(
+        IOptions<CalendarMappingOptions> options, IOptions<InstallOptions> install)
     {
         this.options = options.Value;
+        this.install = install.Value;
     }
+
+    /// <summary>
+    /// Whose phone this is (Release I).
+    ///
+    /// <para>The owner's explicit choice if they made one, otherwise proposed from the account
+    /// signed in here. It is the answer to every question that used to have one person's name
+    /// written into it: where a note with nobody on it goes, and which column an event falls into
+    /// when nothing else can tell.</para>
+    /// </summary>
+    public PersonColumn Owner =>
+        OwnerColumn.Resolve(install.Owner, install.AccountEmail, Addresses());
 
     public IReadOnlyList<CalendarEvent> Assign(IEnumerable<CalendarEvent> events)
     {
@@ -70,15 +87,22 @@ public class CalendarColumnMapper
         // FamilyCalendarId is the shorthand for the one that already exists.
         if (IsSplit(calendarId))
         {
-            return new ColumnRouting(Column: null, Addresses(), Names(), options.DefaultColumn);
+            return new ColumnRouting(Column: null, Addresses(), Names(), Fallback);
         }
 
         PersonColumn? column = options.CalendarColumns.TryGetValue(calendarId, out var mapped)
             ? mapped
-            : options.DefaultColumn;
+            : Fallback;
 
-        return new ColumnRouting(column, Addresses(), Names(), options.DefaultColumn);
+        return new ColumnRouting(column, Addresses(), Names(), Fallback);
     }
+
+    /// <summary>
+    /// Where an event goes when nothing can tell: what the owner set, else whoever this phone
+    /// belongs to. Unset is the ordinary state of a fresh install, and it must not resolve to the
+    /// person the app happened to be written for first.
+    /// </summary>
+    private PersonColumn Fallback => options.DefaultColumn ?? Owner;
 
     /// <summary>Calendars whose events belong to everybody without anyone being named.</summary>
     public bool IsEveryone(string calendarId) => options.EveryoneCalendars.Contains(calendarId);
