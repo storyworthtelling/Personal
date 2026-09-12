@@ -27,11 +27,15 @@ namespace Foreword.Android.Pages;
 /// state change and the reason Score gives for its own vault field: leaving a screen never
 /// blurs anything reliably, so a Save button is one that usually does nothing.</para>
 /// </summary>
-public partial class SetupPage : ContentPage
+public partial class SetupPage : BinderPage
 {
+    /// <summary>The mark's preview, big enough to recognise a face in and no bigger.</summary>
+    private const int PreviewDp = 72;
+
     public SetupPage()
     {
         InitializeComponent();
+        Wrap(ForewordArea.Settings, "Settings");
 
         // The one shared formatter, so every app's foot line reads identically.
         BuildLineLabel.Text = Storyworthtelling.Updates.BuildLine.Format(
@@ -165,9 +169,54 @@ public partial class SetupPage : ContentPage
                 : "Not chosen — your documents carry the household's mark.",
             Style = PaperResources.Token<Style>("CardRowDescription"),
         });
+
+        // The chosen photo, shown SQUARE and filling its box — that is the shape it is stored at
+        // (MedallionImage.Plan centre-crops to a square) and the shape the bookplate window wants.
+        // The circular mask belongs to the PRINTED maker's mark, where §13 puts a ring around it;
+        // a lone circle on a settings screen is just a crop nobody asked for.
+        if (chosen && Preview() is { } preview)
+        {
+            row.Add(preview);
+        }
+
         row.Add(button);
 
         return row;
+    }
+
+    /// <summary>
+    /// The stored mark, at the size a row can carry it. Square and edge to edge: it is a picture of
+    /// a person, not a bullet.
+    /// </summary>
+    private static View? Preview()
+    {
+        try
+        {
+            var bytes = Convert.FromBase64String(CredentialStore.OwnerPhoto);
+
+            return new Border
+            {
+                Stroke = PaperResources.Colour("Hairline"),
+                StrokeThickness = DesignTokens.Shape.HairlineDp,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
+                {
+                    CornerRadius = new CornerRadius(DesignTokens.Shape.RadiusCard),
+                },
+                HorizontalOptions = LayoutOptions.Start,
+                Content = new Image
+                {
+                    Source = ImageSource.FromStream(() => new MemoryStream(bytes)),
+                    WidthRequest = PreviewDp,
+                    HeightRequest = PreviewDp,
+                    Aspect = Aspect.AspectFill,
+                },
+            };
+        }
+        catch (FormatException)
+        {
+            // A vault that restored something that is not base64. The row still works without it.
+            return null;
+        }
     }
 
     /// <summary>

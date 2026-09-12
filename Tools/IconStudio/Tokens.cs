@@ -40,10 +40,12 @@ public static class Tokens
     // the engraved doorstep set into a window on this ground. It sits between Flyleaf's warm
     // 38.6° and the accent terracotta, which is deliberate: the two apps are neighbours in the
     // morning and their covers were chosen to read as the same library.
+    public const string ForewordFillHex = "#E8B99A";
     public const string ForewordGroundHex = "#DFA277";
     public const string ForewordSunriseHex = "#CA662D";
     public const string ForewordDeepHex = "#6E3512";
 
+    public static readonly SKColor ForewordFill = SKColor.Parse(ForewordFillHex);
     public static readonly SKColor ForewordGround = SKColor.Parse(ForewordGroundHex);
     public static readonly SKColor ForewordSunrise = SKColor.Parse(ForewordSunriseHex);
     public static readonly SKColor ForewordDeep = SKColor.Parse(ForewordDeepHex);
