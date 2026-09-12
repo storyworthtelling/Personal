@@ -1,5 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
+using Microsoft.Maui.Media;
+using Foreword.Domain.Calendar;
+using Foreword.Domain.Install;
+using Foreword.Domain.Models;
+using Foreword.Infrastructure.Calendar;
+using Storyworthtelling.Maui;
+using Storyworthtelling.Maui.Views;
+using Storyworthtelling.Paper;
 using Foreword.Domain.Health;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
@@ -72,6 +80,7 @@ public partial class SetupPage : ContentPage
 
         RenderMaps();
         RenderSources();
+        RenderInstall();
         RenderPrayer();
         BuildNeedsYou();
     }
@@ -95,6 +104,158 @@ public partial class SetupPage : ContentPage
 
     private async void OnSourcesClicked(object sender, EventArgs e) =>
         await Navigation.PushAsync(new SourcesPage());
+
+    // ---- This install ======================================================
+
+    /// <summary>
+    /// Whose phone this is, and the mark it signs with.
+    ///
+    /// <para>The owner is <b>proposed</b> from the signed-in account, so most installs never answer
+    /// it — the row shows who the app thinks this is and lets them disagree. A row that demanded an
+    /// answer would be a question with an obvious answer asked of everybody, which is the kind of
+    /// setup step this app does not have.</para>
+    /// </summary>
+    private void RenderInstall()
+    {
+        ThisInstall.Clear();
+
+        var owner = IPlatformApplication.Current!.Services
+            .GetRequiredService<CalendarColumnMapper>().Owner;
+
+        var people = PersonIdentity.WithMailboxes.Select(person => person.ToString()).ToArray();
+        var segmented = new PaperSegmented(people, owner.ToString());
+        segmented.Picked += picked =>
+        {
+            if (Enum.TryParse<PersonColumn>(picked, out var chosen))
+            {
+                CredentialStore.OwnerColumn = chosen;
+                BackUpThisInstall();
+                RenderInstall();
+            }
+        };
+
+        ThisInstall.Add(Field("Whose phone this is", segmented));
+        ThisInstall.Add(Rule());
+        ThisInstall.Add(Field("Your mark", MarkRow()));
+
+        InstallCaption.Text = string.IsNullOrEmpty(CredentialStore.GoogleAccountEmail)
+            ? "Sign in to Google and this fills itself in."
+            : $"Proposed from {CredentialStore.GoogleAccountEmail}. A note with nobody named on it "
+                + $"goes to {owner}.";
+    }
+
+    private View MarkRow()
+    {
+        var chosen = !string.IsNullOrEmpty(CredentialStore.OwnerPhoto);
+
+        var button = new Button
+        {
+            Text = chosen ? "Choose another" : "Choose a photo",
+            Style = PaperResources.Token<Style>("SecondaryButton"),
+            HorizontalOptions = LayoutOptions.Start,
+        };
+
+        button.Clicked += async (_, _) => await ChooseMark();
+
+        var row = new VerticalStackLayout { Spacing = DesignTokens.Space.X2 };
+        row.Add(new Label
+        {
+            Text = chosen
+                ? "Your own photo, on every document this phone builds."
+                : "Not chosen — your documents carry the household's mark.",
+            Style = PaperResources.Token<Style>("CardRowDescription"),
+        });
+        row.Add(button);
+
+        return row;
+    }
+
+    /// <summary>
+    /// Picks a photo, squares it, and keeps it. The cropping is done by the library that prints,
+    /// so this screen never names a Skia type; every failure in there is a null, because the bytes
+    /// came from a file picker and "that was not an image" is an ordinary Tuesday.
+    /// </summary>
+    private async Task ChooseMark()
+    {
+        try
+        {
+            if (await MediaPicker.Default.PickPhotoAsync(
+                new MediaPickerOptions { Title = "Your mark" }) is not { } picked)
+            {
+                return;
+            }
+
+            using var stream = await picked.OpenReadAsync();
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            var source = buffer.ToArray();
+
+            if (MedallionCrop.Measure(source) is not { } size
+                || MedallionImage.Plan(size.Width, size.Height) is not { } plan)
+            {
+                InstallCaption.Text = "That file could not be read as a photo. Nothing was changed.";
+                return;
+            }
+
+            var square = MedallionCrop.SquarePng(
+                source, plan.SourceX, plan.SourceY, plan.SourceEdge, plan.TargetEdge);
+
+            if (square is null)
+            {
+                InstallCaption.Text = "That photo could not be squared up. Nothing was changed.";
+                return;
+            }
+
+            CredentialStore.OwnerPhoto = Convert.ToBase64String(square);
+
+            // So the next document composed carries it, without waiting for a restart.
+            PersonalSync.Apply();
+
+            BackUpThisInstall();
+            RenderInstall();
+        }
+        catch (Exception)
+        {
+            // A cancelled picker, a permission refused, a file that vanished. None of them is worth
+            // more than the row staying as it was.
+            InstallCaption.Text = "No photo was chosen. Nothing was changed.";
+        }
+    }
+
+    /// <summary>
+    /// Mirrors this install's two answers to the person's own vault, so a factory reset costs the
+    /// passphrase rather than the photo. Fire-and-forget: the phone is the source of truth.
+    /// </summary>
+    private static void BackUpThisInstall() => _ = Task.Run(async () =>
+    {
+        try
+        {
+            await IPlatformApplication.Current!.Services
+                .GetRequiredService<PersonalSync>()
+                .PublishAsync(CancellationToken.None);
+        }
+        catch (Exception)
+        {
+            // The backup is a convenience; the answer is already on the phone.
+        }
+    });
+
+    private static View Field(string label, View control) => new VerticalStackLayout
+    {
+        Padding = new Thickness(16, 12),
+        Spacing = DesignTokens.Space.X1,
+        Children =
+        {
+            new Label { Text = label, Style = PaperResources.Token<Style>("CardRowTitle") },
+            control,
+        },
+    };
+
+    private static View Rule() => new BoxView
+    {
+        HeightRequest = DesignTokens.Shape.HairlineDp,
+        Color = PaperResources.Colour("Hairline"),
+    };
 
     // ---- Prayer ============================================================
 

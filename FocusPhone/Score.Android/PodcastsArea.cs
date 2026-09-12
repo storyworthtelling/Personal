@@ -89,7 +89,7 @@ public sealed class PodcastsArea : ScoreArea
         RestoreLibraryFromDrive();
     }
 
-    public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
+    public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill);
 
     public override View BuildView()
     {

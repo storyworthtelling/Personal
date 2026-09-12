@@ -152,16 +152,16 @@ internal static class ForewordPage
     }
 
     /// <summary>
-    /// The maker's mark (§13): the owner's medallion and the line that says who set the paper.
-    /// Drawn without the medallion when none is embedded — a household that has not dropped a photo
-    /// in gets a page with no mark rather than an exception in the middle of a delivery.
+    /// The maker's mark (§13): this install's medallion and the line that says who set the paper.
+    /// Drawn without the medallion when there is none — a household that has not chosen a photo gets
+    /// a page with no mark rather than an exception in the middle of a delivery.
     /// </summary>
     private static void DrawMakersMark(SkiaPageLayout layout, bool hasContents)
     {
         var markFont = SkiaPageLayout.Sans(PaperTypeScale.Label, bold: true);
         var bottom = layout.BottomY;
 
-        if (EmbeddedBranding.OwnerMedallion is { } medallion)
+        if (OwnerMark.Medallion is { } medallion)
         {
             var left = SkiaPageLayout.Margin + (layout.ContentWidth - MedallionSize) / 2;
             var top = bottom - MedallionSize - 14;

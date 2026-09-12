@@ -273,6 +273,42 @@ surfacing anything that cannot be built as drawn rather than substituting:
   same line two inches higher stays private, so a disagreement about that boundary would put a private
   thought on a printed page. `RotationPick` is **arithmetic on the date, never a stored cursor** — a
   cursor advances on a morning that never delivered, so a name is skipped and nobody finds out.
+- **Nothing is hardcoded to one person (Release I).** Foreword had only ever run on one phone, so one
+  person was the answer to three questions nobody had noticed were questions: what a `CalendarEvent`'s
+  columns start as, what `CalendarMappingOptions.DefaultColumn` is, and where a hand-written note with
+  nobody named on it goes. `Foreword.Domain/Install/OwnerColumn` replaces all three — **proposed** from
+  the signed-in account (the calendar screen already knows which addresses belong to whom), an explicit
+  choice always winning, and falling back to what the app did before the setting existed so a phone
+  that has been delivering for months does not change its mind on a version bump.
+  `NobodyIsTheDefaultTests` is the guard; naming a person is *not* the offence, since the household
+  roster, the per-column hues and the vision prompt all name all four and all of those are about the
+  **columns**, which exist on both installs.
+- **The shared vault holds household facts; the personal vault holds per-install ones.** This is the
+  distinction Release I turns on, and the obvious place to put "whose phone is this" is wrong:
+  `CalendarMappingOptions` rides `ForewordSecrets.CalendarMappingJson` inside the **shared**
+  `storyworthtelling-secrets.json`, which both installs read and only one writes (`VaultOwnership`), so
+  a per-install field there would be restored from the first phone onto the second and its owner's
+  handwriting would start filing under somebody else — silently. So `InstallOptions` is its own bag,
+  built fresh by the head and never deserialised from a shared document, backed up to
+  `PersonalVault` (`storyworthtelling-personal.json`, one file per person in their own Drive).
+  `SharedVaultHoldsHouseholdFactsTests` enumerates the shared section's fields so a new one is a
+  decision. **`PersonalVaultAccess` now lives in `Storyworthtelling.Voice`**, moved out of
+  `Codex.Ui.Android` when Foreword became its second consumer — nothing in it was ever Android, the
+  platform half is the Drive glue, and the move gave it its first tests.
+- **The maker's mark belongs to the install, not the repository.** `/Branding/owner.png` is still
+  embedded and is still the fallback (so the phone that has been printing it keeps it), but
+  `Storyworthtelling.Paper/OwnerMark` prefers a photo chosen in Settings, squared by
+  `MedallionImage.Plan` (pure) + `MedallionCrop` (the Skia half, so the head names no Skia type) and
+  kept in the personal vault. **Two SkiaSharp behaviours here were written the obvious way and both
+  were wrong:** `SKBitmap.Decode` **throws** on unreadable bytes rather than returning null, so a file
+  picked out of a folder that was not an image would have thrown out of a settings screen; and
+  disposing the bitmap being replaced is a **use-after-free** — touching a disposed `SKBitmap` is not
+  an `ObjectDisposedException`, it is a native access violation that takes the process down with no
+  managed exception and no stack, and a delivery composing a page while somebody picks a new photo
+  holds exactly that reference. Both were read out of the library with a probe after assuming wrong;
+  the guard that found them crashed the test host, which is what it was for.
+- **A `CollectionDefinition` on a test class makes xUnit discover nothing at all**, silently — the
+  marker has to be its own class. The only sign was a suite going from 75 tests to 74.
 - **Prayer delivers in its own `try` inside `DeliveryWorker`**, with its own outcome preference
   (`LastPrayerOutcome`), because it reads a file the rest of the morning does not behind a passphrase
   the rest of the morning does not need — a morning with no prayer sheet is a smaller loss than a
@@ -287,9 +323,26 @@ in one head only. Done: the six `UndoBar` call sites moved to `DogEar` (the bar 
 from the repo), the binder strip is top-aligned, Music takes Score's identity hue as its
 home area, and Settings went neutral grey.
 
-**Still scheduled:** colour-coding Score's remaining four areas per §9. They currently all
-carry the identity hue, which is the bible and the code disagreeing — the bible says tabs
-are colour-coded per area, and Score ships one hue across six. Post follows the bible.
+**Done:** the four remaining areas are colour-coded per §9 — Podcasts takes Reference, Playing
+takes Progress (the one actually in motion), Discover takes Positive, Workout takes Caution, with
+Music keeping the identity and Settings the neutral grey. `Codex.Tests/Design/AreaHueTests` is the
+guard, and it holds the whole §9 rule rather than just this one fix: no two areas share a hue,
+exactly one carries the identity, Settings alone is the grey, and an area's ink and cloth are the
+same hue.
+
+**The restraint is the point, and it is guarded too.** §9 says an area colour that happens to be a
+role hue is *a tab, not a state, and nothing on the page inherits it* — so Score's in-page accents
+(the filter field, the Dial, the tempo bands, the budget meter) **keep the identity hue** and must
+not be recoloured to match their tab. Writing that guard took three goes: flagging every role hue
+on a page wrongly named Post's genuine status reds and ochres, and flagging an area's own hue
+wrongly named the home areas, whose tab hue *is* the identity and whose pages are meant to wear it.
+The rule that survives is narrow — a page must not wear a **role** hue that is the colour of the
+tab it sits behind.
+
+**One thing surfaced, not changed:** Post's Filed and Rolodex filter fields each take their own
+tab's role hue, which that rule forbids. Found by the guard rather than by looking. Post's areas
+went through the P7 gate, so whether that was approved or missed is the owner's call; the two are
+listed in the guard as standing exceptions, so anything *new* in Post still fails.
 
 ---
 

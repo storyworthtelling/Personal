@@ -1,6 +1,6 @@
 namespace Foreword.Infrastructure.Google;
 
-// OAuth credentials (one-time consent on Rowan's account) plus calendar-creation settings.
+// OAuth credentials (one-time consent on the owner's account) plus calendar-creation settings.
 public class GoogleOptions
 {
     public const string SectionName = "Google";

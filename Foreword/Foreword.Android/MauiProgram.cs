@@ -15,6 +15,7 @@ using Foreword.Infrastructure.Maps;
 using Foreword.Infrastructure.Tasks;
 using Foreword.Infrastructure.Nyt;
 using Foreword.Infrastructure.Pdf;
+using Foreword.Infrastructure.Install;
 using Foreword.Infrastructure.Prayer;
 using Foreword.Android.Google;
 using Storyworthtelling.Remarkable;
@@ -72,6 +73,16 @@ public static class MauiProgram
             }));
         builder.Services.AddSingleton<IOptions<AnthropicOptions>>(
             _ => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions { ApiKey = CredentialStore.AnthropicApiKey }));
+        // Whose phone this is (Release I). Built fresh from this install's own settings and never
+        // deserialised from a shared document — the calendar mapping rides the household vault,
+        // which both installs read, so the per-install answer must not live in it.
+        builder.Services.AddSingleton<IOptions<InstallOptions>>(
+            _ => new LiveOptions<InstallOptions>(() => new InstallOptions
+            {
+                Owner = CredentialStore.OwnerColumn,
+                AccountEmail = CredentialStore.GoogleAccountEmail,
+            }));
+
         builder.Services.AddSingleton<IOptions<CalendarMappingOptions>>(
             _ => new LiveOptions<CalendarMappingOptions>(() =>
             {
@@ -207,6 +218,16 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
         builder.Services.AddSingleton<VaultSync>();
+
+        // This person's own vault, in their own Drive — what is theirs rather than the household's
+        // (Release I). Same store and same crypto as the shared one; what differs is who may write
+        // it, which for this file is only the install it belongs to.
+        builder.Services.AddSingleton(sp => new PersonalVaultAccess(
+            new DrivePersonalVaultStore(new DriveTextFile(
+                VoiceDriveFactory(sp), DrivePersonalVaultStore.FileName,
+                sp.GetRequiredService<InMemoryDriveFileIdStore>())),
+            () => CredentialStore.VaultPassphrase));
+        builder.Services.AddSingleton<PersonalSync>();
 
         // The private prayer archive: its own Drive file, encrypted with the same passphrase the
         // vault uses. A separate file rather than a section of the vault, because the vault is read
