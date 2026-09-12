@@ -27,6 +27,13 @@ public record PolicyContext(
     // Frozen: the head is renamed to Plate IN PLACE, so the package id never moves.
     public const string PlatePackage = "com.storyworthtelling.focusphone.camera";
     public const string AudioPackage = "com.storyworthtelling.focusphone.audio";
+
+    // Foreword, the morning hub. It is a sibling repo app rather than a FocusPhone head, so it
+    // carries no "focusphone" segment — and it still says "dailyloader" because renaming a package
+    // presents the app to the update channel as something new. It is named here because the shelf
+    // draws it: without an entry it fell back to the launcher icon, which Android masks round.
+    public const string ForewordPackage = "com.storyworthtelling.dailyloader";
+
     public const string PlayStorePackage = "com.android.vending";
 
     // Google Drive. Not first-party and not allowlisted for the owner to browse — it is here
