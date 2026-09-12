@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui;
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
+using Foreword.Infrastructure.Calendar;
 using Storyworthtelling.Maui;
 
 namespace Foreword.Android.Pages;
@@ -208,7 +210,10 @@ public partial class CalendarSplitPage : ContentPage
             Addresses: ColumnSet.People.ToDictionary(
                 p => p, p => (IReadOnlyList<string>)(settings.Mapping.PersonAddresses.TryGetValue(p, out var a) ? a : [])),
             Names: ColumnSet.People.ToDictionary(p => p, p => (IReadOnlyList<string>)settings.WordsFor(p)),
-            Default: settings.Mapping.DefaultColumn);
+            // The SAME fallback the morning will use, not this screen's own reading of it. A
+            // preview free to disagree with the delivery is worse than no preview.
+            Default: IPlatformApplication.Current!.Services
+                .GetRequiredService<CalendarColumnMapper>().FallbackColumn);
 
         foreach (var e in events.OrderBy(e => e.Start))
         {
