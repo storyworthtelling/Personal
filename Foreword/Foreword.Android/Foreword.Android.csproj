@@ -47,6 +47,12 @@
          a head that packages the fonts itself can register an alias for a face the kit does not
          carry, which fails silently. -->
     <ProjectReference Include="..\..\Storyworthtelling.Maui\Storyworthtelling.Maui.csproj" />
+    <!-- The printing library. Reached transitively through Infrastructure until Release I, when this
+         head began naming its types directly — the maker's mark it hands over, and the squaring of
+         the photo it is given. A direct dependency is declared rather than inherited: the transitive
+         one is real but it is a property of somebody else's csproj, and this head is the one project
+         in the repo that cannot be compiled outside CI. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
   </ItemGroup>
 
   <ItemGroup>
