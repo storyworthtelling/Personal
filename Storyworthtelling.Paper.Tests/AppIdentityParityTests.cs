@@ -17,6 +17,7 @@ namespace Storyworthtelling.Paper.Tests;
 public class AppIdentityParityTests
 {
     [Theory]
+    [InlineData("ForewordFillHex", AppIdentityTokens.ForewordFillHex)]
     [InlineData("ForewordGroundHex", AppIdentityTokens.ForewordGroundHex)]
     [InlineData("ForewordSunriseHex", AppIdentityTokens.ForewordSunriseHex)]
     [InlineData("ForewordDeepHex", AppIdentityTokens.ForewordDeepHex)]

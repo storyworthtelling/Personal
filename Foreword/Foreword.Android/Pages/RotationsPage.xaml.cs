@@ -13,7 +13,7 @@ namespace Foreword.Android.Pages;
 /// <para>Not in the approved mockup set — no screen had been drawn for this, because the idea
 /// arrived with the answer. Built in the grammar of the screens that were drawn.</para>
 /// </summary>
-public partial class RotationsPage : ContentPage
+public partial class RotationsPage : BinderPage
 {
     private readonly PrayerSettings settings;
 
@@ -21,6 +21,7 @@ public partial class RotationsPage : ContentPage
     {
         this.settings = settings;
         InitializeComponent();
+        Wrap(ForewordArea.Settings, "Lists");
     }
 
     protected override async void OnAppearing()

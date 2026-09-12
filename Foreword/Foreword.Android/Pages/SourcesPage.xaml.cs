@@ -14,11 +14,15 @@ namespace Foreword.Android.Pages;
 /// and stays, because one that disappeared on its own would be indistinguishable from one they
 /// forgot they added.</para>
 /// </summary>
-public partial class SourcesPage : ContentPage
+public partial class SourcesPage : BinderPage
 {
     private readonly BriefSettings settings = new();
 
-    public SourcesPage() => InitializeComponent();
+    public SourcesPage()
+    {
+        InitializeComponent();
+        Wrap(ForewordArea.Today, "Sources");
+    }
 
     protected override void OnAppearing()
     {

@@ -15,11 +15,15 @@ namespace Foreword.Android.Pages;
 /// own app is shown struck through rather than removed — the owner can see <i>why</i> it will not
 /// print instead of wondering where it went.</para>
 /// </summary>
-public partial class TasksPage : ContentPage
+public partial class TasksPage : BinderPage
 {
     private readonly ITaskStore store = new TaskStore();
 
-    public TasksPage() => InitializeComponent();
+    public TasksPage()
+    {
+        InitializeComponent();
+        Wrap(ForewordArea.Tasks, "Tasks");
+    }
 
     protected override async void OnAppearing()
     {

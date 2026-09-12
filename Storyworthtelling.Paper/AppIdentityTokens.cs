@@ -19,11 +19,15 @@ namespace Storyworthtelling.Paper;
 /// </summary>
 public static class AppIdentityTokens
 {
-    // Foreword: sunrise, OKLCH hue 47°, locked at gate 3.
+    // Foreword: sunrise, OKLCH hue 47°, locked at gate 3. The fill tier is the cloth an inactive
+    // binder tab is cut from (§9) — the one tier a SCREEN needs, which is why it arrived later than
+    // the three the printed page uses.
+    public const string ForewordFillHex = "#E8B99A";
     public const string ForewordGroundHex = "#DFA277";
     public const string ForewordSunriseHex = "#CA662D";
     public const string ForewordDeepHex = "#6E3512";
 
+    public static SKColor ForewordFill { get; } = SKColor.Parse(ForewordFillHex);
     public static SKColor ForewordGround { get; } = SKColor.Parse(ForewordGroundHex);
     public static SKColor ForewordSunrise { get; } = SKColor.Parse(ForewordSunriseHex);
     public static SKColor ForewordDeep { get; } = SKColor.Parse(ForewordDeepHex);

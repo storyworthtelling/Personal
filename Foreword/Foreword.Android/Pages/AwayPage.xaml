@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<pages:BinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:Foreword.Android.Pages"
              x:Class="Foreword.Android.Pages.AwayPage"
              Title="Away">
     <!--
@@ -25,7 +26,6 @@
     <ScrollView>
         <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
 
-            <Label Text="Away" Style="{StaticResource DisplayLabel}" />
 
             <Label Text="Dates" Style="{StaticResource GroupLabel}" />
             <Border Style="{StaticResource GroupCard}">
@@ -61,4 +61,4 @@
 
         </VerticalStackLayout>
     </ScrollView>
-</ContentPage>
+</pages:BinderPage>

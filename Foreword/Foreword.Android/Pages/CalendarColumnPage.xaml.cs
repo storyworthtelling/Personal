@@ -11,7 +11,7 @@ namespace Foreword.Android.Pages;
 /// carries §8's highlighter wash rather than being dimmed: a dimmed row means <i>disabled</i>, and
 /// a setting whose current value looks unavailable is worse than one with nothing marked.</para>
 /// </summary>
-public partial class CalendarColumnPage : ContentPage
+public partial class CalendarColumnPage : BinderPage
 {
     private readonly CalendarSettings settings = new();
     private readonly string calendarId;
@@ -20,7 +20,7 @@ public partial class CalendarColumnPage : ContentPage
     {
         InitializeComponent();
         this.calendarId = calendarId;
-        NameLabel.Text = name;
+        Wrap(ForewordArea.Calendar, name);
     }
 
     protected override void OnAppearing()
@@ -100,7 +100,7 @@ public partial class CalendarColumnPage : ContentPage
 
             if (opensSplit)
             {
-                await Navigation.PushAsync(new CalendarSplitPage(calendarId, NameLabel.Text));
+                await Navigation.PushAsync(new CalendarSplitPage(calendarId, HeaderText));
                 return;
             }
 

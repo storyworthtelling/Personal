@@ -14,7 +14,7 @@ namespace Foreword.Android.Pages;
 /// belong here: a line per morning would evict the failures this file exists for within a month,
 /// which is the split Post made for the same reason.</para>
 /// </summary>
-public partial class DiagnosticsPage : ContentPage
+public partial class DiagnosticsPage : BinderPage
 {
     private static string CrashLogPath =>
         System.IO.Path.Combine(FileSystem.AppDataDirectory, "crash.log");
@@ -25,6 +25,7 @@ public partial class DiagnosticsPage : ContentPage
     public DiagnosticsPage()
     {
         InitializeComponent();
+        Wrap(ForewordArea.Settings, "Diagnostics");
     }
 
     protected override void OnAppearing()
