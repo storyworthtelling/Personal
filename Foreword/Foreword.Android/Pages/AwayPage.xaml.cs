@@ -15,13 +15,14 @@ namespace Foreword.Android.Pages;
 /// <para>What is not paused matters as much, and the defaults say so: the morning still goes out,
 /// because a holiday is exactly when a day sheet earns its place.</para>
 /// </summary>
-public partial class AwayPage : ContentPage
+public partial class AwayPage : BinderPage
 {
     private readonly ITaskStore store = new TaskStore();
 
     public AwayPage()
     {
         InitializeComponent();
+        Wrap(ForewordArea.Tasks, "Away");
 
         var away = store.Away;
         var today = DateTime.Today;

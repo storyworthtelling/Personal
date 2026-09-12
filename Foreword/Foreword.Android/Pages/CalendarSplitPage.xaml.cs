@@ -19,7 +19,7 @@ namespace Foreword.Android.Pages;
 /// <para>Adding a word is the only edit. There is no regex, because a regex you get wrong is silent
 /// too.</para>
 /// </summary>
-public partial class CalendarSplitPage : ContentPage
+public partial class CalendarSplitPage : BinderPage
 {
     private readonly CalendarSettings settings = new();
     private readonly string calendarId;
@@ -28,7 +28,7 @@ public partial class CalendarSplitPage : ContentPage
     {
         InitializeComponent();
         this.calendarId = calendarId;
-        NameLabel.Text = name;
+        Wrap(ForewordArea.Calendar, name);
     }
 
     protected override async void OnAppearing()
