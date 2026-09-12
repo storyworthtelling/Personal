@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Foreword.Domain.Delivery;
 using Foreword.Domain.Identity;
 using Foreword.Infrastructure.Delivery;
+using Foreword.Infrastructure.Prayer;
 
 namespace Foreword.Android;
 
@@ -52,6 +53,22 @@ public class DeliveryWorker : Worker
                 var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
                 daily.EnsureKidCalendars().GetAwaiter().GetResult();
                 daily.DeliverDailyDocuments(today).GetAwaiter().GetResult();
+
+                // The third document, in its own try. Prayer is the one part of the morning that
+                // must not be able to take the other two down with it: it reads a file the other
+                // two do not, behind a passphrase the other two do not need, so its failures are
+                // its own — and a morning with no prayer sheet is a smaller loss than a morning
+                // with no day and no paper.
+                try
+                {
+                    scope.ServiceProvider.GetRequiredService<PrayerDeliveryService>()
+                        .Deliver(today).GetAwaiter().GetResult();
+                    CredentialStore.LastPrayerOutcome = "Delivered";
+                }
+                catch (Exception ex)
+                {
+                    CredentialStore.LastPrayerOutcome = $"Failed: {ex.Message}";
+                }
             }
 
             CredentialStore.LastDeliveryOutcome = $"Delivered ({newsStatus})";
