@@ -1,4 +1,5 @@
 using Foreword.Domain.Identity;
+using Foreword.Domain.Models;
 
 namespace Foreword.Android;
 
@@ -164,6 +165,27 @@ public static class CredentialStore
     {
         get => Preferences.Get(PreferenceKeys.LastDeliveryOutcome, string.Empty);
         set => Preferences.Set(PreferenceKeys.LastDeliveryOutcome, value);
+    }
+
+    /// <summary>
+    /// Whose phone this is, as an explicit choice. Null means the app proposes one from the
+    /// signed-in account — which is the ordinary case, so most installs never answer this.
+    /// </summary>
+    public static PersonColumn? OwnerColumn
+    {
+        get => Enum.TryParse<PersonColumn>(
+            Preferences.Get(PreferenceKeys.OwnerColumn, string.Empty), out var column)
+            ? column
+            : null;
+        set => Preferences.Set(
+            PreferenceKeys.OwnerColumn, value?.ToString() ?? string.Empty);
+    }
+
+    /// <summary>This install's maker's mark, as a base64 PNG. Empty means the embedded fallback.</summary>
+    public static string OwnerPhoto
+    {
+        get => Preferences.Get(PreferenceKeys.OwnerPhoto, string.Empty);
+        set => Preferences.Set(PreferenceKeys.OwnerPhoto, value);
     }
 
     /// <summary>

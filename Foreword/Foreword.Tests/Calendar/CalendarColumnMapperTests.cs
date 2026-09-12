@@ -8,8 +8,10 @@ namespace Foreword.Tests.Calendar;
 
 public class CalendarColumnMapperTests
 {
-    private static CalendarColumnMapper CreateMapper(CalendarMappingOptions options) =>
-        new(Options.Create(options));
+    private static CalendarColumnMapper CreateMapper(
+        CalendarMappingOptions options, string accountEmail = "") =>
+        new(Options.Create(options),
+            Options.Create(new Foreword.Infrastructure.Install.InstallOptions { AccountEmail = accountEmail }));
 
     private static CalendarEvent Event(string calendarId, string title = "Thing") =>
         new() { Title = title, SourceCalendarId = calendarId };
