@@ -87,22 +87,26 @@ public class CalendarColumnMapper
         // FamilyCalendarId is the shorthand for the one that already exists.
         if (IsSplit(calendarId))
         {
-            return new ColumnRouting(Column: null, Addresses(), Names(), Fallback);
+            return new ColumnRouting(Column: null, Addresses(), Names(), FallbackColumn);
         }
 
         PersonColumn? column = options.CalendarColumns.TryGetValue(calendarId, out var mapped)
             ? mapped
-            : Fallback;
+            : FallbackColumn;
 
-        return new ColumnRouting(column, Addresses(), Names(), Fallback);
+        return new ColumnRouting(column, Addresses(), Names(), FallbackColumn);
     }
 
     /// <summary>
     /// Where an event goes when nothing can tell: what the owner set, else whoever this phone
     /// belongs to. Unset is the ordinary state of a fresh install, and it must not resolve to the
     /// person the app happened to be written for first.
+    ///
+    /// <para>Public because the calendar preview screen shows where today's events <i>would</i>
+    /// land, and a preview that resolved its own fallback would be free to disagree with the
+    /// morning — which is the one thing a preview must never do.</para>
     /// </summary>
-    private PersonColumn Fallback => options.DefaultColumn ?? Owner;
+    public PersonColumn FallbackColumn => options.DefaultColumn ?? Owner;
 
     /// <summary>Calendars whose events belong to everybody without anyone being named.</summary>
     public bool IsEveryone(string calendarId) => options.EveryoneCalendars.Contains(calendarId);
