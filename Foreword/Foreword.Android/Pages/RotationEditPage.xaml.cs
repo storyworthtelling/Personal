@@ -15,7 +15,7 @@ namespace Foreword.Android.Pages;
 /// the list paused — writes the archive there and then; the name field writes when it loses focus,
 /// because saving to Drive on every keystroke would be a Drive round-trip per letter.</para>
 /// </summary>
-public partial class RotationEditPage : ContentPage
+public partial class RotationEditPage : BinderPage
 {
     private readonly PrayerSettings settings;
 
@@ -38,12 +38,13 @@ public partial class RotationEditPage : ContentPage
         };
 
         InitializeComponent();
+        Wrap(ForewordArea.Settings, "List");
         Render();
     }
 
     private void Render()
     {
-        Heading.Text = string.IsNullOrWhiteSpace(rotation.Name) ? "New list" : rotation.Name;
+        HeaderText = string.IsNullOrWhiteSpace(rotation.Name) ? "New list" : rotation.Name;
 
         Fields.Clear();
         Names.Clear();

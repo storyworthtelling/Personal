@@ -4,7 +4,7 @@ using Storyworthtelling.Voice;
 
 namespace Foreword.Android.Pages;
 
-public partial class MainPage : ContentPage
+public partial class MainPage : BinderPage
 {
     private static string CrashLogPath =>
         System.IO.Path.Combine(FileSystem.AppDataDirectory, "crash.log");
@@ -15,11 +15,20 @@ public partial class MainPage : ContentPage
     private readonly DriveVoiceOptions voiceOptions;
     private readonly VoicedMessenger voice;
 
+    private readonly Button deliverNow = new() { Text = "Deliver now" };
+
     public MainPage(DriveVoiceOptions voiceOptions, VoicedMessenger voice)
     {
         InitializeComponent();
         this.voiceOptions = voiceOptions;
         this.voice = voice;
+
+        // Today is the app's root, so its tab is the one lit when nothing else is. The bar carries
+        // the one thing this screen is for; Tasks and Settings used to sit here as quiet buttons,
+        // and they are the binder's job now.
+        Wrap(ForewordArea.Today, "Today");
+        deliverNow.Clicked += OnDeliverNowClicked;
+        SetBar(deliverNow);
     }
 
     protected override void OnAppearing()
@@ -94,7 +103,7 @@ public partial class MainPage : ContentPage
         }
 
         DeliveryFileLogger.Clear();
-        DeliverNowButton.IsEnabled = false;
+        deliverNow.IsEnabled = false;
         // Loading is words (DESIGN.md §5).
         StatusLabel.Text = "Delivering — fetching today's brief…";
 
@@ -137,7 +146,7 @@ public partial class MainPage : ContentPage
         }
         finally
         {
-            DeliverNowButton.IsEnabled = true;
+            deliverNow.IsEnabled = true;
         }
     }
 
@@ -253,15 +262,6 @@ public partial class MainPage : ContentPage
             if (current != null) parts.AppendLine("Caused by:");
         }
         return parts.ToString().Trim();
-    }
-
-    private async void OnTasksClicked(object sender, EventArgs e) =>
-        await Navigation.PushAsync(new TasksPage());
-
-    private async void OnSettingsClicked(object sender, EventArgs e)
-    {
-        await Navigation.PushAsync(
-            IPlatformApplication.Current!.Services.GetRequiredService<SetupPage>());
     }
 
     private async void OnDeliveryLogClicked(object sender, EventArgs e)
