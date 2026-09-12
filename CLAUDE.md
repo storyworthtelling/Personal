@@ -323,9 +323,26 @@ in one head only. Done: the six `UndoBar` call sites moved to `DogEar` (the bar 
 from the repo), the binder strip is top-aligned, Music takes Score's identity hue as its
 home area, and Settings went neutral grey.
 
-**Still scheduled:** colour-coding Score's remaining four areas per §9. They currently all
-carry the identity hue, which is the bible and the code disagreeing — the bible says tabs
-are colour-coded per area, and Score ships one hue across six. Post follows the bible.
+**Done:** the four remaining areas are colour-coded per §9 — Podcasts takes Reference, Playing
+takes Progress (the one actually in motion), Discover takes Positive, Workout takes Caution, with
+Music keeping the identity and Settings the neutral grey. `Codex.Tests/Design/AreaHueTests` is the
+guard, and it holds the whole §9 rule rather than just this one fix: no two areas share a hue,
+exactly one carries the identity, Settings alone is the grey, and an area's ink and cloth are the
+same hue.
+
+**The restraint is the point, and it is guarded too.** §9 says an area colour that happens to be a
+role hue is *a tab, not a state, and nothing on the page inherits it* — so Score's in-page accents
+(the filter field, the Dial, the tempo bands, the budget meter) **keep the identity hue** and must
+not be recoloured to match their tab. Writing that guard took three goes: flagging every role hue
+on a page wrongly named Post's genuine status reds and ochres, and flagging an area's own hue
+wrongly named the home areas, whose tab hue *is* the identity and whose pages are meant to wear it.
+The rule that survives is narrow — a page must not wear a **role** hue that is the colour of the
+tab it sits behind.
+
+**One thing surfaced, not changed:** Post's Filed and Rolodex filter fields each take their own
+tab's role hue, which that rule forbids. Found by the guard rather than by looking. Post's areas
+went through the P7 gate, so whether that was approved or missed is the owner's call; the two are
+listed in the guard as standing exceptions, so anything *new* in Post still fails.
 
 ---
 

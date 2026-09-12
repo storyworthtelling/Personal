@@ -52,7 +52,7 @@ public sealed class WorkoutArea : ScoreArea
             new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score");
     }
 
-    public override BinderArea Tab => new("Workout", Resource.Drawable.area_workout, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
+    public override BinderArea Tab => new("Workout", Resource.Drawable.area_workout, PaperTheme.CautionMark, PaperTheme.CautionFill);
 
     // The screen already shows what is playing; a bar underneath repeating it is the
     // same information twice.
