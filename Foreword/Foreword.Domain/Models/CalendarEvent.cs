@@ -40,7 +40,12 @@ public class CalendarEvent
     // (D31). "Gwen and Eva to swimming" is one event in two columns, not two events and not a guess
     // between them. Assigned by CalendarColumnMapper via ColumnSet.Resolve, and never empty: an
     // event in the calendar and on no page is the one outcome worse than being in the wrong column.
-    public IReadOnlyList<PersonColumn> Columns { get; set; } = [PersonColumn.Matt];
+    /// <summary>
+    /// Empty until it is assigned. It used to start as one person's, which made every event that
+    /// nothing had assigned quietly theirs — on a second install, quietly the wrong person's
+    /// (Release I). Empty is the honest state: an event nobody has routed belongs to nobody yet.
+    /// </summary>
+    public IReadOnlyList<PersonColumn> Columns { get; set; } = [];
 
     // Classification used by the outlook selector and work-block augmentation.
     public EventKind Kind { get; set; } = EventKind.Normal;

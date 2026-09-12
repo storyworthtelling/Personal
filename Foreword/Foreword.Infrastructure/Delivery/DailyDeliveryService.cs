@@ -160,7 +160,9 @@ public class DailyDeliveryService(
         await googleCalendar.AddEvent(new CalendarEvent
         {
             Title = note.Text,
-            Columns = [note.Column ?? PersonColumn.Matt],
+            // Nobody named on it means whoever wrote it — which is whoever this phone belongs to,
+            // not whoever the app was first written for (Release I).
+            Columns = [note.Column ?? columnMapper.Owner],
             Start = start,
             End = isAllDay ? start.Date.AddDays(1) : start.AddHours(1),
             IsAllDay = isAllDay
