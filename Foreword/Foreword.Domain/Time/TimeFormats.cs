@@ -23,6 +23,20 @@ public static class TimeFormats
     public static string Hour12(DateTime moment) =>
         moment.ToString("%h", CultureInfo.InvariantCulture) + (moment.Hour < 12 ? "am" : "pm");
 
+    /// <summary>
+    /// A wall-clock time carrying its minutes only when it has any — "8", "8:30", "12". For a
+    /// span a person says out loud: "Weekdays 8 – 4".
+    ///
+    /// <para>Like <see cref="Hour12"/> this must use "%h" rather than "h", for the same reason:
+    /// a single-character format string is read as a STANDARD specifier, "h" is not one, and the
+    /// plain version throws a FormatException the moment it is asked for a time on the hour. It
+    /// lives here so that rule is written once — a caller that re-derives it gets it wrong.</para>
+    /// </summary>
+    public static string ClockShort(TimeOnly time) =>
+        time.Minute == 0
+            ? time.ToString("%h", CultureInfo.InvariantCulture)
+            : time.ToString("h:mm", CultureInfo.InvariantCulture);
+
     public static string DateLong(DateTime moment) =>
         moment.ToString("dddd, MMMM d", CultureInfo.InvariantCulture);
 

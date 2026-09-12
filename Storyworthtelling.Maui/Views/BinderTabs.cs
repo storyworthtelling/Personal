@@ -1,4 +1,5 @@
 using Microsoft.Maui.Controls.Shapes;
+using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Layouts;
 using Storyworthtelling.Maui.Layout;
 
@@ -11,9 +12,44 @@ namespace Storyworthtelling.Maui.Views;
 /// the seam it is on (DESIGN.md §9): <paramref name="Cloth"/> is the area's fill tier, the coloured
 /// cloth an INACTIVE tab is cut from, and <paramref name="Hue"/> is the mark tier the ACTIVE tab
 /// sets its glyph and label in once the tab itself has gone page-coloured.</para>
+///
+/// <para><paramref name="GlyphPath"/> is SVG path data in a <b>24-unit</b> viewport, the suite's
+/// convention for a glyph. It is path data rather than an image because the same glyph is drawn in
+/// two inks — ink on the coloured cloth of an inactive tab, the area's hue on the page-coloured
+/// active one — and an <c>ImageSource</c> cannot be re-tinted: MAUI has no equivalent of Android's
+/// <c>SetColorFilter</c>. The alternative was shipping every glyph twice, already inked both ways,
+/// which is two assets per area that can drift apart and a palette baked into a resource file where
+/// the leak guard cannot see it.</para>
 /// </summary>
-public sealed record BinderArea(
-    string Label, ImageSource Glyph, ImageSource GlyphActive, Color Hue, Color Cloth);
+public sealed record BinderArea(string Label, string GlyphPath, Color Hue, Color Cloth);
+
+/// <summary>
+/// A glyph from 24-unit path data, filled in one colour and fitted to the box it is given.
+/// </summary>
+public sealed class BinderGlyphDrawable : IDrawable
+{
+    /// <summary>The viewport glyph path data is written in.</summary>
+    public const float Viewport = 24f;
+
+    public string? PathData { get; set; }
+
+    public Color Ink { get; set; } = Colors.Black;
+
+    public void Draw(ICanvas canvas, RectF dirtyRect)
+    {
+        if (string.IsNullOrWhiteSpace(PathData))
+        {
+            return;
+        }
+
+        canvas.Antialias = true;
+        canvas.SaveState();
+        canvas.Scale(dirtyRect.Width / Viewport, dirtyRect.Height / Viewport);
+        canvas.FillColor = Ink;
+        canvas.FillPath(PathBuilder.Build(PathData), WindingMode.NonZero);
+        canvas.RestoreState();
+    }
+}
 
 /// <summary>
 /// In-app navigation as the right-edge divider tabs of a school notebook (DESIGN.md §9), for the
@@ -37,6 +73,9 @@ public class BinderTabs : ContentView
 {
     /// <summary>The reserved gutter. Wide enough for the longest area label.</summary>
     public const int WidthDp = 66;
+
+    /// <summary>The glyph over the label, at the size the mockups draw it.</summary>
+    public const int GlyphDp = 24;
 
     private readonly AbsoluteLayout strip = new();
     private readonly List<BinderArea> areas = [];
@@ -104,15 +143,12 @@ public class BinderTabs : ContentView
         // colouring the label too would leave a strip that reads as a row of disabled buttons.
         var tint = active ? area.Hue : PaperResources.Colour("Ink");
 
-        // TWO sources rather than one tinted at runtime. MAUI has no equivalent of Android's
-        // ImageView.SetColorFilter, and the only ready answer is a community toolkit behaviour —
-        // a dependency this repository would not take for one tint. So the head supplies the
-        // glyph already inked both ways; IconStudio generates per-hue assets already.
-        var glyph = new Image
+        // Drawn rather than loaded, so one glyph serves both inks. See BinderArea.
+        var glyph = new GraphicsView
         {
-            Source = active ? area.GlyphActive : area.Glyph,
-            WidthRequest = 26,
-            HeightRequest = 26,
+            Drawable = new BinderGlyphDrawable { PathData = area.GlyphPath, Ink = tint },
+            WidthRequest = GlyphDp,
+            HeightRequest = GlyphDp,
         };
 
         var label = new Label
