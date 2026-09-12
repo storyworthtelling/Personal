@@ -29,8 +29,16 @@ public class CalendarMappingOptions
     // held and named (D34): this one has been looked at and answered, so it says nothing.
     public List<string> NotPrintedCalendars { get; set; } = [];
 
-    // Column used for events on a calendar that isn't explicitly mapped.
-    public PersonColumn DefaultColumn { get; set; } = PersonColumn.Rowan;
+    // Column used for events on a calendar that isn't explicitly mapped. NULLABLE, and null is the
+    // ordinary state of a fresh install: unset means "whoever this phone belongs to" rather than
+    // one person written into the code. A document already on a phone carries the word "Rowan" and
+    // goes on meaning exactly that.
+    //
+    // This document is SHARED — it rides the household vault, which both installs read — so it
+    // holds household facts only. Whose phone this is lives in InstallOptions, which never leaves
+    // the phone it describes.
+    public PersonColumn? DefaultColumn { get; set; }
+
 
     // Title keywords per person, used when nobody is invited to an event on a shared calendar.
     // All four, not just the children: an event on a shared calendar can name either parent, and

@@ -97,6 +97,22 @@
                 </Grid>
             </Border>
 
+            <!-- ==== This install =====================================================
+                 The two things that MUST differ between the household's two phones (Release I):
+                 whose it is, and the mark its documents sign off with. Everything else on this
+                 screen is a household fact and rides the shared vault; these ride the personal
+                 one, in this person's own Drive.
+
+                 WHOSE PHONE IS PROPOSED, NOT ASKED. The signed-in account answers it, so most
+                 installs never touch this row — it is here for a shared household account, and
+                 for being able to disagree.
+            -->
+            <Label Text="This install" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <VerticalStackLayout x:Name="ThisInstall" />
+            </Border>
+            <Label x:Name="InstallCaption" Style="{StaticResource CardCaption}" />
+
             <!-- ==== Prayer ===========================================================
                  The third document's one setting: the standing lists prayed through one a day.
                  One-off requests are written on the journal page instead, so there is nothing
