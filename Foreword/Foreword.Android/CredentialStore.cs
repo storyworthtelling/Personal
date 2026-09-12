@@ -166,6 +166,18 @@ public static class CredentialStore
         set => Preferences.Set(PreferenceKeys.LastDeliveryOutcome, value);
     }
 
+    /// <summary>
+    /// What happened to the prayer document. Its own line because it can fail on its own: it reads
+    /// a Drive file the rest of the morning does not, behind a passphrase the rest of the morning
+    /// does not need, so "Delivered" for the day and the paper while the prayer sheet never went
+    /// would be one sentence saying two things.
+    /// </summary>
+    public static string LastPrayerOutcome
+    {
+        get => Preferences.Get(PreferenceKeys.LastPrayerOutcome, string.Empty);
+        set => Preferences.Set(PreferenceKeys.LastPrayerOutcome, value);
+    }
+
     public static DateTime LastDeliveryAtUtc
     {
         get => Preferences.Get(PreferenceKeys.LastDeliveryAtUtc, DateTime.MinValue);

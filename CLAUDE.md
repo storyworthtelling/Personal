@@ -243,6 +243,42 @@ surfacing anything that cannot be built as drawn rather than substituting:
 - `.github/workflows/generate-keystore.yml` still says `CN=DailyLoader`, deliberately: it is the
   one keystore every `com.storyworthtelling` app signs with, and the certificate already issued
   carries that name.
+- **Prayer is isolated by a type, not by care (D15, Release H).** `Foreword.Domain/Prayer/PrayerText`
+  is what the owner writes on the prayer page, and the only way to read it is to declare yourself an
+  `IPrayerReader` — of which there are **five**, enumerated by `PrayerIsolationTests`: the vision
+  transcriber, the pastoral composer, the archive codec's caller, the pages that print it, and the
+  rotations editor on the phone. The reflective half of that guard can only see Domain and
+  Infrastructure, so a second, **source-level** half scans the Android head too; a sixth reader is a
+  decision, not a diff. `ToString()` returns a redaction because interpolation is the one hole a type
+  cannot close — C# calls it for you with no cast and no warning. The three public composers (the
+  brief's opening, the calendar's narrator, the checklist's coach) take and return **strings**, which
+  is what makes "the journal cannot reach them" structural. What *private* does not mean, stated at
+  gate 1 and accepted: the page is transcribed, so a vision model reads it. What it means is that
+  nothing from it reaches Google Tasks, the calendar, the voice profile, or any shared file.
+- **The prayer archive is the only copy, and it is encrypted.** One Drive file
+  (`storyworthtelling-prayer-archive.json`) through the shared `Storyworthtelling.Voice`
+  `VaultEnvelope` — now **public** rather than copied, since there are three such files — locked with
+  the same passphrase the vault uses. The journal page is trashed off the tablet once transcribed, so
+  `DrivePrayerArchive.SaveAsync` **reads the file back first and refuses** (`PrayerArchiveLockedException`)
+  rather than writing over something it could not decrypt; `PrayerDeliveryService` orders the morning
+  read → fold → compose → upload → save → trash so that every step which can fail does so *before*
+  the sheet is thrown away. Encryption over plaintext was the owner's decision, cost accepted: lose
+  the passphrase and the archive is gone.
+- **How something gets onto the prayer list — both ways, by the owner's decision.** A one-off request
+  is **written** on the journal page, under an "Add to the list" strip at its foot; a standing list
+  prayed through one a day (a missionary list) is **edited on the phone** (`RotationsPage` /
+  `RotationEditPage`, neither in the approved mockup set — the idea arrived with the answer).
+  `JournalRegions` is the one place the two writable bands' coordinates live, and both the painter and
+  the transcription prompt read them from it: a line under the strip becomes a printed request and the
+  same line two inches higher stays private, so a disagreement about that boundary would put a private
+  thought on a printed page. `RotationPick` is **arithmetic on the date, never a stored cursor** — a
+  cursor advances on a morning that never delivered, so a name is skipped and nobody finds out.
+- **Prayer delivers in its own `try` inside `DeliveryWorker`**, with its own outcome preference
+  (`LastPrayerOutcome`), because it reads a file the rest of the morning does not behind a passphrase
+  the rest of the morning does not need — a morning with no prayer sheet is a smaller loss than a
+  morning with no day and no paper. Its binder tabs go through `SectionTabs.Box`, which is now the one
+  place the §10 grammar is arithmetic, and its page frame through `PageFurniture`, shared with The Day
+  so the two read as one morning.
 
 ### Score refit (scheduled, from P7)
 

@@ -7,15 +7,20 @@ namespace Storyworthtelling.Voice.Secrets;
 /// opaque file on Drive into plaintext and back, and telling the four ways that can
 /// go apart.
 ///
-/// Extracted because there are two vaults now — the household's shared one and one
-/// per person — and they differ only in their payload type and their file name.
-/// Everything else is identical, and two copies of "which failure is a wrong
-/// passphrase and which is a corrupt file" is exactly the code that drifts: the day
-/// they disagree, one vault tells someone to re-pair a phone that is fine.
+/// Extracted because there is more than one such file now — the household's shared
+/// vault, one per person, and Foreword's private prayer archive — and they differ only
+/// in their payload type and their file name. Everything else is identical, and two
+/// copies of "which failure is a wrong passphrase and which is a corrupt file" is
+/// exactly the code that drifts: the day they disagree, one vault tells someone to
+/// re-pair a phone that is fine.
+///
+/// Public rather than internal for that reason: the prayer archive lives in another
+/// assembly and a second copy of this logic there would be the drift this file exists
+/// to prevent.
 /// </summary>
-internal static class VaultEnvelope
+public static class VaultEnvelope
 {
-    internal static readonly JsonSerializerOptions SerializerOptions = new()
+    public static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true,
@@ -26,7 +31,7 @@ internal static class VaultEnvelope
     /// non-null only when the status is <see cref="SecretsVaultStatus.Loaded"/>, and
     /// even then the caller still has to make sense of it as JSON.
     /// </summary>
-    internal static (SecretsVaultStatus Status, string? Plaintext) Read(string? content, string passphrase)
+    public static (SecretsVaultStatus Status, string? Plaintext) Read(string? content, string passphrase)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -64,6 +69,6 @@ internal static class VaultEnvelope
         }
     }
 
-    internal static string Write(string plaintext, string passphrase) =>
+    public static string Write(string plaintext, string passphrase) =>
         JsonSerializer.Serialize(SecretsCrypto.Encrypt(plaintext, passphrase), SerializerOptions);
 }

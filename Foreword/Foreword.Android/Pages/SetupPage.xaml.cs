@@ -72,6 +72,7 @@ public partial class SetupPage : ContentPage
 
         RenderMaps();
         RenderSources();
+        RenderPrayer();
         BuildNeedsYou();
     }
 
@@ -94,6 +95,25 @@ public partial class SetupPage : ContentPage
 
     private async void OnSourcesClicked(object sender, EventArgs e) =>
         await Navigation.PushAsync(new SourcesPage());
+
+    // ---- Prayer ============================================================
+
+    /// <summary>
+    /// What the prayer row says before it is opened.
+    ///
+    /// <para>Deliberately <b>not</b> a count of the lists, which would need the encrypted archive
+    /// off Drive and would make this screen wait on a network call to draw a summary line. It says
+    /// what last happened to the document instead — which is the question a settings screen can
+    /// answer from the phone, and the more useful one.</para>
+    /// </summary>
+    private void RenderPrayer() =>
+        PrayerSummaryLabel.Text = string.IsNullOrEmpty(CredentialStore.LastPrayerOutcome)
+            ? "Not delivered yet"
+            : CredentialStore.LastPrayerOutcome;
+
+    private async void OnRotationsClicked(object sender, EventArgs e) =>
+        await Navigation.PushAsync(
+            IPlatformApplication.Current!.Services.GetRequiredService<RotationsPage>());
 
     // ---- Weather & drives ==================================================
 
