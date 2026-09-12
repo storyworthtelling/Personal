@@ -1,4 +1,5 @@
 using Foreword.Domain.Models;
+using Foreword.Domain.Time;
 
 namespace Foreword.Infrastructure.Calendar;
 
@@ -34,8 +35,14 @@ public class WorkShift
 
     // 12-hour, no leading zero, and no ":00" on the hour — DESIGN.md §5's time rule, and how a
     // person says their own working day out loud.
+    //
+    // The formatting goes through TimeFormats rather than being spelled out here. The version
+    // written here passed "h" to TimeOnly.ToString, which throws: a one-character format string is
+    // a STANDARD specifier and "h" is not one. Every shift the app ships with starts on the hour,
+    // so this threw for all of them and the Calendars screen could not be opened at all.
+    //
+    // A value that is not a time is shown back rather than thrown over — this row exists so the
+    // owner can see and correct what is stored.
     private static string Clock(string value) =>
-        TimeOnly.TryParseExact(value, "HH:mm", out var time)
-            ? (time.Minute == 0 ? time.ToString("h") : time.ToString("h:mm"))
-            : value;
+        TimeOnly.TryParseExact(value, "HH:mm", out var time) ? TimeFormats.ClockShort(time) : value;
 }
