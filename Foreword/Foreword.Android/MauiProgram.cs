@@ -15,6 +15,7 @@ using Foreword.Infrastructure.Maps;
 using Foreword.Infrastructure.Tasks;
 using Foreword.Infrastructure.Nyt;
 using Foreword.Infrastructure.Pdf;
+using Foreword.Infrastructure.Prayer;
 using Foreword.Android.Google;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
@@ -154,6 +155,16 @@ public static class MauiProgram
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddTransient<DailyDeliveryService>();
 
+        // Prayer (P9 Release H): the third document. Its own composer and its own two Claude calls,
+        // so the journal is structurally unable to reach the other three — see PrayerText and
+        // PrayerIsolationTests. The archive is registered AFTER the Drive seam below, so it is
+        // resolved there rather than here.
+        builder.Services.AddTransient<IPrayerPdfComposer, PrayerPages>();
+        builder.Services.AddHttpClient<IJournalTranscriber, ClaudeJournalTranscriber>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<IPastoralComposer, ClaudePastoralComposer>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+
         // Owner's voice: greet on the delivery screen, reading the shared profile + Claude key from Drive
         // via the existing device account (drive.readonly is now in the token scope). No local key — the key
         // is published once by Storyboarder and read from Drive here. Degrades to neutral when unavailable.
@@ -196,6 +207,23 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
         builder.Services.AddSingleton<VaultSync>();
+
+        // The private prayer archive: its own Drive file, encrypted with the same passphrase the
+        // vault uses. A separate file rather than a section of the vault, because the vault is read
+        // by every app in the suite and this is read by one.
+        builder.Services.AddSingleton<IPrayerArchive>(sp =>
+            new DrivePrayerArchive(new DriveTextFile(
+                VoiceDriveFactory(sp), DrivePrayerArchive.FileName,
+                sp.GetRequiredService<InMemoryDriveFileIdStore>())));
+        builder.Services.AddTransient<PrayerSettings>();
+        builder.Services.AddTransient<PrayerDeliveryService>(sp => new PrayerDeliveryService(
+            sp.GetRequiredService<IPrayerArchive>(),
+            sp.GetRequiredService<IJournalTranscriber>(),
+            sp.GetRequiredService<IPastoralComposer>(),
+            sp.GetRequiredService<IPrayerPdfComposer>(),
+            sp.GetRequiredService<IRemarkableClient>(),
+            () => CredentialStore.VaultPassphrase,
+            sp.GetRequiredService<ILogger<PrayerDeliveryService>>()));
         builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
             new VaultVoiceConfigStore(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
         builder.Services.AddSingleton<DriveVoiceOptions>();
@@ -207,6 +235,7 @@ public static class MauiProgram
 
         builder.Services.AddTransient<Pages.MainPage>();
         builder.Services.AddTransient<Pages.SetupPage>();
+        builder.Services.AddTransient<Pages.RotationsPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

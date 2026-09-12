@@ -151,38 +151,64 @@ public class PrayerIsolationTests
     }
 
     /// <summary>
-    /// And the archive is the only thing that writes prayer content anywhere. A second writer is
-    /// the shape "it also syncs to X" takes when somebody is being helpful.
+    /// Every place in the app that reads prayer content, enumerated by <b>source</b> rather than by
+    /// reflection.
+    ///
+    /// <para>The reflective check above can only see the two assemblies a test can load, and the
+    /// phone is not one of them — the rotations editor reads the names on a list, so there is a
+    /// fifth reader that the reflective test is structurally unable to notice. This one reads the
+    /// repository, which is the only way to see all of them.</para>
+    ///
+    /// <para>A sixth entry here is not a bug in itself. It is a decision, and this is what makes it
+    /// one instead of a diff nobody looked twice at — which is how "while we are here, let us also
+    /// send it to X" gets written.</para>
     /// </summary>
     [Fact]
-    public void OnlyTheArchiveWritesPrayerContentOut()
+    public void EveryPlaceThatReadsPrayerContentIsOneOfTheDeclaredFew()
     {
+        string[] allowed =
+        [
+            // The four in Domain and Infrastructure.
+            "DrivePrayerArchive.cs",
+            "PrayerArchiveCodec.cs",
+            "ClaudePastoralComposer.cs",
+            "ClaudeJournalTranscriber.cs",
+            "PrayerPages.cs",
+
+            // And the one on the phone: the screen that edits the standing lists.
+            "RotationEditPage.xaml.cs",
+        ];
+
         var offenders = new List<string>();
 
-        foreach (var file in Directory.EnumerateFiles(
-            Path.Combine(Root(), "Foreword.Infrastructure"), "*.cs", SearchOption.AllDirectories))
+        foreach (var project in new[] { "Foreword.Infrastructure", "Foreword.Android", "Foreword.Domain" })
         {
-            if (file.Contains("/obj/", StringComparison.Ordinal)
-                || file.Contains("/bin/", StringComparison.Ordinal))
+            foreach (var file in Directory.EnumerateFiles(
+                Path.Combine(Root(), project), "*.cs", SearchOption.AllDirectories))
             {
-                continue;
-            }
+                if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                    || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                {
+                    continue;
+                }
 
-            var name = Path.GetFileName(file);
-            if (name is "DrivePrayerArchive.cs" or "PrayerArchiveCodec.cs"
-                or "ClaudePastoralComposer.cs" or "ClaudeJournalTranscriber.cs" or "PrayerPages.cs")
-            {
-                continue;
-            }
+                var name = Path.GetFileName(file);
 
-            foreach (Match match in Regex.Matches(File.ReadAllText(file), @"\.ReadBy\s*\("))
-            {
-                offenders.Add($"{name}: {match.Value}");
+                // PrayerText itself is where ReadBy is defined.
+                if (allowed.Contains(name) || name == "PrayerText.cs")
+                {
+                    continue;
+                }
+
+                if (Regex.IsMatch(File.ReadAllText(file), @"\.ReadBy\s*\("))
+                {
+                    offenders.Add($"{project}/{name}");
+                }
             }
         }
 
         Assert.True(offenders.Count == 0,
-            "These read prayer content and are not one of the four declared readers:\n"
+            "These read prayer content and are not one of the declared readers:\n"
             + string.Join("\n", offenders));
     }
 
