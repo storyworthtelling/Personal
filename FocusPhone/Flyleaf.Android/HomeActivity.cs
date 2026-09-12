@@ -7,6 +7,7 @@ using Android.Views;
 using Android.Widget;
 using Codex.Domain.Apps;
 using Codex.Domain.Design;
+using Codex.Domain.Policy;
 using Codex.Ui;
 using Storyworthtelling.Voice.Secrets;
 
@@ -458,6 +459,13 @@ public class HomeActivity : Activity
             [HomeFeatureSet.CameraPackage] = Resource.Drawable.cover_plate,
             [HomeFeatureSet.AudioPackage] = Resource.Drawable.cover_score,
             [HomeFeatureSet.MapsPackage] = Resource.Drawable.cover_maps,
+
+            // The owner's other repo apps, which the tray draws cover-out on the same shelf. They
+            // are not in HomeFeatureSet, which is why Foreword shipped wearing a circle: the
+            // featured-six guard could not see it, and the fallback centres the LAUNCHER icon,
+            // which Android masks round. Ledger and Canonizer have no painting yet and fall back
+            // honestly; ShelfCoverArtTests names them so that stays a decision.
+            [PolicyContext.ForewordPackage] = Resource.Drawable.cover_foreword,
             [HomeFeatureSet.DrivePackage] = Resource.Drawable.cover_drive,
             [HomeFeatureSet.GoogleHomePackage] = Resource.Drawable.cover_googlehome,
         };
