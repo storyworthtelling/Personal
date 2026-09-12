@@ -97,6 +97,27 @@
                 </Grid>
             </Border>
 
+            <!-- ==== Prayer ===========================================================
+                 The third document's one setting: the standing lists prayed through one a day.
+                 One-off requests are written on the journal page instead, so there is nothing
+                 here for them. The outcome line is separate from Delivery's because prayer can
+                 fail on its own — it reads a Drive file the rest of the morning does not, behind
+                 a passphrase the rest of the morning does not need.
+            -->
+            <Label Text="Prayer" Style="{StaticResource GroupLabel}" />
+            <Border Style="{StaticResource GroupCard}">
+                <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnRotationsClicked" />
+                    </Grid.GestureRecognizers>
+                    <VerticalStackLayout Grid.Column="0">
+                        <Label Text="Lists you pray through" Style="{StaticResource CardRowTitle}" />
+                        <Label x:Name="PrayerSummaryLabel" Style="{StaticResource CardRowDescription}" />
+                    </VerticalStackLayout>
+                    <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
+                </Grid>
+            </Border>
+
             <!-- ==== Weather & drives =================================================
                  One key for four Maps Platform APIs — routes, weather, pollen, air quality —
                  because Maps Platform bills a project rather than a product. The house is here

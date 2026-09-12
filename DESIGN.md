@@ -131,6 +131,12 @@ Four families, committed as static fonts in `/Fonts` (OFL; see `Fonts/LICENSES.m
 - **Cascadia Code** (Regular) — machine text: keys, SHA-1s, URLs, paths, figures, countdowns.
 - **Pinyon Script** (Regular) — a copperplate **calligraphy** hand, colored ink-blue, used **only** for the owner's voice messages.
 
+**Serif Italic has exactly one role**, and it is the empty state's invitation (§7). It was put to the
+owner a second time when Foreword's prayer page drew its past-entry quotations in it, and the answer
+was to keep italic where it is — so a printed quotation carries its quotation marks and the muted ink
+and nothing else. That is a deliberately weak signal, which makes both of those load-bearing rather
+than decorative wherever a page quotes something.
+
 ### Type scale (reworked — bigger, more contrast at the top)
 
 | Token | Family/weight | Android sp | Analysis PDF px | Use |

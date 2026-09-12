@@ -82,6 +82,11 @@ public static class PreferenceKeys
     // The reading taste profile's local copy. The canonical one is Drive JSON (D29).
     public const string TasteJson = "TasteJson";
 
+    // What happened to the prayer document. Kept apart from LastDeliveryOutcome because prayer can
+    // fail on its own — it reads a file the rest of the morning does not, behind a passphrase the
+    // rest of the morning does not need — and folding it in would make one sentence say two things.
+    public const string LastPrayerOutcome = "LastPrayerOutcome";
+
     /// <summary>
     /// The nine keys a phone was <b>already storing</b> before the rename. These are what may never
     /// move: the guard freezes this list exactly, in order.
@@ -108,6 +113,6 @@ public static class PreferenceKeys
         [
             .. Frozen, WorkScheduleJson, SeenCalendarIds, ScheduledDeliveryTime,
             MapsApiKey, HomeAddress, HomeLatitude, HomeLongitude, TasksJson, AwayJson,
-            FeedsJson, NewsCount, OpinionCount, SeenComic, TasteJson,
+            FeedsJson, NewsCount, OpinionCount, SeenComic, TasteJson, LastPrayerOutcome,
         ];
 }
