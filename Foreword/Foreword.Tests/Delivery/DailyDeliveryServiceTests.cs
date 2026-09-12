@@ -49,7 +49,9 @@ public class DailyDeliveryServiceTests
 
     private DailyDeliveryService CreateService() =>
         new(calendar.Object, tasks.Object,
-            new CalendarColumnMapper(Options.Create(new CalendarMappingOptions())),
+            new CalendarColumnMapper(
+                Options.Create(new CalendarMappingOptions()),
+                Options.Create(new Foreword.Infrastructure.Install.InstallOptions())),
             new WorkScheduleAugmenter(Options.Create(new WorkScheduleOptions())),
             new OutlookSelector(),
             taskStore,

@@ -86,6 +86,19 @@ public sealed record PersonalVault
     // not.
     public TidalAccount TidalAccount { get; init; } = new();
 
+    // Which of the household's columns this install belongs to, as the word rather than the number
+    // — the same lesson the calendar mapping learned, and for the same reason: a stored enum that
+    // serialises as an index is one reordering away from meaning somebody else.
+    //
+    // It is here rather than in the shared vault because it is the one fact that MUST differ
+    // between the two installs. In the shared file it would be restored from the first phone onto
+    // the second, and its owner's handwriting would start filing under somebody else's name.
+    public string OwnerColumn { get; init; } = string.Empty;
+
+    // The maker's mark this install signs its documents with (DESIGN.md §13), as a base64 PNG.
+    // Square and small by the time it gets here — see MedallionImage.
+    public string OwnerPhoto { get; init; } = string.Empty;
+
     public static PersonalVault Empty { get; } = new();
 }
 

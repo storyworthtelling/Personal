@@ -1,6 +1,4 @@
-using Storyworthtelling.Voice.Secrets;
-
-namespace Codex.Ui.Voice;
+namespace Storyworthtelling.Voice.Secrets;
 
 /// <summary>
 /// A head's own vault: read it at launch, write it when something in it changes.
@@ -13,6 +11,13 @@ namespace Codex.Ui.Voice;
 /// Same quiet degradation as everything else vault-backed: no passphrase, no Drive
 /// scope, or no file yet all mean the head carries on from its local settings. The
 /// personal vault is the off-device backup, never the source of truth on the device.
+///
+/// It lives here rather than in a head because there are two of them now — Score, which
+/// keeps a TIDAL sign-in in it, and Foreword, which keeps whose install this is and the
+/// mark its documents sign off with. Nothing in it was ever Android: the platform half is
+/// the Drive glue that builds the store, and that stays where it is. A second copy of
+/// "refuses to write a vault it could not read" is the drift this library exists to
+/// prevent.
 /// </summary>
 public sealed class PersonalVaultAccess
 {
