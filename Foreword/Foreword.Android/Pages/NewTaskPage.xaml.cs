@@ -16,11 +16,15 @@ namespace Foreword.Android.Pages;
 /// Claude. A rule typed on a dead network becomes a rule without anyone retyping it — losing it
 /// because a network was down would be the app throwing away the only thing it was given.</para>
 /// </summary>
-public partial class NewTaskPage : ContentPage
+public partial class NewTaskPage : BinderPage
 {
     private readonly ITaskStore store = new TaskStore();
 
-    public NewTaskPage() => InitializeComponent();
+    public NewTaskPage()
+    {
+        InitializeComponent();
+        Wrap(ForewordArea.Tasks, "New task");
+    }
 
     private async void OnReadClicked(object sender, EventArgs e)
     {

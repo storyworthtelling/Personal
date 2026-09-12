@@ -14,13 +14,14 @@ namespace Foreword.Android.Pages;
 /// <see cref="TaskSummary"/> the edit form uses, so what they accept here and what they find later
 /// cannot be two different descriptions of one rule.</para>
 /// </summary>
-public partial class TaskReadBackPage : ContentPage
+public partial class TaskReadBackPage : BinderPage
 {
     private readonly ForewordTask read;
 
     public TaskReadBackPage(string written, ForewordTask read)
     {
         InitializeComponent();
+        Wrap(ForewordArea.Tasks, "New task");
         this.read = read;
 
         WrittenLabel.Text = $"“{written}”";

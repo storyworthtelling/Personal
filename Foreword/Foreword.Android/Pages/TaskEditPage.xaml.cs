@@ -17,7 +17,7 @@ namespace Foreword.Android.Pages;
 /// <para>There is no Save (D35). Every control commits as it changes, so leaving by the back arrow
 /// never loses anything — and never asks.</para>
 /// </summary>
-public partial class TaskEditPage : ContentPage
+public partial class TaskEditPage : BinderPage
 {
     private readonly bool unsaved;
     private ForewordTask task;
@@ -33,7 +33,7 @@ public partial class TaskEditPage : ContentPage
         this.task = task;
         this.unsaved = unsaved;
 
-        TitleLabel.Text = task.Title;
+        Wrap(ForewordArea.Tasks, task.Title);
         Render();
     }
 
@@ -148,7 +148,7 @@ public partial class TaskEditPage : ContentPage
     private void Commit(ForewordTask updated)
     {
         task = updated;
-        TitleLabel.Text = updated.Title;
+        HeaderText = updated.Title;
 
         // An unaccepted rule is not stored. The read-back screen is where it becomes real, and
         // committing here would save something the owner has not agreed to.

@@ -18,7 +18,7 @@ namespace Foreword.Android.Pages;
 /// bands drawn beside them on the same sheet. They were hardcoded with no screen at all, so
 /// changing a shift meant changing a default and building the app.</para>
 /// </summary>
-public partial class CalendarsPage : ContentPage
+public partial class CalendarsPage : BinderPage
 {
     private readonly CalendarSettings settings = new();
     private IReadOnlyDictionary<string, string> calendars = new Dictionary<string, string>();
@@ -26,6 +26,7 @@ public partial class CalendarsPage : ContentPage
     public CalendarsPage()
     {
         InitializeComponent();
+        Wrap(ForewordArea.Calendar, "Calendars");
     }
 
     protected override async void OnAppearing()

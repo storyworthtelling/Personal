@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<pages:BinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:Foreword.Android.Pages"
              x:Class="Foreword.Android.Pages.SetupPage"
              Title="Settings">
     <!--
@@ -25,12 +26,6 @@
     -->
     <ScrollView>
         <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
-
-            <HorizontalStackLayout Spacing="12">
-                <Image Source="owner_medallion.png" WidthRequest="48" HeightRequest="48"
-                       VerticalOptions="Center" />
-                <Label Text="Settings" Style="{StaticResource DisplayLabel}" VerticalOptions="Center" />
-            </HorizontalStackLayout>
 
             <!-- ==== Delivery ========================================================== -->
             <Label Text="Delivery" Style="{StaticResource GroupLabel}" />
@@ -259,4 +254,4 @@
                    Margin="0,32,0,0" />
         </VerticalStackLayout>
     </ScrollView>
-</ContentPage>
+</pages:BinderPage>
