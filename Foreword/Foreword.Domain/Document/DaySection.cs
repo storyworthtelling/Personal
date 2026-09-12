@@ -38,6 +38,23 @@ public static class SectionTabs
     /// <summary>The hairline the inactive tabs sit behind, as a distance in from the right edge.</summary>
     public const float BinderEdgeInset = TabWidth;
 
+    /// <summary>
+    /// The binder grammar as arithmetic, in the one place it is written.
+    ///
+    /// <para>Two documents carry this strip — The Day's four tabs and Prayer's two — and the rule
+    /// that matters is subtle: the active tab alone crosses the binder edge, so it alone touches the
+    /// page and the others read as sitting behind it. A second copy of that is a second chance to
+    /// close the seam on the wrong side of one document, which nothing fails over.</para>
+    /// </summary>
+    public static (float Left, float Top, float Width, float Height) Box(
+        float pageWidth, int index, bool isActive, float firstTabTop) =>
+        (
+            pageWidth - TabWidth - (isActive ? Hairline : 0),
+            firstTabTop + index * (TabHeight + Gap),
+            TabWidth + (isActive ? Hairline : 0),
+            TabHeight
+        );
+
     public static IReadOnlyList<TabBox> Layout(float pageWidth, DaySection active)
     {
         var sections = Enum.GetValues<DaySection>();
@@ -46,15 +63,10 @@ public static class SectionTabs
         for (var i = 0; i < sections.Length; i++)
         {
             var isActive = sections[i] == active;
+            var box = Box(pageWidth, i, isActive, FirstTabTop);
 
             tabs.Add(new TabBox(
-                sections[i],
-                // The active tab alone crosses the binder edge, so it alone touches the page.
-                pageWidth - TabWidth - (isActive ? Hairline : 0),
-                FirstTabTop + i * (TabHeight + Gap),
-                TabWidth + (isActive ? Hairline : 0),
-                TabHeight,
-                isActive));
+                sections[i], box.Left, box.Top, box.Width, box.Height, isActive));
         }
 
         return tabs;
