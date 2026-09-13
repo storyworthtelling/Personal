@@ -31,6 +31,13 @@ public static class MarkColourway
     /// <summary>How far the oval's outline is carried from its fill, as a fraction of the distance.</summary>
     private const double LineShift = 1.0 / 3.0;
 
+    /// <summary>
+    /// The least an outline may differ from the fill it edges. Far below §17's floors on purpose: this
+    /// is a hairline that says where the shape ends, not something anybody reads. The drawn mark's own
+    /// pair sits at 1.43:1.
+    /// </summary>
+    private const double MinimumEdge = 1.2;
+
     /// <summary>Bits kept per channel when the jacket is quantised — 32 levels, ~32k buckets.</summary>
     private const int QuantisedBits = 3;
 
@@ -108,10 +115,22 @@ public static class MarkColourway
         return null;
     }
 
-    // The oval's own outline: its fill carried a third of the way toward black, or toward white when
-    // the fill is already dark enough that black would lose the edge entirely.
-    private static int Outline(int ground) =>
-        Mix(ground, Luminance(ground) > 0.06 ? 0x000000 : 0xFFFFFF, LineShift);
+    /// <summary>
+    /// The oval's own outline: its fill carried a third of the way toward black, so the shape has an
+    /// edge without the edge becoming a second mark. On a fill already so dark that darker is
+    /// indistinguishable, it goes the other way instead.
+    ///
+    /// <para><b>That "indistinguishable" is measured, and the first version of this was not.</b> It
+    /// tested the fill's luminance against 0.06 — and the drawn mark's own slate sits at 0.0605 while
+    /// the same slate read back out of a jacket and quantised sits at 0.0589. The threshold fell
+    /// between them, so the rendered mark took a <i>lighter</i> outline than the drawing's darker one
+    /// on nothing but rounding. A rule that turns on a hair's breadth of quantisation is not a rule.</para>
+    /// </summary>
+    private static int Outline(int ground)
+    {
+        var darker = Mix(ground, 0x000000, LineShift);
+        return Contrast(ground, darker) >= MinimumEdge ? darker : Mix(ground, 0xFFFFFF, LineShift);
+    }
 
     private static int Quantise(int rgb)
     {
