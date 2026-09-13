@@ -242,7 +242,7 @@ public static class DesignTokens
     public static class Grain
     {
         public const int TileSize = 256;
-        public const int Alpha = 6;          // of 255 — ~2.4% ink
+        public const int Alpha = 32;         // of 255 — ~12.5% ink
         public const int Density = 6;        // ~1 in Density pixels carries grain
         public const uint Seed = 1913;
     }
