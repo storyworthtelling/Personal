@@ -2,25 +2,44 @@ using System.Collections.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
 using Folio.Domain.Time;
 using Folio.Infrastructure.Services;
+using Storyworthtelling.Maui;
 using Storyworthtelling.Voice;
 
 namespace Folio.Android.Pages;
 
-public partial class MainPage : ContentPage
+/// <summary>
+/// The Work desk: the app's home, and where books are being handled.
+///
+/// <para>It was a list with a Display label at the top and two quiet buttons in the bottom bar, one
+/// of which was how you reached Settings — which is the shape P9 found in Foreword and the reason
+/// the binder exists. Settings is a tab now, and the bar carries the one thing this screen is for.
+/// </para>
+/// </summary>
+public partial class MainPage : FolioBinderPage
 {
     private readonly ObservableCollection<ProjectRow> rows = [];
     private readonly Dictionary<Guid, NovelStatus> statuses = [];
     private IDispatcherTimer? refreshTimer;
+    private string voice = string.Empty;
 
     public MainPage()
     {
         InitializeComponent();
-        ProjectsList.ItemsSource = rows;
+
+        // The wood runs behind the header as well as the content: the frame draws the desk as the
+        // whole well, with the screen header sitting on it.
+        SetBackdrop(new GraphicsView { Drawable = new DeskDrawable() });
+        Wrap(FolioArea.Work, "Work desk");
+
+        var add = new Button { Text = "Add manuscript" };
+        add.Clicked += OnNewProjectClicked;
+        SetBar(add);
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        ConfigWarningLabel.Text = "Folio needs its vault passphrase before it can review anything.";
         ConfigWarningCard.IsVisible = !SettingsStore.IsConfigured;
         LastRunLabel.Text = SettingsStore.LastRunSummary;
 
@@ -55,20 +74,11 @@ public partial class MainPage : ContentPage
             foreach (var status in list)
                 statuses[status.Id] = status;
 
-            var updated = list.Select(ProjectRow.From).ToList();
-            for (var i = rows.Count - 1; i >= 0; i--)
-            {
-                if (updated.All(row => row.Id != rows[i].Id))
-                    rows.RemoveAt(i);
-            }
-            for (var i = 0; i < updated.Count; i++)
-            {
-                var existing = rows.FirstOrDefault(row => row.Id == updated[i].Id);
-                if (existing is null)
-                    rows.Insert(Math.Min(i, rows.Count), updated[i]);
-                else if (!existing.SameAs(updated[i]))
-                    rows[rows.IndexOf(existing)] = updated[i];
-            }
+            rows.Clear();
+            foreach (var row in list.Select(ProjectRow.From))
+                rows.Add(row);
+
+            Redraw();
             LastRunLabel.Text = SettingsStore.LastRunSummary;
         }
         catch
@@ -84,7 +94,8 @@ public partial class MainPage : ContentPage
     {
         if (!SettingsStore.IsConfigured)
         {
-            WelcomeLabel.IsVisible = false;
+            voice = string.Empty;
+            Redraw();
             return;
         }
 
@@ -101,19 +112,18 @@ public partial class MainPage : ContentPage
             message = string.Empty;
         }
 
-        WelcomeLabel.Text = message;
-        WelcomeLabel.IsVisible = !string.IsNullOrWhiteSpace(message);
+        voice = message;
+        Redraw();
     }
 
-    private async void OnProjectSelected(object? sender, SelectionChangedEventArgs e)
+    /// <summary>
+    /// A long press offers what can be done with this book, on §7's action card — paper over a haze,
+    /// tap-out to dismiss. It was a system action sheet, which is a dialog: it interrupts, it is not
+    /// the app's own material, and its destructive row asks a question. Deleting here is undo-first
+    /// via the dog-ear instead, so nothing on the card asks "are you sure".
+    /// </summary>
+    private void ShowActions(NovelStatus status)
     {
-        if (e.CurrentSelection.FirstOrDefault() is not ProjectRow row)
-            return;
-        ProjectsList.SelectedItem = null;
-
-        if (!statuses.TryGetValue(row.Id, out var status))
-            return;
-
         var buttons = new List<string>();
 
         // The finished revision report: open/share the PDF, or read it in the app.
@@ -140,9 +150,19 @@ public partial class MainPage : ContentPage
             buttons.Add(StopAction);
         }
 
-        var choice = await DisplayActionSheet(status.Title, "Cancel", DeleteAction, buttons.ToArray());
+        var actions = buttons
+            .Select(label => new CardAction(label, GlyphFor(label), WeightFor(label), () => Chose(label, status)))
+            .ToList();
 
-        switch (choice)
+        // Available, not offered: last, muted, no colour, no confirmation.
+        actions.Add(new CardAction(DeleteAction, Glyphs.Bin, ActionWeight.Quiet, () => Chose(DeleteAction, status)));
+
+        Present(ActionCard.Build(status.Title, ProjectRow.From(status).Summary, actions, Dismiss));
+    }
+
+    private async void Chose(string label, NovelStatus status)
+    {
+        switch (label)
         {
             case DeleteAction: await DeleteProject(status); break;
             case OpenReportPdfAction: await ShareReportPdf(status); break;
@@ -153,6 +173,160 @@ public partial class MainPage : ContentPage
             case RetryAction: await RetryProject(status); break;
             case StopAction: await StopProject(status); break;
         }
+    }
+
+    // The report is what the app is for, so reaching it is the weighted row.
+    private static ActionWeight WeightFor(string label) =>
+        label == OpenReportPdfAction ? ActionWeight.Primary : ActionWeight.Normal;
+
+    private static string GlyphFor(string label) => label switch
+    {
+        OpenReportPdfAction or ReadReportAction => Glyphs.Page,
+        NewDraftAction or NextBookAction => Glyphs.NewPage,
+        DiffAction => Glyphs.Compare,
+        RetryAction => Glyphs.Again,
+        StopAction => Glyphs.Stop,
+        _ => Glyphs.Page,
+    };
+
+    /// <summary>
+    /// Lays the desk out from what is on it: the book being read now with its details on a note
+    /// card, then the ones waiting with their state on a post-it.
+    ///
+    /// <para>Rebuilt whole on each refresh rather than diffed. The list it replaced diffed because a
+    /// CollectionView scrolls and loses its place when its items are swapped; a desk is a handful of
+    /// books that fits on one screen, and at that size a diff is machinery with nothing to buy.</para>
+    /// </summary>
+    private void Redraw()
+    {
+        Desk.Clear();
+
+        var onDesk = rows
+            .Select(row => statuses.TryGetValue(row.Id, out var status) ? (Row: row, Status: status) : default)
+            .Where(pair => pair.Status is not null)
+            .ToList();
+
+        if (onDesk.Count == 0)
+        {
+            Desk.Add(new Label
+            {
+                Text = "Nothing on the desk. Add a manuscript and Folio starts reading.",
+                Style = PaperResources.Token<Style>("EmptyStateLabel"),
+            });
+            return;
+        }
+
+        // What is being read is whatever is still running; failing that, the newest thing here.
+        var reading = onDesk.FirstOrDefault(pair => Active(pair.Status)) is { Status: not null } running
+            ? running
+            : onDesk[0];
+
+        Desk.Add(DeskPaper.Strip("Reading now"));
+        Desk.Add(Hero(reading.Row, reading.Status));
+
+        if (!string.IsNullOrWhiteSpace(voice))
+        {
+            Desk.Add(new Label
+            {
+                Text = voice,
+                Style = PaperResources.Token<Style>("VoiceLabel"),
+                Margin = new Thickness(2, 16, 2, 0),
+            });
+        }
+
+        var waiting = onDesk.Where(pair => pair.Row.Id != reading.Row.Id).ToList();
+        if (waiting.Count > 0)
+        {
+            Desk.Add(new BoxView { HeightRequest = 16, Color = Colors.Transparent });
+            Desk.Add(DeskPaper.Strip("Also on the desk"));
+            Desk.Add(Waiting(waiting));
+        }
+
+        Desk.Add(new GraphicsView
+        {
+            Drawable = new DeskFillerDrawable(),
+            HeightRequest = 150,
+            Margin = new Thickness(0, 10, 0, 0),
+            InputTransparent = true,
+        });
+    }
+
+    private static bool Active(NovelStatus status) =>
+        status.Stage is not ("Completed" or "Failed" or "Cancelled");
+
+    private View Hero(ProjectRow row, NovelStatus status)
+    {
+        var lines = new List<View>
+        {
+            new Label { Text = row.Title, FontFamily = "SerifSemibold", FontSize = 17, LineHeight = 1.15 },
+            new Label
+            {
+                Text = row.Summary,
+                FontSize = 14,
+                TextColor = PaperResources.Colour(status.NeedsAttention ? "ProblemMark" : "InkBlue"),
+                Margin = new Thickness(0, 8, 0, 0),
+            },
+        };
+
+        var card = DeskPaper.Card([.. lines]);
+        card.Rotation = 0.8;
+        card.VerticalOptions = LayoutOptions.Start;
+
+        var grid = new Grid
+        {
+            ColumnDefinitions = [new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star)],
+            ColumnSpacing = 14,
+            Margin = new Thickness(0, 4, 0, 0),
+        };
+
+        var cover = new FlatBook(row.Title, jacket: null, 118, 148, tilt: -1.6)
+        {
+            VerticalOptions = LayoutOptions.Start,
+        };
+        Press(cover, status);
+
+        grid.Children.Add(cover);
+        grid.Children.Add(card);
+        Grid.SetColumn(cover, 0);
+        Grid.SetColumn(card, 1);
+        return grid;
+    }
+
+    private View Waiting(IReadOnlyList<(ProjectRow Row, NovelStatus Status)> books)
+    {
+        var tilts = new[] { 1.4, -2.2, 0.9 };
+        var noteTilts = new[] { -1.8, 1.2, -0.9 };
+        var strip = new HorizontalStackLayout { Spacing = 11, Margin = new Thickness(0, 10, 0, 0) };
+
+        for (var i = 0; i < books.Count; i++)
+        {
+            var (row, status) = books[i];
+            var note = DeskPaper.PostIt(
+                row.Title,
+                row.Summary,
+                PaperResources.Colour(status.NeedsAttention ? "ProblemMark" : "InkSoft"));
+            note.Rotation = noteTilts[i % noteTilts.Length];
+
+            var cover = new FlatBook(row.Title, jacket: null, 88, 110, tilts[i % tilts.Length]);
+            Press(cover, status);
+
+            strip.Children.Add(new VerticalStackLayout
+            {
+                WidthRequest = 88,
+                Spacing = 7,
+                Children = { cover, note },
+            });
+        }
+
+        return strip;
+    }
+
+    // A book is opened by pressing it; what can be done with it is a long press, per the frame.
+    private void Press(View book, NovelStatus status)
+    {
+        var open = new TapGestureRecognizer();
+        open.Tapped += (_, _) => ShowActions(status);
+        book.GestureRecognizers.Add(open);
     }
 
     private const string RetryAction = "Retry now";
