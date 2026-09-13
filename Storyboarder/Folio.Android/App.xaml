@@ -2,11 +2,9 @@
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="Folio.Android.App">
-    <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Resources/Styles/DesignTokens.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Application.Resources>
+    <!--
+        The Paper & Ink dictionary is merged in the code-behind rather than named here. A XAML
+        Source= resolves only inside its own assembly, and the styles now live in the shared
+        Storyworthtelling.Maui kit; this head keeps no copy of them.
+    -->
 </Application>

@@ -12,7 +12,6 @@ public class HexLiteralLeakTests
     private static readonly string[] AllowedSuffixes =
     {
         Path.Combine("Folio.Domain", "Design", "DesignTokens.cs"),
-        Path.Combine("Folio.Android", "Resources", "Styles", "DesignTokens.xaml"),
         Path.Combine("Folio.Tests", "Design", "DesignTokensTests.cs"),
     };
 
