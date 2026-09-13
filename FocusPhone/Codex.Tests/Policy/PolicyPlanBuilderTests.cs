@@ -119,6 +119,17 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
+    public void SettingsPackage_IsNotSuspended_EvenIfDetectedAsABrowser()
+    {
+        // The platform refuses to suspend it regardless, and it can surface in the
+        // browser-resolving package query on some OEM builds via a deep-link handler.
+        var plan = PolicyPlanBuilder.Build(DefaultContext(
+            browserPackages: [PolicyContext.SettingsPackage, "com.android.chrome"]));
+
+        Assert.DoesNotContain(PolicyContext.SettingsPackage, plan.SuspendedPackages);
+    }
+
+    [Fact]
     public void CutoverAllowlistedApps_AreNeverSuspended_EvenIfPreviouslyBlocked()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext(
