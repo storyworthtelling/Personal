@@ -156,16 +156,23 @@ public class FolioInvariantsTests
     /// keeps the assertions off the four other Android heads in this repository — each of which has
     /// its own launcher activity, its own WorkManager worker and its own preferences store.
     /// </summary>
-    internal static IEnumerable<string> HeadFiles()
+    internal static IEnumerable<string> HeadFiles() =>
+        Directory.EnumerateFiles(Path.GetDirectoryName(HeadProjectFile())!, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !file.Split(Path.DirectorySeparatorChar).Any(part => part is "obj" or "bin"));
+
+    /// <summary>
+    /// The head's project file, found from a frozen fact rather than a path: the one csproj that
+    /// declares the frozen ApplicationId. Every guard that needs to look at this head starts here, so
+    /// a rename moving the folder moves all of them together.
+    /// </summary>
+    internal static string HeadProjectFile()
     {
         var head = RepoFiles("*.csproj")
             .FirstOrDefault(file => File.ReadAllText(file)
                 .Contains($"<ApplicationId>{AppId}</ApplicationId>", StringComparison.Ordinal));
 
         Assert.True(head is not null, $"No csproj declares the frozen ApplicationId '{AppId}'.");
-
-        return Directory.EnumerateFiles(Path.GetDirectoryName(head)!, "*.cs", SearchOption.AllDirectories)
-            .Where(file => !file.Split(Path.DirectorySeparatorChar).Any(part => part is "obj" or "bin"));
+        return head!;
     }
 
     /// <summary>
@@ -179,13 +186,7 @@ public class FolioInvariantsTests
     /// </summary>
     internal static IEnumerable<string> ProjectFiles()
     {
-        var head = RepoFiles("*.csproj")
-            .FirstOrDefault(file => File.ReadAllText(file)
-                .Contains($"<ApplicationId>{AppId}</ApplicationId>", StringComparison.Ordinal));
-
-        Assert.True(head is not null, $"No csproj declares the frozen ApplicationId '{AppId}'.");
-
-        var projectRoot = Directory.GetParent(Path.GetDirectoryName(head!)!)!.FullName;
+        var projectRoot = Directory.GetParent(Path.GetDirectoryName(HeadProjectFile())!)!.FullName;
 
         return Directory.EnumerateFiles(projectRoot, "*.cs", SearchOption.AllDirectories)
             .Where(file => !file.Split(Path.DirectorySeparatorChar).Any(part => part is "obj" or "bin"));
