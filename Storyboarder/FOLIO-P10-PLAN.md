@@ -46,7 +46,7 @@ and document task below repeats it.
 
 ## 1. Addenda to the approved finding, from Gate 3
 
-The finding was approved before the pages were drawn. Drawing them changed eleven things. These
+The finding was approved before the pages were drawn. Drawing them changed twelve things. These
 continue the finding's numbering and are part of it.
 
 ### F36 — the owner's mark is **drawn**, not photographed *(D118)*
@@ -151,6 +151,26 @@ are one reader's preferences, not the book's severity tiers, so they take the Po
 roles rather than the four-tier scale. A persona whose review arrives with an empty pros or cons list
 is a **failed pass, not a shorter one** — the same rule as the missing condition. Guard G23.
 
+### F47 — the display version graduates to 1.0.x
+
+**The versionCode needs nothing.** `build-storyboarder.yml` already computes it through the shared
+`.github/actions/version-code` composite at **band 1**, exactly as Post and Plate do, and
+`SuiteVersionBands` records that band 1 clears Canonizer's last bare-`run_number` code of **169**.
+The formula is wall-clock minutes since 2020-01-01 UTC, so it survives a workflow rename — which is
+the failure this phase would otherwise have walked into, twice over, as `build-flyleaf` and then
+`build-post` did.
+
+**The display version does need it.** Canonizer ships `0.1.<run_number>` while Post and Plate
+graduated to `1.0.<run_number>` on exactly this occasion — a rename plus the phase that makes the
+app what it was meant to be. Folio ships **`1.0.<run_number>`**, which is the number the owner reads
+in Settings and in the release notes, and it must never regress to `0.1` afterwards.
+
+Three more strings carry the old name and are part of the same sweep, none of them load-bearing but
+all of them visible: the workflow's own `name: Build Canonizer APK`, its uploaded artifact
+`Canonizer-Android` — **the owner downloads that by name, so the rename goes in the PR body** — and
+the `SuiteVersionBands` comment that still calls the app Canonizer. The app id under all of it stays
+frozen. Guard G24.
+
 ---
 
 ## 2. Standing rules for every release
@@ -190,8 +210,11 @@ drops the database and must do so while the shelf holds nothing.
 - `MainActivity` gains an explicit `Name` — today it has none and is generated from the namespace,
   so the rename would move it.
 - All **twelve** preference keys pinned as literals (the finding's Correction 1).
-- CI: the workflow keeps building the head under its frozen id; if the workflow file or its artifact
-  name is renamed, say so in the PR body — the owner downloads that artifact by name.
+- **Display version `1.0.<run_number>`** (F47), matching Post and Plate. The versionCode already
+  comes from the shared band-1 action and does not change.
+- CI: the workflow keeps building the head under its frozen id; its `name:`, its uploaded artifact
+  `Canonizer-Android` and the `SuiteVersionBands` comment take the new name — **say the artifact's
+  new name in the PR body**, because the owner downloads it by name.
 - **All guards from §4 below that do not depend on later releases.**
 → *Mockups: the Identity section.*
 
@@ -278,6 +301,7 @@ names what was reintroduced. G1–G11 come from the finding; G12–G22 are added
 | G21 | `VerdictOrderTests` — strengths render before problems | Swap them |
 | G22 | `ReaderConditionTests` — every persona read carries a non-empty condition | Accept a read with no "Would need" |
 | G23 | `ReviewShapeTests` — every persona read prints assessment, strengths, weaknesses and recommendation, and none of the four is empty | Flatten a review to a summary line; the pros and cons the shipped report already prints disappear |
+| G24 | `DisplayVersionTests` — the head's display version is `1.0.x` and the versionCode still resolves through the shared band-1 action | Put `0.1.` back, or inline a version instead of calling the action; the rename resets the counter and the update channel rejects every later build |
 
 ---
 
