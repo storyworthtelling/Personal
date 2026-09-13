@@ -38,6 +38,24 @@ public class Novel
     // SeriesSequence is this book's number in the series (1 = first), for the "Book N" badge. All three are
     // carried onto later drafts of a linked book, so every draft of book 2 stays linked to book 1.
     /// <summary>
+    /// This book's jacket, relative to the output root, or null while it has none.
+    ///
+    /// <para>Each jacket is written to its own file and this is repointed; nothing is overwritten in
+    /// place. That is what makes the undo behind a repaint honest — the fold can put the old jacket
+    /// back because the old jacket is still there.</para>
+    /// </summary>
+    public string? CoverPath { get; set; }
+
+    /// <summary>
+    /// Whether the jacket now showing is one the <b>owner</b> chose rather than one the app painted.
+    ///
+    /// <para>Recorded because the two are not the same thing to overwrite. A painted jacket can be
+    /// repainted freely; one the owner picked is theirs, and repainting over it is the act the fold
+    /// exists to take back.</para>
+    /// </summary>
+    public bool CoverIsOwners { get; set; }
+
+    /// <summary>
     /// How long the manuscript is, measured once when it is read in.
     ///
     /// <para>A column rather than a derivation: the shelf draws every spine's width from it, and the
