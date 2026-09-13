@@ -143,7 +143,7 @@ public class ReviewProcessorTests : IDisposable
         claude.Object,
         gemini.Object,
         new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
-        new AnalysisPdfComposer(new PdfVolumeComposer(), new AnalysisDocumentRenderer()),
+        new AnalysisPdfComposer(new AnalysisDocumentRenderer()),
         clock,
         Options.Create(new RateLimitOptions
         {

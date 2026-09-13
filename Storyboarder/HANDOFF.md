@@ -146,8 +146,9 @@ what to *add*, never drafted prose (nudge-never-write):
   sections (the latter grouped by tier, ahead of the revision plan); mirrored in `ReportPage`.
 
 Schema landed via the `Phase3Expansion` migration. Additions are per-draft (regenerated each draft). Pure
-logic + client parsing are unit-tested; the renderer is exercised end-to-end by the pipeline test (raster
-output can't be asserted at the pixel level). The Android head (`ReportPage`) is compile-checked in CI, not
+logic + client parsing are unit-tested; the renderer is exercised end-to-end by the pipeline test. (That
+parenthetical used to read "raster output can't be asserted at the pixel level" — P10 Release E made the
+pages vector, so the report's text is now read back out of the PDF with PdfPig and asserted directly.) The Android head (`ReportPage`) is compile-checked in CI, not
 built in-session.
 
 ## 3d. What Phase 4 delivered (shared reMarkable delivery)

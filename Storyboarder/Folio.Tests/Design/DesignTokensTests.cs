@@ -1,62 +1,48 @@
-using System.Text.RegularExpressions;
 using Folio.Domain.Design;
 
 namespace Folio.Tests.Design;
 
-// The PRINTED tokens only. This head's in-app palette and type ladder are the shared
-// Storyworthtelling.Maui kit's now, and the kit's own tests check those against PaperColorTokens by
-// reflection — which is the point of the move: one copy, so it cannot disagree with itself.
+/// <summary>
+/// What is left of this head's own design literals.
+///
+/// <para>The in-app palette and type ladder belong to the shared <c>Storyworthtelling.Maui</c> kit,
+/// whose tests check them against <c>PaperColorTokens</c> by reflection — one copy, so it cannot
+/// disagree with itself. Release E did the same for the printed side: colour through the Document
+/// profile, geometry in points. What remains here is two recorded DESIGN.md facts that nothing
+/// duplicates, and this is the guard that they stay facts rather than drifting into a third palette.</para>
+/// </summary>
 public class DesignTokensTests
 {
-    internal static readonly IReadOnlyDictionary<string, string> Colors = new Dictionary<string, string>
+    [Fact]
+    public void MotionIsTwoDurationsAndAnUndoWindow()
     {
-        ["Paper"] = DesignTokens.Paper,
-        ["PaperBright"] = DesignTokens.PaperBright,
-        ["PaperDeep"] = DesignTokens.PaperDeep,
-        ["PaperShade"] = DesignTokens.PaperShade,
-        ["Hairline"] = DesignTokens.Hairline,
-        ["Ink"] = DesignTokens.Ink,
-        ["InkSoft"] = DesignTokens.InkSoft,
-        ["InkMuted"] = DesignTokens.InkMuted,
-        ["Accent"] = DesignTokens.Accent,
-        ["AccentDeep"] = DesignTokens.AccentDeep,
-    };
+        Assert.True(DesignTokens.Motion.QuickMs < DesignTokens.Motion.StandardMs,
+            "Quick is meant to be the shorter of the two.");
+        Assert.True(DesignTokens.Motion.UndoWindowMs >= 5_000,
+            "An undo window shorter than five seconds is not an undo, it is a flicker.");
+    }
 
     [Fact]
-    public void AllColorsAreUppercaseSixDigitHex()
+    public void TheGrainIsCappedSoItCannotMuddyText()
     {
-        foreach (var (name, value) in Colors)
-        {
-            Assert.True(Regex.IsMatch(value, "^#[0-9A-F]{6}$"), $"{name} = {value} is not #RRGGBB uppercase hex");
-        }
+        // DESIGN.md §17: texture is always on, and capped so it never fails contrast.
+        Assert.InRange(DesignTokens.Grain.Alpha, 1, 40);
+        Assert.True(DesignTokens.Grain.Density > 1, "Every pixel carrying grain is not grain, it is a tint.");
     }
 
-    [Theory]
-    [InlineData("Ink", "Paper", 7.0)]
-    [InlineData("InkMuted", "Paper", 3.0)]
-    [InlineData("Accent", "Paper", 3.0)]
-    [InlineData("AccentDeep", "Paper", 4.5)]
-    [InlineData("PaperBright", "Accent", 4.5)]
-    [InlineData("Ink", "PaperDeep", 7.0)]
-    public void ContrastMeetsDesignBibleThreshold(string fg, string bg, double minimum)
-    {
-        var ratio = DesignTestHelpers.ContrastRatio(Colors[fg], Colors[bg]);
-        Assert.True(ratio >= minimum, $"{fg} on {bg} is {ratio:F2}:1, below {minimum}:1");
-    }
-
-
+    /// <summary>
+    /// The colours and the 150-DPI page block are gone, not merely unused. A leftover <c>Accent</c>
+    /// holding the retired terracotta is exactly the sort of thing the next person reaches for.
+    /// </summary>
     [Fact]
-    public void PdfScaleDescends()
+    public void NoPaletteOrPixelGeometrySurvivesHere()
     {
-        var scale = new[]
-        {
-            DesignTokens.Pdf.H1, DesignTokens.Pdf.H2, DesignTokens.Pdf.H3,
-            DesignTokens.Pdf.Body, DesignTokens.Pdf.Footer,
-        };
-        for (var i = 1; i < scale.Length; i++)
-        {
-            Assert.True(scale[i] < scale[i - 1], $"PDF scale not strictly descending at index {i}");
-        }
-    }
+        var members = typeof(DesignTokens).GetMembers()
+            .Select(member => member.Name).ToArray();
 
+        Assert.DoesNotContain("Accent", members);
+        Assert.DoesNotContain("Paper", members);
+        Assert.DoesNotContain("Ink", members);
+        Assert.DoesNotContain("Pdf", members);
+    }
 }

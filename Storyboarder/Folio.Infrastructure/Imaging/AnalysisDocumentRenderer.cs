@@ -1,72 +1,99 @@
 using SkiaSharp;
 using Folio.Domain.Analysis;
-using Folio.Domain.Design;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
+using Folio.Domain.Report;
 using Storyworthtelling.Paper;
 
 namespace Folio.Infrastructure.Imaging;
 
-// Renders the revision report — the star product — into a sequence of PNG "pages" with SkiaSharp. The
-// report is layered: the analytical/thematic sections first, then the scene-by-scene walk where each
-// scene's wordless evidence image sits above its notes (the fidelity check), then what-to-do (the
-// revision plan by impact tier), and the candid verdict last. Styling follows DESIGN.md §7. The pages are
-// handed to the existing IVolumePdfComposer to assemble the final PDF.
+// Renders the revision report — the star product — as a vector PDF with SkiaSharp. The report is
+// layered: the analytical/thematic sections first, then the scene-by-scene walk where each scene's
+// wordless evidence image sits above its notes (the fidelity check), then what-to-do (the revision
+// plan by impact tier), and the candid verdict last. Styling follows DESIGN.md §7.
 public sealed record AnalysisRenderResult(
-    IReadOnlyList<byte[]> Pages,
+    byte[] Pdf,
     int FrontMatterCount,
     IReadOnlyList<(string Title, int Page)> TocEntries);
 
 public sealed class AnalysisDocumentRenderer
 {
-    // Colours resolved through the shared Paper palette. The report renders at the Screen profile (its
-    // primary targets are the Drive PDF and the in-app view); PaperPalette is now the single source of these
-    // hues, so the same document can be re-rendered at the Paper Pro / rM2 profiles when per-destination
-    // colour rendering is wired and verified on device.
-    private const DeviceColorProfile Profile = DeviceColorProfile.Screen;
-    private static readonly SKColor Paper = PaperPalette.Resolve(PaperRole.Ground, Profile);
-    private static readonly SKColor Ink = PaperPalette.Resolve(PaperRole.Ink, Profile);
-    private static readonly SKColor Accent = PaperPalette.Resolve(PaperRole.Active, Profile);
-    private static readonly SKColor Muted = PaperPalette.Resolve(PaperRole.InkMuted, Profile);
+    // Colour comes from the report's own palette, which resolves through the Document (muted) profile.
+    // These four names are what the content code below has always called them; only what stands behind
+    // them changed, which is the point of the release — the page moves, the report does not.
+    private static readonly SKColor Ink = ReportPalette.Ink;
+    private static readonly SKColor Accent = ReportPalette.Rule;
+    private static readonly SKColor Muted = ReportPalette.InkMuted;
 
     private readonly CoverPageRenderer covers = new();
 
-    public IReadOnlyList<byte[]> Render(
-        BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null) =>
-        RenderReport(analysis, title, scenes, review).Pages;
+    public byte[] Render(
+        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null) =>
+        RenderReport(analysis, cover, scenes, review).Pdf;
 
     /// <summary>
-    /// Renders content pages first (recording each H2 section's page number),
-    /// then prepends unnumbered front matter: cover + table of contents.
-    /// Content folios stay 1..N, so the printed TOC needs no bookkeeping.
+    /// Renders three times, and each pass buys something the next one needs.
+    ///
+    /// <para>The contents has to name the page each section starts on, and it is printed
+    /// <b>before</b> the content it indexes. While every page was a PNG in a list that was free — the
+    /// front matter was prepended afterwards. A PDF sink writes as it goes and there is no going back,
+    /// so: the first pass renders the content to learn which sections land where, relative to the
+    /// content's own first sheet; the second renders the front matter with those entries to learn how
+    /// many sheets the front matter itself takes; and the third prints the real document, with the
+    /// entries shifted by that count so the contents names the folio a reader will actually see.</para>
+    ///
+    /// <para>The second pass is needed because the front matter's length depends on the number of
+    /// entries, and the entries' numbers depend on the front matter's length. Only the <i>count</i> is
+    /// circular, and it settles at once: a contents page holds the same number of lines whether it is
+    /// printing two-digit folios or three. All three passes are deterministic, and drawing a hundred
+    /// pages of vector type is nothing beside the model calls that wrote the words on them.</para>
     /// </summary>
     public AnalysisRenderResult RenderReport(
-        BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null)
+        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null)
     {
-        var reportTitle = string.IsNullOrWhiteSpace(title) ? "Book Analysis" : title;
-        var content = RenderContent(analysis, reportTitle, scenes, review ?? DraftReview.FirstDraft, out var tocEntries);
+        var reportTitle = string.IsNullOrWhiteSpace(cover.Title) ? "Book Analysis" : cover.Title;
+        var titled = cover with { Title = reportTitle };
+        var foot = $"{reportTitle} · draft {titled.DraftNumber}";
+        var draft = review ?? DraftReview.FirstDraft;
 
-        var pages = new List<byte[]> { covers.AnalysisCover(reportTitle) };
-        var toc = covers.AnalysisToc(tocEntries);
-        pages.AddRange(toc);
-        pages.AddRange(content);
-        return new AnalysisRenderResult(pages, 1 + toc.Count, tocEntries);
+        IReadOnlyList<(string Title, int Page)> relative;
+        using (var probe = new PageWriter(foot))
+        {
+            RenderContent(analysis, scenes, draft, probe);
+            relative = probe.TocEntries.ToList();
+            probe.Finish();
+        }
+
+        int frontMatter;
+        using (var probe = new PageWriter(foot))
+        {
+            covers.AnalysisCover(probe, titled);
+            covers.AnalysisToc(probe, relative);
+            frontMatter = probe.PageCount;
+            probe.Finish();
+        }
+
+        var entries = relative.Select(entry => (entry.Title, entry.Page + frontMatter)).ToList();
+
+        using var document = new PageWriter(foot);
+        covers.AnalysisCover(document, titled);
+        covers.AnalysisToc(document, entries);
+        document.NewPage();
+        RenderContent(analysis, scenes, draft, document);
+        return new AnalysisRenderResult(document.Finish(), frontMatter, entries);
     }
 
-    private IReadOnlyList<byte[]> RenderContent(
-        BookAnalysisResult analysis, string reportTitle, IReadOnlyList<SceneEvidence> scenes, DraftReview review,
-        out IReadOnlyList<(string Title, int Page)> tocEntries)
+    private static void RenderContent(
+        BookAnalysisResult analysis, IReadOnlyList<SceneEvidence> scenes, DraftReview review, PageWriter writer)
     {
-        using var body = new SKFont(EmbeddedTypefaces.SerifRegular, DesignTokens.Pdf.Body);
-        using var bodyBold = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.Body);
-        using var bodyItalic = new SKFont(EmbeddedTypefaces.SerifItalic, DesignTokens.Pdf.Body);
-        using var h1 = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.H1);
-        using var h2 = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.H2);
-        using var h3 = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.H3);
+        using var body = ReportType.Body();
+        using var bodyBold = ReportType.BodyBold();
+        using var bodyItalic = ReportType.BodyItalic();
+        using var h1 = ReportType.Title();
+        using var h2 = ReportType.Section();
+        using var h3 = ReportType.Heading();
 
-        var writer = new PageWriter(reportTitle);
-
-        writer.Heading(reportTitle, h1, Ink, ruled: true);
+        writer.Heading("The frame", h1, Ink, ruled: true);
         writer.Paragraph("Revision report — a candid second read to help you revise toward publication.", bodyItalic, Muted);
 
         // Genre + length, framed against the genre norm. The expansion read's length note is preferred when
@@ -87,7 +114,7 @@ public sealed class AnalysisDocumentRenderer
             }
             writer.Paragraph(Join(analysis.Genre, lengthText), bodyBold, Ink);
         }
-        writer.Gap(20f);
+        writer.Gap(PageGeometry.SectionGap);
 
         // On a later draft, a top summary of what moved since the previous one, and the list of findings it
         // resolved — the draft-over-draft read the revision loop turns on.
@@ -103,7 +130,7 @@ public sealed class AnalysisDocumentRenderer
                 bodyItalic, Muted);
             foreach (var resolved in review.Resolved)
                 writer.Bullet("Resolved — " + Join(resolved.Chapter, resolved.Detail), body, Muted);
-            writer.Gap(18f);
+            writer.Gap(PageGeometry.SectionGap);
         }
 
         if (!string.IsNullOrWhiteSpace(analysis.Logline))
@@ -128,7 +155,7 @@ public sealed class AnalysisDocumentRenderer
                     writer.Paragraph(character.ArcSummary, body, Ink);
                 foreach (var relationship in character.Relationships ?? [])
                     writer.Bullet(relationship, body, Ink);
-                writer.Gap(12f);
+                writer.Gap(PageGeometry.BlockGap);
             }
         }
 
@@ -151,7 +178,7 @@ public sealed class AnalysisDocumentRenderer
             }
             foreach (var note in analysis.PacingNotes ?? [])
                 writer.Bullet(Join(note.Chapter, note.Detail) + Tag(FindingCategory.Pacing, note.Detail, statusByFinding), body, Ink);
-            writer.Gap(18f);
+            writer.Gap(PageGeometry.SectionGap);
         }
 
         if (analysis.ProseNotes is { Count: > 0 })
@@ -163,7 +190,7 @@ public sealed class AnalysisDocumentRenderer
                 if (!string.IsNullOrWhiteSpace(note.Fix))
                     writer.Paragraph(note.Fix, bodyItalic, Muted);
             }
-            writer.Gap(18f);
+            writer.Gap(PageGeometry.SectionGap);
         }
 
         if (analysis.DialogueNotes is { Count: > 0 })
@@ -175,7 +202,7 @@ public sealed class AnalysisDocumentRenderer
                 if (!string.IsNullOrWhiteSpace(note.Fix))
                     writer.Paragraph(note.Fix, bodyItalic, Muted);
             }
-            writer.Gap(18f);
+            writer.Gap(PageGeometry.SectionGap);
         }
 
         if (analysis.LineEdits is { Count: > 0 })
@@ -189,7 +216,7 @@ public sealed class AnalysisDocumentRenderer
                     writer.Paragraph(edit.Suggestion, body, Ink);
                 if (!string.IsNullOrWhiteSpace(edit.Reason))
                     writer.Paragraph(edit.Reason, bodyItalic, Muted);
-                writer.Gap(8f);
+                writer.Gap(PageGeometry.TightGap);
             }
         }
 
@@ -216,9 +243,6 @@ public sealed class AnalysisDocumentRenderer
         // The candid state of the draft, last.
         RenderVerdict(writer, analysis.Verdict, body, bodyBold, bodyItalic, h2);
 
-        var pages = writer.Finish();
-        tocEntries = writer.TocEntries;
-        return pages;
     }
 
     private static void RenderScenes(
@@ -235,7 +259,7 @@ public sealed class AnalysisDocumentRenderer
 
         foreach (var scene in scenes)
         {
-            writer.KeepTogether(DesignTokens.Pdf.SceneImageHeight + 80f);
+            writer.KeepTogether(PageGeometry.SceneImageHeight + 80f);
             writer.Paragraph(string.IsNullOrWhiteSpace(scene.Citation) ? "Scene" : scene.Citation, bodyItalic, Accent);
             if (scene.Image is { Length: > 0 })
                 writer.Image(scene.Image);
@@ -245,7 +269,7 @@ public sealed class AnalysisDocumentRenderer
                 writer.Paragraph(scene.Purpose, body, Ink);
             if (!string.IsNullOrWhiteSpace(scene.Verdict))
                 writer.Paragraph(scene.Verdict, bodyItalic, Muted);
-            writer.Gap(18f);
+            writer.Gap(PageGeometry.SectionGap);
         }
     }
 
@@ -275,7 +299,7 @@ public sealed class AnalysisDocumentRenderer
                     writer.Paragraph(divergence.Divergence, body, Ink);
                 if (!string.IsNullOrWhiteSpace(divergence.Suggestion))
                     writer.Paragraph(divergence.Suggestion, bodyItalic, Muted);
-                writer.Gap(8f);
+                writer.Gap(PageGeometry.TightGap);
             }
         }
     }
@@ -306,7 +330,7 @@ public sealed class AnalysisDocumentRenderer
                 writer.Bullet(Join(brk.Chapter, brk.Contradiction), body, Ink);
                 if (!string.IsNullOrWhiteSpace(brk.Established))
                     writer.Paragraph($"Previously established: {brk.Established}", bodyItalic, Muted);
-                writer.Gap(8f);
+                writer.Gap(PageGeometry.TightGap);
             }
         }
 
@@ -315,7 +339,7 @@ public sealed class AnalysisDocumentRenderer
             writer.Paragraph("Threads carried from the previous book:", bodyBold, Ink);
             foreach (var thread in series.CarriedThreads)
                 writer.Bullet(Join(thread.Status, thread.Established), body, Ink);
-            writer.Gap(12f);
+            writer.Gap(PageGeometry.BlockGap);
         }
     }
 
@@ -345,7 +369,7 @@ public sealed class AnalysisDocumentRenderer
             }
             if (!string.IsNullOrWhiteSpace(review.Recommendation))
                 writer.Paragraph($"Recommendation: {review.Recommendation}", bodyItalic, Muted);
-            writer.Gap(12f);
+            writer.Gap(PageGeometry.BlockGap);
         }
     }
 
@@ -381,7 +405,7 @@ public sealed class AnalysisDocumentRenderer
             writer.Heading(tier, h3, Accent);
             foreach (var item in items)
                 Render(item);
-            writer.Gap(10f);
+            writer.Gap(PageGeometry.BlockGap);
         }
 
         var other = additions.Where(a => !Tiers.Any(t => Matches(a, t))).ToList();
@@ -391,7 +415,7 @@ public sealed class AnalysisDocumentRenderer
             foreach (var item in other)
                 Render(item);
         }
-        writer.Gap(18f);
+        writer.Gap(PageGeometry.SectionGap);
     }
 
     private static string KindLabel(AdditionKind kind) => kind switch
@@ -426,12 +450,12 @@ public sealed class AnalysisDocumentRenderer
                 if (!string.IsNullOrWhiteSpace(note.Suggestion))
                     writer.Paragraph(note.Suggestion, body, Ink);
             }
-            writer.Gap(8f);
+            writer.Gap(PageGeometry.TightGap);
         }
 
         RenderGroup("Summarized — could become a scene:", ShowTellDirection.Dramatize);
         RenderGroup("Over-shown — could be tightened:", ShowTellDirection.Tighten);
-        writer.Gap(10f);
+        writer.Gap(PageGeometry.BlockGap);
     }
 
     // The revision plan grouped by impact tier: Must, then Should, then Consider (anything else last).
@@ -444,7 +468,7 @@ public sealed class AnalysisDocumentRenderer
             return;
 
         writer.Heading("What to do next", h2, Ink, ruled: true);
-        writer.Paragraph("The revision plan, grouped by impact.", new SKFont(EmbeddedTypefaces.SerifItalic, DesignTokens.Pdf.Body), Muted);
+        writer.Paragraph("The revision plan, grouped by impact.", ReportType.BodyItalic(), Muted);
 
         bool Matches(RevisionItem item, string tier) =>
             string.Equals((item.Priority ?? string.Empty).Trim(), tier, StringComparison.OrdinalIgnoreCase);
@@ -459,9 +483,9 @@ public sealed class AnalysisDocumentRenderer
             {
                 writer.Bullet(Join(item.Chapter, item.Issue), body, Ink);
                 if (!string.IsNullOrWhiteSpace(item.SuggestedFix))
-                    writer.Paragraph(item.SuggestedFix, new SKFont(EmbeddedTypefaces.SerifItalic, DesignTokens.Pdf.Body), Muted);
+                    writer.Paragraph(item.SuggestedFix, ReportType.BodyItalic(), Muted);
             }
-            writer.Gap(10f);
+            writer.Gap(PageGeometry.BlockGap);
         }
 
         var other = plan.Where(i => !Tiers.Any(t => Matches(i, t))).ToList();
@@ -472,7 +496,7 @@ public sealed class AnalysisDocumentRenderer
             {
                 writer.Bullet(Join(item.Priority, item.Chapter, item.Issue), body, Ink);
                 if (!string.IsNullOrWhiteSpace(item.SuggestedFix))
-                    writer.Paragraph(item.SuggestedFix, new SKFont(EmbeddedTypefaces.SerifItalic, DesignTokens.Pdf.Body), Muted);
+                    writer.Paragraph(item.SuggestedFix, ReportType.BodyItalic(), Muted);
             }
         }
     }
@@ -512,7 +536,7 @@ public sealed class AnalysisDocumentRenderer
         writer.Heading(heading, h2, Ink, ruled: true);
         foreach (var item in items)
             writer.Bullet(item, body, Ink);
-        writer.Gap(18f);
+        writer.Gap(PageGeometry.SectionGap);
     }
 
     // A section of findings. Each bullet leads with the chapter it was drawn from, which is the first
@@ -526,7 +550,7 @@ public sealed class AnalysisDocumentRenderer
         writer.Heading(heading, h2, Ink, ruled: true);
         foreach (var item in items)
             writer.Bullet(Join(item.Chapter, item.Detail) + Tag(category, item.Detail, statusByFinding), body, Ink);
-        writer.Gap(18f);
+        writer.Gap(PageGeometry.SectionGap);
     }
 
     // Maps each of this draft's findings to its cross-draft status, keyed by category + normalized detail —
@@ -565,219 +589,4 @@ public sealed class AnalysisDocumentRenderer
 
     private static string Quoted(string? excerpt) =>
         string.IsNullOrWhiteSpace(excerpt) ? string.Empty : $"“{excerpt}”";
-
-    // Accumulates drawn text and images down a page, snapshotting to PNG and starting a fresh page when the
-    // content cursor would overflow the bottom margin. All positions derive from DesignTokens.Pdf so the
-    // page geometry stays in one place. Every finished page gets a footer: running title left in muted
-    // ink, page number right in ink.
-    private sealed class PageWriter
-    {
-        private const float ContentLeft = DesignTokens.Pdf.SideMargin;
-        private const float ContentWidth = DesignTokens.Pdf.PageWidth - 2 * DesignTokens.Pdf.SideMargin;
-        private const float ContentTop = DesignTokens.Pdf.TopMargin;
-        private const float ContentBottom = DesignTokens.Pdf.PageHeight - DesignTokens.Pdf.BottomMargin;
-
-        private readonly string runningTitle;
-        private readonly List<byte[]> pages = [];
-        private readonly List<(string Title, int Page)> tocEntries = [];
-        private SKSurface surface = null!;
-        private SKCanvas canvas = null!;
-        private float y;
-
-        public PageWriter(string runningTitle)
-        {
-            this.runningTitle = runningTitle;
-            StartPage();
-        }
-
-        /// <summary>H2 sections and the content page (1-based) they begin on.</summary>
-        public IReadOnlyList<(string Title, int Page)> TocEntries => tocEntries;
-
-        public void Gap(float height) => y += height;
-
-        // Break to a fresh page if the next `height` points wouldn't fit, so a block (a scene's image +
-        // citation) isn't split across a page boundary.
-        public void KeepTogether(float height)
-        {
-            if (y + height > ContentBottom && y > ContentTop)
-                NewPage();
-        }
-
-        public void Heading(string text, SKFont font, SKColor color, bool ruled = false)
-        {
-            y += 10f;
-            if (y + font.Size * DesignTokens.Pdf.LineSpacing * 2 > ContentBottom)
-                NewPage();
-            if (font.Size == DesignTokens.Pdf.H2)
-                tocEntries.Add((text, pages.Count + 1));
-            DrawWrapped(text, font, color, ContentLeft, ContentWidth);
-            if (ruled)
-            {
-                using var rule = new SKPaint { Color = Accent, IsAntialias = false };
-                canvas.DrawRect(ContentLeft, y + 4f, ContentWidth / 3, DesignTokens.Pdf.AccentRuleHeight, rule);
-                y += DesignTokens.Pdf.AccentRuleGap;
-            }
-            y += 6f;
-        }
-
-        public void Paragraph(string text, SKFont font, SKColor color)
-        {
-            DrawWrapped(text, font, color, ContentLeft, ContentWidth);
-            y += 10f;
-        }
-
-        public void Bullet(string text, SKFont font, SKColor color)
-        {
-            float lineHeight = font.Size * DesignTokens.Pdf.LineSpacing;
-            var lines = SkiaText.Wrap(font, text, ContentWidth - DesignTokens.Pdf.BulletIndent);
-            using var paint = new SKPaint { Color = color, IsAntialias = true };
-            using var bulletPaint = new SKPaint { Color = Accent, IsAntialias = true };
-            for (int i = 0; i < lines.Count; i++)
-            {
-                if (y + lineHeight > ContentBottom)
-                    NewPage();
-                float baseline = y + font.Size;
-                if (i == 0)
-                    canvas.DrawText("•", ContentLeft, baseline, font, bulletPaint);
-                canvas.DrawText(lines[i], ContentLeft + DesignTokens.Pdf.BulletIndent, baseline, font, paint);
-                y += lineHeight;
-            }
-            y += 4f;
-        }
-
-        // Draws one wordless evidence image: a portrait block, letterboxed on shaded paper, breaking to a
-        // fresh page if it wouldn't fit.
-        public void Image(byte[] png)
-        {
-            float height = DesignTokens.Pdf.SceneImageHeight;
-            float width = DesignTokens.Pdf.SceneImageWidth;
-            if (y + height > ContentBottom && y > ContentTop)
-                NewPage();
-
-            var dest = new SKRect(ContentLeft, y, ContentLeft + width, y + height);
-            if (!SkiaImageFit.Draw(canvas, png, dest))
-            {
-                // Undecodable bytes: leave a shaded slot rather than crashing the whole report.
-                using var shade = new SKPaint { Color = SKColor.Parse(PaperColorTokens.PaperShade), IsAntialias = false };
-                canvas.DrawRect(dest, shade);
-            }
-            y += height + 8f;
-        }
-
-        // A compact tension-over-chapters chart: an area under a polyline, so a saggy stretch reads at a
-        // glance. Values are clamped 0..1; an empty curve draws nothing.
-        public void PacingChart(IReadOnlyList<ChapterTension> curve)
-        {
-            if (curve is not { Count: > 0 })
-                return;
-
-            float height = DesignTokens.Pdf.PacingChartHeight;
-            float width = ContentWidth;
-            if (y + height > ContentBottom && y > ContentTop)
-                NewPage();
-
-            float left = ContentLeft;
-            float top = y;
-            float bottom = y + height;
-
-            // Baseline + frame in muted ink.
-            using (var frame = new SKPaint { Color = Muted, IsAntialias = true, StrokeWidth = 1, Style = SKPaintStyle.Stroke })
-                canvas.DrawLine(left, bottom, left + width, bottom, frame);
-
-            var points = new SKPoint[curve.Count];
-            float step = curve.Count == 1 ? 0 : width / (curve.Count - 1);
-            for (int i = 0; i < curve.Count; i++)
-            {
-                float px = curve.Count == 1 ? left + width / 2 : left + i * step;
-                float t = (float)Math.Clamp(curve[i].Tension, 0, 1);
-                float py = bottom - t * (height - 6f);
-                points[i] = new SKPoint(px, py);
-            }
-
-            // Area fill under the curve, faint accent.
-            using (var area = new SKPath())
-            {
-                area.MoveTo(points[0].X, bottom);
-                foreach (var p in points)
-                    area.LineTo(p.X, p.Y);
-                area.LineTo(points[^1].X, bottom);
-                area.Close();
-                using var fill = new SKPaint { Color = Accent.WithAlpha(0x33), IsAntialias = true, Style = SKPaintStyle.Fill };
-                canvas.DrawPath(area, fill);
-            }
-
-            // The tension line + points in accent.
-            using (var line = new SKPaint { Color = Accent, IsAntialias = true, StrokeWidth = 2, Style = SKPaintStyle.Stroke, StrokeJoin = SKStrokeJoin.Round })
-            {
-                if (points.Length > 1)
-                    for (int i = 1; i < points.Length; i++)
-                        canvas.DrawLine(points[i - 1], points[i], line);
-            }
-            using (var dot = new SKPaint { Color = Accent, IsAntialias = true, Style = SKPaintStyle.Fill })
-                foreach (var p in points)
-                    canvas.DrawCircle(p.X, p.Y, 2.5f, dot);
-
-            y = bottom + 12f;
-        }
-
-        public IReadOnlyList<byte[]> Finish()
-        {
-            FinishPage();
-            return pages;
-        }
-
-        private void DrawWrapped(string text, SKFont font, SKColor color, float x, float wrapWidth)
-        {
-            float lineHeight = font.Size * DesignTokens.Pdf.LineSpacing;
-            var lines = SkiaText.Wrap(font, text, wrapWidth);
-            using var paint = new SKPaint { Color = color, IsAntialias = true };
-            foreach (var line in lines)
-            {
-                if (y + lineHeight > ContentBottom)
-                    NewPage();
-                canvas.DrawText(line, x, y + font.Size, font, paint);
-                y += lineHeight;
-            }
-        }
-
-        private void StartPage()
-        {
-            surface = SKSurface.Create(new SKImageInfo(DesignTokens.Pdf.PageWidth, DesignTokens.Pdf.PageHeight));
-            canvas = surface.Canvas;
-            canvas.Clear(Paper);
-            PaperGrain.Draw(canvas, DesignTokens.Pdf.PageWidth, DesignTokens.Pdf.PageHeight);
-            y = ContentTop;
-        }
-
-        private void FinishPage()
-        {
-            DrawFooter();
-            using (var image = surface.Snapshot())
-            using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
-                pages.Add(data.ToArray());
-            surface.Dispose();
-        }
-
-        private void DrawFooter()
-        {
-            using var sans = new SKFont(EmbeddedTypefaces.SansRegular, DesignTokens.Pdf.Footer);
-            using var serif = new SKFont(EmbeddedTypefaces.SerifRegular, DesignTokens.Pdf.Footer);
-            float baseline = DesignTokens.Pdf.PageHeight - (DesignTokens.Pdf.BottomMargin - DesignTokens.Pdf.Footer) / 2;
-
-            using var titlePaint = new SKPaint { Color = Muted, IsAntialias = true };
-            canvas.DrawText(runningTitle, ContentLeft, baseline, sans, titlePaint);
-
-            var pageNumber = (pages.Count + 1).ToString();
-            using var numberPaint = new SKPaint { Color = Ink, IsAntialias = true };
-            float numberWidth = serif.MeasureText(pageNumber);
-            canvas.DrawText(pageNumber, DesignTokens.Pdf.PageWidth - DesignTokens.Pdf.SideMargin - numberWidth,
-                baseline, serif, numberPaint);
-        }
-
-        private void NewPage()
-        {
-            FinishPage();
-            StartPage();
-        }
-    }
 }

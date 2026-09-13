@@ -19,6 +19,25 @@ public static class DesignTestHelpers
         return dir.FullName;
     }
 
+    /// <summary>
+    /// Every C# source file in this project, and nothing outside it.
+    ///
+    /// <para>Scoped to the folder holding <c>Folio.sln</c> rather than to the repository, which is the
+    /// lesson a P10 guard taught twice: a scan that walks up to the monorepo root flags FocusPhone and
+    /// <c>Storyworthtelling.Updates</c> for naming Folio's package, which they legitimately do.</para>
+    /// </summary>
+    public static IEnumerable<string> SourceFiles()
+    {
+        foreach (var file in Directory.EnumerateFiles(FolioRoot(), "*.cs", SearchOption.AllDirectories))
+        {
+            var parts = Path.GetRelativePath(FolioRoot(), file).Split(Path.DirectorySeparatorChar);
+            if (!parts.Any(part => part is "obj" or "bin"))
+            {
+                yield return file;
+            }
+        }
+    }
+
     /// <summary>WCAG 2.x contrast ratio between two hex colors.</summary>
     public static double ContrastRatio(string hexA, string hexB)
     {
