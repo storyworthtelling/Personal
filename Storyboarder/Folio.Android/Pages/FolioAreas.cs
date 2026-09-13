@@ -34,9 +34,12 @@ public static class FolioAreas
         + "5.2V19.6C15.6 18.8 19 19 21.4 19.8Z";
 
     // Spines standing on a shelf, two of them leaning — which is what tells it from a bar chart.
+    // The spines are 1.8 units wide rather than 2.5: rendered beside the frame's own, the thicker
+    // version read as a solid block where the drawing reads as books, and at 26dp on a tab that
+    // difference is the whole glyph.
     private const string ShelfGlyph =
-        "M2.8 19.7h18.4v1.9H2.8zM4.2 5.2h2.5v14.5H4.2zM8 4.6h2.4v15.1H8zM12.4 19.7 14.6 5.4l2.3.5"
-        + "-2.2 13.8ZM15.6 19.7 18.4 6.2l2.2.6-2.7 12.9Z";
+        "M2.8 19.4h18.4v1.8H2.8zM4.6 4.6h1.8v14.8H4.6zM8.8 4.6h1.8v14.8H8.8zM12.9 19.4 14.65 5.3"
+        + "l1.75.35-1.75 13.75ZM16.2 19.4 18.6 6l1.75.35-2.4 13.05Z";
 
     // Three sliders, and deliberately not the cog the mockup drew. Foreword settled this for the
     // suite — the suite's settings are choices, not machinery — and a divider that is one component

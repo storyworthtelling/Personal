@@ -20,12 +20,22 @@ namespace Folio.Android.Pages;
 /// </summary>
 public sealed class DeskDrawable : IDrawable
 {
-    // Where the grain runs, as fractions of the plank's height, with the sag of each curve. Fixed
-    // rather than generated: the frame drew nine lines and this is those nine.
-    private static readonly (float Y, float Sag)[] Grain =
+    /// <summary>
+    /// Where the grain runs, as a fraction of the plank's height: how far down it starts, how much
+    /// it wanders, and how strongly it takes the pencil.
+    ///
+    /// <para>Fixed rather than generated — a desk that re-grained itself on every launch would read
+    /// as movement. The <b>varying</b> weight is what matters: drawn at one opacity and one spacing,
+    /// nine parallel lines stop reading as wood and start reading as ruled paper, and with the board
+    /// seams on top of them, as tiles. Wood is irregular, and the irregularity has to be in the
+    /// drawing rather than left to the eye.</para>
+    /// </summary>
+    private static readonly (float Y, float Wander, float Weight)[] Grain =
     [
-        (0.076f, -0.008f), (0.174f, 0.012f), (0.282f, -0.009f), (0.387f, 0.013f), (0.492f, -0.010f),
-        (0.600f, 0.011f), (0.703f, -0.010f), (0.809f, 0.012f), (0.914f, -0.011f),
+        (0.061f, 0.010f, 0.22f), (0.139f, -0.008f, 0.13f), (0.207f, 0.013f, 0.26f),
+        (0.298f, -0.011f, 0.10f), (0.372f, 0.009f, 0.21f), (0.455f, 0.014f, 0.15f),
+        (0.548f, -0.012f, 0.24f), (0.617f, 0.008f, 0.11f), (0.704f, -0.013f, 0.20f),
+        (0.791f, 0.011f, 0.14f), (0.878f, -0.009f, 0.23f),
     ];
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
@@ -46,30 +56,33 @@ public sealed class DeskDrawable : IDrawable
         var grain = Color.FromArgb(MaterialTokens.DeskGrainHex);
         canvas.StrokeLineCap = LineCap.Round;
 
-        // The long grain, running with the plank.
-        canvas.StrokeColor = grain.WithAlpha(0.24f);
-        canvas.StrokeSize = 1.4f;
-        foreach (var (y, sag) in Grain)
+        // Each line an S rather than a single bend: one curve is an arc, and eleven parallel arcs
+        // are a pattern. Two opposed curves wander.
+        foreach (var (y, wander, weight) in Grain)
         {
             var top = dirtyRect.Top + (dirtyRect.Height * y);
+            var drift = dirtyRect.Height * wander;
+
+            canvas.StrokeColor = grain.WithAlpha(weight);
+            canvas.StrokeSize = weight > 0.18f ? 1.4f : 1f;
+
             var path = new PathF();
             path.MoveTo(dirtyRect.Left - 4, top);
-            path.QuadTo(
-                dirtyRect.Center.X, top + (dirtyRect.Height * sag),
-                dirtyRect.Right + 4, top + (dirtyRect.Height * sag * -0.2f));
+            path.QuadTo(dirtyRect.Left + (dirtyRect.Width * 0.3f), top + drift,
+                dirtyRect.Center.X, top + (drift * 0.35f));
+            path.QuadTo(dirtyRect.Left + (dirtyRect.Width * 0.75f), top - (drift * 0.55f),
+                dirtyRect.Right + 4, top + (drift * 0.15f));
             canvas.DrawPath(path);
         }
 
-        // Two boards' worth of seam, so the plank is not one impossible slab.
-        canvas.StrokeColor = grain.WithAlpha(0.14f);
+        // One board seam, not two, and faint. Two evenly spaced verticals across regular grain is
+        // what turned the desk into a tiled floor.
+        canvas.StrokeColor = grain.WithAlpha(0.07f);
         canvas.StrokeSize = 1f;
-        foreach (var x in new[] { 0.19f, 0.71f })
-        {
-            var at = dirtyRect.Left + (dirtyRect.Width * x);
-            var seam = new PathF();
-            seam.MoveTo(at, dirtyRect.Top - 4);
-            seam.QuadTo(at + 8, dirtyRect.Center.Y, at - 6, dirtyRect.Bottom + 4);
-            canvas.DrawPath(seam);
-        }
+        var at = dirtyRect.Left + (dirtyRect.Width * 0.62f);
+        var seam = new PathF();
+        seam.MoveTo(at, dirtyRect.Top - 4);
+        seam.QuadTo(at + 7, dirtyRect.Center.Y, at - 5, dirtyRect.Bottom + 4);
+        canvas.DrawPath(seam);
     }
 }
