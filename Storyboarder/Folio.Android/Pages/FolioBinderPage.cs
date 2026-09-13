@@ -1,4 +1,5 @@
 using Storyworthtelling.Maui;
+using Storyworthtelling.Maui.State;
 using Storyworthtelling.Maui.Views;
 
 namespace Folio.Android.Pages;
@@ -28,6 +29,8 @@ public abstract class FolioBinderPage : ContentPage
     private Grid? column;
     private Grid? root;
     private View? presented;
+    private readonly DogEarState folds = new();
+    private DogEar? corner;
 
     protected FolioBinderPage()
     {
@@ -86,6 +89,13 @@ public abstract class FolioBinderPage : ContentPage
         Grid.SetColumn(strip, 1);
         Grid.SetRow(barSlot, 1);
         Grid.SetColumn(barSlot, 0);
+
+        // The dog-ear sits in the page's own top corner, inside the gutter: it belongs to what is on
+        // the page, not to the binder.
+        corner = new DogEar(folds);
+        page.Children.Add(corner);
+        Grid.SetRow(corner, 0);
+        Grid.SetColumn(corner, 0);
 
         root = page;
         Content = page;
@@ -149,6 +159,23 @@ public abstract class FolioBinderPage : ContentPage
             },
         };
     }
+
+    /// <summary>
+    /// Does the thing, and offers it back (§6).
+    ///
+    /// <para>This is what lets every destructive act here ask nothing first. The corner folds over
+    /// with the back-turn arrow for the length of the window; turning it reverses the act, and
+    /// letting it close is the confirmation — given afterwards, by doing nothing, instead of
+    /// beforehand by answering a question.</para>
+    /// </summary>
+    protected void OfferUndo(string hint, Action reverse)
+    {
+        folds.BeginUndo(hint, reverse, DateTimeOffset.Now, TimeSpan.FromMilliseconds(UndoWindowMs));
+        corner?.Refresh();
+    }
+
+    /// <summary>DESIGN.md §13's window: long enough to catch a mistake, short enough to be a fold.</summary>
+    private const int UndoWindowMs = 6_000;
 
     /// <summary>
     /// Puts an action card over the whole screen — the binder strip and the bar included, since a

@@ -126,6 +126,11 @@ public partial class MainPage : FolioBinderPage
     {
         var buttons = new List<string>();
 
+        // A finished book can be put away. It leads the card and carries the weight — archiving is
+        // prominent and deleting is merely available, which is the whole of D19.
+        if (status.Stage == "Completed" && !status.Shelved)
+            buttons.Add(ShelveAction);
+
         // The finished revision report: open/share the PDF, or read it in the app.
         if (status.AnalysisReady)
         {
@@ -164,6 +169,7 @@ public partial class MainPage : FolioBinderPage
     {
         switch (label)
         {
+            case ShelveAction: await Shelve(status); break;
             case DeleteAction: await DeleteProject(status); break;
             case OpenReportPdfAction: await ShareReportPdf(status); break;
             case ReadReportAction: await OpenReport(status); break;
@@ -175,12 +181,43 @@ public partial class MainPage : FolioBinderPage
         }
     }
 
-    // The report is what the app is for, so reaching it is the weighted row.
+    /// <summary>
+    /// Putting the book away is what a finished one is mostly for, so it takes the weighted row;
+    /// failing that, reaching the report does.
+    /// </summary>
     private static ActionWeight WeightFor(string label) =>
-        label == OpenReportPdfAction ? ActionWeight.Primary : ActionWeight.Normal;
+        label is ShelveAction ? ActionWeight.Primary : ActionWeight.Normal;
+
+    /// <summary>
+    /// Shelves it and offers it straight back. Nothing is asked first: the fold in the corner is the
+    /// undo, and letting it close is the confirmation.
+    /// </summary>
+    private async Task Shelve(NovelStatus status)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .ShelveAsync(status.Id, CancellationToken.None);
+        }
+
+        OfferUndo($"{status.Title} is on the shelf", () => _ = Unshelve(status.Id));
+        await RefreshAsync();
+    }
+
+    private async Task Unshelve(Guid id)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .UnshelveAsync(id, CancellationToken.None);
+        }
+
+        await RefreshAsync();
+    }
 
     private static string GlyphFor(string label) => label switch
     {
+        ShelveAction => Glyphs.Shelve,
         OpenReportPdfAction or ReadReportAction => Glyphs.Page,
         NewDraftAction or NextBookAction => Glyphs.NewPage,
         DiffAction => Glyphs.Compare,
@@ -329,6 +366,7 @@ public partial class MainPage : FolioBinderPage
         book.GestureRecognizers.Add(open);
     }
 
+    private const string ShelveAction = "Put on the shelf";
     private const string RetryAction = "Retry now";
     private const string StopAction = "Stop review";
     private const string DeleteAction = "Delete manuscript";
