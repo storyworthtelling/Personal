@@ -19,7 +19,7 @@ public class TimeHelperParityTests
         var copies = new[]
         {
             Path.Combine(repoRoot, "FocusPhone", "Codex.Domain", relativePath),
-            Path.Combine(repoRoot, "Storyboarder", "Storyboarder.Domain", relativePath),
+            Path.Combine(repoRoot, "Storyboarder", "Folio.Domain", relativePath),
             Path.Combine(repoRoot, "Foreword", "Foreword.Domain", relativePath),
         };
         var normalized = copies

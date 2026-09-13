@@ -66,7 +66,7 @@ public static class IconSpecs
         // resource prefix at Platforms/Android/Resources — the active prefix stays the .NET-for-Android
         // default (`Resources`). Emitting here is what actually gets the mipmaps packaged (see the two heads'
         // csproj comments and CLAUDE.md); the launcher icon is then wired via [Application(Icon=...)].
-        new("Canonizer", "Storyboarder/Storyboarder.Android/Resources", "appicon", true, Glyphs.PenNib),
+        new("Folio", "Storyboarder/Folio.Android/Resources", "appicon", true, Glyphs.PenNib),
         // Foreword's icon IS its cover: the sunrise ground, the engraved doorstep set into the
         // illustration window, and no framing at all — the window is too wide for brackets to
         // survive a round mask, and the engraving needs the room. WritesColorsXml stays true:

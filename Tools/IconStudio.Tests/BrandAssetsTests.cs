@@ -66,12 +66,12 @@ public class BrandAssetsTests : IDisposable
         var written = BrandAssets.Write(root);
 
         Assert.True(File.Exists(Path.Combine(root, "Branding", "owner.png")));
-        Assert.True(File.Exists(Path.Combine(root, "Storyboarder", "Storyboarder.Infrastructure", "Resources", "owner.png")));
+        Assert.True(File.Exists(Path.Combine(root, "Storyboarder", "Folio.Infrastructure", "Resources", "owner.png")));
         Assert.True(File.Exists(Path.Combine(root, "FocusPhone", "Codex.Ui.Android", "Resources", "drawable-nodpi", "paper_grain.png")));
         Assert.True(written.Count >= 7);
 
         // The medallion is circle-masked: corners transparent, center opaque, ring present.
-        var medallionPath = Path.Combine(root, "Storyboarder", "Storyboarder.Infrastructure", "Resources", "owner.png");
+        var medallionPath = Path.Combine(root, "Storyboarder", "Folio.Infrastructure", "Resources", "owner.png");
         using var medallion = SKBitmap.Decode(medallionPath);
         Assert.Equal(0, medallion.GetPixel(3, 3).Alpha);
         Assert.Equal(255, medallion.GetPixel(medallion.Width / 2, medallion.Height / 2).Alpha);
@@ -97,7 +97,7 @@ public class BrandAssetsTests : IDisposable
         Assert.Equal(original, File.ReadAllBytes(ownerPath));
         // And the consumer medallion derives from the photo (accent center).
         using var medallion = SKBitmap.Decode(Path.Combine(
-            root, "Storyboarder", "Storyboarder.Infrastructure", "Resources", "owner.png"));
+            root, "Storyboarder", "Folio.Infrastructure", "Resources", "owner.png"));
         Assert.Equal(Tokens.Accent, medallion.GetPixel(medallion.Width / 2, medallion.Height / 2));
     }
 }
