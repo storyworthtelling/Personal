@@ -42,7 +42,7 @@ public class PointLadderTests
         Assert.Contains(font.Size, Ladder);
     }
 
-    /// <summary>Nine roles are declared; a tenth that appears is a decision, not a diff.</summary>
+    /// <summary>Ten roles are declared; an eleventh that appears is a decision, not a diff.</summary>
     [Fact]
     public void TheReportDeclaresExactlyTheRolesItPrints()
     {
@@ -50,7 +50,11 @@ public class PointLadderTests
             .Select(method => method.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
 
         Assert.Equal(
-            new[] { "Body", "BodyBold", "BodyItalic", "Folio", "Heading", "Label", "Running", "Section", "Small", "Title" },
+            new[]
+            {
+                "Body", "BodyBold", "BodyItalic", "Folio", "Heading", "Label", "Running", "Section",
+                "Small", "Subtitle", "Title",
+            },
             roles);
     }
 

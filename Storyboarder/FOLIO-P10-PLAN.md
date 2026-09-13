@@ -151,6 +151,28 @@ are one reader's preferences, not the book's severity tiers, so they take the Po
 roles rather than the four-tier scale. A persona whose review arrives with an empty pros or cons list
 is a **failed pass, not a shorter one** — the same rule as the missing condition. Guard G23.
 
+### F48 — the folio counts every sheet, and the front contents is an open question *(Release E)*
+
+Found by rendering the real page beside the drawing rather than by reading either. Two things the
+drawn pages say that the shipped report does not.
+
+**The numbering, which is settled.** The drawn frame page carries folio **2**, directly after the
+cover — so the drawing numbers straight through from the title page, and the title page simply does
+not print its own number. The shipped report left front matter outside the numbering and started the
+content again at 1, which meant the contents listed a number that was not the number on the page: a
+reader at folio 61 had to know how many sheets came before it. Release E adopts the drawn scheme.
+The running foot takes the drawn text too — *"The Salt Line · draft three"*, not the title alone.
+
+**The contents, which is not.** The mockup draws nine pages and calls them *every page type*, and a
+document contents page is not among them; the frame is page 2, so in the drawn design nothing sits
+between it and the cover. The contents at page 136 is the **readers'** contents — a different thing,
+one of the seven-reader apparatus. Removing the front contents from a 147-page report is a
+substantive change to the document and Release E's brief is explicitly *no content change*, so it is
+**not** done here and is the owner's call.
+
+What Release E does instead is make that call a one-line change either way: the contents now lists
+absolute folios, so if it goes, the frame lands on page 2 exactly as drawn and nothing else moves.
+
 ### F47 — the display version graduates to 1.0.x
 
 **The versionCode needs nothing.** `build-storyboarder.yml` already computes it through the shared

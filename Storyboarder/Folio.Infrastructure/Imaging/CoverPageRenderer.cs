@@ -18,6 +18,7 @@ internal sealed class CoverPageRenderer
 {
     public void AnalysisCover(PageWriter writer, ReportCover cover)
     {
+        writer.SuppressFolio();
         var canvas = writer.Canvas;
 
         writer.Label("Folio · revision report", PageGeometry.ContentLeft,
@@ -54,7 +55,7 @@ internal sealed class CoverPageRenderer
             }
         }
 
-        using (var draft = ReportType.Body())
+        using (var draft = ReportType.Subtitle())
         {
             y += 12f + draft.Size;
             Centred(canvas, DraftLine(cover), draft, ReportPalette.InkSoft, y);

@@ -58,8 +58,8 @@ public class VectorTextTests
     }
 
     /// <summary>
-    /// The contents names the page a section actually starts on — which is the whole reason the
-    /// content is rendered twice, and the thing that silently goes wrong if the two passes disagree.
+    /// The contents names the folio a section actually starts on — which is the whole reason the
+    /// document is rendered three times, and the thing that silently goes wrong if the passes disagree.
     /// </summary>
     [Fact]
     public void TheContentsAgreesWithWhereTheSectionsLand()
@@ -73,7 +73,7 @@ public class VectorTextTests
 
         foreach (var (title, page) in result.TocEntries)
         {
-            var printed = document.GetPage(result.FrontMatterCount + page).Text;
+            var printed = document.GetPage(page).Text;
             Assert.Contains(Squashed(title), Squashed(printed), StringComparison.Ordinal);
         }
     }

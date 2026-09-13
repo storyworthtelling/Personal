@@ -14,9 +14,12 @@ namespace Folio.Infrastructure.Imaging;
 /// resamples twice. The draw calls below are the same ones; only where they land is different,
 /// because a PDF's user space is already the unit the page is measured in.</para>
 ///
-/// <para><b>Front matter is unnumbered.</b> <see cref="BeginContent"/> starts the folios, so the
-/// cover and the contents carry none and the printed page numbers are 1..N over the content alone —
-/// which is what lets the contents list a number without any bookkeeping.</para>
+/// <para><b>The folio counts every sheet, and the cover prints none.</b> The report used to leave
+/// front matter outside the numbering and start the content at 1, which meant the contents listed a
+/// number that was not the number on the page — a reader at folio 61 had to know how many sheets came
+/// before it. The drawn pages number straight through (the frame carries "2"), so a page's folio and
+/// its place in the file are the same thing. The title page is the ordinary exception: it is page one
+/// and says so by being first.</para>
 /// </summary>
 internal sealed class PageWriter : IDisposable
 {
@@ -28,34 +31,39 @@ internal sealed class PageWriter : IDisposable
     /// <summary>The grain tile was sized for a 150-DPI page; this keeps it the same size on paper.</summary>
     private const float GrainScale = 72f / 150f;
 
-    private readonly string runningTitle;
+    private readonly string runningFoot;
     private readonly VectorPdfSink sink = new();
     private readonly List<(string Title, int Page)> tocEntries = [];
 
     private SKCanvas canvas = null!;
-    private bool numbering;
-    private int contentPages;
+    private bool folioSuppressed;
+    private int finishedPages;
     private float y;
 
-    public PageWriter(string runningTitle)
+    public PageWriter(string runningFoot)
     {
-        this.runningTitle = runningTitle;
+        this.runningFoot = runningFoot;
         StartPage();
     }
 
-    /// <summary>H2 sections and the content page (1-based) they begin on.</summary>
+    /// <summary>H2 sections and the folio they begin on.</summary>
     public IReadOnlyList<(string Title, int Page)> TocEntries => tocEntries;
+
+    /// <summary>
+    /// The folio the next page will carry. Set before the content so its sections record the number a
+    /// reader will actually see, rather than a count that starts again after the front matter.
+    /// </summary>
+    public int FirstFolio { get; init; } = 1;
 
     /// <summary>Pages written so far, including the one in progress.</summary>
     public int PageCount => sink.PageCount;
 
-    /// <summary>Closes the front matter and starts numbering, on a fresh sheet.</summary>
-    public void BeginContent()
-    {
-        FinishPage();
-        numbering = true;
-        StartPage();
-    }
+    /// <summary>
+    /// Keeps this page out of the running foot. The title page is the only one that asks: it is page
+    /// one and says so by being first, so printing the number on it would be telling the reader
+    /// something the page already says.
+    /// </summary>
+    public void SuppressFolio() => folioSuppressed = true;
 
     public SKCanvas Canvas => canvas;
 
@@ -81,7 +89,7 @@ internal sealed class PageWriter : IDisposable
         if (y + font.Size * PageGeometry.LineSpacing * 2 > ContentBottom)
             NewPage();
         if (Math.Abs(font.Size - PaperTypeScale.Title) < 0.01f)
-            tocEntries.Add((text, contentPages + 1));
+            tocEntries.Add((text, FirstFolio + finishedPages));
         DrawWrapped(text, font, color, ContentLeft, ContentWidth);
         if (ruled)
         {
@@ -275,11 +283,12 @@ internal sealed class PageWriter : IDisposable
 
     private void FinishPage()
     {
-        if (numbering)
+        if (!folioSuppressed)
         {
             DrawFooter();
-            contentPages++;
         }
+        folioSuppressed = false;
+        finishedPages++;
         sink.EndPage();
     }
 
@@ -290,9 +299,9 @@ internal sealed class PageWriter : IDisposable
         var baseline = PageGeometry.PageHeight - PageGeometry.FolioBaseline;
 
         using var titlePaint = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
-        canvas.DrawText(runningTitle, ContentLeft, baseline, running, titlePaint);
+        canvas.DrawText(runningFoot, ContentLeft, baseline, running, titlePaint);
 
-        var number = (contentPages + 1).ToString();
+        var number = (FirstFolio + finishedPages).ToString();
         using var numberPaint = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
         canvas.DrawText(number, PageGeometry.ContentRight - folio.MeasureText(number),
             baseline, folio, numberPaint);
