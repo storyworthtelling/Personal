@@ -36,6 +36,15 @@ public static class ReportType
     public static SKFont BodyBold() => Font(EmbeddedTypefaces.SerifSemibold, PaperTypeScale.Body);
     public static SKFont BodyItalic() => Font(EmbeddedTypefaces.SerifItalic, PaperTypeScale.Body);
 
+    /// <summary>
+    /// The line under a cover title — the draft and its length.
+    ///
+    /// <para>Sans, not Serif, and that is the drawing's decision rather than a slip: everything on
+    /// the cover that is <i>about</i> the book rather than <i>of</i> it is set in the apparatus face,
+    /// which is what keeps the title the only thing on the page speaking in the book's own voice.</para>
+    /// </summary>
+    public static SKFont Subtitle() => Font(EmbeddedTypefaces.SansRegular, PaperTypeScale.Body);
+
     /// <summary>The apparatus voice: a caption, a note under a head, a legend entry.</summary>
     public static SKFont Small() => Font(EmbeddedTypefaces.SansRegular, PaperTypeScale.Secondary);
 

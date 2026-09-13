@@ -32,38 +32,55 @@ public sealed class AnalysisDocumentRenderer
         RenderReport(analysis, cover, scenes, review).Pdf;
 
     /// <summary>
-    /// Renders the content twice.
+    /// Renders three times, and each pass buys something the next one needs.
     ///
-    /// <para>The contents page has to name the page each section starts on, and it is printed
-    /// <b>before</b> the content it indexes. While every page was a PNG in a list that was fine — the
-    /// front matter was simply prepended afterwards. A PDF sink writes as it goes and there is no
-    /// going back, so the first pass is a throwaway whose only product is the page numbers, and the
-    /// second prints the real document. The content render is deterministic, so the two agree; and
-    /// drawing a hundred pages of vector type twice is nothing beside the model calls that produced
-    /// the words on them.</para>
+    /// <para>The contents has to name the page each section starts on, and it is printed
+    /// <b>before</b> the content it indexes. While every page was a PNG in a list that was free — the
+    /// front matter was prepended afterwards. A PDF sink writes as it goes and there is no going back,
+    /// so: the first pass renders the content to learn which sections land where, relative to the
+    /// content's own first sheet; the second renders the front matter with those entries to learn how
+    /// many sheets the front matter itself takes; and the third prints the real document, with the
+    /// entries shifted by that count so the contents names the folio a reader will actually see.</para>
+    ///
+    /// <para>The second pass is needed because the front matter's length depends on the number of
+    /// entries, and the entries' numbers depend on the front matter's length. Only the <i>count</i> is
+    /// circular, and it settles at once: a contents page holds the same number of lines whether it is
+    /// printing two-digit folios or three. All three passes are deterministic, and drawing a hundred
+    /// pages of vector type is nothing beside the model calls that wrote the words on them.</para>
     /// </summary>
     public AnalysisRenderResult RenderReport(
         BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null)
     {
         var reportTitle = string.IsNullOrWhiteSpace(cover.Title) ? "Book Analysis" : cover.Title;
         var titled = cover with { Title = reportTitle };
+        var foot = $"{reportTitle} · draft {titled.DraftNumber}";
+        var draft = review ?? DraftReview.FirstDraft;
 
-        IReadOnlyList<(string Title, int Page)> tocEntries;
-        using (var probe = new PageWriter(reportTitle))
+        IReadOnlyList<(string Title, int Page)> relative;
+        using (var probe = new PageWriter(foot))
         {
-            probe.BeginContent();
-            RenderContent(analysis, scenes, review ?? DraftReview.FirstDraft, probe);
-            tocEntries = probe.TocEntries.ToList();
+            RenderContent(analysis, scenes, draft, probe);
+            relative = probe.TocEntries.ToList();
             probe.Finish();
         }
 
-        using var document = new PageWriter(reportTitle);
+        int frontMatter;
+        using (var probe = new PageWriter(foot))
+        {
+            covers.AnalysisCover(probe, titled);
+            covers.AnalysisToc(probe, relative);
+            frontMatter = probe.PageCount;
+            probe.Finish();
+        }
+
+        var entries = relative.Select(entry => (entry.Title, entry.Page + frontMatter)).ToList();
+
+        using var document = new PageWriter(foot);
         covers.AnalysisCover(document, titled);
-        covers.AnalysisToc(document, tocEntries);
-        var frontMatter = document.PageCount;
-        document.BeginContent();
-        RenderContent(analysis, scenes, review ?? DraftReview.FirstDraft, document);
-        return new AnalysisRenderResult(document.Finish(), frontMatter, tocEntries);
+        covers.AnalysisToc(document, entries);
+        document.NewPage();
+        RenderContent(analysis, scenes, draft, document);
+        return new AnalysisRenderResult(document.Finish(), frontMatter, entries);
     }
 
     private static void RenderContent(

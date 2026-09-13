@@ -77,22 +77,29 @@ public class ReportCoverTests
         Assert.True(result.FrontMatterCount <= result.TocEntries.Count + 1);
     }
 
+    /// <summary>
+    /// The folio counts every sheet and the title page prints none, which is what makes a number in
+    /// the contents the same number a reader sees at the foot of the page.
+    /// </summary>
     [Fact]
-    public void TheFrontMatterIsUnnumbered()
+    public void TheTitlePagePrintsNoFolioAndEverythingAfterItDoes()
     {
         var result = new AnalysisDocumentRenderer().RenderReport(
             SampleAnalysis.Of(),
-            new ReportCover("The Salt Line", 1, 0, Read, null, null), Array.Empty<SceneEvidence>());
+            new ReportCover("The Salt Line", 3, 0, Read, null, null), Array.Empty<SceneEvidence>());
 
         using var document = PdfDocument.Open(new MemoryStream(result.Pdf));
-        for (var page = 1; page <= result.FrontMatterCount; page++)
-        {
-            var text = document.GetPage(page).Text;
-            Assert.DoesNotContain("The Salt Line1", text.Replace(" ", string.Empty), StringComparison.Ordinal);
-        }
+        var cover = document.GetPage(1).Text;
+        Assert.DoesNotContain("draft 3", cover, StringComparison.Ordinal);
 
-        // …and the first content page carries folio 1.
-        var first = document.GetPage(result.FrontMatterCount + 1).Text;
-        Assert.Contains("1", first, StringComparison.Ordinal);
+        for (var page = 2; page <= document.NumberOfPages; page++)
+        {
+            var text = Squashed(document.GetPage(page).Text);
+            Assert.Contains(Squashed($"The Salt Line · draft 3"), text, StringComparison.Ordinal);
+            Assert.Contains(page.ToString(), text, StringComparison.Ordinal);
+        }
     }
+
+    private static string Squashed(string text) =>
+        new(text.Where(c => !char.IsWhiteSpace(c)).ToArray());
 }
