@@ -125,7 +125,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IGoogleDocsClient, GoogleDocsClient>();
         builder.Services.AddSingleton<IClock, SystemClock>();
         builder.Services.AddSingleton<IImageStore, FileSystemImageStore>();
-        builder.Services.AddSingleton<IVolumePdfComposer, PdfVolumeComposer>();
+        // The image-to-PDF assembler is gone from this head: the report draws straight into a
+        // VectorPdfSink now, and nothing else here wraps pictures of pages.
         builder.Services.AddSingleton<AnalysisDocumentRenderer>();
         builder.Services.AddSingleton<IAnalysisPdfComposer, AnalysisPdfComposer>();
 
