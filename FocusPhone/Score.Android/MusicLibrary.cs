@@ -432,24 +432,31 @@ public sealed class MusicLibrary(
 
     public void PlayTracks(IReadOnlyList<Track> tracks, int index, PlaybackLaunch launch = PlaybackLaunch.Album)
     {
-        if (playback.Controller is null || tracks.Count == 0)
+        if (tracks.Count == 0)
         {
             return;
         }
 
-        // Putting something on REPLACES the music run — choosing an album is choosing
-        // what to listen to, not adding to a list. Only Enqueue builds one up.
-        Restore();
-        queue.ReplaceWith(tracks.Select(track => track.Id));
-        queueStore.Save(queue.Export());
+        // playback.WhenReady, not an early return on Controller is null: a tap landing in the
+        // brief cold-start window before the controller connects used to be dropped with no
+        // feedback at all (the bottom bar reads persisted state directly, so it looked queued
+        // while nothing actually started) — see WhenReady's remarks.
+        playback.WhenReady(() =>
+        {
+            // Putting something on REPLACES the music run — choosing an album is choosing
+            // what to listen to, not adding to a list. Only Enqueue builds one up.
+            Restore();
+            queue.ReplaceWith(tracks.Select(track => track.Id));
+            queueStore.Save(queue.Export());
 
-        // Speed 1.0 and skip-silence off: both are podcast settings, and a track must
-        // not inherit them from whatever episode played last.
-        playback.Start(MediaKind.Music, [.. tracks.Select(BuildItem)], index, 0L, 1.0f, skipSilence: false);
+            // Speed 1.0 and skip-silence off: both are podcast settings, and a track must
+            // not inherit them from whatever episode played last.
+            playback.Start(MediaKind.Music, [.. tracks.Select(BuildItem)], index, 0L, 1.0f, skipSilence: false);
 
-        // Start a listening sitting for Genius; replay is judged against the saved progress book.
-        var book = new PlaybackProgressBook(progress.Load());
-        listening.BeginSelection(tracks, index, launch, book.IsComplete);
+            // Start a listening sitting for Genius; replay is judged against the saved progress book.
+            var book = new PlaybackProgressBook(progress.Load());
+            listening.BeginSelection(tracks, index, launch, book.IsComplete);
+        });
     }
 
     /// <summary>
@@ -512,18 +519,13 @@ public sealed class MusicLibrary(
     /// starts the track and leaves the stored music queue exactly where it was, so
     /// auditioning something cannot cost you a queue you assembled.
     /// </summary>
-    public void Audition(Track track)
+    public void Audition(Track track) => playback.WhenReady(() =>
     {
-        if (playback.Controller is null)
-        {
-            return;
-        }
-
         playback.Start(MediaKind.Music, [BuildItem(track)], 0, 0L, 1.0f, skipSilence: false);
 
         var book = new PlaybackProgressBook(progress.Load());
         listening.BeginSelection([track], 0, PlaybackLaunch.Album, book.IsComplete);
-    }
+    });
 
     /// <summary>
     /// Starts a workout run: an <b>ephemeral</b> queue that is neither saved nor
@@ -537,11 +539,16 @@ public sealed class MusicLibrary(
     /// </summary>
     public void StartWorkout(IReadOnlyList<Track> tracks, bool fade)
     {
-        if (playback.Controller is null || tracks.Count == 0)
+        if (tracks.Count == 0)
         {
             return;
         }
 
+        playback.WhenReady(() => StartWorkoutReady(tracks, fade));
+    }
+
+    private void StartWorkoutReady(IReadOnlyList<Track> tracks, bool fade)
+    {
         var items = tracks.Select(BuildItem).ToList();
         if (fade)
         {

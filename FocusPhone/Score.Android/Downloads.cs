@@ -61,12 +61,16 @@ public static class Downloads
     /// </summary>
     public static DownloadManager Manager(Context context)
     {
+        // PodcastAudioSource.Factory(), not a bare DefaultHttpDataSource.Factory(): the download
+        // path needs the same User-Agent + cross-protocol-redirect handling as streaming, or any
+        // episode fetched through a tracking-URL redirect (Podtrac/Megaphone/Simplecast — most of
+        // NYT's feeds) fails here even though streaming that same episode works fine.
         return manager ??= new DownloadManager(
             context,
             new StandaloneDatabaseProvider(context),
             Cache(context),
             new ResolvingDataSource.Factory(
-                new DefaultHttpDataSource.Factory(), new DriveMediaResolver(new DeviceAccountTokenProvider())),
+                PodcastAudioSource.Factory(), new DriveMediaResolver(new DeviceAccountTokenProvider())),
             Java.Util.Concurrent.Executors.NewFixedThreadPool(ParallelDownloads)!);
     }
 

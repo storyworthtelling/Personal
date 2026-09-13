@@ -43,6 +43,24 @@ public class MusicCatalog
     public IReadOnlyList<Track> TracksByArtist(string artistName) =>
         InAlbumOrder(tracks.Where(track => Name.Equals(track.DisplayArtist, artistName)));
 
+    /// <summary>
+    /// This artist's tracks, grouped into albums — the same grouping <see cref="Albums"/> uses,
+    /// scoped to what <see cref="TracksByArtist"/> returns rather than to the album's own
+    /// AlbumArtist tag, since a track's performing artist and its album's artist tag are not
+    /// always the same (a compilation, a guest spot). Tapping an artist used to fall straight to
+    /// a flat, unbrowsable song list; this is what lets it open into the same album screen
+    /// Albums itself uses instead.
+    /// </summary>
+    public IReadOnlyList<Album> AlbumsByArtist(string artistName) =>
+        [.. TracksByArtist(artistName)
+            .GroupBy(track => (Artist: track.DisplayAlbumArtist, Album: track.DisplayAlbum))
+            .Select(group => new Album(
+                group.Key.Album,
+                group.Key.Artist,
+                InAlbumOrder(group),
+                group.Select(track => track.ArtRef).FirstOrDefault(art => art is not null)))
+            .OrderBy(album => album.Name, Name)];
+
     public IReadOnlyList<Track> TracksInGenre(string genre) =>
         InAlbumOrder(tracks.Where(track => Name.Equals(track.DisplayGenre, genre)));
 
