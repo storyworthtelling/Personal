@@ -117,6 +117,7 @@ public sealed class ScorePlayback(Activity host)
         driveFuture.AddListener(new Java.Lang.Runnable(() =>
         {
             driveController = (MediaController)driveFuture.Get()!;
+            RunPending();
         }), executor);
 
         var tidalFuture = new MediaController.Builder(host, token)
@@ -126,6 +127,46 @@ public sealed class ScorePlayback(Activity host)
         {
             tidalController = (MediaController)tidalFuture.Get()!;
         }), executor);
+    }
+
+    private readonly List<Action> pendingOnConnect = [];
+
+    /// <summary>
+    /// Runs the given action once a controller exists — immediately if one already does, or
+    /// deferred until <see cref="Connect"/>'s asynchronously-built drive controller resolves.
+    ///
+    /// <see cref="Connect"/>'s own remarks warn that <see cref="Controller"/> stays null for a
+    /// moment after a cold start; every caller that used to check for that and simply drop the
+    /// request (a tap landing in that brief window) dropped it with no feedback at all — the
+    /// bottom bar reads persisted queue/session state directly, so the request looked queued
+    /// while the actual Play() call never went out, and nothing short of tapping Play again
+    /// recovered it. Queuing here instead means the tap that started this call is honored
+    /// exactly once the controller is ready, rather than silently lost.
+    /// </summary>
+    public void WhenReady(Action action)
+    {
+        if (Controller is not null)
+        {
+            action();
+            return;
+        }
+
+        pendingOnConnect.Add(action);
+    }
+
+    private void RunPending()
+    {
+        if (pendingOnConnect.Count == 0)
+        {
+            return;
+        }
+
+        var actions = pendingOnConnect.ToList();
+        pendingOnConnect.Clear();
+        foreach (var action in actions)
+        {
+            action();
+        }
     }
 
     private static Android.OS.Bundle SessionHint(string sessionId)
@@ -228,6 +269,13 @@ public sealed class ScorePlayback(Activity host)
 
     // Stepped on the main thread's handler: Media3's volume is a plain setter, so a
     // fade is a series of them rather than an animation the player runs itself.
+    //
+    // The whole sequence runs inside try/catch and logs through AudioDiagnostics rather than
+    // letting anything escape: an exception thrown from a Handler.PostDelayed runnable is fatal
+    // on Android (it crashes the whole app on the main thread) with nothing captured anywhere —
+    // which would exactly match a workout tempo change that "stops the current track and never
+    // starts the next one" with no trace of why, since a crash mid-fade-out leaves the controller
+    // silenced (Volume already stepped toward 0) and the fade-in/Start() callback never runs.
     private static void Fade(MediaController controller, float from, float to, Action? then)
     {
         const int Steps = 12;
@@ -237,10 +285,18 @@ public sealed class ScorePlayback(Activity host)
             var at = step;
             handler.PostDelayed(() =>
             {
-                controller.Volume = from + ((to - from) * at / (float)Steps);
-                if (at == Steps)
+                try
                 {
-                    then?.Invoke();
+                    controller.Volume = from + ((to - from) * at / (float)Steps);
+                    if (at == Steps)
+                    {
+                        then?.Invoke();
+                    }
+                }
+                catch (Exception e)
+                {
+                    AudioDiagnostics.LogWarning("ScorePlayback.Fade",
+                        $"Fade step {at}/{Steps} (from {from} to {to}) failed.", e);
                 }
             }, (long)(FadeMs * at / (double)Steps));
         }
