@@ -303,6 +303,10 @@ public static class PaperUi
         var tint = hue ?? PaperTheme.Accent;
         var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
         row.Background = Outline(context, PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusInput);
+        // Each cell paints its selection wash as a flat rectangle (SetBackgroundColor below); without
+        // clipping, the first/last cell's fill squares off past the row's own rounded corners. The
+        // GradientDrawable background above provides a rounded-rect outline for free.
+        row.ClipToOutline = true;
 
         var cells = new TextView[labels.Count];
         var selected = initialIndex;
