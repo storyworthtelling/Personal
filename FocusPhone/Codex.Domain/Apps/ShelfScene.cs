@@ -47,7 +47,11 @@ public readonly record struct ShelfMetrics(
     float SpineHeight,
     float ClockSize,
     float BookendWidth,
-    IReadOnlyDictionary<SpineSizing.Size, float> SpineWidths)
+    IReadOnlyDictionary<SpineSizing.Size, float> SpineWidths,
+    // Distinct from ItemGap: the tray's spine-out books are meant to abut (a hair of separation
+    // reads as separate bindings, not a gap), but the six cover-out home books read as two flat
+    // rects with barely a gap between them at ItemGap's width — they need real breathing room.
+    float HomeCoverGap = 14f)
 {
     /// <summary>Reasonable defaults (dp) for a Pixel-8a-width shelf; a head can override.</summary>
     public static ShelfMetrics Default { get; } = new(

@@ -39,6 +39,7 @@ public class BinderTabs : ViewGroup
 
     private readonly List<BinderArea> areas = [];
     private readonly Paint pageEdge;
+    private readonly Paint gutter;
     private readonly int radius;
     private int activeIndex;
 
@@ -53,6 +54,11 @@ public class BinderTabs : ViewGroup
             StrokeWidth = PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp),
         };
         pageEdge.SetStyle(Paint.Style.Stroke);
+
+        // Fills the whole gutter behind the tabs — see OnDraw's remarks for why this
+        // exists at all.
+        gutter = new Paint { AntiAlias = true, Color = PaperTheme.Paper };
+        gutter.SetStyle(Paint.Style.Fill);
     }
 
     /// <summary>Fires with the tapped index — including the active one.</summary>
@@ -63,6 +69,7 @@ public class BinderTabs : ViewGroup
         areas.Clear();
         areas.AddRange(value);
         activeIndex = active;
+        UpdateGutterColor();
 
         RemoveAllViews();
         for (var i = 0; i < areas.Count; i++)
@@ -76,12 +83,23 @@ public class BinderTabs : ViewGroup
     public void SetActive(int index)
     {
         activeIndex = index;
+        UpdateGutterColor();
         for (var i = 0; i < ChildCount; i++)
         {
             PaintTab(GetChildAt(i)!, areas[i], i == index);
         }
 
         Invalidate();
+    }
+
+    // The active area's own cloth, matching the fill an inactive tab of that area
+    // would wear (PaintTab) — the nearest thing this class has to "the cover color."
+    private void UpdateGutterColor()
+    {
+        if (activeIndex >= 0 && activeIndex < areas.Count)
+        {
+            gutter.Color = areas[activeIndex].Cloth;
+        }
     }
 
     private View BuildTab(BinderArea area, int index)
@@ -172,6 +190,19 @@ public class BinderTabs : ViewGroup
     protected override void OnDraw(Canvas canvas)
     {
         base.OnDraw(canvas);
+
+        // BinderTabs never set a Background and its own OnDraw used to paint only the
+        // page-edge hairline below — every tab child paints its own fill, but the lead-in
+        // gap above the first tab and the small gaps BinderTabLayout leaves between tabs
+        // belong to no view at all. Those pixels fell through to the Activity window's
+        // own background (paper_background, the grain tile), which read as flecks of
+        // paper texture inside what is supposed to be a solid binder gutter — worth
+        // fixing on its own, and doubly so now that the grain is raised. Filling the
+        // whole gutter first, before the hairline and before children draw over it, is
+        // what makes the gaps read as the same cloth the tabs around them wear instead
+        // of a hole back to the page underneath.
+        canvas.DrawRect(0, 0, Width, Height, gutter);
+
         // The page edge: the line the tabs are clipped at, running the full height.
         var x = pageEdge.StrokeWidth / 2f;
         canvas.DrawLine(x, 0, x, Height, pageEdge);

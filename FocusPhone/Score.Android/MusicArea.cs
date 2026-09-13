@@ -61,11 +61,20 @@ public sealed class MusicArea : ScoreArea
             return true;
         }
 
-        // An open album, or a narrowed axis, is a level below its list — back returns
-        // to the list rather than all the way to the menu.
-        if (openAlbum is not null || narrowed is not null)
+        // An open album is a level below whatever list opened it — Albums directly, or an
+        // artist's own album shelf when narrowed by artist — so it closes on its own first,
+        // leaving that list (not skipping past it) rather than always clearing both at once.
+        if (openAlbum is not null)
         {
             openAlbum = null;
+            Invalidate();
+            return true;
+        }
+
+        // A narrowed axis is a level below its list — back returns to the list rather than
+        // all the way to the menu.
+        if (narrowed is not null)
+        {
             narrowed = null;
             query = string.Empty;
             Invalidate();
@@ -148,7 +157,11 @@ public sealed class MusicArea : ScoreArea
         head.AddView(PaperUi.Heading(Host, view.ToString()),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         head.AddView(PaperUi.QuietButton(Host, "Shuffle", () => library.PlayShuffled(library.Catalog.Songs())));
-        head.AddView(PaperUi.QuietButton(Host, "EQ", () => Host.StartActivity(new Intent(Host, typeof(EqualizerActivity)))));
+        if (AudioEffects.HasEqualizer)
+        {
+            head.AddView(PaperUi.QuietButton(Host, "EQ", () => Host.StartActivity(new Intent(Host, typeof(EqualizerActivity)))));
+        }
+
         head.AddView(PaperUi.QuietButton(Host, "Rescan", () => _ = library.ScanAsync()));
         container.AddView(head);
 
@@ -192,7 +205,12 @@ public sealed class MusicArea : ScoreArea
         switch (view)
         {
             case MusicView.Artists when narrowed is { } artist:
-                return BuildNarrowed(artist.Name, catalog.TracksByArtist(artist.Name));
+                // A drilled-into album takes over the same way it does under the Albums tab
+                // (see the MusicView.Albums case just below) — the two share one screen rather
+                // than needing a second one drawn for it.
+                return openAlbum is { } artistAlbum
+                    ? BuildAlbum(artistAlbum)
+                    : BuildArtistAlbums(artist.Name);
 
             case MusicView.Artists:
                 var artists = catalog.Artists();
@@ -390,9 +408,30 @@ public sealed class MusicArea : ScoreArea
     }
 
     /// <summary>
-    /// An artist or a genre, narrowed to its tracks. Deliberately the song list rather
-    /// than a screen of its own: neither was ever drawn, and reusing an approved
-    /// surface scoped to one name is honest where inventing two screens is not.
+    /// An artist, narrowed to their albums rather than a flat, unbrowsable list of every track
+    /// they appear on. Tapping one opens the same album screen <see cref="BuildAlbum"/> already
+    /// draws for the Albums tab — an artist's shelf, not a second album screen.
+    /// </summary>
+    private View BuildArtistAlbums(string artistName)
+    {
+        var albums = library.Catalog.AlbumsByArtist(artistName);
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        column.AddView(PaperUi.Heading(Host, artistName));
+        column.AddView(Browse(albums.Count,
+            [.. albums.Select(album => (new PaperListRow(album.Name, album.AlbumArtist, album.ArtRef), album))],
+            Open,
+            album => ShowAlbumActions(album.Name, album.Tracks),
+            asCovers: true), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        return column;
+    }
+
+    /// <summary>
+    /// A genre, narrowed to its tracks. Deliberately the song list rather than a screen of its
+    /// own: no genre screen was ever drawn, and reusing an approved surface scoped to one name
+    /// is honest where inventing one is not. (Artists get their own albums shelf instead — see
+    /// <see cref="BuildArtistAlbums"/> — because a genre usually spans too many unrelated albums
+    /// to read as one shelf the way an artist's discography does.)
     /// </summary>
     private View BuildNarrowed(string name, IReadOnlyList<Track> tracks)
     {

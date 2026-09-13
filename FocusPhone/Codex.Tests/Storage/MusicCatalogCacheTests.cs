@@ -125,6 +125,22 @@ public class MusicCatalogCacheTests : IDisposable
         Assert.Equal(new MusicFileVersion(0, 0), cache.LoadVersions()["1"]);
     }
 
+    // A hidden-track split file's rows carry their own generated ids, never the source file's —
+    // the scan diffs by Drive file id, so LoadVersions has to answer to that id (via sourceId)
+    // the same way Delete already does, or a split file is seen as "never scanned" forever and
+    // re-read on every single pass regardless of whether it changed.
+    [Fact]
+    public void LoadVersions_FindsAHiddenTrackSplitFileByItsSourceId()
+    {
+        cache.Upsert(
+        [
+            (Tr("file#0") with { SourceFileId = "file", ClipStart = TimeSpan.Zero }, new MusicFileVersion(1000, 2048)),
+            (Tr("file#1") with { SourceFileId = "file", ClipStart = TimeSpan.FromMinutes(4) }, new MusicFileVersion(1000, 2048)),
+        ]);
+
+        Assert.Equal(new MusicFileVersion(1000, 2048), cache.LoadVersions()["file"]);
+    }
+
     [Fact]
     public void Migration_AddsVersionColumnsToAPreexistingTracksTable()
     {

@@ -10,7 +10,7 @@ namespace IconStudio;
 public static class GrainTile
 {
     public const int TileSize = 256;
-    public const byte Alpha = 6;   // of 255 — ~2.4% ink
+    public const byte Alpha = 32;  // of 255 — ~12.5% ink
     public const int Density = 6;  // ~1 in Density pixels carries grain
     public const uint Seed = 1913;
 

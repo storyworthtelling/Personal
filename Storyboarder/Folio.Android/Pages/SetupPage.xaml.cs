@@ -3,6 +3,7 @@ using Microsoft.Maui;
 using Folio.Android.Google;
 using Folio.Android.Platforms.Android;
 using Folio.Domain.Health;
+using Folio.Domain.Identity;
 using Folio.Infrastructure.Services;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
@@ -18,12 +19,6 @@ public partial class SetupPage : ContentPage
     public SetupPage()
     {
         InitializeComponent();
-
-        // The one shared formatter, so every app's foot line reads identically.
-        BuildLineLabel.Text = Storyworthtelling.Updates.BuildLine.Format(
-            Folio.Domain.Identity.FolioIdentity.DisplayName,
-            Microsoft.Maui.ApplicationModel.AppInfo.Current.VersionString,
-            Microsoft.Maui.ApplicationModel.AppInfo.Current.PackageName);
     }
 
     protected override void OnAppearing()
@@ -319,11 +314,11 @@ public partial class SetupPage : ContentPage
     {
         try
         {
-            return $"Folio {AppInfo.Current.VersionString} ({AppInfo.Current.BuildString}) · {AppInfo.Current.PackageName}";
+            return $"{FolioIdentity.DisplayName} {AppInfo.Current.VersionString} ({AppInfo.Current.BuildString}) · {AppInfo.Current.PackageName}";
         }
         catch
         {
-            return $"Folio · {AppSigningInfo.PackageName}";
+            return $"{FolioIdentity.DisplayName} · {AppSigningInfo.PackageName}";
         }
     }
 
