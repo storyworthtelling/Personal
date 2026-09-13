@@ -250,8 +250,23 @@ public sealed class ProjectService
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         // Cancelled and Failed are left to the user (Retry/rework); healing files under them would quietly
         // resurrect work they deliberately stopped.
+        //
+        // Completed is excluded for a different reason, and it is the one that costs money. This method
+        // regresses novel.Stage by writing it DIRECTLY — it never calls ProjectStateMachine.NextStage — so
+        // Completed being a terminal stage there protected nothing at all. A finished book whose rendered
+        // file went missing (a reboot mid-flush, a storage sweep, an interrupted write) was pulled back
+        // into the pipeline at the next app start and re-run, which on a full manuscript means the most
+        // expensive stage billed a second time for a file the owner never touched.
+        //
+        // The accepted cost, measured rather than assumed: a Completed book whose report PDF is gone stays
+        // Completed with no PDF on disk. What is NOT lost is the report — GetReportAsync rebuilds it from
+        // the stored JSON on BookAnalysis, so the in-app reader still shows all of it, and an archived
+        // book also has its Drive copy (which this method already skips). So the loss is one local file,
+        // and regaining it is the owner's deliberate act rather than a side effect of opening the app.
         var novelIds = await db.Novels
-            .Where(n => n.Stage != ProjectStage.Cancelled && n.Stage != ProjectStage.Failed)
+            .Where(n => n.Stage != ProjectStage.Cancelled
+                && n.Stage != ProjectStage.Failed
+                && n.Stage != ProjectStage.Completed)
             .Select(n => n.Id)
             .ToListAsync(cancellationToken);
 
