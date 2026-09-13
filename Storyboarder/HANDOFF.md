@@ -1,20 +1,33 @@
-# Canonizer — session handoff
+# Folio — session handoff
 
-**Phase 1 of the Storyboarder → Canonizer pivot is complete.** The app is no longer a graphic-novel
-factory; it is a **manuscript revision instrument** whose star product is a chapter-cited revision
-report, with **one wordless image per scene as supporting evidence** (a fidelity check — does the
-beat land visually as written?). This handoff replaces the old graphic-novel handoff; the phases it
-described are superseded by the pivot.
+**P10 Release A is complete: the rename, and the frozen set.** Canonizer is now **Folio** —
+folders, namespaces, solution, context, database file, CI artifact and the on-device label.
+Everything the phase does after this rides on the rename having already happened, which is why
+it ships first.
 
-The work landed on branch `claude/plan-kickoff-nczkfr` as an ordered set of commits: rebrand →
-strip the graphic-novel machinery → Scene model + schema baseline → per-scene images → new report
-anatomy → new source formats → Drive delivery → the Android head → docs. Read this top to bottom
-before starting work.
+What did **not** move, and must never move, is the frozen set. Every item on it is invisible:
+nothing fails at build time if it moves, and nothing fails loudly at run time either. The app
+simply stops updating, or stops running its pipeline, or comes up as though it had never been
+configured. `Folio.Tests/Guard/FolioInvariantsTests.cs` fails instead — do not "fix" these.
 
-**Internal identity is unchanged on purpose.** The namespaces (`Storyboarder.*`), solution,
-`StoryboarderDbContext`, `storyboarder.db`, and app id `com.storyworthtelling.storyboarder` all
-stay, so an installed build upgrades in place. Only the user-facing name (**Canonizer**), the icon
-(a red pen nib), and a few domain concepts changed.
+| Frozen | Why | Silent failure if it moves |
+| --- | --- | --- |
+| App id `com.storyworthtelling.storyboarder` — one constant, `FolioIdentity.ApplicationId` | The release channel installs by package id | A **second app** installs beside the first; the owner's books stay in the copy that never updates again |
+| `PipelineWorker`'s `[Register]` Java name | WorkManager instantiates by class name from a row persisted on the device | The class named in that row no longer exists, so **the pipeline stops** |
+| Both unique work names (`storyboarder-pipeline`, `-now`) | `EnqueueUniquePeriodicWork` with `Keep` matches on the name | The old schedule is never replaced: **two pipelines or none** |
+| `MainActivity`'s Java name — it had none, so it was generated from the namespace | Home-screen shortcuts point at the class name | Every existing shortcut points at a class that is gone |
+| The **twelve** preference keys, as literals (they were `nameof(…)`) | A renamed property renames its key | Settings come up **empty**, the vault passphrase among them — the one secret the vault itself cannot restore |
+| `"CanonizerSchemaReset"`, still read | It is what already-upgraded devices have stored | The generation-2 reset would run a second time on a phone that has had it |
+
+The old brand survives in exactly those places, by design. Everywhere else it is gone.
+
+**The database moved, so the old one is deleted rather than orphaned.** `storyboarder.db` becomes
+`folio.db`, which means a schema reset cannot just call `EnsureDeleted()` — that runs against the
+new context and never touches the old file. `LegacyDatabase.Remove` deletes it and both its WAL
+siblings, driven by `SettingsStore.SchemaResetGeneration` (a number now, not a boolean, so P10's
+reset can run on a phone that already had the pivot's). A backup written under the old entry name
+still restores: `ProjectBackupService` reads either.
+
 
 ---
 
@@ -27,10 +40,10 @@ Verify the toolchain, then the suite:
 
 ```
 dotnet --version     # expect 10.0.x
-dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj -p:StoryboarderTfms=net10.0
+dotnet test Storyboarder/Folio.sln -p:FolioTfms=net10.0
 ```
 
-**Baseline: 287 passing, 0 failing** (Phase 5 landed) — plus `Storyworthtelling.Remarkable.Tests` (12) and
+**Baseline: 315 passing, 0 failing** (P10 Release A landed) — plus `Storyworthtelling.Remarkable.Tests` (12) and
 Foreword's suite. Run these before every commit. Never commit a red suite. `dotnet ef` is installed but
 not on PATH in a fresh container — `export PATH="$PATH:$HOME/.dotnet/tools"` before `dotnet ef migrations
 add …`. Foreword is now on .NET 10 like the rest of the repo, so its tests build and run here directly
@@ -42,18 +55,18 @@ pulls android.jar for API 36 from a GitHub mirror since `dl.google.com` is block
 minimal SDK at `/opt/android-sdk-min`), then:
 
 ```
-dotnet build Storyboarder/Storyboarder.Android/Storyboarder.Android.csproj \
+dotnet build Storyboarder/Folio.Android/Folio.Android.csproj \
   -p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false
 ```
 
 This gets `dotnet build` green through XAML + C# + resource linking; it does **not** run the app (no
-emulator/display). The setup is ephemeral — re-run the script each session you need the head. The
-head could not be compiled in the pivot session (no network for the script), so its changes are
-careful manual edits, not compile-verified — **build it first thing next session.**
+emulator/display). The setup is ephemeral — re-run the script each session you need the head. The head **was**
+compiled in the Release A session and is green; build it before pushing anything that touches it,
+since CI is otherwise its only compiler.
 
 ## 2. The product thesis (this shapes every decision)
 
-Canonizer is a **manuscript revision instrument for an audience of one, in which the image is a
+Folio is a **manuscript revision instrument for an audience of one, in which the image is a
 comprehension probe.** Four principles override everything:
 
 - **Nudge, never write.** Diagnose and point; never ghost-write the author's prose or lines.
@@ -68,6 +81,7 @@ declined.
 
 - **Rebrand** — `Glyphs.PenNib` (ink nib + terracotta tip), regenerated mipmaps, display name +
   copy + CI workflow renamed to Canonizer. Internal `Storyboarder.*` identity kept.
+  (P10 renamed it again, to **Folio**, and moved the namespaces with it — see the header.)
 - **Stripped the graphic-novel machinery** — entities `Volume`/`Page`/`Panel`, enums
   `ShotType`/`DialogueKind`, the batch renderer, `SkiaPageComposer`, `VolumeDecomposer`,
   `PageLayoutCalculator`, fact-checks, the in-app page reader, and the storyboard/cover/panel Claude
@@ -93,7 +107,7 @@ declined.
 
 ## 3b. What Phase 2 delivered (the revision loop)
 
-Phase 2 (§7 of the brief) makes Canonizer a revision partner across drafts:
+Phase 2 (§7 of the brief) makes Folio a revision partner across drafts:
 
 - **First-class `Finding` rows** with a stable `ThreadId` (the same issue over time), a first-class
   `Category`, and a per-occurrence `Status` (New/Carried/Regressed — **Fixed is derived** from a thread's
@@ -139,7 +153,7 @@ built in-session.
 ## 3d. What Phase 4 delivered (shared reMarkable delivery)
 
 Phase 4 (§8 of the brief) extracts Foreword's reMarkable code into a suite-shared library and delivers
-Canonizer's report to the tablet:
+Folio's report to the tablet:
 
 - **`Storyworthtelling.Remarkable`** — a new shared library (repo root, net10.0, mirrors
   `Storyworthtelling.Voice`) owning the whole cloud path: `IRemarkableClient`/`RemarkableStorageClient`
@@ -149,7 +163,7 @@ Canonizer's report to the tablet:
 - **Foreword migrated onto it** — deleted its local `Remarkable/` copy, repointed namespaces, pairs via
   `IRemarkableRegistration`. Its uploads stay at the account root (the root `Upload` overload), so its
   behavior and tests are unchanged.
-- **Canonizer delivery** — the `Archiving` stage delivers the report to a **"Canonizer" folder** through
+- **Folio delivery** — the `Archiving` stage delivers the report to the tablet **root** through
   `IRemarkableClient` (optional ctor dep), as a **second, independent, best-effort target** that runs before
   and independently of the Drive upload. `BookAnalysis.DeliveredToRemarkable` marks it settled (delivered or
   given up) so a broken token can't wedge a review. Off by default (`ArchiveOptions.DeliverToRemarkable`,
@@ -158,7 +172,7 @@ Canonizer's report to the tablet:
 
 Schema via the `Phase4RemarkableDelivery` migration. The reMarkable v2 path — especially the **folder wire
 format** — is reconstructed-not-verified; the tests pin the shape we send, the first live run verifies the
-cloud accepts it. The Android heads (Canonizer's `SetupPage`/DI, Foreword's) are compile-checked in CI,
+cloud accepts it. The Android heads (Folio's `SetupPage`/DI, Foreword's) are compile-checked in CI,
 not built in-session.
 
 ## 4. Traps that still apply
@@ -187,7 +201,7 @@ feature.
 - **Phase 3 ✅ (done):** the expansion engine ("Scenes to add", show-vs-tell leverage, thin-spot flags,
   genre-norm length targets) — the additive feedback that closes the word-count gap. See §3c.
 - **Phase 4 ✅ (done):** shared bidirectional **reMarkable** delivery library + vault-restored pairing —
-  the report lands in a "Canonizer" folder to read + annotate by hand. See §3d.
+  the report lands on the tablet to read + annotate by hand. See §3d.
 - **Phase 5 ✅ (done):** series awareness — link related books (`SeriesId`/`PreviousBookId`/`SeriesSequence`
   on `Novel`, `CreateNextBookAsync`) and reuse the prior book's canon: returning-entity reference-image reuse
   (`CarryForwardSeriesEntities`), a resumable **Series continuity** read (`AssessSeriesContinuity` sub-step 2f
