@@ -43,6 +43,32 @@ public sealed class GeminiImageClient : IGeminiImageClient
         return Generate(prompt, referenceImages: [], aspectRatio: null, cancellationToken);
     }
 
+    /// <summary>
+    /// The book's jacket.
+    ///
+    /// <para><b>Wordless, deliberately.</b> Image models letter badly — a cover that says
+    /// "The Salt Line" with one letter wrong is worse than one that says nothing, and it is the one
+    /// mistake nobody notices until the book has been on the shelf for a week. The title is set in
+    /// type over the art by the app, where it is spelt from the manuscript.</para>
+    ///
+    /// <para>Portrait, because a book is: 2:3 is the shape of the slot on the desk and the shelf.</para>
+    /// </summary>
+    public Task<byte[]> GenerateJacket(
+        string title, string genre, string logline, string artStyle, CancellationToken cancellationToken)
+    {
+        var subject = string.IsNullOrWhiteSpace(logline) ? title : logline;
+        var kind = string.IsNullOrWhiteSpace(genre) ? "literary novel" : genre;
+
+        var prompt =
+            $"Book jacket illustration for a {kind}, in this style: {artStyle}. " +
+            $"The book is about: {subject}. " +
+            "Compose it as cover art: one strong image that reads at a glance and at thumbnail size, " +
+            "with a calm area of low detail in the lower third where a title will be set over it. " +
+            "Absolutely no text, lettering, words, letters or numbers anywhere in the image.";
+
+        return Generate(prompt, referenceImages: [], aspectRatio: 2.0 / 3.0, cancellationToken);
+    }
+
     public Task<byte[]> GenerateSceneImage(
         string visualPrompt, string artStyle, IReadOnlyList<byte[]> referenceImages,
         double? aspectRatio, CancellationToken cancellationToken)
