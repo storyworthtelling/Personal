@@ -5,7 +5,7 @@
     <UseMaui>true</UseMaui>
     <RootNamespace>Storyboarder.Android</RootNamespace>
     <ApplicationId>com.storyworthtelling.storyboarder</ApplicationId>
-    <ApplicationTitle>Canonizer</ApplicationTitle>
+    <ApplicationTitle>Folio</ApplicationTitle>
     <!-- versionCode comes from the shared .github/actions/version-code action (band 1), like
          every other app in the suite: band * 100,000,000 + minutes since 2020-01-01 UTC. This
          value is only the fallback for a local build; CI always overrides it with -p. It used to
