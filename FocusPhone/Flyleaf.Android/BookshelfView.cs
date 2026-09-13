@@ -278,13 +278,25 @@ public class BookshelfView : View
         var rect = ToRectF(item.Rect);
 
         // The book's top page-block (fore-edge pages seen slightly from above), just above the cover, so a
-        // flat cover reads as a bound book with real thickness.
-        var pageDepth = 5 * density;
+        // flat cover reads as a bound book with real thickness. Deep enough, and lined enough, to read as
+        // a stack of individual pages rather than a second flat cover behind the first.
+        var pageDepth = 9 * density;
+        var pageLeft = rect.Left + 2 * density;
+        var pageRight = rect.Right - 1 * density;
         using (var pages = new Paint { AntiAlias = true })
         {
             pages.SetShader(Linear(0, rect.Top - pageDepth, 0, rect.Top,
                 PaperTheme.PaperBright, WithAlpha(PaperTheme.PaperDeep, 235)));
-            canvas.DrawRect(rect.Left + 2 * density, rect.Top - pageDepth, rect.Right - 1 * density, rect.Top, pages);
+            canvas.DrawRect(pageLeft, rect.Top - pageDepth, pageRight, rect.Top, pages);
+        }
+        using (var pageLine = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.WalnutDeep, 60), StrokeWidth = 1f * density })
+        {
+            const int lineCount = 3;
+            for (var i = 1; i <= lineCount; i++)
+            {
+                var y = rect.Top - pageDepth * i / (lineCount + 1);
+                canvas.DrawLine(pageLeft, y, pageRight, y, pageLine);
+            }
         }
 
         // Every home book is the ex-libris bookplate (the approved Post mockup): the app's identity cloth
@@ -301,9 +313,11 @@ public class BookshelfView : View
         }
         using (var spine = new Paint { AntiAlias = true })
         {
-            spine.SetShader(Linear(rect.Left, 0, rect.Left + 6 * density, 0,
-                WithAlpha(PaperTheme.WalnutDeep, 90), WithAlpha(PaperTheme.WalnutDeep, 0)));
-            canvas.DrawRect(rect.Left, rect.Top, rect.Left + 6 * density, rect.Bottom, spine);
+            // Widened and darkened from a thin seam to a visible spine face — a cover this narrow
+            // read as two flat rects with a gap rather than a bound book with any real thickness.
+            spine.SetShader(Linear(rect.Left, 0, rect.Left + 9 * density, 0,
+                WithAlpha(PaperTheme.WalnutDeep, 120), WithAlpha(PaperTheme.WalnutDeep, 0)));
+            canvas.DrawRect(rect.Left, rect.Top, rect.Left + 9 * density, rect.Bottom, spine);
         }
         using (var edge = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.PaperDeep, 200), StrokeWidth = 1.5f * density })
         {
@@ -626,7 +640,7 @@ public class BookshelfView : View
                 }
                 else if (art.HasNotification(item.Key))
                 {
-                    DrawBookmark(canvas, item.Rect);
+                    DrawBookmark(canvas, item.Rect, item.Key);
                 }
             }
         }
@@ -685,13 +699,18 @@ public class BookshelfView : View
         canvas.DrawLine(cx, cy, cx + (float)Math.Cos(rad) * length, cy + (float)Math.Sin(rad) * length, paint);
     }
 
-    private void DrawBookmark(Canvas canvas, LayoutRect rect)
+    private void DrawBookmark(Canvas canvas, LayoutRect rect, string key)
     {
         var r = ToRectF(rect);
         var w = 10 * density;
-        var x = r.Right - w - 6 * density;
+        // Anchored to the spine edge (the book's left edge, per DrawCoverBook's spine hinge and
+        // DrawSpineBook's rounded-back highlight — both treat left as the spine) rather than the
+        // right/fore-edge, so the tab reads as a bookmark sticking out of the book's binding.
+        var x = r.Left + 6 * density;
         var top = r.Top - 12 * density;
-        using var ribbon = new Paint { AntiAlias = true, Color = PaperTheme.Accent };
+        // Color-coded per app, using the same cloth tone as its cover/spine, so the tab reads as
+        // that book's own marker rather than one flat accent shared by every notifying app.
+        using var ribbon = new Paint { AntiAlias = true, Color = new Color(art.Cloth(key)) };
         using var path = new Android.Graphics.Path();
         path.MoveTo(x, top);
         path.LineTo(x + w, top);
@@ -757,6 +776,7 @@ public class BookshelfView : View
             SidePadding = m.SidePadding * d,
             ShelfGap = m.ShelfGap * d,
             ItemGap = m.ItemGap * d,
+            HomeCoverGap = m.HomeCoverGap * d,
             LedgeThickness = m.LedgeThickness * d,
             CoverWidth = m.CoverWidth * d,
             SpineHeight = m.SpineHeight * d,

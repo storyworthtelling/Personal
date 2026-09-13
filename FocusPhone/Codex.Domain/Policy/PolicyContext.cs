@@ -36,6 +36,13 @@ public record PolicyContext(
 
     public const string PlayStorePackage = "com.android.vending";
 
+    // A protected system package: DevicePolicyManager.SetPackagesSuspended refuses to suspend
+    // it and reports the attempt as a failure every single policy pass. It can surface in the
+    // browser/home-resolving package queries on some OEM builds (e.g. a Settings deep-link
+    // handler), so it is excluded from the suspend candidate set the same way the Play Store
+    // is, rather than logging the same permanent, expected failure forever.
+    public const string SettingsPackage = "com.android.settings";
+
     // Google Drive. Not first-party and not allowlisted for the owner to browse — it is here
     // only as a share target: Plate hands a finished scan to it rather than acquiring a Drive
     // API client and a write scope of its own.
