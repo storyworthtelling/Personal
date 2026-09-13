@@ -13,6 +13,14 @@ internal sealed class StreamMediaDataSource(System.IO.Stream stream) : MediaData
 {
     public override long Size => stream.CanSeek ? stream.Length : -1;
 
+    // ReadAt is invoked by MediaExtractor across the JNI boundary. A .NET exception
+    // escaping an overridden Java method there does not unwind back through our own
+    // call stack to MusicScanner's retry/catch — it is reported as an unhandled
+    // exception and takes the whole app down (this is how a transient DNS/network
+    // failure reading the underlying Drive stream crashed Score). Every failure —
+    // including a mid-read network drop — has to be swallowed here and turned into
+    // the one error signal this contract has: -1, which MediaExtractor treats as
+    // end of stream.
     public override int ReadAt(long position, byte[]? buffer, int offset, int size)
     {
         if (buffer is null)
@@ -20,9 +28,17 @@ internal sealed class StreamMediaDataSource(System.IO.Stream stream) : MediaData
             return -1;
         }
 
-        stream.Seek(position, SeekOrigin.Begin);
-        var read = stream.Read(buffer, offset, size);
-        return read == 0 ? -1 : read;
+        try
+        {
+            stream.Seek(position, SeekOrigin.Begin);
+            var read = stream.Read(buffer, offset, size);
+            return read == 0 ? -1 : read;
+        }
+        catch (Exception e)
+        {
+            AudioDiagnostics.LogWarning("StreamMediaDataSource", "ReadAt failed; reporting end of stream.", e);
+            return -1;
+        }
     }
 
     public override void Close()
