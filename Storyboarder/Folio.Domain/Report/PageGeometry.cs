@@ -47,6 +47,18 @@ public static class PageGeometry
 
     public const float BulletIndent = 16f;
 
+    /// <summary>
+    /// The three amounts of air the report puts between things, named rather than typed.
+    ///
+    /// <para>They were 18–20, 12 and 8 — <b>pixels</b> at 150 DPI, which is 8.6, 5.8 and 3.8 points.
+    /// Carried across as the same figures they would have been twice the air they were drawn with,
+    /// and the report would have reflowed for a reason nobody could see in the diff. So the unit
+    /// change is done here, once, where it can be read.</para>
+    /// </summary>
+    public const float SectionGap = 9f;
+    public const float BlockGap = 6f;
+    public const float TightGap = 4f;
+
     /// <summary>The per-scene evidence image block, portrait, inside the content column.</summary>
     public const float SceneImageWidth = 269f;
     public const float SceneImageHeight = 359f;
