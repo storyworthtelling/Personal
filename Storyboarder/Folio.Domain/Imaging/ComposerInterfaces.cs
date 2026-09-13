@@ -36,14 +36,31 @@ public sealed record DraftReview(
     public static DraftReview FirstDraft { get; } = new(1, Array.Empty<ReportFindingView>(), Array.Empty<ReportFindingView>());
 }
 
-// Renders the consolidated revision report — the star product — into a single image-and-text PDF, placing
+/// <summary>
+/// What the report's cover page prints, which is more than a title: the draft it is reading, how long
+/// that draft runs, when it was read, the book's own jacket, and — on a sequel — where it sits in its
+/// series.
+///
+/// <para>The jacket is carried here rather than fetched by the renderer because it is also what sets
+/// the owner's mark's colourway (F37), and a page that reached out for an image mid-render could
+/// print a mark in colours no jacket on the page actually has.</para>
+/// </summary>
+public sealed record ReportCover(
+    string Title,
+    int DraftNumber,
+    int WordCount,
+    DateTimeOffset ReadOn,
+    byte[]? Jacket,
+    string? SeriesLine);
+
+// Renders the consolidated revision report — the star product — into a single vector PDF, placing
 // each scene's wordless evidence image beside its notes. On a later draft, the review carries the cross-draft
 // finding status so the report marks what changed since the previous draft.
 public interface IAnalysisPdfComposer
 {
     byte[] Compose(
         Folio.Domain.Analysis.BookAnalysisResult analysis,
-        string title,
+        ReportCover cover,
         IReadOnlyList<SceneEvidence> scenes,
         DraftReview review);
 }
