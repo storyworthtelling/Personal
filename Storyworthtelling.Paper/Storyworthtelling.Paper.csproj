@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <!-- The shared Paper & Ink fonts, embedded for the Skia renderers (identical on the desktop test
-       TFM and on device, exactly as Storyboarder.Infrastructure embedded them before extraction). -->
+       TFM and on device, exactly as Folio.Infrastructure embedded them before extraction). -->
   <ItemGroup>
     <EmbeddedResource Include="..\Fonts\*.ttf" Link="Fonts\%(Filename)%(Extension)" />
 

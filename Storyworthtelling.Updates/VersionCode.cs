@@ -97,7 +97,7 @@ public static class SuiteVersionBands
         new("com.storyworthtelling.focusphone.communication", 1, 200_051),
         new("com.storyworthtelling.focusphone.camera", 1, 200_030),
 
-        // Ledger and Canonizer were on a bare run_number — two and three digits. A rename of
+        // Ledger and Folio were on a bare run_number — two and three digits. A rename of
         // either workflow would have reset them to 1 and bricked their own update channel.
         new("com.storyworthtelling.ledger", 1, 58),
         new("com.storyworthtelling.storyboarder", 1, 169),

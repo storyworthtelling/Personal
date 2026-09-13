@@ -1,16 +1,16 @@
-name: Build Canonizer APK
+name: Build Folio APK
 
 on:
   workflow_dispatch:
   push:
     branches: [main, 'claude/**']
     paths:
-      - 'Storyboarder/Storyboarder.Android/**'
-      - 'Storyboarder/Storyboarder.Infrastructure/**'
-      - 'Storyboarder/Storyboarder.Domain/**'
-      - 'Storyboarder/Storyboarder.Tests/**'
+      - 'Storyboarder/Folio.Android/**'
+      - 'Storyboarder/Folio.Infrastructure/**'
+      - 'Storyboarder/Folio.Domain/**'
+      - 'Storyboarder/Folio.Tests/**'
       # The shared owner's-voice library ships in the APK (referenced by Infrastructure), so a change
-      # to it must rebuild Storyboarder too.
+      # to it must rebuild Folio too.
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Voice.Tests/**'
       # The shared reMarkable delivery library also ships in the APK (Infrastructure references it).
@@ -31,14 +31,14 @@ jobs:
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android head, which would require the MAUI/Android workload. The
-      # -p:StoryboarderTfms switch keeps Infrastructure single-targeted at net10.0.
+      # -p:FolioTfms switch keeps Infrastructure single-targeted at net10.0.
       - name: Run tests
         run: >
-          dotnet test Storyboarder/Storyboarder.Tests/Storyboarder.Tests.csproj
-          -p:StoryboarderTfms=net10.0
+          dotnet test Storyboarder/Folio.Tests/Folio.Tests.csproj
+          -p:FolioTfms=net10.0
 
       # The shared owner's-voice library (net10.0, pure .NET) ships in the APK; its own tests run here so
-      # a change to it is verified in the same workflow that rebuilds Storyboarder.
+      # a change to it is verified in the same workflow that rebuilds Folio.
       - name: Run voice tests
         run: dotnet test Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj
 
@@ -80,9 +80,9 @@ jobs:
       - name: Build APK
         working-directory: Storyboarder
         run: >
-          dotnet publish Storyboarder.Android -f net10.0-android -c Release
+          dotnet publish Folio.Android -f net10.0-android -c Release
           -p:ApplicationVersion=${{ steps.version.outputs.code }}
-          -p:ApplicationDisplayVersion=0.1.${{ github.run_number }}
+          -p:ApplicationDisplayVersion=1.0.${{ github.run_number }}
           -p:AndroidPackageFormat=apk
           -p:AndroidKeyStore=true
           -p:AndroidSigningKeyStore=/tmp/storyboarder.keystore
@@ -99,8 +99,8 @@ jobs:
         run: |
           set +e
           echo "=== ICON CHECK ==="
-          APK=$(ls -1 Storyboarder.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
-          [ -z "$APK" ] && APK=$(ls -1 Storyboarder.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+          APK=$(ls -1 Folio.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls -1 Folio.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
           echo "APK: $APK"
           AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
           [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
@@ -128,8 +128,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Canonizer-Android
-          path: Storyboarder/Storyboarder.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          name: Folio-Android
+          path: Storyboarder/Folio.Android/bin/Release/net10.0-android/publish/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
 
@@ -140,4 +140,4 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/publish-rolling-release
         with:
-          apks: Storyboarder/Storyboarder.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          apks: Storyboarder/Folio.Android/bin/Release/net10.0-android/publish/*-Signed.apk
