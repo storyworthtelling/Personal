@@ -71,6 +71,26 @@ public class TidalSignInFailureTests
         Assert.Contains("try again", TidalSignInFailure.Describe("  "), StringComparison.OrdinalIgnoreCase);
     }
 
+    // IsCredentialRejection is the seam TidalPairingActivity uses to decide whether a failure
+    // is worth flagging on the credential health seam (Settings' "TIDAL rejected the app's
+    // credentials" line) — only a genuinely bad client id/secret should flip that, not TIDAL
+    // refusing a grant type or scope the app asked for.
+    [Fact]
+    public void IsCredentialRejection_TrueForInvalidOrUnauthorizedClient()
+    {
+        Assert.True(TidalSignInFailure.IsCredentialRejection("400 BadRequest: invalid_client — client authentication failed"));
+        Assert.True(TidalSignInFailure.IsCredentialRejection("unauthorized_client"));
+    }
+
+    [Fact]
+    public void IsCredentialRejection_FalseForEverythingElse()
+    {
+        Assert.False(TidalSignInFailure.IsCredentialRejection("invalid_request — Client is not a Limited Input Device client"));
+        Assert.False(TidalSignInFailure.IsCredentialRejection("400 BadRequest: invalid_scope — w_sub not permitted"));
+        Assert.False(TidalSignInFailure.IsCredentialRejection("No such host is known (auth.tidal.com:443)"));
+        Assert.False(TidalSignInFailure.IsCredentialRejection(null));
+    }
+
     // Whatever it says, it is one plain sentence on a settings screen — not a stack
     // trace. The trace is in Diagnostics, which is where a trace belongs.
     [Fact]

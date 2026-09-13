@@ -53,6 +53,16 @@ public static class TidalSignInFailure
         return "Couldn't reach TIDAL. Try again in a moment.";
     }
 
+    /// <summary>
+    /// Whether a failure is credential-shaped — the app's client id/secret being wrong or
+    /// missing rather than a transient network problem — so a caller can decide whether it is
+    /// worth flagging on the credential health seam. Deliberately narrower than every branch
+    /// <see cref="Describe"/> handles: a "Limited Input Device" or scope refusal is TIDAL
+    /// refusing what the app asked for, not evidence the stored credentials themselves are bad.
+    /// </summary>
+    public static bool IsCredentialRejection(string? failure) =>
+        Mentions(failure ?? string.Empty, "invalid_client") || Mentions(failure ?? string.Empty, "unauthorized_client");
+
     private static bool Mentions(string text, string term) =>
         text.Contains(term, StringComparison.OrdinalIgnoreCase);
 }
