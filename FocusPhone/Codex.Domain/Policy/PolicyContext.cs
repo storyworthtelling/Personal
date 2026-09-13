@@ -13,7 +13,13 @@ public record PolicyContext(
     bool DebuggingLockedDown,
     // The never-visible categories (games / social / dating / gambling / short-form), hard-suspended
     // and not reversible in Admin — computed by the head via HardBlock.Detect over installed apps.
-    IReadOnlySet<string> NeverVisiblePackages)
+    IReadOnlySet<string> NeverVisiblePackages,
+    // Whether the owner's 6-hour-delayed Admin session (UnlockStateMachine.UnlockState.AdminActive)
+    // is currently open. The login browser (see LoginBrowserPackage below) is gated on this rather
+    // than kept always-runnable: an allowlisted app reaching Chrome for an ordinary in-app link
+    // (Maps opening a business's website, say) is free general browsing, not a sign-in, and the
+    // fix is to make Chrome unavailable outside the owner-initiated Admin window entirely.
+    bool AdminModeActive)
 {
     // Every first-party app the owner ships lives under this namespace. Anything
     // matching it is known-good: the categorizer clears it outright so a
@@ -90,14 +96,15 @@ public record PolicyContext(
         RemarkablePackage,
     };
 
-    // The system browser, kept runnable for ONE reason: those allowlisted apps
-    // sign in through an OAuth Chrome Custom Tab, which a locked same-domain
-    // WebView cannot carry (the flow redirects across domains). It is never
-    // surfaced in the launcher tray (the tray filters out browsers) and never
-    // becomes the default web handler — RestrictedBrowserActivity stays pinned
-    // for ordinary links — so it can't be used for free browsing. Apps reach it
-    // only by launching a Custom Tab with the package set explicitly, which
-    // bypasses the pinned handler.
+    // The system browser. Made runnable for ONE reason: those allowlisted apps sign in through an
+    // OAuth Chrome Custom Tab, which a locked same-domain WebView cannot carry (the flow redirects
+    // across domains). It is never surfaced in the launcher tray (the tray filters out browsers) and
+    // never becomes the default web handler — RestrictedBrowserActivity stays pinned for ordinary
+    // links. That alone is not enough to keep it sign-in-only, though: once un-suspended, an
+    // allowlisted app can launch a Custom Tab pointed at any URL, not just its auth host (this is how
+    // Maps was observed opening arbitrary business-website links in full, unrestricted Chrome). So
+    // PolicyPlanBuilder only un-suspends it while PolicyContext.AdminModeActive is true — the owner's
+    // deliberate, time-boxed Admin session — rather than for the lifetime of the allowlisted apps.
     public const string LoginBrowserPackage = "com.android.chrome";
 
     public static readonly IReadOnlySet<string> LoginBrowserPackages = new HashSet<string>

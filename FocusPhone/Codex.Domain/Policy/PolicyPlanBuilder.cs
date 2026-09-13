@@ -42,13 +42,20 @@ public static class PolicyPlanBuilder
         suspended.Remove(PolicyContext.SettingsPackage);
 
         // The cutover allowlist stays runnable: the curated third-party apps
-        // (GitHub, Gemini, Maps, reMarkable) plus the system browser they need
-        // for an OAuth Custom Tab sign-in. Removed from the suspend set here, and
+        // (GitHub, Gemini, Maps, reMarkable). Removed from the suspend set here, and
         // carried out as RunnablePackages below so a package already quarantined
         // by the install watcher is actively released on the next policy pass —
         // omitting it from the suspend set alone would not un-suspend it.
         var runnable = new HashSet<string>(PolicyContext.AllowlistedPackages);
-        runnable.UnionWith(PolicyContext.LoginBrowserPackages);
+        // The login browser is NOT part of that always-on allowlist: keeping it runnable for the
+        // lifetime of the allowlisted apps let any of them open Chrome for an ordinary in-app link
+        // (Maps opening a business's website), not just an OAuth sign-in. It is un-suspended only
+        // while the owner has deliberately opened an Admin session, and stays suspended like every
+        // other browser the rest of the time.
+        if (context.AdminModeActive)
+        {
+            runnable.UnionWith(PolicyContext.LoginBrowserPackages);
+        }
         suspended.ExceptWith(runnable);
 
         // READ_SMS and READ_CALL_LOG are hard-restricted: the installer only
@@ -75,13 +82,12 @@ public static class PolicyPlanBuilder
         return new PolicyPlan(
             restrictions, suspended, runnable, permissionGrants,
             EnforceAutoTime: true, FamilyDnsHost, DisableStatusBar: true,
-            // Do NOT lock Chrome to the allowlist: that blocked legitimate app logins (e.g. an
-            // OAuth Custom Tab redirecting through an app's own auth host). Logins run unrestricted;
-            // Chrome stays hidden + non-default, RestrictedBrowser contains ordinary links, and the
-            // filtering DNS blocks adult/social. The allowlist is kept for reference / a future
-            // re-tightening but not enforced (BlockNonAllowlisted: false).
+            // Chrome is only ever runnable during an Admin session (above), so the URL lock only
+            // ever matters there — but it does matter there: without it, an Admin-mode sign-in
+            // Custom Tab could be steered to any site, not just the identity provider. Lock it to
+            // LoginBrowserUrlAllowlist whenever Chrome is allowed to run at all.
             LoginBrowser: new LoginBrowserPolicy(
                 PolicyContext.LoginBrowserPackage, PolicyContext.LoginBrowserUrlAllowlist,
-                BlockNonAllowlisted: false));
+                BlockNonAllowlisted: context.AdminModeActive));
     }
 }

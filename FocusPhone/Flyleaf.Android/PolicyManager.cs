@@ -5,6 +5,7 @@ using Android.Content.PM;
 using Android.OS;
 using Android.Util;
 using Codex.Domain.Policy;
+using Codex.Domain.Unlock;
 
 namespace Flyleaf;
 
@@ -37,13 +38,19 @@ public static class PolicyManager
         }
 
         var store = new BlocklistStore(context);
+        // Recomputed live from persisted timestamps (UnlockStateMachine.Touch), same as every other
+        // observer of admin state — never cached, so a session that expired since the last policy
+        // pass is read as expired here too.
+        var adminModeActive = new UnlockStore(context).LoadMachine(new SystemClockAdapter()).CurrentState
+            == UnlockState.AdminActive;
         var policyContext = new PolicyContext(
             OwnPackages: PolicyContext.FocusPhonePackages,
             BrowserPackages: QueryBrowserPackages(context),
             OtherHomePackages: QueryOtherHomePackages(context),
             BlockedPackages: store.Load().BlockedPackages.ToHashSet(),
             DebuggingLockedDown: store.DebuggingLockedDown,
-            NeverVisiblePackages: QueryNeverVisiblePackages(context));
+            NeverVisiblePackages: QueryNeverVisiblePackages(context),
+            AdminModeActive: adminModeActive);
 
         Apply(context, PolicyPlanBuilder.Build(policyContext));
     }
