@@ -60,6 +60,7 @@ public sealed class ProjectService
         // First draft of a new project: the project is identified by this draft's own id.
         novel.ProjectId = novel.Id;
         novel.Source = new SourceText { NovelId = novel.Id, FullText = text, CharacterCount = text.Length };
+        novel.WordCount = Words(text);
 
         db.Novels.Add(novel);
         await db.SaveChangesAsync(cancellationToken);
@@ -106,6 +107,7 @@ public sealed class ProjectService
         draft.PreviousBookId = previous.PreviousBookId;
         draft.SeriesSequence = previous.SeriesSequence;
         draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
+        draft.WordCount = Words(text);
 
         db.Novels.Add(draft);
         await db.SaveChangesAsync(cancellationToken);
@@ -179,6 +181,7 @@ public sealed class ProjectService
         // A new book starts its own draft chain: the project is identified by this book's own id.
         book.ProjectId = book.Id;
         book.Source = new SourceText { NovelId = book.Id, FullText = text, CharacterCount = text.Length };
+        book.WordCount = Words(text);
 
         db.Novels.Add(book);
         await db.SaveChangesAsync(cancellationToken);
@@ -358,10 +361,135 @@ public sealed class ProjectService
         imageStore.Delete(id.ToString());
     }
 
+    /// <summary>
+    /// What a series is called: the owner's name for it, or the title of its first book until they
+    /// give it one. A standalone book has no series and no name.
+    /// </summary>
+    private static async Task<string?> SeriesNameOf(FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        if (novel.SeriesId is not { } series)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(novel.SeriesName))
+        {
+            return novel.SeriesName;
+        }
+
+        return await db.Novels
+            .Where(other => other.SeriesId == series)
+            .OrderBy(other => other.SeriesSequence)
+            .Select(other => other.Title)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Renames a series, across every draft of every book in it — the name is denormalised the way
+    /// the rest of the series fields are, so a rename is a write to all of them.
+    ///
+    /// <para>A blank name clears it rather than storing whitespace, which puts the series back to
+    /// being called after its first book. That is the same act as never having named it, so it
+    /// should leave the same state behind.</para>
+    /// </summary>
+    public async Task RenameSeriesAsync(Guid seriesId, string? name, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var books = await db.Novels.Where(novel => novel.SeriesId == seriesId).ToListAsync(cancellationToken);
+        if (books.Count == 0)
+        {
+            return;
+        }
+
+        var trimmed = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        foreach (var book in books)
+        {
+            book.SeriesName = trimmed;
+            book.UpdatedAtUtc = clock.UtcNow;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>What is on the <b>shelf</b>: what the owner has put away.</summary>
+    public async Task<IReadOnlyList<NovelStatus>> ListShelvedAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var ids = await db.Novels
+            .Where(n => n.ShelvedAtUtc != null)
+            .OrderByDescending(n => n.ShelvedAtUtc)
+            .Select(n => n.Id)
+            .ToListAsync(cancellationToken);
+
+        var statuses = new List<NovelStatus>(ids.Count);
+        var now = clock.UtcNow;
+        foreach (var id in ids)
+        {
+            var status = await BuildStatus(db, id, rateLimits, now, cancellationToken);
+            if (status is not null)
+                statuses.Add(status);
+        }
+
+        return statuses;
+    }
+
+    /// <summary>
+    /// Puts a finished book away.
+    ///
+    /// <para><b>Only a finished one.</b> The shelf is what has been dealt with; a book still being
+    /// read has not been, and shelving it would hide work in progress behind a spine. Asked of an
+    /// unfinished book this does nothing rather than failing — the action is not offered for one, so
+    /// arriving here means something raced, and a book left on the desk is the harmless outcome.</para>
+    /// </summary>
+    public async Task ShelveAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null || novel.Stage != ProjectStage.Completed || novel.ShelvedAtUtc is not null)
+            return;
+
+        novel.ShelvedAtUtc = clock.UtcNow;
+        novel.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Takes it back off. This is the undo behind the dog-ear (§6), which is why shelving asks
+    /// nothing first: the book comes straight back, with no trace that it went.
+    /// </summary>
+    public async Task UnshelveAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null || novel.ShelvedAtUtc is null)
+            return;
+
+        novel.ShelvedAtUtc = null;
+        novel.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// How long a manuscript is. Whitespace-separated runs, which is what the report counts too —
+    /// two different answers to "how long is this book" on the same screen is worse than either.
+    /// </summary>
+    internal static int Words(string text) =>
+        string.IsNullOrWhiteSpace(text)
+            ? 0
+            : text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+
+    /// <summary>
+    /// What is on the <b>desk</b>: everything the owner has not put away yet. A finished review
+    /// stays here until they shelve it — see <see cref="ShelveAsync"/>.
+    /// </summary>
     public async Task<IReadOnlyList<NovelStatus>> ListAsync(CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var ids = await db.Novels.OrderByDescending(n => n.CreatedAtUtc).Select(n => n.Id).ToListAsync(cancellationToken);
+        var ids = await db.Novels
+            .Where(n => n.ShelvedAtUtc == null)
+            .OrderByDescending(n => n.CreatedAtUtc)
+            .Select(n => n.Id)
+            .ToListAsync(cancellationToken);
         var statuses = new List<NovelStatus>(ids.Count);
         var now = clock.UtcNow;
         foreach (var id in ids)
@@ -545,7 +673,9 @@ public sealed class ProjectService
             chunks, sheets, sceneImages, analysisNotes, analysis, analysisReady, needsAttention,
             estimate, rateLimitedUntil,
             novel.DraftNumber, novel.PreviousDraftId is not null,
-            novel.SeriesId is not null, novel.SeriesSequence);
+            novel.SeriesId is not null, novel.SeriesSequence, novel.SeriesId,
+            await SeriesNameOf(db, novel, cancellationToken),
+            novel.ShelvedAtUtc is not null, novel.WordCount);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per
