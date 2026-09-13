@@ -307,6 +307,12 @@ namespace Folio.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("CoverIsOwners")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CoverPath")
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("CreatedAtUtc")
                         .HasColumnType("INTEGER");
 
