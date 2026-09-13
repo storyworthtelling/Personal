@@ -27,6 +27,12 @@ public static class Glyphs
     /// <summary>A bin, and the only glyph on the card that is never anything but quiet.</summary>
     public const string Bin = "M3.5 4.5h11 M7 4.5V3h4v1.5 M5 4.5 5.8 15h6.4L13 4.5";
 
+    /// <summary>A framed picture: choose a jacket from the phone.</summary>
+    public const string Picture = "M2.5 2.5h13v13h-13Z M2.5 11.5 6.5 8l3 2.6L13 7l2.5 2.2";
+
+    /// <summary>A brush: have one painted.</summary>
+    public const string Brush = "M15 3.2 6.2 12l-3.1.9.9-3.1L12.8 1Z M11.4 2.4 13.8 4.8";
+
     /// <summary>Books standing on a shelf: put it away.</summary>
     public const string Shelve = "M3 3v12 M6.5 3v12 M10 3.4l2 11.4 M14 4l1.6 10.6 M2 16h14";
 }
