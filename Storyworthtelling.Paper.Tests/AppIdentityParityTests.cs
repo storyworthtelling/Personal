@@ -21,6 +21,12 @@ public class AppIdentityParityTests
     [InlineData("ForewordGroundHex", AppIdentityTokens.ForewordGroundHex)]
     [InlineData("ForewordSunriseHex", AppIdentityTokens.ForewordSunriseHex)]
     [InlineData("ForewordDeepHex", AppIdentityTokens.ForewordDeepHex)]
+    [InlineData("FolioFillHex", AppIdentityTokens.FolioFillHex)]
+    [InlineData("FolioGroundHex", AppIdentityTokens.FolioGroundHex)]
+    [InlineData("FolioMarkHex", AppIdentityTokens.FolioMarkHex)]
+    [InlineData("FolioTextHex", AppIdentityTokens.FolioTextHex)]
+    [InlineData("FolioDeepHex", AppIdentityTokens.FolioDeepHex)]
+    [InlineData("FolioClothHex", AppIdentityTokens.FolioClothHex)]
     public void TheValueMatchesIconStudio(string constant, string here)
     {
         var source = File.ReadAllText(Path.Combine(RepoRoot(), "Tools", "IconStudio", "Tokens.cs"));
