@@ -77,12 +77,41 @@ public sealed class ShelfDrawable : IDrawable
         canvas.FillRoundedRectangle(x, top, book.WidthDp, height, 2, 2, 0, 0);
         canvas.RestoreState();
 
+        DrawTooth(canvas, x, top, book.WidthDp, height, cloth.Dark);
+
         // The hinge line down the spine's binding edge, as in the frame.
         canvas.StrokeSize = 1;
         canvas.StrokeColor = cloth.Hinge;
         canvas.DrawLine(x + 0.5f, top + 8, x + 0.5f, ledgeTop - 8);
 
         DrawSpineTitle(canvas, book.Title, x, top, book.WidthDp, height, cloth.Lettering);
+    }
+
+    /// <summary>
+    /// The pencil tooth: a fine vertical stripe over the cloth, alternating a lift and a shadow.
+    ///
+    /// <para>It is what stops a row of books reading as a bar chart. Flat gradient fills of varying
+    /// width are a chart; cloth that catches the light unevenly is a shelf, and the difference is
+    /// entirely this. The frame draws it as a 4dp repeating gradient and so does this.</para>
+    /// </summary>
+    private static void DrawTooth(ICanvas canvas, float x, float top, float width, float height, bool darkCloth)
+    {
+        canvas.SaveState();
+        canvas.ClipRectangle(x, top, width, height);
+
+        var lift = (darkCloth ? Colors.White : Colors.Black).WithAlpha(0.05f);
+        var shadow = (darkCloth ? Colors.Black : Colors.White).WithAlpha(0.045f);
+
+        canvas.StrokeSize = 2;
+        for (var offset = 0f; offset < width; offset += 4f)
+        {
+            canvas.StrokeColor = lift;
+            canvas.DrawLine(x + offset + 1, top, x + offset + 1, top + height);
+            canvas.StrokeColor = shadow;
+            canvas.DrawLine(x + offset + 3, top, x + offset + 3, top + height);
+        }
+
+        canvas.RestoreState();
     }
 
     /// <summary>

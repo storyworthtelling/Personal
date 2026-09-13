@@ -16,6 +16,7 @@ public class HexLiteralLeakTests
         // with, held to IconStudio's values by AppIdentityParityTests. Registered rather than
         // exempted — it is scanned for being a token file, not excused for being inconvenient.
         Path.Combine("Storyworthtelling.Paper", "AppIdentityTokens.cs"),
+        Path.Combine("Storyworthtelling.Paper", "MaterialTokens.cs"),
     };
 
     [Fact]
