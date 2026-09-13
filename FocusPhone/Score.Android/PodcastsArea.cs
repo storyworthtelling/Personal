@@ -277,7 +277,8 @@ public sealed class PodcastsArea : ScoreArea
             rows.AddView(matches.Count == 0
                 ? PaperUi.EmptyState(Host, $"No show matches \u201c{shelfQuery}\u201d.")
                 : PaperUi.List(Host,
-                    [.. matches.Select(show => new PaperListRow(show.Title, $"{show.UnplayedCount} unplayed"))],
+                    [.. matches.Select(show => new PaperListRow(
+                        show.Title, $"{show.UnplayedCount} unplayed", artwork.ExistingPath(show.FeedId)))],
                     position =>
                     {
                         openFeedId = matches[position].FeedId;
@@ -571,7 +572,64 @@ public sealed class PodcastsArea : ScoreArea
 
     // ---- Queue editing ----
 
-    private void SaveQueue() => queueStore.Save(queue.Export());
+    private void SaveQueue()
+    {
+        queueStore.Save(queue.Export());
+        SyncControllerTail();
+    }
+
+    /// <summary>
+    /// Keeps the live session's timeline in step with a queue mutation made while this queue is
+    /// the one actually playing.
+    ///
+    /// Every queue edit here (clear, reorder, rebuild, arrangement change) only ever touched
+    /// <see cref="queue"/> and <see cref="queueStore"/> — the Media3 session kept whichever
+    /// timeline <see cref="PlayQueue"/> last handed it, since nothing else ever spoke to the
+    /// controller again. Emptying the queue never stopped what was already playing (correctly:
+    /// clearing "what's up next" should not cut off the current episode), but ExoPlayer auto-
+    /// advances into its own timeline when that episode ends — which meant it played on into
+    /// whatever the queue looked like at the moment it was last started, not as it stands now.
+    ///
+    /// Only the tail (everything after what is currently playing) is touched; the item actually
+    /// playing, and its position, are left alone.
+    /// </summary>
+    private void SyncControllerTail()
+    {
+        if (playback.Kind != MediaKind.Podcast || playback.Controller is not { } controller)
+        {
+            return;
+        }
+
+        var currentIndex = controller.CurrentMediaItemIndex;
+        if (currentIndex < 0)
+        {
+            return; // nothing loaded yet to keep in place
+        }
+
+        // Everything the edited queue says comes after what's currently playing — or, if the
+        // playing episode was itself removed by the edit (the clear-the-queue case), the whole
+        // of what remains, since none of it can precede an episode no longer in the queue at all.
+        var currentId = playback.CurrentMediaId;
+        var afterCurrent = currentId is not null && queue.Items.Contains(currentId)
+            ? queue.Items.SkipWhile(id => id != currentId).Skip(1)
+            : queue.Items;
+
+        var upcoming = afterCurrent
+            .Select(id => episodes.FirstOrDefault(episode => episode.Id == id))
+            .Where(episode => episode is not null)
+            .Select(episode => BuildItem(episode!))
+            .ToList();
+
+        if (currentIndex + 1 < controller.MediaItemCount)
+        {
+            controller.RemoveMediaItems(currentIndex + 1, controller.MediaItemCount);
+        }
+
+        if (upcoming.Count > 0)
+        {
+            controller.AddMediaItems(currentIndex + 1, upcoming);
+        }
+    }
 
     /// <summary>
     /// Re-applies the standing rule. Called whenever the pool of unplayed episodes
@@ -714,13 +772,22 @@ public sealed class PodcastsArea : ScoreArea
         }
     }
 
+    /// <summary>The MediaMetadata extras key PlayingArea reads to fall back to the feed's own
+    /// artwork (<see cref="PodcastArtworkCache"/>) when the episode's audio carries no embedded
+    /// art of its own.</summary>
+    public const string FeedIdExtraKey = "score.podcast.feedId";
+
     private static MediaItem BuildItem(Episode episode)
     {
         // The description rides along so the Playing area can show notes without
-        // reaching back into podcast state for the episode behind the media id.
+        // reaching back into podcast state for the episode behind the media id. The feed id
+        // rides along the same way, so Now Playing can fall back to the feed's own artwork.
+        var extras = new Android.OS.Bundle();
+        extras.PutString(FeedIdExtraKey, episode.FeedId);
         var metadata = new MediaMetadata.Builder()
             .SetTitle(episode.Title)!
             .SetDescription(episode.Description)!
+            .SetExtras(extras)!
             .Build()!;
         return new MediaItem.Builder()
             .SetMediaId(episode.Id)!
