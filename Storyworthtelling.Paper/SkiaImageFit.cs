@@ -33,4 +33,28 @@ public static class SkiaImageFit
         canvas.DrawImage(skImage, target, HighQuality, paint);
         return true;
     }
+
+    /// <summary>
+    /// Draws the image so it <b>fills</b> dest, cropped equally on the overflowing axis and clipped to
+    /// the rectangle — <c>object-fit: cover</c>, the fit a framed artwork slot wants.
+    ///
+    /// <para><see cref="Draw"/> letterboxes on shade, which is right for an evidence image whose whole
+    /// frame is the evidence. Inside a keyline, bands of shade read as a rendering failure rather than
+    /// as a margin, so a jacket is cropped instead. The crop itself is decided by the caller — pure
+    /// and tested — and handed here as <paramref name="source"/> in the image's own pixels.</para>
+    /// </summary>
+    public static bool DrawCover(SKCanvas canvas, byte[] image, SKRect dest, Func<int, int, SKRect> source)
+    {
+        using var bitmap = SKBitmap.Decode(image);
+        if (bitmap is null)
+            return false;
+
+        using var skImage = SKImage.FromBitmap(bitmap);
+        using var paint = new SKPaint { IsAntialias = true };
+        canvas.Save();
+        canvas.ClipRect(dest);
+        canvas.DrawImage(skImage, source(bitmap.Width, bitmap.Height), dest, HighQuality, paint);
+        canvas.Restore();
+        return true;
+    }
 }

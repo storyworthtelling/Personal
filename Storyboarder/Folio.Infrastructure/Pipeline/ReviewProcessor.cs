@@ -1019,7 +1019,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 var review = await BuildDraftReview(db, novel, cancellationToken);
                 var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount)
                     .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity);
-                var pdf = analysisPdfComposer.Compose(folded, novel.Title, scenes, review);
+                var pdf = analysisPdfComposer.Compose(folded, BuildCover(novel, wordCount), scenes, review);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -1624,4 +1624,29 @@ public sealed class ReviewProcessor : IPipelineStep
     }
 
     private void Touch(Novel novel) => novel.UpdatedAtUtc = clock.UtcNow;
+    /// <summary>
+    /// What the report's cover prints. The jacket is read off disk <b>here</b>, once, so the renderer
+    /// is handed bytes rather than a path — a page that fetched its own image mid-render could print
+    /// the owner's mark in colours taken from a jacket that is no longer the book's (the cover can be
+    /// replaced or repainted while a review is in flight).
+    ///
+    /// <para>A cover that has gone missing is not an error: the slot prints empty and the mark falls
+    /// back to the page's own ink. A report is worth more than its cover.</para>
+    /// </summary>
+    private static ReportCover BuildCover(Novel novel, int wordCount)
+    {
+        byte[]? jacket = null;
+        if (!string.IsNullOrWhiteSpace(novel.CoverPath) && File.Exists(novel.CoverPath))
+        {
+            jacket = File.ReadAllBytes(novel.CoverPath);
+        }
+
+        var series = novel.SeriesId is null || string.IsNullOrWhiteSpace(novel.SeriesName)
+            ? null
+            : $"Book {novel.SeriesSequence} · {novel.SeriesName}";
+
+        return new ReportCover(
+            novel.Title, novel.DraftNumber, wordCount, DateTimeOffset.Now, jacket, series);
+    }
+
 }

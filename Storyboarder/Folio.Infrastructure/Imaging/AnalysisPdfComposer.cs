@@ -1,27 +1,21 @@
 using Folio.Domain.Analysis;
-using Folio.Domain.Design;
 using Folio.Domain.Imaging;
-using Storyworthtelling.Paper;
 
 namespace Folio.Infrastructure.Imaging;
 
-// Renders the revision report to raster pages (AnalysisDocumentRenderer), then reuses the existing
-// image-based PDF assembler to wrap those pages into a single analysis PDF — no PDF-text or font
-// machinery, and the same rendering path the comic volumes already ship on-device.
+// Renders the revision report straight to a vector PDF. There is no image composer in the path any
+// more: the pages used to be rasterised to PNGs and wrapped, which is what made the text unselectable
+// and the type soft on e-ink.
 public sealed class AnalysisPdfComposer : IAnalysisPdfComposer
 {
-    private readonly IVolumePdfComposer pdfComposer;
     private readonly AnalysisDocumentRenderer renderer;
 
-    public AnalysisPdfComposer(IVolumePdfComposer pdfComposer, AnalysisDocumentRenderer renderer)
+    public AnalysisPdfComposer(AnalysisDocumentRenderer renderer)
     {
-        this.pdfComposer = pdfComposer;
         this.renderer = renderer;
     }
 
-    public byte[] Compose(BookAnalysisResult analysis, string title, IReadOnlyList<SceneEvidence> scenes, DraftReview review)
-    {
-        var pages = renderer.Render(analysis, title, scenes, review);
-        return pdfComposer.Compose(pages, DesignTokens.Pdf.PrintDpi);
-    }
+    public byte[] Compose(
+        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview review) =>
+        renderer.Render(analysis, cover, scenes, review);
 }
