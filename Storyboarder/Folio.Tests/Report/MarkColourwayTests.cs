@@ -79,12 +79,50 @@ public class MarkColourwayTests
         Assert.True(MarkColourway.Contrast(colours.Ground, colours.Ink) >= MarkColourway.ContrastFloor);
     }
 
+    /// <summary>
+    /// The outline is the darker edge the drawing gives it, and it does not flip to the lighter one
+    /// because a tone landed a thousandth of a luminance unit either side of a threshold. The drawn
+    /// slate and the same slate read back out of a jacket sit at 0.0605 and 0.0589; the first version
+    /// of this rule tested against 0.06 and so answered differently for the two.
+    /// </summary>
+    [Theory]
+    [InlineData(0x42464B)]   // the drawn mark's own slate
+    [InlineData(0x44444C)]   // the same slate, quantised out of a jacket
+    [InlineData(0x7A3B2E)]
+    [InlineData(0xD8CEB8)]
+    public void TheOvalsOutlineIsDarkerThanItsFill(int dominant)
+    {
+        var colours = MarkColourway.From(Jacket((dominant, 900), (0xFFFFFF, 100)));
+
+        Assert.True(Luminance(colours.Line) < Luminance(colours.Ground),
+            $"The outline #{colours.Line:X6} is lighter than the fill #{colours.Ground:X6} it edges.");
+    }
+
+    /// <summary>A fill so dark that darker is nothing goes the other way, rather than vanishing.</summary>
+    [Fact]
+    public void AnAlmostBlackFillTakesALighterEdge()
+    {
+        var colours = MarkColourway.From(Jacket((0x050505, 900), (0xFFFFFF, 100)));
+
+        Assert.True(Luminance(colours.Line) > Luminance(colours.Ground));
+    }
+
     [Fact]
     public void TheOvalsOutlineIsVisibleAgainstItsOwnFill()
     {
         var colours = MarkColourway.From(Jacket((0x42464B, 700), (0xD8CEB8, 300)));
 
         Assert.NotEqual(colours.Ground, colours.Line);
+    }
+
+    private static double Luminance(int rgb)
+    {
+        double Channel(int value)
+        {
+            var c = value / 255.0;
+            return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+        }
+        return 0.2126 * Channel(rgb >> 16 & 0xFF) + 0.7152 * Channel(rgb >> 8 & 0xFF) + 0.0722 * Channel(rgb & 0xFF);
     }
 
     [Fact]
