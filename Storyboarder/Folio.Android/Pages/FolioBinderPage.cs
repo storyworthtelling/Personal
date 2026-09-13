@@ -25,6 +25,7 @@ public abstract class FolioBinderPage : ContentPage
     private readonly PaperPageHeader header = new();
     private readonly ContentView well = new();
     private readonly ContentView barSlot = new();
+    private Grid? column;
 
     protected FolioBinderPage()
     {
@@ -66,7 +67,7 @@ public abstract class FolioBinderPage : ContentPage
             ],
         };
 
-        var column = new Grid
+        column = new Grid
         {
             RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
             Children = { header, well },
@@ -85,6 +86,24 @@ public abstract class FolioBinderPage : ContentPage
         Grid.SetColumn(barSlot, 0);
 
         Content = page;
+    }
+
+    /// <summary>
+    /// Puts something behind the header <b>and</b> the content, rather than behind the content
+    /// alone.
+    ///
+    /// <para>The Work desk needs it: the frame runs the wood the full height of the well with the
+    /// screen header sitting on top of it, so a backdrop confined to the content would leave the
+    /// header floating on paper above a desk that starts halfway down.</para>
+    /// </summary>
+    protected void SetBackdrop(View backdrop)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        backdrop.InputTransparent = true;
+        column.Children.Insert(0, backdrop);
+        Grid.SetRow(backdrop, 0);
+        Grid.SetRowSpan(backdrop, 2);
     }
 
     /// <summary>
