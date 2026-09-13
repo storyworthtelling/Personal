@@ -1,4 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
 using Folio.Domain.Shelf;
+using Folio.Infrastructure.Services;
 using Storyworthtelling.Maui;
 
 namespace Folio.Android.Pages;
@@ -25,6 +27,46 @@ public class ShelfPage : FolioBinderPage
 
         Wrap(FolioArea.Shelf, "Shelf");
     }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        _ = LoadAsync();
+    }
+
+    /// <summary>
+    /// Reads what has been put away and deals it onto shelves.
+    ///
+    /// <para>The dealing itself is <see cref="ShelfComposer"/> — a series gets a shelf to itself —
+    /// so the rule stays where it is tested rather than being re-decided by a screen.</para>
+    /// </summary>
+    private async Task LoadAsync()
+    {
+        IReadOnlyList<NovelStatus> shelved;
+        try
+        {
+            using var scope = IPlatformApplication.Current!.Services.CreateScope();
+            shelved = await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .ListShelvedAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // A transient read should not empty the shelf on screen; the next appearance retries.
+            return;
+        }
+
+        Show(ShelfComposer.Compose(
+        [
+            .. shelved.Select(book => new ShelfBook(
+                book.Id,
+                book.Title,
+                book.SeriesId?.ToString(),
+                book.SeriesSequence,
+                book.WordCount,
+                book.SeriesName)),
+        ]));
+    }
+
 
     /// <summary>
     /// Paints the library. Takes the composed rows rather than the books so the dealing rule — a
@@ -66,6 +108,46 @@ public class ShelfPage : FolioBinderPage
                 });
             }
         }
+    }
+
+    /// <summary>
+    /// Asks what the series is called, on paper. Renaming is reversible by renaming back, so it is
+    /// done and then offered back through the fold rather than asked about first.
+    /// </summary>
+    private void AskForName(string series, string? current)
+    {
+        if (!Guid.TryParse(series, out var seriesId))
+        {
+            return;
+        }
+
+        Present(RenameCard.Build(
+            "Name this series",
+            "The Tidewater Books",
+            current,
+            named: name => _ = Rename(seriesId, name, current),
+            dismissed: Dismiss));
+    }
+
+    private async Task Rename(Guid seriesId, string? name, string? previous)
+    {
+        await Write(seriesId, name);
+
+        // The undo puts the old name back and offers nothing further — an undo that offers its own
+        // undo is a loop that says "renamed to X" about a name nobody typed.
+        OfferUndo(
+            string.IsNullOrWhiteSpace(name) ? "Series name cleared" : $"Series renamed to {name.Trim()}",
+            () => _ = Write(seriesId, previous).ContinueWith(
+                _ => Dispatcher.Dispatch(() => _ = LoadAsync()), TaskScheduler.Default));
+
+        await LoadAsync();
+    }
+
+    private static async Task Write(Guid seriesId, string? name)
+    {
+        using var scope = IPlatformApplication.Current!.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<ProjectService>()
+            .RenameSeriesAsync(seriesId, name, CancellationToken.None);
     }
 
     // "three books", not "3 books" — the frame spells the small numbers out.

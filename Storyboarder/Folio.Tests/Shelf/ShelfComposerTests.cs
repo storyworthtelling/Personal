@@ -55,7 +55,8 @@ public class ShelfComposerTests
         var rows = ShelfComposer.Compose(many);
 
         Assert.True(rows.Count > 1, "Twelve wide spines must not be crammed onto one shelf.");
-        Assert.All(rows, row => Assert.Equal("The Long Cycle", row.SeriesName));
+        // Named by the book that started it, not by the grouping key.
+        Assert.All(rows, row => Assert.Equal("Book 1", row.SeriesName));
         Assert.Equal(12, rows.Sum(row => row.Books.Count));
         // Still in order across the wrap.
         Assert.Equal(

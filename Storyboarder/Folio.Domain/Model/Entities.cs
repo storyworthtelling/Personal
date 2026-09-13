@@ -37,7 +37,57 @@ public class Novel
     // open findings) this book reuses, resolved at link time to the prior book's latest-completed draft.
     // SeriesSequence is this book's number in the series (1 = first), for the "Book N" badge. All three are
     // carried onto later drafts of a linked book, so every draft of book 2 stays linked to book 1.
+    /// <summary>
+    /// This book's jacket, relative to the output root, or null while it has none.
+    ///
+    /// <para>Each jacket is written to its own file and this is repointed; nothing is overwritten in
+    /// place. That is what makes the undo behind a repaint honest — the fold can put the old jacket
+    /// back because the old jacket is still there.</para>
+    /// </summary>
+    public string? CoverPath { get; set; }
+
+    /// <summary>
+    /// Whether the jacket now showing is one the <b>owner</b> chose rather than one the app painted.
+    ///
+    /// <para>Recorded because the two are not the same thing to overwrite. A painted jacket can be
+    /// repainted freely; one the owner picked is theirs, and repainting over it is the act the fold
+    /// exists to take back.</para>
+    /// </summary>
+    public bool CoverIsOwners { get; set; }
+
+    /// <summary>
+    /// How long the manuscript is, measured once when it is read in.
+    ///
+    /// <para>A column rather than a derivation: the shelf draws every spine's width from it, and the
+    /// only other source is splitting the whole manuscript, which is a full text read per book every
+    /// time a list is drawn.</para>
+    /// </summary>
+    public int WordCount { get; set; }
+
+    /// <summary>
+    /// When the owner put this book on the shelf, or null while it is still on the desk.
+    ///
+    /// <para>Finishing a review and putting the book away are two different events. A review that
+    /// completed overnight has not been read by anyone yet, and moving it to the shelf on the
+    /// owner's behalf is the app deciding it is done with — so the pipeline never sets this, and
+    /// <i>Put on the shelf</i> does.</para>
+    /// </summary>
+    public DateTimeOffset? ShelvedAtUtc { get; set; }
+
     public Guid? SeriesId { get; set; }
+
+    /// <summary>
+    /// What the owner calls this series, or null while nobody has said.
+    ///
+    /// <para>Stored rather than derived from the first book's title, which is the obvious rule and
+    /// is wrong: a trilogy is often called something its first book is not, retitling book one
+    /// should not rename the series, and a series can be named before anyone knows which book will
+    /// open it. Null falls back to that title, so a series nobody has named still has a label.</para>
+    ///
+    /// <para>Denormalised onto every draft of every book in the series, like the three fields around
+    /// it — renaming writes to all of them.</para>
+    /// </summary>
+    public string? SeriesName { get; set; }
     public Guid? PreviousBookId { get; set; }
     public int SeriesSequence { get; set; } = 1;
 

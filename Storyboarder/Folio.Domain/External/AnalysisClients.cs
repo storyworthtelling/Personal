@@ -123,6 +123,18 @@ public interface IGeminiImageClient
     // image's slot in the report) is snapped to the nearest ratio the image model supports and requested,
     // so the ~1MP output fills the slot instead of being letterboxed. Null requests the model's default
     // (portrait) framing. Reference images keep recurring characters/settings on-model.
+    /// <summary>
+    /// Paints a book's jacket: the cover art the shelf and the desk show, and the report's own
+    /// front. Wordless, like the scene images — the title is set in type over it by the app, because
+    /// image models letter badly and a jacket with a misspelt title is worse than a plain one.
+    /// </summary>
+    Task<byte[]> GenerateJacket(
+        string title,
+        string genre,
+        string logline,
+        string artStyle,
+        CancellationToken cancellationToken);
+
     Task<byte[]> GenerateSceneImage(
         string visualPrompt,
         string artStyle,

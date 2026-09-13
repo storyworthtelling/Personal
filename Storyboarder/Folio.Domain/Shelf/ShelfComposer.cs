@@ -3,7 +3,12 @@ namespace Folio.Domain.Shelf;
 /// <summary>One book as the shelf needs to know it.</summary>
 /// <param name="Series">The series it belongs to, or null for a standalone book.</param>
 /// <param name="Sequence">Its number within that series; ignored when standalone.</param>
-public sealed record ShelfBook(Guid Id, string Title, string? Series, int Sequence, int WordCount)
+/// <param name="SeriesName">
+/// What that series is called. Passed in rather than worked out here: the owner can name a series,
+/// and a name derived from the first book's title would overrule them the moment they did.
+/// </param>
+public sealed record ShelfBook(
+    Guid Id, string Title, string? Series, int Sequence, int WordCount, string? SeriesName = null)
 {
     /// <summary>How wide this book stands, from its length. The shelf's only data.</summary>
     public int WidthDp => SpineSizing.WidthDp(WordCount);
@@ -12,7 +17,13 @@ public sealed record ShelfBook(Guid Id, string Title, string? Series, int Sequen
     public int HeightDp => SpineSizing.HeightDp(Title);
 }
 
-/// <summary>A single shelf: the books standing on it, and the series it belongs to if any.</summary>
+/// <summary>
+/// A single shelf: the books standing on it, and what the series is called if it is one.
+///
+/// <para><paramref name="SeriesName"/> is what the series is <b>called</b>, not the key it is
+/// grouped by: the owner names a series, and until they do it is called after its first book. The
+/// caller resolves that, so this never overrules a name somebody chose.</para>
+/// </summary>
 public sealed record ShelfRow(string? SeriesName, IReadOnlyList<ShelfBook> Books)
 {
     /// <summary>A series row is bracketed by bookends; a standalone row is not.</summary>
@@ -54,8 +65,12 @@ public static class ShelfComposer
         foreach (var series in books.Where(book => book.Series is not null)
                      .GroupBy(book => book.Series!, StringComparer.Ordinal))
         {
-            var ordered = series.OrderBy(book => book.Sequence).ThenBy(book => book.Title, StringComparer.Ordinal);
-            rows.AddRange(Wrap(ordered.ToList(), series.Key, ShelfWidthDp - (2 * BookendWidthDp)));
+            var ordered = series
+                .OrderBy(book => book.Sequence)
+                .ThenBy(book => book.Title, StringComparer.Ordinal)
+                .ToList();
+
+            rows.AddRange(Wrap(ordered, ordered[0].SeriesName ?? ordered[0].Title, ShelfWidthDp - (2 * BookendWidthDp)));
         }
 
         rows.AddRange(Wrap(books.Where(book => book.Series is null).ToList(), seriesName: null, ShelfWidthDp));
