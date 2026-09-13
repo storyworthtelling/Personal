@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Makes the MAUI Android head (Storyboarder.Android, net10.0-android) COMPILE in a fresh web/CI
+# Makes the MAUI Android head (Folio.Android, net10.0-android) COMPILE in a fresh web/CI
 # container, so UI work isn't written blind. This does NOT produce a runnable app — there is no
 # emulator or display here — it gets `dotnet build` to succeed through XAML + C# + resource linking.
 #
@@ -14,7 +14,7 @@
 # Idempotent. Run from anywhere. Takes a few minutes on first run (the workload is a big download).
 #
 # After it finishes, build the head with the command it prints, e.g.:
-#   dotnet build Storyboarder/Storyboarder.Android/Storyboarder.Android.csproj \
+#   dotnet build Storyboarder/Folio.Android/Folio.Android.csproj \
 #     -p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false
 set -euo pipefail
 
@@ -58,5 +58,5 @@ chmod +x "${SDK}/platform-tools/adb"
 
 echo
 echo "Done. Build the Android head with:"
-echo "  dotnet build Storyboarder/Storyboarder.Android/Storyboarder.Android.csproj \\"
+echo "  dotnet build Storyboarder/Folio.Android/Folio.Android.csproj \\"
 echo "    -p:AndroidSdkDirectory=${SDK} -p:AndroidUseApkSigner=false"
