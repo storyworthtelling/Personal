@@ -38,7 +38,8 @@ and document task below repeats it.
 | Report front matter | p. 1 the cover · p. 2 the frame |
 | Whole-book section | p. 6 Pacing, with the tension chart |
 | The manuscript | p. 61 marked-up manuscript · p. 63 scene block with evidence and the draft pair |
-| Closing | p. 136 seven readers · p. 139 revision plan · p. 140 verdict |
+| The readers | p. 136 the contents of the seven · p. 139 Agent · p. 142 Harsh but fair critic — one page per reader, the same template |
+| Closing | p. 146 revision plan · p. 147 verdict |
 | Identity | cover · bookplate · icon · the ladder · the wheel · the owner's mark |
 
 ---
@@ -128,6 +129,20 @@ Each of the seven persona reads prints a **"Would need"** line. A verdict with n
 is an opinion the author cannot act on, so the structured output gains a required `Condition` field
 beside the verdict, and a read that comes back without one is a failed pass, not a shorter one.
 Guard G22.
+
+### F46 — each reader gets a page, and keeps its pros and cons
+
+Drawn first as seven three-line summaries on one page, which **lost what the shipped report already
+does**: `Review` is `Perspective · Assessment · Strengths[] · Weaknesses[] · Recommendation`, and
+`AnalysisDocumentRenderer.RenderReviews` prints all five today. The mockup now matches the record —
+**one reader to a page**: the long review in character, that reader's own pros and cons in two
+columns, and the recommendation printed as *"Would need"* where the author will read it. A contents
+page in front carries the seven names, their verdict in a clause, and the page to turn to.
+
+The two columns are the only place in the report where a tick and a cross are the right marks: these
+are one reader's preferences, not the book's severity tiers, so they take the Positive and Problem
+roles rather than the four-tier scale. A persona whose review arrives with an empty pros or cons list
+is a **failed pass, not a shorter one** — the same rule as the missing condition. Guard G23.
 
 ### F45 — the marked-up manuscript is ~140 pages
 
@@ -222,9 +237,9 @@ and the error rule.
 
 ### Release I — reachability and delivery
 `FileProvider`, drop `ReportPage` **only once the open-the-report action exists** (R-2), Drive and
-reMarkable delivery of the new document, diagnostics. Closes with the readers, revision plan and
-verdict pages.
-→ *Mockups: report pages 136, 139, 140.*
+reMarkable delivery of the new document, diagnostics. Closes with the readers' contents page, the
+seven reader pages, the revision plan and the verdict.
+→ *Mockups: report pages 136, 139, 142, 146, 147.*
 
 ### The mark, suite-wide *(separate PR, after E)*
 F36 touches `Storyworthtelling.Paper`, `Tools/IconStudio` and four heads. It rides its own PR so a
@@ -262,6 +277,7 @@ names what was reintroduced. G1–G11 come from the finding; G12–G22 are added
 | G20 | `ScenePairRetentionTests` — a changed scene keeps its predecessor's image until the report is composed | Sweep old images at render time; the pair prints one panel |
 | G21 | `VerdictOrderTests` — strengths render before problems | Swap them |
 | G22 | `ReaderConditionTests` — every persona read carries a non-empty condition | Accept a read with no "Would need" |
+| G23 | `ReviewShapeTests` — every persona read prints assessment, strengths, weaknesses and recommendation, and none of the four is empty | Flatten a review to a summary line; the pros and cons the shipped report already prints disappear |
 
 ---
 
