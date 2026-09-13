@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
+using Folio.Domain.Reading;
 using Folio.Domain.External;
 using Folio.Domain.Health;
 using Folio.Domain.Model;
@@ -372,8 +373,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             dto.Inconsistencies ?? [],
             dto.Inaccuracies ?? [],
             dto.PacingNotes ?? [],
-            (dto.Reviews ?? []).Select(r =>
-                new Review(r.Perspective ?? string.Empty, r.Assessment ?? string.Empty, r.Strengths ?? [], r.Weaknesses ?? [], r.Recommendation ?? string.Empty)).ToList(),
+            // A read that arrives short is dropped rather than coalesced into a thinner one: the
+            // ?? string.Empty this replaces is precisely how a persona that answered four of six
+            // questions produced a page that rendered perfectly and said less (F44, F46). What the
+            // pipeline does about a dropped read is the pipeline's decision, not the parser's.
+            (dto.Reviews ?? []).Select(r => new Review(
+                    r.PersonaId ?? r.Perspective ?? string.Empty,
+                    r.Verdict ?? string.Empty,
+                    r.Assessment ?? string.Empty,
+                    r.Strengths ?? [],
+                    r.Weaknesses ?? [],
+                    r.Condition ?? r.Recommendation ?? string.Empty))
+                .Where(ReaderRead.IsWhole).ToList(),
             (dto.RevisionPlan ?? []).Select(r =>
                 new RevisionItem(r.Priority ?? string.Empty, r.Chapter ?? string.Empty,
                     r.Issue ?? string.Empty, r.SuggestedFix ?? string.Empty)).ToList(),
@@ -964,12 +975,17 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? Relationships { get; set; }
     }
 
+    // Perspective and Recommendation are the old names, still read so that a reply generated from a
+    // prompt that has not been reworded yet still maps rather than silently coming back empty.
     private sealed class ReviewDto
     {
+        public string? PersonaId { get; set; }
         public string? Perspective { get; set; }
+        public string? Verdict { get; set; }
         public string? Assessment { get; set; }
         public List<string>? Strengths { get; set; }
         public List<string>? Weaknesses { get; set; }
+        public string? Condition { get; set; }
         public string? Recommendation { get; set; }
     }
 

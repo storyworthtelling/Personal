@@ -2,6 +2,7 @@ using SkiaSharp;
 using Folio.Domain.Analysis;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
+using Folio.Domain.Reading;
 using Folio.Domain.Report;
 using Storyworthtelling.Paper;
 
@@ -352,7 +353,9 @@ public sealed class AnalysisDocumentRenderer
         writer.Heading("Reviews (differing perspectives)", h2, Ink, ruled: true);
         foreach (var review in reviews)
         {
-            writer.Heading(string.IsNullOrWhiteSpace(review.Perspective) ? "Review" : review.Perspective, h3, Ink);
+            writer.Heading(PersonaName(review.PersonaId), h3, Ink);
+            if (!string.IsNullOrWhiteSpace(review.Verdict))
+                writer.Paragraph(review.Verdict, bodyBold, Ink);
             if (!string.IsNullOrWhiteSpace(review.Assessment))
                 writer.Paragraph(review.Assessment, body, Ink);
             if ((review.Strengths?.Count ?? 0) > 0)
@@ -367,10 +370,19 @@ public sealed class AnalysisDocumentRenderer
                 foreach (var weakness in review.Weaknesses!)
                     writer.Bullet(weakness, body, Ink);
             }
-            if (!string.IsNullOrWhiteSpace(review.Recommendation))
-                writer.Paragraph($"Recommendation: {review.Recommendation}", bodyItalic, Muted);
+            if (!string.IsNullOrWhiteSpace(review.Condition))
+                writer.Paragraph($"Would need: {review.Condition}", bodyItalic, Muted);
             writer.Gap(PageGeometry.BlockGap);
         }
+    }
+
+    // A read cites a persona by id; the page prints the persona's name. An id with no persona behind
+    // it prints as itself rather than as "Review", so a wrong citation is visible instead of tidy.
+    private static string PersonaName(string personaId)
+    {
+        if (string.IsNullOrWhiteSpace(personaId))
+            return "Review";
+        return PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId)?.Name ?? personaId;
     }
 
     // The additive engine (Phase 3): scenes and beats to ADD, ranked by the same Must/Should/Consider impact

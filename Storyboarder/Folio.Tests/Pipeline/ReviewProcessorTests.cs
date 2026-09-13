@@ -71,7 +71,8 @@ public class ReviewProcessorTests : IDisposable
                 [new ReportFinding("Chapter 1", "Eye colour shifts")],
                 [new ReportFinding("Chapter 1", "Castle geography")],
                 [new ReportFinding("Chapter 1", "Slow open")],
-                [new Review("developmental editor", "Promising but uneven.", ["Voice"], ["Pacing"], "Tighten the opening.")],
+                [new Review("developmental-editor", "Promising but uneven.", "A sustained read of the structure.",
+                    ["Voice"], ["Pacing"], "The opening tightened.")],
                 [new RevisionItem("High", "Chapter 1", "Sagging middle", "Cut a subplot.")],
                 ["Comparable Title"], "Upmarket fantasy for adult readers.",
                 // The craft sections arrive from ConsolidateCraft and are folded in by the processor.
