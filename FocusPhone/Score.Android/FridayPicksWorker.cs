@@ -60,11 +60,17 @@ public class FridayPicksWorker : Worker
         var gap = MusicSettingsStore.TempoGap;
         MusicSettingsStore.TempoGap = null;
 
+        // Followed shows are the podcast side's own exclusion list, the same role the track
+        // catalog plays for songs and albums — without it a podcast pick could only ever
+        // recommend a show already subscribed to.
+        var subscribedShows = new SubscriptionStore(context).Load().Select(feed => feed.Title).ToList();
+
         // The catalog goes in as evidence and as an exclusion list, and what comes
         // back is records the owner does NOT have. It used to go in as the source, so
         // the crate could only ever offer to add something already on the shelf.
         var picks = taste.WeeklyDiscoveriesAsync(
-            catalog, MusicSettingsStore.FridayStackSize, gap, CancellationToken.None).GetAwaiter().GetResult();
+            catalog, MusicSettingsStore.FridayStackSize, gap, subscribedShows, CancellationToken.None)
+            .GetAwaiter().GetResult();
         if (picks.Count > 0)
         {
             store.Save(picks, DateTimeOffset.Now);
@@ -87,7 +93,7 @@ public class FridayPicksWorker : Worker
 
         return [.. store.LoadPicks()
             .Where(pick => struck.Contains(Discoveries.Key(pick)))
-            .Select(pick => new CratePick(Discoveries.Key(pick), pick.Title, pick.Artist))];
+            .Select(pick => new CratePick(Discoveries.Key(pick), pick.Title, pick.Artist, Kind: pick.Kind))];
     }
 
     /// <summary>The daily backbone (network-connected); Keep so relaunches don't reset a pending run.</summary>

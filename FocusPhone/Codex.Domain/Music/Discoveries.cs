@@ -1,14 +1,30 @@
 namespace Codex.Domain.Music;
 
 /// <summary>
+/// What kind of thing a crate pick names — a track, an album, or a podcast show. The crate
+/// started track-only; a pick's kind decides both what "already owned/subscribed" means for it
+/// (<see cref="Discoveries.Unowned"/>) and what tapping it does (Play for Song/Album, Subscribe
+/// for Podcast — Score has no way to browse or preview an album or a show it doesn't already
+/// hold, so those actions are what the app can actually do, not a full streaming browse).
+/// </summary>
+public enum DiscoveryKind
+{
+    Song,
+    Album,
+    Podcast,
+}
+
+/// <summary>
 /// A record the crate is recommending — one the owner does <b>not</b> have.
 ///
 /// Named rather than referenced by id, because an id is a thing the library already
 /// holds and the whole point of a recommendation is that the library does not hold it.
 /// <see cref="Why"/> is the one line the crate shows: a pick with no reason is just a
-/// name, and a name is not a recommendation.
+/// name, and a name is not a recommendation. For a <see cref="DiscoveryKind.Podcast"/> pick,
+/// <see cref="Artist"/> holds the show's network/publisher when the recommender named one, and
+/// is blank otherwise — a show does not always have one worth stating.
 /// </summary>
-public sealed record Recommendation(string Title, string Artist, string? Why = null);
+public sealed record Recommendation(string Title, string Artist, string? Why = null, DiscoveryKind Kind = DiscoveryKind.Song);
 
 /// <summary>
 /// Turning what a recommender proposed into what the crate may actually show.
@@ -26,18 +42,29 @@ public sealed record Recommendation(string Title, string Artist, string? Why = n
 public static class Discoveries
 {
     /// <summary>
-    /// The recommendations worth showing: those the library does not already hold,
+    /// The recommendations worth showing: those the library (or, for a
+    /// <see cref="DiscoveryKind.Podcast"/> pick, the subscription list) does not already hold,
     /// with repeats and half-named entries dropped, in the order they arrived.
     /// </summary>
+    /// <param name="subscribedShows">
+    /// Shows already subscribed to, by title — the podcast side's equivalent of
+    /// <paramref name="owned"/>. Only checked against <see cref="DiscoveryKind.Podcast"/> picks;
+    /// omit it when the caller has nothing to offer (it simply excludes nothing).
+    /// </param>
     public static IReadOnlyList<Recommendation> Unowned(
-        IEnumerable<Recommendation> recommended, IReadOnlyList<Track> owned)
+        IEnumerable<Recommendation> recommended, IReadOnlyList<Track> owned,
+        IReadOnlyList<string>? subscribedShows = null)
     {
         var kept = new List<Recommendation>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var pick in recommended)
         {
-            if (string.IsNullOrWhiteSpace(pick.Title) || string.IsNullOrWhiteSpace(pick.Artist))
+            // A podcast pick names a show, not an artist — a network/publisher is worth
+            // showing when the recommender gave one, but its absence is not a half-named pick
+            // the way a blank Artist would be for a Song or an Album.
+            var needsArtist = pick.Kind != DiscoveryKind.Podcast;
+            if (string.IsNullOrWhiteSpace(pick.Title) || (needsArtist && string.IsNullOrWhiteSpace(pick.Artist)))
             {
                 continue; // half a name is not a record anyone can go and find
             }
@@ -47,8 +74,7 @@ public static class Discoveries
                 continue;
             }
 
-            if (owned.Any(track => TrackIdentity.SameSong(
-                    track.Title, track.ArtistName, pick.Title, pick.Artist)))
+            if (IsAlreadyHeld(pick, owned, subscribedShows))
             {
                 continue;
             }
@@ -58,6 +84,23 @@ public static class Discoveries
 
         return kept;
     }
+
+    private static bool IsAlreadyHeld(
+        Recommendation pick, IReadOnlyList<Track> owned, IReadOnlyList<string>? subscribedShows) => pick.Kind switch
+    {
+        DiscoveryKind.Song => owned.Any(track =>
+            TrackIdentity.SameSong(track.Title, track.ArtistName, pick.Title, pick.Artist)),
+
+        // An album is "owned" once any of its tracks are — the library groups tracks into
+        // albums by (album, album artist), the same pair a Recommendation for an album carries.
+        DiscoveryKind.Album => owned.Any(track =>
+            TrackIdentity.SameSong(track.AlbumName, track.AlbumArtist, pick.Title, pick.Artist)),
+
+        DiscoveryKind.Podcast => subscribedShows?.Any(show =>
+            Fold(show) == Fold(pick.Title)) ?? false,
+
+        _ => false,
+    };
 
     /// <summary>
     /// A pick's stable id. The crate outlives a launch and the veto ledger keys off
