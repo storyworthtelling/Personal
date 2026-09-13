@@ -124,6 +124,12 @@ public static class PaperUi
             PaperTheme.Dp(context, DesignTokens.Space.X4), PaperTheme.Dp(context, DesignTokens.Space.X3),
             PaperTheme.Dp(context, DesignTokens.Space.X4), PaperTheme.Dp(context, DesignTokens.Space.X3));
         button.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
+        // The platform's default Button style (Widget.Material.Button) carries its own
+        // android:minWidth (88dp), which forces even a single-glyph button like "↑" to that
+        // width. Sizing to the padded label is the design intent here, so it must be cleared —
+        // otherwise a row with several of these buttons (e.g. Settings → Shelves) overflows and
+        // squeezes any weighted sibling view down to near-zero width.
+        button.SetMinimumWidth(0);
         button.Click += (_, _) => onClick();
         return button;
     }

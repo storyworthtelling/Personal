@@ -569,7 +569,7 @@ public class LauncherSettingsActivity : Activity
 
         // A small bronze chip with the shelf's pencil monogram — a settings-scale stand-in for the
         // engraved bookend the shelf carries in the tray.
-        var glyph = PaperUi.Secondary(this, ShelfGlyphMaker.Monogram(category.Name));
+        var glyph = PaperUi.Secondary(this, ShelfMonogram.For(category.Name));
         glyph.Gravity = GravityFlags.Center;
         glyph.SetTextColor(PaperTheme.Paper);
         glyph.Typeface = PaperTheme.SerifSemibold(this);
