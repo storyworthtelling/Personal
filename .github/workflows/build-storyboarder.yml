@@ -120,6 +120,33 @@ jobs:
           fi
           echo "ICON CHECK PASSED: android:icon = $APPICON"
 
+      # The eight faces DESIGN.md names, asserted by name rather than counted. Folio no longer globs
+      # the fonts itself — they arrive through the shared Storyworthtelling.Maui kit's MauiFont — so
+      # the thing that packages them is now a project reference, and a reference can be dropped by a
+      # merge without anything failing to build. An unregistered or unpackaged face is never an error
+      # at run time either: MAUI substitutes the system face and says nothing.
+      - name: FONT CHECK
+        working-directory: Storyboarder
+        run: |
+          set -e
+          echo "=== FONT CHECK ==="
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSerif4-Black SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular PinyonScript-Regular"
+          APK=$(ls -1 Folio.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls -1 Folio.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+          echo "APK: $APK"
+          ENTRIES=$(unzip -l "$APK")
+          # Matched by name, not by path: a MAUI head packages fonts under assets/ while the native
+          # heads use assets/fonts/, and pinning the wrong one would fail for the wrong reason.
+          for font in $FONTS; do
+            if ! echo "$ENTRIES" | grep -q "$font.ttf"; then
+              echo "FAIL: Folio is missing $font.ttf"
+              echo "$ENTRIES" | grep -i '\.ttf' || echo "(no .ttf entries at all)"
+              exit 1
+            fi
+          done
+          echo "ok: all eight fonts packaged"
+          echo "=== END FONT CHECK ==="
+
       # Keep only the latest run's artifacts: delete artifacts from older runs of
       # this workflow before uploading, which also frees storage so the upload succeeds.
       - name: Prune old artifacts

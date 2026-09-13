@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<local:FolioBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="Folio.Android.Pages.NewProjectPage"
-             Title="New project">
+             xmlns:local="clr-namespace:Folio.Android.Pages"
+             x:Class="Folio.Android.Pages.NewProjectPage">
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Padding="{StaticResource ScreenPadding}" RowSpacing="10">
-
-        <Label Grid.Row="0" x:Name="HeaderLabel" Text="New project" Style="{StaticResource DisplayLabel}" />
 
         <Button Grid.Row="1" x:Name="SignInButton"
                 Text="Sign in with Google" Clicked="OnSignInClicked"
@@ -59,4 +57,4 @@
             </Grid>
         </VerticalStackLayout>
     </Grid>
-</ContentPage>
+</local:FolioBinderPage>

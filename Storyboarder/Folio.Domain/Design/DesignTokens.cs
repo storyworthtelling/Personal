@@ -1,10 +1,23 @@
 namespace Folio.Domain.Design;
 
 /// <summary>
-/// The Paper &amp; Ink design tokens, mirroring DESIGN.md at the repository root.
-/// The only sources of design literals in Folio are this class, the
-/// XAML dictionary kept in parity with it by tests, and generated icon
-/// resources. Colors are hex strings so both MAUI and SkiaSharp can parse them.
+/// What is left of this head's own design literals, and why each piece is still here.
+///
+/// <para>The <b>screens</b> no longer read any of it. P10 Release C deleted this head's XAML
+/// dictionary and its in-app type ladder, and the app now takes both from the shared
+/// <c>Storyworthtelling.Maui</c> kit — one palette, enforced by reflection against
+/// <c>PaperColorTokens</c> rather than by a second hand-typed copy that could be wrong in the same
+/// way.</para>
+///
+/// <para>What remains is the <b>printed</b> side, which the kit cannot serve: the kit targets
+/// <c>net10.0-android</c>, and the renderers that need these values live in Infrastructure, which
+/// also builds for the desktop framework the tests run on. <see cref="Pdf"/> is the report page
+/// geometry and the colours above it are what <c>CoverPageRenderer</c> draws with. Both move to
+/// <c>Storyworthtelling.Paper</c>'s Document profile in Release E, which is also where
+/// <see cref="Accent"/> stops being the retired terracotta.</para>
+///
+/// <para><see cref="Motion"/> and <see cref="Grain"/> are recorded DESIGN.md values that nothing in
+/// this app reads yet. Left rather than deleted: they are facts, not duplicates of the kit.</para>
 /// </summary>
 public static class DesignTokens
 {
@@ -19,50 +32,7 @@ public static class DesignTokens
     public const string Accent = "#C2542F";
     public const string AccentDeep = "#9C4023";
 
-    /// <summary>In-app type scale (MAUI font sizes).</summary>
-    public static class Type
-    {
-        public const double Display = 34;
-        public const double Title = 24;
-        public const double Heading = 18;
-        public const double Body = 16;
-        public const double Secondary = 14;
-        public const double Label = 13;
-        public const double Mono = 14;
-    }
 
-    /// <summary>
-    /// Comic volume pages (px at the composed page size). Rendered at 2048×3072 (2:3) so the pages
-    /// carry enough resolution for print: at <see cref="PrintDpi"/> that is ~6.8×10.2in, and each
-    /// panel occupies enough pixels that the ~1MP image-model output fills it without visible softening.
-    /// Every length here scales together, so the page keeps the same proportions at any size.
-    /// </summary>
-    public static class Comic
-    {
-        public const int PageWidth = 2_048;
-        public const int PageHeight = 3_072;
-        public const int TopMargin = 128;
-        public const int SideMargin = 128;
-        public const int BottomMargin = 232; // contains the folio band
-        public const int FolioBand = 104;
-        public const int Gutter = 48;
-        public const float PanelStroke = 4f;
-        public const float BoxStroke = 3f;
-        public const float LetteringSize = 34f;  // dialogue, Sans
-        public const float CaptionSize = 32f;    // captions, Serif Italic
-        public const float SfxSize = 96f;        // sound-effect display lettering over the art, Serif Semibold
-        public const float FolioSize = 36f;      // page number + running title, Serif
-        public const float BalloonRadius = 28f;
-        public const float CaptionRadius = 20f;
-        public const float BoxPadding = 16f;
-        public const float LineSpacing = 1.35f;
-        public const float CoverTitleSize = 144f;
-        public const float CoverMedallionSize = 240f;
-
-        // The physical resolution the volume PDF declares for its full-page rasters, so print output
-        // is sized for print (≈300 DPI) rather than PdfSharp's default 96 DPI screen assumption.
-        public const int PrintDpi = 300;
-    }
 
     /// <summary>Analysis report pages (px at A4 150 DPI).</summary>
     public static class Pdf
