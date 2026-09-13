@@ -44,4 +44,8 @@ public sealed record NovelStatus(
     // review and putting the book away are separate events, and only the second is the owner's.
     bool Shelved = false,
     // How long the book is, which is what the shelf draws its spine width from.
-    int WordCount = 0);
+    int WordCount = 0,
+    // The jacket, and whether it is the owner's. Null falls back to plain cloth — a book with no
+    // painted cover is the ordinary case, not a missing file.
+    string? CoverPath = null,
+    bool CoverIsOwners = false);

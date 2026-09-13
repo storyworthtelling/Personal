@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
 using Folio.Domain.Time;
+using Folio.Domain.External;
+using Folio.Domain.Model;
 using Folio.Infrastructure.Services;
 using Storyworthtelling.Maui;
 using Storyworthtelling.Voice;
@@ -131,6 +133,10 @@ public partial class MainPage : FolioBinderPage
         if (status.Stage == "Completed" && !status.Shelved)
             buttons.Add(ShelveAction);
 
+        // The jacket: pick one, or have another painted. Both are undo-first, so neither asks.
+        buttons.Add(ReplaceCoverAction);
+        buttons.Add(RepaintCoverAction);
+
         // The finished revision report: open/share the PDF, or read it in the app.
         if (status.AnalysisReady)
         {
@@ -170,6 +176,8 @@ public partial class MainPage : FolioBinderPage
         switch (label)
         {
             case ShelveAction: await Shelve(status); break;
+            case ReplaceCoverAction: await ReplaceCover(status); break;
+            case RepaintCoverAction: await RepaintCover(status); break;
             case DeleteAction: await DeleteProject(status); break;
             case OpenReportPdfAction: await ShareReportPdf(status); break;
             case ReadReportAction: await OpenReport(status); break;
@@ -204,6 +212,104 @@ public partial class MainPage : FolioBinderPage
         await RefreshAsync();
     }
 
+    /// <summary>
+    /// Puts a jacket of the owner's choosing on the book. Picking a particular file is already the
+    /// deliberate act, so nothing is asked — and the fold puts the old one back.
+    /// </summary>
+    private async Task ReplaceCover(NovelStatus status)
+    {
+        var activity = Platform.CurrentActivity;
+        if (activity is null)
+        {
+            return;
+        }
+
+        var uri = await SafFilePicker.OpenDocumentAsync(activity, "image/*");
+        if (uri is null)
+        {
+            return;
+        }
+
+        byte[] bytes;
+        try
+        {
+            using var stream = activity.ContentResolver!.OpenInputStream(uri)
+                ?? throw new IOException("Could not open the image.");
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            bytes = buffer.ToArray();
+        }
+        catch
+        {
+            LastRunLabel.Text = "That image could not be read.";
+            return;
+        }
+
+        var (was, wasOwners) = (status.CoverPath, status.CoverIsOwners);
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .ReplaceCoverAsync(status.Id, bytes, CancellationToken.None);
+        }
+
+        OfferUndo("Cover replaced", () => _ = RestoreCover(status.Id, was, wasOwners));
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    /// Has another jacket painted.
+    ///
+    /// <para>The plan had this <i>ask first</i> when the owner had replaced the cover themselves.
+    /// It does not ask: every jacket is written to its own file and nothing is overwritten, so the
+    /// old one is still on disk and the fold genuinely puts it back. The intent — do not quietly
+    /// destroy a cover somebody chose — is kept by making it reversible rather than by a prompt.</para>
+    /// </summary>
+    private async Task RepaintCover(NovelStatus status)
+    {
+        var (was, wasOwners) = (status.CoverPath, status.CoverIsOwners);
+        LastRunLabel.Text = $"Painting a jacket for {status.Title}…";
+
+        try
+        {
+            using var scope = IPlatformApplication.Current!.Services.CreateScope();
+            var gemini = scope.ServiceProvider.GetRequiredService<IGeminiImageClient>();
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+
+            var report = await projects.GetReportAsync(status.Id, CancellationToken.None);
+            var jacket = await gemini.GenerateJacket(
+                status.Title,
+                report?.Genre ?? string.Empty,
+                report?.Logline ?? string.Empty,
+                ArtStyles.Default,
+                CancellationToken.None);
+
+            await projects.SetPaintedCoverAsync(status.Id, jacket, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // A jacket is never the point of the app: say so quietly and leave the book as it was.
+            LastRunLabel.Text = "Couldn't paint a jacket: " + ex.Message;
+            return;
+        }
+
+        LastRunLabel.Text = SettingsStore.LastRunSummary;
+        OfferUndo(
+            wasOwners ? "Your cover was replaced by a painted one" : "Cover repainted",
+            () => _ = RestoreCover(status.Id, was, wasOwners));
+        await RefreshAsync();
+    }
+
+    private async Task RestoreCover(Guid id, string? path, bool wasOwners)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .RestoreCoverAsync(id, path, wasOwners, CancellationToken.None);
+        }
+
+        await RefreshAsync();
+    }
+
     private async Task Unshelve(Guid id)
     {
         using (var scope = IPlatformApplication.Current!.Services.CreateScope())
@@ -218,6 +324,8 @@ public partial class MainPage : FolioBinderPage
     private static string GlyphFor(string label) => label switch
     {
         ShelveAction => Glyphs.Shelve,
+        ReplaceCoverAction => Glyphs.Picture,
+        RepaintCoverAction => Glyphs.Brush,
         OpenReportPdfAction or ReadReportAction => Glyphs.Page,
         NewDraftAction or NextBookAction => Glyphs.NewPage,
         DiffAction => Glyphs.Compare,
@@ -316,7 +424,7 @@ public partial class MainPage : FolioBinderPage
             Margin = new Thickness(0, 4, 0, 0),
         };
 
-        var cover = new FlatBook(row.Title, jacket: null, 118, 148, tilt: -1.6)
+        var cover = new FlatBook(row.Title, Jacket(status), 118, 148, tilt: -1.6)
         {
             VerticalOptions = LayoutOptions.Start,
         };
@@ -344,7 +452,7 @@ public partial class MainPage : FolioBinderPage
                 PaperResources.Colour(status.NeedsAttention ? "ProblemMark" : "InkSoft"));
             note.Rotation = noteTilts[i % noteTilts.Length];
 
-            var cover = new FlatBook(row.Title, jacket: null, 88, 110, tilts[i % tilts.Length]);
+            var cover = new FlatBook(row.Title, Jacket(status), 88, 110, tilts[i % tilts.Length]);
             Press(cover, status);
 
             strip.Children.Add(new VerticalStackLayout
@@ -358,6 +466,13 @@ public partial class MainPage : FolioBinderPage
         return strip;
     }
 
+    /// <summary>
+    /// The painted jacket, or null for plain cloth. A book with no cover is the ordinary case, and a
+    /// recorded cover whose file has gone is the same thing rather than a broken image.
+    /// </summary>
+    private static ImageSource? Jacket(NovelStatus status) =>
+        status.CoverPath is { } path && File.Exists(path) ? ImageSource.FromFile(path) : null;
+
     // A book is opened by pressing it; what can be done with it is a long press, per the frame.
     private void Press(View book, NovelStatus status)
     {
@@ -367,6 +482,8 @@ public partial class MainPage : FolioBinderPage
     }
 
     private const string ShelveAction = "Put on the shelf";
+    private const string ReplaceCoverAction = "Replace cover…";
+    private const string RepaintCoverAction = "Repaint the cover";
     private const string RetryAction = "Retry now";
     private const string StopAction = "Stop review";
     private const string DeleteAction = "Delete manuscript";

@@ -362,6 +362,61 @@ public sealed class ProjectService
     }
 
     /// <summary>
+    /// Records a jacket the <b>owner</b> chose.
+    /// </summary>
+    public Task ReplaceCoverAsync(Guid id, byte[] jacket, CancellationToken cancellationToken) =>
+        SetCoverAsync(id, jacket, owners: true, cancellationToken);
+
+    /// <summary>
+    /// Records a jacket the app <b>painted</b>.
+    /// </summary>
+    public Task SetPaintedCoverAsync(Guid id, byte[] jacket, CancellationToken cancellationToken) =>
+        SetCoverAsync(id, jacket, owners: false, cancellationToken);
+
+    /// <summary>
+    /// Puts a previous jacket back — the undo behind a repaint, and the reason repainting asks
+    /// nothing first. <paramref name="path"/> of null restores having had no jacket at all, which
+    /// is where the first repaint came from.
+    /// </summary>
+    public async Task RestoreCoverAsync(Guid id, string? path, bool wasOwners, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null)
+        {
+            return;
+        }
+
+        novel.CoverPath = path;
+        novel.CoverIsOwners = wasOwners;
+        novel.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Writes a jacket to a file of its own and points the book at it.
+    ///
+    /// <para>Never overwrites: the previous jacket stays on disk so the fold can restore it. They
+    /// live under the book's own folder, so deleting the book takes them with it.</para>
+    /// </summary>
+    private async Task SetCoverAsync(Guid id, byte[] jacket, bool owners, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null)
+        {
+            return;
+        }
+
+        // The absolute path Save returns, the way every other rendered file is recorded here.
+        novel.CoverPath = imageStore.Save(
+            Path.Combine(id.ToString(), "covers", $"{Guid.NewGuid():N}.png"), jacket);
+        novel.CoverIsOwners = owners;
+        novel.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// What a series is called: the owner's name for it, or the title of its first book until they
     /// give it one. A standalone book has no series and no name.
     /// </summary>
@@ -675,7 +730,8 @@ public sealed class ProjectService
             novel.DraftNumber, novel.PreviousDraftId is not null,
             novel.SeriesId is not null, novel.SeriesSequence, novel.SeriesId,
             await SeriesNameOf(db, novel, cancellationToken),
-            novel.ShelvedAtUtc is not null, novel.WordCount);
+            novel.ShelvedAtUtc is not null, novel.WordCount,
+            novel.CoverPath, novel.CoverIsOwners);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

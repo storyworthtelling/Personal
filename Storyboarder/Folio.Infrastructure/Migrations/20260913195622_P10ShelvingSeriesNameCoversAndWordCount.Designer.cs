@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Folio.Infrastructure.Migrations
 {
     [DbContext(typeof(FolioDbContext))]
-    [Migration("20260913194754_P10ShelvingSeriesNameAndWordCount")]
-    partial class P10ShelvingSeriesNameAndWordCount
+    [Migration("20260913195622_P10ShelvingSeriesNameCoversAndWordCount")]
+    partial class P10ShelvingSeriesNameCoversAndWordCount
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -308,6 +308,12 @@ namespace Folio.Infrastructure.Migrations
 
                     b.Property<string>("ContinuitySummary")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("CoverIsOwners")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CoverPath")
                         .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAtUtc")
