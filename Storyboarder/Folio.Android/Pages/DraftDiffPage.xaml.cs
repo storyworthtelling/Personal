@@ -1,16 +1,19 @@
 using Folio.Domain.Analysis;
 
+using Storyworthtelling.Maui;
+
 namespace Folio.Android.Pages;
 
 // Shows what the last revision moved: the report findings it resolved, newly raised, and regressed (matched
 // across drafts by finding identity), and the scenes that changed — each with its before/after evidence
 // image so the author can see how the illustration shifted (the comprehension probe). Built from the
 // DraftDiff already loaded via ProjectService.
-public partial class DraftDiffPage : ContentPage
+public partial class DraftDiffPage : FolioBinderPage
 {
     public DraftDiffPage(string title, int draftNumber, DraftDiff diff)
     {
         InitializeComponent();
+        Wrap(FolioArea.Shelf, "What changed");
         Build(title, draftNumber, diff);
     }
 
@@ -53,12 +56,12 @@ public partial class DraftDiffPage : ContentPage
         var caption = new Label
         {
             Text = scene.Citation,
-            Style = (Style)Application.Current!.Resources["SecondaryLabel"]
+            Style = PaperResources.Token<Style>("SecondaryLabel")
         };
 
         return new Border
         {
-            Style = (Style)Application.Current!.Resources["HairlineCard"],
+            Style = PaperResources.Token<Style>("HairlineCard"),
             Margin = new Thickness(0, 6, 0, 0),
             Content = new VerticalStackLayout { Spacing = 4, Children = { caption, grid } }
         };
@@ -71,13 +74,13 @@ public partial class DraftDiffPage : ContentPage
         var heading = new Label
         {
             Text = label,
-            Style = (Style)Application.Current!.Resources["FieldLabel"]
+            Style = PaperResources.Token<Style>("FieldLabel")
         };
 
         View body = image is not null
             ? new Border
             {
-                Stroke = (Color)Application.Current!.Resources["Hairline"],
+                Stroke = PaperResources.Colour("Hairline"),
                 StrokeThickness = 1,
                 StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 },
                 Padding = 0,
@@ -86,7 +89,7 @@ public partial class DraftDiffPage : ContentPage
             : new Label
             {
                 Text = "(no image)",
-                Style = (Style)Application.Current!.Resources["StatusLine"]
+                Style = PaperResources.Token<Style>("StatusLine")
             };
 
         return new VerticalStackLayout { Spacing = 4, Children = { heading, body } };
@@ -105,10 +108,10 @@ public partial class DraftDiffPage : ContentPage
         Content.Add(new Label
         {
             Text = text,
-            Style = (Style)Application.Current!.Resources[isDisplay ? "DisplayLabel" : "TitleLabel"],
+            Style = PaperResources.Token<Style>(isDisplay ? "DisplayLabel" : "TitleLabel"),
             Margin = new Thickness(0, isDisplay ? 0 : 12, 0, 0)
         });
 
     private void Paragraph(string text) =>
-        Content.Add(new Label { Text = text, Style = (Style)Application.Current!.Resources["StatusLine"] });
+        Content.Add(new Label { Text = text, Style = PaperResources.Token<Style>("StatusLine") });
 }
