@@ -35,12 +35,11 @@
     <ProjectReference Include="..\Folio.Domain\Folio.Domain.csproj" />
     <ProjectReference Include="..\Folio.Infrastructure\Folio.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
-  </ItemGroup>
-
-  <!-- The shared Paper & Ink fonts (aliases registered in MauiProgram). The CI
-       FONT CHECK proves they are packaged in the APK. -->
-  <ItemGroup>
-    <MauiFont Include="..\..\Fonts\*.ttf" />
+    <!-- The shared Paper & Ink kit: the role table, the component styles, and the eight fonts with
+         their aliases. It replaces this head's private DesignTokens.xaml and its own MauiFont glob —
+         a head that packages the fonts itself can register an alias for a face the kit does not
+         carry, which fails silently. The CI FONT CHECK still proves all eight reach the APK. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Maui\Storyworthtelling.Maui.csproj" />
   </ItemGroup>
 
   <ItemGroup>

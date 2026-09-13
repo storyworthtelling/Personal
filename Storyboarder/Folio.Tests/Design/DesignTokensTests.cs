@@ -3,6 +3,9 @@ using Folio.Domain.Design;
 
 namespace Folio.Tests.Design;
 
+// The PRINTED tokens only. This head's in-app palette and type ladder are the shared
+// Storyworthtelling.Maui kit's now, and the kit's own tests check those against PaperColorTokens by
+// reflection — which is the point of the move: one copy, so it cannot disagree with itself.
 public class DesignTokensTests
 {
     internal static readonly IReadOnlyDictionary<string, string> Colors = new Dictionary<string, string>
@@ -41,19 +44,6 @@ public class DesignTokensTests
         Assert.True(ratio >= minimum, $"{fg} on {bg} is {ratio:F2}:1, below {minimum}:1");
     }
 
-    [Fact]
-    public void TypeScaleDescends()
-    {
-        var scale = new[]
-        {
-            DesignTokens.Type.Display, DesignTokens.Type.Title, DesignTokens.Type.Heading,
-            DesignTokens.Type.Body, DesignTokens.Type.Secondary, DesignTokens.Type.Label,
-        };
-        for (var i = 1; i < scale.Length; i++)
-        {
-            Assert.True(scale[i] < scale[i - 1], $"Type scale not strictly descending at index {i}");
-        }
-    }
 
     [Fact]
     public void PdfScaleDescends()
@@ -69,10 +59,4 @@ public class DesignTokensTests
         }
     }
 
-    [Fact]
-    public void ComicFolioBandFitsInsideBottomMargin()
-    {
-        Assert.True(DesignTokens.Comic.FolioBand < DesignTokens.Comic.BottomMargin,
-            "The folio band must sit inside the bottom margin");
-    }
 }
