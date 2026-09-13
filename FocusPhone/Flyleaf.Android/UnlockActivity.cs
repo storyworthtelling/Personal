@@ -38,6 +38,7 @@ public class UnlockActivity : Activity
     private LinearLayout? actionBarHost;
     private string? inlineStatus;
     private bool refreshScheduled;
+    private UnlockState? lastRenderedState;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -106,9 +107,21 @@ public class UnlockActivity : Activity
             inlineStatus = "Debugging is now disabled for good.";
         }
 
+        var currentState = machine!.CurrentState;
+        // The 60-minute admin session also expires passively (UnlockStateMachine.Touch, recomputed
+        // from wall-clock time on every observation) while this screen happens to be sitting open —
+        // catch that transition here too, not just the explicit Re-lock button, so Chrome is
+        // re-suspended the moment the session actually ends rather than at some later unrelated
+        // policy-reapply trigger.
+        if (lastRenderedState == UnlockState.AdminActive && currentState != UnlockState.AdminActive)
+        {
+            PolicyManager.ApplyCurrentPolicy(this);
+        }
+        lastRenderedState = currentState;
+
         content!.RemoveAllViews();
         actionBarHost!.RemoveAllViews();
-        switch (machine!.CurrentState)
+        switch (currentState)
         {
             case UnlockState.Locked:
                 AddHeader("Locked");
@@ -130,7 +143,10 @@ public class UnlockActivity : Activity
             case UnlockState.Ready:
                 AddHeader("Ready");
                 AddBody("The delay has elapsed. Admin mode lasts 60 minutes and re-locks automatically.");
-                PinActions(PaperUi.PrimaryButton(this, "Enter admin mode", () => Transition(machine.EnterAdminMode)));
+                // Entering admin mode is what un-suspends the login browser (Chrome) for OAuth
+                // Custom Tabs — reapply policy immediately rather than waiting for the next
+                // unrelated trigger (a reboot, an app install) to pick the change up.
+                PinActions(PaperUi.PrimaryButton(this, "Enter admin mode", () => TransitionAndReapplyPolicy(machine.EnterAdminMode)));
                 break;
 
             case UnlockState.AdminActive:
@@ -197,7 +213,9 @@ public class UnlockActivity : Activity
             content!.AddView(status, statusParams);
         }
 
-        PinActions(PaperUi.SecondaryButton(this, "Re-lock now", () => Transition(machine!.Relock)));
+        // Re-locking is what re-suspends Chrome; reapply immediately rather than leaving it
+        // runnable until some unrelated trigger reapplies policy.
+        PinActions(PaperUi.SecondaryButton(this, "Re-lock now", () => TransitionAndReapplyPolicy(machine!.Relock)));
     }
 
     private void ShowBlockedApps()
@@ -401,6 +419,15 @@ public class UnlockActivity : Activity
         store!.Save(machine!);
         inlineStatus = null;
         Render();
+    }
+
+    // For a transition that flips AdminModeActive (entering or leaving admin mode): the login
+    // browser's suspended/runnable state is decided from that flag on every policy pass, so the
+    // change has to be applied here rather than waiting for some unrelated trigger to reapply it.
+    private void TransitionAndReapplyPolicy(Action action)
+    {
+        Transition(action);
+        PolicyManager.ApplyCurrentPolicy(this);
     }
 
     private void AddHeader(string text) => content!.AddView(PaperUi.PageHeader(this, text));
