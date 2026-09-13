@@ -33,4 +33,15 @@ public sealed record NovelStatus(
     // Whether this book belongs to a series and, if so, its book number (1 = first). Drives the card's
     // "Book N" badge (Phase 5). InSeries is false for a standalone book, where the sequence is meaningless.
     bool InSeries = false,
-    int SeriesSequence = 1);
+    int SeriesSequence = 1,
+    // Which series, when there is one. The shelf groups by it: without an identity every book is
+    // its own series of one, and a trilogy takes three shelves with three sets of bookends.
+    Guid? SeriesId = null,
+    // What the series is called: the owner's name for it, or the first book's title until they give
+    // it one. Resolved here so no screen has to work it out and none of them can disagree.
+    string? SeriesName = null,
+    // Whether the owner has put this book on the shelf. The pipeline never sets it: finishing a
+    // review and putting the book away are separate events, and only the second is the owner's.
+    bool Shelved = false,
+    // How long the book is, which is what the shelf draws its spine width from.
+    int WordCount = 0);
