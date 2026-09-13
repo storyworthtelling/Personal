@@ -28,7 +28,7 @@ public class AdaptiveIconRendererTests : IDisposable
     // A paper-background app. Not one of the four FocusPhone heads: every one of them now
     // stands on its own identity ground, Plate included since its cover landed, so picking a
     // head here would test the flat-paper path against a spec that no longer uses it.
-    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Canonizer");
+    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Folio");
     private static IconSpec FlyleafSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Launcher");
     private static IconSpec ForewordSpec => IconSpecs.All.First(s => s.App == "Foreword");
 
@@ -43,7 +43,7 @@ public class AdaptiveIconRendererTests : IDisposable
         // four heads under FocusPhone/ still all need an icon.
         Assert.Equal(4, IconSpecs.All.Count(s => s.ResourceRoot.StartsWith("FocusPhone/")));
         Assert.Equal(IconSpecs.All.Count, IconSpecs.All.Select(s => s.ResourceRoot).Distinct().Count());
-        Assert.Contains(IconSpecs.All, s => s.App == "Canonizer" && s.Name == "appicon");
+        Assert.Contains(IconSpecs.All, s => s.App == "Folio" && s.Name == "appicon");
         Assert.Contains(IconSpecs.All, s => s.App == "Foreword" && s.Name == "ic_launcher");
         Assert.Contains(IconSpecs.All, s => s.App == "Ledger" && s.Name == "appicon");
     }
