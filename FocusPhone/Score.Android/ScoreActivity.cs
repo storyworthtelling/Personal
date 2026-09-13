@@ -27,6 +27,7 @@ namespace Score;
 public class ScoreActivity : Activity
 {
     private readonly DeviceAccountTokenProvider musicTokens = new();
+    private BackCallback? backCallback;
 
     private ScorePlayback playback = null!;
     private ListeningLog listening = null!;
@@ -53,6 +54,24 @@ public class ScoreActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
+
+        // ScoreActivity is a plain Activity, not AndroidX's ComponentActivity, so it never gets
+        // ComponentActivity's OnBackPressedDispatcher compatibility shim for free. On API 33+,
+        // with the system's predictive-back gesture enabled, the gesture is resolved by the
+        // platform's OnBackInvokedDispatcher and can bypass the deprecated OnBackPressed()
+        // override entirely — which is what let the gesture fall through past this app (into
+        // whatever was behind it, i.e. the launcher) instead of reaching Active.GoBack(), the
+        // exact "back exits the app instead of returning to the Albums list" report. Registering
+        // here routes both paths to the same GoBack() logic; OnBackPressed() stays for pre-33.
+        if ((int)Build.VERSION.SdkInt >= 33)
+        {
+            backCallback = new BackCallback(this);
+            // 0 is PRIORITY_DEFAULT (android.window.OnBackInvokedDispatcher) — a raw literal
+            // rather than a named constant, since the constant's exact binding surface isn't
+            // worth guessing at when the value itself is stable platform API.
+            OnBackInvokedDispatcher?.RegisterOnBackInvokedCallback(0, backCallback);
+        }
+
         playback = new ScorePlayback(this);
 
         listening = new ListeningLog(
@@ -146,16 +165,28 @@ public class ScoreActivity : Activity
         page.AddView(greetingView);
 
         content = new FrameLayout(this);
-        foreach (var area in areas)
-        {
-            area.Overlay = content; // undo bars and action cards overlay the content frame
-        }
-
         content.SetPadding(edge, 0, edge, 0);
         page.AddView(content, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        spread.AddView(page, new LinearLayout.LayoutParams(
+        // The overlay host wraps the WHOLE page — header included — not just the content frame.
+        // A dog-ear posted against `content` alone sat below the header/greeting, which read as
+        // "inside the binder tabs" rather than at the top of the page the way a folded corner
+        // should. Wrapping the header in it too is what makes the fold read as sitting at the
+        // very top of the page. Under enforced edge-to-edge (API 35+, same reasoning as
+        // PaperUi.BottomBar's navigation-bar inset padding below), the status bar can draw over
+        // this top edge, so the host pads itself down by the status-bar inset — the fold stays
+        // large enough to tap under the battery/clock icons instead of sitting half behind them.
+        var pageOverlayHost = new FrameLayout(this);
+        pageOverlayHost.AddView(page, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        pageOverlayHost.SetOnApplyWindowInsetsListener(new StatusBarInsetListener());
+        foreach (var area in areas)
+        {
+            area.Overlay = pageOverlayHost; // undo bars, notices, and action cards overlay the whole page
+        }
+
+        spread.AddView(pageOverlayHost, new LinearLayout.LayoutParams(
             0, ViewGroup.LayoutParams.MatchParent) { Weight = 1 });
 
         binder = new BinderTabs(this);
@@ -219,6 +250,11 @@ public class ScoreActivity : Activity
 
     protected override void OnDestroy()
     {
+        if (backCallback is not null)
+        {
+            OnBackInvokedDispatcher?.UnregisterOnBackInvokedCallback(backCallback);
+        }
+
         playback.Release();
         base.OnDestroy();
     }
@@ -226,10 +262,38 @@ public class ScoreActivity : Activity
     public override void OnBackPressed()
     {
         // The area gets first refusal — only it knows whether it is drilled into
-        // something. It raises its own redraw if it used the press.
+        // something. It raises its own redraw if it used the press. Pre-33 path; see
+        // BackCallback for the API-33+ predictive-back path that reaches the same GoBack().
         if (!Active.GoBack())
         {
             base.OnBackPressed();
+        }
+    }
+
+    // The API-33+ predictive-back path — see the registration in OnCreate for why this exists
+    // alongside the deprecated OnBackPressed() override rather than instead of it.
+    private sealed class BackCallback(ScoreActivity activity) : Java.Lang.Object, Android.Window.IOnBackInvokedCallback
+    {
+        public void OnBackInvoked()
+        {
+            if (!activity.Active.GoBack())
+            {
+                activity.Finish();
+            }
+        }
+    }
+
+    // Pads the page overlay host down by the status-bar inset, matching PaperUi.BottomBar's own
+    // navigation-bar inset handling for the same reason: under enforced edge-to-edge the window
+    // draws behind the system status bar, so a fold posted flush against this host's top-right
+    // corner would sit partly behind the battery/clock icons rather than being reliably tappable.
+    private sealed class StatusBarInsetListener : Java.Lang.Object, View.IOnApplyWindowInsetsListener
+    {
+        public WindowInsets OnApplyWindowInsets(View view, WindowInsets insets)
+        {
+            var top = insets.GetInsets(WindowInsets.Type.StatusBars()).Top;
+            view.SetPadding(view.PaddingLeft, top, view.PaddingRight, view.PaddingBottom);
+            return insets;
         }
     }
 

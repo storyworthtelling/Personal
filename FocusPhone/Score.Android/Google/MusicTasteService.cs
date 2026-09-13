@@ -133,7 +133,8 @@ public sealed class MusicTasteService
     /// to persist. <paramref name="owned"/> is taste evidence and an exclusion list.
     /// </summary>
     public async Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
-        IReadOnlyList<Track> owned, int maxPicks, string? note, CancellationToken cancellationToken)
+        IReadOnlyList<Track> owned, int maxPicks, string? note,
+        IReadOnlyList<string> subscribedShows, CancellationToken cancellationToken)
     {
         try
         {
@@ -144,7 +145,8 @@ public sealed class MusicTasteService
                 return []; // no taste learned yet -> nothing to recommend against
             }
 
-            return await discovery.WeeklyDiscoveriesAsync(profile, owned, maxPicks, note, cancellationToken);
+            return await discovery.WeeklyDiscoveriesAsync(
+                profile, owned, maxPicks, note, subscribedShows, cancellationToken);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {

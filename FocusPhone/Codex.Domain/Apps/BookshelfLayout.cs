@@ -130,12 +130,15 @@ public static class BookshelfLayout
             var coverHeight = compartment - metrics.ShelfGap - metrics.LedgeThickness;
             var coverWidth = coverHeight * metrics.CoverPortraitRatio;
             var maxRowWidth = contentRight - contentLeft;
-            var groupWidth = n * coverWidth + Math.Max(0, n - 1) * metrics.ItemGap;
+            // Cover-out home books get their own, wider gap (HomeCoverGap) — ItemGap is tuned for
+            // spine-out books that should abut, and at that width two covers on the same shelf read
+            // as one flat rect with barely a seam rather than two separately bound books.
+            var groupWidth = n * coverWidth + Math.Max(0, n - 1) * metrics.HomeCoverGap;
             if (groupWidth > maxRowWidth)
             {
-                coverWidth = (maxRowWidth - Math.Max(0, n - 1) * metrics.ItemGap) / n;
+                coverWidth = (maxRowWidth - Math.Max(0, n - 1) * metrics.HomeCoverGap) / n;
                 coverHeight = coverWidth / metrics.CoverPortraitRatio;
-                groupWidth = n * coverWidth + Math.Max(0, n - 1) * metrics.ItemGap;
+                groupWidth = n * coverWidth + Math.Max(0, n - 1) * metrics.HomeCoverGap;
             }
             var x = (width - groupWidth) / 2f;
             var top = restY - coverHeight;
@@ -144,7 +147,7 @@ public static class BookshelfLayout
             {
                 items.Add(new PlacedItem(entry.Key, ShelfFace.CoverOut, entry.Size,
                     new LayoutRect(x, top, x + coverWidth, restY)));
-                x += coverWidth + metrics.ItemGap;
+                x += coverWidth + metrics.HomeCoverGap;
             }
             placed.Add(new PlacedShelf(ShelfFace.CoverOut, ledge, null, null, null, items, Home: true));
         }

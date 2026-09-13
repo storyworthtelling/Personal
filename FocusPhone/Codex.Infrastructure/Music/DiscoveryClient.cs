@@ -28,13 +28,19 @@ public sealed class DiscoveryClient : IDiscoveryClient
         "in play order, at most the requested count. No prose outside the JSON.";
 
     private const string DiscoveriesInstruction =
-        "You are filling ONE listener's weekly crate: records they do NOT own and might like. You are given " +
-        "their TASTE PROFILE and a sample of the LIBRARY THEY ALREADY HAVE. The library is evidence of what " +
-        "they like and a list of what to AVOID recommending — never pick from it, and do not pick another " +
-        "release of a record it already contains. Favour variety and things adjacent to their taste rather " +
-        "than the safest possible match, and honour what they avoid. Give each pick a SHORT reason in one " +
-        "plain clause, said to the listener. Respond with ONLY a JSON object: " +
-        "{\"picks\":[{\"title\":string,\"artist\":string,\"why\":string}]}. No prose outside the JSON.";
+        "You are filling ONE listener's weekly crate: things they do NOT already have and might like. You are " +
+        "given their TASTE PROFILE, a sample of the LIBRARY THEY ALREADY HAVE (tracks, which also stand for " +
+        "the albums they belong to), and the PODCASTS THEY ALREADY FOLLOW. Both lists are evidence of taste " +
+        "and lists of what to AVOID recommending — never pick a track, another release of an album already " +
+        "represented in the library, or a podcast already followed. Favour variety and things adjacent to " +
+        "their taste rather than the safest possible match, and honour what the profile says they avoid. Mix " +
+        "kinds rather than picking songs alone — a normal week's crate has some albums and, if the listener " +
+        "follows any podcasts at all, a show or two among the tracks. Give each pick a SHORT reason in one " +
+        "plain clause, said to the listener. kind is \"song\", \"album\", or \"podcast\". For a song or an " +
+        "album, artist is who made it; for a podcast, artist is its network/publisher if you know one, else " +
+        "an empty string — never invent one. Respond with ONLY a JSON object: " +
+        "{\"picks\":[{\"title\":string,\"artist\":string,\"why\":string,\"kind\":string}]}. No prose outside " +
+        "the JSON.";
 
     private readonly HttpClient httpClient;
     private readonly IOptions<VoiceOptions> optionsAccessor;
@@ -57,11 +63,13 @@ public sealed class DiscoveryClient : IDiscoveryClient
 
     public async Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
         TasteProfile profile, IReadOnlyList<Track> owned, int maxTracks,
-        string? note, CancellationToken cancellationToken)
+        string? note, IReadOnlyList<string> subscribedShows, CancellationToken cancellationToken)
     {
         var userContent =
             $"TASTE PROFILE (JSON):\n{ProfileJson(profile)}\n\n" +
-            $"LIBRARY THEY ALREADY HAVE (JSON):\n{CatalogJson(owned)}\n\nMAX PICKS: {maxTracks}" +
+            $"LIBRARY THEY ALREADY HAVE (JSON):\n{CatalogJson(owned)}\n\n" +
+            $"PODCASTS THEY ALREADY FOLLOW (JSON):\n{JsonSerializer.Serialize(subscribedShows)}\n\n" +
+            $"MAX PICKS: {maxTracks}" +
             (string.IsNullOrWhiteSpace(note) ? string.Empty : $"\n\nTHE SHELF IS SHORT OF: {note}");
 
         var reply = await SendMessage(DiscoveriesInstruction, userContent, cancellationToken);
@@ -83,14 +91,26 @@ public sealed class DiscoveryClient : IDiscoveryClient
                 picks.Select(pick => new Recommendation(
                     pick.Title?.Trim() ?? string.Empty,
                     pick.Artist?.Trim() ?? string.Empty,
-                    string.IsNullOrWhiteSpace(pick.Why) ? null : pick.Why.Trim())),
-                owned);
+                    string.IsNullOrWhiteSpace(pick.Why) ? null : pick.Why.Trim(),
+                    ParseKind(pick.Kind))),
+                owned,
+                subscribedShows);
         }
         catch (JsonException)
         {
             return [];
         }
     }
+
+    // A kind the model got wrong or omitted defaults to Song rather than being dropped — the
+    // exact same "degrade gracefully, never wedge the crate" bargain every other garbled field
+    // here already takes (a missing why, an unparsable reply, an empty title).
+    private static DiscoveryKind ParseKind(string? kind) => kind?.Trim().ToLowerInvariant() switch
+    {
+        "album" => DiscoveryKind.Album,
+        "podcast" => DiscoveryKind.Podcast,
+        _ => DiscoveryKind.Song,
+    };
 
     private async Task<DiscoverySelection> Choose(string instruction, string userContent, CancellationToken cancellationToken)
     {
@@ -247,5 +267,6 @@ public sealed class DiscoveryClient : IDiscoveryClient
         public string? Title { get; set; }
         public string? Artist { get; set; }
         public string? Why { get; set; }
+        public string? Kind { get; set; }
     }
 }
