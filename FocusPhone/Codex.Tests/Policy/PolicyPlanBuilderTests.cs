@@ -10,14 +10,16 @@ public class PolicyPlanBuilderTests
         IEnumerable<string>? browserPackages = null,
         IEnumerable<string>? otherHomePackages = null,
         IEnumerable<string>? blockedPackages = null,
-        IEnumerable<string>? neverVisiblePackages = null) =>
+        IEnumerable<string>? neverVisiblePackages = null,
+        bool adminModeActive = false) =>
         new(
             OwnPackages: PolicyContext.FocusPhonePackages,
             BrowserPackages: (browserPackages ?? ["com.android.chrome"]).ToHashSet(),
             OtherHomePackages: (otherHomePackages ?? ["com.google.android.apps.nexuslauncher"]).ToHashSet(),
             BlockedPackages: (blockedPackages ?? []).ToHashSet(),
             DebuggingLockedDown: finalized,
-            NeverVisiblePackages: (neverVisiblePackages ?? []).ToHashSet());
+            NeverVisiblePackages: (neverVisiblePackages ?? []).ToHashSet(),
+            AdminModeActive: adminModeActive);
 
     [Fact]
     public void Plan_IncludesCoreRestrictions()
@@ -119,6 +121,17 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
+    public void SettingsPackage_IsNotSuspended_EvenIfDetectedAsABrowser()
+    {
+        // The platform refuses to suspend it regardless, and it can surface in the
+        // browser-resolving package query on some OEM builds via a deep-link handler.
+        var plan = PolicyPlanBuilder.Build(DefaultContext(
+            browserPackages: [PolicyContext.SettingsPackage, "com.android.chrome"]));
+
+        Assert.DoesNotContain(PolicyContext.SettingsPackage, plan.SuspendedPackages);
+    }
+
+    [Fact]
     public void CutoverAllowlistedApps_AreNeverSuspended_EvenIfPreviouslyBlocked()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext(
@@ -142,27 +155,54 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
-    public void LoginBrowser_IsNotSuspended_EvenThoughItIsABrowser()
+    public void LoginBrowser_IsSuspended_OutsideAdminMode_LikeAnyOtherBrowser()
+    {
+        // An allowlisted app (Maps, GitHub, Gemini, reMarkable) must not be able to reach Chrome for
+        // an ordinary in-app link just because it's on the cutover allowlist — Chrome is suspended
+        // like every other browser unless the owner has deliberately opened an Admin session.
+        var plan = PolicyPlanBuilder.Build(DefaultContext(
+            browserPackages: [PolicyContext.LoginBrowserPackage, "org.mozilla.firefox"],
+            adminModeActive: false));
+
+        Assert.Contains(PolicyContext.LoginBrowserPackage, plan.SuspendedPackages);
+        Assert.DoesNotContain(PolicyContext.LoginBrowserPackage, plan.RunnablePackages);
+        Assert.Contains("org.mozilla.firefox", plan.SuspendedPackages);
+    }
+
+    [Fact]
+    public void LoginBrowser_IsRunnable_OnlyWhileAdminModeIsActive()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext(
-            browserPackages: [PolicyContext.LoginBrowserPackage, "org.mozilla.firefox"]));
+            browserPackages: [PolicyContext.LoginBrowserPackage, "org.mozilla.firefox"],
+            adminModeActive: true));
 
-        // The login browser stays runnable for OAuth Custom Tabs; other browsers
-        // are still suspended.
+        // The login browser is un-suspended for OAuth Custom Tabs during the owner's Admin session;
+        // other browsers stay suspended even then.
         Assert.DoesNotContain(PolicyContext.LoginBrowserPackage, plan.SuspendedPackages);
         Assert.Contains(PolicyContext.LoginBrowserPackage, plan.RunnablePackages);
         Assert.Contains("org.mozilla.firefox", plan.SuspendedPackages);
     }
 
     [Fact]
-    public void LoginBrowser_DoesNotBlockNonAllowlistedUrls_SoAppLoginsComplete()
+    public void LoginBrowser_DoesNotBlockNonAllowlistedUrls_OutsideAdminMode()
     {
-        var plan = PolicyPlanBuilder.Build(DefaultContext());
+        var plan = PolicyPlanBuilder.Build(DefaultContext(adminModeActive: false));
 
         Assert.Equal(PolicyContext.LoginBrowserPackage, plan.LoginBrowser.Package);
-        // Locking Chrome to the allowlist broke real app logins (Chick-fil-A). The Custom Tab is
-        // left unrestricted; the general-browsing wall is enforced elsewhere.
+        // Moot in practice (Chrome is suspended outside Admin mode regardless), but the flag itself
+        // should still track AdminModeActive rather than being unconditionally on or off.
         Assert.False(plan.LoginBrowser.BlockNonAllowlisted);
+    }
+
+    [Fact]
+    public void LoginBrowser_BlocksNonAllowlistedUrls_WhileAdminModeIsActive()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext(adminModeActive: true));
+
+        Assert.Equal(PolicyContext.LoginBrowserPackage, plan.LoginBrowser.Package);
+        // The one window Chrome actually runs in is locked to the identity-provider hosts, so it
+        // stays a sign-in surface rather than becoming free general browsing.
+        Assert.True(plan.LoginBrowser.BlockNonAllowlisted);
     }
 
     [Fact]

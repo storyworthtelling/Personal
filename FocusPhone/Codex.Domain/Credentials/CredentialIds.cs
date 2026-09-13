@@ -20,4 +20,9 @@ public static class CredentialIds
 
     /// <summary>Flyleaf: the GitHub token for the post-lockdown update channel.</summary>
     public const string GitHubUpdateToken = "github-update-token";
+
+    /// <summary>Score: the TIDAL app's client id/secret, read from the shared vault at sign-in
+    /// time rather than typed into this app — health is the only way Settings can answer
+    /// whether the vault actually has them.</summary>
+    public const string Tidal = "tidal";
 }

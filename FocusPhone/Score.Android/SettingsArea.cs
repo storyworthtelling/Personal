@@ -110,16 +110,26 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
     }
 
     // Signing in/out both happen on TidalPairingActivity — sign-out is offered there
-    // too (SignOut needs no confirmation dialog per §7, but device-code pairing
-    // genuinely needs its own screen: a code, a link, and a poll that runs for
-    // minutes are not a settings row). This row only ever needs to say which state
-    // that screen last left things in.
+    // too (SignOut needs no confirmation dialog per §7, but the browser round trip
+    // genuinely needs its own screen). This row only ever needs to say which state
+    // that screen last left things in — including, per the credential-health seam
+    // every other app's Settings already uses, whether the vault actually has a
+    // TIDAL client id/secret to sign in with at all.
     private View TidalRow()
     {
+        var health = new CredentialHealthStore().Load().Get(Codex.Domain.Credentials.CredentialIds.Tidal);
+
         if (new TidalAccountStore(Host).Load() is null)
         {
-            return PaperUi.PrimaryButton(Host, "Sign in to TIDAL",
-                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(TidalPairingActivity))));
+            var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+            column.AddView(PaperUi.PrimaryButton(Host, "Sign in to TIDAL",
+                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(TidalPairingActivity)))));
+            if (health.Status == Storyworthtelling.Voice.Health.CredentialStatus.Failing)
+            {
+                column.AddView(PaperUi.Secondary(Host, health.Message));
+            }
+
+            return column;
         }
 
         return Settled("Signed in to TIDAL", "Manage",

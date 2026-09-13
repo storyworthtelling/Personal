@@ -195,13 +195,23 @@ public class MusicCatalogCache
         transaction.Commit();
     }
 
-    /// <summary>The change signature of every cached track, keyed by Drive file id — the scan's "what I already have".</summary>
+    /// <summary>
+    /// The change signature of every cached track, keyed by Drive file id — the scan's "what I
+    /// already have". A hidden-track split's rows carry their own generated <c>id</c>, never the
+    /// source file's — <c>COALESCE(sourceId, id)</c> is what lets a split file's rows answer to
+    /// the file id the scan actually diffs against (see <see cref="Delete"/>'s same handling).
+    /// Without it, a split file matched nothing here on every single scan and was re-read every
+    /// time regardless of whether it had changed.
+    /// </summary>
     public IReadOnlyDictionary<string, MusicFileVersion> LoadVersions()
     {
         using var select = connection.CreateCommand();
-        select.CommandText = "SELECT id, modifiedTimeTicks, sizeBytes FROM tracks";
+        select.CommandText = "SELECT COALESCE(sourceId, id), modifiedTimeTicks, sizeBytes FROM tracks";
         using var reader = select.ExecuteReader();
 
+        // Every split row from the same source file was written with that file's own version
+        // (MusicScanner.ReadFileAsync computes one MusicFileVersion per file, before splitting),
+        // so whichever row is seen last for a given file id agrees with the rest.
         var versions = new Dictionary<string, MusicFileVersion>();
         while (reader.Read())
         {
