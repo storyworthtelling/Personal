@@ -88,6 +88,38 @@ public class MusicCatalogTests
     }
 
     [Fact]
+    public void AlbumsByArtist_GroupsOnlyThatArtistsTracksIntoAlbums()
+    {
+        var catalog = new MusicCatalog(
+        [
+            Tr("1", "T1", "Band", "First", albumArtist: "Band", track: 1),
+            Tr("2", "T2", "Band", "Second", albumArtist: "Band", track: 1),
+            Tr("3", "Other", "Else", "First", albumArtist: "Else", track: 1),
+        ]);
+
+        var albums = catalog.AlbumsByArtist("Band");
+
+        Assert.Equal(["First", "Second"], albums.Select(album => album.Name).ToArray());
+        Assert.All(albums, album => Assert.Single(album.Tracks));
+    }
+
+    [Fact]
+    public void AlbumsByArtist_UsesTheTracksOwnAlbumArtistNotTheGlobalGrouping()
+    {
+        // A guest spot: the track's performing artist differs from the album's own artist tag.
+        // Albums() would file this under "Various Artists"; AlbumsByArtist("Guest") still needs
+        // to find it because that is whose tracks were asked for.
+        var catalog = new MusicCatalog(
+        [
+            Tr("1", "Feature", "Guest", "Compilation", albumArtist: "Various Artists", track: 1),
+        ]);
+
+        var album = Assert.Single(catalog.AlbumsByArtist("Guest"));
+        Assert.Equal("Compilation", album.Name);
+        Assert.Equal("Various Artists", album.AlbumArtist);
+    }
+
+    [Fact]
     public void TracksInGenre_FiltersByGenre()
     {
         var catalog = new MusicCatalog(

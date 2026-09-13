@@ -108,33 +108,58 @@ public sealed class MusicScanner
         cache.ReaderVersion = MusicTagReader.Version;
     }
 
-    // Empty Tracks means the file could not be read at all (skipped; the rest of the
-    // library still scans). One Track is the ordinary case. More than one means the
+    // How many times a file's read is attempted before it is given up on for this run.
+    // MusicScanPlan retries it again on the next scan regardless — this only bounds how often a
+    // single transient hiccup (Drive rate-limiting, a timeout, a brief auth blip — all expected
+    // and normal under MaxConcurrentReads-wide concurrency across a from-scratch scan of
+    // thousands of files) costs the file its place in THIS run.
+    private const int ReadAttempts = 2;
+
+    // Empty Tracks means the file could not be read at all after every retry (skipped; the rest
+    // of the library still scans). One Track is the ordinary case. More than one means the
     // hidden-track pass found — and split off — a bonus track.
+    //
+    // Every failed attempt used to be swallowed silently with no log and no retry — with 6400+
+    // files read in bounded-parallel batches, that meant a normal transient failure vanished
+    // with no trace, and which handful of files happened to be unlucky was effectively random
+    // per run: a full rescan of unchanged Drive content landed a different subset every time.
     private async Task<(IReadOnlyList<Track> Tracks, MusicFileVersion Version)> ReadFileAsync(
         DriveAudioFile file, HttpClient http, CancellationToken cancellationToken)
     {
-        try
+        Exception? lastFailure = null;
+        for (var attempt = 1; attempt <= ReadAttempts; attempt++)
         {
-            Track track;
-            using (var stream = new DriveSeekableStream(file.Id, file.Size, tokens, http))
+            if (attempt > 1)
             {
-                track = await Task.Run(() => tagReader.Read(file.Id, file.Name, stream), cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
             }
 
-            var version = new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size);
-            if (!hiddenTrackPass.Value.IsWorthScanning(track))
+            try
             {
-                return ([track], version);
-            }
+                Track track;
+                using (var stream = new DriveSeekableStream(file.Id, file.Size, tokens, http))
+                {
+                    track = await Task.Run(() => tagReader.Read(file.Id, file.Name, stream), cancellationToken);
+                }
 
-            using var decodeStream = new DriveSeekableStream(file.Id, file.Size, tokens, http);
-            var tracks = await hiddenTrackPass.Value.RunAsync(track, decodeStream, cancellationToken);
-            return (tracks, version);
+                var version = new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size);
+                if (!hiddenTrackPass.Value.IsWorthScanning(track))
+                {
+                    return ([track], version);
+                }
+
+                using var decodeStream = new DriveSeekableStream(file.Id, file.Size, tokens, http);
+                var tracks = await hiddenTrackPass.Value.RunAsync(track, decodeStream, cancellationToken);
+                return (tracks, version);
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                lastFailure = e;
+            }
         }
-        catch (Exception e) when (e is not OperationCanceledException)
-        {
-            return ([], default);
-        }
+
+        AudioDiagnostics.LogWarning(
+            "MusicScanner", $"Could not read {file.Name} (id={file.Id}) after {ReadAttempts} attempts.", lastFailure);
+        return ([], default);
     }
 }
