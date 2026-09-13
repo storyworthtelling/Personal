@@ -1,139 +1,145 @@
-using System.Reflection;
+using Folio.Domain.Imaging;
+using Folio.Domain.Report;
 using SkiaSharp;
-using Folio.Domain.Design;
 using Storyworthtelling.Paper;
 
 namespace Folio.Infrastructure.Imaging;
 
 /// <summary>
-/// Front-matter pages for the generated PDFs (DESIGN.md §9): volume covers,
-/// the analysis report cover, and the analysis table of contents. Front
-/// matter is unnumbered — no folio, no footer — so content page numbers keep
-/// matching the printed TOC with zero bookkeeping.
+/// The report's front matter: the cover and the contents. Both are unnumbered, so the content folios
+/// stay 1..N and the printed contents needs no bookkeeping.
+///
+/// <para>The cover is drawn 1:1 from the approved page: a label and its rule, the book's own jacket
+/// in a keyline-framed slot, the title under it, and the owner's mark at the foot beside who the
+/// report is for. The mark takes the jacket's own two most prominent tones, so a new jacket
+/// recolours it with nobody choosing a colour (F37).</para>
 /// </summary>
-public sealed class CoverPageRenderer
+internal sealed class CoverPageRenderer
 {
-    private static readonly SKColor Paper = SKColor.Parse(DesignTokens.Paper);
-    private static readonly SKColor Ink = SKColor.Parse(DesignTokens.Ink);
-    private static readonly SKColor Accent = SKColor.Parse(DesignTokens.Accent);
-    private static readonly SKColor Muted = SKColor.Parse(DesignTokens.InkMuted);
-
-    private static readonly Lazy<SKBitmap> medallion = new(() =>
+    public void AnalysisCover(PageWriter writer, ReportCover cover)
     {
-        var assembly = typeof(CoverPageRenderer).Assembly;
-        var name = assembly.GetManifestResourceNames()
-            .FirstOrDefault(n => n.EndsWith("owner.png", StringComparison.Ordinal))
-            ?? throw new InvalidOperationException("Branding medallion (owner.png) is not embedded.");
-        using var stream = assembly.GetManifestResourceStream(name)!;
-        return SKBitmap.Decode(stream)!;
-    });
+        var canvas = writer.Canvas;
 
-    // backgroundArt (optional) is a spoiler-free comic-style illustration for the volume: when supplied it
-    // fills the page and the novel + chapter names are typeset over it in light ink on dark scrims; when
-    // null (no art, or its generation failed) the cover falls back to the plain Paper & Ink treatment.
-    public byte[] AnalysisCover(string reportTitle)
-    {
-        var width = DesignTokens.Pdf.PageWidth;
-        var height = DesignTokens.Pdf.PageHeight;
-        using var surface = SKSurface.Create(new SKImageInfo(width, height));
-        var canvas = surface.Canvas;
-        canvas.Clear(Paper);
-        PaperGrain.Draw(canvas, width, height);
+        writer.Label("Folio · revision report", PageGeometry.ContentLeft,
+            PageGeometry.ContentTop + PaperTypeScale.Label);
+        var ruleTop = PageGeometry.ContentTop + PaperTypeScale.Label + PageGeometry.RuleGapAbove;
+        writer.Rule(PageGeometry.ContentLeft, ruleTop, PageGeometry.ContentWidth);
 
-        var contentLeft = DesignTokens.Pdf.SideMargin;
-        var contentWidth = width - 2 * contentLeft;
-
-        using var titleFont = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.CoverTitle);
-        var y = height * 0.26f;
-        y = DrawWrapped(canvas, reportTitle, titleFont, Ink, contentLeft, y, contentWidth);
-
-        y += 20f;
-        DrawRule(canvas, contentLeft, y);
-        y += 72f;
-
-        using var subtitle = new SKFont(EmbeddedTypefaces.SerifItalic, DesignTokens.Pdf.H3);
-        using var mutedPaint = new SKPaint { Color = Muted, IsAntialias = true };
-        canvas.DrawText("Revision report", contentLeft, y, subtitle, mutedPaint);
-
-        DrawMedallion(canvas, width / 2f, height * 0.82f, DesignTokens.Pdf.CoverMedallionSize);
-        return Encode(surface);
-    }
-
-    public IReadOnlyList<byte[]> AnalysisToc(IReadOnlyList<(string Title, int Page)> entries)
-    {
-        var width = DesignTokens.Pdf.PageWidth;
-        var height = DesignTokens.Pdf.PageHeight;
-        var contentLeft = DesignTokens.Pdf.SideMargin;
-        var contentRight = width - DesignTokens.Pdf.SideMargin;
-        var lineHeight = DesignTokens.Pdf.Body * DesignTokens.Pdf.LineSpacing * 1.3f;
-
-        var pages = new List<byte[]>();
-        var index = 0;
-        while (index < entries.Count || pages.Count == 0)
+        // The jacket, framed. Never bled: CoverArtSlot places it inside the column and the keyline is
+        // what says the page is about a book rather than being one.
+        var slot = CoverArtSlot.Place(ruleTop + 26f);
+        var rect = new SKRect(slot.Left, slot.Top, slot.Right, slot.Bottom);
+        var jacket = cover.Jacket is { Length: > 0 }
+            && SkiaImageFit.DrawCover(canvas, cover.Jacket, rect, Crop);
+        if (!jacket)
         {
-            using var surface = SKSurface.Create(new SKImageInfo(width, height));
-            var canvas = surface.Canvas;
-            canvas.Clear(Paper);
-            PaperGrain.Draw(canvas, width, height);
-
-            var y = DesignTokens.Pdf.TopMargin + DesignTokens.Pdf.H2;
-            if (pages.Count == 0)
-            {
-                using var heading = new SKFont(EmbeddedTypefaces.SerifSemibold, DesignTokens.Pdf.H2);
-                using var inkPaint = new SKPaint { Color = Ink, IsAntialias = true };
-                canvas.DrawText("Contents", contentLeft, y, heading, inkPaint);
-                DrawRule(canvas, contentLeft, y + 12f);
-                y += DesignTokens.Pdf.AccentRuleGap + DesignTokens.Pdf.H2;
-            }
-
-            using var entryFont = new SKFont(EmbeddedTypefaces.SerifRegular, DesignTokens.Pdf.Body);
-            using var entryPaint = new SKPaint { Color = Ink, IsAntialias = true };
-            using var numberPaint = new SKPaint { Color = Muted, IsAntialias = true };
-            var bottom = height - DesignTokens.Pdf.BottomMargin;
-            while (index < entries.Count && y < bottom)
-            {
-                var (title, page) = entries[index];
-                canvas.DrawText(title, contentLeft, y, entryFont, entryPaint);
-                var number = page.ToString();
-                var numberWidth = entryFont.MeasureText(number);
-                canvas.DrawText(number, contentRight - numberWidth, y, entryFont, numberPaint);
-                y += lineHeight;
-                index++;
-            }
-            pages.Add(Encode(surface));
+            using var shade = new SKPaint { Color = ReportPalette.Hairline, IsAntialias = false };
+            canvas.DrawRect(rect, shade);
         }
-        return pages;
+        using (var keyline = new SKPaint
+        {
+            Color = ReportPalette.Hairline, IsAntialias = true,
+            Style = SKPaintStyle.Stroke, StrokeWidth = CoverArtSlot.KeylineWidth,
+        })
+            canvas.DrawRect(rect, keyline);
+
+        var y = slot.Bottom + 30f;
+        using (var title = ReportType.Title())
+        {
+            foreach (var line in SkiaText.Wrap(title, cover.Title, PageGeometry.ContentWidth))
+            {
+                y += title.Size;
+                Centred(canvas, line, title, ReportPalette.Ink, y);
+                y += title.Size * 0.06f;
+            }
+        }
+
+        using (var draft = ReportType.Body())
+        {
+            y += 12f + draft.Size;
+            Centred(canvas, DraftLine(cover), draft, ReportPalette.InkSoft, y);
+        }
+        using (var read = ReportType.Small())
+        {
+            y += 2f + read.Size;
+            Centred(canvas, $"Read {cover.ReadOn:d MMMM yyyy}", read, ReportPalette.InkSoft, y);
+        }
+
+        // The mark, at the foot of the column — §12 permits it here and nowhere in the app.
+        const float markSize = 74f;
+        var markTop = PageGeometry.ContentBottom - markSize;
+        OwnersMark.Draw(canvas, new SKRect(
+            PageGeometry.ContentLeft, markTop, PageGeometry.ContentLeft + markSize, markTop + markSize),
+            JacketTones.Read(cover.Jacket));
+
+        var textLeft = PageGeometry.ContentLeft + markSize + 12f;
+        using (var forFont = ReportType.Small())
+        {
+            canvas.DrawText("Prepared for the author", textLeft, markTop + markSize / 2f,
+                forFont, new SKPaint { Color = ReportPalette.Ink, IsAntialias = true });
+            if (!string.IsNullOrWhiteSpace(cover.SeriesLine))
+            {
+                canvas.DrawText(cover.SeriesLine, textLeft,
+                    markTop + markSize / 2f + forFont.Size * 1.4f,
+                    forFont, new SKPaint { Color = ReportPalette.InkSoft, IsAntialias = true });
+            }
+        }
     }
 
-    private static float DrawWrapped(SKCanvas canvas, string text, SKFont font, SKColor color, float x, float y, float wrapWidth)
+    public void AnalysisToc(PageWriter writer, IReadOnlyList<(string Title, int Page)> entries)
+    {
+        writer.NewPage();
+
+        writer.Label("Contents", PageGeometry.ContentLeft, PageGeometry.ContentTop + PaperTypeScale.Label);
+        writer.Rule(PageGeometry.ContentLeft,
+            PageGeometry.ContentTop + PaperTypeScale.Label + PageGeometry.RuleGapAbove,
+            PageGeometry.ContentWidth);
+        writer.Y = PageGeometry.ContentTop + PaperTypeScale.Label + PageGeometry.RuleGapBelow * 2;
+
+        using var entryFont = ReportType.Body();
+        using var folioFont = ReportType.Folio();
+        using var entryPaint = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true };
+        using var numberPaint = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
+        var lineHeight = entryFont.Size * PageGeometry.LineSpacing * 1.3f;
+
+        foreach (var (title, page) in entries)
+        {
+            if (writer.Y + lineHeight > PageGeometry.ContentBottom)
+            {
+                writer.NewPage();
+                writer.Y = PageGeometry.ContentTop;
+            }
+            var baseline = writer.Y + entryFont.Size;
+            writer.Canvas.DrawText(title, PageGeometry.ContentLeft, baseline, entryFont, entryPaint);
+            var number = page.ToString();
+            writer.Canvas.DrawText(number, PageGeometry.ContentRight - folioFont.MeasureText(number),
+                baseline, folioFont, numberPaint);
+            writer.Y += lineHeight;
+        }
+    }
+
+    private static string DraftLine(ReportCover cover)
+    {
+        var draft = $"Draft {Ordinal(cover.DraftNumber)}";
+        return cover.WordCount > 0 ? $"{draft} · {cover.WordCount:N0} words" : draft;
+    }
+
+    private static string Ordinal(int draft) => draft switch
+    {
+        1 => "one", 2 => "two", 3 => "three", 4 => "four", 5 => "five",
+        6 => "six", 7 => "seven", 8 => "eight", 9 => "nine", 10 => "ten",
+        _ => draft.ToString(),
+    };
+
+    private static SKRect Crop(int width, int height)
+    {
+        var crop = CoverArtSlot.Crop(width, height);
+        return new SKRect(crop.Left, crop.Top, crop.Right, crop.Bottom);
+    }
+
+    private static void Centred(SKCanvas canvas, string text, SKFont font, SKColor color, float baseline)
     {
         using var paint = new SKPaint { Color = color, IsAntialias = true };
-        foreach (var line in SkiaText.Wrap(font, text, wrapWidth))
-        {
-            canvas.DrawText(line, x, y, font, paint);
-            y += font.Size * 1.15f;
-        }
-        return y;
-    }
-
-    private static void DrawRule(SKCanvas canvas, float left, float y)
-    {
-        using var rule = new SKPaint { Color = Accent, IsAntialias = false };
-        canvas.DrawRect(left, y, 220f, DesignTokens.Pdf.AccentRuleHeight * 2, rule);
-    }
-
-    private static void DrawMedallion(SKCanvas canvas, float centerX, float centerY, float size)
-    {
-        var half = size / 2f;
-        var dest = new SKRect(centerX - half, centerY - half, centerX + half, centerY + half);
-        using var paint = new SKPaint { IsAntialias = true };
-        canvas.DrawBitmap(medallion.Value, dest, paint);
-    }
-
-    private static byte[] Encode(SKSurface surface)
-    {
-        using var image = surface.Snapshot();
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        return data.ToArray();
+        canvas.DrawText(text, PageGeometry.PageWidth / 2f - font.MeasureText(text) / 2f, baseline, font, paint);
     }
 }
