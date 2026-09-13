@@ -25,7 +25,7 @@ Four drawing media, each assigned a **job** so the metaphor is systematic, not d
 
 | Material | Job | Rendering |
 |---|---|---|
-| **Paper** | The ground of every screen — one consistent warm cream, same color *and* grain everywhere. | Seeded monochrome grain, ~2.4%, on `Paper` grounds only. |
+| **Paper** | The ground of every screen — one consistent warm cream, same color *and* grain everywhere. | Seeded monochrome grain, ~12.5%, on `Paper` grounds only. |
 | **Watercolor** | Grounds & covers: book covers, app icons, hero/section-header washes, empty-state and loading grounds. Never behind body text. | Soft multi-stop radial washes; baked for hero surfaces (hybrid with procedural grain). |
 | **Highlighter** | Attention / active / selected. A translucent band (25–35%) behind full-strength ink that **adopts the functional hue** of what it marks. May sit over any surface, opacity-tuned so ink over it clears AA. | Translucent wash tier (T1) of the relevant role. |
 | **Colored pencil** | Semantic marks: chips, ticks, finding tags, margin notes, in-app icon strokes. The hand-drawn "this means something" material. | Grainy stroke/fill of the role's mark tier (T3). |
