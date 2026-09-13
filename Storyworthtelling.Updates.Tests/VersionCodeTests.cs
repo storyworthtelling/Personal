@@ -252,7 +252,11 @@ public class ProjectReferenceTests
                 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                     && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
 
-            var namesIt = sources.Any(f => File.ReadAllText(f)
+            // Comments are stripped first. A doc comment that *mentions* the library — "kept identical
+            // by a parity guard", "this rule was extracted from Storyworthtelling.Updates" — is prose,
+            // not a using directive, and a guard that cannot tell the two apart reports the file that
+            // explains the rule as the file that breaks it.
+            var namesIt = sources.Any(f => StripComments(File.ReadAllText(f))
                 .Contains("Storyworthtelling.Updates", StringComparison.Ordinal));
             if (!namesIt)
             {
@@ -270,6 +274,12 @@ public class ProjectReferenceTests
             "These projects use Storyworthtelling.Updates without referencing it, which fails as CS0234 "
             + $"in CI and cannot be caught locally for a MAUI head:\n{string.Join("\n", missing)}");
     }
+
+    private static string StripComments(string source) =>
+        System.Text.RegularExpressions.Regex.Replace(
+            System.Text.RegularExpressions.Regex.Replace(
+                source, @"/\*.*?\*/", string.Empty, System.Text.RegularExpressions.RegexOptions.Singleline),
+            @"//.*?$", string.Empty, System.Text.RegularExpressions.RegexOptions.Multiline);
 
     private static string RepoRoot()
     {
