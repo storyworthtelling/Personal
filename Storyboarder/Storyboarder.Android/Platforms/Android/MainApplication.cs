@@ -56,14 +56,15 @@ public class MainApplication : MauiApplication
                 .GetRequiredService<IDbContextFactory<StoryboarderDbContext>>();
             using var db = factory.CreateDbContext();
 
-            // The Canonizer pivot collapsed the migration history into a single new baseline. A device that
-            // upgraded in place still holds the old storyboarder.db stamped with the pre-pivot migration ids,
-            // which the new baseline can't build on — Migrate() would try to create tables that already
-            // exist. The brief keeps no old data, so drop the legacy database once, then migrate fresh.
-            if (!SettingsStore.CanonizerSchemaReset)
+            // Each reset generation drops the database once. Generation 1 was the pivot, which collapsed the
+            // migration history into a single new baseline; generation 2 is P10's fresh start. A device holds
+            // a database stamped with migration ids the current baseline cannot build on, so Migrate() would
+            // try to create tables that already exist. The brief keeps no old data, so drop it once, then
+            // migrate fresh — and record the generation, so this runs once per reset and never again.
+            if (SettingsStore.SchemaResetIsDue)
             {
                 db.Database.EnsureDeleted();
-                SettingsStore.CanonizerSchemaReset = true;
+                SettingsStore.SchemaResetGeneration = SettingsStore.CurrentSchemaResetGeneration;
             }
 
             db.Database.Migrate();

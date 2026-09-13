@@ -7,6 +7,9 @@ using Storyboarder.Infrastructure.Services;
 namespace Storyboarder.Android.Platforms.Android;
 
 [Activity(
+    // Frozen: without an explicit Name the Java class name is generated from the namespace, so the
+    // rename would move it and every home-screen shortcut would point at a class that no longer exists.
+    Name = "com.storyworthtelling.storyboarder.MainActivity",
     Theme = "@style/Maui.SplashTheme",
     MainLauncher = true,
     LaunchMode = LaunchMode.SingleTop,
