@@ -52,6 +52,7 @@ public class HomeActivity : Activity
     private UninstallResultReceiver? uninstallReceiver;
 
     private const string UninstallResultAction = "com.storyworthtelling.focusphone.launcher.UNINSTALL_RESULT";
+    private const string UninstallNoticeKey = "uninstall";
     private readonly HashSet<string> notifiedPackages = [];
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -201,7 +202,11 @@ public class HomeActivity : Activity
                 activity.StartActivity(confirm);
                 return;
             }
-            activity.RunOnUiThread(activity.ReloadScene);
+            activity.RunOnUiThread(() =>
+            {
+                DogEar.SetNotice(activity, activity.root!, UninstallNoticeKey, null);
+                activity.ReloadScene();
+            });
         }
     }
 
@@ -270,7 +275,7 @@ public class HomeActivity : Activity
         }
         actions.Add(("Feature on home", () => ShowFeaturePicker(package, label)));
         actions.Add(("Block", () => BlockWithUndo(package, label)));
-        actions.Add(("Uninstall", () => UninstallApp(package)));
+        actions.Add(("Uninstall", () => UninstallApp(package, label)));
         ShowPaperMenu(label, actions);
     }
 
@@ -278,8 +283,24 @@ public class HomeActivity : Activity
     // the PackageInstaller, no system dialog. The long-press action card is the deliberate confirmation. The
     // result broadcast rebuilds the shelf so the app disappears at once; if the platform can't do it silently
     // (not device owner for this app), it hands back a confirm intent we launch instead of failing.
-    private void UninstallApp(string package)
+    //
+    // An "Uninstalling…" dog-ear notice goes up the moment this is invoked and is cleared by the result
+    // receiver: the silent path is asynchronous with nothing else on screen changing meanwhile, so without
+    // it a tap reads as "nothing happened" for however long the broadcast takes to arrive — or forever, if
+    // it never does.
+    private void UninstallApp(string package, string label)
     {
+        DogEar.SetNotice(this, root!, UninstallNoticeKey,
+            new DogEar.Notice("Uninstalling…", label, PaperTheme.ProgressMark));
+
+        if (!PolicyManager.IsDeviceOwner(this))
+        {
+            // Not device owner (e.g. a dev build) — the silent path is refused outright, so go
+            // straight to the visible system uninstaller rather than a call that will quietly fail.
+            LaunchVisibleUninstaller(package);
+            return;
+        }
+
         try
         {
             var installer = PackageManager!.PackageInstaller;
@@ -294,6 +315,11 @@ public class HomeActivity : Activity
             // Silent path unavailable — fall back to Android's own uninstaller UI.
         }
 
+        LaunchVisibleUninstaller(package);
+    }
+
+    private void LaunchVisibleUninstaller(string package)
+    {
         var uri = Android.Net.Uri.Parse("package:" + package);
         try
         {
@@ -308,6 +334,8 @@ public class HomeActivity : Activity
             catch (Android.Content.ActivityNotFoundException)
             {
                 // No uninstaller available (unusual); nothing more we can do from the launcher.
+                DogEar.SetNotice(this, root!, UninstallNoticeKey,
+                    new DogEar.Notice("Couldn't uninstall", "No uninstaller is available on this device.", PaperTheme.ProblemMark));
             }
         }
     }

@@ -1,3 +1,4 @@
+using Android;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
@@ -163,6 +164,7 @@ public static class PolicyManager
 
         ApplyLoginBrowserConfig(context, dpm, admin, plan.LoginBrowser, events);
         GrantPermissions(dpm, admin, plan, events);
+        GrantSelfBluetoothPermission(dpm, admin, context, events);
         PinHomeActivity(dpm, admin, context);
         PinRestrictedBrowser(dpm, admin, context);
         Log.Info(Tag, $"Policy applied: {plan.UserRestrictions.Count} restrictions, {installed.Length} packages suspended, {plan.PermissionGrants.Count} permission grants.");
@@ -248,6 +250,33 @@ public static class PolicyManager
                 Log.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}");
                 events.Add(Event(PolicyEventKind.GrantFailed, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}"));
             }
+        }
+    }
+
+    /// <summary>
+    /// Self-grants BLUETOOTH_CONNECT (Android 12+) so the Connectivity panel's Bluetooth
+    /// On/Off toggle can call BluetoothAdapter.Enable()/Disable() without crashing. The
+    /// manifest's &lt;uses-permission&gt; alone does not grant a dangerous runtime permission,
+    /// and there is no way to show the normal runtime-permission dialog on a kiosk with no
+    /// chrome around the app; the device owner can grant a permission to any package —
+    /// including itself — the same way GrantPermissions grants Communication its SMS/
+    /// call-log permissions, with no dialog and surviving a silent reinstall.
+    /// </summary>
+    private static void GrantSelfBluetoothPermission(DevicePolicyManager dpm, ComponentName admin, Context context, List<PolicyEvent> events)
+    {
+        try
+        {
+            if (!dpm.SetPermissionGrantState(admin, context.PackageName!, Manifest.Permission.BluetoothConnect,
+                    PermissionGrantState.Granted))
+            {
+                Log.Warn(Tag, "Could not self-grant BLUETOOTH_CONNECT yet; will retry next policy pass.");
+                events.Add(Event(PolicyEventKind.GrantFailed, "Could not self-grant BLUETOOTH_CONNECT yet (will retry)."));
+            }
+        }
+        catch (Java.Lang.Exception e)
+        {
+            Log.Warn(Tag, $"Could not self-grant BLUETOOTH_CONNECT yet: {e.Message}");
+            events.Add(Event(PolicyEventKind.GrantFailed, $"Could not self-grant BLUETOOTH_CONNECT yet: {e.Message}"));
         }
     }
 

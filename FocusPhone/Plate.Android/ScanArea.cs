@@ -7,6 +7,7 @@ using AndroidX.Camera.View;
 using AndroidX.Core.Content;
 using Codex.Domain.Design;
 using Codex.Domain.Plate;
+using Codex.Domain.Policy;
 using Codex.Domain.Time;
 using Codex.Ui;
 using Google.MLKit.Vision.Documentscanner;
@@ -447,10 +448,20 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             return;
         }
 
-        // A plain VIEW intent; the device-owner persistent preferred activity routes it into
-        // the launcher's RestrictedBrowserActivity. Only http and https ever reach here —
-        // see QrScan.
-        Host.StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(reading.Value)));
+        // Targeted explicitly at RestrictedBrowserActivity rather than left to the
+        // device-owner persistent-preferred-activity pin, which a host's verified Android
+        // App Links can outrank. Only http and https ever reach here — see QrScan.
+        var uri = Android.Net.Uri.Parse(reading.Value);
+        var intent = new Intent(Intent.ActionView, uri);
+        intent.SetComponent(new ComponentName(RestrictedBrowserHandoff.Package, RestrictedBrowserHandoff.Activity));
+        try
+        {
+            Host.StartActivity(intent);
+        }
+        catch (ActivityNotFoundException)
+        {
+            Host.StartActivity(new Intent(Intent.ActionView, uri));
+        }
     }
 
     public override void OnShown(bool showing)

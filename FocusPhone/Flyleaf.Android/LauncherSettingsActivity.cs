@@ -63,11 +63,13 @@ public class LauncherSettingsActivity : Activity
 
     private LinearLayout? content;
     private LinearLayout? actionBarHost;
+    private ScrollView? scrollHost;
     private EditText? passphraseField;
     private InlineCountdown? restart;
     private string? inlineStatus;
     private string? undoPackage;
     private bool refreshScheduled;
+    private bool checkingGitHub;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -79,6 +81,7 @@ public class LauncherSettingsActivity : Activity
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
         var scroll = new ScrollView(this);
+        scrollHost = scroll;
         content = new LinearLayout(this) { Orientation = Orientation.Vertical };
         var edge = Dp(DesignTokens.Shape.ScreenEdgeDp);
         content.SetPadding(edge, Dp(DesignTokens.Space.X12), edge, edge);
@@ -166,6 +169,15 @@ public class LauncherSettingsActivity : Activity
         {
             ScheduleRefresh();
         }
+
+        // The status line is appended after every group, so an action on the Connectivity card
+        // (the first group) would otherwise report its result off-screen, well below Apps /
+        // Shelves / Updates / Power / Vault / Advanced — reading as "nothing happened" even
+        // though the status is set correctly. Scroll it into view instead.
+        if (inlineStatus is not null)
+        {
+            scrollHost?.Post(() => scrollHost.FullScroll(FocusSearchDirection.Down));
+        }
     }
 
     // ---- Connectivity: Wi-Fi / mobile data / Bluetooth + scoped deep-links -----
@@ -178,10 +190,19 @@ public class LauncherSettingsActivity : Activity
         AddToggleRow(card, "Wi-Fi", null, wifi?.IsWifiEnabled ?? false, on =>
         {
             // SetWifiEnabled is deprecated for ordinary apps on Android 10+, but the device owner is
-            // exempt from that block — this is the reliable device-owner path.
+            // exempt from that block — this is the reliable device-owner path. Wrapped in try/catch
+            // because a platform that declines can throw rather than just returning false.
+            bool ok;
+            try
+            {
 #pragma warning disable CA1422
-            var ok = wifi?.SetWifiEnabled(on) ?? false;
+                ok = wifi?.SetWifiEnabled(on) ?? false;
 #pragma warning restore CA1422
+            }
+            catch (Exception)
+            {
+                ok = false;
+            }
             if (!ok)
             {
                 inlineStatus = "Couldn't change Wi-Fi. This needs the device-owner lockdown.";
@@ -227,10 +248,21 @@ public class LauncherSettingsActivity : Activity
         AddToggleRow(card, "Bluetooth", null, bluetooth?.IsEnabled ?? false, on =>
         {
             // Enable/Disable is deprecated on recent Android and returns false when the platform declines;
-            // surface that rather than pretend it worked (best-effort, pending an on-device spike).
+            // surface that rather than pretend it worked. Also needs the runtime-granted BLUETOOTH_CONNECT
+            // permission (Android 12+) — PolicyManager self-grants it on every policy pass, but wrap in
+            // try/catch anyway: a SecurityException (e.g. before the first grant lands) must not crash the
+            // launcher, only report the same "couldn't change" status as any other decline.
+            bool ok;
+            try
+            {
 #pragma warning disable CA1422
-            var ok = bluetooth is not null && (on ? bluetooth.Enable() : bluetooth.Disable());
+                ok = bluetooth is not null && (on ? bluetooth.Enable() : bluetooth.Disable());
 #pragma warning restore CA1422
+            }
+            catch (Exception)
+            {
+                ok = false;
+            }
             if (!ok)
             {
                 inlineStatus = "Couldn't change Bluetooth on this device.";
@@ -371,7 +403,17 @@ public class LauncherSettingsActivity : Activity
     private void RenderUpdates()
     {
         var card = StartGroup("Updates");
-        AddNavRow(card, "Install from GitHub now", null, InstallFromGitHubNow);
+        // The row itself changes label and stops accepting taps while a check is running — the caption
+        // below updates too, but that alone read as "nothing happening" since it's easy to miss below
+        // an unchanged-looking button.
+        if (checkingGitHub)
+        {
+            AddNavRow(card, "Checking…", null, () => { });
+        }
+        else
+        {
+            AddNavRow(card, "Install from GitHub now", null, InstallFromGitHubNow);
+        }
 
         // Show whether the 6-hour channel is actually running and what it last did,
         // so a silent failure (rejected token, signature-mismatched install) is visible.
@@ -395,6 +437,7 @@ public class LauncherSettingsActivity : Activity
     {
         inlineStatus = "Checking GitHub… new or updated apps install and appear in Apps.";
         undoPackage = null;
+        checkingGitHub = true;
         Render();
         try
         {
@@ -405,6 +448,7 @@ public class LauncherSettingsActivity : Activity
         {
             inlineStatus = $"GitHub install failed: {e.Message}";
         }
+        checkingGitHub = false;
         Render();
     }
 
@@ -547,7 +591,18 @@ public class LauncherSettingsActivity : Activity
         {
             row.AddView(PaperUi.QuietButton(this, "↓", () => MoveShelf(category.Id, +1)));
         }
+        row.AddView(PaperUi.QuietButton(this, "Redraw", () => RegenerateShelfGlyph(category.Id, category.Name)));
         row.AddView(PaperUi.QuietButton(this, "Remove", () => RemoveShelf(category.Id)));
+    }
+
+    // A shelf's AI-drawn glyph is a first attempt, not a final answer — the owner should be able to
+    // ask again for one that isn't great, rather than living with it or deleting and recreating the
+    // whole shelf just to get a fresh draw.
+    private void RegenerateShelfGlyph(string id, string name)
+    {
+        inlineStatus = $"Redrawing {name}'s glyph…";
+        Render();
+        UpgradeShelfGlyphAsync(id, name);
     }
 
     private void AddShelfAddRow(LinearLayout card)
@@ -604,8 +659,18 @@ public class LauncherSettingsActivity : Activity
     private async void UpgradeShelfGlyphAsync(string id, string name)
     {
         var glyph = await new ShelfGlyphMaker(voiceAccount.GetAccessToken).AiGlyphAsync(name, CancellationToken.None);
-        if (glyph is null || IsFinishing)
+        if (IsFinishing)
         {
+            return;
+        }
+        if (glyph is null)
+        {
+            // Reachable both from silent creation-time upgrade and from an explicit Redraw tap; say
+            // something either way, rather than leaving a "Redrawing…" status stuck on screen forever.
+            inlineStatus = VoiceGoogleAccount.IsSignedIn
+                ? $"Couldn't draw a new glyph for {name}. Kept the current one."
+                : $"Sign in with Google to draw an AI glyph for {name}.";
+            Render();
             return;
         }
         var store = new CategoryStore(this);
@@ -615,6 +680,7 @@ public class LauncherSettingsActivity : Activity
             return; // the shelf was removed before the glyph arrived
         }
         store.Save(catalog.WithGlyph(id, glyph));
+        inlineStatus = null;
         Render();
     }
 

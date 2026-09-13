@@ -37,6 +37,9 @@ public static class PolicyPlanBuilder
         // Suspending the Play Store would break background auto-updates; it is
         // kept runnable but never surfaced in the launcher.
         suspended.Remove(PolicyContext.PlayStorePackage);
+        // The platform refuses to suspend this one regardless of what the plan asks for; asking
+        // anyway just repeats a permanent, expected failure in the policy log every pass.
+        suspended.Remove(PolicyContext.SettingsPackage);
 
         // The cutover allowlist stays runnable: the curated third-party apps
         // (GitHub, Gemini, Maps, reMarkable) plus the system browser they need
