@@ -32,6 +32,7 @@ public sealed class PlayingArea : ScoreArea
     private readonly ScorePlayback playback;
     private readonly ArtworkOverrideStore artworkStore;
     private readonly PlaybackSettingsStore settingsStore;
+    private readonly PodcastArtworkCache podcastArtwork;
 
     private ArtworkWindow artwork = null!;
     private TextView titleView = null!;
@@ -66,6 +67,7 @@ public sealed class PlayingArea : ScoreArea
         this.playback = playback;
         artworkStore = new ArtworkOverrideStore(host);
         settingsStore = new PlaybackSettingsStore(host);
+        podcastArtwork = new PodcastArtworkCache(host);
     }
 
     public override BinderArea Tab => new("Playing", Resource.Drawable.area_playing, PaperTheme.ProgressMark, PaperTheme.ProgressFill);
@@ -188,8 +190,12 @@ public sealed class PlayingArea : ScoreArea
         repeat = PaperUi.QuietButton(Host, "Repeat: off", CycleRepeat);
         row.AddView(shuffle);
         row.AddView(repeat);
-        row.AddView(PaperUi.QuietButton(Host, "EQ",
-            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(EqualizerActivity)))));
+        if (AudioEffects.HasEqualizer)
+        {
+            row.AddView(PaperUi.QuietButton(Host, "EQ",
+                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(EqualizerActivity)))));
+        }
+
         row.AddView(PaperUi.QuietButton(Host, "Art", PickArt));
         return row;
     }
@@ -427,8 +433,11 @@ public sealed class PlayingArea : ScoreArea
 
     private void RenderArtwork()
     {
-        // Precedence: the owner's override for this album, then the embedded art,
-        // then the bookplate the window falls back to.
+        // Precedence: the owner's override for this album, then the embedded art, then the
+        // podcast feed's own fetched artwork (PodcastArtworkCache — shows like NYT's and Holy
+        // Post's that carry no embedded ID3 art otherwise always fell straight to the
+        // bookplate, even though the feed's own image had already been fetched), then the
+        // bookplate the window falls back to.
         var overrideUri = artworkStore.Resolve(AlbumKeyOf(playback.Controller?.MediaMetadata));
         if (overrideUri is not null && TrySetOverrideArt(overrideUri))
         {
@@ -440,11 +449,15 @@ public sealed class PlayingArea : ScoreArea
         {
             var bytes = data.ToArray();
             artwork.SetArtwork(BitmapFactory.DecodeByteArray(bytes, 0, bytes.Length));
+            return;
         }
-        else
-        {
-            artwork.SetArtwork((Bitmap?)null);
-        }
+
+        var feedId = playback.Controller?.MediaMetadata?.Extras?.GetString(PodcastsArea.FeedIdExtraKey);
+        var feedArtPath = feedId is not null ? podcastArtwork.ExistingPath(feedId) : null;
+        var feedArtBitmap = feedArtPath is not null
+            ? CoverCache.Get(feedArtPath, PaperTheme.Dp(Host, ArtworkSizeDp))
+            : null;
+        artwork.SetArtwork(feedArtBitmap);
     }
 
     private bool TrySetOverrideArt(string uri)

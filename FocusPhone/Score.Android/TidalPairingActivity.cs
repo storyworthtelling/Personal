@@ -2,11 +2,13 @@ using Android.App;
 using Android.Content;
 using Android.OS;
 using Android.Views;
+using Codex.Domain.Credentials;
 using Codex.Domain.Design;
 using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Ui;
 using Codex.Ui.Voice;
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 
 namespace Score;
@@ -52,6 +54,8 @@ namespace Score;
     DataHost = "tidal-auth")]
 public class TidalPairingActivity : Activity
 {
+    private readonly ICredentialHealthSink health = new CredentialHealthStore();
+
     private LinearLayout body = null!;
     private string status = string.Empty;
     private bool signedIn;
@@ -150,6 +154,7 @@ public class TidalPairingActivity : Activity
         var credentials = await ReadCredentialsAsync();
         if (credentials is not ({ Length: > 0 } clientId, var clientSecret))
         {
+            health.MarkFailing(CredentialIds.Tidal, "Vault has no TIDAL client id/secret.");
             status = "TIDAL app credentials aren't set up yet.";
             Render();
             return;
@@ -220,6 +225,7 @@ public class TidalPairingActivity : Activity
         var credentials = await ReadCredentialsAsync();
         if (credentials is not ({ Length: > 0 } clientId, var clientSecret))
         {
+            health.MarkFailing(CredentialIds.Tidal, "Vault has no TIDAL client id/secret.");
             Forget();
             status = "TIDAL app credentials aren't set up yet.";
             Render();
@@ -238,6 +244,11 @@ public class TidalPairingActivity : Activity
             AudioDiagnostics.LogWarning("TidalPairingActivity", "Exchanging the TIDAL code failed.", e);
             Forget();
             status = TidalSignInFailure.Describe(e.Message);
+            if (TidalSignInFailure.IsCredentialRejection(e.Message))
+            {
+                health.MarkFailing(CredentialIds.Tidal, status);
+            }
+
             Render();
             return;
         }
@@ -248,6 +259,7 @@ public class TidalPairingActivity : Activity
 
         if (exchanged.Status == TidalTokenPollStatus.Success && !string.IsNullOrEmpty(exchanged.RefreshToken))
         {
+            health.MarkOk(CredentialIds.Tidal);
             var account = new TidalAccount(exchanged.UserId ?? "", exchanged.RefreshToken);
             new TidalAccountStore(this).Save(account);
 

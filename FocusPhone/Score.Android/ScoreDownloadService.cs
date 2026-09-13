@@ -30,10 +30,36 @@ public class ScoreDownloadService : DownloadService
     private const int NotificationId = 5140;
     private const string ChannelId = "score-downloads";
 
+    // channelNameResourceId is 0 ("the caller has already created the channel", per this
+    // constructor's own Javadoc) rather than Resource.String.downloads_channel. .NET for
+    // Android's modern resource designer generates Resource.* fields as runtime-populated
+    // static fields, not compile-time constants, so a Resource.* value here can't be folded
+    // into the generated Java stub's super() call — the stub then has no usable zero-argument
+    // constructor at all, and Android's reflection-based service instantiation throws
+    // InstantiationException. Every argument below is a genuine compile-time constant instead;
+    // the channel itself is created with its real (localized) name in OnCreate.
     public ScoreDownloadService()
-        : base(NotificationId, DefaultForegroundNotificationUpdateInterval, ChannelId,
-            Resource.String.downloads_channel, 0)
+        : base(NotificationId, DefaultForegroundNotificationUpdateInterval, ChannelId, 0, 0)
     {
+    }
+
+    public override void OnCreate()
+    {
+        EnsureNotificationChannel();
+        base.OnCreate();
+    }
+
+    private void EnsureNotificationChannel()
+    {
+        var manager = (Android.App.NotificationManager)GetSystemService(NotificationService)!;
+        if (manager.GetNotificationChannel(ChannelId) is not null)
+        {
+            return;
+        }
+
+        var channel = new Android.App.NotificationChannel(
+            ChannelId, GetString(Resource.String.downloads_channel), Android.App.NotificationImportance.Low);
+        manager.CreateNotificationChannel(channel);
     }
 
     protected override Media3Downloads DownloadManager => Downloads.Manager(this);

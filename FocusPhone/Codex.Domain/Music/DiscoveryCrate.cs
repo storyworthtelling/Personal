@@ -9,7 +9,9 @@ namespace Codex.Domain.Music;
 /// have to change when that changes — a pick is a thing with a name, a maker and a
 /// sleeve either way.
 /// </summary>
-public sealed record CratePick(string Id, string Title, string Subtitle, string? ArtRef = null);
+public sealed record CratePick(
+    string Id, string Title, string Subtitle, string? ArtRef = null, string? Why = null,
+    DiscoveryKind Kind = DiscoveryKind.Song);
 
 /// <summary>
 /// The week's crate: one record showing, the rest of the run behind it, and whatever

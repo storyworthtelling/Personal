@@ -34,7 +34,12 @@ public interface IDiscoveryClient
     /// never the source. The crate exists to name records that are not on the shelf,
     /// so a pick drawn from this is the one thing it must not return.
     /// </param>
+    /// <param name="subscribedShows">
+    /// Podcast shows already followed, by title — the podcast side's equivalent of
+    /// <paramref name="owned"/>, so a show pick can be excluded the same way a track or album
+    /// already on the shelf is.
+    /// </param>
     Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
         TasteProfile profile, IReadOnlyList<Track> owned, int maxTracks,
-        string? note, CancellationToken cancellationToken);
+        string? note, IReadOnlyList<string> subscribedShows, CancellationToken cancellationToken);
 }
