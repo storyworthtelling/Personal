@@ -1,4 +1,4 @@
-# Canonizer
+# Folio
 
 An **Android app** that reads a novel manuscript and produces a **revision report** — a deep,
 chapter-cited editorial read aimed at helping the author revise toward publication. Alongside the
@@ -30,29 +30,30 @@ Four principles are load-bearing:
 - **Background work** is an AndroidX **WorkManager** periodic worker that drains the pipeline a
   cycle at a time. There is no server and no web UI — everything runs on the phone.
 
-> **Internal identity.** The project keeps its original **`Storyboarder.*`** namespaces, solution,
-> `StoryboarderDbContext`, `storyboarder.db`, and app id `com.storyworthtelling.storyboarder` so an
-> installed build upgrades in place. Only the user-facing name (**Canonizer**), the icon (a red pen
-> nib), and a few domain concepts changed in the pivot from graphic-novel factory to revision
-> instrument.
+> **The frozen set.** P10 renamed the namespaces, the solution, the context and the database file to
+> **`Folio.*`**, `Folio.sln`, `FolioDbContext` and `folio.db`. What did **not** move, because a device
+> only upgrades in place when they do not: the app id `com.storyworthtelling.storyboarder`, the
+> worker's registered Java name, both unique work names (`storyboarder-pipeline` and `-now`),
+> `MainActivity`'s declared name, and the twelve preference keys. Every one of them is invisible —
+> nothing fails at build time if it moves — so `FolioInvariantsTests` fails instead. Do not "fix" them.
 
 ## Architecture
 
-`Storyboarder.sln`:
+`Folio.sln`:
 
-- **Storyboarder.Domain** (`net10.0`) — pure logic, no external deps: chunking, chapter/scene
+- **Folio.Domain** (`net10.0`) — pure logic, no external deps: chunking, chapter/scene
   detection, design-bible merge, rate limiter, backoff, the pipeline state machine, the report data
   schema, entities, and collaborator interfaces.
-- **Storyboarder.Infrastructure** (`net10.0;net10.0-android`) — EF Core + SQLite `DbContext`, the
+- **Folio.Infrastructure** (`net10.0;net10.0-android`) — EF Core + SQLite `DbContext`, the
   Claude/Gemini/Docs HTTP clients, the source-format extractors (docx/RTF/ePub/PDF), the SkiaSharp
   report renderer + PdfSharp PDF assembler, the `ReviewProcessor` (advances one manuscript by one
   unit of work per call; all state in the DB), and `PipelineRunner` (the resumable drain loop,
   bounded per WorkManager cycle).
-- **Storyboarder.Android** (`net10.0-android`, MAUI) — the app head: `MauiProgram` DI, the
+- **Folio.Android** (`net10.0-android`, MAUI) — the app head: `MauiProgram` DI, the
   `PipelineWorker` (WorkManager), device-account Google sign-in + Drive doc lister, and the pages
   (manuscript list, new project, report reader, draft diff, settings). Modeled on the sibling
   `DailyLoader` app.
-- **Storyboarder.Tests** (`net10.0`) — xUnit + Moq: pure-logic unit tests, in-memory-SQLite data
+- **Folio.Tests** (`net10.0`) — xUnit + Moq: pure-logic unit tests, in-memory-SQLite data
   tests, fake-HTTP client tests, the end-to-end pipeline test, and the `PipelineRunner` tests.
 
 ### The pipeline
@@ -131,14 +132,14 @@ Wait a few minutes for the client to propagate, then sign in again.
 Tests run on the desktop TFM with no device, emulator, or API keys (external services are faked):
 
 ```bash
-dotnet test Storyboarder/Storyboarder.sln -p:StoryboarderTfms=net10.0
+dotnet test Storyboarder/Folio.sln -p:FolioTfms=net10.0
 ```
 
-The `-p:StoryboarderTfms=net10.0` switch builds `Storyboarder.Infrastructure` for `net10.0` only so
+The `-p:FolioTfms=net10.0` switch builds `Folio.Infrastructure` for `net10.0` only so
 the suite restores and runs without the MAUI/Android workload.
 
 Building the Android head needs the **.NET MAUI / Android workload** and the **Android SDK** (open
-`Storyboarder.sln` in Visual Studio, or `dotnet build Storyboarder/Storyboarder.Android`). In a
+`Folio.sln` in Visual Studio, or `dotnet build Storyboarder/Folio.Android`). In a
 sandboxed environment a minimal SDK works, as with the FocusPhone heads:
 `-p:AndroidSdkDirectory=<sdk> -p:AndroidUseApkSigner=false` (see `scripts/setup-android-build.sh`).
 Debug builds sign with the default debug keystore.
@@ -161,7 +162,7 @@ Debug builds sign with the default debug keystore.
    **Series continuity** read, and its card wears a *Book N* badge.
 6. **Optionally, to a reMarkable tablet:** register the tablet once in Settings (a one-time code from
    `my.remarkable.com/device/mobile/connect`) and turn on *Deliver to reMarkable* — the report then
-   also lands in a **"Canonizer" folder** on the tablet to read and annotate by hand. Best-effort and
+   also lands on the tablet to read and annotate by hand. Best-effort and
    independent of Drive; the pairing is shared with the other Storyworthtelling apps via the secrets
    vault, so pairing once anywhere is enough.
 
