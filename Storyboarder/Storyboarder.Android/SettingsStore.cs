@@ -5,16 +5,42 @@ namespace Storyboarder.Android;
 // restart. API keys are entered on the Settings page; Google access uses the device account.
 public static class SettingsStore
 {
+    /// <summary>
+    /// The stored keys, frozen as literals. They were <c>nameof(...)</c> — tidy-looking, and a trap:
+    /// renaming a property renames its key, and the stored value is not migrated, not reported, simply
+    /// not found. The values below are the old property names for exactly that reason, so no phone
+    /// notices the rename. Guarded by FolioInvariantsTests.
+    /// </summary>
+    internal static class Keys
+    {
+        internal const string ClaudeApiKey = "ClaudeApiKey";
+        internal const string GeminiApiKey = "GeminiApiKey";
+        internal const string VaultPassphrase = "VaultPassphrase";
+        internal const string ArchiveToDrive = "ArchiveToDrive";
+        internal const string FreeLocalCopiesAfterArchive = "FreeLocalCopiesAfterArchive";
+        internal const string DeliverToRemarkable = "DeliverToRemarkable";
+        internal const string RemarkableDeviceToken = "RemarkableDeviceToken";
+        internal const string GoogleAccountEmail = "GoogleAccountEmail";
+        internal const string LastRunOutcome = "LastRunOutcome";
+        internal const string LastRunAtUtc = "LastRunAtUtc";
+        internal const string LastMigrationError = "LastMigrationError";
+
+        // The pivot's one-time boolean. Still read, never written: it is how a device that already
+        // dropped its database once is recognised as generation 1.
+        internal const string PivotSchemaReset = "CanonizerSchemaReset";
+        internal const string SchemaResetGeneration = "SchemaResetGeneration";
+    }
+
     public static string ClaudeApiKey
     {
-        get => Preferences.Get(nameof(ClaudeApiKey), string.Empty);
-        set => Preferences.Set(nameof(ClaudeApiKey), value);
+        get => Preferences.Get(Keys.ClaudeApiKey, string.Empty);
+        set => Preferences.Set(Keys.ClaudeApiKey, value);
     }
 
     public static string GeminiApiKey
     {
-        get => Preferences.Get(nameof(GeminiApiKey), string.Empty);
-        set => Preferences.Set(nameof(GeminiApiKey), value);
+        get => Preferences.Get(Keys.GeminiApiKey, string.Empty);
+        set => Preferences.Set(Keys.GeminiApiKey, value);
     }
 
     // The passphrase that encrypts the shared Drive secrets vault (Storyworthtelling.Voice.Secrets). It is
@@ -23,8 +49,8 @@ public static class SettingsStore
     // participate in the vault (it keeps working from the keys above).
     public static string VaultPassphrase
     {
-        get => Preferences.Get(nameof(VaultPassphrase), string.Empty);
-        set => Preferences.Set(nameof(VaultPassphrase), value);
+        get => Preferences.Get(Keys.VaultPassphrase, string.Empty);
+        set => Preferences.Set(Keys.VaultPassphrase, value);
     }
 
     // Copy each finished book's PDFs to a Drive folder beside its manuscript. Off until the drive.file
@@ -32,16 +58,16 @@ public static class SettingsStore
     // then just sends every finished book through a stage that can only fail.
     public static bool ArchiveToDrive
     {
-        get => Preferences.Get(nameof(ArchiveToDrive), false);
-        set => Preferences.Set(nameof(ArchiveToDrive), value);
+        get => Preferences.Get(Keys.ArchiveToDrive, false);
+        set => Preferences.Set(Keys.ArchiveToDrive, value);
     }
 
     // After a confirmed upload, delete the intermediate panel and page images (hundreds of megabytes for a
     // full book). The PDFs themselves are always kept — they are what gets read.
     public static bool FreeLocalCopiesAfterArchive
     {
-        get => Preferences.Get(nameof(FreeLocalCopiesAfterArchive), false);
-        set => Preferences.Set(nameof(FreeLocalCopiesAfterArchive), value);
+        get => Preferences.Get(Keys.FreeLocalCopiesAfterArchive, false);
+        set => Preferences.Set(Keys.FreeLocalCopiesAfterArchive, value);
     }
 
     // Also deliver the finished report to a "Canonizer" folder on the owner's reMarkable tablet. Off until
@@ -49,8 +75,8 @@ public static class SettingsStore
     // through a stage that can only fail.
     public static bool DeliverToRemarkable
     {
-        get => Preferences.Get(nameof(DeliverToRemarkable), false);
-        set => Preferences.Set(nameof(DeliverToRemarkable), value);
+        get => Preferences.Get(Keys.DeliverToRemarkable, false);
+        set => Preferences.Set(Keys.DeliverToRemarkable, value);
     }
 
     // The long-lived reMarkable device token from the one-time device-code pairing. Backed up to the shared
@@ -58,47 +84,56 @@ public static class SettingsStore
     // the other apps that deliver to the same tablet.
     public static string RemarkableDeviceToken
     {
-        get => Preferences.Get(nameof(RemarkableDeviceToken), string.Empty);
-        set => Preferences.Set(nameof(RemarkableDeviceToken), value);
+        get => Preferences.Get(Keys.RemarkableDeviceToken, string.Empty);
+        set => Preferences.Set(Keys.RemarkableDeviceToken, value);
     }
 
     // The Google account chosen via the native picker; tokens are minted for it via AccountManager.
     public static string GoogleAccountEmail
     {
-        get => Preferences.Get(nameof(GoogleAccountEmail), string.Empty);
-        set => Preferences.Set(nameof(GoogleAccountEmail), value);
+        get => Preferences.Get(Keys.GoogleAccountEmail, string.Empty);
+        set => Preferences.Set(Keys.GoogleAccountEmail, value);
     }
 
     public static string LastRunOutcome
     {
-        get => Preferences.Get(nameof(LastRunOutcome), string.Empty);
-        set => Preferences.Set(nameof(LastRunOutcome), value);
+        get => Preferences.Get(Keys.LastRunOutcome, string.Empty);
+        set => Preferences.Set(Keys.LastRunOutcome, value);
     }
 
     public static DateTime LastRunAtUtc
     {
-        get => Preferences.Get(nameof(LastRunAtUtc), DateTime.MinValue);
-        set => Preferences.Set(nameof(LastRunAtUtc), value);
+        get => Preferences.Get(Keys.LastRunAtUtc, DateTime.MinValue);
+        set => Preferences.Set(Keys.LastRunAtUtc, value);
     }
 
     // Set when applying EF migrations at process start fails, cleared on success. Surfaced on the
     // Settings page so a broken update is visible instead of silently stalling the worker.
     public static string LastMigrationError
     {
-        get => Preferences.Get(nameof(LastMigrationError), string.Empty);
-        set => Preferences.Set(nameof(LastMigrationError), value);
+        get => Preferences.Get(Keys.LastMigrationError, string.Empty);
+        set => Preferences.Set(Keys.LastMigrationError, value);
     }
 
-    // One-time gate for the Canonizer schema reset. The pivot collapsed the whole migration history into a
-    // single new baseline, so a device upgraded in place still holds the old storyboarder.db stamped with
-    // migration ids the new baseline doesn't know — Migrate() would try to create tables that already exist
-    // and fail. The brief accepts no old data preserved, so the migration runner drops the legacy database
-    // once (EnsureDeleted) before the first Migrate, then sets this so it never runs again.
-    public static bool CanonizerSchemaReset
+    // The schema reset is a GENERATION, not a flag, and this is why: the pivot dropped the database once,
+    // gated by a boolean, and it is already true on the one device that matters. P10 drops it again — a
+    // fresh start, by decision — so reusing that boolean would mean the second drop never happens there,
+    // leaving a database stamped with migration ids the new baseline cannot build on and a Migrate() that
+    // fails on a phone nobody can debug. Storing the generation makes the next reset a number instead of
+    // another key, and the key itself carries no brand name so the next rename need not touch it.
+    public const int CurrentSchemaResetGeneration = 2;
+
+    public static int SchemaResetGeneration
     {
-        get => Preferences.Get(nameof(CanonizerSchemaReset), false);
-        set => Preferences.Set(nameof(CanonizerSchemaReset), value);
+        // A device that did the pivot's reset reads back as generation 1 rather than as "never reset",
+        // so the ladder continues from where that device actually is.
+        get => Preferences.Get(Keys.SchemaResetGeneration, 0) is var stored && stored > 0
+            ? stored
+            : Preferences.Get(Keys.PivotSchemaReset, false) ? 1 : 0;
+        set => Preferences.Set(Keys.SchemaResetGeneration, value);
     }
+
+    public static bool SchemaResetIsDue => SchemaResetGeneration < CurrentSchemaResetGeneration;
 
     // "Delivered — 2h ago" style summary for the library footer (DESIGN.md §11).
     public static string LastRunSummary =>
