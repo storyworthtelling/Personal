@@ -45,10 +45,34 @@ public static class Tokens
     public const string ForewordSunriseHex = "#CA662D";
     public const string ForewordDeepHex = "#6E3512";
 
+
+    // Folio: olive, OKLCH hue 107°, locked at gate 3. Committed at the CENTRE of the 105–109 window
+    // rather than at the art's own 105.4°, which clears the caution ochre by only 20.4°: a re-crop or
+    // a regenerated source would drift a measured value under §3's 20° binding and break the build
+    // with nothing visibly different. By gate 3 the wheel had four gaps left, two too narrow to use —
+    // this is the only window Folio fits.
+    public const string FolioFillHex = "#C1C197";
+    public const string FolioGroundHex = "#919059";
+    public const string FolioMarkHex = "#6B681E";
+    public const string FolioTextHex = "#575410";
+    public const string FolioDeepHex = "#3B3902";
+
+    // The binding, and deliberately NOT the identity: §12 does not require a cloth to match the
+    // identity hue, and this red sits about 3° from the problem rose — fine for a binding, and
+    // disqualifying for an identity token. IdentityLadderTests reads the ladder, never this.
+    public const string FolioClothHex = "#B32738";
+
     public static readonly SKColor ForewordFill = SKColor.Parse(ForewordFillHex);
     public static readonly SKColor ForewordGround = SKColor.Parse(ForewordGroundHex);
     public static readonly SKColor ForewordSunrise = SKColor.Parse(ForewordSunriseHex);
     public static readonly SKColor ForewordDeep = SKColor.Parse(ForewordDeepHex);
+
+    public static readonly SKColor FolioFill = SKColor.Parse(FolioFillHex);
+    public static readonly SKColor FolioGround = SKColor.Parse(FolioGroundHex);
+    public static readonly SKColor FolioMark = SKColor.Parse(FolioMarkHex);
+    public static readonly SKColor FolioText = SKColor.Parse(FolioTextHex);
+    public static readonly SKColor FolioDeep = SKColor.Parse(FolioDeepHex);
+    public static readonly SKColor FolioCloth = SKColor.Parse(FolioClothHex);
 
     public static readonly SKColor PostGround = SKColor.Parse(PostGroundHex);
     public static readonly SKColor PostMark = SKColor.Parse(PostMarkHex);
