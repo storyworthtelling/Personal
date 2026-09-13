@@ -426,24 +426,27 @@ public class ProjectServiceTests : IDisposable
         Assert.False(status!.InSeries);
     }
 
+    // Staged at Archiving, not Completed: a Completed book is excluded from the heal selection
+    // outright (see CompletedBooksDoNotHealTests), so seeding one here would pass whether the
+    // file-exists check worked or not — and that check is what this test is for.
     [Fact]
-    public async Task VerifyAndHeal_LeavesAHealthyFinishedReportUntouched()
+    public async Task VerifyAndHeal_LeavesAHealthyReportUntouched()
     {
         var path = imageStore.Save("book/analysis/book-analysis.pdf", [1, 2, 3]);
-        var novelId = SeedReportOnDisk(ProjectStage.Completed, path);
+        var novelId = SeedReportOnDisk(ProjectStage.Archiving, path);
 
         var healed = await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
 
         Assert.Equal(0, healed);
         using var context = database.NewContext();
-        Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == novelId).Stage);
+        Assert.Equal(ProjectStage.Archiving, context.Novels.Single(n => n.Id == novelId).Stage);
     }
 
     [Fact]
     public async Task VerifyAndHeal_ReRendersAMissingReport_AndRegressesTheStage()
     {
         var path = imageStore.Save("book/analysis/book-analysis.pdf", [1, 2, 3]);
-        var novelId = SeedReportOnDisk(ProjectStage.Completed, path);
+        var novelId = SeedReportOnDisk(ProjectStage.Archiving, path);
         File.Delete(path); // a reboot or storage hiccup lost the rendered report
 
         var healed = await NewService().VerifyAndHealOutputsAsync(CancellationToken.None);
@@ -461,7 +464,7 @@ public class ProjectServiceTests : IDisposable
         Guid novelId;
         using (var context = database.NewContext())
         {
-            var novel = new Novel { Title = "Quest", GoogleDocId = "doc", Stage = ProjectStage.Completed, CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow };
+            var novel = new Novel { Title = "Quest", GoogleDocId = "doc", Stage = ProjectStage.ComposingAnalysis, CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow };
             novel.ProjectId = novel.Id;
             novel.Scenes.Add(new Scene { NovelId = novel.Id, Number = 1, ImageStatus = WorkStatus.Completed, ImagePath = scenePath });
             context.Novels.Add(novel);
