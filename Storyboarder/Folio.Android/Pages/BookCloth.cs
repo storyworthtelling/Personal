@@ -3,7 +3,7 @@ using Storyworthtelling.Paper;
 namespace Folio.Android.Pages;
 
 /// <summary>The four inks one bound spine needs.</summary>
-public readonly record struct SpineCloth(Color Top, Color Bottom, Color Hinge, Color Lettering);
+public readonly record struct SpineCloth(Color Top, Color Bottom, Color Hinge, Color Lettering, bool Dark);
 
 /// <summary>
 /// What colour a book is bound in.
@@ -23,9 +23,12 @@ public readonly record struct SpineCloth(Color Top, Color Bottom, Color Hinge, C
 /// </summary>
 public static class BookCloth
 {
-    public static Color Bronze { get; } = Color.FromArgb(PaperColorTokens.CautionFill);
+    // The registered bronze, not an approximation of it. These were CautionFill and CautionDeep for
+    // one commit — a role standing in for a material, which is exactly the substitution the frame
+    // must not suffer: it makes the bookends a colour nobody chose.
+    public static Color Bronze { get; } = Color.FromArgb(MaterialTokens.BronzeHex);
 
-    public static Color BronzeEdge { get; } = Color.FromArgb(PaperColorTokens.CautionDeep);
+    public static Color BronzeEdge { get; } = Color.FromArgb(MaterialTokens.BronzeEdgeHex);
 
     // Mark over Deep: a bound cloth catching light at the top and falling into shadow at the foot.
     private static readonly (string Mark, string Deep, bool DarkCloth)[] Cloths =
@@ -51,7 +54,8 @@ public static class BookCloth
             Hinge: dark
                 ? Color.FromArgb(PaperColorTokens.Paper).WithAlpha(0.35f)
                 : Color.FromArgb(PaperColorTokens.Ink).WithAlpha(0.22f),
-            Lettering: Color.FromArgb(dark ? PaperColorTokens.Paper : PaperColorTokens.Ink));
+            Lettering: Color.FromArgb(dark ? PaperColorTokens.Paper : PaperColorTokens.Ink),
+            Dark: dark);
     }
 
     private static uint Hash(string title)
