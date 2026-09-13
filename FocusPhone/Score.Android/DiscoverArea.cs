@@ -58,6 +58,7 @@ public sealed class DiscoverArea : ScoreArea
 
     private DiscoveryCrate? crate;
     private string? crateKey;
+    private string? actionStatus;
     private string query = string.Empty;
     private string? searchStatus;
     private IReadOnlyList<PodcastSearchResult> results = [];
@@ -97,17 +98,31 @@ public sealed class DiscoverArea : ScoreArea
     }
 
     /// <summary>
-    /// Discover carries the hourly voice line as well as the crate's own note (owner's
-    /// call). The mockups had settled the seat on Music and Podcasts only, on the
-    /// reasoning that one pick at a time means one line of calligraphy — so this is a
-    /// deliberate change to that, not a drift from it.
+    /// The hourly voice line, suppressed whenever the crate's own note is showing.
+    ///
+    /// The original decision here (kept in git history) was to carry both — the mockups had
+    /// settled the voice seat on Music and Podcasts only, reasoning that one pick at a time means
+    /// one line of calligraphy, and Discover was a deliberate exception to that. On-device it
+    /// read as too much, especially at the calligraphy hand's size: two authorial voices stacked
+    /// on one screen. Suppressing the greeting specifically when a crate note has something to
+    /// show (the same condition <see cref="BuildNote"/> uses to render it) keeps the exception
+    /// narrow — an empty crate, or one still composing its note, still gets the hourly line.
     /// </summary>
-    public override bool ShowsVoice => results.Count == 0 && trackResults.Count == 0;
+    public override bool ShowsVoice =>
+        results.Count == 0 && trackResults.Count == 0 && !CrateHasVisibleNote();
+
+    private bool CrateHasVisibleNote() =>
+        crate?.Current is { } current && notes.TryGetValue(current.Id, out var line) && !string.IsNullOrEmpty(line);
 
     public override View BuildView()
     {
         var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         Section(layout, BuildSearch());
+        layout.AddView(Rule(), new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, PaperTheme.Dp(Host, 1))
+        {
+            BottomMargin = PaperTheme.Dp(Host, DesignTokens.Space.X6),
+        });
         Section(layout, results.Count > 0 ? BuildResults() : BuildCrate());
         Section(layout, BuildTrackSearch());
         if (trackResults.Count > 0)
@@ -131,6 +146,17 @@ public sealed class DiscoverArea : ScoreArea
         {
             BottomMargin = PaperTheme.Dp(Host, DesignTokens.Space.X6),
         });
+
+    // A plain hairline between the podcast search and whatever sits below it (the crate, or its
+    // search results) — search and the crate are two different shapes (literal-and-open-ended
+    // vs. curated-and-finite, per the class remarks) and used to read as one flowing block with
+    // nothing marking where one ends and the other begins.
+    private View Rule()
+    {
+        var rule = new View(Host);
+        rule.SetBackgroundColor(PaperTheme.Hairline);
+        return rule;
+    }
 
     private View BuildSearch()
     {
@@ -376,6 +402,11 @@ public sealed class DiscoverArea : ScoreArea
         column.AddView(BuildNote(current));
         column.AddView(BuildStepper());
         column.AddView(BuildActions());
+        if (!string.IsNullOrEmpty(actionStatus))
+        {
+            column.AddView(PaperUi.Secondary(Host, actionStatus));
+        }
+
         return column;
     }
 
@@ -410,9 +441,18 @@ public sealed class DiscoverArea : ScoreArea
         // cannot start the same one twice.
         notes[pick.Id] = string.Empty;
 
+        // Grounds the note in the real, taste-profile-based reason DiscoveryClient already worked
+        // out for this pick (pick.Why) rather than composing from the title/artist alone — with
+        // nothing else to draw on, the voice pass had no real reason to write from and fell back
+        // to interchangeable flea-market flavor text ("it was lying around face-up") for every
+        // pick alike, which read as generic and repetitive because it effectively was.
+        var context = string.IsNullOrWhiteSpace(pick.Why)
+            ? $"{pick.Title} by {pick.Subtitle}"
+            : $"{pick.Title} by {pick.Subtitle} — the reason it was picked: {pick.Why}";
+
         var line = await voice.ComposeAsync(
             "a one-line note about a record in this week's crate, as the person who picked it out",
-            $"{pick.Title} by {pick.Subtitle}", CancellationToken.None);
+            context, CancellationToken.None);
         if (string.IsNullOrWhiteSpace(line))
         {
             return;
@@ -445,9 +485,14 @@ public sealed class DiscoverArea : ScoreArea
     {
         var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
 
-        // Play is an audition. It does not build a queue and does not disturb the one
-        // you have — Discover is for deciding, not for filing.
-        row.AddView(PaperUi.SecondaryButton(Host, "Play", Audition));
+        // Play is an audition for a song or an album (Score has no way to browse an unowned
+        // album, so this plays a track from it instead — see PerformActionAsync). A podcast
+        // pick names a show, not something to audition a clip of, so it offers Subscribe —
+        // the exact same action "Find a podcast" above already offers, reached through the
+        // podcast directory instead of a library lookup, since a crate pick is never something
+        // the library already has. Neither disturbs the assembled music queue.
+        var label = crate!.Current!.Kind == DiscoveryKind.Podcast ? "Subscribe" : "Play";
+        row.AddView(PaperUi.SecondaryButton(Host, label, () => _ = PerformActionAsync()));
         row.AddView(crate!.CurrentIsVetoed
             ? PaperUi.QuietButton(Host, "Bring it back", () => Strike(veto: false))
             : PaperUi.QuietButton(Host, "Not for me", () => Strike(veto: true)));
@@ -465,6 +510,7 @@ public sealed class DiscoverArea : ScoreArea
             crate!.Previous();
         }
 
+        actionStatus = null; // belonged to the pick just left, not the one now showing
         Invalidate();
     }
 
@@ -486,14 +532,76 @@ public sealed class DiscoverArea : ScoreArea
         Invalidate();
     }
 
-    private void Audition()
+    private async Task PerformActionAsync()
     {
-        var id = crate!.Current!.Id;
-        var track = library.Catalog.Songs().FirstOrDefault(song => song.Id == id);
-        if (track is not null)
+        var current = crate?.Current;
+        if (current is null)
         {
-            library.Audition(track);
+            return;
         }
+
+        if (current.Kind == DiscoveryKind.Podcast)
+        {
+            await SubscribeToPickAsync(current);
+            return;
+        }
+
+        await AuditionUnownedAsync(current);
+    }
+
+    // A crate pick is by definition not in the library (Discoveries.Unowned's whole job), so —
+    // unlike Songs/Albums/Playlists elsewhere in the app — there is no local file to play. This
+    // is also the fix for a pick that was always silently inert: the previous Audition() looked
+    // the pick's synthetic key up in the OWNED catalog, which by construction could never match
+    // anything, so Play did nothing for every crate pick before TIDAL sign-in existed to fetch
+    // from. An Album pick has no single track of its own to search for, so this searches by
+    // artist + album title and plays whatever TIDAL returns first for it.
+    private async Task AuditionUnownedAsync(CratePick pick)
+    {
+        if (new TidalAccountStore(Host).Load() is null)
+        {
+            actionStatus = "Sign in to TIDAL in Settings to play this.";
+            Invalidate();
+            return;
+        }
+
+        var token = await new TidalAccessTokenProvider(Host).RefreshAsync(CancellationToken.None);
+        if (token.Status != TidalTokenPollStatus.Success || token.AccessToken is not { Length: > 0 } accessToken)
+        {
+            actionStatus = "Couldn't reach TIDAL. Try again in a moment.";
+            Invalidate();
+            return;
+        }
+
+        var found = await new TidalCatalogClient(new HttpClient())
+            .SearchAsync(accessToken, $"{pick.Subtitle} {pick.Title}", MusicLibrary.TidalCountryCode, CancellationToken.None);
+        if (found.Count == 0)
+        {
+            actionStatus = $"Couldn't find “{pick.Title}” on TIDAL.";
+            Invalidate();
+            return;
+        }
+
+        actionStatus = null;
+        library.Audition(found[0]);
+    }
+
+    // Resolves the recommended show's name to a real feed through the same podcast directory
+    // "Find a podcast" above already searches, then subscribes exactly as that search's own
+    // result rows do — a crate pick has no feed url of its own (the recommender only ever
+    // named the show), so there is nothing to subscribe to until this finds one.
+    private async Task SubscribeToPickAsync(CratePick pick)
+    {
+        var found = await search.SearchAsync(pick.Title, CancellationToken.None);
+        if (found.Count == 0)
+        {
+            actionStatus = $"Couldn't find “{pick.Title}” in the podcast directory.";
+            Invalidate();
+            return;
+        }
+
+        actionStatus = null;
+        Subscribe(found[0]);
     }
 
     private IReadOnlyList<CratePick> ResolvePicks()
@@ -504,10 +612,13 @@ public sealed class DiscoverArea : ScoreArea
         //
         // Filtered against the library again on the way out as well as on the way in,
         // because a crate is a week old by the end of its run and the owner may have
-        // bought one of its records in the meantime; a crate offering to add something
-        // now on the shelf is the failure this whole path was built wrong around.
-        return [.. Discoveries.Unowned(picksStore.LoadPicks(), library.Catalog.Songs())
-            .Select(pick => new CratePick(Discoveries.Key(pick), pick.Title, pick.Artist))];
+        // bought one of its records (or followed one of its shows) in the meantime; a
+        // crate offering something already on the shelf is the failure this whole path
+        // was built wrong around.
+        var subscribedShows = subscriptionStore.Load().Select(feed => feed.Title).ToList();
+        return [.. Discoveries.Unowned(picksStore.LoadPicks(), library.Catalog.Songs(), subscribedShows)
+            .Select(pick => new CratePick(
+                Discoveries.Key(pick), pick.Title, pick.Artist, Why: pick.Why, Kind: pick.Kind))];
     }
 
     // Never a dead end: say which of the three reasons it is.
