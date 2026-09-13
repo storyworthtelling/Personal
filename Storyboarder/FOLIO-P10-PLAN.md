@@ -46,7 +46,7 @@ and document task below repeats it.
 
 ## 1. Addenda to the approved finding, from Gate 3
 
-The finding was approved before the pages were drawn. Drawing them changed ten things. These
+The finding was approved before the pages were drawn. Drawing them changed eleven things. These
 continue the finding's numbering and are part of it.
 
 ### F36 — the owner's mark is **drawn**, not photographed *(D118)*
@@ -130,6 +130,13 @@ is an opinion the author cannot act on, so the structured output gains a require
 beside the verdict, and a read that comes back without one is a failed pass, not a shorter one.
 Guard G22.
 
+### F45 — the marked-up manuscript is ~140 pages
+
+Confirmed on the drawn geometry: 45 lines at 12pt / 1.35 in the 489 × 732 content box. Gate 1's
+figure of 203 was computed on the raster geometry this phase replaces. The artifact and this plan
+both carry the corrected number; **the ~140-page upload has still never been attempted** (finding
+§7).
+
 ### F46 — each reader gets a page, and keeps its pros and cons
 
 Drawn first as seven three-line summaries on one page, which **lost what the shipped report already
@@ -143,13 +150,6 @@ The two columns are the only place in the report where a tick and a cross are th
 are one reader's preferences, not the book's severity tiers, so they take the Positive and Problem
 roles rather than the four-tier scale. A persona whose review arrives with an empty pros or cons list
 is a **failed pass, not a shorter one** — the same rule as the missing condition. Guard G23.
-
-### F45 — the marked-up manuscript is ~140 pages
-
-Confirmed on the drawn geometry: 45 lines at 12pt / 1.35 in the 489 × 732 content box. Gate 1's
-figure of 203 was computed on the raster geometry this phase replaces. The artifact and this plan
-both carry the corrected number; **the ~140-page upload has still never been attempted** (finding
-§7).
 
 ---
 
