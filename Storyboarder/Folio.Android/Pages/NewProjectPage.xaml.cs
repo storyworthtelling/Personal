@@ -5,7 +5,7 @@ using Folio.Infrastructure.Services;
 
 namespace Folio.Android.Pages;
 
-public partial class NewProjectPage : ContentPage
+public partial class NewProjectPage : FolioBinderPage
 {
     private readonly DeviceAccountTokenProvider tokens;
     private readonly DriveDocsLister lister;
@@ -29,6 +29,7 @@ public partial class NewProjectPage : ContentPage
     public NewProjectPage(DeviceAccountTokenProvider tokens, DriveDocsLister lister)
     {
         InitializeComponent();
+        Wrap(FolioArea.Work, "New manuscript");
         this.tokens = tokens;
         this.lister = lister;
         ArtStyleEntry.Text = ArtStyles.Default;
@@ -40,7 +41,7 @@ public partial class NewProjectPage : ContentPage
         if (PreviousBookId is not null)
         {
             var label = string.IsNullOrWhiteSpace(PreviousBookTitle) ? "Next book" : $"Next book after “{PreviousBookTitle}”";
-            HeaderLabel.Text = label;
+            HeaderText = label;
             Title = "Next book";
             CreateButton.Text = "Add book";
             // Blank inherits the previous book's art style in the service, so a returning look stays consistent.
@@ -50,7 +51,7 @@ public partial class NewProjectPage : ContentPage
         else if (PreviousDraftId is not null)
         {
             var label = string.IsNullOrWhiteSpace(PreviousTitle) ? "New draft" : $"New draft of “{PreviousTitle}”";
-            HeaderLabel.Text = label;
+            HeaderText = label;
             Title = "New draft";
             CreateButton.Text = "Add draft";
             // Blank inherits the previous draft's art style in the service; prefilling the default would

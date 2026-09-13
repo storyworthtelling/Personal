@@ -26,6 +26,8 @@ public abstract class FolioBinderPage : ContentPage
     private readonly ContentView well = new();
     private readonly ContentView barSlot = new();
     private Grid? column;
+    private Grid? root;
+    private View? presented;
 
     protected FolioBinderPage()
     {
@@ -85,6 +87,7 @@ public abstract class FolioBinderPage : ContentPage
         Grid.SetRow(barSlot, 1);
         Grid.SetColumn(barSlot, 0);
 
+        root = page;
         Content = page;
     }
 
@@ -145,6 +148,50 @@ public abstract class FolioBinderPage : ContentPage
                 row,
             },
         };
+    }
+
+    /// <summary>
+    /// Puts an action card over the whole screen — the binder strip and the bar included, since a
+    /// card is about one item and turning to another area behind it would be answering a question
+    /// nobody asked. Only one is up at a time; presenting a second replaces the first.
+    /// </summary>
+    protected void Present(View card)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+
+        Dismiss();
+        presented = card;
+        root.Children.Add(card);
+        Grid.SetRow(card, 0);
+        Grid.SetColumn(card, 0);
+        Grid.SetRowSpan(card, 2);
+        Grid.SetColumnSpan(card, 2);
+    }
+
+    /// <summary>Takes the card away. Safe to call when there is none.</summary>
+    protected void Dismiss()
+    {
+        if (presented is not null && root is not null)
+        {
+            root.Children.Remove(presented);
+        }
+
+        presented = null;
+    }
+
+    /// <summary>
+    /// The back gesture closes the card before it leaves the screen — which is what makes the card
+    /// dismissible rather than a thing you have to tap precisely outside of.
+    /// </summary>
+    protected override bool OnBackButtonPressed()
+    {
+        if (presented is null)
+        {
+            return base.OnBackButtonPressed();
+        }
+
+        Dismiss();
+        return true;
     }
 
     /// <summary>

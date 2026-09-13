@@ -1,14 +1,17 @@
 using Folio.Domain.Analysis;
 
+using Storyworthtelling.Maui;
+
 namespace Folio.Android.Pages;
 
 // Browses the revision report in-app — the same content as the analysis PDF, laid out as scrollable
 // sections so the author can read it without opening a viewer. Built from the folded BookAnalysisResult.
-public partial class ReportPage : ContentPage
+public partial class ReportPage : FolioBinderPage
 {
     public ReportPage(string title, BookAnalysisResult report)
     {
         InitializeComponent();
+        Wrap(FolioArea.Shelf, "Revision report");
         Build(title, report);
     }
 
@@ -98,7 +101,7 @@ public partial class ReportPage : ContentPage
         Heading(title);
         foreach (var item in items)
         {
-            Content.Add(new Label { Text = primary(item), Style = (Style)Application.Current!.Resources["HeadingLabel"] });
+            Content.Add(new Label { Text = primary(item), Style = PaperResources.Token<Style>("HeadingLabel") });
             var detail = secondary(item);
             if (!string.IsNullOrWhiteSpace(detail))
                 Paragraph(detail);
@@ -127,12 +130,12 @@ public partial class ReportPage : ContentPage
         Content.Add(new Label
         {
             Text = text,
-            Style = (Style)Application.Current!.Resources[isDisplay ? "DisplayLabel" : "TitleLabel"],
+            Style = PaperResources.Token<Style>(isDisplay ? "DisplayLabel" : "TitleLabel"),
             Margin = new Thickness(0, isDisplay ? 0 : 12, 0, 0)
         });
 
     private void Paragraph(string text) =>
-        Content.Add(new Label { Text = text, Style = (Style)Application.Current!.Resources["StatusLine"] });
+        Content.Add(new Label { Text = text, Style = PaperResources.Token<Style>("StatusLine") });
 
     private static string KindLabel(AdditionKind kind) => kind switch
     {

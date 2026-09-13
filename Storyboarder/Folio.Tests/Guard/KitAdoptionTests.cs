@@ -107,6 +107,43 @@ public class KitAdoptionTests
             + "inflated on a device:\n" + string.Join("\n", missing));
     }
 
+    /// <summary>
+    /// Nothing reads a token with the dictionary's <b>indexer</b>.
+    ///
+    /// <para>This is the subtlest consequence of adopting the kit, and it throws at run time rather
+    /// than failing to build. <c>Resources["DisplayLabel"]</c> looks only at that dictionary's own
+    /// entries; <c>TryGetValue</c> walks what has been merged into it. While the head owned the
+    /// palette the indexer worked, so the call sites written that way were correct — and the moment
+    /// the kit became the only source they all became exceptions waiting for the screen that uses
+    /// them. Two report screens carried nine of them.</para>
+    ///
+    /// <para><c>PaperResources</c> is the one reader, and it throws with a sentence saying the kit is
+    /// not merged rather than returning a default — a view drawn transparent-on-transparent is a bug
+    /// that looks like a rendering problem for an afternoon.</para>
+    /// </summary>
+    [Fact]
+    public void NoScreenReadsATokenThroughTheDictionaryIndexer()
+    {
+        var offenders = HeadFiles("*.cs")
+            .Where(file => Code(file).Any(line => Regex.IsMatch(line, @"Resources\[\s*[""a-zA-Z]")))
+            .Select(FolioInvariantsTests.Relative)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            "These read a Paper & Ink token with the indexer, which does not see merged dictionaries "
+            + "and throws once the kit is the only source. Use PaperResources:\n"
+            + string.Join("\n", offenders));
+    }
+
+    /// <summary>
+    /// A file's lines with the comments dropped. The guard must forbid the <i>mechanism</i>, not the
+    /// characters: the first version of it failed on App.xaml.cs, where the only match was the doc
+    /// comment explaining why the indexer must not be used.
+    /// </summary>
+    private static IEnumerable<string> Code(string file) =>
+        File.ReadAllLines(file).Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal));
+
     private static string KitDictionary()
     {
         var kit = Path.Combine(FolioInvariantsTests.RepoRoot(), "Storyworthtelling.Maui", "Resources", "Styles", "Paper.xaml");

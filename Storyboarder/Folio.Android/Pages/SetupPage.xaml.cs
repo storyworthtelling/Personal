@@ -11,7 +11,7 @@ using Storyworthtelling.Voice.Secrets;
 
 namespace Folio.Android.Pages;
 
-public partial class SetupPage : ContentPage
+public partial class SetupPage : FolioBinderPage
 {
     private static string PipelineLogPath => System.IO.Path.Combine(FileSystem.AppDataDirectory, "pipeline.log");
     private static string CrashLogPath => System.IO.Path.Combine(FileSystem.AppDataDirectory, "crash.log");
@@ -19,6 +19,7 @@ public partial class SetupPage : ContentPage
     public SetupPage()
     {
         InitializeComponent();
+        Wrap(FolioArea.Settings, "Settings");
     }
 
     protected override void OnAppearing()
@@ -146,13 +147,9 @@ public partial class SetupPage : ContentPage
             return;
         }
 
-        var confirm = await DisplayAlert(
-            "Restore from a backup",
-            "This replaces the current library with the backup you pick. Any progress not in that backup will be lost.",
-            "Choose a backup", "Cancel");
-        if (!confirm)
-            return;
-
+        // No confirmation. Choosing a particular file out of a picker is already a deliberate act,
+        // and a prompt in front of it asks the same question twice — what it replaces is said on the
+        // page instead, where it can be read before starting rather than while being interrupted.
         try
         {
             // "*/*" so the backup is always selectable — some providers report the zip under a
