@@ -46,6 +46,25 @@ public sealed class ClaudeOptions
     // and streams for long enough that Android's background worker can be killed mid-response. Two
     // calls of this size each stream for about as long as the storyboard calls that already work.
     public int CraftMaxTokens { get; set; } = 20_000;
+
+    // One persona's whole-book pass. Measured (F49): a reader review runs to about 4,000 output
+    // tokens and a section to about 3,000, and both stopped at the cap rather than finishing, so the
+    // budget is set above what was observed rather than at it. A reply that runs out of budget is
+    // thrown away wholesale, not trimmed — a truncated read costs the whole pass.
+    public int PassMaxTokens { get; set; } = 8_000;
+
+    // The two models the seventeen passes run on (the finding's reversal 2). Judgement — the seven
+    // readers and the two synthesis passes — goes to the strong one, because there the judgement is
+    // the product; the eight structural sections go to the standard one.
+    //
+    // They are their own settings rather than reusing Model above, and that is deliberate on both
+    // sides. Model is claude-sonnet-4-6, a PREVIOUS-generation model at $3/MTok where current Sonnet
+    // is $2 — so the passes should not inherit it. But every other call in the pipeline uses Model
+    // too, and moving all of them is a separate decision with its own blast radius, not something to
+    // do as a side effect of building the reads. Reversal 2 scopes the switch to the passes; this is
+    // that scope, written down.
+    public string StandardModel { get; set; } = "claude-sonnet-5";
+    public string StrongModel { get; set; } = "claude-opus-5";
 }
 
 public sealed class GeminiOptions

@@ -354,6 +354,22 @@ release is about the page, so a reflow regression is isolated.
 Persona passes, grouped and cached, structured output, the model mix, the status sentence. Adds the
 required `Condition` field (F44). The pipeline's largest change, on a page that already works.
 
+**Shipped.** Fifteen personas plus two synthesis passes, drained one per turn from `ReadingPlan` and
+persisted a row each (`PassRead`), so a reader that comes back short retries alone rather than
+re-billing the fourteen that were fine. The reads fold over the consolidated report last: the seven
+readers **replace** the omnibus reduce's reviews rather than joining them. The transport is a
+foreground service, because the group measures ~15 minutes against a 9-minute worker cycle (F49), and
+the prompt puts the manuscript first, because otherwise the cache never hits (F50).
+
+Three things the release had to find out rather than assume, all in §7's unverified list: the cycle
+budget (it fails), the persona bet (it holds, overlap 0.000–0.003), and the caching saving (measured,
+$3.38 a draft against $13.76 done wrong).
+
+**Left for a later release, deliberately:** the eight section reads currently fold in as their
+summaries, and the omnibus `ConsolidateAnalysis` still supplies the report's own finding lists. Making
+each section's findings the report's findings is Release G's work, where the marked-up manuscript
+needs them anchored to offsets anyway.
+
 ### Release G — the marked-up manuscript
 Offsets, proofreading marks (dele · caret · query · check), severity hues, inline reasons, the
 margin packing pass (F38), scene blocks with the evidence image and the draft pair (F41), the

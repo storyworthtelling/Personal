@@ -387,6 +387,39 @@ namespace Folio.Infrastructure.Migrations
                     b.ToTable("Novels");
                 });
 
+            modelBuilder.Entity("Folio.Domain.Model.PassRead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CompletedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Json")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("NovelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PassId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NovelId", "PassId")
+                        .IsUnique();
+
+                    b.ToTable("PassReads");
+                });
+
             modelBuilder.Entity("Folio.Domain.Model.Scene", b =>
                 {
                     b.Property<Guid>("Id")
@@ -523,6 +556,15 @@ namespace Folio.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Folio.Domain.Model.PassRead", b =>
+                {
+                    b.HasOne("Folio.Domain.Model.Novel", null)
+                        .WithMany("PassReads")
+                        .HasForeignKey("NovelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Folio.Domain.Model.Scene", b =>
                 {
                     b.HasOne("Folio.Domain.Model.Novel", null)
@@ -554,6 +596,8 @@ namespace Folio.Infrastructure.Migrations
                     b.Navigation("DesignRefs");
 
                     b.Navigation("Findings");
+
+                    b.Navigation("PassReads");
 
                     b.Navigation("Scenes");
 

@@ -18,6 +18,7 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
     public DbSet<ChunkAnalysis> ChunkAnalyses => Set<ChunkAnalysis>();
     public DbSet<BookAnalysis> BookAnalyses => Set<BookAnalysis>();
     public DbSet<Finding> Findings => Set<Finding>();
+    public DbSet<PassRead> PassReads => Set<PassRead>();
 
     // SQLite has no native DateTimeOffset, and the provider cannot translate comparisons on the
     // default TEXT mapping. Storing UTC ticks as integers makes the worker's "due units" time
@@ -64,6 +65,10 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
                 .WithOne()
                 .HasForeignKey(finding => finding.NovelId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(novel => novel.PassReads)
+                .WithOne()
+                .HasForeignKey(pass => pass.NovelId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(novel => novel.ChunkAnalyses)
                 .WithOne()
                 .HasForeignKey(analysis => analysis.NovelId)
@@ -77,6 +82,16 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
             entity.HasIndex(novel => new { novel.ProjectId, novel.DraftNumber });
             // Books of one series are listed together and in order, so index the series grouping key.
             entity.HasIndex(novel => new { novel.SeriesId, novel.SeriesSequence });
+        });
+
+        model.Entity<PassRead>(entity =>
+        {
+            entity.HasKey(pass => pass.Id);
+            entity.Property(pass => pass.CompletedAtUtc).HasConversion(NullableTicksConverter);
+            // The pipeline asks one question of this table — which of this draft's passes are still
+            // unread — so that is the index. Unique on the pair, because a second row for the same
+            // pass is a double billing waiting to happen.
+            entity.HasIndex(pass => new { pass.NovelId, pass.PassId }).IsUnique();
         });
 
         model.Entity<SourceText>(entity => entity.HasKey(source => source.Id));
