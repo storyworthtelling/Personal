@@ -183,7 +183,11 @@ public static class BookshelfLayout
             var x = contentLeft;
             if (hasBookend && firstRow)
             {
-                bookendRect = new LayoutRect(contentLeft, itemsBottom - rowHeight, contentLeft + metrics.BookendWidth, itemsBottom);
+                // A prop, not a book: short relative to the row it stands in, bottom-aligned on the
+                // same ledge as the spines beside it. Clamped so it can never stand taller than the
+                // row itself (an unusually short first row of tiny spines, say).
+                var bookendHeight = Math.Min(metrics.BookendHeight, rowHeight);
+                bookendRect = new LayoutRect(contentLeft, itemsBottom - bookendHeight, contentLeft + metrics.BookendWidth, itemsBottom);
                 x += metrics.BookendWidth + metrics.ItemGap;
             }
 
