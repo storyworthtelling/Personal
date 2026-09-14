@@ -183,8 +183,13 @@ public static class BookshelfLayout
             var x = contentLeft;
             if (hasBookend && firstRow)
             {
-                bookendRect = new LayoutRect(contentLeft, itemsBottom - rowHeight, contentLeft + metrics.BookendWidth, itemsBottom);
-                x += metrics.BookendWidth + metrics.ItemGap;
+                // The full bookend footprint spans the row's own height — the wall inside it (drawn
+                // by the renderer, right-aligned within this rect) needs that full height to actually
+                // hold the books up; the statue (left-aligned within it) draws shorter, off the same
+                // ratio the renderer reads from ShelfMetrics.
+                var bookendWidth = metrics.BookendWallWidth + metrics.BookendStatueWidth;
+                bookendRect = new LayoutRect(contentLeft, itemsBottom - rowHeight, contentLeft + bookendWidth, itemsBottom);
+                x += bookendWidth + metrics.ItemGap;
             }
 
             var items = new List<PlacedItem>(row.Count);
@@ -215,7 +220,8 @@ public static class BookshelfLayout
     {
         var rows = new List<List<ShelfEntry>>();
         var current = new List<ShelfEntry>();
-        var x = contentLeft + (hasBookend ? metrics.BookendWidth + metrics.ItemGap : 0f);
+        var bookendWidth = metrics.BookendWallWidth + metrics.BookendStatueWidth;
+        var x = contentLeft + (hasBookend ? bookendWidth + metrics.ItemGap : 0f);
         var rowStart = x;
 
         foreach (var entry in spec.Entries)
