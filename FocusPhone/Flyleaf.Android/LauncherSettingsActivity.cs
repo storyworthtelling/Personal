@@ -567,10 +567,10 @@ public class LauncherSettingsActivity : Activity
     {
         var row = BeginRow(card);
 
-        // The actual bookend the shelf carries in the tray, drawn at settings scale — the same low,
-        // wide bronze block with its real engraved glyph, not a stand-in monogram label.
+        // The actual bookend the shelf carries in the tray, drawn at settings scale — the same
+        // upright wall + bronze glyph statue, not a stand-in monogram label.
         var glyph = new BookendChipView(this, category.Glyph);
-        var glyphParams = new LinearLayout.LayoutParams(Dp(40), Dp(30)) { MarginEnd = Dp(DesignTokens.Space.X3) };
+        var glyphParams = new LinearLayout.LayoutParams(Dp(40), Dp(44)) { MarginEnd = Dp(DesignTokens.Space.X3) };
         row.AddView(glyph, glyphParams);
 
         var name = PaperUi.Body(this, category.Name);

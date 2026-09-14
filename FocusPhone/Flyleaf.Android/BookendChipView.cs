@@ -1,24 +1,27 @@
 using Android.Content;
 using Android.Graphics;
 using Android.Views;
-using Codex.Ui;
 
 namespace Flyleaf;
 
 /// <summary>
-/// A settings-scale rendering of a shelf's actual bookend — the same low, wide bronze block with its
-/// engraved glyph (<see cref="BookendGlyphPainter"/>) that the tray carries on the shelf, drawn small,
+/// A settings-scale rendering of a shelf's actual bookend — the same thin upright wall plus bronze
+/// statue (<see cref="BookendGlyphPainter"/>) that the tray carries on the shelf, drawn small,
 /// rather than a plain monogram label standing in for it.
 /// </summary>
 public sealed class BookendChipView : View
 {
-    private readonly float density;
+    // Proportions mirror ShelfMetrics.Default (wall/statue width and height ratios), computed against
+    // this view's own measured size rather than a row height, since there's no shelf row here.
+    private const float WallWidthFraction = 0.22f;
+    private const float WallHeightFraction = 0.92f;
+    private const float StatueHeightFraction = 0.6f;
+
     private readonly string glyph;
 
     public BookendChipView(Context context, string glyph) : base(context)
     {
         this.glyph = glyph;
-        density = context.Resources!.DisplayMetrics!.Density;
     }
 
     protected override void OnDraw(Canvas? canvas)
@@ -29,16 +32,11 @@ public sealed class BookendChipView : View
             return;
         }
 
-        var r = new RectF(0, 0, Width, Height);
-        using (var metal = new Paint { AntiAlias = true })
-        {
-            metal.SetShader(new LinearGradient(0, r.Top, 0, r.Bottom, PaperTheme.Bronze, PaperTheme.BronzeDeep, Shader.TileMode.Clamp!));
-            canvas.DrawRoundRect(r, 3 * density, 3 * density, metal);
-        }
+        var wallWidth = Width * WallWidthFraction;
+        var wall = new RectF(Width - wallWidth, Height * (1 - WallHeightFraction), Width, Height);
+        BookendGlyphPainter.DrawWall(canvas, wall);
 
-        var s = Math.Min(r.Width(), r.Height()) * 0.72f;
-        var gx = r.CenterX() - s / 2;
-        var gy = r.CenterY() - s / 2;
-        BookendGlyphPainter.Draw(canvas, Context!, density, new RectF(gx, gy, gx + s, gy + s), glyph, PaperTheme.BronzeDeep);
+        var statue = new RectF(0, Height * (1 - StatueHeightFraction), wall.Left, Height);
+        BookendGlyphPainter.DrawStatue(canvas, Context!, statue, glyph);
     }
 }
