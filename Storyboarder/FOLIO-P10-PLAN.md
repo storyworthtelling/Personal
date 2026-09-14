@@ -159,6 +159,44 @@ are one reader's preferences, not the book's severity tiers, so they take the Po
 roles rather than the four-tier scale. A persona whose review arrives with an empty pros or cons list
 is a **failed pass, not a shorter one** — the same rule as the missing condition. Guard G23.
 
+### F49 — the group does not fit the worker, measured *(Release F)*
+
+U-3 said the 9-minute cycle budget almost certainly would not hold ~20 whole-manuscript passes, that
+this was **the likeliest thing to force a design change in Release F**, and that it was unmeasured.
+It is measured now, on a real 90,000-word novel (167,190 tokens as the API counts it), one pass per
+persona, asking for the length the report actually prints:
+
+| pass | model | wall time | output |
+|---|---|---|---|
+| reader | Opus 5 | 66.4s / 64.3s | 4,000 tokens — **capped** |
+| section | Sonnet 5 | 37.3s / 43.6s | 2,532 / 3,041 tokens |
+
+Eight sections at ~40s, seven readers and two synthesis passes at ~65s: **905 seconds, 15.1 minutes,
+against a 540-second budget.** That is 1.68× over, and it is a **floor** — both reader passes stopped
+at the token cap rather than finishing, so a real review is longer and slower.
+
+**What the number says is that input size is not the problem and output length is.** Every pass after
+the first reads its whole manuscript from cache in no measurable time; what costs fifteen minutes is
+seventeen models writing.
+
+**Prompt caching is confirmed working, and the saving is now measured rather than computed.** Every
+pass after the first reported `cache_read_input_tokens: 167190` with `cache_creation: 0` — and the
+cache survived between two separate runs several minutes apart, so a read refreshes the five-minute
+window rather than the write starting a clock. That matters for any design that spreads the group
+out: consecutive passes keep the cache alive, a gap of more than five minutes kills it.
+
+**Decision (owner, at the measurement): a foreground service.** It is the only option that keeps the
+whole group inside one cache window and one cycle, and the work is genuinely user-visible — the phone
+really is reading a novel for a quarter of an hour, so a notification is honest rather than a way
+around a cap. Splitting across worker cycles was rejected on economics: cycles are fifteen minutes
+apart and the cache dies in five, so each cycle re-pays a write, roughly $2 a draft to save a code
+change. The Batch API stays available if cost ever matters more than turnaround.
+
+**One thing the measurement cost, worth recording.** The first attempt used synthetic prose — 126,000
+tokens of plausible-looking word salad — and the API refused it as gibberish twice before the
+mistake was obvious, and a refusal still bills the cache write. Use real prose to measure a real
+model.
+
 ### F48 — the folio counts every sheet, and the front contents is an open question *(Release E)*
 
 Found by rendering the real page beside the drawing rather than by reading either. Two things the
