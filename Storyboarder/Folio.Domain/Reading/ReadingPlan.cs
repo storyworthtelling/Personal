@@ -38,9 +38,14 @@ public static class ReadingPlan
     ];
 
     /// <summary>
-    /// Sections first, then readers, then synthesis. Sections come first because they are the cheap
-    /// model: if a read is going to fail on a key or a quota it fails early and cheaply, rather than
-    /// after seven passes of the expensive one.
+    /// Sections first, then readers, then synthesis.
+    ///
+    /// <para>Two reasons, and the second is the expensive one. Sections come first because they are
+    /// the cheap model: a read that is going to fail on a key or a quota then fails early rather than
+    /// after seven passes of the expensive one. And they are kept <b>together</b> because
+    /// <b>each model keeps its own prompt cache</b> (F50, measured): grouped, the manuscript is
+    /// written once for Sonnet and once for Opus and read back fifteen times; alternated, every
+    /// change of model pays another write.</para>
     /// </summary>
     public static IReadOnlyList<ReadingPass> Passes { get; } =
     [
