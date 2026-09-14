@@ -273,6 +273,32 @@ public sealed record BookAnalysisResult(
 
     public BookAnalysisResult WithSeriesContinuity(SeriesContinuity seriesContinuity) =>
         this with { SeriesContinuity = seriesContinuity };
+
+    /// <summary>
+    /// Folds the seventeen reads over the consolidated report.
+    ///
+    /// <para>The readers <b>replace</b> whatever the omnibus reduce produced rather than joining it:
+    /// the whole point of a persona pass is that one voice read the whole book, and a page carrying
+    /// both would be two different instruments under one name. Sections and synthesis only fill what
+    /// they actually found, so a read that has not run yet, or ran and was silent, leaves the
+    /// consolidated report's own answer standing rather than blanking it.</para>
+    /// </summary>
+    public BookAnalysisResult WithReads(
+        IReadOnlyList<Review> readers,
+        IReadOnlyList<string> sectionSummaries,
+        IReadOnlyList<RevisionItem> revisionPlan,
+        Verdict verdict) =>
+        this with
+        {
+            Reviews = readers is { Count: > 0 } ? readers : Reviews,
+            Themes = sectionSummaries is { Count: > 0 } ? sectionSummaries : Themes,
+            RevisionPlan = revisionPlan is { Count: > 0 } ? revisionPlan : RevisionPlan,
+            Verdict = string.IsNullOrWhiteSpace(verdict.MostNeeds)
+                && verdict.Strengths is not { Count: > 0 }
+                && verdict.Problems is not { Count: > 0 }
+                    ? Verdict
+                    : verdict,
+        };
 }
 
 // The additive read — Folio's expansion engine (Phase 3). Because early drafts run short, this surfaces

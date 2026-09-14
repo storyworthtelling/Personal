@@ -1,3 +1,4 @@
+using Folio.Domain.Reading;
 using Folio.Domain.Analysis;
 
 namespace Folio.Domain.External;
@@ -109,6 +110,35 @@ public interface IClaudeAnalysisClient
         SeriesCanon priorCanon,
         IReadOnlyList<ChapterNotes> notes,
         string continuitySummary,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One whole-book section pass, read in character by <paramref name="persona"/>.
+    ///
+    /// <para>The manuscript is passed whole and <b>first</b>, because the seventeen passes share it as
+    /// a cached prefix and anything persona-specific in front of it would make each pass a different
+    /// prefix — measured at roughly $17 a draft against $2 (F50). <c>ReadingPrompt</c> is the one place
+    /// that ordering is decided, and every implementation of this goes through it.</para>
+    ///
+    /// <para>A section is allowed to come back silent; a reader is not.</para>
+    /// </summary>
+    Task<SectionRead> ReadSection(Persona persona, string manuscript, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One reader's whole-book pass, in character. The reply must carry a verdict, a review, pros,
+    /// cons and a condition — a short read is a failed pass, not a shorter one (F44, F46), so this
+    /// throws rather than returning a thinner review and letting the page print it.
+    /// </summary>
+    Task<Review> ReadAsReader(Persona persona, string manuscript, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The two synthesis passes, which read the other fifteen rather than the manuscript: the revision
+    /// plan, then the verdict. They run last for that reason.
+    /// </summary>
+    Task<SynthesisRead> Synthesise(
+        string passId,
+        IReadOnlyList<SectionRead> sections,
+        IReadOnlyList<Review> readers,
         CancellationToken cancellationToken);
 }
 
