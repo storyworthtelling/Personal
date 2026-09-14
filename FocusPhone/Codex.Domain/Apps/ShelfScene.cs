@@ -46,10 +46,15 @@ public readonly record struct ShelfMetrics(
     float CoverPortraitRatio, // height = width / ratio; a portrait cover has ratio < 1
     float SpineHeight,
     float ClockSize,
-    // The bookend is a low, wide prop, not a book: wider than any spine and well short of one,
-    // bottom-aligned on the same ledge (BookshelfLayout.PlaceBookRows).
-    float BookendWidth,
-    float BookendHeight,
+    // A real bookend, not a book: a thin upright WALL flush against the first book — nearly the
+    // books' own height, since it has to actually hold them up — with a STATUE (the shelf's glyph,
+    // solid and freestanding) standing on the shelf beside it. BookshelfLayout.PlaceBookRows lays
+    // out the wall against the right edge of the bookend footprint and the statue against its left,
+    // both bottom-aligned on the row's ledge.
+    float BookendWallWidth,
+    float BookendWallHeightRatio, // of the row height
+    float BookendStatueWidth,
+    float BookendStatueHeightRatio, // of the row height
     IReadOnlyDictionary<SpineSizing.Size, float> SpineWidths,
     // Distinct from ItemGap: the tray's spine-out books are meant to abut (a hair of separation
     // reads as separate bindings, not a gap), but the six cover-out home books read as two flat
@@ -66,8 +71,10 @@ public readonly record struct ShelfMetrics(
         CoverPortraitRatio: 0.80f, // 4:5, matching the approved cover mockup
         SpineHeight: 168f,
         ClockSize: 176f,
-        BookendWidth: 56f,
-        BookendHeight: 46f,
+        BookendWallWidth: 10f,
+        BookendWallHeightRatio: 0.92f,
+        BookendStatueWidth: 40f,
+        BookendStatueHeightRatio: 0.55f,
         SpineWidths: new Dictionary<SpineSizing.Size, float>
         {
             [SpineSizing.Size.Slim] = 22f,
