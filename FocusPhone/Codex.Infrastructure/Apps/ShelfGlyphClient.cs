@@ -28,11 +28,14 @@ public sealed class ShelfGlyphClient : IShelfGlyphClient
     private const string AnthropicVersion = "2023-06-01";
 
     private const string Instruction =
-        "You design tiny monochrome line glyphs for a bookshelf's category labels, engraved on a brass " +
-        "bookend. Given a shelf name, respond with ONLY the SVG path data (the value of a single \"d\" " +
-        "attribute) for one simple, iconic, single-stroke-feel glyph representing that name, authored " +
-        "inside a 0 0 100 100 viewBox. No <svg> wrapper, no attributes, no code fence, no words — just " +
-        "the path data beginning with M. Keep it simple and legible at small size.";
+        "You design tiny solid bronze statues for a bookshelf's category labels — a small figure that " +
+        "stands on the shelf as the bookend itself. Given a shelf name, respond with ONLY the SVG path " +
+        "data (the value of a single \"d\" attribute) for one simple, iconic SILHOUETTE representing " +
+        "that name: a single CLOSED, FILLABLE shape (end with Z), not a line drawing or open strokes — " +
+        "it will be rendered solid-filled, so an outline that doesn't enclose a real area will render " +
+        "as a blob or nothing. Authored inside a 0 0 100 100 viewBox. No <svg> wrapper, no attributes, " +
+        "no code fence, no words — just the path data beginning with M. Keep the silhouette simple and " +
+        "legible at small size.";
 
     private readonly HttpClient httpClient;
     private readonly IOptions<VoiceOptions> optionsAccessor;

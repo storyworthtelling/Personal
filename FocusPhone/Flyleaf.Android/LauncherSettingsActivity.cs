@@ -567,14 +567,10 @@ public class LauncherSettingsActivity : Activity
     {
         var row = BeginRow(card);
 
-        // A small bronze chip with the shelf's pencil monogram — a settings-scale stand-in for the
-        // engraved bookend the shelf carries in the tray.
-        var glyph = PaperUi.Secondary(this, ShelfGlyphMaker.Monogram(category.Name));
-        glyph.Gravity = GravityFlags.Center;
-        glyph.SetTextColor(PaperTheme.Paper);
-        glyph.Typeface = PaperTheme.SerifSemibold(this);
-        glyph.Background = PaperUi.Fill(this, PaperTheme.Bronze, DesignTokens.Shape.HairlineDp * 3);
-        var glyphParams = new LinearLayout.LayoutParams(Dp(28), Dp(32)) { MarginEnd = Dp(DesignTokens.Space.X3) };
+        // The actual bookend the shelf carries in the tray, drawn at settings scale — the same
+        // upright wall + bronze glyph statue, not a stand-in monogram label.
+        var glyph = new BookendChipView(this, category.Glyph);
+        var glyphParams = new LinearLayout.LayoutParams(Dp(40), Dp(44)) { MarginEnd = Dp(DesignTokens.Space.X3) };
         row.AddView(glyph, glyphParams);
 
         var name = PaperUi.Body(this, category.Name);

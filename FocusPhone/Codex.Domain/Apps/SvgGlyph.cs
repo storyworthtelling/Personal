@@ -8,11 +8,11 @@ public readonly record struct GlyphPoint(float X, float Y);
 
 /// <summary>
 /// Parses an AI-generated bookend glyph path (the validated "d" from <see cref="GlyphPath"/>) into
-/// flattened polylines the head can stroke on the bronze bookend, without pulling an SVG engine into
-/// the launcher. Supports the move/line/horizontal/vertical/cubic/quadratic/close commands (absolute
-/// and relative); an arc or smooth-curve command it can't flatten makes it return null, and the head
-/// then falls back to the pencil monogram. Curves are flattened to short segments — rough is fine at
-/// bookend size. Pure, so the parsing is unit-tested without a device.
+/// flattened polylines the head fills solid as the bookend's bronze statue, without pulling an SVG
+/// engine into the launcher. Supports the move/line/horizontal/vertical/cubic/quadratic/close commands
+/// (absolute and relative); an arc or smooth-curve command it can't flatten makes it return null, and
+/// the head then falls back to the pencil monogram. Curves are flattened to short segments — rough is
+/// fine at bookend size. Pure, so the parsing is unit-tested without a device.
 /// </summary>
 public static partial class SvgGlyph
 {

@@ -516,114 +516,19 @@ public class BookshelfView : View
     private void DrawBookend(Canvas canvas, LayoutRect rect, string? glyph)
     {
         var r = ToRectF(rect);
-        // A cast-bronze bookend statue, not a thin book: an upright metal slab on a wider foot, with a
-        // vertical metal gradient, a bright top/left bevel and a dark bottom/right edge for relief, and
-        // a contact shadow so it sits ON the shelf. One per category shelf, carrying that shelf's glyph.
+        // A real bookend, not a book: a thin upright wall flush against the first book, nearly the
+        // books' own height because it actually has to hold them up, and — standing separately on
+        // the shelf beside it, nothing drawn behind it — the shelf's glyph as a solid bronze statue.
+        // A soft contact shadow under the whole footprint grounds both pieces on the shelf.
         DrawContactShadow(canvas, rect);
-        var footHeight = 6 * density;
-        var foot = new RectF(r.Left - 3 * density, r.Bottom - footHeight, r.Right + 3 * density, r.Bottom);
-        using (var metal = new Paint { AntiAlias = true })
-        {
-            metal.SetShader(Linear(0, r.Top, 0, r.Bottom, PaperTheme.Bronze, PaperTheme.BronzeDeep));
-            canvas.DrawRoundRect(r, 3 * density, 3 * density, metal);
-            canvas.DrawRoundRect(foot, 2 * density, 2 * density, metal);
-        }
-        using (var hi = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.PaperBright, 150), StrokeWidth = 1.4f * density })
-        {
-            hi.SetStyle(Paint.Style.Stroke);
-            canvas.DrawLine(r.Left + 1.2f * density, r.Top + 1.2f * density, r.Right - 1.2f * density, r.Top + 1.2f * density, hi);
-            canvas.DrawLine(r.Left + 1.2f * density, r.Top + 1.2f * density, r.Left + 1.2f * density, r.Bottom, hi);
-        }
-        using (var lo = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.WalnutDeep, 150), StrokeWidth = 1.2f * density })
-        {
-            lo.SetStyle(Paint.Style.Stroke);
-            canvas.DrawLine(r.Right - 1f * density, r.Top + 2 * density, r.Right - 1f * density, r.Bottom, lo);
-        }
-        if (string.IsNullOrEmpty(glyph))
-        {
-            return;
-        }
 
-        // The shelf's glyph engraved as a raised bronze medallion, centered on the slab; three kinds of
-        // glyph id: a built-in "folder_*" drawable, an owner shelf's AI vector ("path:<d>"), or the
-        // offline pencil monogram ("mono:<letters>").
-        var s = r.Width() * 0.78f;
-        var gx = r.CenterX() - s / 2;
-        var gy = r.CenterY() - s / 2;
-        var glyphRect = new RectF(gx, gy, gx + s, gy + s);
+        var wallHeight = r.Height() * metrics.BookendWallHeightRatio;
+        var wall = new RectF(r.Right - metrics.BookendWallWidth, r.Bottom - wallHeight, r.Right, r.Bottom);
+        BookendGlyphPainter.DrawWall(canvas, wall);
 
-        if (glyph.StartsWith("path:", StringComparison.Ordinal))
-        {
-            DrawGlyphPath(canvas, glyph[5..], glyphRect);
-        }
-        else if (glyph.StartsWith("mono:", StringComparison.Ordinal))
-        {
-            DrawGlyphMonogram(canvas, glyph[5..], glyphRect);
-        }
-        else
-        {
-            DrawGlyphDrawable(canvas, glyph, glyphRect);
-        }
-    }
-
-    private void DrawGlyphDrawable(Canvas canvas, string glyph, RectF area)
-    {
-        var id = Resources!.GetIdentifier(glyph, "drawable", Context!.PackageName);
-        var drawable = id == 0 ? null : Context.GetDrawable(id);
-        if (drawable is null)
-        {
-            return;
-        }
-        drawable.SetBounds((int)area.Left, (int)area.Top, (int)area.Right, (int)area.Bottom);
-        drawable.SetTint(PaperTheme.BronzeDeep.ToArgb());
-        drawable.Draw(canvas);
-    }
-
-    private void DrawGlyphPath(Canvas canvas, string pathData, RectF area)
-    {
-        var subpaths = SvgGlyph.Parse(pathData);
-        if (subpaths is null)
-        {
-            return; // unparseable — leave the bookend plain
-        }
-        using var stroke = new Paint(PaintFlags.AntiAlias)
-        {
-            Color = PaperTheme.BronzeDeep,
-            StrokeWidth = 2 * density,
-            StrokeCap = Paint.Cap.Round,
-            StrokeJoin = Paint.Join.Round,
-        };
-        stroke.SetStyle(Paint.Style.Stroke);
-        foreach (var polyline in subpaths)
-        {
-            using var path = new Android.Graphics.Path();
-            for (var i = 0; i < polyline.Count; i++)
-            {
-                var x = area.Left + polyline[i].X / SvgGlyph.ViewBox * area.Width();
-                var y = area.Top + polyline[i].Y / SvgGlyph.ViewBox * area.Height();
-                if (i == 0)
-                {
-                    path.MoveTo(x, y);
-                }
-                else
-                {
-                    path.LineTo(x, y);
-                }
-            }
-            canvas.DrawPath(path, stroke);
-        }
-    }
-
-    private void DrawGlyphMonogram(Canvas canvas, string letters, RectF area)
-    {
-        using var text = new Paint(PaintFlags.AntiAlias)
-        {
-            Color = PaperTheme.BronzeDeep,
-            TextAlign = Paint.Align.Center,
-            TextSize = area.Height() * 0.7f,
-        };
-        text.SetTypeface(PaperTheme.SerifSemibold(Context!));
-        canvas.DrawText(letters, area.CenterX(), area.CenterY() + text.TextSize / 3f, text);
+        var statueHeight = r.Height() * metrics.BookendStatueHeightRatio;
+        var statue = new RectF(r.Left, r.Bottom - statueHeight, wall.Left, r.Bottom);
+        BookendGlyphPainter.DrawStatue(canvas, Context!, statue, glyph);
     }
 
     // ---- Live layer (clock hands + bookmark tabs) ----
@@ -781,7 +686,8 @@ public class BookshelfView : View
             CoverWidth = m.CoverWidth * d,
             SpineHeight = m.SpineHeight * d,
             ClockSize = m.ClockSize * d,
-            BookendWidth = m.BookendWidth * d,
+            BookendWallWidth = m.BookendWallWidth * d,
+            BookendStatueWidth = m.BookendStatueWidth * d,
             SpineWidths = m.SpineWidths.ToDictionary(kv => kv.Key, kv => kv.Value * d),
         };
     }
