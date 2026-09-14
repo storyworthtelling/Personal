@@ -12,6 +12,11 @@ using Folio.Infrastructure.Persistence;
 [assembly: UsesPermission(global::Android.Manifest.Permission.WakeLock)]
 [assembly: UsesPermission("android.permission.POST_NOTIFICATIONS")]
 [assembly: UsesPermission("android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")]
+// Reading a novel takes about a quarter of an hour of model calls (F49, measured), and a background
+// worker is killed at ten minutes. These two let the pipeline promote itself to the foreground for
+// the duration — which is also the honest thing to show, since the phone really is busy.
+[assembly: UsesPermission("android.permission.FOREGROUND_SERVICE")]
+[assembly: UsesPermission("android.permission.FOREGROUND_SERVICE_DATA_SYNC")]
 
 namespace Folio.Android.Platforms.Android;
 

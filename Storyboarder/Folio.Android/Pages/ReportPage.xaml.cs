@@ -51,8 +51,10 @@ public partial class ReportPage : FolioBinderPage
         Section("Revision plan", report.RevisionPlan,
             r => $"[{r.Priority}] {Chapter(r.Chapter)}{r.Issue}", r => r.SuggestedFix);
 
-        Section("Reviews", report.Reviews,
-            r => r.Perspective, r => r.Assessment);
+        // A reader's line in the app carries who read it and their verdict; the page itself carries
+        // the long review. The persona is named rather than printed as its id.
+        Section("Readers", report.Reviews,
+            r => $"{PersonaName(r.PersonaId)} — {r.Verdict}", r => r.Assessment);
 
         // The additive engine: scenes to add + show-vs-tell (both ends). Pointers only, never drafted prose.
         Section("Scenes to add", report.Expansion.ScenesToAdd,
@@ -148,4 +150,11 @@ public partial class ReportPage : FolioBinderPage
 
     private static string Chapter(string chapter) =>
         string.IsNullOrWhiteSpace(chapter) ? string.Empty : $"[{chapter}] ";
+
+    // A read cites its persona by id; the screen prints the persona's name. An unknown id prints as
+    // itself, so a wrong citation is visible rather than tidied away.
+    private static string PersonaName(string personaId) =>
+        Folio.Domain.Reading.PersonaCatalogue.All
+            .FirstOrDefault(persona => persona.Id == personaId)?.Name
+        ?? (string.IsNullOrWhiteSpace(personaId) ? "Reader" : personaId);
 }
