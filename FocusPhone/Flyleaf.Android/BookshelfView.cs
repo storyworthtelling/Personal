@@ -516,42 +516,19 @@ public class BookshelfView : View
     private void DrawBookend(Canvas canvas, LayoutRect rect, string? glyph)
     {
         var r = ToRectF(rect);
-        // The bookend IS the glyph's medallion — a low, wide cast-bronze block (wider than a book's
-        // spine, well short of one's height, the way a real bookend props books up rather than
-        // standing among them) with a vertical metal gradient, a bright top/left bevel and a dark
-        // bottom/right edge for relief, and a contact shadow so it sits ON the shelf.
+        // A real bookend, not a book: a thin upright wall flush against the first book, nearly the
+        // books' own height because it actually has to hold them up, and — standing separately on
+        // the shelf beside it, nothing drawn behind it — the shelf's glyph as a solid bronze statue.
+        // A soft contact shadow under the whole footprint grounds both pieces on the shelf.
         DrawContactShadow(canvas, rect);
-        var footHeight = Math.Min(6 * density, r.Height() * 0.25f);
-        var foot = new RectF(r.Left - 3 * density, r.Bottom - footHeight, r.Right + 3 * density, r.Bottom);
-        using (var metal = new Paint { AntiAlias = true })
-        {
-            metal.SetShader(Linear(0, r.Top, 0, r.Bottom, PaperTheme.Bronze, PaperTheme.BronzeDeep));
-            canvas.DrawRoundRect(r, 3 * density, 3 * density, metal);
-            canvas.DrawRoundRect(foot, 2 * density, 2 * density, metal);
-        }
-        using (var hi = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.PaperBright, 150), StrokeWidth = 1.4f * density })
-        {
-            hi.SetStyle(Paint.Style.Stroke);
-            canvas.DrawLine(r.Left + 1.2f * density, r.Top + 1.2f * density, r.Right - 1.2f * density, r.Top + 1.2f * density, hi);
-            canvas.DrawLine(r.Left + 1.2f * density, r.Top + 1.2f * density, r.Left + 1.2f * density, r.Bottom, hi);
-        }
-        using (var lo = new Paint { AntiAlias = true, Color = WithAlpha(PaperTheme.WalnutDeep, 150), StrokeWidth = 1.2f * density })
-        {
-            lo.SetStyle(Paint.Style.Stroke);
-            canvas.DrawLine(r.Right - 1f * density, r.Top + 2 * density, r.Right - 1f * density, r.Bottom, lo);
-        }
-        if (string.IsNullOrEmpty(glyph))
-        {
-            return;
-        }
 
-        // The shelf's glyph engraved as a raised bronze medallion, centered on the block and sized off
-        // its shorter side so it clears both edges whatever the block's aspect ratio.
-        var s = Math.Min(r.Width(), r.Height()) * 0.72f;
-        var gx = r.CenterX() - s / 2;
-        var gy = r.CenterY() - s / 2;
-        var glyphRect = new RectF(gx, gy, gx + s, gy + s);
-        BookendGlyphPainter.Draw(canvas, Context!, density, glyphRect, glyph, PaperTheme.BronzeDeep);
+        var wallHeight = r.Height() * metrics.BookendWallHeightRatio;
+        var wall = new RectF(r.Right - metrics.BookendWallWidth, r.Bottom - wallHeight, r.Right, r.Bottom);
+        BookendGlyphPainter.DrawWall(canvas, wall);
+
+        var statueHeight = r.Height() * metrics.BookendStatueHeightRatio;
+        var statue = new RectF(r.Left, r.Bottom - statueHeight, wall.Left, r.Bottom);
+        BookendGlyphPainter.DrawStatue(canvas, Context!, statue, glyph);
     }
 
     // ---- Live layer (clock hands + bookmark tabs) ----
@@ -709,8 +686,8 @@ public class BookshelfView : View
             CoverWidth = m.CoverWidth * d,
             SpineHeight = m.SpineHeight * d,
             ClockSize = m.ClockSize * d,
-            BookendWidth = m.BookendWidth * d,
-            BookendHeight = m.BookendHeight * d,
+            BookendWallWidth = m.BookendWallWidth * d,
+            BookendStatueWidth = m.BookendStatueWidth * d,
             SpineWidths = m.SpineWidths.ToDictionary(kv => kv.Key, kv => kv.Value * d),
         };
     }
