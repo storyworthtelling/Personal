@@ -197,6 +197,35 @@ tokens of plausible-looking word salad — and the API refused it as gibberish t
 mistake was obvious, and a refusal still bills the cache write. Use real prose to measure a real
 model.
 
+### F50 — the cached prefix must not depend on the persona *(Release F)*
+
+Found by accident, in the harness that measured F49, which is the only reason it was found at all.
+
+Each of the four measured passes reported `cache_creation_input_tokens: 167187` and
+`cache_read_input_tokens: 0` — the manuscript written to the cache once **per pass** rather than once
+per read. The cause was the order of the system blocks: the harness named the persona first and put
+the manuscript after it. Prompt caching matches an exact **prefix**, so a persona ahead of the
+manuscript makes every one of the seventeen passes a different prefix and invalidates everything
+behind it. On the strong model that is roughly **$17 a draft against $2**.
+
+**Nothing about it is visible.** Every request succeeds, every reply is correct, every test passes.
+The bill is the only symptom, and the finding's own standing note says exactly this: a caching
+regression is silent. What it did not say — because it could not, until something reproduced it — is
+*how* it happens, and the answer is an ordering nobody would think to write down.
+
+So the ordering is a function with a guard over it rather than a comment beside a call site.
+`ReadingPrompt.System` puts the manuscript first, carrying the cache breakpoint, and everything
+persona-specific after it; `ReadingPromptTests` asserts the cached prefix is **byte-identical across
+all fifteen personas**, and fails with "15 different cached prefixes across 15 personas" when the
+ordering is put back the wrong way.
+
+**A second thing the same run settled: the phase's central bet holds.** Four voices over one
+90,000-word novel — structure, pacing, the developmental editor and the genre fan — produced pairwise
+5-gram overlaps of **0.000 to 0.003**. They share essentially no phrasing. Chapter overlap peaks at
+0.29, between the two whole-book readers, who agree on chapters 36 and 46 — which is the mockup's
+"where they agree the note is loud" rather than repetition. The finding listed reading-in-character
+as the phase's central bet with no evidence behind it; it has evidence now.
+
 ### F48 — the folio counts every sheet, and the front contents is an open question *(Release E)*
 
 Found by rendering the real page beside the drawing rather than by reading either. Two things the
