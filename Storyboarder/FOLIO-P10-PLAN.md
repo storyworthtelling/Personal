@@ -213,6 +213,17 @@ The bill is the only symptom, and the finding's own standing note says exactly t
 regression is silent. What it did not say — because it could not, until something reproduced it — is
 *how* it happens, and the answer is an ordering nobody would think to write down.
 
+**Confirmed by re-running with the manuscript first.** `structure` (Sonnet) wrote the cache and
+`pacing` read all 167,168 tokens back; `developmental-editor` (Opus) wrote it again and `genre-fan`
+read it back. **Two writes, not seventeen** — and the second write is not a fault: *each model keeps
+its own cache*, so the mix costs exactly one write per model. That is also why the plan runs all
+eight sections before all seven readers: it is one Sonnet window followed by one Opus window, rather
+than nine alternations paying nine writes.
+
+Measured cost per draft, at these figures: **$3.38 manuscript-first against $13.76 persona-first.**
+A cached pass is also *faster* — `pacing` 35.2s against 42.9s, `genre-fan` 58.0s against 70.5s —
+which pulls the read's estimate down from the F49 figure by roughly a sixth.
+
 So the ordering is a function with a guard over it rather than a comment beside a call site.
 `ReadingPrompt.System` puts the manuscript first, carrying the cache breakpoint, and everything
 persona-specific after it; `ReadingPromptTests` asserts the cached prefix is **byte-identical across
