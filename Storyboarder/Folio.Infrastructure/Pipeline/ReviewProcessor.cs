@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
+using Folio.Domain.Reading;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
@@ -994,6 +995,62 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2g) The seventeen reads. Eight whole-book sections on the standard model, then seven readers
+        // on the strong one, then the two synthesis passes that read the other fifteen.
+        //
+        // One pass per turn, each persisted the moment it succeeds, because each is a separate model
+        // call costing real money: a reader that comes back short must not re-bill the fourteen that
+        // were fine. The ORDER is not cosmetic — sections are grouped before readers so the manuscript
+        // is written to the cache once per model rather than once per alternation (F50), and the cheap
+        // model goes first so a failing key fails cheaply.
+        if (await NextUnreadPass(db, novel.Id, cancellationToken) is { } due)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var row = await db.PassReads
+                .FirstOrDefaultAsync(pass => pass.NovelId == novel.Id && pass.PassId == due.Id, cancellationToken);
+            if (row is null)
+            {
+                row = new PassRead { NovelId = novel.Id, PassId = due.Id };
+                db.PassReads.Add(row);
+            }
+
+            try
+            {
+                row.Json = due.IsSynthesis
+                    ? JsonSerializer.Serialize(
+                        await claude.Synthesise(
+                            due.Id,
+                            await ReadSections(db, novel.Id, cancellationToken),
+                            await ReadReaders(db, novel.Id, cancellationToken),
+                            cancellationToken),
+                        JsonResponse.CaseInsensitive)
+                    : due.Persona!.Kind == PersonaKind.Reader
+                        ? JsonSerializer.Serialize(
+                            await claude.ReadAsReader(due.Persona, await Manuscript(db, novel.Id, cancellationToken), cancellationToken),
+                            JsonResponse.CaseInsensitive)
+                        : JsonSerializer.Serialize(
+                            await claude.ReadSection(due.Persona, await Manuscript(db, novel.Id, cancellationToken), cancellationToken),
+                            JsonResponse.CaseInsensitive);
+
+                row.CompletedAtUtc = clock.UtcNow;
+                row.LastError = null;
+                novel.LastError = null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                row.Attempts++;
+                row.LastError = ex.Message;
+                await db.SaveChangesAsync(cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 3) Render: compose the report PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
@@ -1017,8 +1074,22 @@ public sealed class ReviewProcessor : IPipelineStep
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
+                // The seventeen reads, folded last so the readers replace the omnibus reduce's reviews
+                // rather than sitting beside them.
+                var sections = await ReadSections(db, novel.Id, cancellationToken);
+                var readers = await ReadReaders(db, novel.Id, cancellationToken);
+                var synthesis = await ReadSynthesis(db, novel.Id, cancellationToken);
+
                 var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount)
-                    .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity);
+                    .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity)
+                    .WithReads(
+                        readers,
+                        sections.Where(section => section.HasContent)
+                            .Select(section => section.Summary)
+                            .Where(summary => !string.IsNullOrWhiteSpace(summary))
+                            .ToList(),
+                        synthesis.RevisionPlan,
+                        synthesis.Verdict);
                 var pdf = analysisPdfComposer.Compose(folded, BuildCover(novel, wordCount), scenes, review);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
@@ -1647,6 +1718,89 @@ public sealed class ReviewProcessor : IPipelineStep
 
         return new ReportCover(
             novel.Title, novel.DraftNumber, wordCount, DateTimeOffset.Now, jacket, series);
+    }
+
+    /// <summary>
+    /// The next pass this draft has not read yet, in plan order, or null when the read is done.
+    ///
+    /// <para>Order is the whole point of reading them one at a time from a plan rather than picking
+    /// whichever row is unfinished: grouped by model, the manuscript is cached once per model; shuffled,
+    /// every change of model pays another cache write.</para>
+    /// </summary>
+    private async Task<ReadingPass?> NextUnreadPass(FolioDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var done = await db.PassReads
+            .Where(pass => pass.NovelId == novelId && pass.Json != null)
+            .Select(pass => pass.PassId)
+            .ToListAsync(cancellationToken);
+
+        return ReadingPlan.Passes.FirstOrDefault(pass => !done.Contains(pass.Id));
+    }
+
+    private async Task<string> Manuscript(FolioDbContext db, Guid novelId, CancellationToken cancellationToken) =>
+        await db.SourceTexts.Where(source => source.NovelId == novelId)
+            .Select(source => source.FullText).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+
+    private static async Task<IReadOnlyList<SectionRead>> ReadSections(
+        FolioDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var ids = PersonaCatalogue.Sections.Select(persona => persona.Id).ToList();
+        var rows = await db.PassReads
+            .Where(pass => pass.NovelId == novelId && pass.Json != null && ids.Contains(pass.PassId))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(row => JsonSerializer.Deserialize<SectionRead>(row.Json!, JsonResponse.CaseInsensitive))
+            .Where(read => read is not null)
+            .Select(read => read!)
+            .ToList();
+    }
+
+    private static async Task<IReadOnlyList<Review>> ReadReaders(
+        FolioDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var ids = PersonaCatalogue.Readers.Select(persona => persona.Id).ToList();
+        var rows = await db.PassReads
+            .Where(pass => pass.NovelId == novelId && pass.Json != null && ids.Contains(pass.PassId))
+            .ToListAsync(cancellationToken);
+
+        // Ordered by the catalogue, not by when they finished: the report prints the seven in a fixed
+        // order and a retry must not move a reader's page.
+        return rows
+            .Select(row => JsonSerializer.Deserialize<Review>(row.Json!, JsonResponse.CaseInsensitive))
+            .Where(review => review is not null)
+            .Select(review => review!)
+            .OrderBy(review => ids.IndexOf(review.PersonaId))
+            .ToList();
+    }
+
+    // The two synthesis passes, merged: one carries the revision plan and the other the verdict, and
+    // either may not have run yet.
+    private static async Task<SynthesisRead> ReadSynthesis(
+        FolioDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var ids = ReadingPlan.Synthesis.Select(pass => pass.Id).ToList();
+        var rows = await db.PassReads
+            .Where(pass => pass.NovelId == novelId && pass.Json != null && ids.Contains(pass.PassId))
+            .ToListAsync(cancellationToken);
+
+        var plan = new List<RevisionItem>();
+        var verdict = Verdict.Empty;
+        foreach (var row in rows)
+        {
+            var read = JsonSerializer.Deserialize<SynthesisRead>(row.Json!, JsonResponse.CaseInsensitive);
+            if (read is null)
+            {
+                continue;
+            }
+            plan.AddRange(read.RevisionPlan);
+            if (!string.IsNullOrWhiteSpace(read.Verdict.MostNeeds)
+                || read.Verdict.Strengths is { Count: > 0 } || read.Verdict.Problems is { Count: > 0 })
+            {
+                verdict = read.Verdict;
+            }
+        }
+        return new SynthesisRead(plan, verdict);
     }
 
 }
