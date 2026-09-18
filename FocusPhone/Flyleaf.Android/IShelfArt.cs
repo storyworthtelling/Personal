@@ -30,4 +30,12 @@ public interface IShelfArt
 
     /// <summary>True while the app has an active notification, so a bookmark tab is drawn.</summary>
     bool HasNotification(string packageKey);
+
+    /// <summary>
+    /// The bookmark ribbon's color (ARGB int) for a notifying book — a Paper &amp; Ink role hue
+    /// (DESIGN.md §9) chosen by that app's highest-priority active notification, not the book's
+    /// own cloth. A cloth-colored tab on a cloth-colored book nearly vanishes on some spines; a
+    /// priority-coded one reads at a glance regardless of which book it is on.
+    /// </summary>
+    int NotificationHue(string packageKey);
 }

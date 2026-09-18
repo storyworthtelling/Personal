@@ -613,9 +613,11 @@ public class BookshelfView : View
         // right/fore-edge, so the tab reads as a bookmark sticking out of the book's binding.
         var x = r.Left + 6 * density;
         var top = r.Top - 12 * density;
-        // Color-coded per app, using the same cloth tone as its cover/spine, so the tab reads as
-        // that book's own marker rather than one flat accent shared by every notifying app.
-        using var ribbon = new Paint { AntiAlias = true, Color = new Color(art.Cloth(key)) };
+        // Color-coded by notification priority/type (a Paper & Ink role hue, DESIGN.md §9) rather
+        // than the book's own cloth: a cloth-colored tab can nearly vanish against a same-toned
+        // spine, where a priority hue reads at a glance and says something about the notification
+        // itself, not just which app it came from.
+        using var ribbon = new Paint { AntiAlias = true, Color = new Color(art.NotificationHue(key)) };
         using var path = new Android.Graphics.Path();
         path.MoveTo(x, top);
         path.LineTo(x + w, top);
