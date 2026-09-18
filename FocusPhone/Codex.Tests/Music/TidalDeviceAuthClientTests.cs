@@ -158,6 +158,39 @@ public class TidalDeviceAuthClientTests
         Assert.Null(result.RefreshToken);
     }
 
+    // The five RFC 8628 codes above are the polling loop's own vocabulary. The browser/PKCE
+    // exchange endpoint can also answer with TIDAL's own REST error shape — a numeric subStatus
+    // and a userMessage, no "error" field at all — which used to fall through to a bare Error
+    // status with nothing kept. This is the exact shape behind the owner's unexplained "1002 Error".
+    [Fact]
+    public async Task ExchangeCodeAsync_OnTidalsOwnRestErrorShape_CarriesTheSubStatusAndUserMessage()
+    {
+        var (client, handler) = Build();
+        handler.Respond(
+            TokenUrl, """{"status":400,"subStatus":1002,"userMessage":"Invalid code_verifier"}""",
+            status: System.Net.HttpStatusCode.BadRequest);
+
+        var result = await client.ExchangeCodeAsync(
+            "cid", "sec", "c", "v", "app://back", CancellationToken.None);
+
+        Assert.Equal(TidalTokenPollStatus.Error, result.Status);
+        Assert.NotNull(result.Detail);
+        Assert.Contains("1002", result.Detail);
+        Assert.Contains("Invalid code_verifier", result.Detail);
+    }
+
+    [Fact]
+    public async Task ExchangeCodeAsync_OnASuccess_HasNoDetail()
+    {
+        var (client, handler) = Build();
+        handler.Respond(TokenUrl, """{"access_token":"a","refresh_token":"r","expires_in":1,"user":{"userId":1}}""");
+
+        var result = await client.ExchangeCodeAsync(
+            "cid", "sec", "c", "v", "app://back", CancellationToken.None);
+
+        Assert.Null(result.Detail);
+    }
+
     [Fact]
     public async Task PollAsync_OnSuccessReadsTheTokensAndTheAccountId()
     {

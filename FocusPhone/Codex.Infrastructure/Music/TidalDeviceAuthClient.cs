@@ -39,7 +39,8 @@ public sealed record TidalTokenPollResult(
     string? AccessToken = null,
     string? RefreshToken = null,
     int ExpiresIn = 0,
-    string? UserId = null);
+    string? UserId = null,
+    string? Detail = null);
 
 /// <summary>
 /// TIDAL's device-code sign-in, against <c>auth.tidal.com/v1/</c> directly rather than
@@ -230,14 +231,33 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
                 reply.User?.UserId.ToString());
         }
 
-        return new TidalTokenPollResult(TidalPairing.Interpret(reply?.Error) switch
+        var status = TidalPairing.Interpret(reply?.Error) switch
         {
             TidalPairingSignal.Pending => TidalTokenPollStatus.Pending,
             TidalPairingSignal.SlowDown => TidalTokenPollStatus.SlowDown,
             TidalPairingSignal.Denied => TidalTokenPollStatus.Denied,
             TidalPairingSignal.Expired => TidalTokenPollStatus.Expired,
             _ => TidalTokenPollStatus.Error,
-        });
+        };
+
+        // The five RFC 8628 device-flow codes above cover the polling loop's own retry decisions,
+        // but this never checked whether the call actually succeeded, and discarded the body on
+        // anything it didn't recognize — so the browser/PKCE exchange endpoint's OWN error shape
+        // (a numeric subStatus + userMessage, no "error" field at all, e.g. TIDAL's "1002") fell
+        // through to a bare Error status with nothing TIDAL actually said kept anywhere. That is
+        // why "1002 Error" reached the owner with nothing in Settings or Diagnostics to show for
+        // it. Populated whenever the call didn't succeed, regardless of which shape TIDAL used.
+        var detail = response.IsSuccessStatusCode
+            ? null
+            : reply switch
+            {
+                { SubStatus: { } subStatus } => string.IsNullOrWhiteSpace(reply.UserMessage)
+                    ? $"TIDAL error {subStatus}"
+                    : $"TIDAL error {subStatus}: {reply.UserMessage}",
+                _ => Describe(json),
+            };
+
+        return new TidalTokenPollResult(status, Detail: detail);
     }
 
     private sealed record DeviceAuthReply(
@@ -249,6 +269,10 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
         [property: JsonPropertyName("refresh_token")] string? RefreshToken,
         [property: JsonPropertyName("expires_in")] int ExpiresIn,
         string? Error,
+        // TIDAL's own REST error shape on this endpoint — distinct from the RFC 8628 "error"
+        // field above, and case-insensitively matched against the reply's camelCase keys.
+        int? SubStatus,
+        string? UserMessage,
         TokenUser? User);
 
     private sealed record TokenUser(long UserId);

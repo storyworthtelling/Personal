@@ -122,10 +122,10 @@ public class EditorActivity : AppCompatActivity
             page.AddView(PaperUi.Voice(this, caption));
         }
 
-        // The frame a dog-ear folds into, over the page rather than beside it.
-        overlay = new FrameLayout(this);
-        overlay.AddView(page, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        // The frame a dog-ear folds into, over the page rather than beside it. Pads itself
+        // down by the status-bar/display-cutout inset under enforced edge-to-edge (API 35+),
+        // so a fold here isn't drawn partly behind the battery/clock icons.
+        overlay = PaperUi.WrapForTopInset(this, page);
         root.AddView(overlay, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         root.AddView(PaperUi.BottomBar(this,
