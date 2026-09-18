@@ -31,8 +31,8 @@ public class SmsSendToActivity : Activity
         var number = Intent?.Data?.SchemeSpecificPart;
         if (!string.IsNullOrWhiteSpace(number))
         {
-            var thread = new Intent(this, typeof(ThreadActivity));
-            thread.PutExtra(ThreadActivity.ExtraContactKey, Android.Net.Uri.Decode(number));
+            var thread = new Intent(this, typeof(PostActivity));
+            thread.PutExtra(PostActivity.ExtraOpenContactKey, Android.Net.Uri.Decode(number));
             StartActivity(thread);
         }
         else
