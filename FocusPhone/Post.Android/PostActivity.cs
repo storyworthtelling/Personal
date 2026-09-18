@@ -30,10 +30,17 @@ namespace Post;
     Label = "Post",
     MainLauncher = true,
     Exported = true,
+    LaunchMode = Android.Content.PM.LaunchMode.SingleTask,
     Theme = "@style/Theme.FocusPhone.Paper")]
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class PostActivity : Activity
 {
+    // The one extra every external caller — a notification tap, the SMS role's SENDTO
+    // handler — uses to open a correspondence without knowing MailboxArea has an
+    // open/closed state of its own. SingleTask is what lets that land on the running
+    // instance (OnNewIntent) rather than stacking a second copy of the whole shell.
+    public const string ExtraOpenContactKey = "openContactKey";
+
     // One Google sign-in for the whole head, scoped for BOTH jobs it has to do: Drive, for
     // the encrypted secrets vault, and the two Gmail scopes the API path needs. Asking
     // twice would mean two consent screens and two tokens for one account.
@@ -85,6 +92,55 @@ public class PostActivity : Activity
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
         CheckSmsRole();
+        OpenFromIntent(Intent);
+    }
+
+    // Brings an already-running instance's correspondence in line with a new launch
+    // (SingleTask routes a second tap here instead of a second Activity).
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        Intent = intent;
+        OpenFromIntent(intent);
+    }
+
+    // The landing spot for a notification tap or the SMS role's SENDTO handler — anything
+    // outside the app that wants a specific correspondence open rather than just the shell.
+    private void OpenFromIntent(Intent? intent)
+    {
+        var contactKey = intent?.GetStringExtra(ExtraOpenContactKey);
+        if (!string.IsNullOrEmpty(contactKey))
+        {
+            OpenCorrespondence(contactKey);
+        }
+    }
+
+    /// <summary>
+    /// Opens one correspondence inside the Mailbox, switching to that tab first. The single
+    /// entry point every external caller uses, so none of them need to know
+    /// <see cref="MailboxArea"/> has an open/closed state of its own.
+    /// </summary>
+    public void OpenCorrespondence(string contactKey)
+    {
+        TurnTo(typeof(MailboxArea));
+        if (Active is MailboxArea mailbox)
+        {
+            mailbox.OpenThread(contactKey);
+        }
+    }
+
+    /// <summary>Turns the binder to an area by type, as Score's now-playing bar does.</summary>
+    private void TurnTo(Type areaType)
+    {
+        var index = Array.FindIndex(areas, area => area.GetType() == areaType);
+        if (index < 0 || index == activeIndex)
+        {
+            return;
+        }
+
+        activeIndex = index;
+        binder.SetActive(index);
+        RenderContent();
     }
 
     // Post cannot send a text or delete one for real without the SMS role, and the role
@@ -231,8 +287,7 @@ public class PostActivity : Activity
 
     private void RenderContent()
     {
-        headerSlot.RemoveAllViews();
-        headerSlot.AddView(PaperUi.ScreenHeader(this, Active.Title, Active.Tab.Hue));
+        RefreshHeader();
 
         content.RemoveAllViews();
         content.AddView(Active.BuildView(), new FrameLayout.LayoutParams(
@@ -243,6 +298,19 @@ public class PostActivity : Activity
         {
             bottomBarSlot.AddView(bar);
         }
+    }
+
+    /// <summary>
+    /// Repaints just the in-page header from whatever the active area's Title/Tab say now.
+    /// Areas call this when something resolves their title asynchronously after they were
+    /// already showing (MailboxArea's open correspondence, once the contact/group name is
+    /// known) — cheaper than a full <see cref="RenderContent"/> and harmless to call when a
+    /// different area is active, since it only ever reads that area's own current Title.
+    /// </summary>
+    public void RefreshHeader()
+    {
+        headerSlot.RemoveAllViews();
+        headerSlot.AddView(PaperUi.ScreenHeader(this, Active.Title, Active.Tab.Hue));
     }
 
     protected override void OnResume()
