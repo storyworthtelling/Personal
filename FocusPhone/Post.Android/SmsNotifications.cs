@@ -34,8 +34,8 @@ internal static class SmsNotifications
             : ContactNameResolver.DisplayName(context, contactKey);
 
         var key = contactKey ?? address ?? "sms";
-        var thread = new Intent(context, typeof(ThreadActivity));
-        thread.PutExtra(ThreadActivity.ExtraContactKey, key);
+        var thread = new Intent(context, typeof(PostActivity));
+        thread.PutExtra(PostActivity.ExtraOpenContactKey, key);
         var pending = PendingIntent.GetActivity(context, key.GetHashCode(), thread,
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
 
