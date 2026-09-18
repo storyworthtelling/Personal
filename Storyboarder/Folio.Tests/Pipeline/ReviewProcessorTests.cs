@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using PdfSharp.Pdf.IO;
 using Folio.Domain.Analysis;
+using Folio.Domain.Reading;
 using Folio.Domain.External;
 using Folio.Domain.Model;
 using Folio.Domain.Pipeline;
@@ -32,6 +33,11 @@ public class ReviewProcessorTests : IDisposable
     private readonly Mock<IClaudeAnalysisClient> claude = new();
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int chapterAnalysisCalls;
+    private readonly List<string> sectionReads = [];
+    private readonly List<string> readerReads = [];
+    private readonly List<string> synthesisReads = [];
+    private int sectionsSeenBySynthesis;
+    private int readersSeenBySynthesis;
 
     public ReviewProcessorTests()
     {
@@ -42,6 +48,40 @@ public class ReviewProcessorTests : IDisposable
 
         claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("ink-wash watercolor, muted palette");
+
+        // The seventeen reads. Stubbed for real rather than left to Moq's defaults: a default-valued
+        // Task<T> completes with null, which the pipeline records as a finished pass — so the step
+        // would appear to work while reading nothing, which is the failure PassPipelineTests names.
+        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, CancellationToken _) =>
+            {
+                sectionReads.Add(persona.Id);
+                return Task.FromResult(new SectionRead(
+                    persona.Id, $"{persona.Name}: one thing to report.",
+                    [new ReportFinding("Chapter 1", $"{persona.Name} found something.")]));
+            });
+
+        claude.Setup(c => c.ReadAsReader(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, CancellationToken _) =>
+            {
+                readerReads.Add(persona.Id);
+                return Task.FromResult(new Review(
+                    persona.Id, "A verdict in one clause.", "A sustained read in character.",
+                    ["what works"], ["what does not"], "what it would need"));
+            });
+
+        claude.Setup(c => c.Synthesise(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<SectionRead>>(), It.IsAny<IReadOnlyList<Review>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((string passId, IReadOnlyList<SectionRead> sections, IReadOnlyList<Review> readers, CancellationToken _) =>
+            {
+                synthesisReads.Add(passId);
+                sectionsSeenBySynthesis = sections.Count;
+                readersSeenBySynthesis = readers.Count;
+                return Task.FromResult(passId == "verdict"
+                    ? new SynthesisRead([], new Verdict(["a strength"], ["a problem"], "the middle compressed"))
+                    : new SynthesisRead([new RevisionItem("Must", "Ch. 12", "The middle", "Compress it.")], Verdict.Empty));
+            });
 
         // The first chapter-analysis call is rate-limited; the worker must reschedule and succeed on retry.
         claude.Setup(c => c.AnalyzeChapter(
@@ -71,7 +111,8 @@ public class ReviewProcessorTests : IDisposable
                 [new ReportFinding("Chapter 1", "Eye colour shifts")],
                 [new ReportFinding("Chapter 1", "Castle geography")],
                 [new ReportFinding("Chapter 1", "Slow open")],
-                [new Review("developmental editor", "Promising but uneven.", ["Voice"], ["Pacing"], "Tighten the opening.")],
+                [new Review("developmental-editor", "Promising but uneven.", "A sustained read of the structure.",
+                    ["Voice"], ["Pacing"], "The opening tightened.")],
                 [new RevisionItem("High", "Chapter 1", "Sagging middle", "Cut a subplot.")],
                 ["Comparable Title"], "Upmarket fantasy for adult readers.",
                 // The craft sections arrive from ConsolidateCraft and are folded in by the processor.
@@ -176,6 +217,33 @@ public class ReviewProcessorTests : IDisposable
 
     // Drains the pipeline the way the worker does, advancing the clock past any backoff wait so a
     // rescheduled unit becomes due. Bails out after a generous cycle cap so a stuck test fails fast.
+    /// <summary>
+    /// End to end: all seventeen reads run, each once, in plan order — and the synthesis passes see
+    /// the other fifteen, which is the only thing that makes them synthesis rather than a sixteenth
+    /// opinion.
+    /// </summary>
+    [Fact]
+    public async Task EverySeventeenReadsRunOnceAndTheSynthesisSeesThemAll()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(
+            PersonaCatalogue.Sections.Select(persona => persona.Id).ToList(), sectionReads);
+        Assert.Equal(
+            PersonaCatalogue.Readers.Select(persona => persona.Id).ToList(), readerReads);
+        Assert.Equal(["todo", "verdict"], synthesisReads);
+
+        Assert.Equal(8, sectionsSeenBySynthesis);
+        Assert.Equal(7, readersSeenBySynthesis);
+
+        // One row per pass, all settled, so a re-run bills nothing again.
+        using var context = database.NewContext();
+        var rows = context.PassReads.Where(pass => pass.NovelId == id).ToList();
+        Assert.Equal(17, rows.Count);
+        Assert.All(rows, row => Assert.NotNull(row.Json));
+    }
+
     private async Task DriveToCompletion(ReviewProcessor processor)
     {
         for (var cycle = 0; cycle < 200; cycle++)
