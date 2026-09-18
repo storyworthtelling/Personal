@@ -93,7 +93,9 @@ public class LauncherSettingsActivity : Activity
         root.AddView(actionBarHost, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
-        SetContentView(root);
+        // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
+        // (API 35+), so the page isn't drawn partly behind the battery/clock icons.
+        SetContentView(PaperUi.WrapForTopInset(this, root));
     }
 
     protected override void OnResume()
@@ -227,6 +229,7 @@ public class LauncherSettingsActivity : Activity
         var carrier = telephony?.NetworkOperatorName;
         AddToggleRow(card, "Mobile data", string.IsNullOrEmpty(carrier) ? null : carrier, dataOn, on =>
         {
+            bool ok;
             try
             {
                 if (Build.VERSION.SdkInt < BuildVersionCodes.O || telephony is null)
@@ -235,9 +238,19 @@ public class LauncherSettingsActivity : Activity
                 }
 #pragma warning disable CA1422, CS0618
                 telephony.DataEnabled = on;
+                // Unlike Wi-Fi's SetWifiEnabled/Bluetooth's Enable/Disable, DataEnabled's setter is
+                // void — a platform that declines (no MODIFY_PHONE_STATE / carrier privilege) neither
+                // throws nor changes anything, so a caught exception alone missed the silent-no-op
+                // case: mobile data stayed on with nothing telling the owner why. Reading the state
+                // back tells "changed" from "silently ignored" the same way the other two toggles do.
+                ok = telephony.DataEnabled == on;
 #pragma warning restore CA1422, CS0618
             }
             catch (Exception)
+            {
+                ok = false;
+            }
+            if (!ok)
             {
                 inlineStatus = "Couldn't change mobile data on this device. Try Choose a network for the mobile-data panel.";
                 Render();

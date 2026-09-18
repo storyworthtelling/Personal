@@ -31,6 +31,18 @@ internal static class Filing
         database.Filing.SaveTombstones(tombstones);
 
         database.Cache.Delete(item.Kind, item.SourceId);
+
+        // Calls and texts are read LIVE from their provider on every Mailbox reload rather than
+        // mirrored into the SQL cache the way mail is, so deleting from Cache alone did nothing
+        // for them — the very next reload read the row straight back out of the provider and the
+        // correspondence never actually left the Mailbox. Hidden is the same suppression
+        // MailboxArea/ThreadActivity already apply for a permanent per-message delete; applying it
+        // here too is what makes a filed call/text actually disappear until PostSync's retry loop
+        // (see PostSync.DeleteAtSourceAsync) deletes it at the source for real.
+        if (item.Kind != TimelineItemKind.Email)
+        {
+            database.Hidden.Hide(item.Kind, item.SourceId);
+        }
     }
 
     /// <summary>
@@ -56,6 +68,7 @@ internal static class Filing
         database.Filing.SaveTombstones(tombstones);
 
         database.Cache.Upsert([item]);
+        database.Hidden.Unhide(item.Kind, sourceId);
         return item;
     }
 }

@@ -170,11 +170,20 @@ public static class PostSync
     private static async Task<bool> DeleteAtSourceAsync(
         Context context, AccountStore account, MailTransport route, TimelineItem item)
     {
-        if (item.Kind != TimelineItemKind.Email)
+        // Texts, calls and voicemail are local — the provider and the call log do not need a
+        // round trip — but they were never actually deleted here despite the comment above once
+        // claiming they were: Filing.File only ever suppressed them locally (Hidden.Hide), so the
+        // row sat untouched in the provider/call log and a re-sync or an un-file could bring it
+        // straight back. This is that missing delete, run from the retry loop rather than
+        // synchronously at file-time so a missing permission or a disconnected bridge is retried
+        // instead of silently dropped.
+        if (item.Kind == TimelineItemKind.Call)
         {
-            // Texts and calls are deleted where they live, at the moment they are filed —
-            // the provider and the call log are local and do not need a round trip.
-            return true;
+            return DeleteCallAtSource(context, item);
+        }
+        if (item.Kind is TimelineItemKind.Message or TimelineItemKind.Voicemail)
+        {
+            return DeleteMessageAtSource(context, item);
         }
         if (item.MessageId is null)
         {
@@ -187,6 +196,65 @@ public static class PostSync
             MailTransport.AppPassword => await DeleteWithAppPasswordAsync(account, item.MessageId),
             _ => false,
         };
+    }
+
+    private static bool DeleteCallAtSource(Context context, TimelineItem item)
+    {
+        if (!item.SourceId.All(char.IsAsciiDigit))
+        {
+            return true; // not a live call-log row; nothing to delete
+        }
+        try
+        {
+            var deleted = context.ContentResolver!.Delete(
+                Android.Provider.CallLog.Calls.ContentUri!, "_id = ?", [item.SourceId]);
+            return deleted > 0;
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            return false; // WRITE_CALL_LOG not granted yet; retried on the next sync
+        }
+    }
+
+    // The same routing ThreadActivity's per-message delete uses, so filing and an outright
+    // delete agree on where a text actually lives.
+    private static bool DeleteMessageAtSource(Context context, TimelineItem item)
+    {
+        var holdsSmsRole = HoldsSmsRole(context);
+        switch (TextDelete.Choose(item.SourceId, holdsSmsRole, GmBridgeClient.Shared(context).IsConnected))
+        {
+            case TextDeletePath.SmsProvider:
+                return DeleteProviderRow(context, Android.Provider.Telephony.Sms.ContentUri!, item, "sms:");
+            case TextDeletePath.MmsProvider:
+                return DeleteProviderRow(context, Android.Provider.Telephony.Mms.ContentUri!, item, "mms:");
+            case TextDeletePath.Bridge:
+                var messageId = item.SourceId["gm:".Length..];
+                return !messageId.Contains(':') && GmBridgeClient.Shared(context).TryDelete(messageId);
+            default:
+                // Already suppressed locally by Filing.File's Hidden.Hide; nothing more owed.
+                return true;
+        }
+    }
+
+    private static bool DeleteProviderRow(Context context, Android.Net.Uri contentUri, TimelineItem item, string prefix)
+    {
+        try
+        {
+            var rowId = item.SourceId[prefix.Length..];
+            var deleted = context.ContentResolver!.Delete(contentUri, "_id = ?", [rowId]);
+            return deleted > 0;
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HoldsSmsRole(Context context)
+    {
+        var roles = (Android.App.Roles.RoleManager?)context.GetSystemService(Context.RoleService);
+        return roles is not null && roles.IsRoleAvailable(Android.App.Roles.RoleManager.RoleSms!)
+            && roles.IsRoleHeld(Android.App.Roles.RoleManager.RoleSms!);
     }
 
     private static async Task<bool> DeleteWithAppPasswordAsync(AccountStore account, string messageId)
