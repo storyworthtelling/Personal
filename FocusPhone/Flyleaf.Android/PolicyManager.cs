@@ -2,6 +2,7 @@ using Android;
 using Android.App.Admin;
 using Android.Content;
 using Android.Content.PM;
+using Android.Net;
 using Android.OS;
 using Android.Util;
 using Codex.Domain.Policy;
@@ -82,33 +83,46 @@ public static class PolicyManager
             events.Add(Event(PolicyEventKind.ConfigFailed, "Could not disable the status bar (not permitted in the current state)."));
         }
 
-        try
+        // Skipped, not attempted, while there is no active network: the platform throws a bare,
+        // uninformative RuntimeException for this call before the DNS-resolver stack is up (early
+        // after boot/provisioning, or mid Wi-Fi transition), and ApplyCurrentPolicy is invoked from
+        // several places (HomeActivity, UnlockActivity, PackageWatcher) that never wait for
+        // connectivity — so this was firing, and failing, on every single pass while offline. It is
+        // retried on the very next pass once a network is up, same as the exception-driven retry below.
+        if (!HasActiveNetwork(context))
         {
-            // Returns a PrivateDnsSet result (it does not throw for a non-serving host): NoError,
-            // ErrorFailureSetting, or ErrorHostNotServing. The old code ignored it, so a silent
-            // HostNotServing looked like success while the family DNS never applied (adult/SafeSearch
-            // went unenforced). Record the specific outcome so a real on-device failure is diagnosable.
-            var result = dpm.SetGlobalPrivateDnsModeSpecifiedHost(admin, plan.PrivateDnsHost);
-            if (result != PrivateDnsSet.NoError)
-            {
-                var reason = result == PrivateDnsSet.ErrorHostNotServing
-                    ? "host is not serving DNS-over-TLS (unreachable now)"
-                    : "the platform rejected the setting";
-                Log.Warn(Tag, $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result}).");
-                events.Add(Event(PolicyEventKind.ConfigFailed,
-                    $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result})."));
-            }
+            Log.Info(Tag, $"Skipping private DNS this pass: no active network yet.");
         }
-        catch (Java.Lang.Exception e)
+        else
         {
-            // A thrown exception (vs the result code above) is usually an invalid host or a transient
-            // state; retried on the next pass. The device logged a bare "RuntimeException" with no
-            // message, so surface the full chain — a RuntimeException from DevicePolicyManager typically
-            // WRAPS a more specific cause (ServiceSpecificException / SecurityException) whose message
-            // names the real reason. Include the cause's type and message so the next log is diagnosable.
-            var detail = DescribeThrowable(e);
-            Log.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}");
-            events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}"));
+            try
+            {
+                // Returns a PrivateDnsSet result (it does not throw for a non-serving host): NoError,
+                // ErrorFailureSetting, or ErrorHostNotServing. The old code ignored it, so a silent
+                // HostNotServing looked like success while the family DNS never applied (adult/SafeSearch
+                // went unenforced). Record the specific outcome so a real on-device failure is diagnosable.
+                var result = dpm.SetGlobalPrivateDnsModeSpecifiedHost(admin, plan.PrivateDnsHost);
+                if (result != PrivateDnsSet.NoError)
+                {
+                    var reason = result == PrivateDnsSet.ErrorHostNotServing
+                        ? "host is not serving DNS-over-TLS (unreachable now)"
+                        : "the platform rejected the setting";
+                    Log.Warn(Tag, $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result}).");
+                    events.Add(Event(PolicyEventKind.ConfigFailed,
+                        $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result})."));
+                }
+            }
+            catch (Java.Lang.Exception e)
+            {
+                // A thrown exception (vs the result code above) is usually an invalid host or a transient
+                // state; retried on the next pass. The device logged a bare "RuntimeException" with no
+                // message, so surface the full chain — a RuntimeException from DevicePolicyManager typically
+                // WRAPS a more specific cause (ServiceSpecificException / SecurityException) whose message
+                // names the real reason. Include the cause's type and message so the next log is diagnosable.
+                var detail = DescribeThrowable(e);
+                Log.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}");
+                events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}"));
+            }
         }
 
         var installed = plan.SuspendedPackages
@@ -414,5 +428,18 @@ public static class PolicyManager
         {
             return false;
         }
+    }
+
+    private static bool HasActiveNetwork(Context context)
+    {
+        var connectivity = (ConnectivityManager?)context.GetSystemService(Context.ConnectivityService);
+        var network = connectivity?.ActiveNetwork;
+        if (network is null)
+        {
+            return false;
+        }
+
+        var capabilities = connectivity!.GetNetworkCapabilities(network);
+        return capabilities is not null && capabilities.HasCapability(NetCapability.Internet);
     }
 }

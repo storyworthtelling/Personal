@@ -12,6 +12,7 @@ public enum PolicyEventKind
     AppUnblocked,      // the owner unblocked an app
     CutoverFinalized,  // debugging locked down irreversibly
     NotDeviceOwner,    // policy skipped because the app isn't device owner
+    UninstallFailed,   // the silent device-owner uninstall call threw, falling back to the visible uninstaller
 }
 
 /// <summary>One recorded policy action, with when and a human summary.</summary>
