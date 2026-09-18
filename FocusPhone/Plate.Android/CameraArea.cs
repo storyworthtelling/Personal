@@ -68,25 +68,41 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
 
     // §7 keeps one primary action per screen, so the settings that change what the shutter
     // does are a quiet row under the window rather than four more buttons in the bar.
+    //
+    // Ratio and flash are §8 <see cref="PaperUi.Segmented"/> switches rather than the old
+    // tap-to-cycle button: a single label showing only the current state ("Flash off") gave
+    // no hint that a tap would move to "on" and not "auto", and cycling meant overshooting
+    // back around. A segmented control shows every state and the current one at once, and
+    // tapping a state jumps straight to it.
     private View QuietControls()
     {
         var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
         var camera = shell.Camera;
+        var gap = PaperTheme.Dp(Host, DesignTokens.Space.X2);
 
-        row.AddView(PaperUi.QuietButton(Host,
-            camera.Ratio == CaptureRatio.ThreeFour ? "3:4" : "9:16",
-            () => { camera.Rebind(ratio: CaptureFormat.NextRatio(camera.Ratio)); Invalidate(); }));
+        var ratio = PaperUi.Segmented(Host, ["9:16", "3:4"],
+            index => { camera.Rebind(ratio: index == 0 ? CaptureRatio.NineSixteen : CaptureRatio.ThreeFour); Invalidate(); },
+            camera.Ratio == CaptureRatio.ThreeFour ? 1 : 0);
+        row.AddView(ratio, new LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
         row.AddView(PaperUi.QuietButton(Host,
             camera.Lens == Lens.Front ? "Front" : "Back",
-            () => { camera.Rebind(lens: CaptureFormat.NextLens(camera.Lens)); Invalidate(); }));
+            () => { camera.Rebind(lens: CaptureFormat.NextLens(camera.Lens)); Invalidate(); }),
+            new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
+            { MarginStart = gap, MarginEnd = gap });
 
         // Absent rather than disabled on the front lens: this phone has no front-facing
-        // flash, and a button that does nothing is worse than one that is not there.
+        // flash, and a control offering states that do nothing is worse than one that is
+        // not there.
         if (CaptureFormat.HasFlash(camera.Lens))
         {
-            row.AddView(PaperUi.QuietButton(Host, $"Flash {camera.Flash}".ToLowerInvariant(),
-                () => { camera.Rebind(flash: CaptureFormat.NextFlash(camera.Flash)); Invalidate(); }));
+            var flash = PaperUi.Segmented(Host, ["Off", "On", "Auto"],
+                index => { camera.Rebind(flash: (Flash)index); Invalidate(); },
+                (int)camera.Flash);
+            row.AddView(flash, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         }
 
         return row;
