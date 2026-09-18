@@ -38,6 +38,18 @@ public class HiddenItemStore
         insert.ExecuteNonQuery();
     }
 
+    /// <summary>Withdraws a hide — the un-file counterpart to <see cref="Hide"/>, so a
+    /// restored item is not filtered right back out of the merge on the next reload.</summary>
+    public void Unhide(TimelineItemKind kind, string sourceId)
+    {
+        using var delete = connection.CreateCommand();
+        delete.CommandText =
+            "DELETE FROM hiddenItems WHERE kind = $kind AND sourceId = $sourceId";
+        delete.Parameters.AddWithValue("$kind", (int)kind);
+        delete.Parameters.AddWithValue("$sourceId", sourceId);
+        delete.ExecuteNonQuery();
+    }
+
     public IReadOnlySet<(TimelineItemKind Kind, string SourceId)> LoadHidden()
     {
         using var select = connection.CreateCommand();

@@ -84,8 +84,6 @@ public class ThreadActivity : Activity
 
     private View BuildLayout()
     {
-        undoHost = new FrameLayout(this);
-
         var column = new LinearLayout(this) { Orientation = Orientation.Vertical };
         var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
         column.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
@@ -104,8 +102,9 @@ public class ThreadActivity : Activity
         column.AddView(actionRow, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
-        undoHost.AddView(column, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
+        // (API 35+), so a dog-ear folded here isn't drawn partly behind the battery/clock icons.
+        undoHost = PaperUi.WrapForTopInset(this, column);
         return undoHost;
     }
 

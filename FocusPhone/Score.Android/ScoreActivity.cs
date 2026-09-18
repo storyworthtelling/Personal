@@ -173,14 +173,11 @@ public class ScoreActivity : Activity
         // A dog-ear posted against `content` alone sat below the header/greeting, which read as
         // "inside the binder tabs" rather than at the top of the page the way a folded corner
         // should. Wrapping the header in it too is what makes the fold read as sitting at the
-        // very top of the page. Under enforced edge-to-edge (API 35+, same reasoning as
-        // PaperUi.BottomBar's navigation-bar inset padding below), the status bar can draw over
-        // this top edge, so the host pads itself down by the status-bar inset — the fold stays
-        // large enough to tap under the battery/clock icons instead of sitting half behind them.
-        var pageOverlayHost = new FrameLayout(this);
-        pageOverlayHost.AddView(page, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
-        pageOverlayHost.SetOnApplyWindowInsetsListener(new StatusBarInsetListener());
+        // very top of the page. PaperUi.WrapForTopInset pads the host down by the status-bar/
+        // display-cutout inset under enforced edge-to-edge (API 35+, same reasoning as
+        // PaperUi.BottomBar's navigation-bar inset padding) — the shared version of the fix this
+        // Activity originated; Post and Plate now use it too instead of their own fixed padding.
+        var pageOverlayHost = PaperUi.WrapForTopInset(this, page);
         foreach (var area in areas)
         {
             area.Overlay = pageOverlayHost; // undo bars, notices, and action cards overlay the whole page
@@ -280,20 +277,6 @@ public class ScoreActivity : Activity
             {
                 activity.Finish();
             }
-        }
-    }
-
-    // Pads the page overlay host down by the status-bar inset, matching PaperUi.BottomBar's own
-    // navigation-bar inset handling for the same reason: under enforced edge-to-edge the window
-    // draws behind the system status bar, so a fold posted flush against this host's top-right
-    // corner would sit partly behind the battery/clock icons rather than being reliably tappable.
-    private sealed class StatusBarInsetListener : Java.Lang.Object, View.IOnApplyWindowInsetsListener
-    {
-        public WindowInsets OnApplyWindowInsets(View view, WindowInsets insets)
-        {
-            var top = insets.GetInsets(WindowInsets.Type.StatusBars()).Top;
-            view.SetPadding(view.PaddingLeft, top, view.PaddingRight, view.PaddingBottom);
-            return insets;
         }
     }
 
