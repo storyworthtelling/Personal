@@ -203,8 +203,34 @@ public class VersionCodeTests
 
         Assert.Equal(["band 1: com.storyworthtelling.focusphone.launcher, "
             + "com.storyworthtelling.focusphone.audio, com.storyworthtelling.focusphone.communication, "
-            + "com.storyworthtelling.focusphone.camera, com.storyworthtelling.ledger, "
-            + "com.storyworthtelling.storyboarder"], shared);
+            + "com.storyworthtelling.focusphone.camera, com.storyworthtelling.ledger"], shared);
+    }
+
+    /// <summary>
+    /// Folio has to clear Canonizer's timestamp codes, for exactly the reason Foreword has to clear
+    /// DailyLoader's — and this guard exists because the first attempt got it wrong.
+    ///
+    /// <para>Canonizer's csproj computed <c>yearDigit + MMddHHmm</c> from August 2026, its own comment
+    /// saying "(matches DailyLoader)". Band 1 was chosen from a <c>LastShippedBeforeUnification</c> of
+    /// <b>169</b> — the bare <c>run_number</c> era, recorded without noticing the csproj had been
+    /// computing nine-digit codes since. So the suite's own "check nobody ran" ran, and passed, on a
+    /// number that was wrong; the phone kept a build stamped 2026.08.11.1608, versionCode 608111608,
+    /// and every Folio build since has been silently refused.</para>
+    /// </summary>
+    [Fact]
+    public void FolioSitsAboveCanonizersTimestampCodes()
+    {
+        var folio = SuiteVersionBands.All.Single(a => a.Package == "com.storyworthtelling.storyboarder");
+
+        // The build actually found on the owner's device: 6 + 08111608.
+        const int onTheDevice = 608_111_608;
+
+        Assert.True(folio.LastShippedBeforeUnification >= onTheDevice,
+            $"The recorded ceiling {folio.LastShippedBeforeUnification} is below the {onTheDevice} known "
+            + "to be installed, so the band was chosen against a number that is not true.");
+        Assert.True(VersionCode.For(folio.Band, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc))
+            > onTheDevice,
+            "Folio would ship below what is on the phone, and the channel refuses it silently.");
     }
 
     [Fact]

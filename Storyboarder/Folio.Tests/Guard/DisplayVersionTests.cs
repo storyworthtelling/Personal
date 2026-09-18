@@ -38,8 +38,41 @@ public class DisplayVersionTests
         var workflow = Workflow();
 
         Assert.Contains("uses: ./.github/actions/version-code", workflow, StringComparison.Ordinal);
-        Assert.Contains("band: 1", workflow, StringComparison.Ordinal);
+        // Band 8, not 1. Band 1 was chosen against a recorded last-shipped of 169 and was wrong:
+        // Canonizer's csproj computed yearDigit + MMddHHmm, so the phone was holding 608111608 and
+        // every band-1 build was refused silently. See SuiteVersionBands.
+        Assert.Contains("band: 8", workflow, StringComparison.Ordinal);
         Assert.Contains("-p:ApplicationVersion=${{ steps.version.outputs.code }}", workflow, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The csproj must not compute its own versionCode.
+    ///
+    /// <para>This is the actual cause of the band-1 mistake, and it is worth a guard of its own
+    /// because the mistake was invisible from where anyone looked. <c>SuiteVersionBands</c> recorded
+    /// what the <b>workflow</b> injected — a bare <c>run_number</c>, so 169 — while the <b>csproj</b>
+    /// had been computing <c>yearDigit + MMddHHmm</c> since August, quietly shipping nine-digit codes
+    /// to the phone. Both files set the same property and only one of them was being read.</para>
+    ///
+    /// <para>So the rule is that exactly one place decides: CI, through the shared band action. A
+    /// literal here is fine — it is what CI overrides — but anything computed is a second source of
+    /// truth, and the one that wins is whichever happens to be applied last.</para>
+    /// </summary>
+    [Fact]
+    public void TheCsprojDoesNotComputeItsOwnVersionCode()
+    {
+        var path = Path.Combine(
+            FolioInvariantsTests.RepoRoot(), "Storyboarder", "Folio.Android", "Folio.Android.csproj");
+        var csproj = File.ReadAllText(path);
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            csproj, @"<ApplicationVersion>(?<value>.*?)</ApplicationVersion>");
+
+        Assert.True(match.Success, "The csproj no longer declares ApplicationVersion at all.");
+        Assert.True(int.TryParse(match.Groups["value"].Value.Trim(), out _),
+            $"ApplicationVersion is computed as '{match.Groups["value"].Value}'. The versionCode comes "
+            + "from the shared band action; a csproj that computes one is a second source of truth, "
+            + "and that is exactly how Canonizer shipped 608111608 while the band table read 169.");
     }
 
     // The owner downloads the build by the artifact's name.
