@@ -174,16 +174,22 @@ public class PostActivity : Activity
         page.AddView(headerSlot);
 
         content = new FrameLayout(this);
-        foreach (var area in areas)
-        {
-            area.Overlay = content; // dog-ears and action cards overlay the content frame
-        }
-
         content.SetPadding(edge, 0, edge, 0);
         page.AddView(content, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        spread.AddView(page, new LinearLayout.LayoutParams(
+        // The overlay host wraps the WHOLE page — header included — not just the content
+        // frame, and pads itself down by the status-bar/display-cutout inset under enforced
+        // edge-to-edge (API 35+). A dog-ear posted against `content` alone sat below the
+        // header, which read as "inside the binder tabs" and partly behind the status bar
+        // rather than at the very top of the page the way a folded corner should.
+        var pageOverlayHost = PaperUi.WrapForTopInset(this, page);
+        foreach (var area in areas)
+        {
+            area.Overlay = pageOverlayHost; // dog-ears and action cards overlay the whole page
+        }
+
+        spread.AddView(pageOverlayHost, new LinearLayout.LayoutParams(
             0, ViewGroup.LayoutParams.MatchParent) { Weight = 1 });
 
         binder = new BinderTabs(this);
@@ -201,6 +207,13 @@ public class PostActivity : Activity
 
             activeIndex = index;
             binder.SetActive(index);
+            // Resume() is documented to run on every area "showing or not" precisely so a
+            // change made on another tab is not left stale when you switch to it — but it was
+            // only ever invoked from whole-Activity OnResume, never from a tab switch within one
+            // session. That gap is why un-filing (or filing) something in Filed and switching to
+            // Mailbox kept showing the stale in-memory snapshot until the whole Activity was
+            // backgrounded and foregrounded again.
+            Active.Resume();
             RenderContent();
         };
         spread.AddView(binder, new LinearLayout.LayoutParams(

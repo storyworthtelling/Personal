@@ -97,13 +97,37 @@ public class MusicScanWorker : Worker
         var tagReader = new MusicTagReader(Path.Combine(context.CacheDir!.AbsolutePath, "art"));
         var scanner = new MusicScanner(driveClient, tokens, tagReader);
 
-        using var database = MusicDatabase.Open(context);
-        await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
+        IReadOnlyList<Codex.Domain.Music.Track> catalog;
+        using (var database = MusicDatabase.Open(context))
         {
-            SetProgressAsync(new Data.Builder()
-                .PutInt(ProgressDone, done)!
-                .PutInt(ProgressTotal, total)!
-                .Build()!);
-        }, cts.Token);
+            await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
+            {
+                SetProgressAsync(new Data.Builder()
+                    .PutInt(ProgressDone, done)!
+                    .PutInt(ProgressTotal, total)!
+                    .Build()!);
+            }, cts.Token);
+
+            catalog = database.Catalog.LoadAll();
+        }
+
+        // Tag BPM already ran during the scan above (MusicTagReader/TagMapping); this backfills
+        // the long tail that never carries one via a free public catalogue (Deezer). Moved here
+        // from the Workout screen's "Look up tempos" button, which ran the exact same live,
+        // mid-session network lookup on demand — the owner asked for it to happen as part of
+        // import instead, so a workout never has to wait on it. Best-effort: a network hiccup
+        // here just leaves the long tail for the next scan, same as before.
+        try
+        {
+            await new TempoBackfill(context).RunAsync(catalog, (_, _) => { }, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            Log.Warn(Tag, $"Tempo backfill failed: {e.Message}");
+        }
     }
 }
