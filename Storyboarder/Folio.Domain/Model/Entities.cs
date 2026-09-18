@@ -131,6 +131,7 @@ public class Novel
     public List<DesignRef> DesignRefs { get; set; } = [];
     public List<Scene> Scenes { get; set; } = [];
     public List<Finding> Findings { get; set; } = [];
+    public List<PassRead> PassReads { get; set; } = [];
 
     // The per-chunk literary-analysis units (map step) and the consolidated revision-report record.
     public List<ChunkAnalysis> ChunkAnalyses { get; set; } = [];
@@ -334,6 +335,35 @@ public class BookAnalysis
     // resumable call and column, folded in at render like the craft/voice/expansion halves. Null until it runs;
     // it runs only for a book with a PreviousBookId — a standalone book leaves it null, so no section renders.
     public string? SeriesContinuityJson { get; set; }
+}
+
+/// <summary>
+/// One persona's pass over one draft — seventeen rows per read.
+///
+/// <para><b>Why a row each rather than seventeen columns.</b> Every pass is a separate model call
+/// costing real money, so each has to succeed, fail and retry on its own: a reader that came back
+/// short must not re-bill the fourteen passes that were fine. That is the same reason the craft,
+/// voice and expansion halves already have their own columns — this is the same rule at the scale
+/// the rebuilt report needs.</para>
+///
+/// <para><see cref="Json"/> null means the pass has not succeeded yet, which is the gate the
+/// pipeline drains on. A pass that ran and found nothing stores its empty result rather than null,
+/// so "read and silent" and "not yet read" stay different things.</para>
+/// </summary>
+public class PassRead
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid NovelId { get; set; }
+
+    /// <summary>The persona's id from <c>PersonaCatalogue</c>, or a synthesis pass's id.</summary>
+    public string PassId { get; set; } = string.Empty;
+
+    /// <summary>The pass's result, null until it has succeeded.</summary>
+    public string? Json { get; set; }
+
+    public int Attempts { get; set; }
+    public string? LastError { get; set; }
+    public DateTimeOffset? CompletedAtUtc { get; set; }
 }
 
 // One story-integrity finding, promoted to a first-class row in Phase 2 (it lived only inside the report

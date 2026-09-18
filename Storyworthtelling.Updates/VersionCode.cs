@@ -97,10 +97,22 @@ public static class SuiteVersionBands
         new("com.storyworthtelling.focusphone.communication", 1, 200_051),
         new("com.storyworthtelling.focusphone.camera", 1, 200_030),
 
-        // Ledger and Folio were on a bare run_number — two and three digits. A rename of
-        // either workflow would have reset them to 1 and bricked their own update channel.
+        // Ledger was on a bare run_number — two digits. A rename of its workflow would have reset
+        // it to 1 and bricked its own update channel.
         new("com.storyworthtelling.ledger", 1, 58),
-        new("com.storyworthtelling.storyboarder", 1, 169),
+
+        // Folio (Canonizer's package) needs a high band for the SAME reason Foreword does, and this
+        // entry was wrong until a phone proved it. It read band 1 against a last-shipped of 169 — the
+        // bare run_number era — but Canonizer's csproj had been computing yearDigit + MMddHHmm since
+        // August 2026, its own comment saying "(matches DailyLoader)". So the app had really shipped
+        // nine-digit codes, the device was holding 608111608 (stamped 2026.08.11.1608), and band 1's
+        // ~103,500,000 was refused silently by the channel, every build, for a week.
+        //
+        // The lesson is not "check the number" — somebody did check, against this table. It is that
+        // the table recorded what the WORKFLOW injected and missed what the CSPROJ computed, and the
+        // csproj is just as capable of setting a versionCode. Band 8 is Folio's own space, clear of
+        // Foreword's, and the ceiling below is the highest that scheme could reach in 2026.
+        new("com.storyworthtelling.storyboarder", 8, 612_312_359),
 
         // Foreword keeps DailyLoader's package, so it has to clear the old csproj scheme
         // (yearDigit + MMddHHmm, which reached ~609,060,000 in September 2026). Band 7 puts it

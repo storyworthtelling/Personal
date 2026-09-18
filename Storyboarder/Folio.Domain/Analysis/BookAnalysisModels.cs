@@ -118,14 +118,32 @@ public sealed record CharacterProfile(
     string ArcSummary,
     IReadOnlyList<string> Relationships);
 
-// One review from a specific, fair perspective (e.g. developmental editor, target-genre reader,
-// literary critic, acquiring agent) with balanced strengths and weaknesses.
+/// <summary>
+/// One reader's whole-book read, in character. Seven of these, one to a printed page.
+///
+/// <para><b>Every part is load-bearing and none of them may arrive empty</b> (F44, F46). The
+/// <see cref="Verdict"/> is the clause the readers' contents page carries; the
+/// <see cref="Assessment"/> is the long review; the two lists are that reader's own pros and cons —
+/// the one place in the report where a tick and a cross are the right marks, because these are one
+/// reader's preferences rather than the book's severity tiers; and the <see cref="Condition"/> is
+/// the "Would need" line.</para>
+///
+/// <para><c>Recommendation</c> is what <see cref="Condition"/> used to be called. The rename is not
+/// cosmetic: printed where the author reads it, the field is a <i>condition on the verdict</i> — what
+/// would have to change before this reader changed their mind — and "recommendation" invited a
+/// restatement of the review instead.</para>
+///
+/// <para><see cref="PersonaId"/> is a key into <c>PersonaCatalogue</c> rather than free text,
+/// because the to-do list cites the persona that raised each item and a citation naming a
+/// perspective nobody can look up is not a citation.</para>
+/// </summary>
 public sealed record Review(
-    string Perspective,
+    string PersonaId,
+    string Verdict,
     string Assessment,
     IReadOnlyList<string> Strengths,
     IReadOnlyList<string> Weaknesses,
-    string Recommendation);
+    string Condition);
 
 // One actionable revision suggestion. The report lists these highest-impact-first.
 public sealed record RevisionItem(
@@ -255,6 +273,32 @@ public sealed record BookAnalysisResult(
 
     public BookAnalysisResult WithSeriesContinuity(SeriesContinuity seriesContinuity) =>
         this with { SeriesContinuity = seriesContinuity };
+
+    /// <summary>
+    /// Folds the seventeen reads over the consolidated report.
+    ///
+    /// <para>The readers <b>replace</b> whatever the omnibus reduce produced rather than joining it:
+    /// the whole point of a persona pass is that one voice read the whole book, and a page carrying
+    /// both would be two different instruments under one name. Sections and synthesis only fill what
+    /// they actually found, so a read that has not run yet, or ran and was silent, leaves the
+    /// consolidated report's own answer standing rather than blanking it.</para>
+    /// </summary>
+    public BookAnalysisResult WithReads(
+        IReadOnlyList<Review> readers,
+        IReadOnlyList<string> sectionSummaries,
+        IReadOnlyList<RevisionItem> revisionPlan,
+        Verdict verdict) =>
+        this with
+        {
+            Reviews = readers is { Count: > 0 } ? readers : Reviews,
+            Themes = sectionSummaries is { Count: > 0 } ? sectionSummaries : Themes,
+            RevisionPlan = revisionPlan is { Count: > 0 } ? revisionPlan : RevisionPlan,
+            Verdict = string.IsNullOrWhiteSpace(verdict.MostNeeds)
+                && verdict.Strengths is not { Count: > 0 }
+                && verdict.Problems is not { Count: > 0 }
+                    ? Verdict
+                    : verdict,
+        };
 }
 
 // The additive read — Folio's expansion engine (Phase 3). Because early drafts run short, this surfaces
