@@ -75,7 +75,7 @@ jobs:
         id: version
         uses: ./.github/actions/version-code
         with:
-          band: 1
+          band: 8
 
       - name: Build APK
         working-directory: Storyboarder
