@@ -37,6 +37,8 @@ public class HomeActivity : Activity
     private ShelfArt? art;
     private FrameLayout? root;
     private Button? setDefaultLauncherButton;
+    private Button? setDefaultBrowserButton;
+    private const int RequestBrowserRoleCode = 4200;
 
     // The Google account is used for the vault-backed update-token restore and the cover-load
     // voiced hello. Best-effort: both no-op until a Google account is signed in.
@@ -158,6 +160,19 @@ public class HomeActivity : Activity
         {
             Gravity = GravityFlags.Center,
         });
+
+        // Same idea, for the restricted browser. Unlike ROLE_HOME, ROLE_BROWSER is directly
+        // requestable, so this asks outright rather than only deep-linking to Settings — the owner
+        // previously had to find the default-apps screen themselves (via a workaround) to make
+        // links open in Flyleaf's contained browser instead of full Chrome.
+        setDefaultBrowserButton = PaperUi.SecondaryButton(this, "Set Flyleaf as your browser", RequestBrowserRole);
+        setDefaultBrowserButton.Visibility = ViewStates.Gone;
+        root.AddView(setDefaultBrowserButton, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
+        {
+            Gravity = GravityFlags.Center,
+            TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X12),
+        });
         return root;
     }
 
@@ -167,6 +182,7 @@ public class HomeActivity : Activity
         ReloadScene();
         UpdateClock();
         UpdateSetDefaultLauncherButton();
+        UpdateSetDefaultBrowserButton();
         timeTickReceiver = new TimeTickReceiver(UpdateClock);
         RegisterReceiver(timeTickReceiver, new IntentFilter(Intent.ActionTimeTick));
         notificationsReceiver = new NotificationsChangedReceiver(OnNotificationsChanged);
@@ -310,9 +326,15 @@ public class HomeActivity : Activity
             installer.Uninstall(package, pending.IntentSender);
             return;
         }
-        catch (Java.Lang.Exception)
+        catch (Java.Lang.Exception e)
         {
-            // Silent path unavailable — fall back to Android's own uninstaller UI.
+            // Silent path unavailable — fall back to Android's own uninstaller UI. Unlike every
+            // other PolicyManager failure path, this one used to be swallowed with no trace, so a
+            // failure here and a silently-dropped fallback (Intent.ActionUninstallPackage without
+            // REQUEST_DELETE_PACKAGES, per ManifestPermissions.cs) looked identical on-device: an
+            // uninstall tap that did nothing. Logging which branch actually ran distinguishes them.
+            new PolicyAuditStore(this).Record(PolicyEventKind.UninstallFailed,
+                $"Silent uninstall of {package} failed ({e.GetType().Name}: {e.Message}); falling back to the visible uninstaller.");
         }
 
         LaunchVisibleUninstaller(package);
@@ -433,6 +455,38 @@ public class HomeActivity : Activity
         var roleManager = GetSystemService(Context.RoleService) as Android.App.Roles.RoleManager;
         var isDefault = roleManager?.IsRoleHeld(Android.App.Roles.RoleManager.RoleHome) ?? false;
         setDefaultLauncherButton.Visibility = isDefault ? ViewStates.Gone : ViewStates.Visible;
+    }
+
+    private void UpdateSetDefaultBrowserButton()
+    {
+        if (setDefaultBrowserButton is null)
+        {
+            return;
+        }
+        var roleManager = GetSystemService(Context.RoleService) as Android.App.Roles.RoleManager;
+        var isDefault = roleManager?.IsRoleHeld(Android.App.Roles.RoleManager.RoleBrowser) ?? false;
+        setDefaultBrowserButton.Visibility = isDefault ? ViewStates.Gone : ViewStates.Visible;
+    }
+
+    private void RequestBrowserRole()
+    {
+        var roleManager = GetSystemService(Context.RoleService) as Android.App.Roles.RoleManager;
+        if (roleManager is null || !roleManager.IsRoleAvailable(Android.App.Roles.RoleManager.RoleBrowser!))
+        {
+            StartActivity(new Intent(Android.Provider.Settings.ActionManageDefaultAppsSettings));
+            return;
+        }
+        StartActivityForResult(
+            roleManager.CreateRequestRoleIntent(Android.App.Roles.RoleManager.RoleBrowser!), RequestBrowserRoleCode);
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == RequestBrowserRoleCode)
+        {
+            UpdateSetDefaultBrowserButton();
+        }
     }
 
     // After a reinstall or the cutover's factory reset, refill the GitHub update token from the

@@ -11,8 +11,14 @@ public static class ContactPicker
 {
     public record Entry(string Name, string Address);
 
-    /// <summary>One person with every way to reach them, for the person-first New flow.</summary>
-    public record Person(string Name, IReadOnlyList<string> Phones, IReadOnlyList<string> Emails);
+    /// <summary>
+    /// One person with every way to reach them, for the person-first New flow. Id is the
+    /// device contact id (0 for a manually-typed, not-actually-in-the-book entry, which is
+    /// also why such an entry reports HasPhoto true — there is no contact to attach one to).
+    /// </summary>
+    public record Person(
+        string Name, IReadOnlyList<string> Phones, IReadOnlyList<string> Emails,
+        long Id = 0, bool HasPhoto = true);
 
     /// <summary>
     /// Device contacts grouped into people (phones + emails under one contact id),
@@ -26,11 +32,89 @@ public static class ContactPicker
         Gather(context, ContactsContract.CommonDataKinds.Email.ContentUri!,
             ContactsContract.CommonDataKinds.Email.Address, isEmail: true, byId);
 
-        return byId.Values
-            .Where(person => person.Phones.Count > 0 || person.Emails.Count > 0)
-            .Select(person => new Person(person.Name, person.Phones, person.Emails))
+        var withPhoto = PhotoIds(context);
+
+        return byId
+            .Where(entry => entry.Value.Phones.Count > 0 || entry.Value.Emails.Count > 0)
+            .Select(entry => new Person(
+                entry.Value.Name, entry.Value.Phones, entry.Value.Emails,
+                entry.Key, withPhoto.Contains(entry.Key)))
             .OrderBy(person => person.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+    }
+
+    private static IReadOnlySet<long> PhotoIds(Context context)
+    {
+        var ids = new HashSet<long>();
+        using var cursor = context.ContentResolver!.Query(
+            ContactsContract.Contacts.ContentUri!, ["_id", "photo_id"], null, null, null);
+        while (cursor is not null && cursor.MoveToNext())
+        {
+            if (!cursor.IsNull(1) && cursor.GetLong(1) != 0)
+            {
+                ids.Add(cursor.GetLong(0));
+            }
+        }
+        return ids;
+    }
+
+    /// <summary>
+    /// Sets a contact's photo from a JPEG the owner just took. Android's Contacts provider has
+    /// no write-side counterpart to <c>OpenContactPhotoInputStream</c> for reading — a photo is
+    /// set by writing (or replacing) the contact's Photo-mimetype row in the Data table
+    /// directly, the same way the platform's own Contacts app does.
+    /// </summary>
+    public static bool SetPhoto(Context context, long contactId, byte[] jpeg)
+    {
+        try
+        {
+            var resolver = context.ContentResolver!;
+
+            // A contact can be backed by more than one raw contact — one per account it is
+            // synced from. The first is a reasonable, simple choice with nothing else to go on.
+            long rawContactId;
+            using (var raw = resolver.Query(
+                ContactsContract.RawContacts.ContentUri!, ["_id"],
+                "contact_id = ?", [contactId.ToString()], null))
+            {
+                if (raw is null || !raw.MoveToFirst())
+                {
+                    return false;
+                }
+                rawContactId = raw.GetLong(0);
+            }
+
+            var mimeType = ContactsContract.CommonDataKinds.Photo.ContentItemType;
+            long? existingDataId = null;
+            using (var existing = resolver.Query(
+                ContactsContract.Data.ContentUri!, ["_id"],
+                "raw_contact_id = ? AND mimetype = ?", [rawContactId.ToString(), mimeType], null))
+            {
+                if (existing?.MoveToFirst() == true)
+                {
+                    existingDataId = existing.GetLong(0);
+                }
+            }
+
+            var values = new ContentValues();
+            values.Put("raw_contact_id", rawContactId);
+            values.Put("mimetype", mimeType);
+            values.Put("data15", jpeg); // Photo.PHOTO is column data15
+
+            if (existingDataId is { } dataId)
+            {
+                resolver.Update(ContactsContract.Data.ContentUri!, values, "_id = ?", [dataId.ToString()]);
+            }
+            else
+            {
+                resolver.Insert(ContactsContract.Data.ContentUri!, values);
+            }
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>
