@@ -482,8 +482,9 @@ public class ClaudeAnalysisClientTests
             "\"characters\":[{\"name\":\"Alice\",\"role\":\"protagonist\",\"arcSummary\":\"grows brave\"," +
             "\"relationships\":[\"ally: Bob\"]}],\"themes\":[\"courage\"],\"plotHoles\":[\"Where is the key?\"]," +
             "\"inconsistencies\":[\"Eye color\"],\"inaccuracies\":[\"Paris claim\"],\"pacingNotes\":[\"Middle sags\"]," +
-            "\"reviews\":[{\"perspective\":\"developmental editor\",\"assessment\":\"promising\"," +
-            "\"strengths\":[\"voice\"],\"weaknesses\":[\"pacing\"],\"recommendation\":\"revise middle\"}]," +
+            "\"reviews\":[{\"personaId\":\"developmental-editor\",\"verdict\":\"promising\"," +
+            "\"assessment\":\"a sustained read\"," +
+            "\"strengths\":[\"voice\"],\"weaknesses\":[\"pacing\"],\"condition\":\"revise middle\"}]," +
             "\"revisionPlan\":[{\"priority\":\"High\",\"issue\":\"sagging middle\",\"suggestedFix\":\"cut subplot\"}]," +
             "\"comparableTitles\":[\"Book X\"],\"marketPositioning\":\"YA fantasy\"}"));
 
@@ -494,7 +495,7 @@ public class ClaudeAnalysisClientTests
         var character = Assert.Single(report.Characters);
         Assert.Equal("Alice", character.Name);
         Assert.Equal("protagonist", character.Role);
-        Assert.Equal("developmental editor", Assert.Single(report.Reviews).Perspective);
+        Assert.Equal("developmental-editor", Assert.Single(report.Reviews).PersonaId);
         Assert.Equal("High", Assert.Single(report.RevisionPlan).Priority);
         Assert.Equal("YA fantasy", report.MarketPositioning);
         // A model that answered with bare strings instead of {chapter, detail} still parses; the

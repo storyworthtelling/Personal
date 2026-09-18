@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
+using Folio.Domain.Reading;
 using Folio.Domain.External;
 using Folio.Domain.Health;
 using Folio.Domain.Model;
@@ -372,8 +373,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             dto.Inconsistencies ?? [],
             dto.Inaccuracies ?? [],
             dto.PacingNotes ?? [],
-            (dto.Reviews ?? []).Select(r =>
-                new Review(r.Perspective ?? string.Empty, r.Assessment ?? string.Empty, r.Strengths ?? [], r.Weaknesses ?? [], r.Recommendation ?? string.Empty)).ToList(),
+            // A read that arrives short is dropped rather than coalesced into a thinner one: the
+            // ?? string.Empty this replaces is precisely how a persona that answered four of six
+            // questions produced a page that rendered perfectly and said less (F44, F46). What the
+            // pipeline does about a dropped read is the pipeline's decision, not the parser's.
+            (dto.Reviews ?? []).Select(r => new Review(
+                    r.PersonaId ?? r.Perspective ?? string.Empty,
+                    r.Verdict ?? string.Empty,
+                    r.Assessment ?? string.Empty,
+                    r.Strengths ?? [],
+                    r.Weaknesses ?? [],
+                    r.Condition ?? r.Recommendation ?? string.Empty))
+                .Where(ReaderRead.IsWhole).ToList(),
             (dto.RevisionPlan ?? []).Select(r =>
                 new RevisionItem(r.Priority ?? string.Empty, r.Chapter ?? string.Empty,
                     r.Issue ?? string.Empty, r.SuggestedFix ?? string.Empty)).ToList(),
@@ -604,28 +615,169 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     // model selects the tier: null means the strong default. Only the mechanical per-chunk calls pass the
     // fast one — see ClaudeOptions.FastModel for why those two and not the rest.
-    private async Task<string> SendMessage(
+    // What each pass is asked to hand back. Kept beside the calls that use them so the shape the
+    // parser expects and the shape the prompt asks for cannot drift apart.
+    private const string SectionFormat =
+        "Reply with JSON only: {\"summary\": \"one or two sentences on what you found overall, or an "
+        + "empty string if this book gives you nothing to say\", \"findings\": [{\"chapter\": \"Ch. 12-15\", "
+        + "\"detail\": \"what is wrong and why it matters\"}]}. Finding nothing is a legitimate answer: "
+        + "return an empty findings list rather than inventing one.";
+
+    private const string ReaderFormat =
+        "Reply with JSON only: {\"verdict\": \"your answer in one clause\", \"assessment\": \"your full "
+        + "review in character, several hundred words\", \"strengths\": [\"what works, in your terms\"], "
+        + "\"weaknesses\": [\"what does not, in your terms\"], \"condition\": \"what would have to change "
+        + "before your verdict changed\"}. Every field is required. If you cannot fill one of them you "
+        + "have not finished reading: a short answer is worse than none, because the page prints it.";
+
+    private const string RevisionPlanInstruction =
+        "You are given fifteen independent reads of one novel: eight structural sections and seven "
+        + "readers, none of whom saw the others' notes. Produce the author's revision plan. Where "
+        + "several reads name the same thing, that is one item and it ranks higher for it. Reply with "
+        + "JSON only: {\"revisionPlan\": [{\"priority\": \"Must|Should|Consider\", \"chapter\": \"Ch. 12-15\", "
+        + "\"issue\": \"what is wrong\", \"suggestedFix\": \"what to do about it — a direction, never "
+        + "replacement prose\"}]}. You diagnose and point; you never write the author's sentences for them.";
+
+    private const string VerdictInstruction =
+        "You are given fifteen independent reads of one novel. Write the candid state of this draft: "
+        + "its biggest strengths, its biggest problems, and the one thing it most needs. Reply with "
+        + "JSON only: {\"verdict\": {\"strengths\": [], \"problems\": [], \"mostNeeds\": \"\"}}.";
+
+    public async Task<SectionRead> ReadSection(
+        Persona persona, string manuscript, CancellationToken cancellationToken)
+    {
+        var reply = await SendPass(persona, manuscript, SectionFormat, cancellationToken);
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+        {
+            // A section is allowed to find nothing, so an unparseable reply degrades to silence
+            // rather than failing the read. The pass is still recorded as done: it ran, and a section
+            // with nothing to say prints nothing.
+            return SectionRead.Silent(persona.Id);
+        }
+
+        var dto = JsonResponse.Deserialize<SectionDto>(json);
+        return new SectionRead(
+            persona.Id,
+            dto?.Summary ?? string.Empty,
+            (dto?.Findings ?? []).Where(finding => !string.IsNullOrWhiteSpace(finding.Detail))
+                .Select(finding => new ReportFinding(finding.Chapter ?? string.Empty, finding.Detail!))
+                .ToList());
+    }
+
+    public async Task<Review> ReadAsReader(
+        Persona persona, string manuscript, CancellationToken cancellationToken)
+    {
+        var reply = await SendPass(persona, manuscript, ReaderFormat, cancellationToken);
+        var json = JsonResponse.ExtractObject(reply)
+            ?? throw new InvalidOperationException(
+                $"{persona.Name} replied with nothing this could read as a review. A reader's pass is "
+                + "all-or-nothing: a page that prints half a read is worse than one that admits the "
+                + "read failed.");
+
+        var dto = JsonResponse.Deserialize<ReviewDto>(json);
+        var review = new Review(
+            persona.Id,
+            dto?.Verdict ?? string.Empty,
+            dto?.Assessment ?? string.Empty,
+            dto?.Strengths ?? [],
+            dto?.Weaknesses ?? [],
+            dto?.Condition ?? dto?.Recommendation ?? string.Empty);
+
+        // A short read is a failed pass, not a shorter one (F44, F46). Throwing here is what makes
+        // that true: the pipeline retries the pass, where swallowing it would print the gap.
+        if (ReaderRead.Incomplete(review) is { } reason)
+        {
+            throw new InvalidOperationException($"The read came back short — {reason}.");
+        }
+        return review;
+    }
+
+    public async Task<SynthesisRead> Synthesise(
+        string passId,
+        IReadOnlyList<SectionRead> sections,
+        IReadOnlyList<Review> readers,
+        CancellationToken cancellationToken)
+    {
+        // The synthesis passes read the other fifteen rather than the manuscript, so they carry no
+        // cached prefix and cost nothing to run against either model.
+        var evidence = JsonSerializer.Serialize(new { sections, readers }, JsonResponse.CaseInsensitive);
+        var instruction = passId == "verdict" ? VerdictInstruction : RevisionPlanInstruction;
+        var reply = await SendMessage(
+            instruction, evidence, cancellationToken, options.PassMaxTokens, model: options.StrongModel);
+
+        var json = JsonResponse.ExtractObject(reply);
+        if (json is null)
+        {
+            return SynthesisRead.Empty;
+        }
+
+        var dto = JsonResponse.Deserialize<SynthesisDto>(json);
+        return new SynthesisRead(
+            (dto?.RevisionPlan ?? []).Select(item => new RevisionItem(
+                item.Priority ?? string.Empty, item.Chapter ?? string.Empty,
+                item.Issue ?? string.Empty, item.SuggestedFix ?? string.Empty)).ToList(),
+            dto?.Verdict is { } verdict
+                ? new Verdict(verdict.Strengths ?? [], verdict.Problems ?? [], verdict.MostNeeds ?? string.Empty)
+                : Verdict.Empty);
+    }
+
+    /// <summary>
+    /// Sends one persona's pass, with the MANUSCRIPT FIRST and everything persona-specific after it.
+    ///
+    /// <para>It does not go through <see cref="SendMessage"/>, and that is the point. SendMessage puts
+    /// its instruction in the first cached block, which is right when the instruction is constant for
+    /// a call type and catastrophic here: the instruction names the persona, so seventeen passes would
+    /// be seventeen different cache prefixes and the manuscript would be written seventeen times
+    /// instead of read fifteen — measured at roughly $17 a draft against $2 (F50), with nothing
+    /// visible wrong. <c>ReadingPrompt</c> decides the order and a guard holds it.</para>
+    /// </summary>
+    private Task<string> SendPass(
+        Persona persona, string manuscript, string format, CancellationToken cancellationToken)
+    {
+        var system = ReadingPrompt.System(manuscript, persona)
+            .Select(block => block.Cached
+                ? (object)new { type = "text", text = block.Text, cache_control = new { type = "ephemeral" } }
+                : new { type = "text", text = block.Text })
+            .ToArray();
+
+        var model = persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel;
+        return SendRaw(system, ReadingPrompt.Question(persona) + "\n\n" + format,
+            options.PassMaxTokens, model, cancellationToken);
+    }
+
+    private Task<string> SendMessage(
         string instruction, string userText, CancellationToken cancellationToken,
         int? maxTokens = null, string? cachedContext = null, string? model = null)
     {
         // Invariant, reused context (the design bible) is cached as its own block so repeated calls
         // within the cache window bill it as a cache read instead of full input. Both blocks share one
         // anonymous shape so the array stays strongly typed (no object-typed JSON serialization).
-        var system = string.IsNullOrEmpty(cachedContext)
-            ? new[]
-            {
-                new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } }
-            }
-            : new[]
-            {
+        //
+        // The INSTRUCTION comes first here, which is safe only because it is constant for a given call
+        // type — every ConsolidateAnalysis shares one instruction, so the prefix is shared. It is not
+        // safe for the persona passes, whose instruction names the reader: see SendPass and F50.
+        object[] system = string.IsNullOrEmpty(cachedContext)
+            ? [new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } }]
+            :
+            [
                 new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } },
-                new { type = "text", text = cachedContext, cache_control = new { type = "ephemeral" } }
-            };
+                new { type = "text", text = cachedContext, cache_control = new { type = "ephemeral" } },
+            ];
 
-        var effectiveMaxTokens = maxTokens ?? options.MaxTokens;
+        return SendRaw(system, userText, maxTokens ?? options.MaxTokens,
+            string.IsNullOrWhiteSpace(model) ? options.Model : model, cancellationToken);
+    }
+
+    // The transport both paths share: everything below this line is the same whatever the system
+    // blocks say, so the ordering decision lives entirely in the two callers above.
+    private async Task<string> SendRaw(
+        object[] system, string userText, int effectiveMaxTokens, string model,
+        CancellationToken cancellationToken)
+    {
         var payload = new
         {
-            model = string.IsNullOrWhiteSpace(model) ? options.Model : model,
+            model,
             max_tokens = effectiveMaxTokens,
             stream = true,
             system,
@@ -964,12 +1116,35 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? Relationships { get; set; }
     }
 
+    // Perspective and Recommendation are the old names, still read so that a reply generated from a
+    // prompt that has not been reworded yet still maps rather than silently coming back empty.
+    private sealed class SectionDto
+    {
+        public string? Summary { get; set; }
+        public List<SectionFindingDto>? Findings { get; set; }
+    }
+
+    private sealed class SectionFindingDto
+    {
+        public string? Chapter { get; set; }
+        public string? Detail { get; set; }
+    }
+
+    private sealed class SynthesisDto
+    {
+        public List<RevisionItemDto>? RevisionPlan { get; set; }
+        public VerdictDto? Verdict { get; set; }
+    }
+
     private sealed class ReviewDto
     {
+        public string? PersonaId { get; set; }
         public string? Perspective { get; set; }
+        public string? Verdict { get; set; }
         public string? Assessment { get; set; }
         public List<string>? Strengths { get; set; }
         public List<string>? Weaknesses { get; set; }
+        public string? Condition { get; set; }
         public string? Recommendation { get; set; }
     }
 

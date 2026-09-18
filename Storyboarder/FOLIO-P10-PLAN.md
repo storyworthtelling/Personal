@@ -159,6 +159,84 @@ are one reader's preferences, not the book's severity tiers, so they take the Po
 roles rather than the four-tier scale. A persona whose review arrives with an empty pros or cons list
 is a **failed pass, not a shorter one** — the same rule as the missing condition. Guard G23.
 
+### F49 — the group does not fit the worker, measured *(Release F)*
+
+U-3 said the 9-minute cycle budget almost certainly would not hold ~20 whole-manuscript passes, that
+this was **the likeliest thing to force a design change in Release F**, and that it was unmeasured.
+It is measured now, on a real 90,000-word novel (167,190 tokens as the API counts it), one pass per
+persona, asking for the length the report actually prints:
+
+| pass | model | wall time | output |
+|---|---|---|---|
+| reader | Opus 5 | 66.4s / 64.3s | 4,000 tokens — **capped** |
+| section | Sonnet 5 | 37.3s / 43.6s | 2,532 / 3,041 tokens |
+
+Eight sections at ~40s, seven readers and two synthesis passes at ~65s: **905 seconds, 15.1 minutes,
+against a 540-second budget.** That is 1.68× over, and it is a **floor** — both reader passes stopped
+at the token cap rather than finishing, so a real review is longer and slower.
+
+**What the number says is that input size is not the problem and output length is.** Every pass after
+the first reads its whole manuscript from cache in no measurable time; what costs fifteen minutes is
+seventeen models writing.
+
+**Prompt caching is confirmed working, and the saving is now measured rather than computed.** Every
+pass after the first reported `cache_read_input_tokens: 167190` with `cache_creation: 0` — and the
+cache survived between two separate runs several minutes apart, so a read refreshes the five-minute
+window rather than the write starting a clock. That matters for any design that spreads the group
+out: consecutive passes keep the cache alive, a gap of more than five minutes kills it.
+
+**Decision (owner, at the measurement): a foreground service.** It is the only option that keeps the
+whole group inside one cache window and one cycle, and the work is genuinely user-visible — the phone
+really is reading a novel for a quarter of an hour, so a notification is honest rather than a way
+around a cap. Splitting across worker cycles was rejected on economics: cycles are fifteen minutes
+apart and the cache dies in five, so each cycle re-pays a write, roughly $2 a draft to save a code
+change. The Batch API stays available if cost ever matters more than turnaround.
+
+**One thing the measurement cost, worth recording.** The first attempt used synthetic prose — 126,000
+tokens of plausible-looking word salad — and the API refused it as gibberish twice before the
+mistake was obvious, and a refusal still bills the cache write. Use real prose to measure a real
+model.
+
+### F50 — the cached prefix must not depend on the persona *(Release F)*
+
+Found by accident, in the harness that measured F49, which is the only reason it was found at all.
+
+Each of the four measured passes reported `cache_creation_input_tokens: 167187` and
+`cache_read_input_tokens: 0` — the manuscript written to the cache once **per pass** rather than once
+per read. The cause was the order of the system blocks: the harness named the persona first and put
+the manuscript after it. Prompt caching matches an exact **prefix**, so a persona ahead of the
+manuscript makes every one of the seventeen passes a different prefix and invalidates everything
+behind it. On the strong model that is roughly **$17 a draft against $2**.
+
+**Nothing about it is visible.** Every request succeeds, every reply is correct, every test passes.
+The bill is the only symptom, and the finding's own standing note says exactly this: a caching
+regression is silent. What it did not say — because it could not, until something reproduced it — is
+*how* it happens, and the answer is an ordering nobody would think to write down.
+
+**Confirmed by re-running with the manuscript first.** `structure` (Sonnet) wrote the cache and
+`pacing` read all 167,168 tokens back; `developmental-editor` (Opus) wrote it again and `genre-fan`
+read it back. **Two writes, not seventeen** — and the second write is not a fault: *each model keeps
+its own cache*, so the mix costs exactly one write per model. That is also why the plan runs all
+eight sections before all seven readers: it is one Sonnet window followed by one Opus window, rather
+than nine alternations paying nine writes.
+
+Measured cost per draft, at these figures: **$3.38 manuscript-first against $13.76 persona-first.**
+A cached pass is also *faster* — `pacing` 35.2s against 42.9s, `genre-fan` 58.0s against 70.5s —
+which pulls the read's estimate down from the F49 figure by roughly a sixth.
+
+So the ordering is a function with a guard over it rather than a comment beside a call site.
+`ReadingPrompt.System` puts the manuscript first, carrying the cache breakpoint, and everything
+persona-specific after it; `ReadingPromptTests` asserts the cached prefix is **byte-identical across
+all fifteen personas**, and fails with "15 different cached prefixes across 15 personas" when the
+ordering is put back the wrong way.
+
+**A second thing the same run settled: the phase's central bet holds.** Four voices over one
+90,000-word novel — structure, pacing, the developmental editor and the genre fan — produced pairwise
+5-gram overlaps of **0.000 to 0.003**. They share essentially no phrasing. Chapter overlap peaks at
+0.29, between the two whole-book readers, who agree on chapters 36 and 46 — which is the mockup's
+"where they agree the note is loud" rather than repetition. The finding listed reading-in-character
+as the phase's central bet with no evidence behind it; it has evidence now.
+
 ### F48 — the folio counts every sheet, and the front contents is an open question *(Release E)*
 
 Found by rendering the real page beside the drawing rather than by reading either. Two things the
@@ -275,6 +353,22 @@ release is about the page, so a reflow regression is isolated.
 ### Release F — the reading model
 Persona passes, grouped and cached, structured output, the model mix, the status sentence. Adds the
 required `Condition` field (F44). The pipeline's largest change, on a page that already works.
+
+**Shipped.** Fifteen personas plus two synthesis passes, drained one per turn from `ReadingPlan` and
+persisted a row each (`PassRead`), so a reader that comes back short retries alone rather than
+re-billing the fourteen that were fine. The reads fold over the consolidated report last: the seven
+readers **replace** the omnibus reduce's reviews rather than joining them. The transport is a
+foreground service, because the group measures ~15 minutes against a 9-minute worker cycle (F49), and
+the prompt puts the manuscript first, because otherwise the cache never hits (F50).
+
+Three things the release had to find out rather than assume, all in §7's unverified list: the cycle
+budget (it fails), the persona bet (it holds, overlap 0.000–0.003), and the caching saving (measured,
+$3.38 a draft against $13.76 done wrong).
+
+**Left for a later release, deliberately:** the eight section reads currently fold in as their
+summaries, and the omnibus `ConsolidateAnalysis` still supplies the report's own finding lists. Making
+each section's findings the report's findings is Release G's work, where the marked-up manuscript
+needs them anchored to offsets anyway.
 
 ### Release G — the marked-up manuscript
 Offsets, proofreading marks (dele · caret · query · check), severity hues, inline reasons, the
