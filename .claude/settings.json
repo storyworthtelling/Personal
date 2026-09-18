@@ -1,3 +1,4 @@
+
 {
   "extraKnownMarketplaces": {
     "superpowers-marketplace": {
@@ -16,6 +17,12 @@
   "enabledPlugins": {
     "superpowers@superpowers-marketplace": true,
     "design@knowledge-work-plugins": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv tool install graphifyy)",
+      "Bash(graphify *)"
+    ]
   },
   "hooks": {
     "SessionStart": [
