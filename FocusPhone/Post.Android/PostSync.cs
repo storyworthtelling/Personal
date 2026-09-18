@@ -216,8 +216,8 @@ public static class PostSync
         }
     }
 
-    // The same routing ThreadActivity's per-message delete uses, so filing and an outright
-    // delete agree on where a text actually lives.
+    // The same routing MailboxArea's per-message delete (of the open correspondence) uses,
+    // so filing and an outright delete agree on where a text actually lives.
     private static bool DeleteMessageAtSource(Context context, TimelineItem item)
     {
         var holdsSmsRole = HoldsSmsRole(context);
