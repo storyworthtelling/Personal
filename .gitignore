@@ -7,6 +7,10 @@ publish/
 .vs/
 *.user
 
+# Claude Code agent worktrees — ephemeral, created and torn down per background
+# agent, never meant to be committed.
+.claude/worktrees/
+
 # Ledger's launcher icon is generated, not committed — unlike the other apps',
 # whose IconStudio output is checked in. Ledger's CI build regenerates it before
 # packaging (see CLAUDE.md), so the console's output here is build output. Listed
