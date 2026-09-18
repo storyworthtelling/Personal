@@ -55,7 +55,11 @@ public class HomeActivity : Activity
 
     private const string UninstallResultAction = "com.storyworthtelling.focusphone.launcher.UNINSTALL_RESULT";
     private const string UninstallNoticeKey = "uninstall";
-    private readonly HashSet<string> notifiedPackages = [];
+
+    // Keyed by package; the value is the normalized urgency TileNotificationListener broadcast
+    // (0/1/2 — see its Urgency method), which ShelfArt.NotificationHue maps to a role hue. A key's
+    // mere presence is still "has a notification" for HasNotification.
+    private readonly Dictionary<string, int> notificationPriorities = [];
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -134,7 +138,7 @@ public class HomeActivity : Activity
 
     private View BuildLayout()
     {
-        art = new ShelfArt(this, () => notifiedPackages);
+        art = new ShelfArt(this, () => notificationPriorities);
         shelf = new BookshelfView(this, art)
         {
             ItemTapped = OnItemTapped,
@@ -245,10 +249,13 @@ public class HomeActivity : Activity
 
     private void UpdateClock() => shelf?.SetTime(DateTime.Now.TimeOfDay);
 
-    private void OnNotificationsChanged(IReadOnlySet<string> packages)
+    private void OnNotificationsChanged(IReadOnlyDictionary<string, int> priorities)
     {
-        notifiedPackages.Clear();
-        notifiedPackages.UnionWith(packages);
+        notificationPriorities.Clear();
+        foreach (var (package, priority) in priorities)
+        {
+            notificationPriorities[package] = priority;
+        }
         shelf?.RefreshBookmarks();
     }
 
@@ -519,7 +526,7 @@ public class HomeActivity : Activity
 
     // ---- The art the shelf paints through ----
 
-    private sealed class ShelfArt(Context context, Func<IReadOnlySet<string>> notifications) : IShelfArt
+    private sealed class ShelfArt(Context context, Func<IReadOnlyDictionary<string, int>> notifications) : IShelfArt
     {
         private readonly PackageManager packageManager = context.PackageManager!;
         private readonly Android.Content.Res.Resources resources = context.Resources!;
@@ -587,7 +594,20 @@ public class HomeActivity : Activity
         public bool MarksInvertToInk(string packageKey) =>
             BookClothPalette.MarksInvertToInk(BookClothPalette.ForPackage(packageKey));
 
-        public bool HasNotification(string packageKey) => notifications().Contains(packageKey);
+        public bool HasNotification(string packageKey) => notifications().ContainsKey(packageKey);
+
+        // Priority, not cloth: DESIGN.md §9's role hues, so an urgent notification reads as
+        // urgent regardless of which book's binding it is pinned to. TileNotificationListener's
+        // Urgency already collapsed both Android priority systems to this 0/1/2 scale.
+        public int NotificationHue(string packageKey) =>
+            notifications().TryGetValue(packageKey, out var urgency)
+                ? urgency switch
+                {
+                    2 => PaperTheme.ProblemMark.ToArgb(),    // high/max — needs attention now
+                    0 => PaperTheme.ResolvedMark.ToArgb(),   // low/min — the quiet, settled tone
+                    _ => PaperTheme.ProgressMark.ToArgb(),   // default — something waiting for you
+                }
+                : PaperTheme.ProgressMark.ToArgb();
 
         private Drawable? TryLoad(string package)
         {
@@ -613,12 +633,21 @@ public class HomeActivity : Activity
         public override void OnReceive(Context? context, Intent? intent) => onTick();
     }
 
-    private class NotificationsChangedReceiver(Action<IReadOnlySet<string>> onChanged) : BroadcastReceiver
+    private class NotificationsChangedReceiver(Action<IReadOnlyDictionary<string, int>> onChanged) : BroadcastReceiver
     {
         public override void OnReceive(Context? context, Intent? intent)
         {
             var packages = intent?.GetStringArrayExtra(TileNotificationListener.ExtraPackages) ?? [];
-            onChanged(packages.ToHashSet());
+            var priorities = intent?.GetIntArrayExtra(TileNotificationListener.ExtraPriorities) ?? [];
+            var byPackage = new Dictionary<string, int>();
+            for (var i = 0; i < packages.Length; i++)
+            {
+                // Priorities is parallel to packages (TileNotificationListener.BroadcastActivePackages);
+                // a short array here would only mean an old build sent the intent — default to 1
+                // (the neutral "default" urgency) rather than throw.
+                byPackage[packages[i]] = i < priorities.Length ? priorities[i] : 1;
+            }
+            onChanged(byPackage);
         }
     }
 }
