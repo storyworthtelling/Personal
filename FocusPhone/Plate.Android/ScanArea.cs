@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Content;
+using Android.Net.Wifi;
 using Android.Views;
 using Android.Widget;
 using AndroidX.Camera.Core;
@@ -171,7 +172,8 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             // in a proportional face is a value the owner cannot check character by character.
             column.AddView(PaperUi.Mono(Host, reading.Value));
             column.AddView(PaperUi.Secondary(Host,
-                "A web address opens in the phone's browser. Anything else stays here."));
+                "A web address opens in the phone's browser. A Wi-Fi network offers to join "
+                + "it. Anything else stays here."));
         }
 
         shell.Camera.BindPreview(codePreview);
@@ -186,9 +188,12 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             PaperUi.SecondaryButton(Host, "Add a page", StartDocumentScan),
             PaperUi.QuietButton(Host, "Discard", Discard)),
         Face.Code => PaperUi.BottomBar(Host,
-            reading.Action == QrAction.OpenInBrowser
-                ? PaperUi.PrimaryButton(Host, "Open it", OpenReading)
-                : PaperUi.PrimaryButton(Host, "Read the code", TakeCodeFrame),
+            reading.Action switch
+            {
+                QrAction.OpenInBrowser => PaperUi.PrimaryButton(Host, "Open it", OpenReading),
+                QrAction.JoinWifi => PaperUi.PrimaryButton(Host, "Join this network", JoinWifiNetwork),
+                _ => PaperUi.PrimaryButton(Host, "Read the code", TakeCodeFrame),
+            },
             PaperUi.SecondaryButton(Host, "Scan another", TakeCodeFrame),
             PaperUi.QuietButton(Host, "Done", Discard)),
         _ => null,
@@ -461,6 +466,47 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         catch (ActivityNotFoundException)
         {
             Host.StartActivity(new Intent(Intent.ActionView, uri));
+        }
+    }
+
+    // The modern, non-privileged route: a normal app cannot touch the Wi-Fi config directly
+    // on recent Android, so this hands one suggestion to the system, which shows the owner
+    // its own add/join dialog rather than joining silently on the code's say-so.
+    private void JoinWifiNetwork()
+    {
+        if (reading.Action != QrAction.JoinWifi || reading.Network is not { } network)
+        {
+            return;
+        }
+
+        var builder = new WifiNetworkSuggestion.Builder()
+            .SetSsid(network.Ssid)
+            .SetIsHiddenSsid(network.Hidden);
+        if (!string.IsNullOrEmpty(network.Password))
+        {
+            switch (network.Security)
+            {
+                case WifiSecurity.Wpa2:
+                    builder.SetWpa2Passphrase(network.Password);
+                    break;
+                case WifiSecurity.Wpa3:
+                    builder.SetWpa3Passphrase(network.Password);
+                    break;
+            }
+            // WifiSecurity.Open and WifiSecurity.Wep never reach here: Open sets no
+            // passphrase at all, and QrScan never emits QrAction.JoinWifi for Wep.
+        }
+
+        var suggestions = new List<Android.OS.IParcelable> { builder.Build() };
+        var intent = new Intent(Android.Provider.Settings.ActionWifiAddNetworks);
+        intent.PutParcelableArrayListExtra(Android.Provider.Settings.ExtraWifiNetworkList, suggestions);
+        try
+        {
+            Host.StartActivity(intent);
+        }
+        catch (ActivityNotFoundException)
+        {
+            ShowStatus("This phone can't add a Wi-Fi network from here.");
         }
     }
 
