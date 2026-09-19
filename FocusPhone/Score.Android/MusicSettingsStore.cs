@@ -1,3 +1,4 @@
+using System.Globalization;
 using Android.Content;
 using Codex.Domain.Music;
 
@@ -17,6 +18,7 @@ public static class MusicSettingsStore
     private const string LastRefreshKey = "tasteLastRefreshUtc";
     private const string StackSizeKey = "fridayStackSize";
     private const string TempoGapKey = "tempoGap";
+    private const string LastGreetingDateKey = "lastGreetingLocalDate";
 
     private static ISharedPreferences Preferences =>
         global::Android.App.Application.Context.GetSharedPreferences(PreferencesName, FileCreationMode.Private)!;
@@ -75,5 +77,26 @@ public static class MusicSettingsStore
             return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
         }
         set => Preferences.Edit()!.PutLong(LastRefreshKey, value?.UtcTicks ?? 0)!.Apply();
+    }
+
+    /// <summary>
+    /// The owner's-local calendar date the owner's-voice greeting last actually displayed
+    /// something (not merely attempted — see <see cref="Codex.Domain.Music.FirstOpenOfDay"/>),
+    /// so <c>ScoreActivity.ShowGreetingAsync</c> knows whether this open is the day's first —
+    /// the one the nightly rescan's findings ride in on.
+    /// </summary>
+    public static DateOnly? LastGreetingLocalDate
+    {
+        get
+        {
+            var stored = Preferences.GetString(LastGreetingDateKey, null);
+            return stored is not null && DateOnly.TryParseExact(
+                stored, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                ? date
+                : null;
+        }
+        set => Preferences.Edit()!
+            .PutString(LastGreetingDateKey, value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))!
+            .Apply();
     }
 }
