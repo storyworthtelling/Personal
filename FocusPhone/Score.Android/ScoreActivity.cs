@@ -5,6 +5,7 @@ using Android.Views;
 using Android.Widget;
 using Score.Google;
 using Codex.Domain.Design;
+using Codex.Domain.Music;
 using Codex.Ui;
 
 namespace Score;
@@ -39,6 +40,7 @@ public class ScoreActivity : Activity
     private Codex.Ui.Voice.VoiceGreeting? greeting;
     private TextView? greetingView;
     private string greetingText = string.Empty;
+    private RescanOutcomeStore rescanOutcomeStore = null!;
 
     private FrameLayout content = null!;
     private FrameLayout bottomBarSlot = null!;
@@ -98,6 +100,7 @@ public class ScoreActivity : Activity
         }
 
         FridayPicksWorker.Schedule(this); // weekly "New for you"; no-ops until signed in
+        MusicScanWorker.ScheduleNightly(this); // nightly incremental rescan; no-ops until a folder is chosen
 
         // Keeps Score current where nothing else will. On the locked phone the
         // launcher is the custodian and this resolves to Deferred, so it costs a
@@ -105,6 +108,7 @@ public class ScoreActivity : Activity
         ScoreUpdateService.Schedule(this);
 
         greeting = new Codex.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "Score");
+        rescanOutcomeStore = new RescanOutcomeStore(this);
         SetContentView(BuildLayout());
         playback.Connect();
         ShowGreetingAsync();
@@ -125,16 +129,40 @@ public class ScoreActivity : Activity
 
     // Composes a greeting in the owner's voice (from the shared Drive profile + key) and shows it under the
     // header. Best-effort: it stays hidden when there's no signed-in account, profile, key, or on any error.
+    //
+    // On the day's first such greeting (Codex.Domain.Music.FirstOpenOfDay), the context fed to the
+    // composer carries what the nightly rescan (MusicScanWorker.ScheduleNightly) found, when it found
+    // anything — RescanOutcomeStore.Completed is the last fully-drained scan's outcome, whether that
+    // scan ran overnight or was triggered by hand from Settings. Nothing found is left unmentioned
+    // rather than described as "nothing new" (quiet by default, DESIGN.md's own standing rule):
+    // the owner asked for the greeting to be ABOUT a finding, not to announce the absence of one.
+    // The date is only advanced once a greeting actually displays, so a composer that returns
+    // nothing (no profile, no key, a failed call) leaves the day's "first" open for the next try.
     private async void ShowGreetingAsync()
     {
         if (greeting is null || greetingView is null)
             return;
-        var message = await greeting.ComposeAsync(
-            "welcome", "the owner is opening their music and podcasts", CancellationToken.None);
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var isFirstOpenToday = FirstOpenOfDay.IsFirst(today, MusicSettingsStore.LastGreetingLocalDate);
+        var outcome = isFirstOpenToday ? rescanOutcomeStore.Completed : null;
+
+        var context = outcome is { IsEmpty: false } found
+            ? "the owner is opening their music and podcasts for the first time today; " +
+              $"their automatic overnight library rescan found this: {found.Describe()}"
+            : "the owner is opening their music and podcasts";
+
+        var message = await greeting.ComposeAsync("welcome", context, CancellationToken.None);
         if (string.IsNullOrWhiteSpace(message))
             return;
+
         greetingText = message;
         greetingView.Text = message;
+        if (isFirstOpenToday)
+        {
+            MusicSettingsStore.LastGreetingLocalDate = today;
+        }
+
         RenderContent(); // the seat belongs to two areas, so the shell decides where it shows
     }
 
