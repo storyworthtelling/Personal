@@ -19,6 +19,13 @@ public class Novel
     public string ArtStyle { get; set; } = ArtStyles.Default;
     public ProjectStage Stage { get; set; } = ProjectStage.Created;
 
+    // The Work desk's line about this book, in the owner's voice (D96), and the stage it was written
+    // for. Stored rather than composed on render: the line comes from a model, and the desk is the
+    // screen the app opens on, so composing as it paints would bill a call per book every time the
+    // owner looked at their shelf. VoicedLinePlan decides when it has gone stale.
+    public string VoicedLine { get; set; } = string.Empty;
+    public ProjectStage? VoicedLineStage { get; set; }
+
     // Draft versioning. A "project" is one book the owner is revising; each draft is a fresh conversion
     // of a re-picked source doc, all sharing one ProjectId. The first draft's ProjectId is its own Id
     // (so a lone manuscript is a one-draft project), DraftNumber is 1, and PreviousDraftId is null. A
