@@ -1090,7 +1090,16 @@ public sealed class ReviewProcessor : IPipelineStep
                             .ToList(),
                         synthesis.RevisionPlan,
                         synthesis.Verdict);
-                var pdf = analysisPdfComposer.Compose(folded, BuildCover(novel, wordCount), scenes, review);
+                // The draft's own text, which the report marks the findings onto (Release G). Read
+                // here rather than carried through the reduce, because it is the largest thing in the
+                // database and every earlier step works from notes about it.
+                var manuscript = await db.SourceTexts
+                    .Where(source => source.NovelId == novel.Id)
+                    .Select(source => source.FullText)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                var pdf = analysisPdfComposer.Compose(
+                    folded, BuildCover(novel, wordCount), scenes, review, manuscript);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -1252,9 +1261,19 @@ public sealed class ReviewProcessor : IPipelineStep
             novel.ArchivedAtUtc = clock.UtcNow;
             if (archive.FreeLocalCopies)
             {
-                imageStore.Delete($"{novel.Id}/scenes");
+                // Not this draft's own scenes: the next draft pairs its changed scenes against them
+                // (F41) and this is the only copy. SceneRetention says which are actually finished.
+                var siblings = await db.Novels
+                    .Where(n => n.ProjectId == novel.ProjectId)
+                    .Select(n => n.Id)
+                    .ToListAsync(cancellationToken);
+                foreach (var finished in SceneRetention.Freeable(novel.Id, novel.PreviousDraftId, siblings))
+                {
+                    imageStore.Delete($"{finished}/scenes");
+                }
+
                 logger.LogInformation(
-                    "Freed the intermediate scene images of manuscript {NovelId} after archiving", novel.Id);
+                    "Freed the scene images of the finished drafts of project {ProjectId} after archiving", novel.ProjectId);
             }
         }
 
@@ -1567,8 +1586,22 @@ public sealed class ReviewProcessor : IPipelineStep
         var scenes = await db.Scenes
             .Where(s => s.NovelId == novelId)
             .OrderBy(s => s.Number)
-            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath })
+            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath, s.Changed, s.PreviousSceneId })
             .ToListAsync(cancellationToken);
+
+        // The before half of a changed scene's pair (F41). Only for changed scenes: an unchanged one
+        // reuses the very image it would be compared against, and the same picture twice is not a
+        // before and after.
+        var priorIds = scenes
+            .Where(s => s.Changed && s.PreviousSceneId is not null)
+            .Select(s => s.PreviousSceneId!.Value)
+            .ToList();
+        var priorPaths = priorIds.Count == 0
+            ? []
+            : await db.Scenes
+                .Where(s => priorIds.Contains(s.Id))
+                .Select(s => new { s.Id, s.ImagePath })
+                .ToDictionaryAsync(s => s.Id, s => s.ImagePath, cancellationToken);
 
         var evidence = new List<SceneEvidence>(scenes.Count);
         for (var i = 0; i < scenes.Count; i++)
@@ -1578,11 +1611,19 @@ public sealed class ReviewProcessor : IPipelineStep
                 ? $"Scene {scene.Number}"
                 : $"{scene.ChapterLabel} · Scene {scene.Number}";
             var beat = i < sceneBreakdown.Count ? sceneBreakdown[i] : null;
-            var image = scene.ImagePath is not null && imageStore.Exists(scene.ImagePath)
-                ? imageStore.Read(scene.ImagePath)
-                : null;
+            byte[]? Read(string? path) =>
+                path is not null && imageStore.Exists(path) ? imageStore.Read(path) : null;
+
+            byte[]? previous = null;
+            if (scene.Changed && scene.PreviousSceneId is { } priorId
+                && priorPaths.TryGetValue(priorId, out var priorPath))
+            {
+                previous = Read(priorPath);
+            }
+
             evidence.Add(new SceneEvidence(
-                citation, beat?.Purpose ?? string.Empty, beat?.Verdict ?? string.Empty, image));
+                citation, beat?.Purpose ?? string.Empty, beat?.Verdict ?? string.Empty,
+                Read(scene.ImagePath), previous));
         }
         return evidence;
     }

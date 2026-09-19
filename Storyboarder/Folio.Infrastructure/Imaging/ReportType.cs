@@ -33,6 +33,14 @@ public static class ReportType
     public static SKFont Heading() => Font(EmbeddedTypefaces.SerifSemibold, PaperTypeScale.Heading);
 
     public static SKFont Body() => Font(EmbeddedTypefaces.SerifRegular, PaperTypeScale.Body);
+
+    /// <summary>
+    /// The manuscript itself, on the marked-up pages. The same face and rung as the body, named
+    /// separately because it is the only type in the report that is the author's own words rather
+    /// than the report's — and because <see cref="Folio.Domain.Markup.MarkupGeometry"/>'s line
+    /// height, which decides how long the document is, is set against this size.
+    /// </summary>
+    public static SKFont Manuscript() => Font(EmbeddedTypefaces.SerifRegular, PaperTypeScale.Body);
     public static SKFont BodyBold() => Font(EmbeddedTypefaces.SerifSemibold, PaperTypeScale.Body);
     public static SKFont BodyItalic() => Font(EmbeddedTypefaces.SerifItalic, PaperTypeScale.Body);
 
