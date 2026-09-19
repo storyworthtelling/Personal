@@ -1,4 +1,5 @@
 using Folio.Domain.Analysis;
+using Folio.Domain.Readiness;
 using Folio.Domain.Report;
 using SkiaSharp;
 using Storyworthtelling.Paper;
@@ -184,9 +185,18 @@ internal sealed class PageWriter : IDisposable
         y += height + PageGeometry.TightGap;
     }
 
-    // A compact tension-over-chapters chart: an area under a polyline, so a saggy stretch reads at a
-    // glance. Values are clamped 0..1; an empty curve draws nothing.
-    public void PacingChart(IReadOnlyList<ChapterTension> curve)
+    /// <summary>
+    /// Tension across the chapters, with the revision plan drawn on it: a finding over a range
+    /// recolours that run of the line in its severity, a single-chapter finding is a dot, and a sag
+    /// takes the hue of whatever sits on it (F39).
+    ///
+    /// <para>It is a line and not filled bands, and the reason is measured in
+    /// <see cref="PacingChart"/>: the Document profile's four severity tones are equiluminant, so
+    /// the edge between two adjacent fills would carry about 1.02:1 and exist in hue alone. Each run
+    /// therefore also carries its <see cref="SeverityCue"/> weight and dash, which is §16's
+    /// non-colour cue and what makes the chart survive the grayscale panel it is read on.</para>
+    /// </summary>
+    public void PacingChart(IReadOnlyList<ChapterTension> curve, IReadOnlyList<PacingFinding> findings)
     {
         if (curve is not { Count: > 0 })
             return;
@@ -198,6 +208,7 @@ internal sealed class PageWriter : IDisposable
 
         var left = ContentLeft;
         var bottom = y + height;
+        var overlay = Domain.Report.PacingChart.Overlay(curve, findings ?? []);
 
         using (var frame = new SKPaint
         {
@@ -215,34 +226,121 @@ internal sealed class PageWriter : IDisposable
             points[i] = new SKPoint(px, py);
         }
 
-        using (var area = new SKPath())
+        // A sag is a bracket *under* the rule, not a wash behind the line. Rendered as a pale fill it
+        // came out as a smear sitting on the baseline and read as a printing fault; a bracket is a
+        // drawn mark, survives the grayscale panel, and cannot be mistaken for the series.
+        foreach (var sag in overlay.Sags)
         {
-            area.MoveTo(points[0].X, bottom);
-            foreach (var point in points)
-                area.LineTo(point.X, point.Y);
-            area.LineTo(points[^1].X, bottom);
-            area.Close();
-            using var fill = new SKPaint
+            var from = points[Math.Clamp(sag.FromChapter, 0, points.Length - 1)].X;
+            var to = points[Math.Clamp(sag.ToChapter, 0, points.Length - 1)].X;
+            var rule = bottom + SagBandDepth;
+            using var bracket = new SKPaint
             {
-                Color = ReportPalette.Rule.WithAlpha(0x33), IsAntialias = true, Style = SKPaintStyle.Fill,
+                Color = Hue(sag.Severity), IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.2f,
             };
-            canvas.DrawPath(area, fill);
+            canvas.DrawLine(from, rule, to, rule, bracket);
+            canvas.DrawLine(from, rule, from, rule - 3f, bracket);
+            canvas.DrawLine(to, rule, to, rule - 3f, bracket);
         }
 
-        using (var line = new SKPaint
+        foreach (var run in overlay.Runs)
         {
-            Color = ReportPalette.Rule, IsAntialias = true, StrokeWidth = 1.5f,
-            Style = SKPaintStyle.Stroke, StrokeJoin = SKStrokeJoin.Round,
-        })
-            for (var i = 1; i < points.Length; i++)
-                canvas.DrawLine(points[i - 1], points[i], line);
+            var cue = run.Severity is { } severity ? SeverityCue.Stroke(severity) : SeverityCue.Plain;
+            using var line = new SKPaint
+            {
+                Color = Hue(run.Severity), IsAntialias = true, StrokeWidth = (float)cue.Width,
+                Style = SKPaintStyle.Stroke, StrokeJoin = SKStrokeJoin.Round, StrokeCap = SKStrokeCap.Round,
+                PathEffect = cue.IsSolid
+                    ? null
+                    : SKPathEffect.CreateDash([.. cue.Dash.Select(length => (float)length)], 0),
+            };
 
-        using (var dot = new SKPaint { Color = ReportPalette.Rule, IsAntialias = true, Style = SKPaintStyle.Fill })
+            for (var i = run.FromChapter + 1; i <= run.ToChapter && i < points.Length; i++)
+                canvas.DrawLine(points[i - 1], points[i], line);
+        }
+
+        using (var dot = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true, Style = SKPaintStyle.Fill })
             foreach (var point in points)
                 canvas.DrawCircle(point.X, point.Y, 1.5f, dot);
 
-        y = bottom + PageGeometry.BlockGap;
+        // A single-chapter finding: a ringed dot, so it is a different shape from the chapter marks
+        // rather than the same shape in a colour.
+        foreach (var marked in overlay.Dots)
+        {
+            var point = points[Math.Clamp(marked.Chapter, 0, points.Length - 1)];
+            using var ring = new SKPaint
+            {
+                Color = Hue(marked.Severity), IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.4f,
+            };
+            canvas.DrawCircle(point.X, point.Y, 4f, ring);
+        }
+
+        y = bottom + SagBandDepth;
+        Key(overlay);
     }
+
+    /// <summary>
+    /// Names the severities this chart drew, in their own stroke and hue.
+    ///
+    /// <para>Without it the claim the chart rests on is not true: a reader would be inferring
+    /// severity from colour, which is the thing §16 forbids and the thing the runs' weights and
+    /// dashes exist to avoid. It lists only what was drawn, so a clean chart carries no key.</para>
+    /// </summary>
+    private void Key(PacingOverlay overlay)
+    {
+        var drawn = overlay.Runs.Select(run => run.Severity)
+            .Concat(overlay.Dots.Select(dot => (ReadinessTier?)dot.Severity))
+            .Where(severity => severity is not null)
+            .Select(severity => severity!.Value)
+            .Distinct()
+            .OrderBy(severity => severity)
+            .ToList();
+
+        if (drawn.Count == 0)
+            return;
+
+        var font = ReportType.Small();
+
+        // A whole line clear of the sag brackets hanging under the rule. Set to one gap, the key's
+        // swatches printed alongside a bracket and the two read as one row of marks.
+        y += font.Spacing;
+
+        var x = ContentLeft;
+        foreach (var severity in drawn)
+        {
+            var cue = SeverityCue.Stroke(severity);
+            using (var sample = new SKPaint
+            {
+                Color = Hue(severity), IsAntialias = true, StrokeWidth = (float)cue.Width,
+                Style = SKPaintStyle.Stroke, StrokeCap = SKStrokeCap.Round,
+                PathEffect = cue.IsSolid
+                    ? null
+                    : SKPathEffect.CreateDash([.. cue.Dash.Select(length => (float)length)], 0),
+            })
+                canvas.DrawLine(x, y, x + 18f, y, sample);
+
+            var label = severity.ToString();
+            using (var ink = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true })
+                canvas.DrawText(label, x + 23f, y + 3f, SKTextAlign.Left, font, ink);
+
+            x += 23f + font.MeasureText(label) + 20f;
+        }
+
+        y += PageGeometry.BlockGap;
+    }
+
+    /// <summary>How far below the chart's rule a sag bracket hangs.</summary>
+    private const float SagBandDepth = 5f;
+
+    /// <summary>The severity's printed hue; the plain line where nothing is wrong.</summary>
+    private static SKColor Hue(ReadinessTier? severity) => severity switch
+    {
+        ReadinessTier.Must => ReportPalette.MustFix,
+        ReadinessTier.Should => ReportPalette.Should,
+        ReadinessTier.Consider => ReportPalette.Consider,
+        ReadinessTier.Great => ReportPalette.Great,
+        _ => ReportPalette.Rule,
+    };
 
     /// <summary>Closes the last page and returns the document's bytes.</summary>
     public byte[] Finish()
