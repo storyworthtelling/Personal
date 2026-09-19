@@ -829,6 +829,14 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // Blocking is handed to Android's own blocked-numbers list rather than kept here, so
     // it applies everywhere on the phone instead of only inside Post — a number blocked in
     // one app and ringing through in another is worse than not blocking it.
+    //
+    // Blocking a number is deciding to be done with the person, not just their calls, so it
+    // also files the whole open correspondence — every item under it, on every channel the
+    // owner has resolved to this contact (§ ContactAssociations/TimelineMerger), not only
+    // the one number that was blocked — through the same Filing.File the rest of the phase
+    // uses (hide locally, queue the source delete). The correspondence is then closed back
+    // to the list: there is nothing left here worth looking at. It is one undo-first act
+    // (§7): undo un-blocks the number AND un-files every item, exactly reversing both halves.
     private void Block(string number)
     {
         try
@@ -837,14 +845,13 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             values.Put(Android.Provider.BlockedNumberContract.BlockedNumbers.ColumnOriginalNumber, number);
             Host.ContentResolver!.Insert(
                 Android.Provider.BlockedNumberContract.BlockedNumbers.ContentUri!, values);
-
-            DogEar.Show(Host, Overlay, $"Blocked {number}.", onUndo: () => Unblock(number));
         }
         catch (Exception e)
         {
             // Only the default SMS or dialer app may write the blocked list. Post holds the
-            // SMS role, so this should work — but if it does not, say so rather than
-            // leaving the owner believing a number is blocked when it is not.
+            // SMS role, so this should work — but if it does not, say so rather than leaving
+            // the owner believing a number is blocked when it is not. Nothing is filed and
+            // the correspondence stays open: a refused block should look like nothing happened.
             Android.Util.Log.Warn("Post", $"Could not block {number}: {e}");
             PostDiagnostics.LogWarning("Block", $"Could not block {number}", e);
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Block, new DogEar.Notice(
@@ -852,6 +859,31 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 "The phone would not accept it. Blocking is the system's list, not Post's, and it "
                 + "refused — so calls from this number will still come through.",
                 PaperTheme.ProblemMark));
+            return;
+        }
+
+        var title = openTitle;
+        var now = DateTimeOffset.UtcNow;
+        var filed = openItems.ToList();
+        foreach (var item in filed)
+        {
+            Filing.File(Host, item, now);
+        }
+        CloseThread();
+
+        DogEar.Show(Host, Overlay, $"Blocked {title}.", onUndo: () =>
+        {
+            Unblock(number);
+            foreach (var item in filed)
+            {
+                Filing.Unfile(Host, item.SourceId);
+            }
+            ReloadThreads();
+        });
+
+        if (filed.Count > 0)
+        {
+            Syncs.After(Host, PostAction.Filed);
         }
     }
 
