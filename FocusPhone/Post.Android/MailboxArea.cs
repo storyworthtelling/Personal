@@ -46,6 +46,16 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private IReadOnlyList<ThreadRow> allRows = [];
     private IReadOnlyList<ThreadRow> shownRows = [];
 
+    // Marketing-classified mail, set aside from the ordinary list into its own quiet,
+    // collapsible bucket (see remarks on BuildMarketingSection). It ages out on exactly the
+    // same one-day schedule as before (Codex.Domain.Post.MailAgeing) — this only changes
+    // where it is seen in the meantime, not when it goes.
+    private IReadOnlyList<ThreadRow> marketingRows = [];
+    private bool marketingExpanded;
+    private LinearLayout? marketingSection;
+    private TextView? marketingHeader;
+    private LinearLayout? marketingItemsHost;
+
     // What the empty state last said, and how far up any ladder it had climbed. Held for
     // the life of the screen and persisted by the store, so opening an unchanged empty
     // Mailbox again is what steps the line up.
@@ -73,6 +83,9 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             BindRows();
         };
         column.AddView(filter, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        column.AddView(BuildMarketingSection(), new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
         // A quiet status sentence for loading/sync (§8: a sentence, not a spinner).
@@ -127,7 +140,82 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         BindRows();
+        BindMarketingSection();
         return column;
+    }
+
+    // A quiet, collapsible bucket for marketing-classified mail (Codex.Domain.Post.MailClass
+    // .Marketing), set aside from the ordinary list rather than mixed into it — moving it
+    // here is itself a form of dealt-with, the way filing or blocking a sender are. It is
+    // not a new binder tab (that is a bigger decision than this one) and it is not a
+    // confirm step or a toast: the header just says how many are waiting and expands in
+    // place, updating on the normal render cycle like everything else in the Mailbox.
+    //
+    // Marketing mail still ages out on exactly the schedule it always has
+    // (Codex.Domain.Post.MailAgeing, one day) — this section only changes where it is seen
+    // until then, never when it goes.
+    private View BuildMarketingSection()
+    {
+        marketingSection = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+
+        marketingHeader = PaperUi.Secondary(Host, string.Empty);
+        var verticalPadding = PaperTheme.Dp(Host, DesignTokens.Space.X3);
+        marketingHeader.SetPadding(0, verticalPadding, 0, verticalPadding);
+        marketingHeader.Click += (_, _) =>
+        {
+            marketingExpanded = !marketingExpanded;
+            BindMarketingSection();
+        };
+        marketingSection.AddView(marketingHeader, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        marketingItemsHost = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        marketingSection.AddView(marketingItemsHost, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
+        marketingSection.Visibility = ViewStates.Gone;
+        return marketingSection;
+    }
+
+    // Redraws the section from the current marketingRows — hidden entirely while the
+    // bucket is empty, so an owner with no marketing mail waiting never sees it. Tapping a
+    // row opens that correspondence exactly the way a Mailbox row does (ThreadActivity),
+    // which is where the full set of actions (file, delete, …) already live.
+    private void BindMarketingSection()
+    {
+        if (marketingSection is null || marketingHeader is null || marketingItemsHost is null)
+        {
+            return;
+        }
+
+        if (marketingRows.Count == 0)
+        {
+            marketingSection.Visibility = ViewStates.Gone;
+            marketingExpanded = false;
+            return;
+        }
+
+        marketingSection.Visibility = ViewStates.Visible;
+        var arrow = marketingExpanded ? "▾" : "▸";
+        marketingHeader.Text = $"{arrow} Marketing ({marketingRows.Count})";
+
+        marketingItemsHost.RemoveAllViews();
+        marketingItemsHost.Visibility = marketingExpanded ? ViewStates.Visible : ViewStates.Gone;
+        if (marketingExpanded)
+        {
+            var rows = marketingRows;
+            var list = PaperUi.List(Host, rows
+                .Select(row => new PaperListRow(row.Title, row.Subtitle))
+                .ToList(),
+                position =>
+                {
+                    var intent = new Android.Content.Intent(Host, typeof(ThreadActivity));
+                    intent.PutExtra(ThreadActivity.ExtraContactKey, rows[position].ContactKey);
+                    Host.StartActivity(intent);
+                });
+            marketingItemsHost.AddView(list, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+        }
     }
 
     public override void Resume()
@@ -155,7 +243,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         Task.Run(() =>
         {
             var live = ReadLiveTail();
-            var (page, rows) = ReadPageAndBuild(live, [], 0, titleSeed);
+            var (page, rows, marketing) = ReadPageAndBuild(live, [], 0, titleSeed);
             Host.RunOnUiThread(() =>
             {
                 if (generation != loadGeneration)
@@ -169,9 +257,11 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 cacheOffset = page.Count;
                 cacheExhausted = page.Count < CachePageSize;
                 allRows = rows;
+                marketingRows = marketing;
                 loading = false;
                 RefreshEmptyLine(rows.Count);
                 BindRows();
+                BindMarketingSection();
                 ClearStatus();
             });
         });
@@ -194,7 +284,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         Task.Run(() =>
         {
-            var (page, rows) = ReadPageAndBuild(live, prior, offset, titleSeed);
+            var (page, rows, marketing) = ReadPageAndBuild(live, prior, offset, titleSeed);
             Host.RunOnUiThread(() =>
             {
                 if (generation != loadGeneration)
@@ -205,8 +295,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 cacheOffset += page.Count;
                 cacheExhausted = page.Count < CachePageSize;
                 allRows = rows;
+                marketingRows = marketing;
                 loading = false;
                 BindRows();
+                BindMarketingSection();
             });
         });
     }
@@ -235,12 +327,19 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     // Reads one cache page at the given offset and merges it with the live tail and the
     // pages already loaded into an ordered set of list rows. Runs on a background thread.
-    private (List<TimelineItem> Page, List<ThreadRow> Rows) ReadPageAndBuild(
+    //
+    // Marketing-classified mail is split out of the merge before the ordinary rows are
+    // built (MailboxSections.SplitMarketing) and merged into its own thread list the same
+    // way, so the Mailbox's rows never include it — it surfaces only in the marketing
+    // section (BuildMarketingSection). This is a visibility split, not a new expiry path:
+    // MailAgeing still decides when a marketing item goes, unchanged.
+    private (List<TimelineItem> Page, List<ThreadRow> Rows, List<ThreadRow> MarketingRows) ReadPageAndBuild(
         List<TimelineItem> live, List<TimelineItem> priorCache, int offset,
         Dictionary<string, string> titleSeed)
     {
         var page = new List<TimelineItem>();
         IReadOnlyList<ContactThread> merged;
+        IReadOnlyList<ContactThread> marketingThreads;
         try
         {
             using var database = TimelineDatabase.Open(Host);
@@ -254,9 +353,13 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             // Drop items the owner deleted, merge by resolved person identity, then stamp
             // unread from the per-thread read record.
             var visible = database.Hidden.Filter(all);
+            var (ordinary, marketing) = MailboxSections.SplitMarketing(visible);
             var resolver = ContactAssociations.BuildResolver(Host, database.IdentityLinks);
             var readState = new ReadState(database.ReadState.LoadAll());
-            merged = new TimelineMerger().Merge(visible, resolver)
+            merged = new TimelineMerger().Merge(ordinary, resolver)
+                .Select(readState.Apply)
+                .ToList();
+            marketingThreads = new TimelineMerger().Merge(marketing, resolver)
                 .Select(readState.Apply)
                 .ToList();
         }
@@ -266,13 +369,18 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             // database problem take the screen down — fall back to a plain merge.
             Android.Util.Log.Warn("Post", $"Timeline stores unavailable: {e}");
             PostDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
-            merged = new TimelineMerger().Merge(live.Concat(priorCache).Concat(page));
+            var (ordinary, marketing) = MailboxSections.SplitMarketing(live.Concat(priorCache).Concat(page));
+            merged = new TimelineMerger().Merge(ordinary);
+            marketingThreads = new TimelineMerger().Merge(marketing);
         }
 
         var rows = InboxOrdering.UnreadFirstThenRecent(merged)
             .Select(thread => BuildRow(thread, titleSeed))
             .ToList();
-        return (page, rows);
+        var marketingRows = InboxOrdering.UnreadFirstThenRecent(marketingThreads)
+            .Select(thread => BuildRow(thread, titleSeed))
+            .ToList();
+        return (page, rows, marketingRows);
     }
 
     private ThreadRow BuildRow(ContactThread thread, Dictionary<string, string> titleSeed)
