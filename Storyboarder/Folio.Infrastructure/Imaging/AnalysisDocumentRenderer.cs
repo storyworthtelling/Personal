@@ -175,7 +175,7 @@ public sealed class AnalysisDocumentRenderer
             if (analysis.PacingCurve is { Count: > 0 })
             {
                 writer.Paragraph("Tension across the chapters — a dip is a place to check the story is still pulling.", bodyItalic, Muted);
-                writer.PacingChart(analysis.PacingCurve);
+                writer.PacingChart(analysis.PacingCurve, PlacedFindings(analysis));
             }
             foreach (var note in analysis.PacingNotes ?? [])
                 writer.Bullet(Join(note.Chapter, note.Detail) + Tag(FindingCategory.Pacing, note.Detail, statusByFinding), body, Ink);
@@ -601,4 +601,18 @@ public sealed class AnalysisDocumentRenderer
 
     private static string Quoted(string? excerpt) =>
         string.IsNullOrWhiteSpace(excerpt) ? string.Empty : $"“{excerpt}”";
+
+    /// <summary>
+    /// The revision plan, placed on the pacing chart (F39). A finding whose citation names no chapter
+    /// on the curve is simply not drawn: the chart says less rather than saying it in the wrong
+    /// place. See <see cref="ChapterCitation"/>.
+    /// </summary>
+    private static IReadOnlyList<PacingFinding> PlacedFindings(BookAnalysisResult analysis) =>
+    [
+        .. (analysis.RevisionPlan ?? [])
+            .Select(item => (Item: item, Range: ChapterCitation.Locate(item.Chapter, analysis.PacingCurve)))
+            .Where(placed => placed.Range is not null)
+            .Select(placed => new PacingFinding(
+                placed.Range!.Value.From, placed.Range.Value.To, ChapterCitation.Tier(placed.Item.Priority))),
+    ];
 }
