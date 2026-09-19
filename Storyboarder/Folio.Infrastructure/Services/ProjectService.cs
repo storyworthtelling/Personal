@@ -8,6 +8,7 @@ using Folio.Domain.Imaging;
 using Folio.Domain.Model;
 using Folio.Domain.Text;
 using Folio.Domain.Time;
+using Folio.Domain.Voice;
 using Folio.Infrastructure.Configuration;
 using Storyworthtelling.Voice;
 using Folio.Infrastructure.External;
@@ -34,12 +35,14 @@ public sealed class ProjectService
     // Optional, like the pipeline's: a head with no Drive access still deletes books. The voice is a
     // nicety and never a gate on the owner's own instruction.
     private readonly IVoiceProfileStore? voiceStore;
+    private readonly IVoiceClient? voiceClient;
 
     public ProjectService(
         IDbContextFactory<FolioDbContext> dbContextFactory, IGoogleDocsClient docs,
         IImageStore imageStore, IClock clock, IOptions<RateLimitOptions> rateLimitOptions,
-        IVoiceProfileStore? voiceStore = null)
+        IVoiceProfileStore? voiceStore = null, IVoiceClient? voiceClient = null)
     {
+        this.voiceClient = voiceClient;
         this.dbContextFactory = dbContextFactory;
         this.docs = docs;
         this.imageStore = imageStore;
@@ -375,6 +378,71 @@ public sealed class ProjectService
         if (!remaining)
         {
             await DiscardVoiceOf(project, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// The Work desk's line about one book, in the owner's voice (D96).
+    ///
+    /// <para><b>Composed when the book has moved, remembered when it has not.</b> The line comes from
+    /// a model and the shelf is the screen the app opens on, painting again on every return to it, so
+    /// composing on each ask would be a call per book per glance. <see cref="VoicedLinePlan"/> makes
+    /// the cost one call per book per state change, which is the rate at which the line has anything
+    /// new to say.</para>
+    ///
+    /// <para>The neutral <paramref name="fallback"/> is returned but never <i>stored</i>: remembering
+    /// it would leave the desk holding today's wording as though it were the owner's, and never
+    /// trying again once a voice had been learned.</para>
+    /// </summary>
+    public async Task<string> VoicedLineAsync(Guid id, string fallback, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null)
+            return fallback;
+
+        if (!VoicedLinePlan.NeedsComposing(novel.VoicedLine, novel.VoicedLineStage, novel.Stage))
+            return novel.VoicedLine;
+
+        var composed = await ComposeLine(novel, cancellationToken);
+        if (string.IsNullOrWhiteSpace(composed))
+            return fallback;
+
+        novel.VoicedLine = composed;
+        novel.VoicedLineStage = novel.Stage;
+        await db.SaveChangesAsync(cancellationToken);
+        return composed;
+    }
+
+    /// <summary>
+    /// One line in the owner's voice about where this book has got to, or nothing at all — which is
+    /// every ordinary case of the voice being unavailable: no key, no profile learned yet, offline.
+    /// Never throws into a screen.
+    /// </summary>
+    private async Task<string?> ComposeLine(Novel novel, CancellationToken cancellationToken)
+    {
+        if (voiceStore is null || voiceClient is null)
+            return null;
+
+        try
+        {
+            var profile = await voiceStore.LoadAsync(cancellationToken);
+            if (profile.IsEmpty)
+                return null;
+
+            var message = await voiceClient.ComposeAsync(
+                profile,
+                new MessageRequest(
+                    "a one-line note on the desk about how this book is coming along",
+                    $"Title: {novel.Title}. Draft {novel.DraftNumber}. Stage: {novel.Stage}.",
+                    MaxWords: 18),
+                cancellationToken);
+
+            return string.IsNullOrWhiteSpace(message) ? null : message.Trim();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return null;
         }
     }
 
