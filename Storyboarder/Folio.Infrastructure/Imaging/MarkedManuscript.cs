@@ -42,12 +42,14 @@ internal static class MarkedManuscript
             .Select((line, index) => new LineSpan(index, line.Start, line.End))
             .ToList();
 
+        var all = marks ?? [];
+
         // Two different questions, and conflating them was a real defect: a mark is *drawn* on every
         // line it touches, while its note is *anchored* to the first of them.
-        var drawnOn = (marks ?? [])
+        var drawnOn = all
             .SelectMany(mark => MarkPlacement.Lines(mark, spans).Select(line => (Line: line, Mark: mark)))
             .ToLookup(placed => placed.Line, placed => placed.Mark);
-        var anchored = Anchor(marks, spans);
+        var anchored = Anchor(all, spans);
 
         var first = 0;
         while (first < lines.Count)
@@ -63,7 +65,7 @@ internal static class MarkedManuscript
     /// </summary>
     private static ILookup<int, Mark> Anchor(IReadOnlyList<Mark> marks, IReadOnlyList<LineSpan> spans)
     {
-        return (marks ?? [])
+        return marks
             .Select(mark => (Mark: mark, Line: MarkPlacement.AnchorLine(mark, spans)))
             .Where(placed => placed.Line is not null)
             .ToLookup(placed => placed.Line!.Value, placed => placed.Mark);

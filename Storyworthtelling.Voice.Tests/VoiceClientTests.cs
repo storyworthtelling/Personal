@@ -27,6 +27,16 @@ public class VoiceClientTests
     private static VoiceClient Client(FakeHttpMessageHandler handler) =>
         new(new HttpClient(handler), Microsoft.Extensions.Options.Options.Create(Options));
 
+    /// <summary>A voice that has been learned from one book, for the tests that only need one.</summary>
+    private static VoiceProfile Learned(string register, string example) => VoiceProfile.Empty with
+    {
+        Register = register,
+        Traits = ["wry"],
+        Examples = [new VoiceExample(example, Guid.NewGuid())],
+        Avoid = ["hype"],
+        DocumentsAnalyzed = 2,
+    };
+
     [Fact]
     public async Task ComposeAsync_WritesTheMessage_UsingTheFastModelAndTheKey()
     {
@@ -34,7 +44,7 @@ public class VoiceClientTests
             MessageResponse("At last — the gate is open. Let's begin."));
 
         var message = await Client(handler).ComposeAsync(
-            new VoiceProfile("Wry and warm.", ["wry"], ["At last, the gate."], ["hype"], [], DocumentsAnalyzed: 2),
+            Learned("Wry and warm.", "At last, the gate."),
             new MessageRequest("welcome", "returning user"), CancellationToken.None);
 
         Assert.Equal("At last — the gate is open. Let's begin.", message);
@@ -54,7 +64,7 @@ public class VoiceClientTests
         var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse("At last — the gate is open."));
 
         await Client(handler).ComposeAsync(
-            new VoiceProfile("Wry and warm.", ["wry"], ["At last, the gate."], ["hype"], [], DocumentsAnalyzed: 2),
+            Learned("Wry and warm.", "At last, the gate."),
             new MessageRequest("welcome", "returning user", HighVisibility: true), CancellationToken.None);
 
         var body = handler.RequestBodies.Single();
@@ -66,16 +76,18 @@ public class VoiceClientTests
     public async Task RefineAsync_FoldsTheDocumentIntoTheProfile_OnTheStrongModel()
     {
         var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse(
-            """{"summary":"Wry, warm, economical.","traits":["wry","warm"],"examples":["At last, the gate."],"avoid":["hype"],"signatureMoves":["em-dash asides"]}"""));
+            """{"register":"Wry, warm, economical.","traits":["wry","warm"],"examples":["At last, the gate."],"avoid":["hype"],"cadence":["short declarative openers"],"punctuation":["em-dash asides"]}"""));
 
+        var book = Guid.NewGuid();
         var updated = await Client(handler).RefineAsync(
-            VoiceProfile.Empty, "A sample of the owner's writing.", CancellationToken.None);
+            VoiceProfile.Empty, "A sample of the owner's writing.", book, CancellationToken.None);
 
-        Assert.Equal("Wry, warm, economical.", updated.Summary);
+        Assert.Equal("Wry, warm, economical.", updated.Register);
         Assert.Equal(["wry", "warm"], updated.Traits);
-        Assert.Equal(["At last, the gate."], updated.Examples);
+        Assert.Equal([new VoiceExample("At last, the gate.", book)], updated.Examples);
         Assert.Equal(["hype"], updated.Avoid);
-        Assert.Equal(["em-dash asides"], updated.SignatureMoves);
+        Assert.Equal(["short declarative openers"], updated.Cadence);
+        Assert.Equal(["em-dash asides"], updated.Punctuation);
         Assert.Equal(1, updated.DocumentsAnalyzed); // provenance counted here, not trusted to the model
 
         Assert.Contains("claude-sonnet-4-6", handler.RequestBodies.Single()); // strong tier for the analysis
@@ -87,27 +99,41 @@ public class VoiceClientTests
         // Examples are sticky: the model returns only fresh phrasings from this sample, and the client folds
         // them onto the ones already learned — old anchors are never dropped as more books feed the profile.
         var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse(
-            """{"summary":"s","traits":[],"examples":["a fresh turn of phrase","At last, the gate."],"avoid":[]}"""));
+            """{"register":"s","traits":[],"examples":["a fresh turn of phrase","At last, the gate."],"avoid":[]}"""));
 
-        var existing = new VoiceProfile(
-            "old", [], ["At last, the gate.", "the old anchor"], [], [], DocumentsAnalyzed: 2);
+        var earlier = Guid.NewGuid();
+        var thisBook = Guid.NewGuid();
+        var existing = VoiceProfile.Empty with
+        {
+            Register = "old",
+            Examples = [new VoiceExample("At last, the gate.", earlier), new VoiceExample("the old anchor", earlier)],
+            DocumentsAnalyzed = 2,
+        };
 
-        var updated = await Client(handler).RefineAsync(existing, "another book", CancellationToken.None);
+        var updated = await Client(handler).RefineAsync(existing, "another book", thisBook, CancellationToken.None);
 
         // Old examples kept in order, the genuinely new one appended, and the echoed duplicate not stored twice.
-        Assert.Equal(["At last, the gate.", "the old anchor", "a fresh turn of phrase"], updated.Examples);
+        Assert.Equal(
+            ["At last, the gate.", "the old anchor", "a fresh turn of phrase"],
+            updated.Examples.Select(example => example.Text));
+
+        // And the echoed one keeps the book that first taught it, so discarding this book cannot take
+        // an anchor the earlier book is still paying for.
+        Assert.Equal(earlier, updated.Examples[0].ProjectId);
+        Assert.Equal(thisBook, updated.Examples[2].ProjectId);
     }
 
     [Fact]
     public async Task RefineAsync_DefaultsMissingLists_WhenTheReplyOmitsThem()
     {
         var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse(
-            """{"summary":"Plain-spoken."}"""));
+            """{"register":"Plain-spoken."}"""));
 
         var updated = await Client(handler).RefineAsync(
-            VoiceProfile.Empty, "doc", CancellationToken.None);
+            VoiceProfile.Empty, "doc", Guid.NewGuid(), CancellationToken.None);
 
-        Assert.Empty(updated.SignatureMoves);
+        Assert.Empty(updated.Cadence);
+        Assert.Empty(updated.Punctuation);
         Assert.Empty(updated.Examples);
     }
 
@@ -115,11 +141,11 @@ public class VoiceClientTests
     public async Task RefineAsync_IncrementsTheDocumentCount_FromTheExistingProfile()
     {
         var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse(
-            """{"summary":"s","traits":[],"examples":[],"avoid":[]}"""));
+            """{"register":"s","traits":[],"examples":[],"avoid":[]}"""));
 
         var updated = await Client(handler).RefineAsync(
-            new VoiceProfile("old", ["a"], [], [], [], DocumentsAnalyzed: 4),
-            "another document", CancellationToken.None);
+            VoiceProfile.Empty with { Register = "old", Traits = ["a"], DocumentsAnalyzed = 4 },
+            "another document", Guid.NewGuid(), CancellationToken.None);
 
         Assert.Equal(5, updated.DocumentsAnalyzed);
     }
@@ -128,12 +154,12 @@ public class VoiceClientTests
     public async Task RefineAsync_ToleratesJsonWrappedInProse()
     {
         var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse(
-            """Here is the profile: {"summary":"Plain-spoken.","traits":["plain"],"examples":[],"avoid":[]} — hope that helps!"""));
+            """Here is the profile: {"register":"Plain-spoken.","traits":["plain"],"examples":[],"avoid":[]} — hope that helps!"""));
 
         var updated = await Client(handler).RefineAsync(
-            VoiceProfile.Empty, "doc", CancellationToken.None);
+            VoiceProfile.Empty, "doc", Guid.NewGuid(), CancellationToken.None);
 
-        Assert.Equal("Plain-spoken.", updated.Summary);
+        Assert.Equal("Plain-spoken.", updated.Register);
         Assert.Equal(1, updated.DocumentsAnalyzed);
     }
 
@@ -141,10 +167,10 @@ public class VoiceClientTests
     public async Task RefineAsync_KeepsTheExistingProfile_WhenTheReplyCannotBeParsed()
     {
         // A garbled reply must never corrupt a good profile — the safe outcome is "no change".
-        var existing = new VoiceProfile("Wry and warm.", ["wry"], ["At last."], ["hype"], [], DocumentsAnalyzed: 3);
+        var existing = Learned("Wry and warm.", "At last.") with { DocumentsAnalyzed = 3 };
         var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse("sorry, I can't do that"));
 
-        var updated = await Client(handler).RefineAsync(existing, "doc", CancellationToken.None);
+        var updated = await Client(handler).RefineAsync(existing, "doc", Guid.NewGuid(), CancellationToken.None);
 
         Assert.Equal(existing, updated);
     }
@@ -156,7 +182,8 @@ public class VoiceClientTests
             HttpStatusCode.Unauthorized, """{"error":{"type":"authentication_error","message":"bad key"}}""");
 
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => Client(handler).ComposeAsync(
-            new VoiceProfile("v", ["a"], [], [], [], 1), new MessageRequest("welcome"), CancellationToken.None));
+            VoiceProfile.Empty with { Register = "v", Traits = ["a"], DocumentsAnalyzed = 1 },
+            new MessageRequest("welcome"), CancellationToken.None));
 
         Assert.Contains("401", ex.Message);
     }
