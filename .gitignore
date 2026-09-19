@@ -22,3 +22,7 @@ Ledger/Ledger.Android/Resources/values/
 # refresh a ~30MB, ~35%-churned diff — not worth it for a build that costs no
 # tokens to redo. Rebuild per session instead (see CLAUDE.md's Graphify section).
 graphify-out/
+
+# Claude Code's isolated-worktree agent checkouts — local scratch state for
+# background subagents, not repo content.
+.claude/worktrees/
