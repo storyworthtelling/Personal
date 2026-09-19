@@ -387,6 +387,44 @@ public class ReviewProcessorTests : IDisposable
         Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
     }
 
+    /// <summary>
+    /// F41 end to end: the changed scene's predecessor reaches the composed report, so the block
+    /// prints a before and an after.
+    ///
+    /// <para>This exists because the suite went green with the pair wired everywhere except the one
+    /// step that loads it — the record had the field, the renderer could draw two panels, and
+    /// nothing put an image in it. That is the same silent gap a stubbed call left in Release F, and
+    /// a rendered report is the only thing that can tell the difference.</para>
+    /// </summary>
+    [Fact]
+    public async Task AChangedScenesPredecessorReachesTheComposedReport()
+    {
+        const string first = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        const string second = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked loudly and waited in the cold.";
+        var firstId = SeedManuscript(first);
+        await DriveToCompletion(NewProcessor());
+        var secondId = SeedNextDraft(firstId, second);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.True(Pictures(ReportOf(secondId)) > Pictures(ReportOf(firstId)),
+            "The second draft's report carries no more pictures than the first's, though one of its "
+            + "two scenes changed and should print its predecessor beside it.");
+    }
+
+    private byte[] ReportOf(Guid novelId)
+    {
+        using var context = database.NewContext();
+        var path = context.BookAnalyses.Single(a => a.NovelId == novelId).PdfPath;
+        Assert.NotNull(path);
+        return File.ReadAllBytes(path!);
+    }
+
+    private static int Pictures(byte[] pdf)
+    {
+        using var document = UglyToad.PdfPig.PdfDocument.Open(pdf);
+        return document.GetPages().Sum(page => page.GetImages().Count());
+    }
+
     [Fact]
     public async Task Review_DeliversToRemarkable_AtTheRoot_WhenEnabledAndPaired()
     {
