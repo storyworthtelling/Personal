@@ -18,7 +18,16 @@ public interface IImageStore
 
 // One scene's supporting evidence in the report: the wordless image (null when the model couldn't render
 // one), cited as "Ch. N · Scene M", with the scene's purpose and verdict from the craft read.
-public sealed record SceneEvidence(string Citation, string Purpose, string Verdict, byte[]? Image);
+public sealed record SceneEvidence(
+    string Citation, string Purpose, string Verdict, byte[]? Image, byte[]? PreviousImage = null)
+{
+    /// <summary>
+    /// Whether this block prints a before and an after. It needs both halves: a scene whose own
+    /// render failed must not print its predecessor alone, or the reader takes the old picture for
+    /// this draft's.
+    /// </summary>
+    public bool ShowsPair => Image is not null && PreviousImage is not null;
+}
 
 // One finding as it appears in the report, tagged with the cross-draft status the reconciliation gave it, so
 // the report can mark each [new] / [carried] / [regressed] on a later draft.
