@@ -514,6 +514,35 @@ public static class PaperUi
     }
 
     /// <summary>
+    /// Wraps a page (the header + content column) in a host that pads itself down by the
+    /// status-bar/display-cutout inset under enforced edge-to-edge (API 35+), the top-edge
+    /// counterpart of <see cref="BottomBar"/>'s navigation-bar handling above. Assign the
+    /// returned host — not the inner content frame — as every area's <c>Overlay</c>, so a
+    /// dog-ear posted against it sits at the very top of the page, header included, rather
+    /// than partly behind the battery/clock icons or the camera cutout, and never "inside
+    /// the binder tabs" the way a fold anchored below a fixed-padding header would read.
+    /// </summary>
+    public static FrameLayout WrapForTopInset(Context context, Android.Views.View page)
+    {
+        var host = new FrameLayout(context);
+        host.AddView(page, new FrameLayout.LayoutParams(
+            Android.Views.ViewGroup.LayoutParams.MatchParent, Android.Views.ViewGroup.LayoutParams.MatchParent));
+        host.SetOnApplyWindowInsetsListener(new TopInsetListener());
+        return host;
+    }
+
+    private sealed class TopInsetListener : Java.Lang.Object, Android.Views.View.IOnApplyWindowInsetsListener
+    {
+        public Android.Views.WindowInsets OnApplyWindowInsets(Android.Views.View view, Android.Views.WindowInsets insets)
+        {
+            var top = insets.GetInsets(
+                Android.Views.WindowInsets.Type.StatusBars() | Android.Views.WindowInsets.Type.DisplayCutout()).Top;
+            view.SetPadding(view.PaddingLeft, top, view.PaddingRight, view.PaddingBottom);
+            return insets;
+        }
+    }
+
+    /// <summary>
     /// The icon-only affordance for the swipe-up tray: a small ink chevron
     /// with a 48dp touch target (DESIGN.md §7 gesture hint).
     /// </summary>

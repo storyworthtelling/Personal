@@ -84,7 +84,9 @@ public class ErrandActivity : AppCompatActivity
         }
 
         camera = new PlateCamera(this);
-        SetContentView(BuildLayout());
+        // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
+        // (API 35+), so the page header isn't drawn partly behind the battery/clock icons.
+        SetContentView(PaperUi.WrapForTopInset(this, BuildLayout()));
 
         if (CheckSelfPermission(Android.Manifest.Permission.Camera)
             != Android.Content.PM.Permission.Granted)

@@ -37,6 +37,8 @@ public class HomeActivity : Activity
     private ShelfArt? art;
     private FrameLayout? root;
     private Button? setDefaultLauncherButton;
+    private Button? setDefaultBrowserButton;
+    private const int RequestBrowserRoleCode = 4200;
 
     // The Google account is used for the vault-backed update-token restore and the cover-load
     // voiced hello. Best-effort: both no-op until a Google account is signed in.
@@ -53,7 +55,11 @@ public class HomeActivity : Activity
 
     private const string UninstallResultAction = "com.storyworthtelling.focusphone.launcher.UNINSTALL_RESULT";
     private const string UninstallNoticeKey = "uninstall";
-    private readonly HashSet<string> notifiedPackages = [];
+
+    // Keyed by package; the value is the normalized urgency TileNotificationListener broadcast
+    // (0/1/2 — see its Urgency method), which ShelfArt.NotificationHue maps to a role hue. A key's
+    // mere presence is still "has a notification" for HasNotification.
+    private readonly Dictionary<string, int> notificationPriorities = [];
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -132,7 +138,7 @@ public class HomeActivity : Activity
 
     private View BuildLayout()
     {
-        art = new ShelfArt(this, () => notifiedPackages);
+        art = new ShelfArt(this, () => notificationPriorities);
         shelf = new BookshelfView(this, art)
         {
             ItemTapped = OnItemTapped,
@@ -158,6 +164,19 @@ public class HomeActivity : Activity
         {
             Gravity = GravityFlags.Center,
         });
+
+        // Same idea, for the restricted browser. Unlike ROLE_HOME, ROLE_BROWSER is directly
+        // requestable, so this asks outright rather than only deep-linking to Settings — the owner
+        // previously had to find the default-apps screen themselves (via a workaround) to make
+        // links open in Flyleaf's contained browser instead of full Chrome.
+        setDefaultBrowserButton = PaperUi.SecondaryButton(this, "Set Flyleaf as your browser", RequestBrowserRole);
+        setDefaultBrowserButton.Visibility = ViewStates.Gone;
+        root.AddView(setDefaultBrowserButton, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
+        {
+            Gravity = GravityFlags.Center,
+            TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X12),
+        });
         return root;
     }
 
@@ -167,6 +186,7 @@ public class HomeActivity : Activity
         ReloadScene();
         UpdateClock();
         UpdateSetDefaultLauncherButton();
+        UpdateSetDefaultBrowserButton();
         timeTickReceiver = new TimeTickReceiver(UpdateClock);
         RegisterReceiver(timeTickReceiver, new IntentFilter(Intent.ActionTimeTick));
         notificationsReceiver = new NotificationsChangedReceiver(OnNotificationsChanged);
@@ -229,10 +249,13 @@ public class HomeActivity : Activity
 
     private void UpdateClock() => shelf?.SetTime(DateTime.Now.TimeOfDay);
 
-    private void OnNotificationsChanged(IReadOnlySet<string> packages)
+    private void OnNotificationsChanged(IReadOnlyDictionary<string, int> priorities)
     {
-        notifiedPackages.Clear();
-        notifiedPackages.UnionWith(packages);
+        notificationPriorities.Clear();
+        foreach (var (package, priority) in priorities)
+        {
+            notificationPriorities[package] = priority;
+        }
         shelf?.RefreshBookmarks();
     }
 
@@ -310,9 +333,15 @@ public class HomeActivity : Activity
             installer.Uninstall(package, pending.IntentSender);
             return;
         }
-        catch (Java.Lang.Exception)
+        catch (Java.Lang.Exception e)
         {
-            // Silent path unavailable — fall back to Android's own uninstaller UI.
+            // Silent path unavailable — fall back to Android's own uninstaller UI. Unlike every
+            // other PolicyManager failure path, this one used to be swallowed with no trace, so a
+            // failure here and a silently-dropped fallback (Intent.ActionUninstallPackage without
+            // REQUEST_DELETE_PACKAGES, per ManifestPermissions.cs) looked identical on-device: an
+            // uninstall tap that did nothing. Logging which branch actually ran distinguishes them.
+            new PolicyAuditStore(this).Record(PolicyEventKind.UninstallFailed,
+                $"Silent uninstall of {package} failed ({e.GetType().Name}: {e.Message}); falling back to the visible uninstaller.");
         }
 
         LaunchVisibleUninstaller(package);
@@ -435,6 +464,38 @@ public class HomeActivity : Activity
         setDefaultLauncherButton.Visibility = isDefault ? ViewStates.Gone : ViewStates.Visible;
     }
 
+    private void UpdateSetDefaultBrowserButton()
+    {
+        if (setDefaultBrowserButton is null)
+        {
+            return;
+        }
+        var roleManager = GetSystemService(Context.RoleService) as Android.App.Roles.RoleManager;
+        var isDefault = roleManager?.IsRoleHeld(Android.App.Roles.RoleManager.RoleBrowser) ?? false;
+        setDefaultBrowserButton.Visibility = isDefault ? ViewStates.Gone : ViewStates.Visible;
+    }
+
+    private void RequestBrowserRole()
+    {
+        var roleManager = GetSystemService(Context.RoleService) as Android.App.Roles.RoleManager;
+        if (roleManager is null || !roleManager.IsRoleAvailable(Android.App.Roles.RoleManager.RoleBrowser!))
+        {
+            StartActivity(new Intent(Android.Provider.Settings.ActionManageDefaultAppsSettings));
+            return;
+        }
+        StartActivityForResult(
+            roleManager.CreateRequestRoleIntent(Android.App.Roles.RoleManager.RoleBrowser!), RequestBrowserRoleCode);
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == RequestBrowserRoleCode)
+        {
+            UpdateSetDefaultBrowserButton();
+        }
+    }
+
     // After a reinstall or the cutover's factory reset, refill the GitHub update token from the
     // encrypted Drive vault so the self-update channel keeps working. Runs only when it's missing.
     private void RestoreUpdateTokenFromVault() => Task.Run(async () =>
@@ -465,7 +526,7 @@ public class HomeActivity : Activity
 
     // ---- The art the shelf paints through ----
 
-    private sealed class ShelfArt(Context context, Func<IReadOnlySet<string>> notifications) : IShelfArt
+    private sealed class ShelfArt(Context context, Func<IReadOnlyDictionary<string, int>> notifications) : IShelfArt
     {
         private readonly PackageManager packageManager = context.PackageManager!;
         private readonly Android.Content.Res.Resources resources = context.Resources!;
@@ -533,7 +594,20 @@ public class HomeActivity : Activity
         public bool MarksInvertToInk(string packageKey) =>
             BookClothPalette.MarksInvertToInk(BookClothPalette.ForPackage(packageKey));
 
-        public bool HasNotification(string packageKey) => notifications().Contains(packageKey);
+        public bool HasNotification(string packageKey) => notifications().ContainsKey(packageKey);
+
+        // Priority, not cloth: DESIGN.md §9's role hues, so an urgent notification reads as
+        // urgent regardless of which book's binding it is pinned to. TileNotificationListener's
+        // Urgency already collapsed both Android priority systems to this 0/1/2 scale.
+        public int NotificationHue(string packageKey) =>
+            notifications().TryGetValue(packageKey, out var urgency)
+                ? urgency switch
+                {
+                    2 => PaperTheme.ProblemMark.ToArgb(),    // high/max — needs attention now
+                    0 => PaperTheme.ResolvedMark.ToArgb(),   // low/min — the quiet, settled tone
+                    _ => PaperTheme.ProgressMark.ToArgb(),   // default — something waiting for you
+                }
+                : PaperTheme.ProgressMark.ToArgb();
 
         private Drawable? TryLoad(string package)
         {
@@ -559,12 +633,21 @@ public class HomeActivity : Activity
         public override void OnReceive(Context? context, Intent? intent) => onTick();
     }
 
-    private class NotificationsChangedReceiver(Action<IReadOnlySet<string>> onChanged) : BroadcastReceiver
+    private class NotificationsChangedReceiver(Action<IReadOnlyDictionary<string, int>> onChanged) : BroadcastReceiver
     {
         public override void OnReceive(Context? context, Intent? intent)
         {
             var packages = intent?.GetStringArrayExtra(TileNotificationListener.ExtraPackages) ?? [];
-            onChanged(packages.ToHashSet());
+            var priorities = intent?.GetIntArrayExtra(TileNotificationListener.ExtraPriorities) ?? [];
+            var byPackage = new Dictionary<string, int>();
+            for (var i = 0; i < packages.Length; i++)
+            {
+                // Priorities is parallel to packages (TileNotificationListener.BroadcastActivePackages);
+                // a short array here would only mean an old build sent the intent — default to 1
+                // (the neutral "default" urgency) rather than throw.
+                byPackage[packages[i]] = i < priorities.Length ? priorities[i] : 1;
+            }
+            onChanged(byPackage);
         }
     }
 }

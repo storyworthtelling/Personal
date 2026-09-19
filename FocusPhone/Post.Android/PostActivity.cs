@@ -30,10 +30,17 @@ namespace Post;
     Label = "Post",
     MainLauncher = true,
     Exported = true,
+    LaunchMode = Android.Content.PM.LaunchMode.SingleTask,
     Theme = "@style/Theme.FocusPhone.Paper")]
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class PostActivity : Activity
 {
+    // The one extra every external caller — a notification tap, the SMS role's SENDTO
+    // handler — uses to open a correspondence without knowing MailboxArea has an
+    // open/closed state of its own. SingleTask is what lets that land on the running
+    // instance (OnNewIntent) rather than stacking a second copy of the whole shell.
+    public const string ExtraOpenContactKey = "openContactKey";
+
     // One Google sign-in for the whole head, scoped for BOTH jobs it has to do: Drive, for
     // the encrypted secrets vault, and the two Gmail scopes the API path needs. Asking
     // twice would mean two consent screens and two tokens for one account.
@@ -85,6 +92,60 @@ public class PostActivity : Activity
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
         CheckSmsRole();
+        OpenFromIntent(Intent);
+    }
+
+    // Brings an already-running instance's correspondence in line with a new launch
+    // (SingleTask routes a second tap here instead of a second Activity).
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        Intent = intent;
+        OpenFromIntent(intent);
+    }
+
+    // The landing spot for a notification tap or the SMS role's SENDTO handler — anything
+    // outside the app that wants a specific correspondence open rather than just the shell.
+    private void OpenFromIntent(Intent? intent)
+    {
+        var contactKey = intent?.GetStringExtra(ExtraOpenContactKey);
+        if (!string.IsNullOrEmpty(contactKey))
+        {
+            OpenCorrespondence(contactKey);
+        }
+    }
+
+    /// <summary>
+    /// Opens one correspondence inside the Mailbox, switching to that tab first. The single
+    /// entry point every external caller uses, so none of them need to know
+    /// <see cref="MailboxArea"/> has an open/closed state of its own.
+    ///
+    /// <paramref name="promptCallNoteForNumber"/> is what distinguishes an ordinary open
+    /// (a tap, a notification) from the call-ended dog-ear's own action: when set, the
+    /// same note prompt <see cref="MailboxArea.WriteCallNote"/> shows from a long-press is
+    /// raised automatically once the correspondence is on screen.
+    /// </summary>
+    public void OpenCorrespondence(string contactKey, string? promptCallNoteForNumber = null)
+    {
+        TurnTo(typeof(MailboxArea));
+        if (Active is MailboxArea mailbox)
+        {
+            mailbox.OpenThread(contactKey, promptCallNoteForNumber);
+        }
+    }
+
+    /// <summary>Turns the binder to an area by type, as Score's now-playing bar does.</summary>
+    private void TurnTo(Type areaType)
+    {
+        var index = Array.FindIndex(areas, area => area.GetType() == areaType);
+        if (index < 0 || index == activeIndex)
+        {
+            return;
+        }
+
+        activeIndex = index;
+        binder.SetActive(index);
+        RenderContent();
     }
 
     // Post cannot send a text or delete one for real without the SMS role, and the role
@@ -174,16 +235,22 @@ public class PostActivity : Activity
         page.AddView(headerSlot);
 
         content = new FrameLayout(this);
-        foreach (var area in areas)
-        {
-            area.Overlay = content; // dog-ears and action cards overlay the content frame
-        }
-
         content.SetPadding(edge, 0, edge, 0);
         page.AddView(content, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        spread.AddView(page, new LinearLayout.LayoutParams(
+        // The overlay host wraps the WHOLE page — header included — not just the content
+        // frame, and pads itself down by the status-bar/display-cutout inset under enforced
+        // edge-to-edge (API 35+). A dog-ear posted against `content` alone sat below the
+        // header, which read as "inside the binder tabs" and partly behind the status bar
+        // rather than at the very top of the page the way a folded corner should.
+        var pageOverlayHost = PaperUi.WrapForTopInset(this, page);
+        foreach (var area in areas)
+        {
+            area.Overlay = pageOverlayHost; // dog-ears and action cards overlay the whole page
+        }
+
+        spread.AddView(pageOverlayHost, new LinearLayout.LayoutParams(
             0, ViewGroup.LayoutParams.MatchParent) { Weight = 1 });
 
         binder = new BinderTabs(this);
@@ -201,6 +268,13 @@ public class PostActivity : Activity
 
             activeIndex = index;
             binder.SetActive(index);
+            // Resume() is documented to run on every area "showing or not" precisely so a
+            // change made on another tab is not left stale when you switch to it — but it was
+            // only ever invoked from whole-Activity OnResume, never from a tab switch within one
+            // session. That gap is why un-filing (or filing) something in Filed and switching to
+            // Mailbox kept showing the stale in-memory snapshot until the whole Activity was
+            // backgrounded and foregrounded again.
+            Active.Resume();
             RenderContent();
         };
         spread.AddView(binder, new LinearLayout.LayoutParams(
@@ -218,8 +292,7 @@ public class PostActivity : Activity
 
     private void RenderContent()
     {
-        headerSlot.RemoveAllViews();
-        headerSlot.AddView(PaperUi.ScreenHeader(this, Active.Title, Active.Tab.Hue));
+        RefreshHeader();
 
         content.RemoveAllViews();
         content.AddView(Active.BuildView(), new FrameLayout.LayoutParams(
@@ -232,6 +305,19 @@ public class PostActivity : Activity
         }
     }
 
+    /// <summary>
+    /// Repaints just the in-page header from whatever the active area's Title/Tab say now.
+    /// Areas call this when something resolves their title asynchronously after they were
+    /// already showing (MailboxArea's open correspondence, once the contact/group name is
+    /// known) — cheaper than a full <see cref="RenderContent"/> and harmless to call when a
+    /// different area is active, since it only ever reads that area's own current Title.
+    /// </summary>
+    public void RefreshHeader()
+    {
+        headerSlot.RemoveAllViews();
+        headerSlot.AddView(PaperUi.ScreenHeader(this, Active.Title, Active.Tab.Hue));
+    }
+
     protected override void OnResume()
     {
         base.OnResume();
@@ -239,7 +325,32 @@ public class PostActivity : Activity
         {
             area.Resume();
         }
+        CheckPendingCallNotes();
         RenderContent();
+    }
+
+    // A call worth a note is never announced while the owner is elsewhere on the phone —
+    // CallStateReceiver only ever records that one is waiting (§5-§11: no toast, no
+    // notification, no forcing Post to the foreground). This is what actually offers it,
+    // the next time the owner opens Post themselves, exactly like the SMS role's own
+    // waiting notice below. Checked on every resume rather than only OnCreate, since
+    // SingleTask means a second launch reuses this same running instance.
+    private void CheckPendingCallNotes()
+    {
+        var pending = PendingCallNoteStore.Get(this);
+        DogEar.SetNotice(this, content, NoticeKeys.CallNote, pending is null
+            ? null
+            : new DogEar.Notice(
+                $"Write a note on your call with {pending.DisplayName}?",
+                "Post noticed the call just ended. A quick summary is easy to lose track "
+                + "of later — or leave it.",
+                PaperTheme.PostMark,
+                "Write a note",
+                () =>
+                {
+                    PendingCallNoteStore.Clear(this);
+                    OpenCorrespondence(pending.ContactKey, pending.Number);
+                }));
     }
 
     protected override void OnPause()
@@ -295,6 +406,9 @@ public class PostActivity : Activity
             // says the day was not checked.
             Manifest.Permission.ReadCalendar,
             Manifest.Permission.WriteCalendar,
+            // Without this, Android never delivers ACTION_PHONE_STATE_CHANGED to
+            // CallStateReceiver at all, so the call-ended note prompt never fires.
+            Manifest.Permission.ReadPhoneState,
         };
         var toRequest = wanted
             .Where(permission => CheckSelfPermission(permission) != Permission.Granted)

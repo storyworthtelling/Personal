@@ -450,8 +450,16 @@ public sealed class DiscoverArea : ScoreArea
             ? $"{pick.Title} by {pick.Subtitle}"
             : $"{pick.Title} by {pick.Subtitle} — the reason it was picked: {pick.Why}";
 
+        // The reason grounds the note in something real, but left unconstrained it gave the
+        // model one obvious sentence shape to reach for every time ("Picked this because…"),
+        // which read as its own kind of repetition even once the content itself stopped being
+        // generic. Told explicitly to vary the opening, it has to actually reach for a
+        // different one each time rather than defaulting to the shape the reason implies.
         var line = await voice.ComposeAsync(
-            "a one-line note about a record in this week's crate, as the person who picked it out",
+            "a one-line note about a record in this week's crate, as the person who picked it out — "
+            + "vary how it opens from one pick to the next (lead with an image, a memory, a detail "
+            + "about the record itself, whatever fits) rather than starting with \"Picked this "
+            + "because\" or any other fixed opening every time",
             context, CancellationToken.None);
         if (string.IsNullOrWhiteSpace(line))
         {
