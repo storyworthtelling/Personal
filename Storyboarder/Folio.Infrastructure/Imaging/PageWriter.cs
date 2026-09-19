@@ -186,6 +186,42 @@ internal sealed class PageWriter : IDisposable
     }
 
     /// <summary>
+    /// A changed scene's before and after, side by side under their own labels (F41).
+    ///
+    /// <para>Two half-width panels rather than two full-width ones: a reader comparing them looks
+    /// from one to the other, and a page turn between them is not a comparison. They are labelled in
+    /// words, because which of two pictures is the older one is not something a picture can say.</para>
+    /// </summary>
+    public void ScenePair(byte[] previous, byte[] current)
+    {
+        var height = PageGeometry.SceneImageHeight * 0.62f;
+        var gutter = PageGeometry.BlockGap;
+        var width = (ContentWidth - gutter) / 2f;
+        var font = ReportType.Small();
+
+        if (y + height + font.Spacing > ContentBottom && y > ContentTop)
+            NewPage();
+
+        Panel(previous, ContentLeft, width, height, "Previous draft", font);
+        Panel(current, ContentLeft + width + gutter, width, height, "This draft", font);
+
+        y += height + font.Spacing + PageGeometry.TightGap;
+    }
+
+    private void Panel(byte[] png, float left, float width, float height, string label, SKFont font)
+    {
+        var dest = new SKRect(left, y, left + width, y + height);
+        if (!SkiaImageFit.Draw(canvas, png, dest))
+        {
+            using var shade = new SKPaint { Color = ReportPalette.Hairline, IsAntialias = false };
+            canvas.DrawRect(dest, shade);
+        }
+
+        using var ink = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
+        canvas.DrawText(label, left, y + height + font.Size + 1f, SKTextAlign.Left, font, ink);
+    }
+
+    /// <summary>
     /// Tension across the chapters, with the revision plan drawn on it: a finding over a range
     /// recolours that run of the line in its severity, a single-chapter finding is a dot, and a sag
     /// takes the hue of whatever sits on it (F39).

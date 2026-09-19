@@ -262,7 +262,9 @@ public sealed class AnalysisDocumentRenderer
         {
             writer.KeepTogether(PageGeometry.SceneImageHeight + 80f);
             writer.Paragraph(string.IsNullOrWhiteSpace(scene.Citation) ? "Scene" : scene.Citation, bodyItalic, Accent);
-            if (scene.Image is { Length: > 0 })
+            if (scene.ShowsPair)
+                writer.ScenePair(scene.PreviousImage!, scene.Image!);
+            else if (scene.Image is { Length: > 0 })
                 writer.Image(scene.Image);
             else
                 writer.Paragraph("Image unavailable for this scene.", bodyItalic, Muted);
