@@ -9,6 +9,7 @@ using Folio.Domain.Model;
 using Folio.Domain.Text;
 using Folio.Domain.Time;
 using Folio.Infrastructure.Configuration;
+using Storyworthtelling.Voice;
 using Folio.Infrastructure.External;
 using Folio.Infrastructure.Persistence;
 
@@ -30,15 +31,21 @@ public sealed class ProjectService
     private readonly IClock clock;
     private readonly RateLimitOptions rateLimits;
 
+    // Optional, like the pipeline's: a head with no Drive access still deletes books. The voice is a
+    // nicety and never a gate on the owner's own instruction.
+    private readonly IVoiceProfileStore? voiceStore;
+
     public ProjectService(
         IDbContextFactory<FolioDbContext> dbContextFactory, IGoogleDocsClient docs,
-        IImageStore imageStore, IClock clock, IOptions<RateLimitOptions> rateLimitOptions)
+        IImageStore imageStore, IClock clock, IOptions<RateLimitOptions> rateLimitOptions,
+        IVoiceProfileStore? voiceStore = null)
     {
         this.dbContextFactory = dbContextFactory;
         this.docs = docs;
         this.imageStore = imageStore;
         this.clock = clock;
         rateLimits = rateLimitOptions.Value;
+        this.voiceStore = voiceStore;
     }
 
     public async Task<Guid> CreateFromDocAsync(
@@ -353,12 +360,50 @@ public sealed class ProjectService
         if (novel is null)
             return;
 
+        var project = novel.ProjectId;
         db.Novels.Remove(novel);
         await db.SaveChangesAsync(cancellationToken);
 
         // The DB row is gone; drop the output subtree too. Files failing to delete shouldn't resurrect
         // the (already-removed) project, so this runs after the row is committed.
         imageStore.Delete(id.ToString());
+
+        // And if that was the book's last draft, the phrasings it taught the owner's voice leave with
+        // it. Checked after the delete, so "is this book still in the library" is answered by what is
+        // actually left rather than by what was there a moment ago.
+        var remaining = await db.Novels.AnyAsync(n => n.ProjectId == project, cancellationToken);
+        if (!remaining)
+        {
+            await DiscardVoiceOf(project, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Takes one book's anchors out of the shared voice profile.
+    ///
+    /// <para>Best-effort and silent on failure: the delete is the owner's instruction and has already
+    /// happened, so an unreachable Drive must not throw out of it or leave the book in the library.
+    /// The worst case is a few stale phrasings in a profile the next ingestion rewrites anyway.</para>
+    /// </summary>
+    private async Task DiscardVoiceOf(Guid projectId, CancellationToken cancellationToken)
+    {
+        if (voiceStore is null)
+            return;
+
+        try
+        {
+            var profile = await voiceStore.LoadAsync(cancellationToken);
+            var after = profile.Discard(projectId);
+            if (!ReferenceEquals(after, profile) && after != profile)
+            {
+                await voiceStore.SaveAsync(after, cancellationToken);
+            }
+        }
+        catch (Exception)
+        {
+            // Deliberately swallowed: see above. Nothing the owner can act on, and nothing worth
+            // failing a delete over.
+        }
     }
 
     /// <summary>
