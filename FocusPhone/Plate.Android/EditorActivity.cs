@@ -47,7 +47,12 @@ public class EditorActivity : AppCompatActivity
     private PhotoEdit edit = PhotoEdit.None;
     private Tool tool = Tool.Crop;
 
+    // Free crop is dragging rather than a one-tap shape, so it needs its own on/off switch —
+    // Square and Portrait stay one tap exactly as before regardless of this.
+    private bool freeCropping;
+
     private ImageView? window;
+    private CropOverlayView? cropOverlay;
     private LinearLayout? toolRow;
     private FrameLayout? overlay;
     private FaceRecogniser recogniser = null!;
@@ -99,7 +104,26 @@ public class EditorActivity : AppCompatActivity
         window = new ImageView(this);
         window.SetScaleType(ImageView.ScaleType.FitCenter);
         window.SetBackgroundColor(PaperTheme.PaperShade);
-        page.AddView(window, new LinearLayout.LayoutParams(
+
+        // The overlay sits ON the window, at the same bounds, rather than beside it — it has
+        // to agree pixel-for-pixel with where FitCenter drew the picture, and a sibling view
+        // measured independently could not promise that.
+        var windowFrame = new FrameLayout(this);
+        windowFrame.AddView(window, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        cropOverlay = new CropOverlayView(this, original.Width, original.Height, released =>
+        {
+            edit = released;
+            Repaint();
+        })
+        {
+            Visibility = ViewStates.Gone,
+        };
+        windowFrame.AddView(cropOverlay, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+        page.AddView(windowFrame, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         var tools = PaperUi.Segmented(this, ["Crop", "Tint", "Filter"], index =>
@@ -122,10 +146,10 @@ public class EditorActivity : AppCompatActivity
             page.AddView(PaperUi.Voice(this, caption));
         }
 
-        // The frame a dog-ear folds into, over the page rather than beside it.
-        overlay = new FrameLayout(this);
-        overlay.AddView(page, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        // The frame a dog-ear folds into, over the page rather than beside it. Pads itself
+        // down by the status-bar/display-cutout inset under enforced edge-to-edge (API 35+),
+        // so a fold here isn't drawn partly behind the battery/clock icons.
+        overlay = PaperUi.WrapForTopInset(this, page);
         root.AddView(overlay, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         root.AddView(PaperUi.BottomBar(this,
@@ -188,6 +212,18 @@ public class EditorActivity : AppCompatActivity
             return;
         }
 
+        // A tool switch away from Crop leaves the handles behind rather than carrying them
+        // to Tint or Filter, so freeCropping never survives one on its own.
+        if (tool != Tool.Crop)
+        {
+            freeCropping = false;
+        }
+        if (cropOverlay is not null)
+        {
+            cropOverlay.Visibility = tool == Tool.Crop && freeCropping
+                ? ViewStates.Visible : ViewStates.Gone;
+        }
+
         toolRow.RemoveAllViews();
         switch (tool)
         {
@@ -197,6 +233,17 @@ public class EditorActivity : AppCompatActivity
                     var chosen = shape;
                     toolRow.AddView(PaperUi.QuietButton(this, Label(chosen), () =>
                     {
+                        if (chosen == CropShape.Free)
+                        {
+                            // Turns on the handles rather than resetting the crop — dragging
+                            // starts from whatever the owner has framed so far.
+                            freeCropping = true;
+                            cropOverlay?.Sync(edit);
+                            BuildToolRow();
+                            return;
+                        }
+
+                        freeCropping = false;
                         edit = edit.CropTo(
                             PhotoEdit.Shaped(chosen, original.Width, original.Height));
                         Repaint();
@@ -204,6 +251,7 @@ public class EditorActivity : AppCompatActivity
                 }
                 toolRow.AddView(PaperUi.QuietButton(this, "Turn", () =>
                 {
+                    freeCropping = false;
                     edit = edit.Turn();
                     Repaint();
                 }));

@@ -40,6 +40,7 @@ public class BinderTabs : ViewGroup
     private readonly List<BinderArea> areas = [];
     private readonly Paint pageEdge;
     private readonly Paint gutter;
+    private readonly Paint gutterGrain;
     private readonly int radius;
     private int activeIndex;
 
@@ -59,6 +60,10 @@ public class BinderTabs : ViewGroup
         // exists at all.
         gutter = new Paint { AntiAlias = true, Color = PaperTheme.Paper };
         gutter.SetStyle(Paint.Style.Fill);
+
+        // The gaps read as flat vector color without this — the same grain the tabs'
+        // own cloth carries (DESIGN.md §2), drawn as a second pass over the same rect.
+        gutterGrain = PaperTheme.GrainOverlay(context, gutter);
     }
 
     /// <summary>Fires with the tapped index — including the active one.</summary>
@@ -200,8 +205,12 @@ public class BinderTabs : ViewGroup
         // fixing on its own, and doubly so now that the grain is raised. Filling the
         // whole gutter first, before the hairline and before children draw over it, is
         // what makes the gaps read as the same cloth the tabs around them wear instead
-        // of a hole back to the page underneath.
+        // of a hole back to the page underneath. The grain pass right after it is what
+        // makes that cloth read as cloth rather than flat vector color — filling solved
+        // the hole-back-to-the-page problem but left the fix itself looking synthetic
+        // next to the textured paper it now sits beside (G3-04).
         canvas.DrawRect(0, 0, Width, Height, gutter);
+        canvas.DrawRect(0, 0, Width, Height, gutterGrain);
 
         // The page edge: the line the tabs are clipped at, running the full height.
         var x = pageEdge.StrokeWidth / 2f;

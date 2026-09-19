@@ -203,15 +203,109 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
         {
             options.Add(("Email", Channel.Email, person.Emails[0]));
         }
-        if (options.Count == 0)
+
+        var actions = options
+            .Select(option => new CardAction(
+                option.Label, () => Dispatch(option.Kind, option.Address), Lead: option.Kind == Channel.Text))
+            .ToList();
+
+        // Offered only for someone with no photo, and only for a real contact (Id != 0) —
+        // the missing "path to take a photo and get back and set the image to a contact"
+        // that the bulk "Take them in Plate" nudge never actually had, since it names no
+        // contact at all. This does.
+        if (!person.HasPhoto && person.Id != 0)
+        {
+            actions.Add(new CardAction(
+                "Take their photo in Plate",
+                () => TakePhotoFor(person),
+                Detail: "Sets what Plate takes as this contact's photo."));
+        }
+
+        if (actions.Count == 0)
         {
             return;
         }
 
-        ActionCard.Show(Host, Overlay, person.Name, subtitle: null, options
-            .Select(option => new CardAction(
-                option.Label, () => Dispatch(option.Kind, option.Address), Lead: option.Kind == Channel.Text))
-            .ToArray());
+        ActionCard.Show(Host, Overlay, person.Name, subtitle: null, [.. actions]);
+    }
+
+    private const int RequestContactPhotoCode = 4802;
+    private long pendingContactPhotoId;
+    private Android.Net.Uri? pendingContactPhotoUri;
+
+    // The same "attachments" cache folder and FileProvider Post already shares fetched
+    // attachments through (AttachmentProvider/AttachmentCache) — reused here rather than
+    // declaring a second provider or widening that one's scope, since a contact-photo capture
+    // is exactly as temporary as an attachment: read once, then left for the system to reclaim.
+    private void TakePhotoFor(ContactPicker.Person person)
+    {
+        var directory = new Java.IO.File(Host.CacheDir, "attachments");
+        directory.Mkdirs();
+        var file = new Java.IO.File(directory, $"contact-{person.Id}.jpg");
+        var uri = AndroidX.Core.Content.FileProvider.GetUriForFile(
+            Host, $"{Host.PackageName}.attachments", file);
+
+        var intent = new Intent(Android.Provider.MediaStore.ActionImageCapture)
+            .SetPackage(PlatePackage)
+            .PutExtra(Android.Provider.MediaStore.ExtraOutput, uri)
+            .AddFlags(ActivityFlags.GrantWriteUriPermission);
+
+        if (Host.PackageManager?.ResolveActivity(intent, Android.Content.PM.PackageInfoFlags.MatchDefaultOnly)
+            is null)
+        {
+            DogEar.SetNotice(Host, Overlay, NoticeKeys.Photos, new DogEar.Notice(
+                "Plate is not on this phone yet.",
+                "Taking a face for a contact is Plate's job, and Post does not have a camera "
+                + "of its own. Google's copies are the other route.",
+                PaperTheme.CautionMark));
+            return;
+        }
+
+        pendingContactPhotoId = person.Id;
+        pendingContactPhotoUri = uri;
+        Host.StartActivityForResult(intent, RequestContactPhotoCode);
+    }
+
+    public override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        if (requestCode != RequestContactPhotoCode)
+        {
+            return;
+        }
+
+        var uri = pendingContactPhotoUri;
+        var contactId = pendingContactPhotoId;
+        pendingContactPhotoUri = null;
+        pendingContactPhotoId = 0;
+
+        if (resultCode != Result.Ok || uri is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var input = Host.ContentResolver!.OpenInputStream(uri)!;
+            using var buffer = new MemoryStream();
+            input.CopyTo(buffer);
+
+            if (ContactPicker.SetPhoto(Host, contactId, buffer.ToArray()))
+            {
+                Resume();
+                Invalidate();
+            }
+            else
+            {
+                DogEar.SetNotice(Host, Overlay, NoticeKeys.Photos, new DogEar.Notice(
+                    "Couldn't set that as their photo.",
+                    "The picture came back from Plate but Post could not write it to the contact.",
+                    PaperTheme.ProblemMark));
+            }
+        }
+        catch (Exception e)
+        {
+            PostDiagnostics.LogWarning("Rolodex", "Could not read the photo Plate handed back", e);
+        }
     }
 
     private void ShowManualEntry()

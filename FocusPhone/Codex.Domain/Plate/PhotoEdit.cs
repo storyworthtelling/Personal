@@ -1,8 +1,14 @@
 namespace Codex.Domain.Plate;
 
-/// <summary>The crop shapes offered under the window. Free is the whole frame.</summary>
+/// <summary>The crop shapes offered under the window.</summary>
 public enum CropShape
 {
+    /// <summary>
+    /// Interactive: the owner drags corner handles over the picture to any rectangle they
+    /// like — the touch math behind that is <see cref="CropGesture"/>. <see
+    /// cref="PhotoEdit.Shaped"/> still treats this value as the whole frame — that method is
+    /// Square/Portrait's one-tap centred box, not the dragging tool's own arithmetic.
+    /// </summary>
     Free,
 
     /// <summary>1:1.</summary>

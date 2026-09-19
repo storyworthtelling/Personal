@@ -252,10 +252,21 @@ public class PlateActivity : AppCompatActivity
         {
             // The same undo the grid's delete gets: the act happens, the fold carries it,
             // and the bytes outlive the row.
-            DogEar.Show(this, content, "1 deleted.", () =>
+            //
+            // Posted rather than shown immediately: returning from a finished child Activity
+            // calls OnActivityResult (here) BEFORE OnResume, and OnResume unconditionally
+            // calls RenderContent(), which clears content's children — silently wiping this
+            // fold out again in the same beat it was added, before it could ever be seen.
+            // Posting to content's own message queue defers it until after that render has
+            // settled, which is why the grid's own delete (never routed through another
+            // Activity, so never raced against this) never needed to.
+            content.Post(() =>
             {
-                Room = Room.Restore(taken);
-                RenderContent();
+                DogEar.Show(this, content, "1 deleted.", () =>
+                {
+                    Room = Room.Restore(taken);
+                    RenderContent();
+                });
             });
             ForgetWhenTheFoldCloses(taken);
         }
@@ -367,16 +378,22 @@ public class PlateActivity : AppCompatActivity
         page.AddView(headerSlot);
 
         content = new FrameLayout(this);
-        foreach (var area in areas)
-        {
-            area.Overlay = content; // dog-ears and action cards overlay the content frame
-        }
-
         content.SetPadding(edge, 0, edge, 0);
         page.AddView(content, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        spread.AddView(page, new LinearLayout.LayoutParams(
+        // The overlay host wraps the WHOLE page — header included — not just the content
+        // frame, and pads itself down by the status-bar/display-cutout inset under enforced
+        // edge-to-edge (API 35+). A dog-ear posted against `content` alone sat below the
+        // header, which read as "inside the binder tabs" and partly behind the status bar
+        // rather than at the very top of the page the way a folded corner should.
+        var pageOverlayHost = PaperUi.WrapForTopInset(this, page);
+        foreach (var area in areas)
+        {
+            area.Overlay = pageOverlayHost; // dog-ears and action cards overlay the whole page
+        }
+
+        spread.AddView(pageOverlayHost, new LinearLayout.LayoutParams(
             0, ViewGroup.LayoutParams.MatchParent) { Weight = 1 });
 
         binder = new BinderTabs(this);

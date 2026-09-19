@@ -273,8 +273,15 @@ public class TidalPairingActivity : Activity
         }
 
         AudioDiagnostics.LogWarning(
-            "TidalPairingActivity", $"TIDAL refused the code exchange: {exchanged.Status}.");
-        status = "TIDAL wouldn't complete the sign-in. Try again.";
+            "TidalPairingActivity", $"TIDAL refused the code exchange: {exchanged.Status}." +
+                (string.IsNullOrEmpty(exchanged.Detail) ? "" : $" {exchanged.Detail}"));
+        status = string.IsNullOrEmpty(exchanged.Detail)
+            ? "TIDAL wouldn't complete the sign-in. Try again."
+            : $"TIDAL wouldn't complete the sign-in: {exchanged.Detail}";
+        if (TidalSignInFailure.IsCredentialRejection(exchanged.Detail))
+        {
+            health.MarkFailing(CredentialIds.Tidal, status);
+        }
         Render();
     }
 

@@ -63,7 +63,9 @@ public class UnlockActivity : Activity
         root.AddView(actionBarHost, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
-        SetContentView(root);
+        // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
+        // (API 35+), so the page isn't drawn partly behind the battery/clock icons.
+        SetContentView(PaperUi.WrapForTopInset(this, root));
     }
 
     protected override void OnResume()
