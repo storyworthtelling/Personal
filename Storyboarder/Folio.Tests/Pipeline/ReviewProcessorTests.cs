@@ -387,6 +387,87 @@ public class ReviewProcessorTests : IDisposable
         Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
     }
 
+    /// <summary>
+    /// Release G end to end: the draft's own text reaches the report and the findings are marked on
+    /// it.
+    ///
+    /// <para>Written because the suite stayed green with the manuscript threaded through every
+    /// signature and never actually read — the same silent shape as the pair that was wired
+    /// everywhere but loaded nowhere. Only the composed PDF can tell the difference, so this reads
+    /// the prose back out of it.</para>
+    /// </summary>
+    [Fact]
+    public async Task TheManuscriptIsMarkedUpInsideTheComposedReport()
+    {
+        const string text = "He felt the cold. The knight rode to the castle and knocked on the gate.";
+        var id = SeedManuscript(text);
+
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Contains("knocked on the gate", TextOf(ReportOf(id)), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// And the other half of the same claim: a draft nothing could be marked on prints no manuscript
+    /// at all. A hundred and forty pages of unmarked prose is a copy of the book, not a reading.
+    /// </summary>
+    [Fact]
+    public async Task ADraftWithNoLocatableFindingsPrintsNoManuscript()
+    {
+        claude.Setup(c => c.ConsolidateCraft(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CraftReport([], [], [], []));
+
+        var id = SeedManuscript("The knight rode to the castle and knocked on the gate.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.DoesNotContain("knocked on the gate", TextOf(ReportOf(id)), StringComparison.Ordinal);
+    }
+
+    private static string TextOf(byte[] pdf)
+    {
+        using var document = UglyToad.PdfPig.PdfDocument.Open(pdf);
+        return string.Join(' ', document.GetPages().Select(page => page.Text));
+    }
+
+    /// <summary>
+    /// F41 end to end: the changed scene's predecessor reaches the composed report, so the block
+    /// prints a before and an after.
+    ///
+    /// <para>This exists because the suite went green with the pair wired everywhere except the one
+    /// step that loads it — the record had the field, the renderer could draw two panels, and
+    /// nothing put an image in it. That is the same silent gap a stubbed call left in Release F, and
+    /// a rendered report is the only thing that can tell the difference.</para>
+    /// </summary>
+    [Fact]
+    public async Task AChangedScenesPredecessorReachesTheComposedReport()
+    {
+        const string first = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        const string second = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked loudly and waited in the cold.";
+        var firstId = SeedManuscript(first);
+        await DriveToCompletion(NewProcessor());
+        var secondId = SeedNextDraft(firstId, second);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.True(Pictures(ReportOf(secondId)) > Pictures(ReportOf(firstId)),
+            "The second draft's report carries no more pictures than the first's, though one of its "
+            + "two scenes changed and should print its predecessor beside it.");
+    }
+
+    private byte[] ReportOf(Guid novelId)
+    {
+        using var context = database.NewContext();
+        var path = context.BookAnalyses.Single(a => a.NovelId == novelId).PdfPath;
+        Assert.NotNull(path);
+        return File.ReadAllBytes(path!);
+    }
+
+    private static int Pictures(byte[] pdf)
+    {
+        using var document = UglyToad.PdfPig.PdfDocument.Open(pdf);
+        return document.GetPages().Sum(page => page.GetImages().Count());
+    }
+
     [Fact]
     public async Task Review_DeliversToRemarkable_AtTheRoot_WhenEnabledAndPaired()
     {
