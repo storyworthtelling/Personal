@@ -1,4 +1,5 @@
 using Folio.Domain.Analysis;
+using Folio.Domain.Markup;
 using Folio.Domain.Readiness;
 using Folio.Domain.Report;
 using SkiaSharp;
@@ -377,6 +378,145 @@ internal sealed class PageWriter : IDisposable
         ReadinessTier.Great => ReportPalette.Great,
         _ => ReportPalette.Rule,
     };
+
+    /// <summary>
+    /// Draws one page of the marked-up manuscript and returns the first line it did <b>not</b>
+    /// print, so the caller can ask for the next page.
+    ///
+    /// <para>The page's length is not a constant: <see cref="MarginColumn"/> packs the notes and
+    /// says how much of the text fits beside them, and when a note would fall off the foot the page
+    /// ends short so the note and its line arrive on the next sheet together (the owner's Release G
+    /// decision). Which is why this returns a line number rather than taking one.</para>
+    /// </summary>
+    public int ManuscriptPage(
+        string manuscript, IReadOnlyList<TextSpan> lines, int first,
+        ILookup<int, Mark> drawnOn, ILookup<int, Mark> anchored, SKFont prose, SKFont noteFont)
+    {
+        NewPage();
+
+        var lineHeight = (float)MarkupGeometry.LineHeight;
+        var textLeft = ContentLeft;
+        var marginLeft = ContentLeft + (float)MarkupGeometry.MarginLeft;
+        var noteWidth = (float)MarkupGeometry.MarginWidth;
+        var last = Math.Min(first + MarkupGeometry.LinesPerPage, lines.Count);
+
+        // What each line's notes come to, in the order the notes will be packed.
+        var wanted = new List<(int Line, double AnchorY, double Height)>();
+        var wrapped = new Dictionary<int, List<string>>();
+        for (var i = first; i < last; i++)
+        {
+            foreach (var mark in anchored[i])
+            {
+                var text = NoteText(mark);
+                var wraps = SkiaText.Wrap(noteFont, text, noteWidth - 6f);
+                wrapped[wanted.Count] = wraps;
+                wanted.Add((i, (i - first) * lineHeight, (wraps.Count * noteFont.Spacing) + 6f));
+            }
+        }
+
+        var packed = MarginColumn.Place(wanted, (float)MarkupGeometry.ContentHeight);
+        var printable = Math.Max((int)Math.Ceiling(packed.TextHeight / lineHeight), 1);
+        last = Math.Min(first + printable, last);
+
+        using (var ink = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true })
+            for (var i = first; i < last; i++)
+            {
+                var span = lines[i];
+                if (span.Length == 0)
+                    continue;
+
+                var baseline = ContentTop + ((i - first) * lineHeight) + prose.Size;
+                canvas.DrawText(manuscript[span.Start..span.End], textLeft, baseline, prose, ink);
+
+                foreach (var mark in drawnOn[i])
+                    DrawMarkOn(manuscript, new LineSpan(i, span.Start, span.End), mark, textLeft, baseline, prose);
+            }
+
+        for (var n = 0; n < packed.Notes.Count; n++)
+        {
+            var note = packed.Notes[n];
+            if (note.AnchorLine >= last)
+                continue;   // its line went to the next page with it
+
+            DrawNote(
+                packed.Notes[n], wanted[n].Line, wrapped[n], anchored[wanted[n].Line].First(),
+                marginLeft, noteWidth, noteFont, lineHeight, prose.Size);
+        }
+
+        // The page draws in absolute coordinates, so the flowing cursor has to be told where the
+        // manuscript actually left off. Without this it stays at the top of the sheet and every
+        // section after the manuscript prints straight through it — which is what the first render
+        // of this page did, and no test could see.
+        y = ContentTop + ((last - first) * lineHeight);
+        return last;
+    }
+
+    /// <summary>A mark drawn over the part of this line that it actually covers.</summary>
+    private void DrawMarkOn(string manuscript, LineSpan line, Mark mark, float left, float baseline, SKFont prose)
+    {
+        if (MarkPlacement.RunOn(mark, line) is not { } run)
+            return;
+
+        var x = left + prose.MeasureText(manuscript[line.StartOffset..run.Start]);
+        var width = mark.IsPoint ? 0f : prose.MeasureText(manuscript[run.Start..run.End]);
+
+        MarkedManuscript.DrawMark(
+            canvas, mark, x, baseline, width, MarkedManuscript.Hue(mark.Severity),
+            tail: run.End >= mark.EndOffset);
+    }
+
+    /// <summary>
+    /// The note itself: a severity bracket, the reason, and — when the packing pushed it down — a
+    /// leader elbowing back to the line it concerns, so a reader never has to guess which line a
+    /// note two inches lower is about.
+    /// </summary>
+    private void DrawNote(
+        PlacedNote note, int line, IReadOnlyList<string> wraps, Mark mark,
+        float marginLeft, float noteWidth, SKFont font, float lineHeight, float proseSize)
+    {
+        var hue = MarkedManuscript.Hue(mark.Severity);
+        var top = ContentTop + (float)note.Top;
+
+        using (var bracket = new SKPaint
+        {
+            Color = hue, IsAntialias = true, Style = SKPaintStyle.Fill,
+        })
+            canvas.DrawRect(
+                marginLeft - (float)MarkupGeometry.BracketInset - (float)MarkupGeometry.BracketWidth,
+                top, (float)MarkupGeometry.BracketWidth, (float)note.Height - 6f, bracket);
+
+        using (var ink = new SKPaint { Color = ReportPalette.InkSoft, IsAntialias = true })
+        {
+            var y = top + font.Size;
+            foreach (var wrap in wraps)
+            {
+                canvas.DrawText(wrap, marginLeft, y, font, ink);
+                y += font.Spacing;
+            }
+        }
+
+        if (!note.NeedsLeader)
+            return;
+
+        // Out of the text, down the gutter, and in to the note — an elbow rather than a diagonal,
+        // because a diagonal across a column of prose reads as a mark on the prose.
+        var anchorY = ContentTop + (float)note.AnchorY + (proseSize / 2f) + 2f;
+        var elbow = ContentLeft + (float)MarkupGeometry.TextWidth + 22f;
+        using var leader = new SKPaint
+        {
+            Color = ReportPalette.Hairline, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 0.6f,
+        };
+        canvas.DrawLine(ContentLeft + (float)MarkupGeometry.TextWidth + 6f, anchorY, elbow, anchorY, leader);
+        canvas.DrawLine(elbow, anchorY, elbow, top + (font.Size / 2f), leader);
+        canvas.DrawLine(elbow, top + (font.Size / 2f), marginLeft - 4f, top + (font.Size / 2f), leader);
+    }
+
+    /// <summary>
+    /// What a note says. The label names the problem and the reason explains it — and that is the
+    /// whole of it, because nothing in this document hands the author a line to use instead (F40).
+    /// </summary>
+    private static string NoteText(Mark mark) =>
+        string.IsNullOrWhiteSpace(mark.Reason) ? mark.Label : $"{mark.Label} — {mark.Reason}";
 
     /// <summary>Closes the last page and returns the document's bytes.</summary>
     public byte[] Finish()

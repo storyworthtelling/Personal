@@ -1090,7 +1090,16 @@ public sealed class ReviewProcessor : IPipelineStep
                             .ToList(),
                         synthesis.RevisionPlan,
                         synthesis.Verdict);
-                var pdf = analysisPdfComposer.Compose(folded, BuildCover(novel, wordCount), scenes, review);
+                // The draft's own text, which the report marks the findings onto (Release G). Read
+                // here rather than carried through the reduce, because it is the largest thing in the
+                // database and every earlier step works from notes about it.
+                var manuscript = await db.SourceTexts
+                    .Where(source => source.NovelId == novel.Id)
+                    .Select(source => source.FullText)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                var pdf = analysisPdfComposer.Compose(
+                    folded, BuildCover(novel, wordCount), scenes, review, manuscript);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
