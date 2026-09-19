@@ -211,7 +211,7 @@ public sealed class ReviewProcessor : IPipelineStep
         {
             var sample = manuscript.Length > VoiceSampleChars ? manuscript[..VoiceSampleChars] : manuscript;
             var existing = await voiceStore.LoadAsync(cancellationToken);
-            var refined = await voiceClient.RefineAsync(existing, sample, cancellationToken);
+            var refined = await voiceClient.RefineAsync(existing, sample, novel.ProjectId, cancellationToken);
             await voiceStore.SaveAsync(refined, cancellationToken);
             novel.VoiceAnalyzed = true;
             logger.LogInformation(

@@ -6,8 +6,14 @@ namespace Storyworthtelling.Voice.Tests;
 
 public class VoicedMessengerTests
 {
-    private static readonly VoiceProfile Learned =
-        new("Wry and warm, economical.", ["wry"], ["At last, the gate."], ["hype"], [], DocumentsAnalyzed: 3);
+    private static readonly VoiceProfile Learned = VoiceProfile.Empty with
+    {
+        Register = "Wry and warm, economical.",
+        Traits = ["wry"],
+        Examples = [new VoiceExample("At last, the gate.", Guid.NewGuid())],
+        Avoid = ["hype"],
+        DocumentsAnalyzed = 3,
+    };
 
     private readonly Mock<IVoiceProfileStore> store = new();
     private readonly Mock<IVoiceClient> client = new();
