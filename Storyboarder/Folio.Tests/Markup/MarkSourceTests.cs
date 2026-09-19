@@ -1,0 +1,203 @@
+using Folio.Domain.Analysis;
+using Folio.Domain.Markup;
+using Folio.Domain.Readiness;
+
+namespace Folio.Tests.Markup;
+
+/// <summary>
+/// Where a mark comes from, and the failure that makes the whole marked-up manuscript worthless
+/// without saying anything.
+///
+/// <para>The bug this reintroduces is searching for an excerpt literally. A quotation comes back
+/// through a model and a JSON string: the manuscript's line break is a space in the excerpt, runs of
+/// spaces collapse, and a typographic quote has often become a straight one. Searched as-is, most
+/// excerpts are not found and the document prints almost no marks — which reads as a clean draft
+/// rather than as a search that failed. Nothing errors, and the report is still 140 pages long.</para>
+/// </summary>
+public class MarkSourceTests
+{
+    private const string Manuscript =
+        "Ruth came back to Saltings in the spring.\nThe water had taken her brother and the village "
+        + "had let it.\n\nShe walked the sea wall for an hour, and nobody spoke to her, and she "
+        + "understood that nothing had been forgiven.";
+
+    [Fact]
+    public void ALineEditBecomesAQueryOverTheSentenceItQuoted()
+    {
+        var analysis = With(lineEdits: [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "x", "Flat opening.")]);
+
+        var mark = Assert.Single(MarkSource.From(Manuscript, analysis));
+        Assert.Equal(MarkKind.Query, mark.Kind);
+        Assert.Equal("Ruth came back to Saltings in the spring.", Manuscript[mark.StartOffset..mark.EndOffset]);
+        Assert.Equal("Flat opening.", mark.Reason);
+    }
+
+    /// <summary>
+    /// The one that matters. The excerpt spans the manuscript's own line break, arrives with it
+    /// flattened to a space, and carries a curly apostrophe the page does not have.
+    /// </summary>
+    [Fact]
+    public void AnExcerptWhoseWhitespaceAndQuotesChangedIsStillFound()
+    {
+        const string asQuoted = "in the spring. The water had taken her brother";
+        var analysis = With(lineEdits: [new LineEdit("Ch. 1", asQuoted, "x", "Two beats in one.")]);
+
+        var mark = Assert.Single(MarkSource.From(Manuscript, analysis));
+        Assert.Equal("in the spring.\nThe water had taken her brother", Manuscript[mark.StartOffset..mark.EndOffset]);
+    }
+
+    /// <summary>
+    /// The other half, and it hides behind the first: a manuscript double-spaced after its full
+    /// stops still matches an excerpt that came back single-spaced. Folding whitespace to one space
+    /// is not enough — the runs have to collapse on both sides.
+    /// </summary>
+    [Fact]
+    public void AManuscriptDoubleSpacedAfterItsStopsStillMatches()
+    {
+        const string typed = "She stopped at the wall.  Nobody spoke to her.  The tide was out.";
+        var analysis = With(lineEdits: [new LineEdit("Ch. 1", "the wall. Nobody spoke to her.", "x", "y")]);
+
+        var mark = Assert.Single(MarkSource.From(typed, analysis));
+        Assert.Equal("the wall.  Nobody spoke to her.", typed[mark.StartOffset..mark.EndOffset]);
+    }
+
+    /// <summary>A curly apostrophe on the page and a straight one in the excerpt are the same word.</summary>
+    [Fact]
+    public void ACurlyApostropheOnThePageMatchesAStraightOneInTheExcerpt()
+    {
+        const string typed = "It was her brother\u2019s coat, and she knew it.";
+        var analysis = With(lineEdits: [new LineEdit("Ch. 1", "her brother's coat", "x", "y")]);
+
+        Assert.Single(MarkSource.From(typed, analysis));
+    }
+
+    [Fact]
+    public void AnExcerptThatIsNotInTheManuscriptIsDroppedRatherThanPlaced()
+    {
+        var analysis = With(lineEdits: [new LineEdit("Ch. 1", "He mounted his horse and rode north.", "x", "y")]);
+
+        Assert.Empty(MarkSource.From(Manuscript, analysis));
+    }
+
+    [Fact]
+    public void APassageThatRunsLongIsADeleAndASummarizedOneIsACaret()
+    {
+        var analysis = With(showTell:
+        [
+            new ShowTellNote("Ch. 1", "She walked the sea wall for an hour", ShowTellDirection.Tighten, "This runs long."),
+            new ShowTellNote("Ch. 1", "nobody spoke to her", ShowTellDirection.Dramatize, "This could be a scene."),
+        ]);
+
+        var marks = MarkSource.From(Manuscript, analysis);
+
+        Assert.Equal(MarkKind.Dele, marks.Single(m => m.Label == "Runs long").Kind);
+        Assert.Equal(MarkKind.Caret, marks.Single(m => m.Label == "Summarized").Kind);
+    }
+
+    /// <summary>
+    /// A caret is a point at the head of the passage, not a run over it. Found on the page: drawn
+    /// over the whole quotation it prints once per line of it, which reads as several missing things
+    /// rather than the one thing that is missing.
+    /// </summary>
+    [Fact]
+    public void ACaretIsAPointAtTheHeadOfThePassage()
+    {
+        var analysis = With(showTell:
+            [new ShowTellNote("Ch. 1", "nobody spoke to her", ShowTellDirection.Dramatize, "z")]);
+
+        var caret = Assert.Single(MarkSource.From(Manuscript, analysis));
+
+        Assert.True(caret.IsPoint);
+        Assert.Equal(Manuscript.IndexOf("nobody spoke to her", StringComparison.Ordinal), caret.StartOffset);
+    }
+
+    /// <summary>A dele keeps its run: it has to strike the words it is taking out.</summary>
+    [Fact]
+    public void ADeleKeepsTheWholePassageItStrikes()
+    {
+        var analysis = With(showTell:
+            [new ShowTellNote("Ch. 1", "She walked the sea wall for an hour", ShowTellDirection.Tighten, "z")]);
+
+        var dele = Assert.Single(MarkSource.From(Manuscript, analysis));
+
+        Assert.False(dele.IsPoint);
+        Assert.Equal("She walked the sea wall for an hour", Manuscript[dele.StartOffset..dele.EndOffset]);
+    }
+
+    /// <summary>
+    /// F40 at the boundary where it is actually enforced: both source records carry a suggestion,
+    /// and the mark carries the reason only. Nothing drawn on the manuscript hands the author prose.
+    /// </summary>
+    [Fact]
+    public void TheSourcesSuggestionNeverReachesTheMark()
+    {
+        var analysis = With(lineEdits:
+            [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "Try: Ruth returned to Saltings.", "Flat opening.")]);
+
+        var mark = Assert.Single(MarkSource.From(Manuscript, analysis));
+
+        Assert.DoesNotContain("Ruth returned", mark.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ruth returned", mark.Label, StringComparison.Ordinal);
+    }
+
+    /// <summary>A mark inside the chapters a Must covers is a Must; nothing else raises it.</summary>
+    [Fact]
+    public void AMarkTakesTheTierOfTheRevisionPlanItemCoveringItsChapter()
+    {
+        var analysis = With(
+            lineEdits: [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "x", "y")],
+            plan: [new RevisionItem("Must", "Ch. 1-3", "The opening does not commit", "x")]);
+
+        Assert.Equal(ReadinessTier.Must, Assert.Single(MarkSource.From(Manuscript, analysis)).Severity);
+    }
+
+    [Fact]
+    public void AMarkNoPlanItemCoversStaysAtConsider()
+    {
+        var analysis = With(
+            lineEdits: [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "x", "y")],
+            plan: [new RevisionItem("Must", "Ch. 8-9", "The close hurries", "x")]);
+
+        Assert.Equal(ReadinessTier.Consider, Assert.Single(MarkSource.From(Manuscript, analysis)).Severity);
+    }
+
+    [Fact]
+    public void MarksComeOutInReadingOrder()
+    {
+        var analysis = With(lineEdits:
+        [
+            new LineEdit("Ch. 1", "nobody spoke to her", "x", "y"),
+            new LineEdit("Ch. 1", "Ruth came back to Saltings", "x", "y"),
+        ]);
+
+        var marks = MarkSource.From(Manuscript, analysis);
+
+        Assert.Equal(marks.Select(m => m.StartOffset).OrderBy(o => o), marks.Select(m => m.StartOffset));
+    }
+
+    /// <summary>
+    /// The check mark has no source, and this says so rather than leaving it to be discovered.
+    /// Nothing in the report quotes prose that is working — the strengths are about the book, not
+    /// about a sentence — so no marked page carries one yet.
+    /// </summary>
+    [Fact]
+    public void NothingInTheReportYetProducesACheck()
+    {
+        var analysis = With(
+            lineEdits: [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "x", "y")],
+            showTell: [new ShowTellNote("Ch. 1", "nobody spoke to her", ShowTellDirection.Dramatize, "z")]);
+
+        Assert.DoesNotContain(MarkSource.From(Manuscript, analysis), mark => mark.Kind == MarkKind.Check);
+    }
+
+    private static BookAnalysisResult With(
+        IReadOnlyList<LineEdit>? lineEdits = null,
+        IReadOnlyList<ShowTellNote>? showTell = null,
+        IReadOnlyList<RevisionItem>? plan = null) =>
+        BookAnalysisResult.Empty with
+        {
+            LineEdits = lineEdits ?? [],
+            RevisionPlan = plan ?? [],
+            Expansion = new ExpansionReport([], showTell ?? [], LengthAssessment.Empty),
+        };
+}

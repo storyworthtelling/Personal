@@ -80,4 +80,40 @@ public class MarkPlacementTests
         Assert.Equal(1, MarkPlacement.AnchorLine(Run(70, 150), Lines));
         Assert.Null(MarkPlacement.AnchorLine(Run(500, 520), Lines));
     }
+
+    /// <summary>
+    /// A mark is drawn once per line it touches. Found by rendering the page rather than by a test:
+    /// a dele over a sentence that wrapped struck only the line its note was anchored to, so half a
+    /// struck sentence printed as if it were staying — which is the opposite of what the mark says.
+    /// </summary>
+    [Fact]
+    public void AMarkSpanningTwoLinesCoversPartOfEach()
+    {
+        var lines = new List<LineSpan> { new(0, 0, 20), new(1, 20, 40), new(2, 40, 60) };
+        var mark = new Mark(MarkKind.Dele, ReadinessTier.Should, 14, 28, "Runs long", "why", "test");
+
+        Assert.Equal(new TextRange(14, 20), MarkPlacement.RunOn(mark, lines[0]));
+        Assert.Equal(new TextRange(20, 28), MarkPlacement.RunOn(mark, lines[1]));
+        Assert.Null(MarkPlacement.RunOn(mark, lines[2]));
+    }
+
+    [Fact]
+    public void ACaretRunsOnlyOnTheLineHoldingItsPoint()
+    {
+        var lines = new List<LineSpan> { new(0, 0, 20), new(1, 20, 40) };
+        var caret = new Mark(MarkKind.Caret, ReadinessTier.Consider, 25, 25, "Summarized", "why", "test");
+
+        Assert.Null(MarkPlacement.RunOn(caret, lines[0]));
+        Assert.Equal(new TextRange(25, 25), MarkPlacement.RunOn(caret, lines[1]));
+    }
+
+    /// <summary>The run never reaches past the line, however far the mark runs on.</summary>
+    [Fact]
+    public void ARunIsClippedToItsOwnLine()
+    {
+        var line = new LineSpan(0, 10, 30);
+        var mark = new Mark(MarkKind.Query, ReadinessTier.Consider, 0, 500, "Unclear", "why", "test");
+
+        Assert.Equal(new TextRange(10, 30), MarkPlacement.RunOn(mark, line));
+    }
 }

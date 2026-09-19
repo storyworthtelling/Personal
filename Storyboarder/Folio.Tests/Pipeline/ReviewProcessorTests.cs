@@ -388,6 +388,49 @@ public class ReviewProcessorTests : IDisposable
     }
 
     /// <summary>
+    /// Release G end to end: the draft's own text reaches the report and the findings are marked on
+    /// it.
+    ///
+    /// <para>Written because the suite stayed green with the manuscript threaded through every
+    /// signature and never actually read — the same silent shape as the pair that was wired
+    /// everywhere but loaded nowhere. Only the composed PDF can tell the difference, so this reads
+    /// the prose back out of it.</para>
+    /// </summary>
+    [Fact]
+    public async Task TheManuscriptIsMarkedUpInsideTheComposedReport()
+    {
+        const string text = "He felt the cold. The knight rode to the castle and knocked on the gate.";
+        var id = SeedManuscript(text);
+
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Contains("knocked on the gate", TextOf(ReportOf(id)), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// And the other half of the same claim: a draft nothing could be marked on prints no manuscript
+    /// at all. A hundred and forty pages of unmarked prose is a copy of the book, not a reading.
+    /// </summary>
+    [Fact]
+    public async Task ADraftWithNoLocatableFindingsPrintsNoManuscript()
+    {
+        claude.Setup(c => c.ConsolidateCraft(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CraftReport([], [], [], []));
+
+        var id = SeedManuscript("The knight rode to the castle and knocked on the gate.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.DoesNotContain("knocked on the gate", TextOf(ReportOf(id)), StringComparison.Ordinal);
+    }
+
+    private static string TextOf(byte[] pdf)
+    {
+        using var document = UglyToad.PdfPig.PdfDocument.Open(pdf);
+        return string.Join(' ', document.GetPages().Select(page => page.Text));
+    }
+
+    /// <summary>
     /// F41 end to end: the changed scene's predecessor reaches the composed report, so the block
     /// prints a before and an after.
     ///

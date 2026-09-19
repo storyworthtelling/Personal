@@ -67,9 +67,14 @@ public sealed record ReportCover(
 // finding status so the report marks what changed since the previous draft.
 public interface IAnalysisPdfComposer
 {
+    /// <summary>
+    /// <paramref name="manuscript"/> is the draft's own text, which the report marks up (Release G).
+    /// Optional, so a report can still be composed for a draft whose source is not to hand.
+    /// </summary>
     byte[] Compose(
         Folio.Domain.Analysis.BookAnalysisResult analysis,
         ReportCover cover,
         IReadOnlyList<SceneEvidence> scenes,
-        DraftReview review);
+        DraftReview review,
+        string? manuscript = null);
 }
