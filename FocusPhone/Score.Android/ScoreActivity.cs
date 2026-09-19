@@ -27,6 +27,13 @@ namespace Score;
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class ScoreActivity : Activity
 {
+    // Set by a secondary screen's binder tab (via BinderFrame) just before it finishes,
+    // naming the area this shell should land on once it resumes. A same-instance hand-off
+    // rather than an Intent extra: those screens are ordinary children on THIS Activity's own
+    // back stack (StartActivity/StartActivityForResult, not a new task), so the instance is
+    // never recreated and OnNewIntent never runs for it — only OnResume does.
+    internal static int? PendingArea;
+
     private readonly DeviceAccountTokenProvider musicTokens = new();
     private BackCallback? backCallback;
 
@@ -256,6 +263,24 @@ public class ScoreActivity : Activity
         {
             area.Resume();
         }
+
+        ApplyPendingArea();
+    }
+
+    // Consumes a switch requested by a secondary screen's binder tap. Cleared unconditionally
+    // so a stale request never fires on some later, unrelated resume.
+    private void ApplyPendingArea()
+    {
+        var pending = PendingArea;
+        PendingArea = null;
+        if (pending is not { } index || index < 0 || index >= areas.Length || index == activeIndex)
+        {
+            return;
+        }
+
+        activeIndex = index;
+        binder.SetActive(index);
+        RenderContent();
     }
 
     protected override void OnPause()
