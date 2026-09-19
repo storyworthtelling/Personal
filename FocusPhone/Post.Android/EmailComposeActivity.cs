@@ -51,18 +51,16 @@ public class EmailComposeActivity : Activity
             return;
         }
 
-        // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
-        // (API 35+), so the page header isn't drawn partly behind the battery/clock icons.
-        SetContentView(PaperUi.WrapForTopInset(this, BuildLayout(name)));
+        // BinderFrame applies its own top-inset padding to the page it draws (see its own
+        // remarks for why), so this screen no longer wraps its whole root in WrapForTopInset
+        // itself — doing both would pad the header down twice.
+        SetContentView(BuildLayout(name));
         subject!.Text = Intent?.GetStringExtra(ExtraSubject) ?? "";
     }
 
     private View BuildLayout(string name)
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
-        root.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(PaperUi.PageHeader(this, $"Email {name}"));
 
         var content = new LinearLayout(this) { Orientation = Orientation.Vertical };
         subject = PaperUi.Field(this, "Subject");
@@ -79,11 +77,27 @@ public class EmailComposeActivity : Activity
         attachmentList = new LinearLayout(this) { Orientation = Orientation.Vertical };
         content.AddView(attachmentList, Row());
 
-        root.AddView(content, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        root.AddView(BinderFrame.Wrap(
+            this, $"Email {name}", PostShellAreas.All[PostShellAreas.Mailbox].Hue, content,
+            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea),
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         root.AddView(PaperUi.BottomBar(this, PaperUi.PrimaryButton(this, "Send", Send)));
         return root;
+    }
+
+    // Names the tab PostActivity should land on once this screen finishes (see
+    // PostActivity.PendingArea); ReorderToFront brings its existing instance forward rather
+    // than creating a second one, or starts it fresh if it isn't running at all. Reachable from
+    // both Mailbox and Rolodex, so — like the other multi-entry screens here — it lights one
+    // fixed home tab rather than tracking which one actually launched it.
+    private void SwitchArea(int index)
+    {
+        PostActivity.PendingArea = index;
+        var intent = new Intent(this, typeof(PostActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
     }
 
     private LinearLayout.LayoutParams Row()

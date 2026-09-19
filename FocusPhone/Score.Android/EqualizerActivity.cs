@@ -36,6 +36,20 @@ public class EqualizerActivity : Activity
         SetContentView(BuildLayout());
     }
 
+    // Names the tab ScoreActivity should land on once this screen finishes (see
+    // ScoreActivity.PendingArea); ReorderToFront brings its existing instance forward rather
+    // than creating a second one, or starts it fresh if it isn't running at all. Reachable from
+    // Music, Playing and Settings alike, so — like the other multi-entry screens here — it
+    // lights one fixed home tab rather than tracking which one actually launched it.
+    private void SwitchArea(int index)
+    {
+        ScoreActivity.PendingArea = index;
+        var intent = new Intent(this, typeof(ScoreActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
+    }
+
     // Mirror equalizer curve/presets/loudness up to Drive on the way out, so a tuning change here is backed
     // up even if the app is killed before the home screen next pauses. Best-effort and off the UI thread.
     protected override void OnPause()
@@ -60,15 +74,9 @@ public class EqualizerActivity : Activity
 
     private View BuildLayout()
     {
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
-        var header = PaperUi.PageHeader(this, "Equalizer");
-        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(header);
-
         var content = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        content.SetPadding(edge, 0, edge, 0);
 
         int[] centerFrequencies;
         short bandCount;
@@ -88,7 +96,7 @@ public class EqualizerActivity : Activity
         catch (Exception e) when (e is Java.Lang.RuntimeException or Java.Lang.UnsupportedOperationException)
         {
             content.AddView(PaperUi.Body(this, "This device doesn't offer an equalizer."));
-            root.AddView(content, Fill());
+            root.AddView(Framed(content), Fill());
             root.AddView(PaperUi.BottomBar(this, PaperUi.SecondaryButton(this, "Back", Finish)));
             return root;
         }
@@ -116,13 +124,17 @@ public class EqualizerActivity : Activity
 
         var scroll = new ScrollView(this);
         scroll.AddView(content);
-        root.AddView(scroll, Fill());
+        root.AddView(Framed(scroll), Fill());
 
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Save", Save),
             PaperUi.QuietButton(this, "Back", Finish)));
         return root;
     }
+
+    private View Framed(View content) => BinderFrame.Wrap(
+        this, "Equalizer", ScoreShellAreas.All[ScoreShellAreas.Music].Hue, content,
+        ScoreShellAreas.All, ScoreShellAreas.Music, SwitchArea);
 
     private View BuildBandRow(short band, int centerFrequencyMilliHz)
     {

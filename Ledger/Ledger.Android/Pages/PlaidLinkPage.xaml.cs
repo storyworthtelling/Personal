@@ -21,12 +21,14 @@ namespace Ledger.Android.Pages;
 // stalled connect can be diagnosed off-device: whether the link token was created, whether Plaid returned
 // a hosted URL, and whether the browser was opened. Only lengths and host names are logged — never the
 // secret or the token values.
-public partial class PlaidLinkPage : ContentPage
+public partial class PlaidLinkPage : LedgerBinderPage
 {
     private readonly IPlaidClient plaid;
     private readonly AccountService accounts;
     private readonly VaultSync vaultSync;
     private readonly ILogger<PlaidLinkPage> logger;
+
+    private readonly Button doneButton = new() { Text = "Done", IsEnabled = false };
 
     // Plaid populates the Hosted Link session's public_token a few seconds after the OAuth redirect
     // returns (worst with app-to-app banks like Redwood Bank). Poll a short window with exponential backoff so
@@ -43,6 +45,14 @@ public partial class PlaidLinkPage : ContentPage
     public PlaidLinkPage(IPlaidClient plaid, AccountService accounts, VaultSync vaultSync, ILogger<PlaidLinkPage> logger)
     {
         InitializeComponent();
+        // Reached only from Settings ("Connect an account"), so it lights that tab.
+        Wrap(LedgerArea.Settings, "Connect an account");
+        doneButton.Clicked += OnDoneClicked;
+        // Application.Current.Resources, not this page's own (empty) Resources dictionary — a
+        // page's own indexer doesn't walk what's merged into the app, only what it declares itself.
+        var cancelButton = new Button { Text = "Cancel", Style = (Style)Application.Current!.Resources["QuietButton"] };
+        cancelButton.Clicked += OnCancelClicked;
+        SetBar(doneButton, cancelButton);
         this.plaid = plaid;
         this.accounts = accounts;
         this.vaultSync = vaultSync;
@@ -101,7 +111,7 @@ public partial class PlaidLinkPage : ContentPage
             }
 
             OpenButton.IsEnabled = true;
-            DoneButton.IsEnabled = true;
+            doneButton.IsEnabled = true;
             await OpenHostedLinkAsync();
         }
         catch (Exception ex)
@@ -149,7 +159,7 @@ public partial class PlaidLinkPage : ContentPage
         }
 
         finishing = true;
-        DoneButton.IsEnabled = false;
+        doneButton.IsEnabled = false;
         StatusLabel.Text = auto ? "Checking for your connection…" : "Finishing up…";
 
         try
@@ -167,7 +177,7 @@ public partial class PlaidLinkPage : ContentPage
                 StatusLabel.Text =
                     "Couldn't find your connection yet. Finish signing in in the browser, then tap Done to " +
                     "retry — or try connecting on a different phone.";
-                DoneButton.IsEnabled = true;
+                doneButton.IsEnabled = true;
                 finishing = false;
                 return;
             }
@@ -196,7 +206,7 @@ public partial class PlaidLinkPage : ContentPage
         {
             logger.LogError(ex, "Connect: failed to finish connecting.");
             StatusLabel.Text = $"Couldn't finish connecting: {ex.Message}";
-            DoneButton.IsEnabled = true;
+            doneButton.IsEnabled = true;
             finishing = false;
         }
     }

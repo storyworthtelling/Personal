@@ -33,6 +33,13 @@ namespace Plate;
 [IntentFilter([Intent.ActionMain], Categories = [Intent.CategoryLauncher])]
 public class PlateActivity : AppCompatActivity
 {
+    // Set by a secondary screen's binder tab (via BinderFrame) just before it finishes, naming
+    // the area this shell should land on once it resumes. A same-instance hand-off rather than
+    // an Intent extra — see Score.ScoreActivity.PendingArea for why: EditorActivity is an
+    // ordinary child on THIS Activity's own back stack (StartActivityForResult), so the
+    // instance is never recreated and OnNewIntent never runs for it, only OnResume does.
+    internal static int? PendingArea;
+
     /// <summary>The one holder of the camera. Areas ask it for a preview; nobody else binds.</summary>
     public PlateCamera Camera { get; private set; } = null!;
 
@@ -453,8 +460,25 @@ public class PlateActivity : AppCompatActivity
         {
             area.Resume();
         }
+        ApplyPendingArea();
         RenderContent();
         Active.OnShown(true);
+    }
+
+    // Consumes a switch requested by a secondary screen's binder tap. Cleared unconditionally
+    // so a stale request never fires on some later, unrelated resume. RenderContent() above
+    // always runs regardless, so this only needs to move activeIndex/binder before it does.
+    private void ApplyPendingArea()
+    {
+        var pending = PendingArea;
+        PendingArea = null;
+        if (pending is not { } index || index < 0 || index >= areas.Length || index == activeIndex)
+        {
+            return;
+        }
+
+        activeIndex = index;
+        binder.SetActive(index);
     }
 
     protected override void OnPause()
