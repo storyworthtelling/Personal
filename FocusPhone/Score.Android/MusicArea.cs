@@ -162,7 +162,6 @@ public sealed class MusicArea : ScoreArea
             head.AddView(PaperUi.QuietButton(Host, "EQ", () => Host.StartActivity(new Intent(Host, typeof(EqualizerActivity)))));
         }
 
-        head.AddView(PaperUi.QuietButton(Host, "Rescan", () => _ = library.ScanAsync()));
         container.AddView(head);
 
         if (!string.IsNullOrEmpty(library.Status))
@@ -195,7 +194,7 @@ public sealed class MusicArea : ScoreArea
             "track number, genre. Folder names and structure don't matter; the tags do."));
         layout.AddView(PaperUi.Secondary(Host,
             "Playable file types: " + string.Join(", ", AudioFileTypes.SupportedExtensions) + "."));
-        layout.AddView(PaperUi.PrimaryButton(Host, "Scan again", () => _ = library.ScanAsync()));
+        layout.AddView(PaperUi.Secondary(Host, "Rescan from Settings once files are in place."));
         return WrapScroll(layout);
     }
 
