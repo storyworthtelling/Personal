@@ -1,4 +1,5 @@
 using Android.App;
+using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -46,39 +47,51 @@ public class DownloadsActivity : Activity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
-
-        var header = PaperUi.PageHeader(this, "Downloads");
-        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(header);
+        var page = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
         reading = PaperUi.Body(this, string.Empty);
-        reading.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X2));
-        root.AddView(reading);
+        reading.SetPadding(0, 0, 0, PaperTheme.Dp(this, DesignTokens.Space.X2));
+        page.AddView(reading);
 
         meter = new BudgetMeter(this);
         var meterParams = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, PaperTheme.Dp(this, BudgetMeter.HeightDp));
-        meterParams.SetMargins(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X3));
-        root.AddView(meter, meterParams);
+        meterParams.SetMargins(0, 0, 0, PaperTheme.Dp(this, DesignTokens.Space.X3));
+        page.AddView(meter, meterParams);
 
         var explainer = PaperUi.Secondary(this,
             "Downloads are measured in playback time and share one allowance across music and podcasts. " +
             "Each one is removed ten days after it arrives — playing it does not extend that, so the phone " +
             "does not slowly fill up with things you meant to get to.");
-        explainer.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X4));
-        root.AddView(explainer);
+        explainer.SetPadding(0, 0, 0, PaperTheme.Dp(this, DesignTokens.Space.X4));
+        page.AddView(explainer);
 
         undoHost = new FrameLayout(this);
         var scroll = new ScrollView(this);
         rows = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        rows.SetPadding(edge, 0, edge, 0);
         scroll.AddView(rows);
         undoHost.AddView(scroll, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
-        root.AddView(undoHost, new LinearLayout.LayoutParams(
+        page.AddView(undoHost, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        root.AddView(BinderFrame.Wrap(
+            this, "Downloads", ScoreShellAreas.All[ScoreShellAreas.Settings].Hue, page,
+            ScoreShellAreas.All, ScoreShellAreas.Settings, SwitchArea),
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         return root;
+    }
+
+    // Names the tab ScoreActivity should land on once this screen finishes (see
+    // ScoreActivity.PendingArea); ReorderToFront brings its existing instance forward rather
+    // than creating a second one, or starts it fresh if it isn't running at all.
+    private void SwitchArea(int index)
+    {
+        ScoreActivity.PendingArea = index;
+        var intent = new Intent(this, typeof(ScoreActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
     }
 
     private void Render()

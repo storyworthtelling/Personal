@@ -34,16 +34,15 @@ public class DiagnosticsActivity : Activity
         undoHost = new FrameLayout(this);
         var scroll = new ScrollView(this);
         contentColumn = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        contentColumn.SetPadding(
-            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X12),
-            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X6));
         BindContent();
         scroll.AddView(contentColumn);
         undoHost.AddView(scroll, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        root.AddView(undoHost, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        root.AddView(BinderFrame.Wrap(
+            this, "Diagnostics", PostShellAreas.All[PostShellAreas.Settings].Hue, undoHost,
+            PostShellAreas.All, PostShellAreas.Settings, SwitchArea),
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         var copy = PaperUi.SecondaryButton(this, "Copy", CopyToClipboard);
         var share = PaperUi.SecondaryButton(this, "Share", ShareReport);
@@ -53,13 +52,24 @@ public class DiagnosticsActivity : Activity
         SetContentView(root);
     }
 
+    // Names the tab PostActivity should land on once this screen finishes (see
+    // PostActivity.PendingArea); ReorderToFront brings its existing instance forward rather
+    // than creating a second one, or starts it fresh if it isn't running at all.
+    private void SwitchArea(int index)
+    {
+        PostActivity.PendingArea = index;
+        var intent = new Intent(this, typeof(PostActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
+    }
+
     private void BindContent()
     {
         contentColumn!.RemoveAllViews();
         var logText = PostDiagnostics.ReadAll().TrimEnd();
         var hasEntries = logText.Length > 0;
 
-        contentColumn.AddView(PaperUi.PageHeader(this, "Diagnostics"));
         contentColumn.AddView(PaperUi.Body(this, hasEntries
             ? "Recent problems captured on this device, oldest first. Use Share to send this to whoever is "
               + "helping fix the app."
