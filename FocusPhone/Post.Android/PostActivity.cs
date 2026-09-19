@@ -119,13 +119,18 @@ public class PostActivity : Activity
     /// Opens one correspondence inside the Mailbox, switching to that tab first. The single
     /// entry point every external caller uses, so none of them need to know
     /// <see cref="MailboxArea"/> has an open/closed state of its own.
+    ///
+    /// <paramref name="promptCallNoteForNumber"/> is what distinguishes an ordinary open
+    /// (a tap, a notification) from the call-ended dog-ear's own action: when set, the
+    /// same note prompt <see cref="MailboxArea.WriteCallNote"/> shows from a long-press is
+    /// raised automatically once the correspondence is on screen.
     /// </summary>
-    public void OpenCorrespondence(string contactKey)
+    public void OpenCorrespondence(string contactKey, string? promptCallNoteForNumber = null)
     {
         TurnTo(typeof(MailboxArea));
         if (Active is MailboxArea mailbox)
         {
-            mailbox.OpenThread(contactKey);
+            mailbox.OpenThread(contactKey, promptCallNoteForNumber);
         }
     }
 
@@ -320,7 +325,32 @@ public class PostActivity : Activity
         {
             area.Resume();
         }
+        CheckPendingCallNotes();
         RenderContent();
+    }
+
+    // A call worth a note is never announced while the owner is elsewhere on the phone —
+    // CallStateReceiver only ever records that one is waiting (§5-§11: no toast, no
+    // notification, no forcing Post to the foreground). This is what actually offers it,
+    // the next time the owner opens Post themselves, exactly like the SMS role's own
+    // waiting notice below. Checked on every resume rather than only OnCreate, since
+    // SingleTask means a second launch reuses this same running instance.
+    private void CheckPendingCallNotes()
+    {
+        var pending = PendingCallNoteStore.Get(this);
+        DogEar.SetNotice(this, content, NoticeKeys.CallNote, pending is null
+            ? null
+            : new DogEar.Notice(
+                $"Write a note on your call with {pending.DisplayName}?",
+                "Post noticed the call just ended. A quick summary is easy to lose track "
+                + "of later — or leave it.",
+                PaperTheme.PostMark,
+                "Write a note",
+                () =>
+                {
+                    PendingCallNoteStore.Clear(this);
+                    OpenCorrespondence(pending.ContactKey, pending.Number);
+                }));
     }
 
     protected override void OnPause()
@@ -376,6 +406,9 @@ public class PostActivity : Activity
             // says the day was not checked.
             Manifest.Permission.ReadCalendar,
             Manifest.Permission.WriteCalendar,
+            // Without this, Android never delivers ACTION_PHONE_STATE_CHANGED to
+            // CallStateReceiver at all, so the call-ended note prompt never fires.
+            Manifest.Permission.ReadPhoneState,
         };
         var toRequest = wanted
             .Where(permission => CheckSelfPermission(permission) != Permission.Granted)

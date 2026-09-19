@@ -685,9 +685,14 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     /// <summary>
     /// Opens one correspondence in-frame — called both from a tap on this area's own list
     /// and, via <see cref="PostActivity.OpenCorrespondence"/>, from outside the area
-    /// entirely (a notification tap, the SMS role's SENDTO handler).
+    /// entirely (a notification tap, the SMS role's SENDTO handler, the call-ended dog-ear).
+    ///
+    /// <paramref name="promptCallNoteForNumber"/> is that last case's own signal: it is
+    /// what tells this open apart from an ordinary tap, so the note prompt
+    /// <see cref="WriteCallNote"/> already shows from a long-press is raised the moment
+    /// the correspondence is on screen, rather than waiting for the owner to ask for it.
     /// </summary>
-    public void OpenThread(string contactKey)
+    public void OpenThread(string contactKey, string? promptCallNoteForNumber = null)
     {
         openContactKey = contactKey;
         openTitle = ContactNameResolver.DisplayName(Host, contactKey);
@@ -703,6 +708,11 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         Invalidate();
         LoadOpenThread();
         ShowAnyProposedDate();
+
+        if (promptCallNoteForNumber is not null)
+        {
+            WriteCallNote(promptCallNoteForNumber);
+        }
     }
 
     // Closing hands the Mailbox back to the list — and, since nothing else brings this
