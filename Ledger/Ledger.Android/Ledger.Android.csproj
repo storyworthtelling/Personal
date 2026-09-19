@@ -36,6 +36,13 @@
          owner in their voice (degrading to neutral copy when unavailable). -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+    <!-- Only for BinderTabs (the binder tab strip component) — Ledger's Balances/Settings pages
+         wire into it directly rather than adopting the kit's Paper.xaml/PaperKit dictionary.
+         BinderTabs reads its own internal tokens ("Hairline"/"Ink"/"Paper"/"FieldLabel") through
+         PaperResources, which walks the Application's merged resources — Ledger's own
+         Resources/Styles/DesignTokens.xaml already registers all four under those exact names,
+         so this is the minimal wiring rather than a full kit migration. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Maui\Storyworthtelling.Maui.csproj" />
   </ItemGroup>
 
   <!-- Google Drive read access for the shared voice profile/config (device-account sign-in). -->
@@ -44,11 +51,12 @@
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
   </ItemGroup>
 
-  <!-- The shared Paper & Ink fonts (aliases registered in MauiProgram). The CI FONT CHECK proves they
-       are packaged in the APK. -->
-  <ItemGroup>
-    <MauiFont Include="..\..\Fonts\*.ttf" />
-  </ItemGroup>
+  <!-- The shared Paper & Ink fonts (aliases still registered in MauiProgram, unchanged — this head
+       does not adopt PaperFonts.Register). Packaged via the Storyworthtelling.Maui project
+       reference above instead of Ledger's own glob of the same files, following Foreword's and
+       Folio's precedent of dropping their own MauiFont glob once that reference exists, rather than
+       shipping two MauiFont items pointing at the same physical files. The CI FONT CHECK proves
+       they are still packaged in the APK. -->
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />

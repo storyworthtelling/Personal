@@ -41,6 +41,14 @@ public class PostActivity : Activity
     // instance (OnNewIntent) rather than stacking a second copy of the whole shell.
     public const string ExtraOpenContactKey = "openContactKey";
 
+    // Set by a secondary screen's binder tab (via BinderFrame) just before it finishes, naming
+    // the area this shell should land on once it resumes. A same-instance hand-off rather than
+    // an Intent extra — see ScoreActivity.PendingArea for why an Intent/OnNewIntent path is
+    // the wrong tool for this even though PostActivity already uses OnNewIntent for other
+    // callers: those screens are ordinary children on THIS Activity's own back stack, so the
+    // instance is never recreated and OnNewIntent never runs for them, only OnResume does.
+    internal static int? PendingArea;
+
     // One Google sign-in for the whole head, scoped for BOTH jobs it has to do: Drive, for
     // the encrypted secrets vault, and the two Gmail scopes the API path needs. Asking
     // twice would mean two consent screens and two tokens for one account.
@@ -325,8 +333,25 @@ public class PostActivity : Activity
         {
             area.Resume();
         }
+        ApplyPendingArea();
         CheckPendingCallNotes();
         RenderContent();
+    }
+
+    // Consumes a switch requested by a secondary screen's binder tap. Cleared unconditionally
+    // so a stale request never fires on some later, unrelated resume. RenderContent() above
+    // always runs regardless, so this only needs to move activeIndex/binder before it does.
+    private void ApplyPendingArea()
+    {
+        var pending = PendingArea;
+        PendingArea = null;
+        if (pending is not { } index || index < 0 || index >= areas.Length || index == activeIndex)
+        {
+            return;
+        }
+
+        activeIndex = index;
+        binder.SetActive(index);
     }
 
     // A call worth a note is never announced while the owner is elsewhere on the phone —

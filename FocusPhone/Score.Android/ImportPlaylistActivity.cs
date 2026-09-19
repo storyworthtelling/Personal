@@ -50,28 +50,40 @@ public class ImportPlaylistActivity : Activity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
-
-        var header = PaperUi.PageHeader(this, "Import playlist");
-        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(header);
+        var page = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
         name = PaperUi.Field(this, "Playlist name");
         name.Visibility = ViewStates.Gone;
-        name.SetPadding(edge, 0, edge, 0);
-        root.AddView(name);
+        page.AddView(name);
 
         var scroll = new ScrollView(this);
         body = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        body.SetPadding(edge, 0, edge, 0);
         scroll.AddView(body);
-        root.AddView(scroll, new LinearLayout.LayoutParams(
+        page.AddView(scroll, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        root.AddView(BinderFrame.Wrap(
+            this, "Import playlist", ScoreShellAreas.All[ScoreShellAreas.Music].Hue, page,
+            ScoreShellAreas.All, ScoreShellAreas.Music, SwitchArea),
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.QuietButton(this, "Close", Finish),
             PaperUi.PrimaryButton(this, "Save playlist", Save)));
         return root;
+    }
+
+    // Tapping the tab this screen was opened from just returns to it; any other tab asks
+    // ScoreActivity to land there once this screen finishes (see ScoreActivity.PendingArea).
+    // Reachable only as an external share target (ActionSend) — if Score isn't already
+    // running, ScoreActivity starts fresh at that area rather than nothing happening.
+    private void SwitchArea(int index)
+    {
+        ScoreActivity.PendingArea = index;
+        var intent = new Intent(this, typeof(ScoreActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
     }
 
     private async Task ImportAsync(string? shared)
