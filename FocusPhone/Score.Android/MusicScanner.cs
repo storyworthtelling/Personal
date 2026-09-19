@@ -49,13 +49,14 @@ public sealed class MusicScanner
     }
 
     /// <returns>
-    /// <c>true</c> once every file the plan called for has been read (or there was
-    /// nothing to read); <c>false</c> if <paramref name="timeBudget"/> ran out first.
-    /// A partial run has already committed each batch it managed, so the caller
+    /// Whether this run drained the whole plan (or there was nothing to do), and what it
+    /// actually changed while doing so — see <see cref="MusicScanRunResult"/>. A partial
+    /// run has already committed each batch it managed, so the caller
     /// (<see cref="MusicScanWorker"/>) just needs to run again — the plan recomputed
-    /// against the now-larger cache picks up only what's still left.
+    /// against the now-larger cache picks up only what's still left, and its own
+    /// <see cref="MusicScanRunResult.Outcome"/> only ever describes what THIS run did.
     /// </returns>
-    public async Task<bool> ScanAsync(
+    public async Task<MusicScanRunResult> ScanAsync(
         string folderId, MusicCatalogCache cache, Action<int, int> onProgress, CancellationToken cancellationToken,
         TimeSpan? timeBudget = null)
     {
@@ -68,6 +69,12 @@ public sealed class MusicScanner
         // read since; nothing about the files says so, so the scan is told directly.
         var rereadAll = cache.ReaderVersion < MusicTagReader.Version;
         var plan = MusicScanPlan.Compute(current, cache.LoadVersions(), rereadAll);
+
+        // Named apart from ToRead so a successfully-processed id can be classified back
+        // into "added" or "changed" for the RescanOutcome the greeting reads.
+        var addedIds = plan.ToAdd.ToHashSet(StringComparer.Ordinal);
+        var updatedIds = plan.ToUpdate.ToHashSet(StringComparer.Ordinal);
+        var removed = plan.ToDelete.Count;
 
         // Availability first, and unconditionally: a file gone from Drive is dropped
         // whether or not there's time left to read anything new this run (replaces the
@@ -83,12 +90,15 @@ public sealed class MusicScanner
         if (total == 0)
         {
             cache.ReaderVersion = MusicTagReader.Version;
-            return true; // nothing new or changed — the cached catalog already matches Drive
+            // nothing new or changed — the cached catalog already matches Drive
+            return new MusicScanRunResult(true, new RescanOutcome(0, 0, removed));
         }
 
         using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
         var elapsed = timeBudget is null ? null : Stopwatch.StartNew();
         var done = 0;
+        var added = 0;
+        var changed = 0;
         var fullyDrained = true;
         foreach (var batch in toRead.Chunk(MaxConcurrentReads))
         {
@@ -123,13 +133,33 @@ public sealed class MusicScanner
                 .Where(result => result.Tracks.Count > 0)
                 .SelectMany(result => result.Tracks.Select(track => (track, result.Version))));
 
+            // Only a file that actually succeeded counts toward the outcome — a read
+            // exhausted after every retry (see ReadFileAsync) left the cache untouched
+            // for it, so it is neither newly added nor actually changed this run.
+            foreach (var (file, result) in batch.Zip(results))
+            {
+                if (result.Tracks.Count == 0)
+                {
+                    continue;
+                }
+
+                if (addedIds.Contains(file.Id))
+                {
+                    added++;
+                }
+                else if (updatedIds.Contains(file.Id))
+                {
+                    changed++;
+                }
+            }
+
             done += batch.Length;
             onProgress(done, total);
         }
 
         if (!fullyDrained)
         {
-            return false;
+            return new MusicScanRunResult(false, new RescanOutcome(added, changed, removed));
         }
 
         // A song can end up duplicated across multiple physical files — repeated
@@ -145,7 +175,7 @@ public sealed class MusicScanner
         // Only once the pass finished. A partial scan has read part of the library, and
         // marking it done would leave the rest missing the new field for good.
         cache.ReaderVersion = MusicTagReader.Version;
-        return true;
+        return new MusicScanRunResult(true, new RescanOutcome(added, changed, removed));
     }
 
     // How many times a file's read is attempted before it is given up on for this run.

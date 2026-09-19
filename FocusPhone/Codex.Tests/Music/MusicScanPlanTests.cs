@@ -81,6 +81,59 @@ public class MusicScanPlanTests
 
         Assert.Equal(["edited", "new"], plan.ToRead.OrderBy(id => id).ToArray());
         Assert.Equal(["removed"], plan.ToDelete);
+        Assert.Equal(["new"], plan.ToAdd);
+        Assert.Equal(["edited"], plan.ToUpdate);
+    }
+
+    // ToAdd/ToUpdate split ToRead by whether the cache had ever heard of the id before —
+    // the distinction RescanOutcome needs to say "3 new tracks" rather than just "3 tracks
+    // to read", which is all ToRead alone can tell you.
+    [Fact]
+    public void NewFile_IsClassifiedAsAdded()
+    {
+        var plan = MusicScanPlan.Compute(
+            current: new Dictionary<string, MusicFileVersion> { ["a"] = V(1) },
+            cached: new Dictionary<string, MusicFileVersion>());
+
+        Assert.Equal(["a"], plan.ToAdd);
+        Assert.Empty(plan.ToUpdate);
+    }
+
+    [Fact]
+    public void ChangedFile_IsClassifiedAsUpdated()
+    {
+        var plan = MusicScanPlan.Compute(
+            current: new Dictionary<string, MusicFileVersion> { ["a"] = V(2) },
+            cached: new Dictionary<string, MusicFileVersion> { ["a"] = V(1) });
+
+        Assert.Empty(plan.ToAdd);
+        Assert.Equal(["a"], plan.ToUpdate);
+    }
+
+    [Fact]
+    public void ToAddAndToUpdate_TogetherEqualToRead()
+    {
+        var plan = MusicScanPlan.Compute(
+            current: new Dictionary<string, MusicFileVersion> { ["a"] = V(1), ["b"] = V(2) },
+            cached: new Dictionary<string, MusicFileVersion> { ["b"] = V(1) });
+
+        Assert.Equal(
+            plan.ToRead.OrderBy(id => id),
+            plan.ToAdd.Concat(plan.ToUpdate).OrderBy(id => id));
+    }
+
+    // A rereadAll pass re-reads a file already in the cache to backfill a new column, not
+    // because anything about it changed — that is a re-read of a known file, not a new one.
+    [Fact]
+    public void Compute_RereadAll_ClassifiesKnownFilesAsUpdated()
+    {
+        var version = new MusicFileVersion(10, 100);
+        var current = new Dictionary<string, MusicFileVersion> { ["a"] = version };
+
+        var plan = MusicScanPlan.Compute(current, current, rereadAll: true);
+
+        Assert.Empty(plan.ToAdd);
+        Assert.Equal(["a"], plan.ToUpdate);
     }
 
     // When the reader learns to read a new field — tempo, in P6 — every cached row is
