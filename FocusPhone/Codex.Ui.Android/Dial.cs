@@ -25,6 +25,7 @@ public sealed class Dial : View
     private readonly DialGeometry geometry;
     private readonly Paint track = new() { AntiAlias = true };
     private readonly Paint filled = new() { AntiAlias = true };
+    private readonly Paint filledGrain;
     private readonly Paint knob = new() { AntiAlias = true };
     private readonly Paint reading = new() { AntiAlias = true };
 
@@ -45,6 +46,11 @@ public sealed class Dial : View
         filled.StrokeWidth = PaperTheme.Dp(context, TrackDp);
         filled.StrokeCap = Paint.Cap.Round;
         filled.Color = hue;
+
+        // DESIGN.md §7 calls this a colored-pencil filled arc — a second, translucent
+        // ink-speckle pass over the same arc is what makes it read as pencil rather
+        // than a flat vector stroke (G3-02).
+        filledGrain = PaperTheme.GrainOverlay(context, filled);
 
         knob.SetStyle(Paint.Style.Fill);
         knob.Color = hue;
@@ -135,9 +141,9 @@ public sealed class Dial : View
         var box = new RectF(inset, inset, Width - inset, Height - inset);
 
         canvas.DrawArc(box, (float)DialGeometry.StartDegrees, (float)DialGeometry.SweepDegrees, false, track);
-        canvas.DrawArc(
-            box, (float)DialGeometry.StartDegrees,
-            (float)(DialGeometry.SweepDegrees * geometry.FractionOf(value)), false, filled);
+        var sweep = (float)(DialGeometry.SweepDegrees * geometry.FractionOf(value));
+        canvas.DrawArc(box, (float)DialGeometry.StartDegrees, sweep, false, filled);
+        canvas.DrawArc(box, (float)DialGeometry.StartDegrees, sweep, false, filledGrain);
 
         var radius = (box.Width() / 2f);
         var (x, y) = geometry.KnobAt(value, box.CenterX(), box.CenterY(), radius);

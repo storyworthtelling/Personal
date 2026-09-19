@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Score.Google;
 using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
@@ -14,6 +15,19 @@ namespace Score;
 /// serialized transaction (a single SQLite connection is not safe for concurrent
 /// writes). Progress is reported as (done, total) over the work actually needed — the
 /// files being read — so a rescan that changed little finishes fast.
+///
+/// Availability and discovery come from the same single Drive listing rather than two
+/// passes: a file missing from it is dropped (<see cref="MusicScanPlan.ToDelete"/>)
+/// before a single tag is read, and a file new to it joins the read queue
+/// (<see cref="MusicScanPlan.ToRead"/>) alongside anything changed — so a library with
+/// thousands of files gets both answers together rather than one waiting on the other.
+///
+/// A library too large to finish its tag reads inside one WorkManager execution window
+/// is not a failure: <see cref="ScanAsync"/> takes a time budget and yields before the
+/// system would kill it, having already committed every batch it read, and reports
+/// <c>false</c> so the caller knows to run again. Because the plan is computed fresh
+/// from the cache each time, the next run picks up exactly the files still left rather
+/// than starting over.
 /// </summary>
 public sealed class MusicScanner
 {
@@ -34,8 +48,16 @@ public sealed class MusicScanner
         hiddenTrackPass = new Lazy<HiddenTrackPass>(() => new HiddenTrackPass(tokens));
     }
 
-    public async Task ScanAsync(
-        string folderId, MusicCatalogCache cache, Action<int, int> onProgress, CancellationToken cancellationToken)
+    /// <returns>
+    /// <c>true</c> once every file the plan called for has been read (or there was
+    /// nothing to read); <c>false</c> if <paramref name="timeBudget"/> ran out first.
+    /// A partial run has already committed each batch it managed, so the caller
+    /// (<see cref="MusicScanWorker"/>) just needs to run again — the plan recomputed
+    /// against the now-larger cache picks up only what's still left.
+    /// </returns>
+    public async Task<bool> ScanAsync(
+        string folderId, MusicCatalogCache cache, Action<int, int> onProgress, CancellationToken cancellationToken,
+        TimeSpan? timeBudget = null)
     {
         var files = await driveClient.ListAudioRecursiveAsync(folderId, cancellationToken);
         var filesById = files.ToDictionary(file => file.Id);
@@ -47,7 +69,9 @@ public sealed class MusicScanner
         var rereadAll = cache.ReaderVersion < MusicTagReader.Version;
         var plan = MusicScanPlan.Compute(current, cache.LoadVersions(), rereadAll);
 
-        // Drop tracks whose file disappeared from Drive (replaces the old clear-and-rebuild).
+        // Availability first, and unconditionally: a file gone from Drive is dropped
+        // whether or not there's time left to read anything new this run (replaces the
+        // old clear-and-rebuild).
         foreach (var id in plan.ToDelete)
         {
             cache.Delete(id);
@@ -59,14 +83,24 @@ public sealed class MusicScanner
         if (total == 0)
         {
             cache.ReaderVersion = MusicTagReader.Version;
-            return; // nothing new or changed — the cached catalog already matches Drive
+            return true; // nothing new or changed — the cached catalog already matches Drive
         }
 
         using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+        var elapsed = timeBudget is null ? null : Stopwatch.StartNew();
         var done = 0;
+        var fullyDrained = true;
         foreach (var batch in toRead.Chunk(MaxConcurrentReads))
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (elapsed is not null && elapsed.Elapsed >= timeBudget!.Value)
+            {
+                // Out of time for this run, not out of files. Everything up to here is
+                // already committed; stop short of the system doing it for us.
+                fullyDrained = false;
+                break;
+            }
 
             // Read this batch's tags (and, for a long track, run the hidden-track pass) concurrently...
             var reads = batch.Select(file => ReadFileAsync(file, http, cancellationToken)).ToList();
@@ -93,6 +127,11 @@ public sealed class MusicScanner
             onProgress(done, total);
         }
 
+        if (!fullyDrained)
+        {
+            return false;
+        }
+
         // A song can end up duplicated across multiple physical files — repeated
         // downloads, an upgrade from MP3 to FLAC left sitting next to the old copy.
         // Runs over the WHOLE current catalog, not just what this pass touched, since
@@ -103,9 +142,10 @@ public sealed class MusicScanner
             cache.Delete(id);
         }
 
-        // Only once the pass finished. A cancelled scan has read part of the library,
-        // and marking it done would leave the rest missing the new field for good.
+        // Only once the pass finished. A partial scan has read part of the library, and
+        // marking it done would leave the rest missing the new field for good.
         cache.ReaderVersion = MusicTagReader.Version;
+        return true;
     }
 
     // How many times a file's read is attempted before it is given up on for this run.
