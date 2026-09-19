@@ -35,6 +35,14 @@ using Android;
 [assembly: UsesPermission(Manifest.Permission.ReadCalendar)]
 [assembly: UsesPermission(Manifest.Permission.WriteCalendar)]
 
+// READ_PHONE_STATE: what lets CallStateReceiver see ACTION_PHONE_STATE_CHANGED at all —
+// Android does not deliver that broadcast to an app without it, dialog or no dialog. It
+// is how Post notices the OFFHOOK-then-IDLE transition that means a call just ended, so
+// it can offer to write a note on it. An ordinary runtime-requested permission, unlike
+// READ_CALL_LOG/READ_SMS above: it is not hard-restricted, so RequestRuntimePermissions's
+// normal dialog is all this one needs.
+[assembly: UsesPermission(Manifest.Permission.ReadPhoneState)]
+
 // Needed to resolve/deep-link the dialer, Google Messages, and email apps under
 // Android 11+ package-visibility filtering. Sideloaded, so QUERY_ALL_PACKAGES is fine.
 [assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]

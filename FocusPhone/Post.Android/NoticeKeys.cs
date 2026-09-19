@@ -13,4 +13,5 @@ internal static class NoticeKeys
     public const string Attachment = "attachment";
     public const string ProposedDate = "proposed-date";
     public const string Photos = "photos";
+    public const string CallNote = "call-note";
 }
