@@ -433,7 +433,7 @@ public sealed class ProjectService
             var message = await voiceClient.ComposeAsync(
                 profile,
                 new MessageRequest(
-                    "a one-line note on the desk about how this book is coming along",
+                    VoicedOccasions.DeskLine,
                     $"Title: {novel.Title}. Draft {novel.DraftNumber}. Stage: {novel.Stage}.",
                     MaxWords: 18),
                 cancellationToken);

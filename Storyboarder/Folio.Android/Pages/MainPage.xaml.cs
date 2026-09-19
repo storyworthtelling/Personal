@@ -5,6 +5,7 @@ using Folio.Domain.External;
 using Folio.Domain.Model;
 using Folio.Infrastructure.Services;
 using Storyworthtelling.Maui;
+using Folio.Domain.Voice;
 using Storyworthtelling.Voice;
 
 namespace Folio.Android.Pages;
@@ -24,6 +25,11 @@ public partial class MainPage : FolioBinderPage
     // The desk line per book, in the owner's voice, when one has been composed (D96). Absent for a
     // book whose voice is not available, where the row's own neutral summary stands.
     private readonly Dictionary<Guid, string> voicedLines = [];
+
+    // What an empty desk says, in the owner's voice, once one has been composed. Empty until then, so
+    // the neutral invitation stands — an empty shelf is the first thing a new install shows and it
+    // must never wait on a model call to say anything at all.
+    private string emptyDeskLine = string.Empty;
     private readonly Dictionary<Guid, NovelStatus> statuses = [];
     private IDispatcherTimer? refreshTimer;
     private string voice = string.Empty;
@@ -109,6 +115,25 @@ public partial class MainPage : FolioBinderPage
             var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
 
             var changed = false;
+
+            // An empty desk is the one place in the app with room to speak to the owner directly, and
+            // it is not a failure — it is the ordinary first state of a new install.
+            if (list.Count == 0)
+            {
+                var messenger = scope.ServiceProvider.GetRequiredService<VoicedMessenger>();
+                var line = await messenger.ComposeAsync(
+                    new MessageRequest(VoicedOccasions.EmptyDesk, "no manuscripts yet", HighVisibility: true),
+                    fallback: string.Empty, CancellationToken.None);
+
+                if (!string.IsNullOrWhiteSpace(line) && line != emptyDeskLine)
+                {
+                    emptyDeskLine = line;
+                    Redraw();
+                }
+
+                return;
+            }
+
             foreach (var status in list)
             {
                 var row = rows.FirstOrDefault(r => r.Id == status.Id);
@@ -150,7 +175,8 @@ public partial class MainPage : FolioBinderPage
             var messenger = IPlatformApplication.Current!.Services.GetRequiredService<VoicedMessenger>();
             var context = rows.Count == 0 ? "no manuscripts yet" : $"{rows.Count} manuscript(s) under review";
             message = await messenger.ComposeAsync(
-                new MessageRequest("welcome", context, HighVisibility: true), fallback: string.Empty, CancellationToken.None);
+                new MessageRequest(VoicedOccasions.Welcome, context, HighVisibility: true),
+                fallback: string.Empty, CancellationToken.None);
         }
         catch
         {
@@ -398,7 +424,9 @@ public partial class MainPage : FolioBinderPage
         {
             Desk.Add(new Label
             {
-                Text = "Nothing on the desk. Add a manuscript and Folio starts reading.",
+                Text = string.IsNullOrWhiteSpace(emptyDeskLine)
+                    ? "Nothing on the desk. Add a manuscript and Folio starts reading."
+                    : emptyDeskLine,
                 Style = PaperResources.Token<Style>("EmptyStateLabel"),
             });
             return;
