@@ -22,7 +22,35 @@ public static partial class ChapterCitation
     {
         ArgumentNullException.ThrowIfNull(curve);
 
-        if (string.IsNullOrWhiteSpace(citation) || curve.Count == 0)
+        if (curve.Count == 0 || Span(citation) is not { } chapters)
+        {
+            return null;
+        }
+
+        var start = IndexOf(chapters.From, curve);
+        if (start is null)
+        {
+            return null;
+        }
+
+        if (chapters.To == chapters.From)
+        {
+            return new ChapterRange(start.Value, start.Value);
+        }
+
+        // A range that runs off the end keeps the part that is on the chart: it genuinely covers
+        // chapters the reader can see, unlike a single citation past the end.
+        var end = IndexOf(chapters.To, curve) ?? (chapters.To > Largest(curve) ? curve.Count - 1 : start.Value);
+        return new ChapterRange(start.Value, Math.Max(end, start.Value));
+    }
+
+    /// <summary>
+    /// The chapter <i>numbers</i> a citation names, with no chart to place them on — which is what a
+    /// mark on the manuscript needs, since the page it is drawn on has no pacing curve.
+    /// </summary>
+    public static ChapterRange? Span(string? citation)
+    {
+        if (string.IsNullOrWhiteSpace(citation))
         {
             return null;
         }
@@ -36,26 +64,13 @@ public static partial class ChapterCitation
             && int.TryParse(span.Groups[2].Value, out var to)
             && to >= from)
         {
-            var start = IndexOf(from, curve);
-            if (start is null)
-            {
-                return null;
-            }
-
-            // A range that runs off the end keeps the part that is on the chart: it genuinely covers
-            // chapters the reader can see, unlike a single citation past the end.
-            var end = IndexOf(to, curve) ?? (to > Largest(curve) ? curve.Count - 1 : start.Value);
-            return new ChapterRange(start.Value, Math.Max(end, start.Value));
+            return new ChapterRange(from, to);
         }
 
         var single = Numbers().Match(citation);
-        if (!single.Success || !int.TryParse(single.Value, out var only))
-        {
-            return null;
-        }
-
-        var at = IndexOf(only, curve);
-        return at is null ? null : new ChapterRange(at.Value, at.Value);
+        return single.Success && int.TryParse(single.Value, out var only)
+            ? new ChapterRange(only, only)
+            : null;
     }
 
     /// <summary>The highest chapter number the curve actually labels.</summary>

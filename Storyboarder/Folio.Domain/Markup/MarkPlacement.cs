@@ -48,6 +48,29 @@ public static class MarkPlacement
         return touched.Count == 0 ? null : touched[0];
     }
 
+    /// <summary>
+    /// The part of one line a mark actually covers, or null when it covers none of it.
+    ///
+    /// <para>A mark is drawn once per line it touches, not once per mark: a dele over a sentence that
+    /// wraps has to strike both halves, and the first render of the marked page struck only the line
+    /// the note was anchored to — so half a struck sentence printed as if it were staying.</para>
+    /// </summary>
+    public static TextRange? RunOn(Mark mark, LineSpan line)
+    {
+        ArgumentNullException.ThrowIfNull(mark);
+
+        if (mark.IsPoint)
+        {
+            return mark.StartOffset >= line.StartOffset && mark.StartOffset < line.EndOffset
+                ? new TextRange(mark.StartOffset, mark.StartOffset)
+                : null;
+        }
+
+        var from = Math.Max(mark.StartOffset, line.StartOffset);
+        var to = Math.Min(mark.EndOffset, line.EndOffset);
+        return to > from ? new TextRange(from, to) : null;
+    }
+
     private static bool Contains(IReadOnlyList<LineSpan> lines, int offset) =>
         lines.Any(span => offset >= span.StartOffset && offset < span.EndOffset);
 }
