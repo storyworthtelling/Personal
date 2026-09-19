@@ -36,9 +36,10 @@ internal static class Filing
         // mirrored into the SQL cache the way mail is, so deleting from Cache alone did nothing
         // for them — the very next reload read the row straight back out of the provider and the
         // correspondence never actually left the Mailbox. Hidden is the same suppression
-        // MailboxArea/ThreadActivity already apply for a permanent per-message delete; applying it
-        // here too is what makes a filed call/text actually disappear until PostSync's retry loop
-        // (see PostSync.DeleteAtSourceAsync) deletes it at the source for real.
+        // MailboxArea already applies for a permanent per-message delete (list and open
+        // correspondence alike); applying it here too is what makes a filed call/text
+        // actually disappear until PostSync's retry loop (see PostSync.DeleteAtSourceAsync)
+        // deletes it at the source for real.
         if (item.Kind != TimelineItemKind.Email)
         {
             database.Hidden.Hide(item.Kind, item.SourceId);

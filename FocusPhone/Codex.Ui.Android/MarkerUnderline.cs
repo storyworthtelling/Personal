@@ -24,6 +24,7 @@ public class MarkerUnderline : View
     public const int HeightDp = 12;
 
     private readonly Paint stroke;
+    private readonly Paint strokeGrain;
     private readonly Paint trail;
     private readonly Path path = new();
     private readonly Path trailPath = new();
@@ -39,6 +40,11 @@ public class MarkerUnderline : View
             Alpha = 235,
         };
         stroke.SetStyle(Paint.Style.Stroke);
+
+        // DESIGN.md §2 calls Marker a "near-solid streaked stroke" — the streaking is
+        // this second, translucent ink-speckle pass over the same path, the same grain
+        // the paper ground carries rather than a flat length of vector color (G3-02).
+        strokeGrain = PaperTheme.GrainOverlay(context, stroke);
 
         trail = new Paint
         {
@@ -99,5 +105,6 @@ public class MarkerUnderline : View
         base.OnDraw(canvas);
         canvas.DrawPath(trailPath, trail);
         canvas.DrawPath(path, stroke);
+        canvas.DrawPath(path, strokeGrain);
     }
 }
