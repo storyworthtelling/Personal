@@ -19,6 +19,23 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
+# Rebuild graphify's knowledge graph so it's there from the first tool call instead of only after
+# someone remembers to run it. graphify-out/ is gitignored (see CLAUDE.md's Graphify section — the
+# built graph isn't checked in, since community-ID reshuffling made every commit a ~30MB diff), so a
+# fresh checkout has no graph at all until this runs; the graphify skill's own trigger condition
+# ("especially when graphify-out/ exists") depends on this file being here. Local CPU only — no LLM,
+# no network for --code-only — so this costs wall-clock time, not tokens or API spend: ~25s cold,
+# ~1-2s on a warm container where the AST cache already covers most files. Never fails the session:
+# graphify might not be installed yet in some environments, and a build hiccup here shouldn't block
+# dotnet setup below.
+if command -v graphify >/dev/null 2>&1; then
+  (
+    cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" && \
+    graphify update . --no-cluster >/dev/null 2>&1 && \
+    graphify cluster-only . --no-label --no-viz >/dev/null 2>&1
+  ) || echo "graphify graph rebuild failed or skipped (non-fatal)"
+fi
+
 # Quieter, faster builds. Appended on every start (including warm ones where the SDK is already
 # there), guarded so repeated starts don't stack duplicate lines into the env file.
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then

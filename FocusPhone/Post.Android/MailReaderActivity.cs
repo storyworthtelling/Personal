@@ -69,7 +69,9 @@ public class MailReaderActivity : Activity
                 this, Attachments.Label(item.Attachments), () => Attachments.Offer(this, host, item))));
         }
 
-        SetContentView(root);
+        // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
+        // (API 35+), so the subject header isn't drawn partly behind the battery/clock icons.
+        SetContentView(PaperUi.WrapForTopInset(this, root));
         Render(item, edge);
     }
 

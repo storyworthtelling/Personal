@@ -19,11 +19,25 @@ namespace Score;
 /// are already keyed to it — so a stored flag could only ever agree with it or be
 /// wrong. Deleting the row deleted the worst screen in the design with it.
 ///
-/// There is also no manual rescan and no manual update check: buttons that usually
-/// do nothing teach you to press them for reassurance rather than for a reason.
+/// There is also no manual update check: a button that usually does nothing teaches
+/// you to press it for reassurance rather than for a reason. Rescan is the one
+/// exception — it lives here rather than in the Music tab because it is a library
+/// operation, not a browsing one, and moving it here freed the Music header for
+/// browsing controls only.
 /// </summary>
-public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library) : ScoreArea(host)
+public sealed class SettingsArea : ScoreArea
 {
+    private readonly MusicLibrary library;
+
+    public SettingsArea(Android.App.Activity host, MusicLibrary library) : base(host)
+    {
+        this.library = library;
+
+        // So the status line updates live if a scan is already running (or one this
+        // screen starts) — the same wiring MusicArea uses.
+        library.Changed += Invalidate;
+    }
+
     public override BinderArea Tab => new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
 
     public override View BuildView()
@@ -45,6 +59,9 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
         passphrase.TextChanged += (_, _) =>
             VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
         column.AddView(passphrase);
+
+        Group(column, "Library");
+        column.AddView(LibraryRow());
 
         Group(column, "Listening");
         column.AddView(StackSizeRow());
@@ -134,6 +151,23 @@ public sealed class SettingsArea(Android.App.Activity host, MusicLibrary library
 
         return Settled("Signed in to TIDAL", "Manage",
             () => Host.StartActivity(new Android.Content.Intent(Host, typeof(TidalPairingActivity))));
+    }
+
+    // Idle shows the button; a running scan shows its own status instead — pressing
+    // Rescan while one is already going would just enqueue-with-Keep and do nothing,
+    // which reads worse than not offering the button at all. A large library can take
+    // several chained WorkManager runs to finish (see MusicScanWorker); the status line
+    // tracks that automatically, the same way the Music tab used to.
+    private View LibraryRow()
+    {
+        if (!library.HasFolder)
+        {
+            return PaperUi.Secondary(Host, "Choose a music folder in the Music tab first.");
+        }
+
+        return string.IsNullOrEmpty(library.Status)
+            ? PaperUi.SecondaryButton(Host, "Rescan", () => _ = library.ScanAsync())
+            : PaperUi.Secondary(Host, library.Status);
     }
 
     private View StackSizeRow()

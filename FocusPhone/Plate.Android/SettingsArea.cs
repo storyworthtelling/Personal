@@ -3,6 +3,7 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Codex.Ui.Voice;
+using Plate.Google;
 
 namespace Plate;
 
@@ -54,6 +55,16 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         column.AddView(PaperUi.Secondary(Host,
             "Only to read the shared vault. Plate keeps no account of its own, and nothing it "
             + "captures goes to Drive by this route."));
+        if (!VoiceGoogleAccount.IsSignedIn)
+        {
+            // Sign-in needs this app registered as an Android OAuth client (package + signing-cert
+            // SHA-1) in the same Google Cloud project the other apps already use. Without this,
+            // "Cannot sign in" had no next step — Score and Storyboarder both surface it; Plate
+            // never did.
+            column.AddView(PaperUi.Secondary(Host,
+                "If sign-in fails, register this app as an Android OAuth client (Drive API "
+                + $"enabled):\n\nPackage: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
+        }
 
         // The tablet.
         column.AddView(Label("reMarkable", gap));
@@ -127,7 +138,9 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         }
         catch (Exception e)
         {
-            ShowStatus($"Could not sign in: {e.Message}");
+            ShowStatus($"Could not sign in: {e.Message}. Package: {AppSigningInfo.PackageName}, "
+                + $"SHA-1: {AppSigningInfo.Sha1Fingerprint()} — register these as an OAuth client "
+                + "if they aren't already.");
         }
     }
 
