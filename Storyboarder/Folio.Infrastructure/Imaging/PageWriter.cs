@@ -1,4 +1,6 @@
 using Folio.Domain.Analysis;
+using Folio.Domain.Markup;
+using Folio.Domain.Readiness;
 using Folio.Domain.Report;
 using SkiaSharp;
 using Storyworthtelling.Paper;
@@ -184,9 +186,54 @@ internal sealed class PageWriter : IDisposable
         y += height + PageGeometry.TightGap;
     }
 
-    // A compact tension-over-chapters chart: an area under a polyline, so a saggy stretch reads at a
-    // glance. Values are clamped 0..1; an empty curve draws nothing.
-    public void PacingChart(IReadOnlyList<ChapterTension> curve)
+    /// <summary>
+    /// A changed scene's before and after, side by side under their own labels (F41).
+    ///
+    /// <para>Two half-width panels rather than two full-width ones: a reader comparing them looks
+    /// from one to the other, and a page turn between them is not a comparison. They are labelled in
+    /// words, because which of two pictures is the older one is not something a picture can say.</para>
+    /// </summary>
+    public void ScenePair(byte[] previous, byte[] current)
+    {
+        var height = PageGeometry.SceneImageHeight * 0.62f;
+        var gutter = PageGeometry.BlockGap;
+        var width = (ContentWidth - gutter) / 2f;
+        var font = ReportType.Small();
+
+        if (y + height + font.Spacing > ContentBottom && y > ContentTop)
+            NewPage();
+
+        Panel(previous, ContentLeft, width, height, "Previous draft", font);
+        Panel(current, ContentLeft + width + gutter, width, height, "This draft", font);
+
+        y += height + font.Spacing + PageGeometry.TightGap;
+    }
+
+    private void Panel(byte[] png, float left, float width, float height, string label, SKFont font)
+    {
+        var dest = new SKRect(left, y, left + width, y + height);
+        if (!SkiaImageFit.Draw(canvas, png, dest))
+        {
+            using var shade = new SKPaint { Color = ReportPalette.Hairline, IsAntialias = false };
+            canvas.DrawRect(dest, shade);
+        }
+
+        using var ink = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
+        canvas.DrawText(label, left, y + height + font.Size + 1f, SKTextAlign.Left, font, ink);
+    }
+
+    /// <summary>
+    /// Tension across the chapters, with the revision plan drawn on it: a finding over a range
+    /// recolours that run of the line in its severity, a single-chapter finding is a dot, and a sag
+    /// takes the hue of whatever sits on it (F39).
+    ///
+    /// <para>It is a line and not filled bands, and the reason is measured in
+    /// <see cref="PacingChart"/>: the Document profile's four severity tones are equiluminant, so
+    /// the edge between two adjacent fills would carry about 1.02:1 and exist in hue alone. Each run
+    /// therefore also carries its <see cref="SeverityCue"/> weight and dash, which is §16's
+    /// non-colour cue and what makes the chart survive the grayscale panel it is read on.</para>
+    /// </summary>
+    public void PacingChart(IReadOnlyList<ChapterTension> curve, IReadOnlyList<PacingFinding> findings)
     {
         if (curve is not { Count: > 0 })
             return;
@@ -198,6 +245,7 @@ internal sealed class PageWriter : IDisposable
 
         var left = ContentLeft;
         var bottom = y + height;
+        var overlay = Domain.Report.PacingChart.Overlay(curve, findings ?? []);
 
         using (var frame = new SKPaint
         {
@@ -215,34 +263,260 @@ internal sealed class PageWriter : IDisposable
             points[i] = new SKPoint(px, py);
         }
 
-        using (var area = new SKPath())
+        // A sag is a bracket *under* the rule, not a wash behind the line. Rendered as a pale fill it
+        // came out as a smear sitting on the baseline and read as a printing fault; a bracket is a
+        // drawn mark, survives the grayscale panel, and cannot be mistaken for the series.
+        foreach (var sag in overlay.Sags)
         {
-            area.MoveTo(points[0].X, bottom);
-            foreach (var point in points)
-                area.LineTo(point.X, point.Y);
-            area.LineTo(points[^1].X, bottom);
-            area.Close();
-            using var fill = new SKPaint
+            var from = points[Math.Clamp(sag.FromChapter, 0, points.Length - 1)].X;
+            var to = points[Math.Clamp(sag.ToChapter, 0, points.Length - 1)].X;
+            var rule = bottom + SagBandDepth;
+            using var bracket = new SKPaint
             {
-                Color = ReportPalette.Rule.WithAlpha(0x33), IsAntialias = true, Style = SKPaintStyle.Fill,
+                Color = Hue(sag.Severity), IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.2f,
             };
-            canvas.DrawPath(area, fill);
+            canvas.DrawLine(from, rule, to, rule, bracket);
+            canvas.DrawLine(from, rule, from, rule - 3f, bracket);
+            canvas.DrawLine(to, rule, to, rule - 3f, bracket);
         }
 
-        using (var line = new SKPaint
+        foreach (var run in overlay.Runs)
         {
-            Color = ReportPalette.Rule, IsAntialias = true, StrokeWidth = 1.5f,
-            Style = SKPaintStyle.Stroke, StrokeJoin = SKStrokeJoin.Round,
-        })
-            for (var i = 1; i < points.Length; i++)
-                canvas.DrawLine(points[i - 1], points[i], line);
+            var cue = run.Severity is { } severity ? SeverityCue.Stroke(severity) : SeverityCue.Plain;
+            using var line = new SKPaint
+            {
+                Color = Hue(run.Severity), IsAntialias = true, StrokeWidth = (float)cue.Width,
+                Style = SKPaintStyle.Stroke, StrokeJoin = SKStrokeJoin.Round, StrokeCap = SKStrokeCap.Round,
+                PathEffect = cue.IsSolid
+                    ? null
+                    : SKPathEffect.CreateDash([.. cue.Dash.Select(length => (float)length)], 0),
+            };
 
-        using (var dot = new SKPaint { Color = ReportPalette.Rule, IsAntialias = true, Style = SKPaintStyle.Fill })
+            for (var i = run.FromChapter + 1; i <= run.ToChapter && i < points.Length; i++)
+                canvas.DrawLine(points[i - 1], points[i], line);
+        }
+
+        using (var dot = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true, Style = SKPaintStyle.Fill })
             foreach (var point in points)
                 canvas.DrawCircle(point.X, point.Y, 1.5f, dot);
 
-        y = bottom + PageGeometry.BlockGap;
+        // A single-chapter finding: a ringed dot, so it is a different shape from the chapter marks
+        // rather than the same shape in a colour.
+        foreach (var marked in overlay.Dots)
+        {
+            var point = points[Math.Clamp(marked.Chapter, 0, points.Length - 1)];
+            using var ring = new SKPaint
+            {
+                Color = Hue(marked.Severity), IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.4f,
+            };
+            canvas.DrawCircle(point.X, point.Y, 4f, ring);
+        }
+
+        y = bottom + SagBandDepth;
+        Key(overlay);
     }
+
+    /// <summary>
+    /// Names the severities this chart drew, in their own stroke and hue.
+    ///
+    /// <para>Without it the claim the chart rests on is not true: a reader would be inferring
+    /// severity from colour, which is the thing §16 forbids and the thing the runs' weights and
+    /// dashes exist to avoid. It lists only what was drawn, so a clean chart carries no key.</para>
+    /// </summary>
+    private void Key(PacingOverlay overlay)
+    {
+        var drawn = overlay.Runs.Select(run => run.Severity)
+            .Concat(overlay.Dots.Select(dot => (ReadinessTier?)dot.Severity))
+            .Where(severity => severity is not null)
+            .Select(severity => severity!.Value)
+            .Distinct()
+            .OrderBy(severity => severity)
+            .ToList();
+
+        if (drawn.Count == 0)
+            return;
+
+        var font = ReportType.Small();
+
+        // A whole line clear of the sag brackets hanging under the rule. Set to one gap, the key's
+        // swatches printed alongside a bracket and the two read as one row of marks.
+        y += font.Spacing;
+
+        var x = ContentLeft;
+        foreach (var severity in drawn)
+        {
+            var cue = SeverityCue.Stroke(severity);
+            using (var sample = new SKPaint
+            {
+                Color = Hue(severity), IsAntialias = true, StrokeWidth = (float)cue.Width,
+                Style = SKPaintStyle.Stroke, StrokeCap = SKStrokeCap.Round,
+                PathEffect = cue.IsSolid
+                    ? null
+                    : SKPathEffect.CreateDash([.. cue.Dash.Select(length => (float)length)], 0),
+            })
+                canvas.DrawLine(x, y, x + 18f, y, sample);
+
+            var label = severity.ToString();
+            using (var ink = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true })
+                canvas.DrawText(label, x + 23f, y + 3f, SKTextAlign.Left, font, ink);
+
+            x += 23f + font.MeasureText(label) + 20f;
+        }
+
+        y += PageGeometry.BlockGap;
+    }
+
+    /// <summary>How far below the chart's rule a sag bracket hangs.</summary>
+    private const float SagBandDepth = 5f;
+
+    /// <summary>The severity's printed hue; the plain line where nothing is wrong.</summary>
+    private static SKColor Hue(ReadinessTier? severity) => severity switch
+    {
+        ReadinessTier.Must => ReportPalette.MustFix,
+        ReadinessTier.Should => ReportPalette.Should,
+        ReadinessTier.Consider => ReportPalette.Consider,
+        ReadinessTier.Great => ReportPalette.Great,
+        _ => ReportPalette.Rule,
+    };
+
+    /// <summary>
+    /// Draws one page of the marked-up manuscript and returns the first line it did <b>not</b>
+    /// print, so the caller can ask for the next page.
+    ///
+    /// <para>The page's length is not a constant: <see cref="MarginColumn"/> packs the notes and
+    /// says how much of the text fits beside them, and when a note would fall off the foot the page
+    /// ends short so the note and its line arrive on the next sheet together (the owner's Release G
+    /// decision). Which is why this returns a line number rather than taking one.</para>
+    /// </summary>
+    public int ManuscriptPage(
+        string manuscript, IReadOnlyList<TextSpan> lines, int first,
+        ILookup<int, Mark> drawnOn, ILookup<int, Mark> anchored, SKFont prose, SKFont noteFont)
+    {
+        NewPage();
+
+        var lineHeight = (float)MarkupGeometry.LineHeight;
+        var textLeft = ContentLeft;
+        var marginLeft = ContentLeft + (float)MarkupGeometry.MarginLeft;
+        var noteWidth = (float)MarkupGeometry.MarginWidth;
+        var last = Math.Min(first + MarkupGeometry.LinesPerPage, lines.Count);
+
+        // What each line's notes come to, in the order the notes will be packed.
+        var wanted = new List<(int Line, double AnchorY, double Height)>();
+        var wrapped = new Dictionary<int, List<string>>();
+        for (var i = first; i < last; i++)
+        {
+            foreach (var mark in anchored[i])
+            {
+                var text = NoteText(mark);
+                var wraps = SkiaText.Wrap(noteFont, text, noteWidth - 6f);
+                wrapped[wanted.Count] = wraps;
+                wanted.Add((i, (i - first) * lineHeight, (wraps.Count * noteFont.Spacing) + 6f));
+            }
+        }
+
+        var packed = MarginColumn.Place(wanted, (float)MarkupGeometry.ContentHeight);
+        var printable = Math.Max((int)Math.Ceiling(packed.TextHeight / lineHeight), 1);
+        last = Math.Min(first + printable, last);
+
+        using (var ink = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true })
+            for (var i = first; i < last; i++)
+            {
+                var span = lines[i];
+                if (span.Length == 0)
+                    continue;
+
+                var baseline = ContentTop + ((i - first) * lineHeight) + prose.Size;
+                canvas.DrawText(manuscript[span.Start..span.End], textLeft, baseline, prose, ink);
+
+                foreach (var mark in drawnOn[i])
+                    DrawMarkOn(manuscript, new LineSpan(i, span.Start, span.End), mark, textLeft, baseline, prose);
+            }
+
+        for (var n = 0; n < packed.Notes.Count; n++)
+        {
+            var note = packed.Notes[n];
+            if (note.AnchorLine >= last)
+                continue;   // its line went to the next page with it
+
+            DrawNote(
+                packed.Notes[n], wanted[n].Line, wrapped[n], anchored[wanted[n].Line].First(),
+                marginLeft, noteWidth, noteFont, lineHeight, prose.Size);
+        }
+
+        // The page draws in absolute coordinates, so the flowing cursor has to be told where the
+        // manuscript actually left off. Without this it stays at the top of the sheet and every
+        // section after the manuscript prints straight through it — which is what the first render
+        // of this page did, and no test could see.
+        y = ContentTop + ((last - first) * lineHeight);
+        return last;
+    }
+
+    /// <summary>A mark drawn over the part of this line that it actually covers.</summary>
+    private void DrawMarkOn(string manuscript, LineSpan line, Mark mark, float left, float baseline, SKFont prose)
+    {
+        if (MarkPlacement.RunOn(mark, line) is not { } run)
+            return;
+
+        var x = left + prose.MeasureText(manuscript[line.StartOffset..run.Start]);
+        var width = mark.IsPoint ? 0f : prose.MeasureText(manuscript[run.Start..run.End]);
+
+        MarkedManuscript.DrawMark(
+            canvas, mark, x, baseline, width, MarkedManuscript.Hue(mark.Severity),
+            tail: run.End >= mark.EndOffset);
+    }
+
+    /// <summary>
+    /// The note itself: a severity bracket, the reason, and — when the packing pushed it down — a
+    /// leader elbowing back to the line it concerns, so a reader never has to guess which line a
+    /// note two inches lower is about.
+    /// </summary>
+    private void DrawNote(
+        PlacedNote note, int line, IReadOnlyList<string> wraps, Mark mark,
+        float marginLeft, float noteWidth, SKFont font, float lineHeight, float proseSize)
+    {
+        var hue = MarkedManuscript.Hue(mark.Severity);
+        var top = ContentTop + (float)note.Top;
+
+        using (var bracket = new SKPaint
+        {
+            Color = hue, IsAntialias = true, Style = SKPaintStyle.Fill,
+        })
+            canvas.DrawRect(
+                marginLeft - (float)MarkupGeometry.BracketInset - (float)MarkupGeometry.BracketWidth,
+                top, (float)MarkupGeometry.BracketWidth, (float)note.Height - 6f, bracket);
+
+        using (var ink = new SKPaint { Color = ReportPalette.InkSoft, IsAntialias = true })
+        {
+            var y = top + font.Size;
+            foreach (var wrap in wraps)
+            {
+                canvas.DrawText(wrap, marginLeft, y, font, ink);
+                y += font.Spacing;
+            }
+        }
+
+        if (!note.NeedsLeader)
+            return;
+
+        // Out of the text, down the gutter, and in to the note — an elbow rather than a diagonal,
+        // because a diagonal across a column of prose reads as a mark on the prose.
+        var anchorY = ContentTop + (float)note.AnchorY + (proseSize / 2f) + 2f;
+        var elbow = ContentLeft + (float)MarkupGeometry.TextWidth + 22f;
+        using var leader = new SKPaint
+        {
+            Color = ReportPalette.Hairline, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 0.6f,
+        };
+        canvas.DrawLine(ContentLeft + (float)MarkupGeometry.TextWidth + 6f, anchorY, elbow, anchorY, leader);
+        canvas.DrawLine(elbow, anchorY, elbow, top + (font.Size / 2f), leader);
+        canvas.DrawLine(elbow, top + (font.Size / 2f), marginLeft - 4f, top + (font.Size / 2f), leader);
+    }
+
+    /// <summary>
+    /// What a note says. The label names the problem and the reason explains it — and that is the
+    /// whole of it, because nothing in this document hands the author a line to use instead (F40).
+    /// </summary>
+    private static string NoteText(Mark mark) =>
+        string.IsNullOrWhiteSpace(mark.Reason) ? mark.Label : $"{mark.Label} — {mark.Reason}";
 
     /// <summary>Closes the last page and returns the document's bytes.</summary>
     public byte[] Finish()

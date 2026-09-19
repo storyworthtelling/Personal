@@ -1,3 +1,4 @@
+using Folio.Domain.Markup;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Folio.Infrastructure.Imaging;
@@ -42,7 +43,7 @@ public class PointLadderTests
         Assert.Contains(font.Size, Ladder);
     }
 
-    /// <summary>Ten roles are declared; an eleventh that appears is a decision, not a diff.</summary>
+    /// <summary>The declared roles; one more that appears is a decision, not a diff.</summary>
     [Fact]
     public void TheReportDeclaresExactlyTheRolesItPrints()
     {
@@ -52,8 +53,8 @@ public class PointLadderTests
         Assert.Equal(
             new[]
             {
-                "Body", "BodyBold", "BodyItalic", "Folio", "Heading", "Label", "Running", "Section",
-                "Small", "Subtitle", "Title",
+                "Body", "BodyBold", "BodyItalic", "Folio", "Heading", "Label", "Manuscript",
+                "Running", "Section", "Small", "Subtitle", "Title",
             },
             roles);
     }
@@ -109,4 +110,20 @@ public class PointLadderTests
     private static string StripComments(string source) =>
         Regex.Replace(Regex.Replace(source, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline),
             @"//.*?$", string.Empty, RegexOptions.Multiline);
+
+    /// <summary>
+    /// The manuscript's line height decides how long the marked-up document is — about 140 pages
+    /// (F45) — and it is set against a size Domain cannot see, because Domain holds no reference to
+    /// the library the ladder lives in. So the two are held together here instead: if the ladder's
+    /// Body rung moves and MarkupGeometry does not, the page count silently becomes a different
+    /// number from the one the plan was measured on.
+    /// </summary>
+    [Fact]
+    public void TheManuscriptIsSetOnTheLaddersBodyRung()
+    {
+        using var manuscript = ReportType.Manuscript();
+
+        Assert.Equal(PaperTypeScale.Body, manuscript.Size);
+        Assert.Equal(PaperTypeScale.Body, (float)MarkupGeometry.TypeSize);
+    }
 }

@@ -1,5 +1,6 @@
 using SkiaSharp;
 using Folio.Domain.Analysis;
+using Folio.Domain.Markup;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
 using Folio.Domain.Reading;
@@ -29,8 +30,9 @@ public sealed class AnalysisDocumentRenderer
     private readonly CoverPageRenderer covers = new();
 
     public byte[] Render(
-        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null) =>
-        RenderReport(analysis, cover, scenes, review).Pdf;
+        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes,
+        DraftReview? review = null, string? manuscript = null) =>
+        RenderReport(analysis, cover, scenes, review, manuscript).Pdf;
 
     /// <summary>
     /// Renders three times, and each pass buys something the next one needs.
@@ -50,7 +52,8 @@ public sealed class AnalysisDocumentRenderer
     /// pages of vector type is nothing beside the model calls that wrote the words on them.</para>
     /// </summary>
     public AnalysisRenderResult RenderReport(
-        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview? review = null)
+        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes,
+        DraftReview? review = null, string? manuscript = null)
     {
         var reportTitle = string.IsNullOrWhiteSpace(cover.Title) ? "Book Analysis" : cover.Title;
         var titled = cover with { Title = reportTitle };
@@ -60,7 +63,7 @@ public sealed class AnalysisDocumentRenderer
         IReadOnlyList<(string Title, int Page)> relative;
         using (var probe = new PageWriter(foot))
         {
-            RenderContent(analysis, scenes, draft, probe);
+            RenderContent(analysis, scenes, draft, probe, manuscript);
             relative = probe.TocEntries.ToList();
             probe.Finish();
         }
@@ -80,12 +83,13 @@ public sealed class AnalysisDocumentRenderer
         covers.AnalysisCover(document, titled);
         covers.AnalysisToc(document, entries);
         document.NewPage();
-        RenderContent(analysis, scenes, draft, document);
+        RenderContent(analysis, scenes, draft, document, manuscript);
         return new AnalysisRenderResult(document.Finish(), frontMatter, entries);
     }
 
     private static void RenderContent(
-        BookAnalysisResult analysis, IReadOnlyList<SceneEvidence> scenes, DraftReview review, PageWriter writer)
+        BookAnalysisResult analysis, IReadOnlyList<SceneEvidence> scenes, DraftReview review,
+        PageWriter writer, string? manuscript)
     {
         using var body = ReportType.Body();
         using var bodyBold = ReportType.BodyBold();
@@ -175,7 +179,7 @@ public sealed class AnalysisDocumentRenderer
             if (analysis.PacingCurve is { Count: > 0 })
             {
                 writer.Paragraph("Tension across the chapters — a dip is a place to check the story is still pulling.", bodyItalic, Muted);
-                writer.PacingChart(analysis.PacingCurve);
+                writer.PacingChart(analysis.PacingCurve, PlacedFindings(analysis));
             }
             foreach (var note in analysis.PacingNotes ?? [])
                 writer.Bullet(Join(note.Chapter, note.Detail) + Tag(FindingCategory.Pacing, note.Detail, statusByFinding), body, Ink);
@@ -235,6 +239,7 @@ public sealed class AnalysisDocumentRenderer
 
         // The scene-by-scene walk: each scene's evidence image above its notes — the fidelity check.
         RenderScenes(writer, scenes, body, bodyItalic, h2);
+        RenderMarkedManuscript(writer, analysis, manuscript, bodyItalic, h2);
 
         // What to do next: first the scenes to ADD (the additive engine — the owner writes short), then the
         // revision plan, both grouped by impact tier.
@@ -262,7 +267,9 @@ public sealed class AnalysisDocumentRenderer
         {
             writer.KeepTogether(PageGeometry.SceneImageHeight + 80f);
             writer.Paragraph(string.IsNullOrWhiteSpace(scene.Citation) ? "Scene" : scene.Citation, bodyItalic, Accent);
-            if (scene.Image is { Length: > 0 })
+            if (scene.ShowsPair)
+                writer.ScenePair(scene.PreviousImage!, scene.Image!);
+            else if (scene.Image is { Length: > 0 })
                 writer.Image(scene.Image);
             else
                 writer.Paragraph("Image unavailable for this scene.", bodyItalic, Muted);
@@ -272,6 +279,36 @@ public sealed class AnalysisDocumentRenderer
                 writer.Paragraph(scene.Verdict, bodyItalic, Muted);
             writer.Gap(PageGeometry.SectionGap);
         }
+    }
+
+    /// <summary>
+    /// The manuscript itself, with the report's findings written on it — the document the author
+    /// actually revises from. It is last because it is most of the sheets (F45), and it is skipped
+    /// entirely when there are no marks: a hundred and forty pages of unmarked prose is a copy of
+    /// the book, not a reading of it.
+    /// </summary>
+    private static void RenderMarkedManuscript(
+        PageWriter writer, BookAnalysisResult analysis, string? manuscript, SKFont bodyItalic, SKFont h2)
+    {
+        if (string.IsNullOrWhiteSpace(manuscript))
+            return;
+
+        var marks = MarkSource.From(manuscript, analysis);
+        if (marks.Count == 0)
+            return;
+
+        writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
+        writer.Paragraph(
+            "Your pages with the findings on them. A caret is something missing, a struck line is "
+            + "something doing no work, an underline is something unclear — and the note in the "
+            + "margin says why. None of them writes the line for you.",
+            bodyItalic, Muted);
+
+        MarkedManuscript.Render(writer, manuscript, marks);
+
+        // Whatever follows starts on its own sheet. After a hundred and forty pages of marked prose,
+        // a section heading four lines under the last one reads as part of the book.
+        writer.NewPage();
     }
 
     private static void RenderVoiceConsistency(
@@ -601,4 +638,18 @@ public sealed class AnalysisDocumentRenderer
 
     private static string Quoted(string? excerpt) =>
         string.IsNullOrWhiteSpace(excerpt) ? string.Empty : $"“{excerpt}”";
+
+    /// <summary>
+    /// The revision plan, placed on the pacing chart (F39). A finding whose citation names no chapter
+    /// on the curve is simply not drawn: the chart says less rather than saying it in the wrong
+    /// place. See <see cref="ChapterCitation"/>.
+    /// </summary>
+    private static IReadOnlyList<PacingFinding> PlacedFindings(BookAnalysisResult analysis) =>
+    [
+        .. (analysis.RevisionPlan ?? [])
+            .Select(item => (Item: item, Range: ChapterCitation.Locate(item.Chapter, analysis.PacingCurve)))
+            .Where(placed => placed.Range is not null)
+            .Select(placed => new PacingFinding(
+                placed.Range!.Value.From, placed.Range.Value.To, ChapterCitation.Tier(placed.Item.Priority))),
+    ];
 }

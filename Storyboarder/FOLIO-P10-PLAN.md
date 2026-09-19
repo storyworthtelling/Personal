@@ -93,10 +93,22 @@ jacket cannot produce an illegible mark. Guard G16.
 On the marked-up manuscript every note sits at its anchor line *unless* the note above it has not
 finished, in which case it is pushed down until it clears and a leader takes it back to its line.
 That is a layout pass, not a coordinate: pure `MarginColumn.Place(anchors, heights, contentHeight)`.
-**Unresolved and to be surfaced before Release G:** what happens when the packed column runs past
-the foot of the page — does the note move to the next page with its anchor line repeated, or does
-the page break early so the note stays with its line? The mockup's page does not overflow, so it
-does not answer this. Guard G17.
+Guard G17.
+
+**Resolved (owner, at the Release G gate): the page breaks early.** When the packed column runs past
+the foot, the manuscript page ends short so every note stays on the same sheet as the line it
+concerns. Nothing is ever separated from what it refers to, and a leader never crosses a page
+boundary — which is the whole reason these are anchored notes rather than endnotes.
+
+The cost is accepted rather than unnoticed: a heavily-marked chapter prints ragged, with pages ending
+well above the foot, and a dense run turns a ~140-page markup into rather more. The alternative —
+carrying the note over and reprinting its anchor line — keeps the pagination tidy and was refused,
+because a note beside the wrong page of prose is worse than a short page.
+
+So `MarginColumn` decides the **break**, not only the placement: it returns how much of the page's
+text actually fits once the notes are packed, and the paginator takes that as the page's content
+height. Which means the guard has a second half — a page whose notes overflow must end early, and
+must never emit a leader pointing off the sheet.
 
 ### F39 — the pacing chart carries the findings
 

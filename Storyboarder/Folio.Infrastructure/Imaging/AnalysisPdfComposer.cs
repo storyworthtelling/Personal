@@ -16,6 +16,7 @@ public sealed class AnalysisPdfComposer : IAnalysisPdfComposer
     }
 
     public byte[] Compose(
-        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview review) =>
-        renderer.Render(analysis, cover, scenes, review);
+        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes,
+        DraftReview review, string? manuscript = null) =>
+        renderer.Render(analysis, cover, scenes, review, manuscript);
 }
