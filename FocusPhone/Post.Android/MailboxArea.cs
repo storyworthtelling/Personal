@@ -165,8 +165,39 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         {
             return false;
         }
+
+        // Choosing is a mode, not a level: back leaves the mode and keeps the
+        // correspondence open, exactly as it does for Plate's Darkroom cull.
+        if (openSelection.IsActive)
+        {
+            EndOpenSelection();
+            return true;
+        }
+
         CloseThread();
         return true;
+    }
+
+    /// <summary>
+    /// The area's own actions, offered while the shell's pinned bottom bar would
+    /// otherwise sit empty: only while a Choose selection inside the open
+    /// correspondence is active. The Mailbox list itself has none — its acts are
+    /// per-row — and neither does an open correspondence outside Choose mode, whose
+    /// channel actions (Call/Text/Email) are drawn in-page instead.
+    /// </summary>
+    public override View? BuildBottomBar()
+    {
+        if (openContactKey is null || !openSelection.IsActive)
+        {
+            return null;
+        }
+
+        return PaperUi.BottomBar(Host,
+            PaperUi.QuietButton(Host, "Cancel", EndOpenSelection),
+            PaperUi.SecondaryButton(Host,
+                openSelection.Count == 0 ? "File" : $"File {openSelection.Count}", FileSelected),
+            PaperUi.DestructiveButton(Host,
+                openSelection.Count == 0 ? "Delete" : $"Delete {openSelection.Count}", DeleteSelected));
     }
 
     // Full reload: re-read the live call/SMS tail and the first cache page, then rebuild
@@ -278,9 +309,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             all.AddRange(priorCache);
             all.AddRange(page);
 
-            // Drop items the owner deleted, merge by resolved person identity, then stamp
-            // unread from the per-thread read record.
-            var visible = database.Hidden.Filter(all);
+            // Drop items the owner deleted (permanently, or still inside a bulk delete's
+            // undo window via the shared delete buffer), merge by resolved person identity,
+            // then stamp unread from the per-thread read record.
+            var visible = deleteBuffer.Filter(database.Hidden.Filter(all));
             var resolver = ContactAssociations.BuildResolver(Host, database.IdentityLinks);
             var readState = new ReadState(database.ReadState.LoadAll());
             merged = new TimelineMerger().Merge(visible, resolver)
@@ -293,7 +325,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             // database problem take the screen down — fall back to a plain merge.
             Android.Util.Log.Warn("Post", $"Timeline stores unavailable: {e}");
             PostDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
-            merged = new TimelineMerger().Merge(live.Concat(priorCache).Concat(page));
+            merged = new TimelineMerger().Merge(deleteBuffer.Filter(live.Concat(priorCache).Concat(page)));
         }
 
         var rows = InboxOrdering.UnreadFirstThenRecent(merged)
@@ -378,7 +410,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private void ShowRowActions(ThreadRow row)
     {
         ActionCard.Show(Host, Overlay, row.Title, row.Subtitle,
-            new CardAction("File this correspondence", () => FileCorrespondence(row), Lead: true));
+            new CardAction("File this correspondence", () => FileCorrespondence(row), Lead: true),
+            new CardAction("Delete this correspondence", () => DeleteCorrespondence(row), Destructive: true));
     }
 
     // A correspondence is filed whole: every item in it goes to the archive and every
@@ -413,6 +446,21 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         // closes rather than leaving it for the next screen-open: mail that stays in the
         // inbox after being filed is what makes filing look like it does not work.
         Syncs.After(Host, PostAction.Filed);
+    }
+
+    // Deleting a correspondence whole is permanent — unlike filing, nothing is kept: no
+    // ghost, no archive entry. It reuses the same per-kind delete-at-source routing as a
+    // single-item delete (see ScheduleBulkDelete/CommitDelete), just over every item the
+    // correspondence has, batched into one fold rather than one per item.
+    private void DeleteCorrespondence(ThreadRow row)
+    {
+        var items = ItemsFor(row.ContactKey);
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        ScheduleBulkDelete(items, $"Deleted {row.Title}.", ReloadThreads);
     }
 
     private IReadOnlyList<TimelineItem> ItemsFor(string contactKey) =>
@@ -505,13 +553,25 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private string openTitle = string.Empty;
     private View? openView;
     private ListView? openListView;
+    private LinearLayout? openChooserRow;
     private LinearLayout? openActionRow;
     private List<TimelineItem> openItems = [];
     private IReadOnlyList<string> openMemberKeys = [];
     private bool openIsGroup;
     private string? openBridgeConversationId;
-    private readonly DeleteBuffer openDeleteBuffer = new();
-    private readonly Handler openHandler = new(Looper.MainLooper!);
+
+    // Which items are picked while "Choose" is on, inside the open correspondence. Bulk
+    // file/delete reuse the same Selection type Score's picker screens use — pick order
+    // does not matter here, but the checkbox/wash rendering and All/None toggle do.
+    private readonly Selection openSelection = new();
+
+    // Shared by the whole-correspondence delete (thread list) and the per-item delete —
+    // single or Choose-mode bulk — inside the open correspondence: an item scheduled here
+    // disappears from BOTH views at once (see ReadPageAndBuild/BindOpenThread), because a
+    // delete made from either screen should read as done everywhere, not just where it
+    // was made.
+    private readonly DeleteBuffer deleteBuffer = new();
+    private readonly Handler deleteHandler = new(Looper.MainLooper!);
     private const int PickBridgePhoto = 71;
     private string? pendingPhotoConversationId;
     private string? pendingPhotoNumber;
@@ -527,11 +587,13 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         openTitle = ContactNameResolver.DisplayName(Host, contactKey);
         openView = null;
         openListView = null;
+        openChooserRow = null;
         openActionRow = null;
         openItems = [];
         openMemberKeys = [];
         openIsGroup = false;
         openBridgeConversationId = null;
+        openSelection.Cancel();
         Invalidate();
         LoadOpenThread();
         ShowAnyProposedDate();
@@ -546,11 +608,13 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         openContactKey = null;
         openView = null;
         openListView = null;
+        openChooserRow = null;
         openActionRow = null;
         openItems = [];
         openMemberKeys = [];
         openIsGroup = false;
         openBridgeConversationId = null;
+        openSelection.Cancel();
         DogEar.SetNotice(Host, Overlay, NoticeKeys.ProposedDate, null);
         DogEar.SetNotice(Host, Overlay, NoticeKeys.Block, null);
         ReloadThreads();
@@ -569,21 +633,47 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
+        // The way into Choose mode, and — once in it — the running count and an
+        // All/None toggle over what the correspondence holds. Built once here and
+        // repainted in place by BuildChooserRow, same as the channel-action row below.
+        openChooserRow = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
+        openChooserRow.SetGravity(GravityFlags.CenterVertical);
+        var chooserVertical = PaperTheme.Dp(Host, DesignTokens.Space.X3);
+        openChooserRow.SetPadding(0, chooserVertical, 0, chooserVertical);
+        column.AddView(openChooserRow, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
         openListView = new ListView(Host);
         PaperUi.StylePaperList(Host, openListView);
         openListView.ItemLongClick += (_, e) =>
         {
-            if (e.Position >= 0 && e.Position < openItems.Count)
+            if (e.Position < 0 || e.Position >= openItems.Count)
             {
-                ShowItemActions(openItems[e.Position]);
+                return;
             }
+            if (openSelection.IsActive)
+            {
+                // Already choosing — a long-press is just another pick.
+                openSelection.Toggle(openItems[e.Position].SourceId);
+                RefreshOpenView();
+                return;
+            }
+            ShowItemActions(openItems[e.Position]);
         };
 
         // Email in a stream is a subject and a snippet; the message itself is its own page.
+        // While choosing, a tap picks and nothing opens — the list is one control for as
+        // long as the mode is on.
         openListView.ItemClick += (_, e) =>
         {
             if (e.Position < 0 || e.Position >= openItems.Count)
             {
+                return;
+            }
+            if (openSelection.IsActive)
+            {
+                openSelection.Toggle(openItems[e.Position].SourceId);
+                RefreshOpenView();
                 return;
             }
             var tapped = openItems[e.Position];
@@ -686,8 +776,12 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         openIsGroup = thread?.IsGroup ?? false;
         openTitle = OpenThreadTitle(thread);
 
-        // Hide anything the owner just deleted (still inside its undo window).
-        openItems = openDeleteBuffer.Filter(thread?.Items ?? []).ToList();
+        // Hide anything the owner just deleted (still inside its undo window, single or
+        // bulk — see the shared deleteBuffer's remarks).
+        openItems = deleteBuffer.Filter(thread?.Items ?? []).ToList();
+        // A pick whose item filed, deleted, or aged out from under it is not a pick
+        // anymore — drop it rather than let the count and the fold disagree.
+        openSelection.RetainKnown(openItems.Select(item => item.SourceId));
         // The conversation id to reply through the bridge (learned from the most
         // recent bridge-captured message in this thread).
         openBridgeConversationId =
@@ -695,11 +789,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         if (openListView is not null)
         {
-            openListView.Adapter = new PaperListAdapter(Host, openItems
-                .Select(item => new PaperListRow(
-                    TimelineItemFormatter.Describe(item),
-                    $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.LocalDateTime, DateTime.Now)}"))
-                .ToList());
+            openListView.Adapter = new PaperListAdapter(Host, BuildOpenRows(), openSelection.IsActive);
         }
 
         // The shell reads Title fresh only on a render, so a rename mid-load (the contact
@@ -709,7 +799,169 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             postActivity.RefreshHeader();
         }
 
+        BuildChooserRow();
         BuildActionRow();
+    }
+
+    private List<PaperListRow> BuildOpenRows() => openItems
+        .Select(item => new PaperListRow(
+            TimelineItemFormatter.Describe(item),
+            $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.LocalDateTime, DateTime.Now)}",
+            Picked: openSelection.Contains(item.SourceId)))
+        .ToList();
+
+    // Repaints the list, the chooser row, and the channel-action row in place after a
+    // local change that does not need a fresh read from the source — a pick, an
+    // All/None toggle, ending the mode. LoadOpenThread re-reads calls/texts/cache, which
+    // a mere selection change never needs.
+    private void RefreshOpenView()
+    {
+        if (openListView is not null)
+        {
+            openListView.Adapter = new PaperListAdapter(Host, BuildOpenRows(), openSelection.IsActive);
+        }
+        BuildChooserRow();
+        BuildActionRow();
+        // The shell's pinned bottom bar (File N / Delete N) is only rebuilt on a render.
+        Invalidate();
+    }
+
+    // The way into Choose mode, and — once in it — what the picker controls offer above
+    // the list: the running count and an All/None toggle. The bulk actions themselves live
+    // in the shell's pinned bottom bar (see BuildBottomBar), matching DESIGN.md §7.
+    private void BuildChooserRow()
+    {
+        if (openChooserRow is null)
+        {
+            return;
+        }
+        openChooserRow.RemoveAllViews();
+
+        if (!openSelection.IsActive)
+        {
+            openChooserRow.AddView(PaperUi.QuietButton(Host, "Choose", () =>
+            {
+                openSelection.Begin();
+                RefreshOpenView();
+            }));
+            return;
+        }
+
+        openChooserRow.AddView(
+            PaperUi.Secondary(Host, openSelection.Count == 0 ? "Nothing chosen" : $"{openSelection.Count} chosen"),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+
+        var ids = openItems.Select(item => item.SourceId).ToList();
+        openChooserRow.AddView(PaperUi.QuietButton(Host, openSelection.AllSelected(ids) ? "None" : "All", () =>
+        {
+            openSelection.ToggleAll(ids);
+            RefreshOpenView();
+        }));
+    }
+
+    private void EndOpenSelection()
+    {
+        openSelection.Cancel();
+        RefreshOpenView();
+    }
+
+    // The long-press door into Choose mode, entered already holding the item that was
+    // pressed — the way it actually begins: you see the one you meant first.
+    private void BeginChoosingWith(TimelineItem item)
+    {
+        openSelection.Begin(item.SourceId);
+        RefreshOpenView();
+    }
+
+    // Bulk-files everything picked, exactly as filing a whole correspondence does for
+    // every one of its items: the ghost is kept and the source delete is owed per item,
+    // batched into one fold rather than one per item.
+    private void FileSelected()
+    {
+        var picked = new HashSet<string>(openSelection.Items);
+        var items = openItems.Where(item => picked.Contains(item.SourceId)).ToList();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        openSelection.Cancel();
+        var now = DateTimeOffset.UtcNow;
+        foreach (var item in items)
+        {
+            Filing.File(Host, item, now);
+        }
+        LoadOpenThread();
+
+        DogEar.Show(Host, Overlay, CountMessage(items.Count, "filed"), onUndo: () =>
+        {
+            foreach (var item in items)
+            {
+                Filing.Unfile(Host, item.SourceId);
+            }
+            LoadOpenThread();
+        });
+
+        Syncs.After(Host, PostAction.Filed);
+    }
+
+    // Bulk-deletes everything picked, permanently — unlike filing, nothing is kept.
+    private void DeleteSelected()
+    {
+        var picked = new HashSet<string>(openSelection.Items);
+        var items = openItems.Where(item => picked.Contains(item.SourceId)).ToList();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        openSelection.Cancel();
+        ScheduleBulkDelete(items, CountMessage(items.Count, "deleted"), LoadOpenThread);
+    }
+
+    private static string CountMessage(int count, string verb) => count == 1 ? $"1 {verb}." : $"{count} {verb}.";
+
+    // Schedules a batch of items for undo-first delete (§7): every item disappears from
+    // whichever view is watching at once via the shared deleteBuffer, and the fold
+    // restores the whole batch together rather than one item at a time. Once the window
+    // closes, each item is deleted at the source through the same per-kind routing
+    // (CommitDelete) a single-item delete already uses.
+    private void ScheduleBulkDelete(IReadOnlyList<TimelineItem> items, string message, params Action[] refresh)
+    {
+        var now = DateTimeOffset.Now;
+        var window = TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
+        foreach (var item in items)
+        {
+            deleteBuffer.Schedule(item, now, window);
+        }
+        foreach (var action in refresh)
+        {
+            action();
+        }
+
+        DogEar.Show(Host, Overlay, message, onUndo: () =>
+        {
+            foreach (var item in items)
+            {
+                deleteBuffer.Undo(item.Kind, item.SourceId);
+            }
+            foreach (var action in refresh)
+            {
+                action();
+            }
+        });
+
+        deleteHandler.PostDelayed(() =>
+        {
+            foreach (var item in items)
+            {
+                // Commit only what was not undone in the meantime.
+                if (deleteBuffer.Undo(item.Kind, item.SourceId))
+                {
+                    CommitDelete(item);
+                }
+            }
+        }, DesignTokens.Motion.UndoWindowMs);
     }
 
     private string OpenThreadTitle(ContactThread? thread)
@@ -737,6 +989,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         if (openIsGroup)
         {
             return; // Group replies need the bridge; no per-channel deep link yet.
+        }
+        if (openSelection.IsActive)
+        {
+            return; // Choosing takes over the row's job; the channel actions come back when it ends.
         }
 
         var phone = openMemberKeys.FirstOrDefault(IsPhone) ?? (IsPhone(openContactKey!) ? openContactKey : null);
@@ -793,6 +1049,9 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         actions.Add(new CardAction("File", () => FileWithUndo(item)));
         actions.Add(new CardAction("Delete", () => DeleteWithUndo(item), Destructive: true));
+        // How Choose actually begins: you see the one you meant first, exactly as a
+        // long-press starts Plate's Darkroom cull with that picture already picked.
+        actions.Add(new CardAction("Choose", () => BeginChoosingWith(item)));
 
         if (phone is not null && !openIsGroup)
         {
@@ -955,27 +1214,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         FieldNotesStore.Record(Host, notes => notes.WithCalendarWrite(written: false));
     }
 
-    private void DeleteWithUndo(TimelineItem item)
-    {
-        var window = TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
-        openDeleteBuffer.Schedule(item, DateTimeOffset.Now, window);
-        LoadOpenThread(); // Item disappears immediately.
-
-        DogEar.Show(Host, Overlay, $"Deleted {ChannelWord(item)}.", onUndo: () =>
-        {
-            openDeleteBuffer.Undo(item.Kind, item.SourceId);
-            LoadOpenThread();
-        });
-
-        openHandler.PostDelayed(() =>
-        {
-            // Commit only if it was not undone in the meantime.
-            if (openDeleteBuffer.Undo(item.Kind, item.SourceId))
-            {
-                CommitDelete(item);
-            }
-        }, DesignTokens.Motion.UndoWindowMs);
-    }
+    private void DeleteWithUndo(TimelineItem item) =>
+        ScheduleBulkDelete([item], $"Deleted {ChannelWord(item)}.", LoadOpenThread);
 
     // Performs the irreversible, channel-specific delete once the undo window closes.
     private void CommitDelete(TimelineItem item)
