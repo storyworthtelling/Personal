@@ -16,7 +16,12 @@ public interface IVoiceClient
 {
     // Refines the voice profile from one newly-uploaded document, folding it into the existing profile
     // (pass VoiceProfile.Empty for the first document). Returns the updated profile.
-    Task<VoiceProfile> RefineAsync(VoiceProfile existing, string documentText, CancellationToken cancellationToken);
+    //
+    // projectId is the book the document belongs to, and it is required rather than optional: the
+    // examples learned here are tagged with it, which is the only thing that later lets this book's
+    // contribution be discarded without throwing away what every other book taught.
+    Task<VoiceProfile> RefineAsync(
+        VoiceProfile existing, string documentText, Guid projectId, CancellationToken cancellationToken);
 
     // Writes one situational message in the owner's voice for the given request. Returns plain prose (no
     // markup) sized to the request. The profile is assumed non-empty (VoicedMessenger guards that).

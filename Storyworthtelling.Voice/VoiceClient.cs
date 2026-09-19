@@ -24,21 +24,25 @@ public sealed class VoiceClient : IVoiceClient
         "SAMPLE. Update the profile to reflect the sample, folding it into what's already there rather " +
         "than replacing it. Capture how the person actually writes — tone, register, attitude, cadence — " +
         "not the subject matter. Respond with ONLY a JSON object: " +
-        "{\"summary\":string,\"traits\":[string],\"examples\":[string],\"avoid\":[string]," +
-        "\"signatureMoves\":[string]}. " +
-        "summary = a short paragraph describing the voice. traits = a few short descriptors (\"wry\", " +
-        "\"warm\", \"economical\"). examples = 2 or 3 characteristic phrasings drawn from THIS sample, " +
-        "quoted closely, to anchor the voice concretely — supply only fresh ones from this sample; do NOT " +
-        "repeat the profile's existing examples, as the app preserves those itself. signatureMoves = " +
-        "recurring structural habits — sentence shapes, favored transitions, punctuation tics (\"em-dash " +
-        "asides\", \"short declarative openers\", \"lists of three\"). avoid = things that would read as " +
-        "not-them (\"corporate boilerplate\", \"exclamation marks\", \"hype\"). Keep traits, avoid, and " +
-        "signatureMoves to at most 6 items each. No prose outside the JSON.";
+        "{\"register\":string,\"traits\":[string],\"examples\":[string],\"avoid\":[string]," +
+        "\"cadence\":[string],\"punctuation\":[string]}. " +
+        "register = how this person sounds, in a few words rather than a paragraph (\"wry, warm, " +
+        "economical\"). traits = a few short descriptors (\"plain-spoken\", \"unhurried\", \"dry\"). " +
+        "examples = 2 or 3 characteristic phrasings drawn from THIS sample, quoted closely, to anchor the " +
+        "voice concretely — supply only fresh ones from this sample; do NOT repeat the profile's existing " +
+        "examples, as the app preserves those itself. cadence = the shapes their sentences take (\"short " +
+        "declarative openers\", \"lists of three\", \"a long sentence then a very short one\"). " +
+        "punctuation = their marks and how they use them (\"em-dash asides\", \"semicolons, rarely\", " +
+        "\"no exclamation marks\"). Keep cadence and punctuation apart: a sentence shape and a mark are " +
+        "different instructions to write under. avoid = things that would read as not-them (\"corporate " +
+        "boilerplate\", \"hype\"). Keep traits, avoid, cadence and punctuation to at most 6 items each. " +
+        "No prose outside the JSON.";
 
     private const string ComposeInstruction =
         "You are writing a single situational message inside an app, in the voice described by the PROFILE " +
         "below. The message is UI copy shown for a specific occasion — write it to sound like the person " +
-        "the profile describes, honoring their traits, echoing their signature moves, drawing on their " +
+        "the profile describes, honoring their traits, writing in their cadence and punctuation, drawing " +
+        "on their " +
         "example phrasings, and avoiding what they'd avoid. PURPOSE names the occasion; CONTEXT gives the " +
         "specifics to reflect. Keep it within the word limit, plain text, no markup, no quotes, no " +
         "preamble — just the message itself.";
@@ -55,16 +59,20 @@ public sealed class VoiceClient : IVoiceClient
     }
 
     public async Task<VoiceProfile> RefineAsync(
-        VoiceProfile existing, string documentText, CancellationToken cancellationToken)
+        VoiceProfile existing, string documentText, Guid projectId, CancellationToken cancellationToken)
     {
         var options = optionsAccessor.Value;
         var existingJson = JsonSerializer.Serialize(new
         {
-            summary = existing.Summary,
+            register = existing.Register,
             traits = existing.Traits,
-            examples = existing.Examples,
+            // The model is shown the phrasings, not the book each came from: which book taught an
+            // anchor is the app's bookkeeping for discarding it later, and nothing the model should
+            // be reasoning about while it reads.
+            examples = existing.Examples.Select(example => example.Text),
             avoid = existing.Avoid,
-            signatureMoves = existing.SignatureMoves
+            cadence = existing.Cadence,
+            punctuation = existing.Punctuation
         });
         var userContent = $"CURRENT PROFILE (JSON):\n{existingJson}\n\nNEW WRITING SAMPLE:\n{documentText}";
 
@@ -85,34 +93,52 @@ public sealed class VoiceClient : IVoiceClient
             return existing;
         }
 
-        if (dto is null || string.IsNullOrWhiteSpace(dto.Summary))
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Register))
             return existing;
 
         // Provenance is counted here rather than trusted to the model: one more document has now fed the
         // profile than fed the one we passed in. Examples are merged (never replaced) here rather than
         // trusted to the model, so the concrete voice anchors accumulate across every book.
-        return new VoiceProfile(
-            dto.Summary.Trim(),
-            dto.Traits ?? [],
-            MergeExamples(existing.Examples, dto.Examples),
-            dto.Avoid ?? [],
-            dto.SignatureMoves ?? [],
-            existing.DocumentsAnalyzed + 1);
+        return existing with
+        {
+            Register = dto.Register.Trim(),
+            Traits = dto.Traits ?? [],
+            Examples = MergeExamples(existing.Examples, dto.Examples, projectId),
+            Avoid = dto.Avoid ?? [],
+            Cadence = dto.Cadence ?? [],
+            Punctuation = dto.Punctuation ?? [],
+            DocumentsAnalyzed = existing.DocumentsAnalyzed + 1,
+            // Whatever was read here is in the current shape, so there is nothing left to relearn.
+            NeedsRelearn = false,
+        };
     }
 
     // Folds the sample's fresh examples onto the ones already learned, keeping every old example (they are
     // the accumulated voice anchors) and appending any new ones the model returned. Trimmed, blanks
     // dropped, deduped case-insensitively so a phrase the model happens to echo isn't stored twice.
-    private static IReadOnlyList<string> MergeExamples(IReadOnlyList<string> existing, List<string>? fresh)
+    private static IReadOnlyList<VoiceExample> MergeExamples(
+        IReadOnlyList<VoiceExample> existing, List<string>? fresh, Guid projectId)
     {
-        var merged = new List<string>();
+        var merged = new List<VoiceExample>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var example in existing.Concat(fresh ?? []))
+
+        foreach (var example in existing)
         {
-            var trimmed = example.Trim();
+            var trimmed = example.Text.Trim();
             if (trimmed.Length > 0 && seen.Add(trimmed))
-                merged.Add(trimmed);
+                merged.Add(example with { Text = trimmed });
         }
+
+        // A phrasing this book happens to echo from an earlier one keeps the earlier book's id: the
+        // anchor was already learned, and re-attributing it would let discarding this book take an
+        // example the other one is still paying for.
+        foreach (var text in fresh ?? [])
+        {
+            var trimmed = text.Trim();
+            if (trimmed.Length > 0 && seen.Add(trimmed))
+                merged.Add(new VoiceExample(trimmed, projectId));
+        }
+
         return merged;
     }
 
@@ -122,11 +148,12 @@ public sealed class VoiceClient : IVoiceClient
         var options = optionsAccessor.Value;
         var profileJson = JsonSerializer.Serialize(new
         {
-            summary = profile.Summary,
+            register = profile.Register,
             traits = profile.Traits,
-            examples = profile.Examples,
+            examples = profile.Examples.Select(example => example.Text),
             avoid = profile.Avoid,
-            signatureMoves = profile.SignatureMoves
+            cadence = profile.Cadence,
+            punctuation = profile.Punctuation
         });
         var context = string.IsNullOrWhiteSpace(request.Context) ? "(none)" : request.Context;
         var userContent =
@@ -228,10 +255,11 @@ public sealed class VoiceClient : IVoiceClient
 
     private sealed class ProfileDto
     {
-        public string? Summary { get; set; }
+        public string? Register { get; set; }
         public List<string>? Traits { get; set; }
         public List<string>? Examples { get; set; }
         public List<string>? Avoid { get; set; }
-        public List<string>? SignatureMoves { get; set; }
+        public List<string>? Cadence { get; set; }
+        public List<string>? Punctuation { get; set; }
     }
 }
