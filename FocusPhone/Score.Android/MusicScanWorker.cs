@@ -1,6 +1,7 @@
 using Android.Content;
 using Android.Util;
 using AndroidX.Work;
+using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Infrastructure.Storage;
 using Score.Google;
@@ -36,6 +37,12 @@ public class MusicScanWorker : Worker
 
     /// <summary>Unique-work name, so a second enqueue does not stack a duplicate scan.</summary>
     public const string WorkName = "music-library-scan";
+
+    /// <summary>Unique-work name for the nightly automatic pass — deliberately its own unique
+    /// work (a separate <see cref="PeriodicWorkRequest"/> from <see cref="Enqueue"/>'s
+    /// on-demand <see cref="OneTimeWorkRequest"/>) so an owner-triggered "scan now" from
+    /// Settings never collides with, or gets silently absorbed by, the nightly schedule.</summary>
+    public const string NightlyWorkName = "music-library-nightly-scan";
 
     /// <summary>Progress keys, read back by <see cref="MusicLibrary"/>'s observer.</summary>
     public const string ProgressDone = "done";
@@ -77,6 +84,36 @@ public class MusicScanWorker : Worker
             .EnqueueUniqueWork(WorkName, ExistingWorkPolicy.Keep!, (OneTimeWorkRequest)request);
     }
 
+    /// <summary>
+    /// The nightly automatic pass — the same worker and the same incremental plan as
+    /// <see cref="Enqueue"/>, just triggered by the clock instead of the owner. Modeled on
+    /// this head's own <c>FridayPicksWorker.Schedule</c> (a periodic WorkManager request
+    /// enqueued unconditionally from <c>ScoreActivity.OnCreate</c> with
+    /// <see cref="ExistingPeriodicWorkPolicy.Keep"/>, so a relaunch never disturbs work
+    /// already scheduled) for the periodic-request shape, and on Foreword's
+    /// <c>DeliveryWorker.Schedule</c> for aiming that request at a specific hour via
+    /// <see cref="PeriodicWorkRequest.Builder.SetInitialDelay"/> — the delay itself is
+    /// <see cref="NightlyRescanSchedule.DelayUntilNext"/>, pure and unit-tested. Whatever
+    /// this run finds is recorded by <see cref="RescanOutcomeStore"/> for the owner's-voice
+    /// greeting to read on the next app open (see <see cref="DoWork"/>).
+    /// </summary>
+    public static void ScheduleNightly(Context context)
+    {
+        var constraints = new Constraints.Builder()
+            .SetRequiredNetworkType(NetworkType.Connected!)!
+            .Build()!;
+        var delay = NightlyRescanSchedule.DelayUntilNext(DateTimeOffset.Now);
+        var request = (PeriodicWorkRequest)new PeriodicWorkRequest.Builder(
+                typeof(MusicScanWorker), TimeSpan.FromHours(24))
+            .SetConstraints(constraints)!
+            .SetInitialDelay((long)delay.TotalMilliseconds, Java.Util.Concurrent.TimeUnit.Milliseconds!)!
+            .AddTag(NightlyWorkName)!
+            .Build();
+
+        WorkManager.GetInstance(context)
+            .EnqueueUniquePeriodicWork(NightlyWorkName, ExistingPeriodicWorkPolicy.Keep!, request);
+    }
+
     public override void OnStopped()
     {
         cts.Cancel();
@@ -93,13 +130,19 @@ public class MusicScanWorker : Worker
 
         try
         {
-            var fullyDrained = RunAsync(folderId).GetAwaiter().GetResult();
+            var result = RunAsync(folderId).GetAwaiter().GetResult();
+
+            // Recorded whether or not this run fully drained the backlog — the store
+            // only PUBLISHES a finding once FullyDrained is true, but it still needs
+            // every partial run's contribution folded into the running total to get
+            // there (see RescanOutcomeStore).
+            new RescanOutcomeStore(ApplicationContext!).RecordRun(result);
 
             // A run that ran out of its time budget has already committed everything it
             // read so far; retrying resumes from exactly where the incremental plan left
             // off. Success here would tell MusicLibrary's observer — and the owner — the
             // scan finished when most of a 7,000-file library might still be unread.
-            return fullyDrained ? Result.InvokeSuccess() : Result.InvokeRetry();
+            return result.FullyDrained ? Result.InvokeSuccess() : Result.InvokeRetry();
         }
         catch (OperationCanceledException)
         {
@@ -115,8 +158,8 @@ public class MusicScanWorker : Worker
         }
     }
 
-    /// <returns>Whether the scan fully drained the backlog this run (see <see cref="MusicScanner.ScanAsync"/>).</returns>
-    private async Task<bool> RunAsync(string folderId)
+    /// <returns>Whether this run fully drained the backlog, and what it found — see <see cref="MusicScanner.ScanAsync"/>.</returns>
+    private async Task<MusicScanRunResult> RunAsync(string folderId)
     {
         var context = ApplicationContext!;
         var tokens = new DeviceAccountTokenProvider();
@@ -124,11 +167,11 @@ public class MusicScanWorker : Worker
         var tagReader = new MusicTagReader(Path.Combine(context.CacheDir!.AbsolutePath, "art"));
         var scanner = new MusicScanner(driveClient, tokens, tagReader);
 
-        bool fullyDrained;
+        MusicScanRunResult result;
         IReadOnlyList<Codex.Domain.Music.Track> catalog;
         using (var database = MusicDatabase.Open(context))
         {
-            fullyDrained = await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
+            result = await scanner.ScanAsync(folderId, database.Catalog, (done, total) =>
             {
                 SetProgressAsync(new Data.Builder()
                     .PutInt(ProgressDone, done)!
@@ -142,9 +185,9 @@ public class MusicScanWorker : Worker
         // Only once the backlog is actually drained — running this against a catalog
         // that's still missing most of a large library would waste the lookup on tracks
         // this same worker is about to re-read anyway on its next chained run.
-        if (!fullyDrained)
+        if (!result.FullyDrained)
         {
-            return false;
+            return result;
         }
 
         // Tag BPM already ran during the scan above (MusicTagReader/TagMapping); this backfills
@@ -166,6 +209,6 @@ public class MusicScanWorker : Worker
             Log.Warn(Tag, $"Tempo backfill failed: {e.Message}");
         }
 
-        return true;
+        return result;
     }
 }
