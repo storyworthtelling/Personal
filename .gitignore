@@ -15,3 +15,10 @@ Ledger/Ledger.Android/Resources/drawable/
 Ledger/Ledger.Android/Resources/drawable-nodpi/
 Ledger/Ledger.Android/Resources/mipmap-*/
 Ledger/Ledger.Android/Resources/values/
+
+# graphify — entirely rebuildable, local CPU work only (no LLM, no network for
+# --code-only, ~25s cold / ~1-2s incremental). Community IDs reshuffle on every
+# cluster-only run even with no real change, so committing graph.json made every
+# refresh a ~30MB, ~35%-churned diff — not worth it for a build that costs no
+# tokens to redo. Rebuild per session instead (see CLAUDE.md's Graphify section).
+graphify-out/
