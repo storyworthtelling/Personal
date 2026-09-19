@@ -373,6 +373,13 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<bool>("VoiceAnalyzed")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("VoicedLine")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("VoicedLineStage")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("WordCount")
                         .HasColumnType("INTEGER");
 

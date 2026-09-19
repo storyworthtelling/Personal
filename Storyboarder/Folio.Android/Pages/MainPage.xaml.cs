@@ -20,6 +20,10 @@ namespace Folio.Android.Pages;
 public partial class MainPage : FolioBinderPage
 {
     private readonly ObservableCollection<ProjectRow> rows = [];
+
+    // The desk line per book, in the owner's voice, when one has been composed (D96). Absent for a
+    // book whose voice is not available, where the row's own neutral summary stands.
+    private readonly Dictionary<Guid, string> voicedLines = [];
     private readonly Dictionary<Guid, NovelStatus> statuses = [];
     private IDispatcherTimer? refreshTimer;
     private string voice = string.Empty;
@@ -81,11 +85,50 @@ public partial class MainPage : FolioBinderPage
                 rows.Add(row);
 
             Redraw();
+            await ShowVoicedLinesAsync(list);
             LastRunLabel.Text = SettingsStore.LastRunSummary;
         }
         catch
         {
             // A transient read failure shouldn't crash the page; the next tick retries.
+        }
+    }
+
+    // The desk's per-project line in the owner's voice (D96). Fetched after the first draw, so the
+    // shelf appears immediately with its neutral copy and the voiced line replaces it when it arrives —
+    // the line is a nicety and must never be something the screen waits on.
+    //
+    // ProjectService composes only when a book has actually moved and remembers the result, so this
+    // costs nothing on the paints that make up most of a session (coming back from another screen,
+    // the refresh tick) rather than a model call per book per glance.
+    private async Task ShowVoicedLinesAsync(IReadOnlyList<NovelStatus> list)
+    {
+        try
+        {
+            using var scope = IPlatformApplication.Current!.Services.CreateScope();
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+
+            var changed = false;
+            foreach (var status in list)
+            {
+                var row = rows.FirstOrDefault(r => r.Id == status.Id);
+                if (row is null)
+                    continue;
+
+                var line = await projects.VoicedLineAsync(status.Id, row.Summary, CancellationToken.None);
+                if (line == row.Summary)
+                    continue;
+
+                voicedLines[status.Id] = line;
+                changed = true;
+            }
+
+            if (changed)
+                Redraw();
+        }
+        catch
+        {
+            // Voiced copy is layered over neutral copy; a failure here leaves the desk exactly as drawn.
         }
     }
 
@@ -406,7 +449,7 @@ public partial class MainPage : FolioBinderPage
             new Label { Text = row.Title, FontFamily = "SerifSemibold", FontSize = 17, LineHeight = 1.15 },
             new Label
             {
-                Text = row.Summary,
+                Text = voicedLines.TryGetValue(row.Id, out var voiced) ? voiced : row.Summary,
                 FontSize = 14,
                 TextColor = PaperResources.Colour(status.NeedsAttention ? "ProblemMark" : "InkBlue"),
                 Margin = new Thickness(0, 8, 0, 0),
