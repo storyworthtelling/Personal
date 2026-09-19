@@ -205,6 +205,13 @@ public sealed class ScorePlayback(Activity host)
         var idle = startingTidal ? driveController : tidalController;
         if (controller is null)
         {
+            // The session this pool needs never finished connecting (or failed to).
+            // Silent here used to mean exactly the same untraceable symptom Fade()'s
+            // own remarks describe — music just stops with nothing captured anywhere —
+            // except mid-run rather than mid-fade, e.g. a workout's pool switching to a
+            // TIDAL track whose controller never came up.
+            AudioDiagnostics.LogWarning("ScorePlayback.Start",
+                $"No {(startingTidal ? "TIDAL" : "Drive")} controller — dropping start of {items.Count} item(s).");
             return;
         }
 

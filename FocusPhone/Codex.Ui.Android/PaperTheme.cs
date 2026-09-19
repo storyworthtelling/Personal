@@ -126,6 +126,28 @@ public static class PaperTheme
     public static Color Wash(Color hue) =>
         new(hue.R, hue.G, hue.B, DesignTokens.Alpha.Wash);
 
+    // The tiled ink-fleck bitmap every paper ground uses (paper_grain.png, generated
+    // by Tools/IconStudio — DESIGN.md §2/§6), decoded once and reused for every caller.
+    private static Bitmap? grainBitmap;
+
+    /// <summary>
+    /// A copy of <paramref name="basePaint"/> with the shared paper-grain tile as its
+    /// Shader, for drawing a second, translucent ink-speckle pass directly on top of a
+    /// shape another Paint just drew — DESIGN.md §2 gives Marker and Colored pencil
+    /// fills the same "always on" grain the paper ground carries, and a Shader-based
+    /// overlay picks up whatever the base Paint's own style already describes (a
+    /// stroke, an arc, a plain rect) rather than needing a second drawable layered on
+    /// and separately clipped to match. Alpha resets to opaque so the grain reads at
+    /// its own baked-in intensity regardless of the base paint's.
+    /// </summary>
+    public static Paint GrainOverlay(Context context, Paint basePaint)
+    {
+        grainBitmap ??= BitmapFactory.DecodeResource(context.Resources, Resource.Drawable.paper_grain)!;
+        var overlay = new Paint(basePaint) { Alpha = 255 };
+        overlay.SetShader(new BitmapShader(grainBitmap, Shader.TileMode.Repeat!, Shader.TileMode.Repeat!));
+        return overlay;
+    }
+
     /// <summary>Converts a DesignTokens.Space/Shape dp value to device pixels.</summary>
     public static int Dp(Context context, int dp) =>
         (int)(dp * context.Resources!.DisplayMetrics!.Density + 0.5f);
