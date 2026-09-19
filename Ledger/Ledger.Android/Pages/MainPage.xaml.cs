@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using Microsoft.Extensions.DependencyInjection;
 using Ledger.Domain.External;
 using Ledger.Domain.Model;
 using Ledger.Domain.Time;
@@ -10,12 +9,14 @@ using Storyworthtelling.Voice;
 
 namespace Ledger.Android.Pages;
 
-public partial class MainPage : ContentPage
+public partial class MainPage : LedgerBinderPage
 {
     private readonly AccountService accounts;
     private readonly IPlaidClient plaid;
     private readonly DriveVoiceOptions voiceOptions;
     private readonly VoicedMessenger voice;
+
+    private readonly Button refreshNow = new() { Text = "Refresh now" };
 
     public MainPage(AccountService accounts, IPlaidClient plaid, DriveVoiceOptions voiceOptions, VoicedMessenger voice)
     {
@@ -24,6 +25,13 @@ public partial class MainPage : ContentPage
         this.plaid = plaid;
         this.voiceOptions = voiceOptions;
         this.voice = voice;
+
+        // Balances is the app's root, so its tab is the one lit when nothing else is. The bar
+        // carries the one thing this screen is for; Settings used to sit here as a second quiet
+        // button, and it is the binder's job now.
+        Wrap(LedgerArea.Balances, "Balances");
+        refreshNow.Clicked += OnRefreshClicked;
+        SetBar(refreshNow);
     }
 
     protected override async void OnAppearing()
@@ -107,9 +115,6 @@ public partial class MainPage : ContentPage
         LastRunLabel.Text = "Refreshing…";
         await ReloadAsync();
     }
-
-    private void OnSettingsClicked(object? sender, EventArgs e) =>
-        Navigation.PushAsync(IPlatformApplication.Current!.Services.GetRequiredService<SetupPage>());
 
     // Expands/collapses an account's recent-transactions panel, loading it the first time.
     private async void OnAccountTapped(object? sender, TappedEventArgs e)

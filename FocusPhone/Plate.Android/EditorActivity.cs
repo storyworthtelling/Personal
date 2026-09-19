@@ -95,11 +95,9 @@ public class EditorActivity : AppCompatActivity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
         var gap = PaperTheme.Dp(this, DesignTokens.Space.X3);
 
         var page = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        page.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
 
         window = new ImageView(this);
         window.SetScaleType(ImageView.ScaleType.FitCenter);
@@ -146,16 +144,33 @@ public class EditorActivity : AppCompatActivity
             page.AddView(PaperUi.Voice(this, caption));
         }
 
-        // The frame a dog-ear folds into, over the page rather than beside it. Pads itself
-        // down by the status-bar/display-cutout inset under enforced edge-to-edge (API 35+),
-        // so a fold here isn't drawn partly behind the battery/clock icons.
-        overlay = PaperUi.WrapForTopInset(this, page);
-        root.AddView(overlay, new LinearLayout.LayoutParams(
+        // The frame a dog-ear folds into, over the page rather than beside it — WrapWithOverlay
+        // hands it back rather than building it separately, since it's also the host
+        // BinderFrame pads down by the status-bar/display-cutout inset under enforced
+        // edge-to-edge (API 35+), so a fold here isn't drawn partly behind the battery/clock icons.
+        var (framed, host) = BinderFrame.WrapWithOverlay(
+            this, "Edit photo", PlateShellAreas.All[PlateShellAreas.Darkroom].Hue, page,
+            PlateShellAreas.All, PlateShellAreas.Darkroom, SwitchArea);
+        overlay = host;
+        root.AddView(framed, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Send", Send),
             PaperUi.DestructiveButton(this, "Delete", Delete)));
         return root;
+    }
+
+    // Nothing is written until Send, so leaving via a different tab is exactly the "back
+    // out" case OnBackPressed already handles: cancel first, then name the tab PlateActivity
+    // should land on once this screen finishes (see PlateActivity.PendingArea). EditorActivity
+    // is reached only via StartActivityForResult from PlateActivity itself, so — unlike the
+    // Score/Post secondary screens — there's no need to also relaunch it; finishing always
+    // returns to that same waiting instance.
+    private void SwitchArea(int index)
+    {
+        SetResult(Result.Canceled);
+        PlateActivity.PendingArea = index;
+        Finish();
     }
 
     /// <summary>

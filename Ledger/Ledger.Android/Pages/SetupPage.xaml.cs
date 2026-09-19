@@ -13,11 +13,13 @@ using Storyworthtelling.Voice.Secrets;
 
 namespace Ledger.Android.Pages;
 
-public partial class SetupPage : ContentPage
+public partial class SetupPage : LedgerBinderPage
 {
     private readonly AccountService accounts;
     private readonly IPlaidClient plaid;
     private readonly VaultSync vaultSync;
+
+    private readonly Button saveSettings = new() { Text = "Save settings" };
 
     private List<InstitutionRow> rows = [];
     private InstitutionRow? pendingRemoval;
@@ -26,6 +28,9 @@ public partial class SetupPage : ContentPage
     public SetupPage(AccountService accounts, IPlaidClient plaid, VaultSync vaultSync)
     {
         InitializeComponent();
+        Wrap(LedgerArea.Settings, "Settings");
+        saveSettings.Clicked += OnSaveClicked;
+        SetBar(saveSettings);
 
         // The one shared formatter, so every app's foot line reads identically.
         BuildLineLabel.Text = Storyworthtelling.Updates.BuildLine.Format(

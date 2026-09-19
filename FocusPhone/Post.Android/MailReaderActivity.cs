@@ -49,19 +49,23 @@ public class MailReaderActivity : Activity
         }
 
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
-
-        var header = PaperUi.ScreenHeader(this, item.Subject ?? "(no subject)", PaperTheme.PostMark);
-        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(header);
+        var page = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
         var from = PaperUi.Secondary(this, ContactNameResolver.DisplayName(this, item.ContactKey));
-        from.SetPadding(edge, 0, edge, PaperTheme.Dp(this, DesignTokens.Space.X3));
-        root.AddView(from);
+        from.SetPadding(0, 0, 0, PaperTheme.Dp(this, DesignTokens.Space.X3));
+        page.AddView(from);
 
         host = new FrameLayout(this);
-        root.AddView(host, new LinearLayout.LayoutParams(
+        page.AddView(host, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        // BinderFrame applies its own top-inset padding to the page it draws (see its own
+        // remarks for why), so this screen no longer wraps its whole root in WrapForTopInset
+        // itself — doing both would pad the subject header down twice.
+        root.AddView(BinderFrame.Wrap(
+            this, item.Subject ?? "(no subject)", PaperTheme.PostMark, page,
+            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea),
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         if (item.Attachments.Count > 0)
         {
@@ -69,10 +73,22 @@ public class MailReaderActivity : Activity
                 this, Attachments.Label(item.Attachments), () => Attachments.Offer(this, host, item))));
         }
 
-        // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
-        // (API 35+), so the subject header isn't drawn partly behind the battery/clock icons.
-        SetContentView(PaperUi.WrapForTopInset(this, root));
-        Render(item, edge);
+        SetContentView(root);
+        // 0, not edge: BinderFrame's own contentHost already pads the horizontal edge, and
+        // padding it again here would double it.
+        Render(item, 0);
+    }
+
+    // Names the tab PostActivity should land on once this screen finishes (see
+    // PostActivity.PendingArea); ReorderToFront brings its existing instance forward rather
+    // than creating a second one, or starts it fresh if it isn't running at all.
+    private void SwitchArea(int index)
+    {
+        PostActivity.PendingArea = index;
+        var intent = new Intent(this, typeof(PostActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
     }
 
     private void Render(TimelineItem item, int edge)

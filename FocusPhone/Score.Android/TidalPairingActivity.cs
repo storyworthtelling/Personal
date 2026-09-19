@@ -96,21 +96,31 @@ public class TidalPairingActivity : Activity
     private View BuildLayout()
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
-
-        var header = PaperUi.PageHeader(this, "TIDAL");
-        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(header);
 
         var scroll = new ScrollView(this);
         body = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        body.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X4), edge, 0);
+        body.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X4), 0, 0);
         scroll.AddView(body);
-        root.AddView(scroll, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        root.AddView(BinderFrame.Wrap(
+            this, "TIDAL", ScoreShellAreas.All[ScoreShellAreas.Settings].Hue, scroll,
+            ScoreShellAreas.All, ScoreShellAreas.Settings, SwitchArea),
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         root.AddView(PaperUi.BottomBar(this, PaperUi.QuietButton(this, "Close", Finish)));
         return root;
+    }
+
+    // Names the tab ScoreActivity should land on once this screen finishes (see
+    // ScoreActivity.PendingArea); ReorderToFront brings its existing instance forward rather
+    // than creating a second one, or starts it fresh if it isn't running at all.
+    private void SwitchArea(int index)
+    {
+        ScoreActivity.PendingArea = index;
+        var intent = new Intent(this, typeof(ScoreActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
     }
 
     private void Render()

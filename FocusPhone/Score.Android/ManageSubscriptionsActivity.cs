@@ -65,20 +65,17 @@ public class ManageSubscriptionsActivity : Activity
     {
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
-        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
-        var header = PaperUi.PageHeader(this, "Subscriptions");
-        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
-        root.AddView(header);
-
         undoHost = new FrameLayout(this);
         var scroll = new ScrollView(this);
         rows = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        rows.SetPadding(edge, 0, edge, 0);
         scroll.AddView(rows);
         undoHost.AddView(scroll, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
-        root.AddView(undoHost, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+
+        root.AddView(BinderFrame.Wrap(
+            this, "Subscriptions", ScoreShellAreas.All[ScoreShellAreas.Podcasts].Hue, undoHost,
+            ScoreShellAreas.All, ScoreShellAreas.Podcasts, SwitchArea),
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Add feed", ShowAddFeedDialog),
@@ -86,6 +83,20 @@ public class ManageSubscriptionsActivity : Activity
             PaperUi.QuietButton(this, "Diagnostics",
                 () => StartActivity(new Intent(this, typeof(AudioDiagnosticsActivity))))));
         return root;
+    }
+
+    // Names the tab ScoreActivity should land on once this screen finishes (see
+    // ScoreActivity.PendingArea); ReorderToFront brings its existing instance forward rather
+    // than creating a second one, or starts it fresh if it isn't running at all. Reachable from
+    // both Podcasts and Settings, so — like the other multi-entry screens here — it lights one
+    // fixed home tab rather than tracking which one actually launched it.
+    private void SwitchArea(int index)
+    {
+        ScoreActivity.PendingArea = index;
+        var intent = new Intent(this, typeof(ScoreActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
     }
 
     private void Render()
