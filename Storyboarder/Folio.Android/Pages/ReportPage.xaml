@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<local:FolioBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:local="clr-namespace:Folio.Android.Pages"
-             x:Class="Folio.Android.Pages.ReportPage">
-    <ScrollView Padding="{StaticResource ScreenPadding}">
-        <VerticalStackLayout x:Name="Content" Spacing="6" />
-    </ScrollView>
-</local:FolioBinderPage>

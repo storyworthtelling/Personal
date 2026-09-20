@@ -24,7 +24,7 @@ public class ScreenFrameTests
     /// ask whether it belongs in the binder.
     /// </summary>
     public static TheoryData<string> Screens =>
-        ["MainPage", "SetupPage", "ShelfPage", "BookPage", "NewProjectPage", "ReportPage", "DraftDiffPage"];
+        ["MainPage", "SetupPage", "ShelfPage", "BookPage", "NewProjectPage", "DraftDiffPage"];
 
     [Theory]
     [MemberData(nameof(Screens))]
@@ -52,9 +52,9 @@ public class ScreenFrameTests
     /// one in the page would say the same word twice, in the wrong face.
     ///
     /// <para>What is forbidden is a header <b>in the XAML</b> — a declared Display label is a screen
-    /// title. The report screens still build Display-sized headings in code, and those are headings
-    /// <i>within a document</i>: the report has sections, and its top level is allowed to be the
-    /// largest thing in the scroll without being the screen's name.</para>
+    /// title. The draft-diff screen still builds Display-sized headings in code, and those are
+    /// headings <i>within a document</i>: its top level is allowed to be the largest thing in the
+    /// scroll without being the screen's name.</para>
     /// </summary>
     [Theory]
     [MemberData(nameof(Screens))]

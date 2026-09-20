@@ -195,7 +195,7 @@ public partial class MainPage : FolioBinderPage
     /// </summary>
     private void ShowActions(NovelStatus status)
     {
-        var buttons = new List<string>();
+        var buttons = new List<string> { OpenBookAction };
 
         // A finished book can be put away. It leads the card and carries the weight — archiving is
         // prominent and deleting is merely available, which is the whole of D19.
@@ -206,12 +206,10 @@ public partial class MainPage : FolioBinderPage
         buttons.Add(ReplaceCoverAction);
         buttons.Add(RepaintCoverAction);
 
-        // The finished revision report: open/share the PDF, or read it in the app.
+        // The finished revision report. One action, not two: the in-app reader is gone (D85) and
+        // what is left is the document itself.
         if (status.AnalysisReady)
-        {
             buttons.Add(OpenReportPdfAction);
-            buttons.Add(ReadReportAction);
-        }
 
         // Drafts: start the next draft of this book from a re-picked doc, and — once there is a
         // predecessor — see what the last revision changed.
@@ -248,8 +246,8 @@ public partial class MainPage : FolioBinderPage
             case ReplaceCoverAction: await ReplaceCover(status); break;
             case RepaintCoverAction: await RepaintCover(status); break;
             case DeleteAction: await DeleteProject(status); break;
-            case OpenReportPdfAction: await ShareReportPdf(status); break;
-            case ReadReportAction: await OpenReport(status); break;
+            case OpenBookAction: await OpenBook(status.Id); break;
+            case OpenReportPdfAction: await OpenReport(status); break;
             case NewDraftAction: await StartNewDraft(status); break;
             case NextBookAction: await StartNextBook(status); break;
             case DiffAction: await ShowDraftDiff(status); break;
@@ -395,7 +393,8 @@ public partial class MainPage : FolioBinderPage
         ShelveAction => Glyphs.Shelve,
         ReplaceCoverAction => Glyphs.Picture,
         RepaintCoverAction => Glyphs.Brush,
-        OpenReportPdfAction or ReadReportAction => Glyphs.Page,
+        OpenBookAction => Glyphs.Book,
+        OpenReportPdfAction => Glyphs.Page,
         NewDraftAction or NextBookAction => Glyphs.NewPage,
         DiffAction => Glyphs.Compare,
         RetryAction => Glyphs.Again,
@@ -544,12 +543,36 @@ public partial class MainPage : FolioBinderPage
     private static ImageSource? Jacket(NovelStatus status) =>
         status.CoverPath is { } path && File.Exists(path) ? ImageSource.FromFile(path) : null;
 
-    // A book is opened by pressing it; what can be done with it is a long press, per the frame.
+    // A book on the desk is work in progress, so pressing it offers what can be done with that
+    // work. Opening the BOOK — the record of every draft — is the first thing on that card, and
+    // the shelf opens it directly, where a book is a book rather than a job.
     private void Press(View book, NovelStatus status)
     {
         var open = new TapGestureRecognizer();
         open.Tapped += (_, _) => ShowActions(status);
         book.GestureRecognizers.Add(open);
+    }
+
+    /// <summary>
+    /// Opens the book this draft belongs to: the record of the whole book, not of one draft.
+    ///
+    /// <para><see cref="BookPage"/> was built, wears the binder, passes every frame guard — and was
+    /// constructed by nothing at all. A screen no tap ends at is not a screen, and no test about a
+    /// component ever notices, which is what <c>ReportIsReachableTests</c> is for.</para>
+    /// </summary>
+    private async Task OpenBook(Guid draftId)
+    {
+        BookRecord? book;
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            book = await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .GetBookAsync(draftId, CancellationToken.None);
+        }
+
+        if (book is not null)
+        {
+            await Navigation.PushAsync(new BookPage(book));
+        }
     }
 
     private const string ShelveAction = "Put on the shelf";
@@ -561,45 +584,24 @@ public partial class MainPage : FolioBinderPage
     private const string NewDraftAction = "New draft (re-pick doc)";
     private const string NextBookAction = "Start next book (new manuscript)";
     private const string DiffAction = "What changed since last draft";
-    private const string OpenReportPdfAction = "Open the report PDF";
-    private const string ReadReportAction = "Read report in app";
+    private const string OpenBookAction = "Open the book";
+    private const string OpenReportPdfAction = "Open the report";
 
-    // Opens/shares the rendered revision-report PDF.
-    private async Task ShareReportPdf(NovelStatus status)
-    {
-        string? path;
-        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
-        {
-            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
-            path = await projects.GetAnalysisPdfPathAsync(status.Id, CancellationToken.None);
-        }
-        if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
-        {
-            await DisplayAlert("Report", "The report PDF could not be found.", "OK");
-            return;
-        }
-        await Share.RequestAsync(new ShareFileRequest
-        {
-            Title = $"{status.Title} — Analysis",
-            File = new ShareFile(path)
-        });
-    }
-
-    // Opens the browsable revision report in the app.
+    /// <summary>
+    /// Opens the rendered revision report through <see cref="ReportFile"/>.
+    ///
+    /// <para>This was two actions and two methods — share the PDF, or read a paraphrase of it in the
+    /// app — and the second is gone with <c>ReportPage</c>. What is left shares its one risky line
+    /// with the book page's own button rather than keeping a second copy of it.</para>
+    /// </summary>
     private async Task OpenReport(NovelStatus status)
     {
-        Folio.Domain.Analysis.BookAnalysisResult? report;
-        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        if (!await ReportFile.OpenAsync(status.Id, status.Title))
         {
-            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
-            report = await projects.GetReportAsync(status.Id, CancellationToken.None);
+            // The status line, not a dialog (§8): the report has been delivered and cleared off the
+            // device, or has not been rendered yet. Either way there is nothing here to open.
+            LastRunLabel.Text = "That report is not on this phone — it is in Drive, beside the manuscript.";
         }
-        if (report is null)
-        {
-            await DisplayAlert("Report", "The revision report isn't ready yet.", "OK");
-            return;
-        }
-        await Navigation.PushAsync(new ReportPage(status.Title, report));
     }
 
     // Starts the next draft of this book: opens the Drive picker in "new draft" mode, so the doc the user
