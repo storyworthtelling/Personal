@@ -138,10 +138,13 @@ public abstract class FolioBinderPage : ContentPage
                 DesignTokens.Space.X6, DesignTokens.Space.X3, DesignTokens.Space.X4, DesignTokens.Space.X4),
         };
 
+        // The PRIMARY leads and takes the room left over; anything after it is sized to its own
+        // words. That is the order the drawings use on both screens that carry two buttons — "Open
+        // report · New draft", "Connect Google · Skip" — and it had been built the other way round,
+        // which put the secondary under the thumb and the primary in the corner.
         for (var i = 0; i < buttons.Length; i++)
         {
-            row.ColumnDefinitions.Add(new ColumnDefinition(
-                i == buttons.Length - 1 ? GridLength.Star : GridLength.Auto));
+            row.ColumnDefinitions.Add(new ColumnDefinition(i == 0 ? GridLength.Star : GridLength.Auto));
             row.Children.Add(buttons[i]);
             Grid.SetColumn(buttons[i], i);
         }
