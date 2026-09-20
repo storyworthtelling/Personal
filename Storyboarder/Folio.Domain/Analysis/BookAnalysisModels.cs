@@ -152,12 +152,31 @@ public sealed record RevisionItem(
     string Issue,
     string SuggestedFix);
 
+// What is actually wrong with a line edit's sentence — so the manuscript's margin note can say
+// something specific rather than the single catch-all "Unclear" every edit used to carry regardless
+// of whether the problem was a filter word, a redundant clause, or a malformed sentence.
+public enum LineEditKind
+{
+    Other,
+    FilterWord,
+    Redundant,
+    WeakWord,
+    Cliche,
+    Grammar,
+    Digression,
+    Tone
+}
+
 // One sentence (or short passage) to cut, tighten, or rewrite, quoted so the author can find it.
 public sealed record LineEdit(
     string Chapter,
     string Excerpt,
     string Suggestion,
-    string Reason);
+    string Reason)
+{
+    // Defaults to Other for a stored report from before this existed, or a reply that omits it.
+    public LineEditKind Kind { get; init; } = LineEditKind.Other;
+}
 
 // A prose-style or voice pattern: repetition, filter words ("she felt", "he saw"), a verbal tic,
 // monotonous sentence rhythm, an overused construction, or a slip out of the established POV.

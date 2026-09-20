@@ -39,7 +39,7 @@ public static class MarkSource
 
         foreach (var edit in analysis.LineEdits ?? [])
         {
-            Add(marks, index, edit.Excerpt, MarkKind.Query, "Unclear", edit.Reason, edit.Chapter, analysis);
+            Add(marks, index, edit.Excerpt, MarkKind.Query, Label(edit.Kind), edit.Reason, edit.Chapter, analysis);
         }
 
         foreach (var note in analysis.Expansion?.ShowVsTell ?? [])
@@ -51,6 +51,22 @@ public static class MarkSource
 
         return [.. marks.OrderBy(mark => mark.StartOffset)];
     }
+
+    // The margin word for a line edit — specific to what is actually wrong, since a query mark
+    // promising "Unclear" on a sentence that is really redundant, or clichéd, or just weak, misnames
+    // the note under it. Other (an omitted or unrecognized kind) reads honestly as "an edit" rather
+    // than guessing at a diagnosis the model never gave.
+    private static string Label(LineEditKind kind) => kind switch
+    {
+        LineEditKind.FilterWord => "Filter word",
+        LineEditKind.Redundant => "Redundant",
+        LineEditKind.WeakWord => "Weak word",
+        LineEditKind.Cliche => "Cliché",
+        LineEditKind.Grammar => "Grammar",
+        LineEditKind.Digression => "Digression",
+        LineEditKind.Tone => "Tone",
+        _ => "Line edit",
+    };
 
     private static void Add(
         List<Mark> marks, ExcerptIndex index, string? excerpt, MarkKind kind,

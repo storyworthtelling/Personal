@@ -588,6 +588,36 @@ public class ClaudeAnalysisClientTests
         Assert.Empty(craft.SceneBreakdown);
     }
 
+    /// <summary>
+    /// A line edit's "kind" is what lets the manuscript's margin note say something specific ("Filter
+    /// word", "Cliché") instead of a blanket "Unclear". Parsed the same way every other free-text
+    /// classification in this client is: snapped to the closed set, case-insensitively.
+    /// </summary>
+    [Fact]
+    public async Task ConsolidateCraft_ParsesTheLineEditKind()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"lineEdits\":[{\"chapter\":\"Chapter 2\",\"excerpt\":\"x\",\"kind\":\"filterword\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        Assert.Equal(LineEditKind.FilterWord, Assert.Single(craft.LineEdits).Kind);
+    }
+
+    /// <summary>An omitted or unrecognized kind degrades to Other rather than a guessed diagnosis.</summary>
+    [Fact]
+    public async Task ConsolidateCraft_UnrecognizedLineEditKind_DegradesToOther()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"lineEdits\":[{\"chapter\":\"Chapter 2\",\"excerpt\":\"x\",\"kind\":\"nonsense\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        Assert.Equal(LineEditKind.Other, Assert.Single(craft.LineEdits).Kind);
+    }
+
     [Fact]
     public async Task AnalyzeChapter_GathersTheCraftObservations_WhileTheSentencesAreStillAvailable()
     {
