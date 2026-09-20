@@ -1,7 +1,7 @@
 namespace Folio.Domain.Reading;
 
 /// <summary>
-/// The fifteen voices the report is read in: eight whole-book sections and seven readers.
+/// The fourteen voices the report is read in: eight whole-book sections and six readers.
 ///
 /// <para>They live in one list because the thing that matters about them is collective — <b>no two
 /// share a persona</b>. Two sections read by the same voice produce two paraphrases of one note,
@@ -44,12 +44,20 @@ public static class PersonaCatalogue
             PersonaKind.Section, ModelTier.Standard),
     ];
 
-    /// <summary>The seven readers, in the order the report prints them, each on a page of its own.</summary>
+    /// <summary>
+    /// The six readers, in the order the report prints them, each on a page of its own.
+    ///
+    /// <para>A seventh, Line editor, stood here through Release F and G. The owner dropped it on the
+    /// first report read from a real device: its whole subject — sentence-by-sentence craft, quoted
+    /// against the line — is exactly what <c>LineEdit</c> already puts on the manuscript itself as
+    /// Query marks (<see cref="Domain.Markup.MarkSource"/>), so a reader built to say the same thing
+    /// in character was reading the marks back as prose. The other six ask a question the marked
+    /// manuscript cannot answer — sellability, structure, whether a stranger finishes it — which is
+    /// what a whole-book voice is for.</para>
+    /// </summary>
     public static IReadOnlyList<Persona> Readers { get; } =
     [
         new("developmental-editor", "Developmental editor", "Structure",
-            PersonaKind.Reader, ModelTier.Strong),
-        new("line-editor", "Line editor", "Sentence by sentence",
             PersonaKind.Reader, ModelTier.Strong),
         new("agent", "Agent", "Could I sell it",
             PersonaKind.Reader, ModelTier.Strong),
