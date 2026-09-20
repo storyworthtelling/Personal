@@ -33,6 +33,29 @@ public class MarkSourceTests
     }
 
     /// <summary>
+    /// The label names the actual defect — a filter word, a redundant clause, a cliché — rather than
+    /// the single "Unclear" every line edit used to carry regardless of what was really wrong. A model
+    /// reply (or a report saved before <see cref="LineEditKind"/> existed) that never sets it degrades
+    /// to a plain "Line edit" tag rather than a false claim of unclarity.
+    /// </summary>
+    [Theory]
+    [InlineData(LineEditKind.FilterWord, "Filter word")]
+    [InlineData(LineEditKind.Redundant, "Redundant")]
+    [InlineData(LineEditKind.WeakWord, "Weak word")]
+    [InlineData(LineEditKind.Cliche, "Cliché")]
+    [InlineData(LineEditKind.Grammar, "Grammar")]
+    [InlineData(LineEditKind.Digression, "Digression")]
+    [InlineData(LineEditKind.Tone, "Tone")]
+    [InlineData(LineEditKind.Other, "Line edit")]
+    public void TheLabelNamesWhatIsActuallyWrong(LineEditKind kind, string label)
+    {
+        var analysis = With(lineEdits:
+            [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "x", "y") { Kind = kind }]);
+
+        Assert.Equal(label, Assert.Single(MarkSource.From(Manuscript, analysis)).Label);
+    }
+
+    /// <summary>
     /// The one that matters. The excerpt spans the manuscript's own line break, arrives with it
     /// flattened to a space, and carries a curly apostrophe the page does not have.
     /// </summary>

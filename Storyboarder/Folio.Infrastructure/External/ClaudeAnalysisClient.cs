@@ -145,13 +145,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "your four sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
         "book — merge duplicates, drop the trivial, keep the author's own words when quoting. Respond " +
         "with ONLY a JSON object: " +
-        "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string}]," +
+        "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string,\"kind\":string}]," +
         "\"proseNotes\":[{\"chapter\":string,\"pattern\":string,\"evidence\":string,\"fix\":string}]," +
         "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string}]," +
         "\"sceneBreakdown\":[{\"chapter\":string,\"scene\":string,\"purpose\":string,\"verdict\":string}]}. " +
         "lineEdits: specific sentences to cut, tighten, or rewrite — \"excerpt\" quoted verbatim from " +
         "the notes so the author can find it, \"suggestion\" the actual replacement or cut, \"reason\" " +
-        "one short clause. AT MOST 40, chosen for impact. " +
+        "one short clause, \"kind\" the ONE word that names what is actually wrong with the sentence: " +
+        "\"FilterWord\" (she felt/he saw/I thought distancing the reader), \"Redundant\" (says twice what " +
+        "one sentence already said), \"WeakWord\" (a vague or imprecise word choice), \"Cliche\" (a stock " +
+        "phrase or transition), \"Grammar\" (a malformed or ungrammatical sentence), \"Digression\" (an " +
+        "aside that adds nothing), \"Tone\" (a register slip), or \"Other\" if none fit. AT MOST 40, " +
+        "chosen for impact. " +
         "proseNotes: recurring prose-style and voice patterns — repetition, filter words, verbal tics, " +
         "monotonous sentence rhythm, overused constructions, POV slips — with \"evidence\" quoting a " +
         "real example. AT MOST 20. " +
@@ -434,7 +439,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return new CraftReport(
             (dto.LineEdits ?? []).Select(e => new LineEdit(
                 e.Chapter ?? string.Empty, e.Excerpt ?? string.Empty,
-                e.Suggestion ?? string.Empty, e.Reason ?? string.Empty)).ToList(),
+                e.Suggestion ?? string.Empty, e.Reason ?? string.Empty)
+                { Kind = ParseLineEditKind(e.Kind) }).ToList(),
             (dto.ProseNotes ?? []).Select(n => new ProseNote(
                 n.Chapter ?? string.Empty, n.Pattern ?? string.Empty,
                 n.Evidence ?? string.Empty, n.Fix ?? string.Empty)).ToList(),
@@ -607,6 +613,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private static ShowTellDirection ParseShowTellDirection(string? direction) =>
         Enum.TryParse<ShowTellDirection>(direction, ignoreCase: true, out var parsed) ? parsed : ShowTellDirection.Dramatize;
+
+    private static LineEditKind ParseLineEditKind(string? kind) =>
+        Enum.TryParse<LineEditKind>(kind, ignoreCase: true, out var parsed) ? parsed : LineEditKind.Other;
 
     // Snap a free-text priority to the three impact tiers the report groups by; anything unrecognized is the
     // lowest tier so a stray value can't masquerade as urgent.
@@ -1104,6 +1113,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Excerpt { get; set; }
         public string? Suggestion { get; set; }
         public string? Reason { get; set; }
+        public string? Kind { get; set; }
     }
 
     private sealed class ProseNoteDto
