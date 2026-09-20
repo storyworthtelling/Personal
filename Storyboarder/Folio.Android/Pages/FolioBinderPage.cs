@@ -29,6 +29,7 @@ public abstract class FolioBinderPage : ContentPage
     private Grid? column;
     private Grid? root;
     private View? presented;
+    private View? pendingBackdrop;
     private readonly DogEarState folds = new();
     private DogEar? corner;
 
@@ -99,6 +100,12 @@ public abstract class FolioBinderPage : ContentPage
 
         root = page;
         Content = page;
+
+        if (pendingBackdrop is not null)
+        {
+            Hang(pendingBackdrop);
+            pendingBackdrop = null;
+        }
     }
 
     /// <summary>
@@ -109,12 +116,30 @@ public abstract class FolioBinderPage : ContentPage
     /// screen header sitting on top of it, so a backdrop confined to the content would leave the
     /// header floating on paper above a desk that starts halfway down.</para>
     /// </summary>
+    /// <para><b>It may be called before <see cref="Wrap"/>, and used not to be.</b> The column it
+    /// hangs on is built by <c>Wrap</c>, so calling this first threw out of the page's constructor,
+    /// out of the DI resolution that built it, and out of <c>CreateWindow</c> — the app opened on
+    /// its failure page and nothing else ran. Both orders compile, no test in this project can
+    /// construct a MAUI page, and the home screen's constructor runs on every launch and in nothing
+    /// else; so the order is held here rather than trusted. A backdrop set early waits and is hung
+    /// when the frame exists.</para>
     protected void SetBackdrop(View backdrop)
     {
-        ArgumentNullException.ThrowIfNull(column);
+        ArgumentNullException.ThrowIfNull(backdrop);
 
+        if (column is null)
+        {
+            pendingBackdrop = backdrop;
+            return;
+        }
+
+        Hang(backdrop);
+    }
+
+    private void Hang(View backdrop)
+    {
         backdrop.InputTransparent = true;
-        column.Children.Insert(0, backdrop);
+        column!.Children.Insert(0, backdrop);
         Grid.SetRow(backdrop, 0);
         Grid.SetRowSpan(backdrop, 2);
     }
