@@ -6,6 +6,7 @@ using Folio.Domain.Analysis;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
+using Folio.Domain.Readiness;
 using Folio.Domain.Text;
 using Folio.Domain.Time;
 using Folio.Domain.Voice;
@@ -675,6 +676,144 @@ public sealed class ProjectService
         return await BuildStatus(db, id, rateLimits, clock.UtcNow, cancellationToken);
     }
 
+    /// <summary>
+    /// A whole book, read from any one of its drafts: every draft in the project, the readiness of
+    /// each draft that has been reported on, and whether there is a report to open.
+    ///
+    /// <para>The readiness list is deliberately shorter than the draft list when a draft is still
+    /// being read. Counting a reportless draft as four zeroes would draw its Must line arriving at
+    /// the axis, which says the problems were fixed rather than not yet found — the one reading of
+    /// that chart that would be actively untrue.</para>
+    /// </summary>
+    public async Task<BookRecord?> GetBookAsync(Guid draftId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var projectId = await db.Novels
+            .Where(n => n.Id == draftId)
+            .Select(n => (Guid?)n.ProjectId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (projectId is null)
+            return null;
+
+        var drafts = await db.Novels
+            .Where(n => n.ProjectId == projectId)
+            .OrderBy(n => n.DraftNumber)
+            .Select(n => new
+            {
+                n.Id,
+                n.DraftNumber,
+                n.CreatedAtUtc,
+                n.WordCount,
+                n.Title,
+                n.CoverPath,
+                n.Stage,
+                n.SeriesName,
+                n.SeriesId,
+                n.SeriesSequence,
+            })
+            .ToListAsync(cancellationToken);
+        if (drafts.Count == 0)
+            return null;
+
+        var latest = drafts[^1];
+
+        var reports = await db.BookAnalyses
+            .Where(a => drafts.Select(d => d.Id).Contains(a.NovelId))
+            .Select(a => new { a.NovelId, a.ConsolidatedJson, a.ExpansionJson, a.PdfStatus, a.PdfPath })
+            .ToListAsync(cancellationToken);
+
+        var readiness = new List<DraftFindings>();
+        var genre = string.Empty;
+        var length = LengthAssessment.Empty;
+        foreach (var draft in drafts)
+        {
+            var stored = reports.FirstOrDefault(report => report.NovelId == draft.Id);
+            if (stored?.ConsolidatedJson is null)
+                continue;
+
+            BookAnalysisResult? report;
+            try
+            {
+                report = JsonSerializer.Deserialize<BookAnalysisResult>(
+                    stored.ConsolidatedJson, JsonResponse.CaseInsensitive);
+            }
+            catch (JsonException)
+            {
+                // A report stored in a shape this version cannot read is a draft with no counts, not
+                // a book that cannot be opened. The chart simply skips it, as it skips an unread draft.
+                continue;
+            }
+
+            if (report is null)
+                continue;
+
+            readiness.Add(DraftReadiness.From(draft.DraftNumber, report));
+            if (draft.Id == latest.Id)
+            {
+                genre = report.Genre;
+                length = Length(stored.ExpansionJson, report);
+            }
+        }
+
+        var latestReport = reports.FirstOrDefault(report => report.NovelId == latest.Id);
+
+        // Books, not drafts: a series of one trilogy-in-progress holds one book however many times
+        // its author has revised it.
+        var seriesLength = latest.SeriesId is null
+            ? 0
+            : await db.Novels
+                .Where(n => n.SeriesId == latest.SeriesId)
+                .Select(n => n.ProjectId)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+        return new BookRecord(
+            projectId.Value,
+            latest.Id,
+            latest.Title,
+            latest.CoverPath,
+            latest.Stage.ToString(),
+            latest.SeriesName,
+            latest.SeriesSequence,
+            latest.SeriesId is not null,
+            seriesLength,
+            [.. drafts.Select(draft =>
+                new BookDraft(draft.Id, draft.DraftNumber, draft.CreatedAtUtc, draft.WordCount))],
+            readiness,
+            latestReport is { PdfStatus: WorkStatus.Completed, PdfPath: not null },
+            genre,
+            length);
+    }
+
+    /// <summary>
+    /// The length read, preferring the expansion pass's own measured range. Falling back to the
+    /// consolidated half's count with no range is deliberate: a count with no norm behind it says
+    /// how long the book is and claims nothing about whether that is right, which is the honest
+    /// thing to print before the read that would know has run.
+    /// </summary>
+    private static LengthAssessment Length(string? expansionJson, BookAnalysisResult report)
+    {
+        if (expansionJson is not null)
+        {
+            try
+            {
+                var expansion = JsonSerializer.Deserialize<ExpansionReport>(
+                    expansionJson, JsonResponse.CaseInsensitive);
+                if (expansion?.Length is { WordCount: > 0 } measured)
+                    return measured;
+            }
+            catch (JsonException)
+            {
+                // An unreadable expansion read costs the norm, not the page.
+            }
+        }
+
+        return report.WordCount > 0
+            ? new LengthAssessment(report.WordCount, 0, 0, string.Empty)
+            : LengthAssessment.Empty;
+    }
+
     public async Task<string?> GetAnalysisPdfPathAsync(Guid novelId, CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -887,9 +1026,55 @@ public sealed class ProjectService
                 s => s.ImageStatus, s => s.LastError, cancellationToken);
             await AppendPhase(report, "Analysis notes", db.ChunkAnalyses.Where(a => a.NovelId == novel.Id),
                 a => a.Status, a => a.LastError, cancellationToken);
+
+            AppendReport(report, novel, await db.BookAnalyses
+                .FirstOrDefaultAsync(a => a.NovelId == novel.Id, cancellationToken));
         }
 
         return report.ToString();
+    }
+
+    /// <summary>
+    /// Where the document is, and whether it went anywhere.
+    ///
+    /// <para>This is the question an owner asks once a review has FINISHED, and it was the one thing
+    /// the export could not answer. Every other line here is about a review that will not finish; a
+    /// finished book whose delivery quietly gave up looks exactly like one whose delivery worked,
+    /// because the stage reads Completed either way and the give-up is a log line on a phone nobody
+    /// can read. Delivery is best-effort by design — neither target may wedge a review — which is
+    /// precisely why its outcome has to be legible somewhere.</para>
+    /// </summary>
+    private static void AppendReport(StringBuilder report, Novel novel, BookAnalysis? analysis)
+    {
+        if (analysis is null || analysis.PdfStatus == WorkStatus.Pending)
+        {
+            report.AppendLine("  Report: not rendered yet");
+            return;
+        }
+
+        if (analysis.PdfStatus != WorkStatus.Completed)
+        {
+            report.AppendLine($"  Report: could not be rendered ({analysis.PdfStatus})");
+            return;
+        }
+
+        var where = new List<string>();
+        if (analysis.ArchivedDriveFileId is not null)
+            where.Add($"Drive [{analysis.ArchivedDriveFileId}]");
+        if (analysis.DeliveredToRemarkable)
+            where.Add("reMarkable (settled — delivered, or given up)");
+        if (analysis.PdfPath is not null)
+            where.Add($"on this device at {analysis.PdfPath}");
+
+        report.AppendLine($"  Report: rendered as \"{DeliveredDocument.FileName(novel.Title, novel.DraftNumber)}\"");
+        report.AppendLine(where.Count == 0
+            ? "      • nowhere — rendered, and the file is gone"
+            : $"      • {string.Join("; ", where)}");
+
+        // "on this device only" is a state worth naming rather than inferring from an absence: it
+        // means the owner can still open it from the book page, and that nothing else has a copy.
+        if (analysis.ArchivedDriveFileId is null && !analysis.DeliveredToRemarkable && analysis.PdfPath is not null)
+            report.AppendLine("      • on this device only — nothing has been delivered");
     }
 
     // Writes one phase line ("done/total, N failed, M retrying") plus a short sample of the distinct

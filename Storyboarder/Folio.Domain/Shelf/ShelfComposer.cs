@@ -33,6 +33,28 @@ public sealed record ShelfRow(string? SeriesName, IReadOnlyList<ShelfBook> Books
 
     /// <summary>The 2dp hair between spines in the approved frame.</summary>
     public const int GapDp = 2;
+
+    /// <summary>
+    /// The book standing at <paramref name="x"/> points from this row's left edge, or null for a
+    /// bookend, a gap, or bare shelf.
+    ///
+    /// <para>The shelf is painted as one canvas, so a tap arrives as a coordinate. This is the
+    /// painter's own walk read backwards, and it is here rather than in the view because a painter
+    /// and a hit test that drift apart open the wrong book while both look correct.</para>
+    /// </summary>
+    public ShelfBook? At(double x)
+    {
+        var cursor = HasBookends ? (double)ShelfComposer.BookendWidthDp : 0;
+
+        foreach (var book in Books)
+        {
+            if (x >= cursor && x < cursor + book.WidthDp)
+                return book;
+            cursor += book.WidthDp + GapDp;
+        }
+
+        return null;
+    }
 }
 
 /// <summary>

@@ -361,6 +361,22 @@ public sealed record Verdict(
     string MostNeeds)
 {
     public static Verdict Empty { get; } = new(Array.Empty<string>(), Array.Empty<string>(), string.Empty);
+
+    /// <summary>
+    /// The clause the verdict page opens with — "The book is close." — and the paragraph under it.
+    ///
+    /// <para>They are what an author actually carries away. Everything else on the page is a list,
+    /// and a list is read once; a sentence short enough to repeat to yourself is the one that
+    /// survives the reading and decides whether the work gets done. The page was drawn around it
+    /// from the start, and the renderer had been building the page without it.</para>
+    ///
+    /// <para>Init-only with an empty default, like every other field added after a report was
+    /// stored: a verdict written before this existed opens with its strengths, which is the page
+    /// that shipped rather than a hole in it.</para>
+    /// </summary>
+    public string Standing { get; init; } = string.Empty;
+
+    public string Reading { get; init; } = string.Empty;
 }
 
 // The authorial-voice-consistency read: a short characterization of the book's dominant voice, and the
