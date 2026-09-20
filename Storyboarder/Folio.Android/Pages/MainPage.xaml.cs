@@ -38,10 +38,11 @@ public partial class MainPage : FolioBinderPage
     {
         InitializeComponent();
 
-        // The wood runs behind the header as well as the content: the frame draws the desk as the
-        // whole well, with the screen header sitting on it.
-        SetBackdrop(new GraphicsView { Drawable = new DeskDrawable() });
+        // The frame first — it builds the column the backdrop hangs on. Then the wood, which runs
+        // behind the header as well as the content: the desk is the whole well, with the screen
+        // header sitting on it.
         Wrap(FolioArea.Work, "Work desk");
+        SetBackdrop(new GraphicsView { Drawable = new DeskDrawable() });
 
         var add = new Button { Text = "Add manuscript" };
         add.Clicked += OnNewProjectClicked;
