@@ -676,6 +676,23 @@ internal sealed class PageWriter : IDisposable
     /// work is</i> — one pass through the manuscript, not three — and the tier still has to be
     /// readable down the page.</para>
     /// </summary>
+    /// <summary>
+    /// The heading to re-print at the top of a page this list continues onto, or null once the list
+    /// is done with it. Set by <see cref="Heading"/>'s caller through <see cref="Continues"/>.
+    /// </summary>
+    private string? continuation;
+
+    /// <summary>
+    /// Says that the items which follow belong under <paramref name="heading"/>, so a page break in
+    /// the middle of them re-prints it.
+    ///
+    /// <para>F42 asks for exactly this, and it is not a nicety. The revision plan spills overleaf
+    /// whenever it is long, and without the repeat the continuation page opens with unheaded items
+    /// whose only tier cue is the severity chip — which is colour alone, and DESIGN.md §16's
+    /// non-colour-cue rule is the one thing this document may not lean on.</para>
+    /// </summary>
+    public void Continues(string? heading) => continuation = heading;
+
     public void CheckItem(string action, string citation, SKColor chip)
     {
         using var body = ReportType.Body();
@@ -689,9 +706,18 @@ internal sealed class PageWriter : IDisposable
             ? new List<string>()
             : SkiaText.Wrap(small, citation, width);
 
-        KeepTogether(
-            (lines.Count * body.Size * PageGeometry.LineSpacing)
-            + (cited.Count * small.Size * PageGeometry.LineSpacing) + 10f);
+        var height = (lines.Count * body.Size * PageGeometry.LineSpacing)
+            + (cited.Count * small.Size * PageGeometry.LineSpacing) + 10f;
+        var before = PageCount;
+        KeepTogether(height);
+
+        // Carried over. Re-print the heading these items sit under, with "continued" after it so
+        // the page says it is a continuation rather than a second list of the same name.
+        if (PageCount != before && continuation is not null)
+        {
+            using var h3 = ReportType.Heading();
+            Heading($"{continuation} (continued)", h3, ReportPalette.Ink);
+        }
 
         var top = y;
         using var boxPaint = new SKPaint

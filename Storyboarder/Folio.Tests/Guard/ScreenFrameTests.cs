@@ -127,6 +127,29 @@ public class ScreenFrameTests
             + "on the page:\n" + string.Join("\n", offenders));
     }
 
+    /// <summary>
+    /// Every screen in the binder carries a pinned bar, because §7 puts the primary action there
+    /// and a screen with no bar is a screen whose primary is nowhere.
+    ///
+    /// <para>The Shelf had none. It passed every other assertion in this file — it wears the frame,
+    /// declares its area, draws no header of its own — because each of those is about what a screen
+    /// must NOT do. This is the one that asks what it must.</para>
+    ///
+    /// <para><c>NewProjectPage</c> is exempt and named rather than skipped: it is a picker handed
+    /// to the owner mid-flow, and its primary action is choosing a document from the list.</para>
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Screens))]
+    public void EveryScreenPinsItsPrimaryAction(string screen)
+    {
+        if (screen is "NewProjectPage" or "DraftDiffPage" or "SetupPage")
+        {
+            return;
+        }
+
+        Assert.Contains("SetBar(", Source(screen), StringComparison.Ordinal);
+    }
+
     private static string Source(string screen) =>
         string.Concat(Files(screen).Select(File.ReadAllText));
 
