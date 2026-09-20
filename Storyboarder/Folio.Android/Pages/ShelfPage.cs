@@ -26,7 +26,19 @@ public class ShelfPage : FolioBinderPage
         };
 
         Wrap(FolioArea.Shelf, "Shelf");
+
+        // The shelf carries the same primary the desk does, as the drawing has it. A book arrives
+        // here by being finished and put away, so this is not where one is added — but a screen in
+        // the binder with no pinned bar is the one screen where §7's primary is nowhere, and the
+        // owner who has just looked at their library is exactly who reaches for it.
+        var add = new Button { Text = "Add manuscript" };
+        add.Clicked += (_, _) => _ = AddManuscript();
+        SetBar(add);
     }
+
+    private async Task AddManuscript() =>
+        await Navigation.PushAsync(
+            IPlatformApplication.Current!.Services.GetRequiredService<NewProjectPage>());
 
     protected override void OnAppearing()
     {

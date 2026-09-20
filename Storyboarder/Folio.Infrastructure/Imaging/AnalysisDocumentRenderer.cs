@@ -630,6 +630,7 @@ public sealed class AnalysisDocumentRenderer
 
             writer.Hairline();
             writer.Heading(tier, h3, Ink);
+            writer.Continues(tier);
             foreach (var item in items)
                 writer.CheckItem(Sentences(item.Issue, item.SuggestedFix), item.Chapter, Chip(tier));
         }
@@ -639,11 +640,14 @@ public sealed class AnalysisDocumentRenderer
         {
             writer.Hairline();
             writer.Heading("Other", h3, Ink);
+            writer.Continues("Other");
             foreach (var item in other)
                 writer.CheckItem(
                     Sentences(item.Issue, item.SuggestedFix), Join(item.Priority, item.Chapter),
                     Chip("Consider"));
         }
+
+        writer.Continues(null);
 
         using var small = ReportType.Small();
         writer.Footer(
