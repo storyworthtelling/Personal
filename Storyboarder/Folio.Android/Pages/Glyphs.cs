@@ -33,6 +33,9 @@ public static class Glyphs
     /// <summary>A brush: have one painted.</summary>
     public const string Brush = "M15 3.2 6.2 12l-3.1.9.9-3.1L12.8 1Z M11.4 2.4 13.8 4.8";
 
+    /// <summary>A closed volume, cover-out: the book itself rather than a page of it.</summary>
+    public const string Book = "M4 2.5h9a1 1 0 0 1 1 1v11a1 1 0 0 0-1-1H4Z M4 2.5v11 M6.5 5.5h5";
+
     /// <summary>Books standing on a shelf: put it away.</summary>
     public const string Shelve = "M3 3v12 M6.5 3v12 M10 3.4l2 11.4 M14 4l1.6 10.6 M2 16h14";
 }

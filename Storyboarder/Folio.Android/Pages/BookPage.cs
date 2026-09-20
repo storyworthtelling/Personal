@@ -1,4 +1,9 @@
+using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
+using Folio.Domain.Analysis;
 using Folio.Domain.Readiness;
+using Folio.Domain.Shelf;
+using Folio.Infrastructure.Services;
 using Storyworthtelling.Maui;
 
 namespace Folio.Android.Pages;
@@ -14,7 +19,39 @@ public sealed record BookPageModel(
     string Drafts,
     string Measure,
     IReadOnlyList<DraftFindings> Readiness,
-    IReadOnlyList<DraftRow> Rows);
+    IReadOnlyList<DraftRow> Rows)
+{
+    /// <summary>
+    /// The read, phrased. Every sentence here is assembled by a tested function in Domain
+    /// (<see cref="BookLines"/>, <see cref="LengthGap"/>) and this only puts the pieces on the page —
+    /// so the shelf and this screen cannot come to different words about the same book.
+    /// </summary>
+    public static BookPageModel From(BookRecord book) => new(
+        book.Title,
+        book.CoverPath is { } path && File.Exists(path) ? ImageSource.FromFile(path) : null,
+        BookLines.Standing(book.InSeries, book.SeriesSequence, book.SeriesLength, book.Stage),
+        BookLines.Drafts(book.Drafts.Count, book.Drafts.Count > 0 ? book.Drafts[^1].Created : null),
+        MeasureLine(book),
+        book.Readiness,
+        // Newest first, which is the opposite of the chart beneath which it sits — and deliberately:
+        // the chart is a history and reads left to right, the list is a record and the draft the
+        // author is working on belongs at the top of it.
+        [.. book.Drafts.OrderByDescending(draft => draft.Number).Select(Row)]);
+
+    private static DraftRow Row(BookDraft draft) => new(
+        draft.Number,
+        draft.Created.ToLocalTime().ToString("d MMM", CultureInfo.CurrentCulture),
+        draft.WordCount > 0 ? draft.WordCount.ToString("N0", CultureInfo.CurrentCulture) : "—");
+
+    // "Literary · 94,200 words, inside the genre norm" — the genre only when one was inferred.
+    private static string MeasureLine(BookRecord book)
+    {
+        var length = LengthGap.Brief(book.Length.WordCount, book.Length.TargetLow, book.Length.TargetHigh);
+        return string.IsNullOrWhiteSpace(book.Genre)
+            ? length
+            : string.IsNullOrEmpty(length) ? book.Genre : $"{book.Genre} · {length}";
+    }
+}
 
 /// <summary>
 /// One book: what it is, how ready it is, and its drafts.
@@ -42,21 +79,73 @@ public class BookPage : FolioBinderPage
         };
 
     private readonly VerticalStackLayout body = new();
+    private readonly BookRecord record;
 
-    public BookPage(BookPageModel book)
+    public BookPage(BookRecord book) : this(BookPageModel.From(book), book)
     {
+    }
+
+    private BookPage(BookPageModel model, BookRecord book)
+    {
+        record = book;
+
         Content = new ScrollView
         {
             Padding = new Thickness(24, 4, 16, 24),
             Content = body,
         };
 
-        Wrap(FolioArea.Shelf, book.Title);
-        Show(book);
+        Wrap(FolioArea.Shelf, model.Title);
+        Show(model);
 
-        SetBar(
-            new Button { Text = "New draft", Style = PaperResources.Token<Style>("SecondaryButton") },
-            new Button { Text = "Open report" });
+        var draft = new Button
+        {
+            Text = "New draft",
+            Style = PaperResources.Token<Style>("SecondaryButton"),
+        };
+        draft.Clicked += (_, _) => _ = NewDraft();
+
+        var open = new Button { Text = "Open report", IsEnabled = book.ReportReady };
+        open.Clicked += (_, _) => _ = OpenReport();
+
+        SetBar(draft, open);
+    }
+
+    /// <summary>
+    /// Opens the rendered report.
+    ///
+    /// <para>There is no in-app reader behind this any more (D85). The report is a printed document
+    /// with a marked-up manuscript in the middle of it, and the screen that paraphrased it was a
+    /// second, thinner copy that drifted from the page it was copying. Which makes this button the
+    /// whole of the product's reachability, and why <see cref="ReportFile"/> is guarded.</para>
+    /// </summary>
+    private async Task OpenReport()
+    {
+        if (!await ReportFile.OpenAsync(record.LatestDraftId, record.Title))
+        {
+            // Said on the page, not in a dialog: the report has been delivered and cleared off the
+            // device, or has not been rendered yet. Either way there is nothing here to open.
+            Note("The report is not on this phone. It is in the Drive folder beside the manuscript.");
+        }
+    }
+
+    private async Task NewDraft()
+    {
+        var page = IPlatformApplication.Current!.Services.GetRequiredService<NewProjectPage>();
+        page.PreviousDraftId = record.LatestDraftId;
+        page.PreviousTitle = record.Title;
+        await Navigation.PushAsync(page);
+    }
+
+    // A status sentence under the bar, per §8 — not a toast, and never an alert.
+    private void Note(string sentence)
+    {
+        body.Add(new Label
+        {
+            Text = sentence,
+            Style = PaperResources.Token<Style>("SecondaryLabel"),
+            Margin = new Thickness(0, DesignTokens.Space.X4, 0, 0),
+        });
     }
 
     private void Show(BookPageModel book)
