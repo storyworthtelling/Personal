@@ -38,7 +38,7 @@ public sealed record IconSpec(
     string BackgroundHex = Tokens.PaperHex,
     string? GroundImage = null,
     string? PlateImage = null,
-    float PlateInset = Glyphs.PlateInset,
+    float PlateInset = Glyphs.FullBleedInset,
     string? CoverImage = null);
 
 public static class IconSpecs
@@ -66,14 +66,22 @@ public static class IconSpecs
         // resource prefix at Platforms/Android/Resources — the active prefix stays the .NET-for-Android
         // default (`Resources`). Emitting here is what actually gets the mipmaps packaged (see the two heads'
         // csproj comments and CLAUDE.md); the launcher icon is then wired via [Application(Icon=...)].
-        new("Folio", "Storyboarder/Folio.Android/Resources", "appicon", true, Glyphs.PenNib),
-        // Foreword's icon IS its cover: the sunrise ground, the engraved doorstep set into the
-        // illustration window, and no framing at all — the window is too wide for brackets to
-        // survive a round mask, and the engraving needs the room. WritesColorsXml stays true:
+        // Folio's icon IS its cover, like Post's and Plate's: the deep red binding as the ground,
+        // the linocut set into the illustration window, and mitred brackets at the corners. It
+        // shipped its whole rebrand still wearing Glyphs.PenNib on plain paper — Canonizer's red
+        // nib, the pre-rebrand icon — because the rename moved this line's name and output path and
+        // left its glyph alone. CoverImage is what puts the same picture on the Flyleaf shelf,
+        // where Folio was the one sibling app with no book.
+        new("Folio", "Storyboarder/Folio.Android/Resources", "appicon", true, Glyphs.FolioPlate,
+            Tokens.FolioClothHex, PlateImage: "Branding/folio-cover.png",
+            CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_folio.png"),
+        // Foreword's icon IS its cover: the sunrise ground and the engraved doorstep, full bleed.
+        // It was the first to drop its framing — the window is too wide for brackets to survive a
+        // round mask, and the engraving needed the room — and is now the shape every cover icon
+        // takes, by the owner's decision. WritesColorsXml stays true:
         // this head's values/colors.xml is the one the MAUI resource glob actually packages.
         new("Foreword", "Foreword/Foreword.Android/Resources", "ic_launcher", true, Glyphs.ForewordPlate,
-            Tokens.ForewordSunriseHex, PlateImage: "Branding/foreword-cover.png",
-            PlateInset: Glyphs.ForewordPlateInset),
+            Tokens.ForewordSunriseHex, PlateImage: "Branding/foreword-cover.png"),
         new("Ledger", "Ledger/Ledger.Android/Resources", "appicon", true, Glyphs.Ledger),
     ];
 }
