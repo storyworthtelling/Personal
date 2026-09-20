@@ -239,7 +239,7 @@ public sealed class AnalysisDocumentRenderer
         RenderSeriesContinuity(writer, analysis.SeriesContinuity, body, bodyBold, bodyItalic, h2);
 
         // The manuscript is the centre of the report (P10): everything anchored to a place in the
-        // text lives here, before the whole-book sections above give way to the seven whole-book
+        // text lives here, before the whole-book sections above give way to the six whole-book
         // voices below. The scene-by-scene walk follows it — each scene's evidence image above its
         // notes, the fidelity check — and only then do the readers speak.
         RenderMarkedManuscript(writer, analysis, manuscript, bodyItalic, h2);
@@ -393,7 +393,7 @@ public sealed class AnalysisDocumentRenderer
     }
 
     /// <summary>
-    /// The seven readers: a contents page that maps them, then one page each.
+    /// The six readers: a contents page that maps them, then one page each.
     ///
     /// <para>They used to be seven blocks flowed into a single "Reviews" section, which is how a
     /// long read becomes a paragraph nobody finishes. Each read is a whole-book judgement in
@@ -416,7 +416,7 @@ public sealed class AnalysisDocumentRenderer
     }
 
     /// <summary>
-    /// The readers' contents page: the map to the seven sheets that follow.
+    /// The readers' contents page: the map to the six sheets that follow.
     ///
     /// <para>The closing line <b>counts</b> the agreement rather than asserting it, and names the
     /// dissent. A reader who wants nothing changed is information, not a rounding error — and a
@@ -448,10 +448,10 @@ public sealed class AnalysisDocumentRenderer
                 writer.Hairline();
         }
 
-        // The drawing closes this page with a counted consensus — "six of the seven name the middle
+        // The drawing closes this page with a counted consensus — "five of the six name the middle
         // … one asks for no change at all". It is NOT built here, and deliberately: the only count
         // this report can actually take is how many reads carry a weakness, and G23 makes that
-        // always all of them. A line that can only ever say "seven of the seven" is not a count, and
+        // always all of them. A line that can only ever say "six of the six" is not a count, and
         // the drawn claim — which reads are naming the SAME thing — is a judgement about text that
         // belongs to the model that read them. Raised for the owner rather than substituted.
     }
@@ -491,8 +491,8 @@ public sealed class AnalysisDocumentRenderer
 
     /// <summary>
     /// The reader's question, as the catalogue words it — "Could I sell it", "What is wrong with
-    /// it". It is the other half of the page's own label, and it is what makes seven reads read as
-    /// seven questions rather than seven opinions.
+    /// it". It is the other half of the page's own label, and it is what makes six reads read as
+    /// six questions rather than six opinions.
     /// </summary>
     private static string Lens(string personaId) =>
         PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId)?.Question ?? string.Empty;

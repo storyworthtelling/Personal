@@ -307,6 +307,9 @@ namespace Folio.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("CoverAttempted")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("CoverIsOwners")
                         .HasColumnType("INTEGER");
 
