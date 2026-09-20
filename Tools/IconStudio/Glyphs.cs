@@ -327,37 +327,27 @@ public static class Glyphs
     public const float FullBleedInset = 0.12f;
 
     /// <summary>
-    /// Post's cover, as the launcher icon: §12's ex-libris plate with the mailbox painting
-    /// already set into the window by the renderer. This draws what goes AROUND it — the
-    /// frame rule, the window keyline, and the four corner brackets.
+    /// The one thing drawn around a cover: the window's own edge, and nothing else.
     ///
-    /// The corners are a <b>mitred bracket</b> rather than the default quarter-curve: the
-    /// art it frames is flat and geometric, where a curl fights it, and a bracket is the
-    /// variant that survives being shrunk to 48dp. Each corner is a REFLECTION of the
-    /// top-left, never a rotation — rotating an asymmetric corner through 90 degrees gives
-    /// a pinwheel with no mirror line, which reads wrong on a plate (§12).
-    /// </summary>
-    /// <summary>
-    /// Foreword's plate: the window keyline, and nothing else.
+    /// <para>Every cover icon used to carry four mitred corner brackets as well. Foreword was the
+    /// first to drop them, and the reason was arithmetic rather than taste: an adaptive icon's
+    /// round mask keeps only the central 72 of 108, so framing survives only while it stays
+    /// inside that circle, and the engraving had to be large to be legible at 48dp — a doorstep,
+    /// a rolled newspaper and a door all inside a third of the tile read as a smudge. At the
+    /// inset that made the picture big enough, brackets would have been sliced off by the mask,
+    /// and broken framing reads as a rendering fault where no framing reads as a picture.</para>
     ///
-    /// <para>Post's icon frames its painting with mitred brackets; this one deliberately does
-    /// not, and the two decisions come from the same constraint pointing opposite ways. An
-    /// adaptive icon's round mask keeps only the central 72 of 108, so framing survives only
-    /// while it stays inside that circle. Post's window is small enough (0.325 inset) to leave
-    /// room for brackets inside it.</para>
+    /// <para>The owner then chose that shape for the rest, so it is now the rule and the
+    /// brackets are gone from the repo. What is left is the keyline, on exactly the rect the
+    /// renderer put the art in, so it reads as the window's own edge rather than as a border
+    /// floating near it.</para>
     ///
-    /// <para>Foreword's window is not: the engraving has to be large to be legible at 48dp — a
-    /// doorstep, a rolled newspaper and a door all inside a third of the tile read as a smudge —
-    /// so its inset is 0.12, and brackets there would be sliced off by the mask. Broken framing
-    /// reads as a rendering fault; no framing reads as a picture. The frame goes so the picture
-    /// can be big.</para>
-    ///
-    /// <para>Measured, so the claim is not larger than the fact: at 0.12 an adaptive launcher's
-    /// mask crops <i>inside</i> this keyline, so on the phone's home screen the icon reads as a
-    /// full-bleed engraving and neither the keyline nor the sunrise ground is visible. The
-    /// keyline does show on the legacy square <c>ic_launcher.png</c>, at its very edge. The
-    /// ground is still declared: it is what a launcher shows behind the foreground during its
-    /// zoom and parallax, and what any consumer of values/colors.xml reads.</para>
+    /// <para>Measured, so the claim is not larger than the fact: at this inset the mask crops
+    /// <i>inside</i> the keyline, so on the phone's home screen an icon reads as a full-bleed
+    /// picture and neither the keyline nor the cloth is visible. The keyline does show on the
+    /// legacy square PNG, at its very edge. The ground is still declared: it is what a launcher
+    /// shows behind the foreground during its zoom and parallax, and what any consumer of
+    /// values/colors.xml reads.</para>
     /// </summary>
     public static void CoverKeyline(SKCanvas canvas, float s, SKColor frameColor)
     {
@@ -393,11 +383,9 @@ public static class Glyphs
     ///
     /// <para><b>The art set into this window is a crop, and that is the point.</b> The approved
     /// cover paints a whole desk from above — monitor, keyboard, notebook, magnifier, mug — and the
-    /// design book records that it does not survive being shrunk: five objects inside a window that
-    /// is roughly a third of the tile dissolve at 48dp. Foreword met the same wall and answered it
-    /// by making the picture bigger, dropping its framing to do so. That answer is not available
-    /// here: the brackets sit at a fixed 0.268 rect set by the round mask, so widening Folio's
-    /// window far enough to matter would run the keyline into them.</para>
+    /// design book records that it does not survive being shrunk: five objects dissolve at 48dp.
+    /// Going full bleed buys room but not that much room, so the picture is reduced to its subject
+    /// as well as enlarged.</para>
     ///
     /// <para>So the picture is reduced to its subject instead — the composition book with the
     /// magnifier lying on it, which is what the app does, with the desk it sat on left behind. The
@@ -407,13 +395,12 @@ public static class Glyphs
     public static void FolioPlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Paper);
 
     /// <summary>
-    /// Plate's cover, as the launcher icon. The same anatomy as Post's, with the framing
+    /// Plate's cover, as the launcher icon. The same anatomy as the rest, with the keyline
     /// <b>inverted to ink</b>: Plate's binding is the LIGHT ground tier, where Post's is deep
-    /// indigo, so cream framing would vanish into the cloth instead of drawing the window.
+    /// indigo, so a cream keyline would vanish into the cloth instead of drawing the window.
     /// DESIGN.md §12 sets the binding per app and lets it contrast its own art; Plate's art is
-    /// a near-black lens, which is why the cloth is light and the frame is dark.
+    /// a near-black lens, which is why the cloth is light and the keyline is dark.
     /// </summary>
-    /// <summary>Plate's cover: ink keyline, because its binding is the light ground tier.</summary>
     public static void PlatePlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Ink);
 
     private static SKRect Inset(SKRect r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
