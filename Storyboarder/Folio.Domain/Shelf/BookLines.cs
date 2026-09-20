@@ -41,8 +41,12 @@ public static class BookLines
     }
 
     /// <summary>
-    /// The frame's own way with small numbers: words to six, figures after. Past six the word is
-    /// longer than the thing it counts and stops helping.
+    /// The frame's own way with small numbers: words to ten, figures after.
+    ///
+    /// <para>Ten rather than a rounder-sounding six because the drawings settle it: the report's own
+    /// pages say "Seven readers" and "Reader 3 of seven", and a document that spells three and
+    /// prints 7 in the same sentence reads as two documents. Past ten the word is longer than the
+    /// thing it counts and stops helping.</para>
     /// </summary>
     public static string Spell(int count) => count switch
     {
@@ -52,6 +56,10 @@ public static class BookLines
         4 => "four",
         5 => "five",
         6 => "six",
+        7 => "seven",
+        8 => "eight",
+        9 => "nine",
+        10 => "ten",
         _ => count.ToString(CultureInfo.InvariantCulture),
     };
 

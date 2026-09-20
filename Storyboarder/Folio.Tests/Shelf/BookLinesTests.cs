@@ -41,11 +41,19 @@ public class BookLinesTests
             BookLines.Drafts(1, new DateTimeOffset(2026, 6, 2, 8, 0, 0, TimeSpan.Zero)));
 
     /// <summary>
+    /// Spelled to ten, because the report's own pages say "Reader 3 of seven" — and a document that
+    /// spells three and prints 7 in one sentence reads as two documents.
+    /// </summary>
+    [Fact]
+    public void SevenIsSpelled() =>
+        Assert.Equal("seven", BookLines.Spell(7));
+
+    /// <summary>
     /// Past the words the frame spells, figures. A book on its eleventh draft is not a book the
     /// sentence "eleven drafts" flatters, and the numeral is what the author is counting in by then.
     /// </summary>
     [Fact]
-    public void PastSixItIsFigures() =>
+    public void PastTenItIsFigures() =>
         Assert.StartsWith("11 drafts", BookLines.Drafts(11, DateTimeOffset.UtcNow));
 
     [Fact]

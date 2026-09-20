@@ -27,6 +27,7 @@ internal sealed class PageWriter : IDisposable
 {
     private const float ContentLeft = PageGeometry.ContentLeft;
     private const float ContentWidth = PageGeometry.ContentWidth;
+    private const float ContentRight = PageGeometry.ContentRight;
     private const float ContentTop = PageGeometry.ContentTop;
     private const float ContentBottom = PageGeometry.ContentBottom;
 
@@ -59,6 +60,15 @@ internal sealed class PageWriter : IDisposable
 
     /// <summary>Pages written so far, including the one in progress.</summary>
     public int PageCount => sink.PageCount;
+
+    /// <summary>
+    /// The folio the page in progress carries — the number a reader sees at its foot.
+    ///
+    /// <para>Deliberately not <see cref="PageCount"/>: the front matter is composed separately and
+    /// the body's numbering starts after it, so a section pointing at "page 137" has to mean the
+    /// number printed there rather than the count of sheets so far.</para>
+    /// </summary>
+    public int Folio => FirstFolio + finishedPages;
 
     /// <summary>
     /// Keeps this page out of the running foot. The title page is the only one that asks: it is page
@@ -517,6 +527,296 @@ internal sealed class PageWriter : IDisposable
     /// </summary>
     private static string NoteText(Mark mark) =>
         string.IsNullOrWhiteSpace(mark.Reason) ? mark.Label : $"{mark.Label} — {mark.Reason}";
+
+    // ---- The reader, plan and verdict pages (Release I) ----------------------------------------
+    //
+    // These four page kinds are drawn rather than flowed: each opens with a caps label under a
+    // full-width rule and closes with a block pinned to the foot, which is a shape the Heading /
+    // Paragraph / Bullet vocabulary above cannot make. They are here rather than in the renderer
+    // because they are geometry, and the renderer's job is to know what a page says.
+
+    /// <summary>
+    /// A page's own label, under a rule across the whole measure: the apparatus naming what this
+    /// sheet is. Optionally a second label at the right — the reader's question, which on a reader's
+    /// page is the other half of the same line.
+    /// </summary>
+    public void PageLabel(string left, string? right = null)
+    {
+        var baseline = y + PaperTypeScale.Label;
+        Label(left, ContentLeft, baseline);
+        if (!string.IsNullOrWhiteSpace(right))
+        {
+            Label(right, ContentRight - LabelWidth(right), baseline);
+        }
+        y = baseline + 6f;
+        Rule(ContentLeft, y, ContentWidth);
+        y += PageGeometry.RuleGapBelow;
+    }
+
+    /// <summary>
+    /// One line of the readers' contents: who read it, from where, their verdict in a clause, and
+    /// the page to turn to.
+    /// </summary>
+    public void ContentsRow(int index, string name, string lens, string verdict, int folio)
+    {
+        using var heading = ReportType.Heading();
+        using var body = ReportType.Body();
+        using var small = ReportType.Small();
+
+        var numberWidth = 16f;
+        var folioWidth = 34f;
+        var textLeft = ContentLeft + numberWidth;
+        var textWidth = ContentWidth - numberWidth - folioWidth - 10f;
+
+        var lines = SkiaText.Wrap(body, verdict, textWidth);
+        var height = heading.Size * PageGeometry.LineSpacing
+            + (lines.Count * body.Size * PageGeometry.LineSpacing) + 6f;
+        KeepTogether(height);
+
+        var top = y;
+        using var ink = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true };
+        using var muted = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
+
+        canvas.DrawText(
+            index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ContentLeft, top + heading.Size, small, muted);
+        canvas.DrawText(name, textLeft, top + heading.Size, heading, ink);
+        Label(lens, ContentRight - folioWidth - 8f - LabelWidth(lens), top + heading.Size);
+        canvas.DrawText(
+            $"p. {folio}", ContentRight - folioWidth, top + heading.Size, small, muted);
+
+        y = top + (heading.Size * PageGeometry.LineSpacing);
+        foreach (var line in lines)
+        {
+            canvas.DrawText(line, textLeft, y + body.Size, body, ink);
+            y += body.Size * PageGeometry.LineSpacing;
+        }
+        y += 4f;
+    }
+
+    /// <summary>
+    /// A reader's own pros and cons, side by side under their two labels.
+    ///
+    /// <para>The tick and the cross are the <b>only</b> such marks in the report, and they are right
+    /// here for a reason DESIGN.md §16 would otherwise forbid: these are one reader's preferences,
+    /// not the book's severity tiers, so a mark that says "this one liked it" is a fact about the
+    /// reader rather than a rating of the book.</para>
+    /// </summary>
+    public void ProsAndCons(
+        string leftLabel, IReadOnlyList<string> left, string rightLabel, IReadOnlyList<string> right)
+    {
+        using var small = ReportType.Small();
+        var gutter = 22f;
+        var column = (ContentWidth - gutter) / 2f;
+        var rightLeft = ContentLeft + column + gutter;
+
+        var baseline = y + PaperTypeScale.Label;
+        Label(leftLabel, ContentLeft, baseline, ReportPalette.Great);
+        Label(rightLabel, rightLeft, baseline, ReportPalette.MustFix);
+        y = baseline + 8f;
+
+        var top = y;
+        var leftBottom = Marked(left, ContentLeft, top, column, small, ReportPalette.Great, tick: true);
+        var rightBottom = Marked(right, rightLeft, top, column, small, ReportPalette.MustFix, tick: false);
+        y = Math.Max(leftBottom, rightBottom);
+    }
+
+    // One column of marked items; returns the y it finished at, so the pair can end level.
+    private float Marked(
+        IReadOnlyList<string> items, float left, float top, float width, SKFont font, SKColor mark, bool tick)
+    {
+        var indent = 14f;
+        var cursor = top;
+        using var paint = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true };
+        using var stroke = new SKPaint
+        {
+            Color = mark, IsAntialias = true, Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1.4f, StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round,
+        };
+
+        foreach (var item in items)
+        {
+            foreach (var (line, i) in SkiaText.Wrap(font, item, width - indent).Select((line, i) => (line, i)))
+            {
+                if (i == 0)
+                {
+                    DrawMark(left, cursor + 3f, stroke, tick);
+                }
+                canvas.DrawText(line, left + indent, cursor + font.Size, font, paint);
+                cursor += font.Size * PageGeometry.LineSpacing;
+            }
+            cursor += 4f;
+        }
+
+        return cursor;
+    }
+
+    private void DrawMark(float x, float top, SKPaint stroke, bool tick)
+    {
+        var size = 7f;
+        if (tick)
+        {
+            using var path = new SKPath();
+            path.MoveTo(x, top + (size * 0.55f));
+            path.LineTo(x + (size * 0.35f), top + size);
+            path.LineTo(x + size, top);
+            canvas.DrawPath(path, stroke);
+            return;
+        }
+
+        canvas.DrawLine(x, top, x + size, top + size, stroke);
+        canvas.DrawLine(x + size, top, x, top + size, stroke);
+    }
+
+    /// <summary>
+    /// One revision item: an empty check box, what to do, where, and the severity chip at the right.
+    ///
+    /// <para>The box is printed empty because this is the page that gets carried to the desk. The
+    /// chip is at the right rather than leading the line because the list is ordered by <i>where the
+    /// work is</i> — one pass through the manuscript, not three — and the tier still has to be
+    /// readable down the page.</para>
+    /// </summary>
+    public void CheckItem(string action, string citation, SKColor chip)
+    {
+        using var body = ReportType.Body();
+        using var small = ReportType.Small();
+
+        var indent = 18f;
+        var chipWidth = 16f;
+        var width = ContentWidth - indent - chipWidth;
+        var lines = SkiaText.Wrap(body, action, width);
+        var cited = string.IsNullOrWhiteSpace(citation)
+            ? new List<string>()
+            : SkiaText.Wrap(small, citation, width);
+
+        KeepTogether(
+            (lines.Count * body.Size * PageGeometry.LineSpacing)
+            + (cited.Count * small.Size * PageGeometry.LineSpacing) + 10f);
+
+        var top = y;
+        using var boxPaint = new SKPaint
+        {
+            Color = ReportPalette.InkMuted, IsAntialias = true,
+            Style = SKPaintStyle.Stroke, StrokeWidth = 1f,
+        };
+        canvas.DrawRoundRect(
+            new SKRect(ContentLeft, top + 2f, ContentLeft + 9f, top + 11f), 1.4f, 1.4f, boxPaint);
+
+        using var ink = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true };
+        using var muted = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
+        foreach (var line in lines)
+        {
+            canvas.DrawText(line, ContentLeft + indent, y + body.Size, body, ink);
+            y += body.Size * PageGeometry.LineSpacing;
+        }
+        foreach (var line in cited)
+        {
+            canvas.DrawText(line, ContentLeft + indent, y + small.Size, small, muted);
+            y += small.Size * PageGeometry.LineSpacing;
+        }
+
+        using var chipPaint = new SKPaint { Color = chip, IsAntialias = true };
+        canvas.DrawRoundRect(
+            new SKRect(ContentRight - 9f, top + 3f, ContentRight, top + 12f), 2f, 2f, chipPaint);
+
+        y += 5f;
+    }
+
+    /// <summary>
+    /// The count line that opens the revision plan: the tally in numerals, and what the ordering
+    /// means beside it. Three Musts is a draft in good shape, and saying so in figures is less
+    /// flattering and more useful than saying so in a sentence.
+    /// </summary>
+    public void Tally(IReadOnlyList<(int Count, string Name)> counts, string note)
+    {
+        using var figures = ReportType.Section();
+        using var small = ReportType.Small();
+
+        var top = y;
+        var cursor = ContentLeft;
+        using var ink = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true };
+        foreach (var (count, name) in counts)
+        {
+            var text = count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            canvas.DrawText(text, cursor, top + figures.Size, figures, ink);
+            cursor += figures.MeasureText(text) + 5f;
+            Label(name, cursor, top + figures.Size);
+            cursor += LabelWidth(name) + 20f;
+        }
+
+        y = top + (figures.Size * PageGeometry.LineSpacing);
+
+        if (!string.IsNullOrWhiteSpace(note))
+        {
+            using var muted = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
+            foreach (var line in SkiaText.Wrap(small, note, ContentWidth))
+            {
+                canvas.DrawText(line, ContentLeft, y + small.Size, small, muted);
+                y += small.Size * PageGeometry.LineSpacing;
+            }
+        }
+        y += PageGeometry.BlockGap;
+    }
+
+    /// <summary>
+    /// The block that closes a page, pinned to its foot as the drawings pin theirs with
+    /// <c>margin-top:auto</c>: a hairline, an optional caps label, and a line or two under it.
+    ///
+    /// <para>It measures itself rather than taking a height, which is the whole reason it exists.
+    /// Written as "work out how tall this is, then call ToFoot" it was wrong by one label the first
+    /// time it ran — and being wrong by a few points does not look like a layout that is a few points
+    /// off. The last line falls past the foot, the wrapper breaks to a fresh sheet, and the report
+    /// grows a nearly blank page carrying half a sentence.</para>
+    /// </summary>
+    public void Footer(string? label, string text, SKFont font, SKColor color)
+    {
+        var height = (PageGeometry.HairlineGap * 2) + PageGeometry.HairlineHeight
+            + Measure(text, font) + FootSlack;
+        if (!string.IsNullOrWhiteSpace(label))
+            height += PaperTypeScale.Label + 5f;
+
+        ToFoot(height);
+        Hairline();
+        if (!string.IsNullOrWhiteSpace(label))
+        {
+            Label(label, ContentLeft, y + PaperTypeScale.Label);
+            y += PaperTypeScale.Label + 5f;
+        }
+        Paragraph(text, font, color);
+    }
+
+    /// <summary>
+    /// One line set against the right margin, at the current position. The other half of a colophon,
+    /// and the one thing a left-flowing writer cannot do by wrapping.
+    /// </summary>
+    public void Right(string text, SKFont font, SKColor color)
+    {
+        using var paint = new SKPaint { Color = color, IsAntialias = true };
+        canvas.DrawText(text, ContentRight - font.MeasureText(text), y + font.Size, font, paint);
+        y += font.Size * PageGeometry.LineSpacing;
+    }
+
+    /// <summary>
+    /// A hair of room past the measured height, so the final line of a pinned block cannot land
+    /// exactly on the foot and be pushed to the next sheet by a rounding error.
+    /// </summary>
+    private const float FootSlack = 3f;
+
+    /// <summary>
+    /// Pins what follows to the foot of the page. The caller says how tall the block is; a block
+    /// taller than the room left simply stays where it is rather than being pushed up over the text
+    /// above it. Prefer <see cref="Footer"/>, which measures itself.
+    /// </summary>
+    public void ToFoot(float height)
+    {
+        var top = ContentBottom - height;
+        if (top > y)
+            y = top;
+    }
+
+    /// <summary>How tall this text will be when wrapped to the full measure — for <see cref="ToFoot"/>.</summary>
+    public float Measure(string text, SKFont font, float width = ContentWidth) =>
+        SkiaText.Wrap(font, text, width).Count * font.Size * PageGeometry.LineSpacing;
 
     /// <summary>Closes the last page and returns the document's bytes.</summary>
     public byte[] Finish()

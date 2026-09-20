@@ -114,7 +114,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "[{\"perspective\":string,\"assessment\":string,\"strengths\":[string],\"weaknesses\":[string]," +
         "\"recommendation\":string}],\"revisionPlan\":[{\"priority\":string,\"chapter\":string," +
         "\"issue\":string,\"suggestedFix\":string}]," +
-        "\"verdict\":{\"strengths\":[string],\"problems\":[string],\"mostNeeds\":string}}. " +
+        "\"verdict\":{\"standing\":string,\"reading\":string,\"strengths\":[string]," +
+        "\"problems\":[string],\"mostNeeds\":string}}. " +
         // Every finding has to be findable: an observation the author can't locate in the manuscript
         // costs them a re-read to act on. The chapter is already on the notes, so it only has to be
         // carried through rather than worked out.
@@ -404,6 +405,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             Verdict = dto.Verdict is null
                 ? Verdict.Empty
                 : new Verdict(dto.Verdict.Strengths ?? [], dto.Verdict.Problems ?? [], dto.Verdict.MostNeeds ?? string.Empty)
+                {
+                    Standing = dto.Verdict.Standing ?? string.Empty,
+                    Reading = dto.Verdict.Reading ?? string.Empty,
+                }
         };
     }
 
@@ -639,9 +644,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "replacement prose\"}]}. You diagnose and point; you never write the author's sentences for them.";
 
     private const string VerdictInstruction =
-        "You are given fifteen independent reads of one novel. Write the candid state of this draft: "
-        + "its biggest strengths, its biggest problems, and the one thing it most needs. Reply with "
-        + "JSON only: {\"verdict\": {\"strengths\": [], \"problems\": [], \"mostNeeds\": \"\"}}.";
+        "You are given fifteen independent reads of one novel. Write the candid state of this draft. "
+        // "standing" is the line the author repeats to themselves afterwards, so it is asked for as a
+        // sentence rather than as a rating: a page that opens on a number is read as a mark.
+        + "Open with \"standing\": ONE short sentence naming where the draft stands (\"The book is "
+        + "close.\"), and \"reading\": a paragraph that argues it. Then its biggest strengths, its "
+        + "biggest problems, and the one thing it most needs. Reply with JSON only: {\"verdict\": "
+        + "{\"standing\": \"\", \"reading\": \"\", \"strengths\": [], \"problems\": [], \"mostNeeds\": \"\"}}.";
 
     public async Task<SectionRead> ReadSection(
         Persona persona, string manuscript, CancellationToken cancellationToken)
@@ -719,6 +728,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 item.Issue ?? string.Empty, item.SuggestedFix ?? string.Empty)).ToList(),
             dto?.Verdict is { } verdict
                 ? new Verdict(verdict.Strengths ?? [], verdict.Problems ?? [], verdict.MostNeeds ?? string.Empty)
+                {
+                    Standing = verdict.Standing ?? string.Empty,
+                    Reading = verdict.Reading ?? string.Empty,
+                }
                 : Verdict.Empty);
     }
 
@@ -1066,6 +1079,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? Strengths { get; set; }
         public List<string>? Problems { get; set; }
         public string? MostNeeds { get; set; }
+        public string? Standing { get; set; }
+        public string? Reading { get; set; }
     }
 
     private sealed class CraftReportDto
