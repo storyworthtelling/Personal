@@ -1051,6 +1051,44 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2h) Paint the jacket (a Gemini call), if nothing has painted or set one yet. Its own resumable
+        // step, gated on CoverPath/CoverAttempted rather than a column of its own — there is no report field
+        // to hold, only a file and a flag. A refusal (ImageContentBlockedException) settles CoverAttempted
+        // without a retry, the same as a scene left without an image: a cover is evidence, not the report,
+        // and the render must never wait on one. Skipped entirely once the owner has set or repainted a
+        // cover by hand — ProjectService's own SetCoverAsync path, not this gate.
+        if (novel.CoverPath is null && !novel.CoverAttempted)
+        {
+            if (!geminiLimiter.TryAcquire())
+                return ProcessResult.Waiting(geminiLimiter.TimeUntilNext(), novel.Id);
+
+            var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
+                         ?? BookAnalysisResult.Empty;
+
+            try
+            {
+                var jacket = await gemini.GenerateJacket(novel.Title, report.Genre, report.Logline, novel.ArtStyle, cancellationToken);
+                novel.CoverPath = imageStore.Save(
+                    Path.Combine(novel.Id.ToString(), "covers", $"{Guid.NewGuid():N}.png"), jacket);
+                novel.CoverIsOwners = false;
+                novel.LastError = null;
+            }
+            catch (ImageContentBlockedException blocked)
+            {
+                logger.LogWarning("Manuscript {NovelId} left without a painted jacket after a refusal: {Reason}",
+                    novel.Id, blocked.Reason);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            novel.CoverAttempted = true;
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 3) Render: compose the report PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
