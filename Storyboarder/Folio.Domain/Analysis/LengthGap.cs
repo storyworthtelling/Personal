@@ -25,6 +25,27 @@ public static class LengthGap
         return $"{count} — within the {range} genre norm";
     }
 
+    /// <summary>
+    /// The same reading, at the width a phone line has. Built from the same three numbers as
+    /// <see cref="Describe"/> so the screen and the printed page cannot come to different verdicts
+    /// about one book — only to shorter and longer sentences about the same one.
+    /// </summary>
+    public static string Brief(int wordCount, int targetLow, int targetHigh)
+    {
+        if (wordCount <= 0)
+            return string.Empty;
+
+        var count = $"{wordCount:N0} words";
+        if (targetLow <= 0 || targetHigh < targetLow)
+            return count;
+
+        if (wordCount < targetLow)
+            return $"{count}, {Round(targetLow - wordCount):N0} short of the norm";
+        if (wordCount > targetHigh)
+            return $"{count}, {Round(wordCount - targetHigh):N0} over the norm";
+        return $"{count}, inside the genre norm";
+    }
+
     // The gap is an estimate, so round to the nearest thousand rather than implying false precision.
     private static int Round(int gap) => (int)System.Math.Round(gap / 1000.0) * 1000;
 }
