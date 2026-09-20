@@ -1123,10 +1123,7 @@ public sealed class ReviewProcessor : IPipelineStep
                     .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity)
                     .WithReads(
                         readers,
-                        sections.Where(section => section.HasContent)
-                            .Select(section => section.Summary)
-                            .Where(summary => !string.IsNullOrWhiteSpace(summary))
-                            .ToList(),
+                        sections.Where(section => section.HasContent).ToList(),
                         synthesis.RevisionPlan,
                         synthesis.Verdict);
                 // The draft's own text, which the report marks the findings onto (Release G). Read
