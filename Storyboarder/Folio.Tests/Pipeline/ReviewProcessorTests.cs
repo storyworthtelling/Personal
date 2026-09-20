@@ -478,7 +478,10 @@ public class ReviewProcessorTests : IDisposable
 
         // Delivery rides the proven root path Foreword uses (the "Canonizer" folder path relied on a
         // reMarkable wire format never verified against the live cloud, and silently delivered nothing).
-        remarkable.Verify(r => r.Upload(It.Is<string>(t => t.Contains("Analysis")), It.IsAny<byte[]>()), Times.Once);
+        // Named through the same function the Drive upload uses, so the two targets cannot come to
+        // different names for one document — which is what a hand-written "Analysis" here let happen.
+        remarkable.Verify(
+            r => r.Upload(DeliveredDocument.Name("Quest", 1), It.IsAny<byte[]>()), Times.Once);
         remarkable.Verify(r => r.EnsureFolder(It.IsAny<string>()), Times.Never);
 
         using var context = database.NewContext();

@@ -1168,7 +1168,7 @@ public sealed class ReviewProcessor : IPipelineStep
             }
 
             analysis!.ArchivedDriveFileId = await delivery!.UploadDriveFile(
-                novel.ArchiveFolderId, $"{novel.Title} — Draft {novel.DraftNumber} — Analysis.pdf", "application/pdf",
+                novel.ArchiveFolderId, DeliveredDocument.FileName(novel.Title, novel.DraftNumber), "application/pdf",
                 imageStore.Read(analysis.PdfPath!), cancellationToken);
             logger.LogInformation("Archived the revision report of manuscript {NovelId} to Drive", novel.Id);
 
@@ -1214,7 +1214,7 @@ public sealed class ReviewProcessor : IPipelineStep
         try
         {
             await delivery!.DeliverToRemarkableRoot(
-                $"{novel.Title} — Draft {novel.DraftNumber} — Analysis",
+                DeliveredDocument.Name(novel.Title, novel.DraftNumber),
                 imageStore.Read(analysis.PdfPath!), cancellationToken);
 
             analysis.DeliveredToRemarkable = true;

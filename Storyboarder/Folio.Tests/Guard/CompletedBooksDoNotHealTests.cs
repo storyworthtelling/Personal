@@ -25,11 +25,15 @@ namespace Folio.Tests.Guard;
 /// most expensive thing this app does, and a finished book restarting is not a nuisance — it is the
 /// same bill a second time, arriving because a file the owner never touched went missing.</para>
 ///
-/// <para><b>The accepted cost, stated:</b> a Completed book whose report PDF vanishes stays Completed
-/// with no PDF on disk, rather than quietly rebuilding. It is a smaller cost than it first looks:
-/// the report itself is not in the PDF, it is in <c>BookAnalysis</c>'s stored JSON, so
-/// <c>GetReportAsync</c> still shows the whole thing in the app, and an archived book still has its
-/// Drive copy. One local file is lost, and regaining it is the owner's deliberate act.</para>
+/// <para><b>The accepted cost, stated — and it grew when the in-app reader went.</b> A Completed
+/// book whose report PDF vanishes stays Completed with no PDF on disk, rather than quietly
+/// rebuilding. The reading itself is not lost with it: it is in <c>BookAnalysis</c>'s stored JSON,
+/// and an archived book still has its Drive copy, which is what the book page's open action points
+/// at when there is nothing local left. But the PDF WAS the second copy on the device, and since
+/// D85 dropped <c>ReportPage</c> there is no longer a screen that renders the stored JSON — so on a
+/// book that was never delivered, one local file going missing is now the whole document. Regaining
+/// it is the owner's deliberate act, which is the point: the alternative is the same bill a second
+/// time, arriving unasked.</para>
 /// </summary>
 public class CompletedBooksDoNotHealTests : IDisposable
 {

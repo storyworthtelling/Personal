@@ -91,22 +91,75 @@ public class ShelfPage : FolioBinderPage
         {
             var drawable = new ShelfDrawable { Row = row };
 
-            shelves.Add(new GraphicsView
+            var shelf = new GraphicsView
             {
                 Drawable = drawable,
                 HeightRequest = drawable.HeightDp,
                 HorizontalOptions = LayoutOptions.Fill,
-            });
+            };
+            Press(shelf, row);
+            shelves.Add(shelf);
 
             if (row.SeriesName is not null)
             {
-                shelves.Add(new Label
+                var label = new Label
                 {
-                    Text = $"{row.SeriesName} · {Count(row.Books.Count)}",
+                    Text = $"{row.SeriesName} · {BookLines.Spell(row.Books.Count)} "
+                        + (row.Books.Count == 1 ? "book" : "books"),
                     Style = PaperResources.Token<Style>("SecondaryLabel"),
                     Margin = new Thickness(DesignTokens.Space.X4, DesignTokens.Space.X1, 0, 0),
-                });
+                };
+
+                // The rename card had no route to it either: it was built, tested, and opened by
+                // nothing. The series' own name is the obvious thing to press to change it.
+                var rename = new TapGestureRecognizer();
+                var series = row.Books[0].Series;
+                var current = row.SeriesName;
+                rename.Tapped += (_, _) =>
+                {
+                    if (series is not null)
+                        AskForName(series, current);
+                };
+                label.GestureRecognizers.Add(rename);
+
+                shelves.Add(label);
             }
+        }
+    }
+
+    /// <summary>
+    /// A shelf is one painted canvas, so a tap arrives as a coordinate and
+    /// <see cref="ShelfRow.At"/> turns it back into a book — the painter's own walk, read backwards,
+    /// which is why it lives in Domain beside the painting rather than here.
+    ///
+    /// <para>A tap that lands on a bookend, a gap or bare shelf opens nothing. Nudging the nearest
+    /// book open instead would mean the shelf sometimes opens a book nobody pointed at.</para>
+    /// </summary>
+    private void Press(View shelf, ShelfRow row)
+    {
+        var open = new TapGestureRecognizer();
+        open.Tapped += (sender, args) =>
+        {
+            if (args.GetPosition(shelf) is { } point && row.At(point.X) is { } book)
+            {
+                _ = OpenBook(book.Id);
+            }
+        };
+        shelf.GestureRecognizers.Add(open);
+    }
+
+    private async Task OpenBook(Guid draftId)
+    {
+        BookRecord? book;
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            book = await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .GetBookAsync(draftId, CancellationToken.None);
+        }
+
+        if (book is not null)
+        {
+            await Navigation.PushAsync(new BookPage(book));
         }
     }
 
@@ -149,15 +202,4 @@ public class ShelfPage : FolioBinderPage
         await scope.ServiceProvider.GetRequiredService<ProjectService>()
             .RenameSeriesAsync(seriesId, name, CancellationToken.None);
     }
-
-    // "three books", not "3 books" — the frame spells the small numbers out.
-    private static string Count(int books) => books switch
-    {
-        1 => "one book",
-        2 => "two books",
-        3 => "three books",
-        4 => "four books",
-        5 => "five books",
-        _ => $"{books} books",
-    };
 }
