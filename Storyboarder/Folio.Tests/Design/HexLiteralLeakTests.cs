@@ -21,6 +21,14 @@ public class HexLiteralLeakTests
         // could throw for the same reason the app just did, and the owner would be back to a blank
         // stop with nothing to read. Guarded narrowly by OnlyTheStartupFailurePageMayHardCode below.
         Path.Combine("Folio.Android", "Pages", "StartupFailurePage.cs"),
+
+        // The identity-ladder guard (G10), whose whole job is to hold the five committed tiers as
+        // literals. Reading them from the file a change would be made in would catch nothing: the
+        // guard exists to notice a value moving, so it has to carry its own copy of what the value
+        // was. That is the one case where a second copy of a colour is the point rather than the
+        // disease — and the copy is checked against the OKLCH wheel on every run, so it cannot rot
+        // into agreeing with a mistake.
+        Path.Combine("Folio.Tests", "Design", "IdentityLadderTests.cs"),
     };
 
     private static readonly string[] AllowedDirectories =
