@@ -195,12 +195,16 @@ public partial class MainPage : FolioBinderPage
     /// </summary>
     private void ShowActions(NovelStatus status)
     {
-        var buttons = new List<string> { OpenBookAction };
+        var buttons = new List<string>();
 
         // A finished book can be put away. It leads the card and carries the weight — archiving is
-        // prominent and deleting is merely available, which is the whole of D19.
+        // prominent and deleting is merely available, which is the whole of D19. Adding the route
+        // into the book page above it would have quietly taken that lead away, which is what the
+        // drawing shows it keeping.
         if (status.Stage == "Completed" && !status.Shelved)
             buttons.Add(ShelveAction);
+
+        buttons.Add(OpenBookAction);
 
         // The jacket: pick one, or have another painted. Both are undo-first, so neither asks.
         buttons.Add(ReplaceCoverAction);
@@ -580,8 +584,10 @@ public partial class MainPage : FolioBinderPage
     private const string RepaintCoverAction = "Repaint the cover";
     private const string RetryAction = "Retry now";
     private const string StopAction = "Stop review";
-    private const string DeleteAction = "Delete manuscript";
-    private const string NewDraftAction = "New draft (re-pick doc)";
+    private const string DeleteAction = "Delete";
+    // Named for the draft it starts, as the drawing has it: "Start draft 3…", not a description of
+    // the mechanism. The ellipsis is the §7 grammar for an action that opens a picker.
+    private const string NewDraftAction = "Start the next draft…";
     private const string NextBookAction = "Start next book (new manuscript)";
     private const string DiffAction = "What changed since last draft";
     private const string OpenBookAction = "Open the book";

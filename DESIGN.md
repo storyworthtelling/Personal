@@ -113,8 +113,18 @@ Registered ladders (per-app `Design/DesignTokens.cs`, §19):
 | Score | `#AFC0BC` | `#93ABA5` | `#436A61` | `#35544D` | `#263B36` | 178° | action, 26° |
 | Post | `#B9B9D4` | `#A1A1C7` | `#5C5894` | `#494676` | `#333252` | 285° | reference, 32° |
 | Plate | `#C8B5C8` | `#B69BB6` | `#7A4F7B` | `#613F62` | `#442D44` | 326° | problem, 50° |
+| Folio | `#C1C197` | `#919059` | `#6B681E` | `#575410` | `#3B3902` | 107° | positive, 21° |
 
 Flyleaf's three tiers predate the five-tier ladder and are **provisional** pending a resample.
+
+*Folio* is the **tightest ladder in the suite** at 21.4° from the positive olive — inside the floor,
+but only just, and worth knowing before anything on that side of the wheel moves. The window it was
+committed at the centre of (105–109°) is the only one left that clears every role and every sibling;
+the wheel is nearly full. Its tiers were registered here and brought under a guard late, in P10
+Release I: they lived in `Tools/IconStudio/Tokens.cs` and in no table, so the suite's hue-separation
+check — which enumerates its apps by hand — simply did not know about them. `Folio.Tests`'
+`IdentityLadderTests` now covers them, and adds the half the suite's copy never did: distance from
+every *other* app's committed identity, which is a different failure from crowding a role.
 
 ### Contrast (binding)
 

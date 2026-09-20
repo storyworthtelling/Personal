@@ -108,7 +108,7 @@ public class BookPage : FolioBinderPage
         var open = new Button { Text = "Open report", IsEnabled = book.ReportReady };
         open.Clicked += (_, _) => _ = OpenReport();
 
-        SetBar(draft, open);
+        SetBar(open, draft);
     }
 
     /// <summary>
