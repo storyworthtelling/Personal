@@ -108,19 +108,30 @@ public class BinderTabs : ContentView
     private void Rebuild()
     {
         strip.Children.Clear();
-        if (Height <= 0)
+        if (areas.Count == 0)
         {
-            // Laid out on the first SizeChanged; the well's height is what decides tab heights,
-            // so there is nothing meaningful to draw before it is known.
             return;
         }
 
+        // SetAreas is called from a page's constructor, before Wrap has even added this view to the
+        // page — so the first Rebuild() always runs detached, with no height yet. Bailing out there
+        // (as this used to) left the whole gutter blank — no page edge, no tab cloth, no colour — for
+        // however long it took the platform to run this view's first layout pass and raise
+        // SizeChanged, which on a cold Android launch is a real, visible gap: Plate, Score and Post
+        // never show it because their native BinderTabs computes its layout synchronously inside
+        // onLayout, with no such window. Painting at the preferred per-tab height as a placeholder
+        // means the strip is never blank; this reruns and snaps to the true geometry once Height is
+        // known (observed live on device for Folio and Foreword, both built on this component).
+        var wellHeightDp = Height > 0
+            ? (int)Height
+            : BinderTabLayout.PreferredHeightDp * (areas.Count + 1);
+
         // The page edge: the line the tabs are clipped at, running the full height.
         var edge = new BoxView { Color = PaperResources.Colour("Hairline") };
-        AbsoluteLayout.SetLayoutBounds(edge, new Rect(0, 0, DesignTokens.Shape.HairlineDp, Height));
+        AbsoluteLayout.SetLayoutBounds(edge, new Rect(0, 0, DesignTokens.Shape.HairlineDp, wellHeightDp));
         strip.Children.Add(edge);
 
-        var tabs = BinderTabLayout.Compute(areas.Count, (int)Height);
+        var tabs = BinderTabLayout.Compute(areas.Count, wellHeightDp);
         for (var i = 0; i < areas.Count; i++)
         {
             var view = BuildTab(areas[i], i);

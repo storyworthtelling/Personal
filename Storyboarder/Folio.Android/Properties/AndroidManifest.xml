@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  This head has no other manifest content: permissions and the launcher icon are declared as
+  assembly attributes in Platforms/Android/MainApplication.cs (see the comment there), because the
+  project does not set <SingleProject>true</SingleProject> and so never wires up MAUI's
+  Platforms/Android/AndroidManifest.xml convention. .NET-for-Android still merges
+  Properties/AndroidManifest.xml when present, independently of that MAUI switch, which is what
+  this file exists to reach.
+
+  It carries exactly one override. WorkManager's own manifest declares
+  androidx.work.impl.foreground.SystemForegroundService with no foregroundServiceType (0x0), but
+  PipelineWorker.GoToForeground promotes with ForegroundService.TypeDataSync (0x1) on Android 29+
+  (SupportedOSPlatformVersion here is 34, where this is enforced). The mismatch throws
+  IllegalArgumentException("foregroundServiceType 0x00000001 is not a subset of
+  foregroundServiceType attribute 0x00000000 in service element of manifest file") on the main
+  thread, *after* GoToForeground's own try/catch has already returned — SetForegroundAsync merely
+  schedules the promotion; the OS invokes startForeground() later, off the call stack that catches
+  it — so the "best-effort" comment there did not hold. Confirmed live on device: it crash-looped
+  the app on every single pipeline cycle from 2026-09-20 09:59 through 13:44
+  (folio-diagnostics-20260920-1503.txt). Declaring the type here overrides the library's merged
+  entry so it matches what the code requests.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+  <application>
+    <service
+        android:name="androidx.work.impl.foreground.SystemForegroundService"
+        android:foregroundServiceType="dataSync"
+        tools:node="merge" />
+  </application>
+</manifest>
