@@ -11,6 +11,7 @@ using Folio.Domain.External;
 using Folio.Domain.Health;
 using Folio.Domain.Model;
 using Folio.Domain.Pipeline;
+using Folio.Domain.Text;
 using Folio.Infrastructure.Configuration;
 using Storyworthtelling.Voice.Health;
 
@@ -635,16 +636,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "before your verdict changed\"}. Every field is required. If you cannot fill one of them you "
         + "have not finished reading: a short answer is worse than none, because the page prints it.";
 
-    private const string RevisionPlanInstruction =
-        "You are given fifteen independent reads of one novel: eight structural sections and seven "
-        + "readers, none of whom saw the others' notes. Produce the author's revision plan. Where "
-        + "several reads name the same thing, that is one item and it ranks higher for it. Reply with "
+    // Built rather than a const: the noun has to name what this manuscript actually is (a 1,200-word
+    // short story is not "one novel"), and that depends on the measured word count these passes never
+    // see the manuscript to derive for themselves.
+    private static string RevisionPlanInstruction(StoryLength length) =>
+        $"You are given fourteen independent reads of one {ManuscriptLength.Noun(length)}: eight structural "
+        + "sections and six readers, none of whom saw the others' notes. Produce the author's revision plan. "
+        + "Where several reads name the same thing, that is one item and it ranks higher for it. Reply with "
         + "JSON only: {\"revisionPlan\": [{\"priority\": \"Must|Should|Consider\", \"chapter\": \"Ch. 12-15\", "
         + "\"issue\": \"what is wrong\", \"suggestedFix\": \"what to do about it — a direction, never "
         + "replacement prose\"}]}. You diagnose and point; you never write the author's sentences for them.";
 
-    private const string VerdictInstruction =
-        "You are given fifteen independent reads of one novel. Write the candid state of this draft. "
+    private static string VerdictInstruction(StoryLength length) =>
+        $"You are given fourteen independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
+        + "state of this draft. "
         // "standing" is the line the author repeats to themselves afterwards, so it is asked for as a
         // sentence rather than as a rating: a page that opens on a number is read as a mark.
         + "Open with \"standing\": ONE short sentence naming where the draft stands (\"The book is "
@@ -706,12 +711,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         string passId,
         IReadOnlyList<SectionRead> sections,
         IReadOnlyList<Review> readers,
+        int wordCount,
         CancellationToken cancellationToken)
     {
-        // The synthesis passes read the other fifteen rather than the manuscript, so they carry no
+        // The synthesis passes read the other fourteen rather than the manuscript, so they carry no
         // cached prefix and cost nothing to run against either model.
         var evidence = JsonSerializer.Serialize(new { sections, readers }, JsonResponse.CaseInsensitive);
-        var instruction = passId == "verdict" ? VerdictInstruction : RevisionPlanInstruction;
+        var length = ManuscriptLength.Classify(wordCount);
+        var instruction = passId == "verdict" ? VerdictInstruction(length) : RevisionPlanInstruction(length);
         var reply = await SendMessage(
             instruction, evidence, cancellationToken, options.PassMaxTokens, model: options.StrongModel);
 

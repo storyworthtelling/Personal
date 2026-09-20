@@ -132,13 +132,17 @@ public interface IClaudeAnalysisClient
     Task<Review> ReadAsReader(Persona persona, string manuscript, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The two synthesis passes, which read the other fifteen rather than the manuscript: the revision
-    /// plan, then the verdict. They run last for that reason.
+    /// The two synthesis passes, which read the other fourteen rather than the manuscript: the revision
+    /// plan, then the verdict. They run last for that reason. <paramref name="wordCount"/> is the
+    /// manuscript's own measured length — not re-derived here, since the passes never see the
+    /// manuscript itself — so the prompt can call the book what it actually is (short story, novella,
+    /// or novel) rather than assuming "novel".
     /// </summary>
     Task<SynthesisRead> Synthesise(
         string passId,
         IReadOnlyList<SectionRead> sections,
         IReadOnlyList<Review> readers,
+        int wordCount,
         CancellationToken cancellationToken);
 }
 
