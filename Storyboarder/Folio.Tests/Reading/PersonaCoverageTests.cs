@@ -3,7 +3,7 @@ using Folio.Domain.Reading;
 namespace Folio.Tests.Reading;
 
 /// <summary>
-/// G8 — every section and every one of the seven readers has a persona, and no two share one.
+/// G8 — every section and every one of the six readers has a persona, and no two share one.
 ///
 /// <para>The bug this reintroduces is dropping a persona so two sections share one. It produces a
 /// report that renders perfectly and says the same thing twice in different words, which is exactly
@@ -20,9 +20,9 @@ public class PersonaCoverageTests
     }
 
     [Fact]
-    public void TheSevenReadersEachHaveOne()
+    public void TheSixReadersEachHaveOne()
     {
-        Assert.Equal(7, PersonaCatalogue.Readers.Count);
+        Assert.Equal(6, PersonaCatalogue.Readers.Count);
         Assert.All(PersonaCatalogue.Readers, persona => Assert.Equal(PersonaKind.Reader, persona.Kind));
     }
 
@@ -38,14 +38,18 @@ public class PersonaCoverageTests
         Assert.Equal(questions.Count, questions.Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
-    /// <summary>The drawn readers, by name and in the drawn order — the mockup is the specification.</summary>
+    /// <summary>
+    /// The readers by name and order. Six now, not the drawn seven — the owner dropped Line editor
+    /// after the first real report, since its whole subject already prints as marks on the
+    /// manuscript. The Gate-3 mockup still shows seven; this is the amendment, not a drift from it.
+    /// </summary>
     [Fact]
-    public void TheReadersAreTheDrawnSevenInTheDrawnOrder()
+    public void TheReadersAreTheApprovedSixInTheApprovedOrder()
     {
         Assert.Equal(
             new[]
             {
-                "Developmental editor", "Line editor", "Agent", "Acquiring editor", "Genre fan",
+                "Developmental editor", "Agent", "Acquiring editor", "Genre fan",
                 "Harsh but fair critic", "Graduate literature professor",
             },
             PersonaCatalogue.Readers.Select(persona => persona.Name).ToArray());

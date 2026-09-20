@@ -6,7 +6,7 @@ public enum PersonaKind
     /// <summary>One of the eight whole-book sections. Prints as a section; silent when it has nothing to say.</summary>
     Section,
 
-    /// <summary>One of the seven readers. Gets a page of its own, in character.</summary>
+    /// <summary>One of the six readers. Gets a page of its own, in character.</summary>
     Reader,
 }
 
@@ -14,7 +14,7 @@ public enum PersonaKind
 /// Which model reads this pass.
 ///
 /// <para>The mix is a decision taken deliberately rather than a default inherited (finding §3,
-/// reversal 2). The judgement calls — the seven readers and the two synthesis passes — go to the
+/// reversal 2). The judgement calls — the six readers and the two synthesis passes — go to the
 /// strong model, because on those the judgement <i>is</i> the product. The eight structural sections
 /// go to the standard model, which is current-generation Sonnet: both newer and cheaper than the
 /// Sonnet 4.6 the repo ships today. This is not the tiering that failed for entity extraction — that
