@@ -63,6 +63,17 @@ public class Novel
     public bool CoverIsOwners { get; set; }
 
     /// <summary>
+    /// Whether the pipeline has already tried to paint this book's jacket.
+    ///
+    /// <para>Billed once, like expansion or delivery: a refused jacket
+    /// (<see cref="Folio.Domain.Pipeline.ImageContentBlockedException"/>) settles this to true with
+    /// <see cref="CoverPath"/> still null, so the worker does not repaint a book Gemini has already
+    /// declined rather than deferring it forever. It never gates a repaint the owner asks for by hand
+    /// — <c>ProjectService.ReplaceCoverAsync</c>/<c>SetPaintedCoverAsync</c> do not read it.</para>
+    /// </summary>
+    public bool CoverAttempted { get; set; }
+
+    /// <summary>
     /// How long the manuscript is, measured once when it is read in.
     ///
     /// <para>A column rather than a derivation: the shelf draws every spine's width from it, and the

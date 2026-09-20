@@ -168,6 +168,10 @@ public class ReviewProcessorTests : IDisposable
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
                 It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
+
+        gemini.Setup(g => g.GenerateJacket(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => SampleImages.Png());
     }
 
     public void Dispose()
@@ -280,6 +284,50 @@ public class ReviewProcessorTests : IDisposable
         // The rendered report opens as a valid PDF.
         using var document = PdfReader.Open(analysis.PdfPath!, PdfDocumentOpenMode.ReadOnly);
         Assert.True(document.PageCount > 0);
+    }
+
+    /// <summary>
+    /// A book with no jacket gets one painted by the pipeline itself — the gap the first real device
+    /// run surfaced: the app only ever painted a cover from a manual Settings action, so a book run
+    /// end to end never got one.
+    /// </summary>
+    [Fact]
+    public async Task Review_PaintsAJacket_WhenNoneIsSetOrPainted()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == id);
+        Assert.True(novel.CoverAttempted);
+        Assert.NotNull(novel.CoverPath);
+        Assert.True(File.Exists(novel.CoverPath));
+        Assert.False(novel.CoverIsOwners);
+    }
+
+    /// <summary>
+    /// A jacket Gemini refuses is a smaller loss than a report that never completes: the review still
+    /// reaches Completed, CoverAttempted settles so the worker does not retry a moment the model has
+    /// already declined, and CoverPath stays null so the render falls back to the page's own ink.
+    /// </summary>
+    [Fact]
+    public async Task Review_StillCompletes_WhenTheJacketIsRefused()
+    {
+        gemini.Setup(g => g.GenerateJacket(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ImageContentBlockedException("refused", ImageBlockReason.Safety));
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == id);
+        Assert.Equal(ProjectStage.Completed, novel.Stage);
+        Assert.True(novel.CoverAttempted);
+        Assert.Null(novel.CoverPath);
+
+        var analysis = context.BookAnalyses.Single(a => a.NovelId == id);
+        Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);
     }
 
     [Fact]
