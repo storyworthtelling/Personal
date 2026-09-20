@@ -266,6 +266,16 @@ public sealed record BookAnalysisResult(
     // series section renders.
     public SeriesContinuity SeriesContinuity { get; init; } = SeriesContinuity.Empty;
 
+    /// <summary>
+    /// The eight whole-book section personas' own reads, carried through <b>whole</b> — not flattened
+    /// into a string, which is what let their summaries overwrite <see cref="Themes"/> in the first
+    /// place. The renderer routes each by <see cref="Reading.SectionRead.PersonaId"/>: three fold into
+    /// a section that already exists for that ground (Pacing, Voice consistency, Series continuity),
+    /// and the rest — Story integrity, Structure, Setup and payoff, Theme hierarchy, Length — get a
+    /// section of their own. Themes keeps the model's own answer to what this book is about.
+    /// </summary>
+    public IReadOnlyList<Reading.SectionRead> SectionReads { get; init; } = [];
+
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
         Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(),
@@ -294,23 +304,25 @@ public sealed record BookAnalysisResult(
         this with { SeriesContinuity = seriesContinuity };
 
     /// <summary>
-    /// Folds the seventeen reads over the consolidated report.
+    /// Folds the sixteen reads over the consolidated report.
     ///
     /// <para>The readers <b>replace</b> whatever the omnibus reduce produced rather than joining it:
     /// the whole point of a persona pass is that one voice read the whole book, and a page carrying
     /// both would be two different instruments under one name. Sections and synthesis only fill what
     /// they actually found, so a read that has not run yet, or ran and was silent, leaves the
-    /// consolidated report's own answer standing rather than blanking it.</para>
+    /// consolidated report's own answer standing rather than blanking it. Themes is never touched
+    /// here — it is the model's own answer to what the book is about, and the sections are carried
+    /// separately in <see cref="SectionReads"/> for the renderer to route.</para>
     /// </summary>
     public BookAnalysisResult WithReads(
         IReadOnlyList<Review> readers,
-        IReadOnlyList<string> sectionSummaries,
+        IReadOnlyList<Reading.SectionRead> sections,
         IReadOnlyList<RevisionItem> revisionPlan,
         Verdict verdict) =>
         this with
         {
             Reviews = readers is { Count: > 0 } ? readers : Reviews,
-            Themes = sectionSummaries is { Count: > 0 } ? sectionSummaries : Themes,
+            SectionReads = sections is { Count: > 0 } ? sections : SectionReads,
             RevisionPlan = revisionPlan is { Count: > 0 } ? revisionPlan : RevisionPlan,
             Verdict = string.IsNullOrWhiteSpace(verdict.MostNeeds)
                 && verdict.Strengths is not { Count: > 0 }
