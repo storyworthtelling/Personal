@@ -63,7 +63,7 @@ public sealed class AnalysisDocumentRenderer
         IReadOnlyList<(string Title, int Page)> relative;
         using (var probe = new PageWriter(foot))
         {
-            RenderContent(analysis, scenes, draft, probe, manuscript);
+            RenderContent(analysis, titled, scenes, draft, probe, manuscript);
             relative = probe.TocEntries.ToList();
             probe.Finish();
         }
@@ -83,13 +83,13 @@ public sealed class AnalysisDocumentRenderer
         covers.AnalysisCover(document, titled);
         covers.AnalysisToc(document, entries);
         document.NewPage();
-        RenderContent(analysis, scenes, draft, document, manuscript);
+        RenderContent(analysis, titled, scenes, draft, document, manuscript);
         return new AnalysisRenderResult(document.Finish(), frontMatter, entries);
     }
 
     private static void RenderContent(
-        BookAnalysisResult analysis, IReadOnlyList<SceneEvidence> scenes, DraftReview review,
-        PageWriter writer, string? manuscript)
+        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes,
+        DraftReview review, PageWriter writer, string? manuscript)
     {
         using var body = ReportType.Body();
         using var bodyBold = ReportType.BodyBold();
@@ -247,7 +247,7 @@ public sealed class AnalysisDocumentRenderer
         RenderRevisionPlan(writer, analysis.RevisionPlan, body, h2, h3);
 
         // The candid state of the draft, last.
-        RenderVerdict(writer, analysis.Verdict, body, bodyBold, bodyItalic, h2);
+        RenderVerdict(writer, analysis.Verdict, cover, body, bodyBold, bodyItalic, h2);
 
     }
 
@@ -381,37 +381,126 @@ public sealed class AnalysisDocumentRenderer
         }
     }
 
+    /// <summary>
+    /// The seven readers: a contents page that maps them, then one page each.
+    ///
+    /// <para>They used to be seven blocks flowed into a single "Reviews" section, which is how a
+    /// long read becomes a paragraph nobody finishes. Each read is a whole-book judgement in
+    /// character and gets a sheet of its own, and the sheet before them is the map: who read it,
+    /// from where, their verdict in a clause, and the page to turn to.</para>
+    /// </summary>
     private static void RenderReviews(
-        PageWriter writer, IReadOnlyList<Review> reviews, SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2, SKFont h3)
+        PageWriter writer, IReadOnlyList<Review> reviews, SKFont body, SKFont bodyBold, SKFont bodyItalic,
+        SKFont h2, SKFont h3)
     {
         if (reviews is not { Count: > 0 })
             return;
 
-        writer.Heading("Reviews (differing perspectives)", h2, Ink, ruled: true);
-        foreach (var review in reviews)
+        RenderReadersContents(writer, reviews, body);
+
+        for (var i = 0; i < reviews.Count; i++)
         {
-            writer.Heading(PersonaName(review.PersonaId), h3, Ink);
-            if (!string.IsNullOrWhiteSpace(review.Verdict))
-                writer.Paragraph(review.Verdict, bodyBold, Ink);
-            if (!string.IsNullOrWhiteSpace(review.Assessment))
-                writer.Paragraph(review.Assessment, body, Ink);
-            if ((review.Strengths?.Count ?? 0) > 0)
-            {
-                writer.Paragraph("Strengths:", bodyBold, Ink);
-                foreach (var strength in review.Strengths!)
-                    writer.Bullet(strength, body, Ink);
-            }
-            if ((review.Weaknesses?.Count ?? 0) > 0)
-            {
-                writer.Paragraph("Weaknesses:", bodyBold, Ink);
-                foreach (var weakness in review.Weaknesses!)
-                    writer.Bullet(weakness, body, Ink);
-            }
-            if (!string.IsNullOrWhiteSpace(review.Condition))
-                writer.Paragraph($"Would need: {review.Condition}", bodyItalic, Muted);
-            writer.Gap(PageGeometry.BlockGap);
+            RenderReader(writer, reviews[i], i + 1, reviews.Count, body, h3);
         }
     }
+
+    /// <summary>
+    /// The readers' contents page: the map to the seven sheets that follow.
+    ///
+    /// <para>The closing line <b>counts</b> the agreement rather than asserting it, and names the
+    /// dissent. A reader who wants nothing changed is information, not a rounding error — and a
+    /// sentence claiming the readers agree, on a page where one of them plainly does not, is the
+    /// kind of summary that teaches an author to stop believing the document.</para>
+    /// </summary>
+    private static void RenderReadersContents(
+        PageWriter writer, IReadOnlyList<Review> reviews, SKFont body)
+    {
+        writer.NewPage();
+        writer.PageLabel($"{Spell(reviews.Count)} readers");
+        writer.Paragraph(
+            $"{Capitalize(Spell(reviews.Count))} full reviews follow, one to a page. Each read the whole book in "
+            + "character and none of them saw the others' notes, so where they agree the note is "
+            + "loud, and where they split the split is itself the finding.",
+            body, Ink);
+        writer.Gap(PageGeometry.BlockGap);
+
+        // The folio each reader's own page will carry. The pages follow this one in order, and this
+        // page is itself one sheet, so the first reader is the next folio along.
+        var firstReaderFolio = writer.Folio + 1;
+        for (var i = 0; i < reviews.Count; i++)
+        {
+            var review = reviews[i];
+            writer.ContentsRow(
+                i + 1, PersonaName(review.PersonaId), Lens(review.PersonaId), review.Verdict,
+                firstReaderFolio + i);
+            if (i < reviews.Count - 1)
+                writer.Hairline();
+        }
+
+        // The drawing closes this page with a counted consensus — "six of the seven name the middle
+        // … one asks for no change at all". It is NOT built here, and deliberately: the only count
+        // this report can actually take is how many reads carry a weakness, and G23 makes that
+        // always all of them. A line that can only ever say "seven of the seven" is not a count, and
+        // the drawn claim — which reads are naming the SAME thing — is a judgement about text that
+        // belongs to the model that read them. Raised for the owner rather than substituted.
+    }
+
+    /// <summary>
+    /// One reader, one page: the long review in character, that reader's own pros and cons, and the
+    /// condition on their verdict pinned to the foot.
+    ///
+    /// <para>The same three parts and the same room whether the read is warm or brutal. A persona
+    /// that only prints at length when it is negative is a different instrument, and the author
+    /// would learn to skip it.</para>
+    /// </summary>
+    private static void RenderReader(
+        PageWriter writer, Review review, int index, int of, SKFont body, SKFont h3)
+    {
+        writer.NewPage();
+        writer.PageLabel($"Reader {index} of {Spell(of)}", Lens(review.PersonaId));
+
+        writer.Heading(PersonaName(review.PersonaId), h3, Ink);
+        foreach (var paragraph in Paragraphs(review.Assessment))
+        {
+            writer.Paragraph(paragraph, body, Ink);
+            writer.Gap(PageGeometry.TightGap);
+        }
+
+        if (review.Strengths is { Count: > 0 } || review.Weaknesses is { Count: > 0 })
+        {
+            writer.Hairline();
+            writer.ProsAndCons(
+                "What works, for me", review.Strengths ?? [],
+                "What does not", review.Weaknesses ?? []);
+        }
+
+        if (!string.IsNullOrWhiteSpace(review.Condition))
+            writer.Footer("Would need", review.Condition, body, Ink);
+    }
+
+    /// <summary>
+    /// The reader's question, as the catalogue words it — "Could I sell it", "What is wrong with
+    /// it". It is the other half of the page's own label, and it is what makes seven reads read as
+    /// seven questions rather than seven opinions.
+    /// </summary>
+    private static string Lens(string personaId) =>
+        PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId)?.Question ?? string.Empty;
+
+    /// <summary>
+    /// A long review as the paragraphs the model wrote it in. Blank lines are the break; a read that
+    /// arrives as one block prints as one block rather than being cut up by a rule of this file's
+    /// own invention.
+    /// </summary>
+    private static IReadOnlyList<string> Paragraphs(string text) =>
+        [.. (text ?? string.Empty)
+            .Split(["\n\n", "\r\n\r\n"], StringSplitOptions.RemoveEmptyEntries)
+            .Select(paragraph => paragraph.Replace("\r\n", " ").Replace("\n", " ").Trim())
+            .Where(paragraph => paragraph.Length > 0)];
+
+    private static string Spell(int count) => Folio.Domain.Shelf.BookLines.Spell(count);
+
+    private static string Capitalize(string word) =>
+        word.Length == 0 ? word : char.ToUpperInvariant(word[0]) + word[1..];
 
     // A read cites a persona by id; the page prints the persona's name. An id with no persona behind
     // it prints as itself rather than as "Review", so a wrong citation is visible instead of tidy.
@@ -424,6 +513,9 @@ public sealed class AnalysisDocumentRenderer
 
     // The additive engine (Phase 3): scenes and beats to ADD, ranked by the same Must/Should/Consider impact
     // tiers as the revision plan. Pointers only — the intro is explicit that these are the author's to write.
+    // The impact tiers, in the order the plan and the additive engine both group by.
+    private static readonly string[] Tiers = ["Must", "Should", "Consider"];
+
     private static void RenderScenesToAdd(
         PageWriter writer, IReadOnlyList<SceneAddition> additions, SKFont body, SKFont bodyItalic, SKFont h2, SKFont h3)
     {
@@ -507,75 +599,157 @@ public sealed class AnalysisDocumentRenderer
         writer.Gap(PageGeometry.BlockGap);
     }
 
-    // The revision plan grouped by impact tier: Must, then Should, then Consider (anything else last).
-    private static readonly string[] Tiers = ["Must", "Should", "Consider"];
-
+    /// <summary>
+    /// The revision plan: the only page in the report that is a <b>list of actions</b>.
+    ///
+    /// <para>It opens with the tally in numerals, because three Musts is a draft in good shape and
+    /// saying so in figures is less flattering and more useful than saying so in a sentence. Each
+    /// item gets an empty check box — this is the page that gets carried to the desk — and the
+    /// severity chip sits at the right rather than leading the line, so the tier stays readable down
+    /// the page while the order belongs to <i>where the work is</i>. The author makes one pass
+    /// through the manuscript, not three.</para>
+    /// </summary>
     private static void RenderRevisionPlan(
         PageWriter writer, IReadOnlyList<RevisionItem> plan, SKFont body, SKFont h2, SKFont h3)
     {
         if (plan is not { Count: > 0 })
             return;
 
-        writer.Heading("What to do next", h2, Ink, ruled: true);
-        writer.Paragraph("The revision plan, grouped by impact.", ReportType.BodyItalic(), Muted);
+        writer.NewPage();
+        writer.PageLabel("What to do about it");
 
-        bool Matches(RevisionItem item, string tier) =>
-            string.Equals((item.Priority ?? string.Empty).Trim(), tier, StringComparison.OrdinalIgnoreCase);
+        writer.Tally(
+            [.. Tiers.Select(tier => (plan.Count(item => Matches(item, tier)), tier))],
+            "Ordered by where the work is, not by severity — one pass through the manuscript does all of it.");
 
         foreach (var tier in Tiers)
         {
-            var items = plan.Where(i => Matches(i, tier)).ToList();
+            var items = plan.Where(item => Matches(item, tier)).ToList();
             if (items.Count == 0)
                 continue;
-            writer.Heading(tier, h3, Accent);
+
+            writer.Hairline();
+            writer.Heading(tier, h3, Ink);
             foreach (var item in items)
-            {
-                writer.Bullet(Join(item.Chapter, item.Issue), body, Ink);
-                if (!string.IsNullOrWhiteSpace(item.SuggestedFix))
-                    writer.Paragraph(item.SuggestedFix, ReportType.BodyItalic(), Muted);
-            }
-            writer.Gap(PageGeometry.BlockGap);
+                writer.CheckItem(Sentences(item.Issue, item.SuggestedFix), item.Chapter, Chip(tier));
         }
 
-        var other = plan.Where(i => !Tiers.Any(t => Matches(i, t))).ToList();
+        var other = plan.Where(item => !Tiers.Any(tier => Matches(item, tier))).ToList();
         if (other.Count > 0)
         {
-            writer.Heading("Other", h3, Accent);
+            writer.Hairline();
+            writer.Heading("Other", h3, Ink);
             foreach (var item in other)
-            {
-                writer.Bullet(Join(item.Priority, item.Chapter, item.Issue), body, Ink);
-                if (!string.IsNullOrWhiteSpace(item.SuggestedFix))
-                    writer.Paragraph(item.SuggestedFix, ReportType.BodyItalic(), Muted);
-            }
+                writer.CheckItem(
+                    Sentences(item.Issue, item.SuggestedFix), Join(item.Priority, item.Chapter),
+                    Chip("Consider"));
+        }
+
+        using var small = ReportType.Small();
+        writer.Footer(
+            null,
+            "Nothing on this list is a sentence to copy — each item says what to do and where, "
+            + "and leaves the writing to the author.",
+            small, Muted);
+    }
+
+    /// <summary>
+    /// What to do, and then why — run together as prose rather than joined with the report's
+    /// citation dash. Both halves are sentences; a dash between two sentences reads as a citation
+    /// separator, which is what it means everywhere else in this document.
+    /// </summary>
+    private static string Sentences(params string?[] parts) =>
+        string.Join(" ", parts.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim()));
+
+    private static bool Matches(RevisionItem item, string tier) =>
+        string.Equals((item.Priority ?? string.Empty).Trim(), tier, StringComparison.OrdinalIgnoreCase);
+
+    private static SKColor Chip(string tier) => tier.Trim().ToLowerInvariant() switch
+    {
+        "must" => ReportPalette.MustFix,
+        "should" => ReportPalette.Should,
+        _ => ReportPalette.Consider,
+    };
+
+    /// <summary>
+    /// The verdict, and the last page.
+    ///
+    /// <para><b>Strengths come before problems by decision, not by politeness</b> (G21). A report
+    /// whose first page of judgement is a list of faults gets read defensively, and this one is
+    /// asking for a specific piece of work. The closing line names what the draft most needs in a
+    /// single action: if the verdict cannot say that in one sentence, the sections above it have not
+    /// finished their job.</para>
+    /// </summary>
+    private static void RenderVerdict(
+        PageWriter writer, Verdict verdict, ReportCover cover,
+        SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
+    {
+        if (verdict.Strengths is not { Count: > 0 } && verdict.Problems is not { Count: > 0 }
+            && string.IsNullOrWhiteSpace(verdict.MostNeeds)
+            && string.IsNullOrWhiteSpace(verdict.Standing))
+            return;
+
+        writer.NewPage();
+        writer.PageLabel("Verdict");
+
+        if (!string.IsNullOrWhiteSpace(verdict.Standing))
+        {
+            using var h3 = ReportType.Heading();
+            writer.Heading(verdict.Standing, h3, Ink);
+        }
+        if (!string.IsNullOrWhiteSpace(verdict.Reading))
+        {
+            writer.Paragraph(verdict.Reading, body, Ink);
+            writer.Gap(PageGeometry.TightGap);
+        }
+
+        Judgement(writer, "Biggest strengths", verdict.Strengths, body, bodyBold);
+        Judgement(writer, "Biggest problems", verdict.Problems, body, bodyBold);
+
+        if (!string.IsNullOrWhiteSpace(verdict.MostNeeds))
+        {
+            writer.Hairline();
+            writer.Label("What this draft most needs", PageGeometry.ContentLeft, writer.Y + PaperTypeScale.Label);
+            writer.Y += PaperTypeScale.Label + 5f;
+            writer.Paragraph(verdict.MostNeeds, body, Ink);
+        }
+
+        Colophon(writer, cover);
+    }
+
+    private static void Judgement(
+        PageWriter writer, string label, IReadOnlyList<string>? items, SKFont body, SKFont bodyBold)
+    {
+        if (items is not { Count: > 0 })
+            return;
+
+        writer.Hairline();
+        writer.Label(label, PageGeometry.ContentLeft, writer.Y + PaperTypeScale.Label);
+        writer.Y += PaperTypeScale.Label + 5f;
+        foreach (var item in items)
+        {
+            writer.Paragraph(item, body, Ink);
+            writer.Gap(PageGeometry.TightGap);
         }
     }
 
-    private static void RenderVerdict(
-        PageWriter writer, Verdict verdict, SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
+    /// <summary>
+    /// What was read, how long it was, and who it was prepared for — the line that closes the
+    /// document, set at the foot where a colophon belongs.
+    /// </summary>
+    private static void Colophon(PageWriter writer, ReportCover cover)
     {
-        if (verdict.Strengths is not { Count: > 0 } && verdict.Problems is not { Count: > 0 } &&
-            string.IsNullOrWhiteSpace(verdict.MostNeeds))
-            return;
+        using var small = ReportType.Small();
+        var read = cover.ReadOn.ToLocalTime().ToString("d MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
+        var length = cover.WordCount > 0 ? $" · {cover.WordCount:N0} words" : string.Empty;
+        writer.Footer(null, $"Read {read}{length} · draft {Spell(cover.DraftNumber)}", small, Muted);
 
-        writer.Heading("The verdict", h2, Ink, ruled: true);
-        writer.Paragraph("The candid state of this draft.", bodyItalic, Muted);
-        if (verdict.Strengths is { Count: > 0 })
-        {
-            writer.Paragraph("Biggest strengths:", bodyBold, Ink);
-            foreach (var strength in verdict.Strengths)
-                writer.Bullet(strength, body, Ink);
-        }
-        if (verdict.Problems is { Count: > 0 })
-        {
-            writer.Paragraph("Biggest problems:", bodyBold, Ink);
-            foreach (var problem in verdict.Problems)
-                writer.Bullet(problem, body, Ink);
-        }
-        if (!string.IsNullOrWhiteSpace(verdict.MostNeeds))
-        {
-            writer.Paragraph("What this draft most needs:", bodyBold, Ink);
-            writer.Paragraph(verdict.MostNeeds, body, Ink);
-        }
+        // Who it is for, set against the right margin on the same line — the closing half of a
+        // colophon, and the only place in the document that names its reader.
+        // Back up over the line just written AND the gap Paragraph leaves after it, so the two
+        // halves sit on one baseline rather than on two four points apart.
+        writer.Y -= (small.Size * PageGeometry.LineSpacing) + PageGeometry.TightGap;
+        writer.Right("Prepared for the author", small, Muted);
     }
 
     private static void Section(PageWriter writer, string heading, IReadOnlyList<string>? items, SKFont body, SKFont h2)
