@@ -25,10 +25,10 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal("#CA662D", Tokens.ForewordSunriseHex);
     }
 
-    // A paper-background app. Not one of the four FocusPhone heads: every one of them now
-    // stands on its own identity ground, Plate included since its cover landed, so picking a
-    // head here would test the flat-paper path against a spec that no longer uses it.
-    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Folio");
+    // A paper-background app, and by now there is exactly one. Every FocusPhone head stands on
+    // its own identity ground, Foreword on its sunrise, and Folio joined them when its cover
+    // landed — so Ledger is the last spec that still exercises the flat-paper path at all.
+    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Ledger");
     private static IconSpec FlyleafSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Launcher");
     private static IconSpec ForewordSpec => IconSpecs.All.First(s => s.App == "Foreword");
 
@@ -191,36 +191,33 @@ public class AdaptiveIconRendererTests : IDisposable
     }
 
     /// <summary>
-    /// Foreword's cover sits in a far larger window than Post's, and that is the whole
-    /// difference between the two icons. The engraving is the subject: at Post's 0.325 inset
-    /// the doorstep, the newspaper and the door all land inside a third of the tile and read
-    /// as a smudge at 48dp.
+    /// Every cover icon sets its art into the same wide window, and none of them draws framing
+    /// outside it.
+    ///
+    /// <para>This used to be Foreword's exception, tested against Post as the control: Foreword
+    /// took a 0.12 inset and no brackets so its engraving could be big, while Post kept a 0.325
+    /// window inside mitred corners. The owner chose Foreword's shape for all of them, so the
+    /// control is gone and the exception is the rule — which is why the two tests that named Post
+    /// as the small-window case are this one test now.</para>
+    ///
+    /// <para>The reason survives the change. At this inset the corners are far outside an adaptive
+    /// icon's round-mask safe zone, so brackets there would be sliced off — leaving broken framing
+    /// rather than none, which reads as a rendering fault. The frame goes so the picture can be
+    /// big.</para>
     /// </summary>
     [Fact]
-    public void ForewordSetsItsCoverIntoAMuchLargerWindowThanPost()
+    public void EveryCoverIconIsFullBleedAndFramesNothingOutsideItsWindow()
     {
-        var post = IconSpecs.All.Single(s => s.App == "Post");
+        var covers = IconSpecs.All.Where(spec => spec.PlateImage is not null).ToList();
 
-        Assert.Equal(0.12f, ForewordSpec.PlateInset);
-        Assert.True(ForewordSpec.PlateInset < post.PlateInset / 2f,
-            "Foreword's window has drifted back toward Post's, which is what made the engraving illegible.");
-    }
+        Assert.NotEmpty(covers);
+        foreach (var spec in covers)
+        {
+            Assert.Equal(Glyphs.FullBleedInset, spec.PlateInset);
 
-    /// <summary>
-    /// And why it has no framing. At a 0.12 inset the corners are far outside an adaptive
-    /// icon's round-mask safe zone, so brackets there would be sliced off — leaving the plate
-    /// with broken framing rather than none, which reads as a rendering bug. The frame goes so
-    /// the picture can be big.
-    /// </summary>
-    [Fact]
-    public void ForewordsPlateDrawsNoFramingOutsideItsWindow()
-    {
-        using var foreword = GlyphOnly(ForewordSpec);
-        using var post = GlyphOnly(IconSpecs.All.Single(s => s.App == "Post"));
-
-        Assert.True(InkOutsideWindow(post, IconSpecs.All.Single(s => s.App == "Post").PlateInset) > 0,
-            "Post is the control here: it is supposed to have framing outside its window.");
-        Assert.Equal(0, InkOutsideWindow(foreword, ForewordSpec.PlateInset));
+            using var glyph = GlyphOnly(spec);
+            Assert.Equal(0, InkOutsideWindow(glyph, spec.PlateInset));
+        }
     }
 
     // The glyph layer alone, with no ground and no plate art beneath it.
@@ -293,7 +290,7 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void LineArtGlyphsDrawInkAndExactlyOneTerracottaDetail()
     {
-        // Score, Post, Plate and Foreword are deliberately not in this set. Each one's icon IS
+        // Score, Post, Plate, Foreword and Folio are deliberately not in this set. Each one's icon IS
         // its cover — a keyboard on a painted ground, a mailbox painting set into an indigo
         // plate, a lens set into a mauve one, an engraved doorstep set into a sunrise one —
         // rather than an ink glyph on paper, so none has an ink line to count or a terracotta
@@ -303,7 +300,8 @@ public class AdaptiveIconRendererTests : IDisposable
         // the point: it was counting the terracotta dot on Glyphs.Lens, the pre-rebrand Camera
         // icon in an accent P4 retired. DESIGN.md §12 says a cover carries "no single accent
         // detail", so a cover that still had one would be the bug.
-        foreach (var spec in IconSpecs.All.Where(s => s.App is not ("Score" or "Post" or "Plate" or "Foreword")))
+        foreach (var spec in IconSpecs.All.Where(
+            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio")))
         {
             using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);
@@ -400,48 +398,35 @@ public class AdaptiveIconRendererTests : IDisposable
         return blobs;
     }
 
-    // A plate's corner framing has to survive a ROUND mask, which is the tighter of the two
-    // an Android launcher may apply. A corner sits at sqrt(2) x (0.5 - inset) from the
-    // centre while the round mask keeps only radius 0.333 of the layer, so framing that
-    // looks correctly placed on a square icon can be cut away entirely on a round one —
-    // leaving the painting in a window with nothing around it, and no error anywhere.
+    /// <summary>
+    /// A cover icon's art has to reach the edge of the ROUND mask, which is the tighter of the two
+    /// an Android launcher may apply.
+    ///
+    /// <para>This used to assert the opposite thing about the same geometry: that the mitred corner
+    /// brackets fell <i>inside</i> the mask, because framing which looks correctly placed on a
+    /// square icon can be cut away entirely on a round one. The brackets are gone now, so what is
+    /// left to protect is the reason they went — the picture is meant to fill the circle. The mask
+    /// keeps the central 72 of 108, so anything inside a radius of 0.333 is on screen, and at a
+    /// 0.12 inset the art covers all of it.</para>
+    ///
+    /// <para>Widening the window back would put the identity cloth inside that circle and make each
+    /// icon a small painting on a coloured ground again — visibly, but with nothing failing.</para>
+    /// </summary>
     [Fact]
-    public void PlateFramingSurvivesARoundMask()
+    public void ACoverIconsArtFillsTheRoundMask()
     {
-        var spec = IconSpecs.All.Single(s => s.App == "Post");
-        using var foreground = Foreground(spec);
-
-        var size = foreground.Width;
-        var centre = size / 2f;
-        var maskRadius = size * (72f / 108f) / 2f;
-        var window = size * spec.PlateInset;
-
-        // Only the four CORNER squares count. An earlier version of this counted anything
-        // outside the window, which meant it was really counting the window keyline —
-        // that runs through the middle of each edge, is always well inside the mask, and
-        // survives however far out the corners have drifted. It passed happily with the
-        // corners entirely outside the circle.
-        var framingInsideTheMask = 0;
-        for (var y = 0; y < size; y++)
+        foreach (var spec in IconSpecs.All.Where(spec => spec.PlateImage is not null))
         {
-            for (var x = 0; x < size; x++)
-            {
-                var inACorner = (x < window || x > size - window) && (y < window || y > size - window);
-                if (!inACorner)
-                {
-                    continue;
-                }
-                var distance = Math.Sqrt(((x - centre) * (x - centre)) + ((y - centre) * (y - centre)));
-                if (distance <= maskRadius && foreground.GetPixel(x, y).Alpha > 200)
-                {
-                    framingInsideTheMask++;
-                }
-            }
-        }
+            // The art's own rect, and the circle a round launcher keeps, both as fractions.
+            var window = spec.PlateInset;
+            const float maskRadius = 0.333f;
 
-        Assert.True(framingInsideTheMask > 200,
-            $"Only {framingInsideTheMask} corner pixels fall inside a round mask — the plate's corners "
-            + "are outside it and would be cut away completely on a launcher that draws round icons.");
+            // The window's nearest edge to the centre must be at least the mask's radius away, or
+            // the ground shows between the art and the edge of the icon.
+            Assert.True(0.5f - window >= maskRadius,
+                $"{spec.App}: its art stops {0.5f - window:F3} from the centre while the round mask "
+                + $"reaches {maskRadius}, so the identity cloth shows inside the circle.");
+        }
     }
 
     private static bool Differs(SKColor a, SKColor b, int tolerance) =>

@@ -315,14 +315,16 @@ public static class Glyphs
     }
 
     /// <summary>
-    /// How far in from each edge §12's illustration window sits, as a fraction of the layer.
-    /// Shared with the renderer, which draws the art into exactly this rect — a second copy
-    /// of the number in either place would drift and leave the frame off the picture.
+    /// The window every cover icon now uses: wide enough that the art reaches the edge of the
+    /// round mask, so the icon reads as a picture rather than as a picture inside a frame.
+    ///
+    /// <para>It began as Foreword's exception — see <see cref="CoverKeyline"/> — and became the
+    /// rule when the owner chose it for the rest. At this inset an adaptive launcher's mask crops
+    /// <i>inside</i> the keyline, so on the home screen neither the keyline nor the cloth is
+    /// visible; the ground is still declared, because it is what a launcher shows behind the
+    /// foreground during its zoom and parallax.</para>
     /// </summary>
-    public const float PlateInset = 0.325f;
-
-    /// <summary>Foreword's window, far wider than Post's — see <see cref="ForewordPlate"/>.</summary>
-    public const float ForewordPlateInset = 0.12f;
+    public const float FullBleedInset = 0.12f;
 
     /// <summary>
     /// Post's cover, as the launcher icon: §12's ex-libris plate with the mailbox painting
@@ -357,42 +359,7 @@ public static class Glyphs
     /// ground is still declared: it is what a launcher shows behind the foreground during its
     /// zoom and parallax, and what any consumer of values/colors.xml reads.</para>
     /// </summary>
-    public static void ForewordPlate(SKCanvas canvas, float s)
-    {
-        using var cream = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = s * 0.011f,
-            StrokeCap = SKStrokeCap.Butt,
-            StrokeJoin = SKStrokeJoin.Miter,
-            Color = Tokens.Paper,
-            IsAntialias = true,
-        };
-
-        // Exactly the rect the renderer put the engraving in, so the keyline reads as the
-        // window's own edge rather than as a border floating near it.
-        var window = new SKRect(
-            s * ForewordPlateInset, s * ForewordPlateInset,
-            s * (1f - ForewordPlateInset), s * (1f - ForewordPlateInset));
-        canvas.DrawRect(window, cream);
-    }
-
-    public static void PostPlate(SKCanvas canvas, float s) => CoverPlate(canvas, s, Tokens.Paper);
-
-    /// <summary>
-    /// Plate's cover, as the launcher icon. The same anatomy as Post's, with the framing
-    /// <b>inverted to ink</b>: Plate's binding is the LIGHT ground tier, where Post's is deep
-    /// indigo, so cream framing would vanish into the cloth instead of drawing the window.
-    /// DESIGN.md §12 sets the binding per app and lets it contrast its own art; Plate's art is
-    /// a near-black lens, which is why the cloth is light and the frame is dark.
-    /// </summary>
-    public static void PlatePlate(SKCanvas canvas, float s) => CoverPlate(canvas, s, Tokens.Ink);
-
-    // The shared ex-libris treatment: a window keyline on exactly the rect the renderer put
-    // the painting in, and four mitred brackets around it. One implementation rather than one
-    // per app, because the geometry below (the round-mask inset especially) is reasoning that
-    // must not be re-derived — and re-derived slightly differently — for each new cover.
-    private static void CoverPlate(SKCanvas canvas, float s, SKColor frameColor)
+    public static void CoverKeyline(SKCanvas canvas, float s, SKColor frameColor)
     {
         using var cream = new SKPaint
         {
@@ -403,66 +370,51 @@ public static class Glyphs
             Color = frameColor,
             IsAntialias = true,
         };
-        using var hair = new SKPaint
-        {
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = s * 0.006f,
-            StrokeJoin = SKStrokeJoin.Miter,
-            Color = frameColor.WithAlpha(150),
-            IsAntialias = true,
-        };
 
-        // The window keyline, on exactly the rect the renderer put the painting in.
+        // Exactly the rect the renderer put the art in, so the keyline reads as the window's own
+        // edge rather than as a border floating near it.
         var window = new SKRect(
-            s * PlateInset, s * PlateInset, s * (1f - PlateInset), s * (1f - PlateInset));
+            s * FullBleedInset, s * FullBleedInset,
+            s * (1f - FullBleedInset), s * (1f - FullBleedInset));
         canvas.DrawRect(window, cream);
-
-        // The brackets ARE the framing here; the shelf cover's full ex-libris rule is
-        // dropped. An adaptive icon's safe zone is the central 72 of 108, so a rule and a
-        // window keyline both fit only by sitting almost on top of each other, which at
-        // 48dp reads as one thick smudged border with the corners crushed against the art.
-        //
-        // The inset is set by the ROUND mask, not the square one. A corner sits at
-        // sqrt(2) x (0.5 - inset) from the centre, while a circular mask keeps only the
-        // central 72 of 108 — radius 0.333. Anything closer to the edge than 0.264 is
-        // outside that circle and is cut off completely on a launcher that draws round
-        // icons, which would leave the plate with no framing at all rather than with
-        // clipped framing.
-        var frame = new SKRect(s * 0.268f, s * 0.268f, s * 0.732f, s * 0.732f);
-        DrawMitredBrackets(canvas, frame, s, cream, hair);
     }
 
-    // One bracket, drawn at the top-left of the frame and then mirrored into the other
-    // three corners — scale(-1,1), (1,-1) and (-1,-1) about the frame's own centre.
-    private static void DrawMitredBrackets(
-        SKCanvas canvas, SKRect frame, float s, SKPaint heavy, SKPaint light)
-    {
-        var arm = s * 0.062f;
-        var innerOffset = s * 0.015f;
-        var innerArm = arm * 0.55f;
+    /// <summary>Foreword's cover: cream keyline on the sunrise ground.</summary>
+    public static void ForewordPlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Paper);
 
-        using var bracket = new SKPath();
-        bracket.MoveTo(frame.Left, frame.Top + arm);
-        bracket.LineTo(frame.Left, frame.Top);
-        bracket.LineTo(frame.Left + arm, frame.Top);
 
-        using var inner = new SKPath();
-        inner.MoveTo(frame.Left + innerOffset, frame.Top + innerOffset + innerArm);
-        inner.LineTo(frame.Left + innerOffset, frame.Top + innerOffset);
-        inner.LineTo(frame.Left + innerOffset + innerArm, frame.Top + innerOffset);
+    /// <summary>Post's cover: cream keyline on the deep indigo binding.</summary>
+    public static void PostPlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Paper);
 
-        (float X, float Y)[] mirrors = [(1, 1), (-1, 1), (1, -1), (-1, -1)];
-        foreach (var (x, y) in mirrors)
-        {
-            canvas.Save();
-            canvas.Translate(frame.MidX, frame.MidY);
-            canvas.Scale(x, y);
-            canvas.Translate(-frame.MidX, -frame.MidY);
-            canvas.DrawPath(bracket, heavy);
-            canvas.DrawPath(inner, light);
-            canvas.Restore();
-        }
-    }
+    /// <summary>
+    /// Folio's cover, as the launcher icon: the same anatomy as Post's, framed in cream for the
+    /// same reason — Folio's binding is a deep red cloth, which cream draws on and ink would
+    /// disappear into.
+    ///
+    /// <para><b>The art set into this window is a crop, and that is the point.</b> The approved
+    /// cover paints a whole desk from above — monitor, keyboard, notebook, magnifier, mug — and the
+    /// design book records that it does not survive being shrunk: five objects inside a window that
+    /// is roughly a third of the tile dissolve at 48dp. Foreword met the same wall and answered it
+    /// by making the picture bigger, dropping its framing to do so. That answer is not available
+    /// here: the brackets sit at a fixed 0.268 rect set by the round mask, so widening Folio's
+    /// window far enough to matter would run the keyline into them.</para>
+    ///
+    /// <para>So the picture is reduced to its subject instead — the composition book with the
+    /// magnifier lying on it, which is what the app does, with the desk it sat on left behind. The
+    /// crop is taken from the approved painting rather than drawn afresh, so nothing about the
+    /// identity changes; there is simply less of it, larger.</para>
+    /// </summary>
+    public static void FolioPlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Paper);
+
+    /// <summary>
+    /// Plate's cover, as the launcher icon. The same anatomy as Post's, with the framing
+    /// <b>inverted to ink</b>: Plate's binding is the LIGHT ground tier, where Post's is deep
+    /// indigo, so cream framing would vanish into the cloth instead of drawing the window.
+    /// DESIGN.md §12 sets the binding per app and lets it contrast its own art; Plate's art is
+    /// a near-black lens, which is why the cloth is light and the frame is dark.
+    /// </summary>
+    /// <summary>Plate's cover: ink keyline, because its binding is the light ground tier.</summary>
+    public static void PlatePlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Ink);
 
     private static SKRect Inset(SKRect r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
 }
