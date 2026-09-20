@@ -15,9 +15,9 @@ namespace IconStudio;
 /// </param>
 /// <param name="PlateImage">
 /// Cover art set INTO the foreground as §12's illustration window, rather than filling the
-/// background edge to edge. The difference is the whole ex-libris anatomy: a window has a
-/// frame and corners around it, and art that bleeds to the edge has neither. Drawn before
-/// the glyph, which draws the frame over it.
+/// background edge to edge. The window is what the round mask crops to, so the art reads as a
+/// picture rather than as a picture inside a frame. Drawn before the glyph, which draws the
+/// window's keyline over it.
 /// </param>
 /// <param name="PlateInset">How far in from each edge the window sits, as a fraction of the layer.</param>
 /// <param name="CoverImage">
@@ -46,8 +46,8 @@ public static class IconSpecs
     public static readonly IReadOnlyList<IconSpec> All =
     [
         new("FocusPhone.Launcher", "FocusPhone/Flyleaf.Android/Resources", "appicon", false, Glyphs.Bookplate, Tokens.FlyleafWarmHex),
-        // Plate's icon IS its cover, like Post's: the light mauve binding as the ground, the
-        // chosen lens study set into the illustration window, mitred brackets in ink. It shipped
+        // Plate's icon IS its cover, like Post's: the light mauve binding as the ground and the
+        // chosen lens study filling the window, keylined in ink. It shipped
         // its whole rebrand still wearing Glyphs.Lens on plain paper — the pre-rebrand Camera
         // icon, in the retired terracotta — because the art was chosen at gate 3 and never
         // committed. CoverImage is what puts the same picture on the Flyleaf shelf.
@@ -57,8 +57,8 @@ public static class IconSpecs
         new("Score", "FocusPhone/Score.Android/Resources", "appicon", false, Glyphs.Keyboard,
             Tokens.ScoreGroundHex, GroundImage: "Branding/score-ground.png",
             CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_score.png"),
-        // Post's icon IS its cover: the indigo binding as the ground, the mid-century mailbox
-        // painting set into the illustration window, and mitred brackets at the corners.
+        // Post's icon IS its cover: the indigo binding as the ground and the mid-century mailbox
+        // painting filling the window, keylined in cream.
         new("Post", "FocusPhone/Post.Android/Resources", "appicon", false, Glyphs.PostPlate,
             Tokens.PostDeepHex, PlateImage: "Branding/post-cover.png"),
         // MAUI heads: resources live in the plain `Resources/` folder, not `Platforms/Android/Resources`.
@@ -66,8 +66,8 @@ public static class IconSpecs
         // resource prefix at Platforms/Android/Resources — the active prefix stays the .NET-for-Android
         // default (`Resources`). Emitting here is what actually gets the mipmaps packaged (see the two heads'
         // csproj comments and CLAUDE.md); the launcher icon is then wired via [Application(Icon=...)].
-        // Folio's icon IS its cover, like Post's and Plate's: the deep red binding as the ground,
-        // the linocut set into the illustration window, and mitred brackets at the corners. It
+        // Folio's icon IS its cover, like Post's and Plate's: the deep red binding as the ground
+        // and the linocut filling the window, keylined in cream. It
         // shipped its whole rebrand still wearing Glyphs.PenNib on plain paper — Canonizer's red
         // nib, the pre-rebrand icon — because the rename moved this line's name and output path and
         // left its glyph alone. CoverImage is what puts the same picture on the Flyleaf shelf,
@@ -76,9 +76,9 @@ public static class IconSpecs
             Tokens.FolioClothHex, PlateImage: "Branding/folio-cover.png",
             CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_folio.png"),
         // Foreword's icon IS its cover: the sunrise ground and the engraved doorstep, full bleed.
-        // It was the first to drop its framing — the window is too wide for brackets to survive a
-        // round mask, and the engraving needed the room — and is now the shape every cover icon
-        // takes, by the owner's decision. WritesColorsXml stays true:
+        // It was the first to drop its corner brackets — the window is too wide for them to
+        // survive a round mask, and the engraving needed the room — and the keyline-only cover is
+        // now the shape every cover icon takes, by the owner's decision. WritesColorsXml stays true:
         // this head's values/colors.xml is the one the MAUI resource glob actually packages.
         new("Foreword", "Foreword/Foreword.Android/Resources", "ic_launcher", true, Glyphs.ForewordPlate,
             Tokens.ForewordSunriseHex, PlateImage: "Branding/foreword-cover.png"),
