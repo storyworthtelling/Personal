@@ -1026,9 +1026,55 @@ public sealed class ProjectService
                 s => s.ImageStatus, s => s.LastError, cancellationToken);
             await AppendPhase(report, "Analysis notes", db.ChunkAnalyses.Where(a => a.NovelId == novel.Id),
                 a => a.Status, a => a.LastError, cancellationToken);
+
+            AppendReport(report, novel, await db.BookAnalyses
+                .FirstOrDefaultAsync(a => a.NovelId == novel.Id, cancellationToken));
         }
 
         return report.ToString();
+    }
+
+    /// <summary>
+    /// Where the document is, and whether it went anywhere.
+    ///
+    /// <para>This is the question an owner asks once a review has FINISHED, and it was the one thing
+    /// the export could not answer. Every other line here is about a review that will not finish; a
+    /// finished book whose delivery quietly gave up looks exactly like one whose delivery worked,
+    /// because the stage reads Completed either way and the give-up is a log line on a phone nobody
+    /// can read. Delivery is best-effort by design — neither target may wedge a review — which is
+    /// precisely why its outcome has to be legible somewhere.</para>
+    /// </summary>
+    private static void AppendReport(StringBuilder report, Novel novel, BookAnalysis? analysis)
+    {
+        if (analysis is null || analysis.PdfStatus == WorkStatus.Pending)
+        {
+            report.AppendLine("  Report: not rendered yet");
+            return;
+        }
+
+        if (analysis.PdfStatus != WorkStatus.Completed)
+        {
+            report.AppendLine($"  Report: could not be rendered ({analysis.PdfStatus})");
+            return;
+        }
+
+        var where = new List<string>();
+        if (analysis.ArchivedDriveFileId is not null)
+            where.Add($"Drive [{analysis.ArchivedDriveFileId}]");
+        if (analysis.DeliveredToRemarkable)
+            where.Add("reMarkable (settled — delivered, or given up)");
+        if (analysis.PdfPath is not null)
+            where.Add($"on this device at {analysis.PdfPath}");
+
+        report.AppendLine($"  Report: rendered as \"{DeliveredDocument.FileName(novel.Title, novel.DraftNumber)}\"");
+        report.AppendLine(where.Count == 0
+            ? "      • nowhere — rendered, and the file is gone"
+            : $"      • {string.Join("; ", where)}");
+
+        // "on this device only" is a state worth naming rather than inferring from an absence: it
+        // means the owner can still open it from the book page, and that nothing else has a copy.
+        if (analysis.ArchivedDriveFileId is null && !analysis.DeliveredToRemarkable && analysis.PdfPath is not null)
+            report.AppendLine("      • on this device only — nothing has been delivered");
     }
 
     // Writes one phase line ("done/total, N failed, M retrying") plus a short sample of the distinct
