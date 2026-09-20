@@ -3,7 +3,7 @@ using Folio.Domain.Reading;
 namespace Folio.Tests.Reading;
 
 /// <summary>
-/// The seventeen passes, their order, and the estimate built from the measured figures.
+/// The sixteen passes, their order, and the estimate built from the measured figures.
 ///
 /// <para>The bug worth reintroducing here is the one F49 actually caught: believing a group fits a
 /// budget it does not. The estimate is arithmetic over measured per-pass times, so the moment
@@ -12,10 +12,10 @@ namespace Folio.Tests.Reading;
 public class ReadingPlanTests
 {
     [Fact]
-    public void SeventeenPassesMakeARead()
+    public void SixteenPassesMakeARead()
     {
-        Assert.Equal(17, ReadingPlan.Passes.Count);
-        Assert.Equal(15, ReadingPlan.Passes.Count(pass => !pass.IsSynthesis));
+        Assert.Equal(16, ReadingPlan.Passes.Count);
+        Assert.Equal(14, ReadingPlan.Passes.Count(pass => !pass.IsSynthesis));
         Assert.Equal(2, ReadingPlan.Passes.Count(pass => pass.IsSynthesis));
     }
 
@@ -37,8 +37,8 @@ public class ReadingPlanTests
     [Fact]
     public void TheSynthesisPassesComeLastBecauseTheyReadTheOthers()
     {
-        Assert.All(ReadingPlan.Passes.Take(15), pass => Assert.False(pass.IsSynthesis));
-        Assert.All(ReadingPlan.Passes.Skip(15), pass => Assert.True(pass.IsSynthesis));
+        Assert.All(ReadingPlan.Passes.Take(14), pass => Assert.False(pass.IsSynthesis));
+        Assert.All(ReadingPlan.Passes.Skip(14), pass => Assert.True(pass.IsSynthesis));
     }
 
     /// <summary>

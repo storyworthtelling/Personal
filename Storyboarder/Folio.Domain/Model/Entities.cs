@@ -345,9 +345,9 @@ public class BookAnalysis
 }
 
 /// <summary>
-/// One persona's pass over one draft — seventeen rows per read.
+/// One persona's pass over one draft — sixteen rows per read.
 ///
-/// <para><b>Why a row each rather than seventeen columns.</b> Every pass is a separate model call
+/// <para><b>Why a row each rather than sixteen columns.</b> Every pass is a separate model call
 /// costing real money, so each has to succeed, fail and retry on its own: a reader that came back
 /// short must not re-bill the fourteen passes that were fine. That is the same reason the craft,
 /// voice and expansion halves already have their own columns — this is the same rule at the scale

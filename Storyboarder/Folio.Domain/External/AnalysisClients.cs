@@ -115,7 +115,7 @@ public interface IClaudeAnalysisClient
     /// <summary>
     /// One whole-book section pass, read in character by <paramref name="persona"/>.
     ///
-    /// <para>The manuscript is passed whole and <b>first</b>, because the seventeen passes share it as
+    /// <para>The manuscript is passed whole and <b>first</b>, because the sixteen passes share it as
     /// a cached prefix and anything persona-specific in front of it would make each pass a different
     /// prefix — measured at roughly $17 a draft against $2 (F50). <c>ReadingPrompt</c> is the one place
     /// that ordering is decided, and every implementation of this goes through it.</para>

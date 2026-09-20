@@ -18,28 +18,28 @@ public class ReadingStatusTests
     [Fact]
     public void ASectionPassSaysWhatItIsReadingFor()
     {
-        var line = ReadingStatus.Sentence(Pass("pacing"), done: 4, total: 17);
+        var line = ReadingStatus.Sentence(Pass("pacing"), done: 4, total: 16);
 
-        Assert.Equal("Reading for pacing — 5 of 17.", line);
+        Assert.Equal("Reading for pacing — 5 of 16.", line);
     }
 
     [Fact]
     public void AReaderPassSaysWhoIsReading()
     {
-        var line = ReadingStatus.Sentence(Pass("agent"), done: 10, total: 17);
+        var line = ReadingStatus.Sentence(Pass("agent"), done: 10, total: 16);
 
-        Assert.Equal("Reading as the agent — 11 of 17.", line);
+        Assert.Equal("Reading as the agent — 11 of 16.", line);
     }
 
     [Fact]
     public void ASynthesisPassSaysWhatItIsDoing()
     {
-        var line = ReadingStatus.Sentence(Pass("verdict"), done: 16, total: 17);
+        var line = ReadingStatus.Sentence(Pass("verdict"), done: 15, total: 16);
 
-        Assert.Equal("Writing the verdict — 17 of 17.", line);
+        Assert.Equal("Writing the verdict — 16 of 16.", line);
     }
 
-    /// <summary>Seventeen passes, seventeen different sentences — the thing a spinner cannot do.</summary>
+    /// <summary>Sixteen passes, sixteen different sentences — the thing a spinner cannot do.</summary>
     [Fact]
     public void EveryPassGetsItsOwnSentence()
     {
@@ -47,14 +47,14 @@ public class ReadingStatusTests
             .Select((pass, index) => ReadingStatus.Sentence(pass, index, ReadingPlan.Passes.Count))
             .ToList();
 
-        Assert.Equal(17, lines.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(16, lines.Distinct(StringComparer.Ordinal).Count());
         Assert.All(lines, line => Assert.False(string.IsNullOrWhiteSpace(line)));
     }
 
     [Fact]
     public void AFinishedReadSaysSo()
     {
-        Assert.Equal("Read.", ReadingStatus.Sentence(null, done: 17, total: 17));
+        Assert.Equal("Read.", ReadingStatus.Sentence(null, done: 16, total: 16));
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class ReadingStatusTests
     [InlineData(40)]
     public void TheCountStaysInsideTheRead(int done)
     {
-        var line = ReadingStatus.Sentence(Pass("agent"), done, total: 17);
+        var line = ReadingStatus.Sentence(Pass("agent"), done, total: 16);
 
         Assert.DoesNotContain("-", line, StringComparison.Ordinal);
         Assert.DoesNotContain("41 of", line, StringComparison.Ordinal);
@@ -78,7 +78,7 @@ public class ReadingStatusTests
     [Fact]
     public void TheTimeLeftIsAboutSomethingRatherThanAPromise()
     {
-        var remaining = ReadingStatus.Remaining(done: 2, total: 17);
+        var remaining = ReadingStatus.Remaining(done: 2, total: 16);
 
         Assert.StartsWith("about ", remaining, StringComparison.Ordinal);
         Assert.Contains("minutes left", remaining, StringComparison.Ordinal);
@@ -87,6 +87,6 @@ public class ReadingStatusTests
     [Fact]
     public void TheLastPassDoesNotClaimMinutes()
     {
-        Assert.Equal("less than a minute left", ReadingStatus.Remaining(done: 17, total: 17));
+        Assert.Equal("less than a minute left", ReadingStatus.Remaining(done: 16, total: 16));
     }
 }

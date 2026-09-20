@@ -49,7 +49,7 @@ public class ReviewProcessorTests : IDisposable
         claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("ink-wash watercolor, muted palette");
 
-        // The seventeen reads. Stubbed for real rather than left to Moq's defaults: a default-valued
+        // The sixteen reads. Stubbed for real rather than left to Moq's defaults: a default-valued
         // Task<T> completes with null, which the pipeline records as a finished pass — so the step
         // would appear to work while reading nothing, which is the failure PassPipelineTests names.
         claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -218,12 +218,12 @@ public class ReviewProcessorTests : IDisposable
     // Drains the pipeline the way the worker does, advancing the clock past any backoff wait so a
     // rescheduled unit becomes due. Bails out after a generous cycle cap so a stuck test fails fast.
     /// <summary>
-    /// End to end: all seventeen reads run, each once, in plan order — and the synthesis passes see
-    /// the other fifteen, which is the only thing that makes them synthesis rather than a sixteenth
-    /// opinion.
+    /// End to end: all sixteen reads run, each once, in plan order — and the synthesis passes see
+    /// the other fourteen, which is the only thing that makes them synthesis rather than a
+    /// fifteenth opinion.
     /// </summary>
     [Fact]
-    public async Task EverySeventeenReadsRunOnceAndTheSynthesisSeesThemAll()
+    public async Task EverySixteenReadsRunOnceAndTheSynthesisSeesThemAll()
     {
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor());
@@ -235,12 +235,12 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(["todo", "verdict"], synthesisReads);
 
         Assert.Equal(8, sectionsSeenBySynthesis);
-        Assert.Equal(7, readersSeenBySynthesis);
+        Assert.Equal(6, readersSeenBySynthesis);
 
         // One row per pass, all settled, so a re-run bills nothing again.
         using var context = database.NewContext();
         var rows = context.PassReads.Where(pass => pass.NovelId == id).ToList();
-        Assert.Equal(17, rows.Count);
+        Assert.Equal(16, rows.Count);
         Assert.All(rows, row => Assert.NotNull(row.Json));
     }
 

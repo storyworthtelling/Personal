@@ -995,7 +995,7 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 2g) The seventeen reads. Eight whole-book sections on the standard model, then seven readers
+        // 2g) The sixteen reads. Eight whole-book sections on the standard model, then six readers
         // on the strong one, then the two synthesis passes that read the other fifteen.
         //
         // One pass per turn, each persisted the moment it succeeds, because each is a separate model
@@ -1074,7 +1074,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
-                // The seventeen reads, folded last so the readers replace the omnibus reduce's reviews
+                // The sixteen reads, folded last so the readers replace the omnibus reduce's reviews
                 // rather than sitting beside them.
                 var sections = await ReadSections(db, novel.Id, cancellationToken);
                 var readers = await ReadReaders(db, novel.Id, cancellationToken);
@@ -1805,7 +1805,7 @@ public sealed class ReviewProcessor : IPipelineStep
             .Where(pass => pass.NovelId == novelId && pass.Json != null && ids.Contains(pass.PassId))
             .ToListAsync(cancellationToken);
 
-        // Ordered by the catalogue, not by when they finished: the report prints the seven in a fixed
+        // Ordered by the catalogue, not by when they finished: the report prints the six in a fixed
         // order and a retry must not move a reader's page.
         return rows
             .Select(row => JsonSerializer.Deserialize<Review>(row.Json!, JsonResponse.CaseInsensitive))
