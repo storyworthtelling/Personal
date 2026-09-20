@@ -58,7 +58,14 @@ public abstract class FolioBinderPage : ContentPage
         header.Text = title;
         header.Ink = FolioAreas.RuleInk(area);
 
-        well.Content = Content;
+        // Detach before reparenting: at this point Content is still the ContentPage's own child
+        // (InitializeComponent set it), so handing the same view straight to well.Content while it
+        // is still attached there logged "X is already a child of <page>. Remove X from <page>
+        // before adding to ContentView." on every screen that calls Wrap — observed live on device
+        // for MainPage, SetupPage and ShelfPage (folio-diagnostics-20260920-1503.txt).
+        var body = Content;
+        Content = null;
+        well.Content = body;
 
         strip.SetAreas(FolioAreas.All, (int)area);
         strip.AreaSelected += OnAreaSelected;
