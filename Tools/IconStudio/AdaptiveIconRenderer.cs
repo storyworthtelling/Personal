@@ -76,8 +76,8 @@ public static class AdaptiveIconRenderer
 
         // A spec with PlateImage already HAS its window illustration: the painting is the
         // whole of what the shelf wants, and the shelf draws the bookplate around it. Baking
-        // this spec's own frame in would put a second keyline and a second set of brackets
-        // inside the shelf's, at a different scale. So the art goes down alone.
+        // this spec's own keyline in would put a second one inside the shelf's, at a different
+        // scale. So the art goes down alone.
         if (plate is not null)
         {
             surface.Canvas.DrawBitmap(plate, CentreSquare(plate), new SKRect(0, 0, px, px));

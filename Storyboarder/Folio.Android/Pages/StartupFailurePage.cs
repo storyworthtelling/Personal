@@ -16,17 +16,47 @@ internal sealed class StartupFailurePage : ContentPage
 {
     public StartupFailurePage(Exception failure)
     {
+        var text = failure.ToString();
+
         BackgroundColor = Color.FromArgb("#FAF8F2");
         Padding = new Thickness(24, 48, 24, 24);
 
         var detail = new Editor
         {
-            Text = failure.ToString(),
+            Text = text,
             IsReadOnly = true,
             AutoSize = EditorAutoSizeOption.TextChanges,
             FontSize = 12,
             TextColor = Color.FromArgb("#33322B"),
             BackgroundColor = Color.FromArgb("#FFFFFF"),
+        };
+
+        // The page's whole job is to be read back to somebody, and it could not be: a read-only
+        // Editor on Android takes no selection at all, so the promise that the detail "can be
+        // copied and sent on" was the one thing the screen did not offer. A button needs no
+        // selection. It says so afterwards on itself rather than raising an alert, because a
+        // success dialog on a crash screen is one more thing to dismiss (DESIGN.md §6).
+        var copy = new Button
+        {
+            Text = "Copy the detail",
+            FontSize = 15,
+            TextColor = Color.FromArgb("#FAF8F2"),
+            BackgroundColor = Color.FromArgb("#38734A"),
+        };
+
+        copy.Clicked += async (_, _) =>
+        {
+            try
+            {
+                await Clipboard.SetTextAsync(text);
+                copy.Text = "Copied";
+            }
+            catch (Exception ex)
+            {
+                // Even this can fail on a device in this state, and silently swallowing it would
+                // leave the owner pressing a button that does nothing.
+                copy.Text = "Could not copy — " + ex.GetType().Name;
+            }
         };
 
         Content = new ScrollView
@@ -46,10 +76,11 @@ internal sealed class StartupFailurePage : ContentPage
                     {
                         Text = "Your manuscripts and reports are untouched — this is the screen "
                             + "failing to build, not the library. The detail below is what went "
-                            + "wrong; it can be copied and sent on.",
+                            + "wrong. Copy takes all of it.",
                         FontSize = 15,
                         TextColor = Color.FromArgb("#6B6759"),
                     },
+                    copy,
                     detail,
                 },
             },
