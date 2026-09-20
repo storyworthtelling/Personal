@@ -172,11 +172,14 @@ public sealed class AnalysisDocumentRenderer
 
         Section(writer, "Themes", analysis.Themes, body, h2);
 
-        // Pacing, with a tension-over-chapters chart when the model returned a curve.
+        // Pacing, with a tension-over-chapters chart when the model returned a curve of at least two
+        // points. A single chapter has nothing to trend between it and — a real manuscript proved
+        // this: the chart degenerated to one point floating above a bare rule, with nothing on the
+        // page saying what either mark was.
         if (analysis.PacingNotes is { Count: > 0 } || analysis.PacingCurve is { Count: > 0 })
         {
             writer.Heading("Pacing", h2, Ink, ruled: true);
-            if (analysis.PacingCurve is { Count: > 0 })
+            if (analysis.PacingCurve is { Count: >= 2 })
             {
                 writer.Paragraph("Tension across the chapters — a dip is a place to check the story is still pulling.", bodyItalic, Muted);
                 writer.PacingChart(analysis.PacingCurve, PlacedFindings(analysis));
@@ -235,11 +238,14 @@ public sealed class AnalysisDocumentRenderer
         // handles the prior book's open threads. Silent for a standalone book or a clean sequel.
         RenderSeriesContinuity(writer, analysis.SeriesContinuity, body, bodyBold, bodyItalic, h2);
 
-        RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3);
-
-        // The scene-by-scene walk: each scene's evidence image above its notes — the fidelity check.
-        RenderScenes(writer, scenes, body, bodyItalic, h2);
+        // The manuscript is the centre of the report (P10): everything anchored to a place in the
+        // text lives here, before the whole-book sections above give way to the seven whole-book
+        // voices below. The scene-by-scene walk follows it — each scene's evidence image above its
+        // notes, the fidelity check — and only then do the readers speak.
         RenderMarkedManuscript(writer, analysis, manuscript, bodyItalic, h2);
+        RenderScenes(writer, scenes, body, bodyItalic, h2);
+
+        RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3);
 
         // What to do next: first the scenes to ADD (the additive engine — the owner writes short), then the
         // revision plan, both grouped by impact tier.
@@ -292,6 +298,11 @@ public sealed class AnalysisDocumentRenderer
     {
         if (string.IsNullOrWhiteSpace(manuscript))
             return;
+
+        // A real .docx paragraph opened with a literal Word tab has no glyph on the page — see
+        // ManuscriptText. Sanitized once, before marks are indexed, so the marks and the drawn
+        // lines agree on the same offsets throughout.
+        manuscript = ManuscriptText.ForPrint(manuscript);
 
         var marks = MarkSource.From(manuscript, analysis);
         if (marks.Count == 0)
