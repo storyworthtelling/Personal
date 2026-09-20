@@ -72,8 +72,8 @@ public class ReviewProcessorTests : IDisposable
 
         claude.Setup(c => c.Synthesise(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<SectionRead>>(), It.IsAny<IReadOnlyList<Review>>(),
-                It.IsAny<CancellationToken>()))
-            .Returns((string passId, IReadOnlyList<SectionRead> sections, IReadOnlyList<Review> readers, CancellationToken _) =>
+                It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns((string passId, IReadOnlyList<SectionRead> sections, IReadOnlyList<Review> readers, int _, CancellationToken _) =>
             {
                 synthesisReads.Add(passId);
                 sectionsSeenBySynthesis = sections.Count;

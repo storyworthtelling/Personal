@@ -996,7 +996,7 @@ public sealed class ReviewProcessor : IPipelineStep
         }
 
         // 2g) The sixteen reads. Eight whole-book sections on the standard model, then six readers
-        // on the strong one, then the two synthesis passes that read the other fifteen.
+        // on the strong one, then the two synthesis passes that read the other fourteen.
         //
         // One pass per turn, each persisted the moment it succeeds, because each is a separate model
         // call costing real money: a reader that comes back short must not re-bill the fourteen that
@@ -1024,6 +1024,7 @@ public sealed class ReviewProcessor : IPipelineStep
                             due.Id,
                             await ReadSections(db, novel.Id, cancellationToken),
                             await ReadReaders(db, novel.Id, cancellationToken),
+                            novel.WordCount,
                             cancellationToken),
                         JsonResponse.CaseInsensitive)
                     : due.Persona!.Kind == PersonaKind.Reader
