@@ -322,8 +322,8 @@ public sealed class AnalysisDocumentRenderer
         writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
         writer.Paragraph(
             "Your pages with the findings on them. A caret is something missing, a struck line is "
-            + "something doing no work, an underline is something unclear — and the note in the "
-            + "margin says why. None of them writes the line for you.",
+            + "something doing no work, an underline is something unclear, and a ticked underline is "
+            + "praise — and the note in the margin says why. None of them writes the line for you.",
             bodyItalic, Muted);
 
         MarkedManuscript.Render(writer, manuscript, marks);

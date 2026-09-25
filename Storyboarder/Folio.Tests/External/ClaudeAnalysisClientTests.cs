@@ -618,6 +618,48 @@ public class ClaudeAnalysisClientTests
         Assert.Equal(LineEditKind.Other, Assert.Single(craft.LineEdits).Kind);
     }
 
+    /// <summary>A dialogue note's excerpt is what lets it anchor to the manuscript as a mark.</summary>
+    [Fact]
+    public async Task ConsolidateCraft_ParsesTheDialogueNoteExcerpt()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"dialogueNotes\":[{\"chapter\":\"Chapter 2\",\"speakers\":\"Ruth\",\"excerpt\":\"nobody spoke\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        Assert.Equal("nobody spoke", Assert.Single(craft.DialogueNotes).Excerpt);
+    }
+
+    /// <summary>Scene outcome and excerpt are what let a scene beat become a Check or Dele mark.</summary>
+    [Fact]
+    public async Task ConsolidateCraft_ParsesTheSceneBeatExcerptAndOutcome()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"sceneBreakdown\":[{\"chapter\":\"Chapter 2\",\"scene\":\"The walk\"," +
+            "\"excerpt\":\"nobody spoke\",\"outcome\":\"doesnowork\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        var beat = Assert.Single(craft.SceneBreakdown);
+        Assert.Equal("nobody spoke", beat.Excerpt);
+        Assert.Equal(SceneVerdict.DoesNoWork, beat.Outcome);
+    }
+
+    /// <summary>An unparseable outcome defaults to EarnsItsPlace, never striking a scene unjudged.</summary>
+    [Fact]
+    public async Task ConsolidateCraft_UnrecognizedSceneOutcome_DegradesToEarnsItsPlace()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"sceneBreakdown\":[{\"chapter\":\"Chapter 2\",\"scene\":\"The walk\",\"outcome\":\"nonsense\"}]}"));
+
+        var craft = await client.ConsolidateCraft("Quest", [ChapterNotes.Empty], CancellationToken.None);
+
+        Assert.Equal(SceneVerdict.EarnsItsPlace, Assert.Single(craft.SceneBreakdown).Outcome);
+    }
+
     [Fact]
     public async Task AnalyzeChapter_GathersTheCraftObservations_WhileTheSentencesAreStillAvailable()
     {
