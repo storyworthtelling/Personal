@@ -675,20 +675,43 @@ public partial class MainPage : FolioBinderPage
         await RefreshAsync();
     }
 
-    // Removes a manuscript entirely (rows + rendered files) after a confirm.
+    // Removes a manuscript — undo-first (§6), like everything else this card offers. Soft-deleted at
+    // once (hidden from the desk immediately) and only actually gone once the fold's window closes
+    // without being turned; ActionCard's own doc comment is the rule this used to break with a confirm.
     private async Task DeleteProject(NovelStatus status)
     {
-        var confirm = await DisplayAlert(
-            "Delete this manuscript?",
-            $"“{status.Title}” and its report will be removed for good. This can’t be undone.",
-            "Delete", "Keep");
-        if (!confirm)
-            return;
-
         using (var scope = IPlatformApplication.Current!.Services.CreateScope())
         {
-            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
-            await projects.DeleteAsync(status.Id, CancellationToken.None);
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .SoftDeleteAsync(status.Id, CancellationToken.None);
+        }
+        await RefreshAsync();
+
+        var reversed = false;
+        OfferUndo($"“{status.Title}” deleted", () =>
+        {
+            reversed = true;
+            _ = RestoreProject(status.Id);
+        });
+        CommitUnlessUndone(() => reversed, () => HardDeleteProject(status.Id));
+    }
+
+    private async Task RestoreProject(Guid id)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .RestoreAsync(id, CancellationToken.None);
+        }
+        await RefreshAsync();
+    }
+
+    private async Task HardDeleteProject(Guid id)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .DeleteAsync(id, CancellationToken.None);
         }
         await RefreshAsync();
     }

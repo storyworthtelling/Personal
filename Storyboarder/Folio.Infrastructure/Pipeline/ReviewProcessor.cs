@@ -125,7 +125,7 @@ public sealed class ReviewProcessor : IPipelineStep
         // soonest Waiting if any is merely deferred, else Idle.
         var novels = await db.Novels
             .Where(n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed &&
-                        n.Stage != ProjectStage.Cancelled)
+                        n.Stage != ProjectStage.Cancelled && n.DeletedAtUtc == null)
             .OrderBy(n => n.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 

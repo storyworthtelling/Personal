@@ -319,6 +319,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<long>("CreatedAtUtc")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("DeletedAtUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("DesignBibleConsolidated")
                         .HasColumnType("INTEGER");
 
