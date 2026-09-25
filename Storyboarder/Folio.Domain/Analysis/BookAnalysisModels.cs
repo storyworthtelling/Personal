@@ -192,7 +192,20 @@ public sealed record DialogueNote(
     string Chapter,
     string Speakers,
     string Observation,
-    string Fix);
+    string Fix)
+{
+    // A verbatim quote of the actual exchange, when the note is about one — not every dialogue note
+    // is: "all three sound identical" is an aggregate observation with nothing to point at. Empty
+    // means exactly that, and MarkSource produces no mark for it.
+    public string Excerpt { get; init; } = string.Empty;
+}
+
+// Whether a scene, once written, earns its place or does no work for the book.
+public enum SceneVerdict
+{
+    EarnsItsPlace,
+    DoesNoWork
+}
 
 // One scene in the scene-by-scene map: what happens, what it accomplishes for the book, and a
 // verdict — which is what surfaces the scenes doing no work.
@@ -200,7 +213,14 @@ public sealed record SceneBeat(
     string Chapter,
     string Scene,
     string Purpose,
-    string Verdict);
+    string Verdict)
+{
+    // A verbatim quote from near the scene's own close, so its mark sits at the end of the scene it
+    // is about rather than floating free of the text. Empty for an older stored report; MarkSource
+    // produces no mark without something to anchor to.
+    public string Excerpt { get; init; } = string.Empty;
+    public SceneVerdict Outcome { get; init; } = SceneVerdict.EarnsItsPlace;
+}
 
 // The craft half of the report (line edits, prose/voice, dialogue, scene map). It is consolidated by
 // its OWN Claude call: together with the story half it is far more output than one call can produce
