@@ -287,6 +287,28 @@ public class ReviewProcessorTests : IDisposable
     }
 
     /// <summary>
+    /// A book soft-deleted mid-review (DESIGN.md §6's undo window) must not keep being worked on —
+    /// spending a model call on a book the owner is about to lose for good is billed for nothing.
+    /// </summary>
+    [Fact]
+    public async Task ADeletedBookIsNeverAdvanced()
+    {
+        var id = SeedManuscript();
+        using (var context = database.NewContext())
+        {
+            var novel = context.Novels.Single(n => n.Id == id);
+            novel.DeletedAtUtc = clock.UtcNow;
+            context.SaveChanges();
+        }
+
+        var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(ProcessOutcome.Idle, result.Outcome);
+        using var check = database.NewContext();
+        Assert.Equal(ProjectStage.Created, check.Novels.Single(n => n.Id == id).Stage);
+    }
+
+    /// <summary>
     /// A book with no jacket gets one painted by the pipeline itself — the gap the first real device
     /// run surfaced: the app only ever painted a cover from a manual Settings action, so a book run
     /// end to end never got one.
