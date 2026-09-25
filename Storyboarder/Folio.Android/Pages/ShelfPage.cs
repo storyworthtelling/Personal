@@ -154,10 +154,70 @@ public class ShelfPage : FolioBinderPage
         {
             if (args.GetPosition(shelf) is { } point && row.At(point.X) is { } book)
             {
-                _ = OpenBook(book.Id);
+                ShowActions(book);
             }
         };
         shelf.GestureRecognizers.Add(open);
+    }
+
+    /// <summary>
+    /// What can be done with a shelved book, on §7's action card — the same paper-over-a-haze the
+    /// Desk offers, so putting a book away doesn't change the vocabulary for reaching it. Open leads
+    /// and carries the weight; Delete is merely available, last, muted, and asks nothing first —
+    /// deleting is undo-first (§6), and the fold is the confirmation.
+    /// </summary>
+    private void ShowActions(ShelfBook book)
+    {
+        var actions = new List<CardAction>
+        {
+            new(OpenAction, Glyphs.Book, ActionWeight.Primary, () => _ = OpenBook(book.Id)),
+            new(DeleteAction, Glyphs.Bin, ActionWeight.Quiet, () => _ = DeleteBook(book.Id, book.Title)),
+        };
+
+        Present(ActionCard.Build(book.Title, $"{book.WordCount:N0} words", actions, Dismiss));
+    }
+
+    private const string OpenAction = "Open book";
+    private const string DeleteAction = "Delete";
+
+    // Undo-first (§6), matching the Desk: soft-deleted at once, hidden from the shelf immediately,
+    // and only actually gone once the fold's window closes without being turned.
+    private async Task DeleteBook(Guid id, string title)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .SoftDeleteAsync(id, CancellationToken.None);
+        }
+        await LoadAsync();
+
+        var reversed = false;
+        OfferUndo($"“{title}” deleted", () =>
+        {
+            reversed = true;
+            _ = RestoreBook(id);
+        });
+        CommitUnlessUndone(() => reversed, () => HardDeleteBook(id));
+    }
+
+    private async Task RestoreBook(Guid id)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .RestoreAsync(id, CancellationToken.None);
+        }
+        await LoadAsync();
+    }
+
+    private async Task HardDeleteBook(Guid id)
+    {
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .DeleteAsync(id, CancellationToken.None);
+        }
+        await LoadAsync();
     }
 
     private async Task OpenBook(Guid draftId)

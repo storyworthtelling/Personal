@@ -92,6 +92,17 @@ public class Novel
     /// </summary>
     public DateTimeOffset? ShelvedAtUtc { get; set; }
 
+    /// <summary>
+    /// When the owner deleted this book, or null while it is live.
+    ///
+    /// <para>Set the moment "Delete" is chosen — before the undo window closes, not after — because
+    /// deleting is undo-first (DESIGN.md §6) and the fold has to have something to put back. The
+    /// owner's rows and files are not actually removed until the window closes without being turned;
+    /// this column is what the Desk's and the Shelf's own listings, and the pipeline's unit of work,
+    /// exclude in the meantime rather than showing a book that is about to be gone.</para>
+    /// </summary>
+    public DateTimeOffset? DeletedAtUtc { get; set; }
+
     public Guid? SeriesId { get; set; }
 
     /// <summary>

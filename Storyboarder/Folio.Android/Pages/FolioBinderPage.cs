@@ -213,6 +213,28 @@ public abstract class FolioBinderPage : ContentPage
     private const int UndoWindowMs = 6_000;
 
     /// <summary>
+    /// The deferred half of a destructive act nothing can literally put back (a hard delete: rows
+    /// gone, files gone), for a call site that already did the reversible half — hid the row,
+    /// soft-deleted it — before calling <see cref="OfferUndo"/> the ordinary way.
+    ///
+    /// <para><see cref="OfferUndo"/> alone is enough for every other destructive act here, because
+    /// shelving or replacing a cover is something a second write undoes. A delete is not, so the
+    /// irreversible half waits until the window has actually closed rather than running up front:
+    /// <c>DogEarState.BeginUndo</c>'s own rule for a fold nobody turned ("it simply becomes
+    /// permanent") applied going forward instead of after the fact.</para>
+    /// </summary>
+    protected void CommitUnlessUndone(Func<bool> wasUndone, Func<Task> commit)
+    {
+        _ = Task.Delay(UndoWindowMs).ContinueWith(async _ =>
+        {
+            if (!wasUndone())
+            {
+                await commit();
+            }
+        }, TaskScheduler.Default);
+    }
+
+    /// <summary>
     /// Puts an action card over the whole screen — the binder strip and the bar included, since a
     /// card is about one item and turning to another area behind it would be answering a question
     /// nobody asked. Only one is up at a time; presenting a second replaces the first.
