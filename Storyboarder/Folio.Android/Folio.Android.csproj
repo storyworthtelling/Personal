@@ -42,6 +42,17 @@
     <ProjectReference Include="..\..\Storyworthtelling.Maui\Storyworthtelling.Maui.csproj" />
   </ItemGroup>
 
+  <!-- The desk's wood-grain fill (DeskDrawable) is a photo of the owner's own crayon-and-pencil
+       wood-grain drawing, cropped and normalized for seamless tiling (DESIGN.md §2: texture is
+       cached and reused, never a raw per-screen image). It goes under native Assets/ with an
+       explicit AndroidAsset item rather than MAUI's Resources/Raw/MauiAsset convention, for the
+       same reason the app icon does: this head does not set <SingleProject>, so MAUI's default
+       asset globbing is not reliable here (see the ICON CHECK comment above). Loaded via
+       Android.App.Application.Context.Assets.Open(...). -->
+  <ItemGroup>
+    <AndroidAsset Include="Assets\desk-wood-tile.png" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
