@@ -78,7 +78,11 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     // A prepared list row: identity to open, plus the strings the list renders. Titles are
     // resolved off the UI thread (a Contacts query each), so binding and filtering stay cheap.
-    private sealed record ThreadRow(string ContactKey, string Title, string Subtitle, bool HasUnread);
+    // Items rides along too — filing/deleting the whole row needs the thread's own resolved
+    // membership, not a re-derived guess from ContactKey, which for a group is "group:<id>"
+    // and matches no individual item's own ContactKey at all.
+    private sealed record ThreadRow(
+        string ContactKey, string Title, string Subtitle, bool HasUnread, IReadOnlyList<TimelineItem> Items);
 
     public override BinderArea Tab =>
         new("Mailbox", Resource.Drawable.area_mailbox, PaperTheme.PostMark, PaperTheme.PostFill);
@@ -468,7 +472,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         var latest = thread.Items[^1];
         var subtitle =
             $"{RelativeTime.Format(latest.TimestampUtc.LocalDateTime, DateTime.Now)} · {TimelineItemFormatter.Describe(latest)}";
-        return new ThreadRow(thread.ContactKey, title, subtitle, thread.HasUnread);
+        return new ThreadRow(thread.ContactKey, title, subtitle, thread.HasUnread, thread.Items);
     }
 
     private string ThreadTitle(ContactThread thread)
@@ -545,7 +549,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private void FileCorrespondence(ThreadRow row)
     {
         var now = DateTimeOffset.UtcNow;
-        var filed = ItemsFor(row.ContactKey);
+        var filed = row.Items;
         if (filed.Count == 0)
         {
             return;
@@ -578,19 +582,13 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // correspondence has, batched into one fold rather than one per item.
     private void DeleteCorrespondence(ThreadRow row)
     {
-        var items = ItemsFor(row.ContactKey);
-        if (items.Count == 0)
+        if (row.Items.Count == 0)
         {
             return;
         }
 
-        ScheduleBulkDelete(items, $"Deleted {row.Title}.", ReloadThreads);
+        ScheduleBulkDelete(row.Items, $"Deleted {row.Title}.", ReloadThreads);
     }
-
-    private IReadOnlyList<TimelineItem> ItemsFor(string contactKey) =>
-        liveItems.Concat(cachedItems)
-            .Where(item => item.ContactKey == contactKey)
-            .ToList();
 
     // Brings the cache up to date with the mail account. Success is the refreshed list —
     // no toast, no banner, no "last synced" line. A failure folds into the corner and
@@ -1670,6 +1668,16 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         {
             MmsSender.Send(Host, recipients, text, media);
             Syncs.After(Host, PostAction.Sent);
+        }
+        catch (MmsAttachmentTooLargeException e)
+        {
+            PostDiagnostics.LogWarning("Mms", "Refused an oversized attachment", e);
+            DogEar.ShowNotices(Host, Overlay,
+            [
+                new DogEar.Notice("That attachment is too large to send.",
+                    "It never reached the carrier — pick a smaller photo or video, or trim the clip first.",
+                    PaperTheme.ProblemMark),
+            ]);
         }
         catch (Exception e)
         {
