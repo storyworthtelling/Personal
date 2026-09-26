@@ -54,6 +54,17 @@ public static class TidalSignInFailure
     }
 
     /// <summary>
+    /// The sentence shown while the owner is on TIDAL's page. A refusal there — TIDAL's
+    /// "Error 1002" — happens where Score cannot see it and never comes back, so this is
+    /// the only place to say what fixes it: the redirect URI and the scopes registered on
+    /// the app in TIDAL's developer portal, which the page checks before anything else.
+    /// </summary>
+    public const string WhileAtTidal =
+        "Finish signing in, and TIDAL will send you back here. If TIDAL's page shows an " +
+        "error instead, the app's redirect URI or scopes in TIDAL's developer portal don't " +
+        "match what Score asks for.";
+
+    /// <summary>
     /// Whether a failure is credential-shaped — the app's client id/secret being wrong or
     /// missing rather than a transient network problem — so a caller can decide whether it is
     /// worth flagging on the credential health seam. Deliberately narrower than every branch
