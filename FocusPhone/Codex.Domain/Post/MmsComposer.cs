@@ -1,9 +1,18 @@
+using System.Linq;
 using System.Text;
 
 namespace Codex.Domain.Post;
 
 /// <summary>One thing to attach to an outgoing MMS: a filename, its MIME type, and its bytes.</summary>
 public sealed record MmsOutboundPart(string FileName, string MimeType, byte[] Data);
+
+/// <summary>Thrown instead of composing a PDU that would hold the whole file in memory twice over.</summary>
+public sealed class MmsAttachmentTooLargeException(long actualBytes, long maxBytes)
+    : Exception($"Attachment is {actualBytes:N0} bytes, over the {maxBytes:N0}-byte limit.")
+{
+    public long ActualBytes { get; } = actualBytes;
+    public long MaxBytes { get; } = maxBytes;
+}
 
 /// <summary>
 /// Builds an M-Send.req PDU (OMA-WAP-209-MMS-Encapsulation) — the wire format
@@ -38,6 +47,11 @@ public static class MmsComposer
     private const int FromInsertAddressToken = 0x81;
     private const int Utf8CharacterSet = 0x6A; // IANA MIBenum 106.
     private const string ContentTypeMultipartMixed = "application/vnd.wap.multipart.mixed";
+
+    // A guess, not a measured carrier limit: most US MMSCs cap well under this. It exists so
+    // an oversized attachment fails predictably here rather than as an OutOfMemoryException
+    // partway through building the wire buffer.
+    public const long MaxMediaBytes = 15 * 1024 * 1024;
 
     // WSP well-known header field-name octets (high bit already set), matching the ones
     // MmsNotificationParser reads on the receiving side.
@@ -76,6 +90,17 @@ public static class MmsComposer
         if (string.IsNullOrEmpty(text) && media.Count == 0)
         {
             throw new ArgumentException("An MMS needs a message or an attachment.", nameof(text));
+        }
+        var mediaBytes = media.Sum(part => (long)part.Data.Length);
+        if (mediaBytes > MaxMediaBytes)
+        {
+            // A cap rather than none at all: without one, a picked video is read fully into
+            // memory here and again in the wire buffer below, which is how a phone-sized
+            // video turns into an OutOfMemoryException instead of a message the owner can
+            // act on. The number itself is a conservative guess, not a measured carrier
+            // limit — most US MMSCs cap well under this, so this exists to fail predictably
+            // before that point, not to promise anything will actually be accepted.
+            throw new MmsAttachmentTooLargeException(mediaBytes, MaxMediaBytes);
         }
 
         var writer = new PduWriter();

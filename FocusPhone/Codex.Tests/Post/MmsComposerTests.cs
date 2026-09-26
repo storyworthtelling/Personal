@@ -121,6 +121,28 @@ public class MmsComposerTests
     }
 
     [Fact]
+    public void AttachmentOverTheSizeCap_ThrowsBeforeBuildingTheWireBuffer()
+    {
+        var oversized = new MmsOutboundPart("clip.mp4", "video/mp4", new byte[MmsComposer.MaxMediaBytes + 1]);
+
+        var ex = Assert.Throws<MmsAttachmentTooLargeException>(() =>
+            MmsComposer.ComposeSendRequest("txn-10", ["5551234567"], null, null, [oversized], SentAt));
+
+        Assert.Equal(MmsComposer.MaxMediaBytes + 1, ex.ActualBytes);
+        Assert.Equal(MmsComposer.MaxMediaBytes, ex.MaxBytes);
+    }
+
+    [Fact]
+    public void AttachmentAtExactlyTheSizeCap_IsAccepted()
+    {
+        var atCap = new MmsOutboundPart("photo.jpg", "image/jpeg", new byte[MmsComposer.MaxMediaBytes]);
+
+        var pdu = MmsComposer.ComposeSendRequest("txn-11", ["5551234567"], null, null, [atCap], SentAt);
+
+        Assert.NotNull(Decode(pdu));
+    }
+
+    [Fact]
     public void ATextByteWithTheHighBitSet_RoundTripsThroughTheQuoteRule()
     {
         // Exercises the Text-String Quote (0x7F) branch inside Encoded-string-value: a
