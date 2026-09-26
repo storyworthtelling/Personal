@@ -113,7 +113,8 @@ public class TimelineCacheTests : IDisposable
             new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero), "hi all", Incoming: true, "g1")
         {
             GroupId = "conv-42",
-            Participants = ["5551110000", "5552220000"],
+            Participants = ["5551110000", "7911123456"],
+            ParticipantAddresses = ["5551110000", "+447911123456"],
             ExternalConversationId = "conv-42",
             Unread = true,
         };
@@ -123,7 +124,8 @@ public class TimelineCacheTests : IDisposable
 
         Assert.Equal("conv-42", loaded.GroupId);
         Assert.True(loaded.IsGroup);
-        Assert.Equal(["5551110000", "5552220000"], loaded.Participants);
+        Assert.Equal(["5551110000", "7911123456"], loaded.Participants);
+        Assert.Equal(["5551110000", "+447911123456"], loaded.ParticipantAddresses);
         Assert.Equal("conv-42", loaded.ExternalConversationId);
         Assert.True(loaded.Unread);
     }
