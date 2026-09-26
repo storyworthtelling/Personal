@@ -46,7 +46,7 @@ public class TidalDeviceAuthClientTests
 
         var request = handler.Requests.Single();
         Assert.Equal(HttpMethod.Post, request.Method);
-        Assert.Equal("client_id=client-id&scope=r_usr+w_usr+w_sub", handler.RequestBodies.Single());
+        Assert.Equal("client_id=client-id&scope=user.read+search.read+playback", handler.RequestBodies.Single());
     }
 
     // RFC 8628 section 3.1: a confidential client MUST authenticate at the device
@@ -224,7 +224,7 @@ public class TidalDeviceAuthClientTests
             request.Headers.Authorization.Parameter);
         Assert.Equal(
             "client_id=client-id&device_code=device-code" +
-            "&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&scope=r_usr+w_usr+w_sub",
+            "&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&scope=user.read+search.read+playback",
             handler.RequestBodies.Single());
     }
 
