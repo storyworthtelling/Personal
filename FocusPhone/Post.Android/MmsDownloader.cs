@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Provider;
 using Android.Telephony;
 using Codex.Domain.Post;
+using Codex.Domain.Timeline;
 
 namespace Post;
 
@@ -97,7 +98,8 @@ public class MmsDownloadReceiver : BroadcastReceiver
             }
 
             var address = SmsLogReader.ReadMmsAddress(context, id, SmsLogReader.MmsBoxInbox);
-            var body = SmsLogReader.ReadMmsText(context, id) ?? "[MMS]";
+            var body = SmsLogReader.ReadMmsText(context, id)
+                ?? AttachmentSummary.Describe(SmsLogReader.ReadMmsAttachments(context, id));
             SmsNotifications.NotifyIncoming(context, new IncomingSms(address, body));
         }
         catch (Exception e)
