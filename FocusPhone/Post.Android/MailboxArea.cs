@@ -680,6 +680,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private List<TimelineItem> openItems = [];
     private IReadOnlyList<string> openMemberKeys = [];
     private IReadOnlyList<string> openParticipants = [];
+    private IReadOnlyList<string> openParticipantAddresses = [];
     private bool openIsGroup;
     private string? openBridgeConversationId;
 
@@ -909,6 +910,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         openMemberKeys = thread?.MemberKeys ?? [];
         openParticipants = thread?.Participants ?? [];
+        openParticipantAddresses = thread?.ParticipantAddresses ?? [];
         openIsGroup = thread?.IsGroup ?? false;
         openTitle = OpenThreadTitle(thread);
 
@@ -1130,9 +1132,13 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         {
             // A group has no single number to call or email, but it does have a group MMS
             // to reply into — the same recipient set every message in it already carries.
-            if (openParticipants.Count > 0)
+            // ParticipantAddresses (raw, country code intact) is what actually has to reach
+            // each number; Participants is the normalized fallback for an older cached
+            // thread that predates the raw-address column.
+            var groupRecipients = openParticipantAddresses.Count > 0 ? openParticipantAddresses : openParticipants;
+            if (groupRecipients.Count > 0)
             {
-                AddAction("Text", () => ShowGroupCompose(openParticipants));
+                AddAction("Text", () => ShowGroupCompose(groupRecipients));
             }
             return;
         }
@@ -1177,7 +1183,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         else if (openIsGroup && openParticipants.Count > 0)
         {
-            actions.Add(new CardAction("Text back", () => ShowGroupCompose(openParticipants), Lead: true));
+            var groupRecipients = openParticipantAddresses.Count > 0 ? openParticipantAddresses : openParticipants;
+            actions.Add(new CardAction("Text back", () => ShowGroupCompose(groupRecipients), Lead: true));
         }
 
         var email = openMemberKeys.FirstOrDefault(IsEmail) ?? (IsEmail(openContactKey!) ? openContactKey : null);

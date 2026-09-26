@@ -49,9 +49,15 @@ public record TimelineItem(
     public string? InReplyTo { get; init; }
 
     // Group conversations: a non-null GroupId threads items by the group rather
-    // than by a single person. Participants are the group's member contact keys.
+    // than by a single person. Participants are the group's member contact keys —
+    // ContactKeyNormalizer output, good for matching and display, never for dialing:
+    // it keeps only the last ten digits, which drops the country code a number outside
+    // the NANP needs to actually be reachable. ParticipantAddresses is the original,
+    // unnormalized address for each — one per distinct Participants entry — and is
+    // what an outgoing reply must send to.
     public string? GroupId { get; init; }
     public IReadOnlyList<string> Participants { get; init; } = [];
+    public IReadOnlyList<string> ParticipantAddresses { get; init; } = [];
 
     // The Messages-for-Web conversation this text belongs to; the send/delete
     // target for the gmbridge path.
@@ -110,6 +116,7 @@ public record ContactThread(
 {
     public IReadOnlyList<string> MemberKeys { get; init; } = [];
     public IReadOnlyList<string> Participants { get; init; } = [];
+    public IReadOnlyList<string> ParticipantAddresses { get; init; } = [];
     public bool IsGroup { get; init; }
     public bool HasUnread { get; init; }
 }
