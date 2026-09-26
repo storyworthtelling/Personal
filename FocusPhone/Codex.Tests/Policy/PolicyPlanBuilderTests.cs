@@ -9,14 +9,12 @@ public class PolicyPlanBuilderTests
         bool finalized = false,
         IEnumerable<string>? browserPackages = null,
         IEnumerable<string>? otherHomePackages = null,
-        IEnumerable<string>? blockedPackages = null,
         IEnumerable<string>? neverVisiblePackages = null,
         bool adminModeActive = false) =>
         new(
             OwnPackages: PolicyContext.FocusPhonePackages,
             BrowserPackages: (browserPackages ?? ["com.android.chrome"]).ToHashSet(),
             OtherHomePackages: (otherHomePackages ?? ["com.google.android.apps.nexuslauncher"]).ToHashSet(),
-            BlockedPackages: (blockedPackages ?? []).ToHashSet(),
             DebuggingLockedDown: finalized,
             NeverVisiblePackages: (neverVisiblePackages ?? []).ToHashSet(),
             AdminModeActive: adminModeActive);
@@ -95,14 +93,6 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
-    public void BlockedPackages_AreSuspended()
-    {
-        var plan = PolicyPlanBuilder.Build(DefaultContext(blockedPackages: ["com.example.game"]));
-
-        Assert.Contains("com.example.game", plan.SuspendedPackages);
-    }
-
-    [Fact]
     public void OwnPackages_AreNeverSuspended_EvenWhenDetectedAsBrowserOrHome()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext(
@@ -115,7 +105,9 @@ public class PolicyPlanBuilderTests
     [Fact]
     public void PlayStore_IsNotSuspended()
     {
-        var plan = PolicyPlanBuilder.Build(DefaultContext(blockedPackages: ["com.android.vending"]));
+        // Suspending the Play Store would break background auto-updates, so it is excluded from
+        // the suspend candidate set regardless of how it was detected.
+        var plan = PolicyPlanBuilder.Build(DefaultContext(otherHomePackages: ["com.android.vending"]));
 
         Assert.DoesNotContain("com.android.vending", plan.SuspendedPackages);
     }
@@ -132,10 +124,10 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
-    public void CutoverAllowlistedApps_AreNeverSuspended_EvenIfPreviouslyBlocked()
+    public void CutoverAllowlistedApps_AreNeverSuspended_EvenIfDetectedAsBrowsers()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext(
-            blockedPackages: [PolicyContext.GitHubPackage, PolicyContext.MapsPackage]));
+            browserPackages: [PolicyContext.GitHubPackage, PolicyContext.MapsPackage]));
 
         Assert.DoesNotContain(PolicyContext.GitHubPackage, plan.SuspendedPackages);
         Assert.DoesNotContain(PolicyContext.GeminiPackage, plan.SuspendedPackages);
