@@ -60,7 +60,7 @@ public static class SmsLogReader
     {
         using var cursor = context.ContentResolver!.Query(
             Telephony.Mms.ContentUri!,
-            ["_id", "date", "msg_box"],
+            ["_id", "date", "msg_box", "thread_id"],
             null, null, null);
         if (cursor is null)
         {
@@ -70,12 +70,16 @@ public static class SmsLogReader
         {
             var id = cursor.GetString(0)!;
             var messageBox = cursor.GetInt(2);
+            var threadId = cursor.IsNull(3) ? 0 : cursor.GetLong(3);
             var item = SmsRecordMapper.MapMms(
                 id,
                 cursor.GetLong(1),
                 messageBox,
                 ReadMmsAddress(context, id, messageBox),
-                ReadMmsText(context, id));
+                ReadMmsText(context, id),
+                threadId,
+                ReadMmsAllAddresses(context, id),
+                ReadMmsAttachments(context, id));
             if (item is not null)
             {
                 items.Add(item);
@@ -103,6 +107,30 @@ public static class SmsLogReader
         return null;
     }
 
+    /// <summary>
+    /// Every address on the message — from, to, cc and bcc together, whichever type each
+    /// row is — which is what SmsRecordMapper needs to tell a group text apart from an
+    /// ordinary one. Unlike <see cref="ReadMmsAddress"/> this deliberately does not filter
+    /// by type: a group's other members show up as "to" rows the same as the one recipient
+    /// an ordinary message has, and the count is the whole signal.
+    /// </summary>
+    private static List<string> ReadMmsAllAddresses(Context context, string id)
+    {
+        var addresses = new List<string>();
+        using var cursor = context.ContentResolver!.Query(
+            Android.Net.Uri.Parse($"content://mms/{id}/addr")!,
+            ["address"], null, null, null);
+        while (cursor is not null && cursor.MoveToNext())
+        {
+            var address = cursor.IsNull(0) ? null : cursor.GetString(0);
+            if (!string.IsNullOrEmpty(address) && address != "insert-address-token")
+            {
+                addresses.Add(address);
+            }
+        }
+        return addresses;
+    }
+
     internal static string? ReadMmsText(Context context, string id)
     {
         using var cursor = context.ContentResolver!.Query(
@@ -119,4 +147,46 @@ public static class SmsLogReader
         }
         return null;
     }
+
+    // SMIL (application/smil) is the MMS layout description every multi-part message
+    // carries alongside its real content — a stage direction, not something to show.
+    private const string SmilContentType = "application/smil";
+
+    /// <summary>
+    /// The picture/video parts a message actually carries, as attachments the Mailbox can
+    /// offer to open — this is the half of "receiving an MMS" that stops at a [MMS]
+    /// placeholder without it. Bytes are not read here: only enough to build the reference
+    /// (id, name, type), matching how email attachments are fetched lazily, on open.
+    /// </summary>
+    // Internal rather than private: MmsDownloadReceiver reads the same parts off a row it
+    // just landed, to say "Photo"/"Video" in the notification instead of a bare placeholder.
+    internal static List<AttachmentRef> ReadMmsAttachments(Context context, string id)
+    {
+        var attachments = new List<AttachmentRef>();
+        using var cursor = context.ContentResolver!.Query(
+            Android.Net.Uri.Parse("content://mms/part")!,
+            ["_id", "ct", "fn", "name", "cl"],
+            "mid = ? AND ct NOT LIKE 'text/%' AND ct <> ?", [id, SmilContentType], null);
+        while (cursor is not null && cursor.MoveToNext())
+        {
+            var partId = cursor.IsNull(0) ? null : cursor.GetString(0);
+            var contentType = cursor.IsNull(1) ? null : cursor.GetString(1);
+            if (partId is null || string.IsNullOrEmpty(contentType))
+            {
+                continue;
+            }
+            var fileName = FirstNonEmpty(
+                cursor.IsNull(2) ? null : cursor.GetString(2),
+                cursor.IsNull(3) ? null : cursor.GetString(3),
+                cursor.IsNull(4) ? null : cursor.GetString(4));
+            // The byte size lives with the part's own data, not as a column worth a second
+            // query for a value the attachment sheet only ever shows as a courtesy; 0 reads
+            // as "size unknown" the same way a missing size does elsewhere in Post.
+            attachments.Add(new AttachmentRef($"mms-part:{partId}", fileName, contentType, SizeBytes: 0));
+        }
+        return attachments;
+    }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrEmpty(value));
 }
