@@ -282,10 +282,14 @@ surfacing anything that cannot be built as drawn rather than substituting:
 - **Nothing is hardcoded to one person (Release I).** Foreword had only ever run on one phone, so one
   person was the answer to three questions nobody had noticed were questions: what a `CalendarEvent`'s
   columns start as, what `CalendarMappingOptions.DefaultColumn` is, and where a hand-written note with
-  nobody named on it goes. `Foreword.Domain/Install/OwnerColumn` replaces all three — **proposed** from
-  the signed-in account (the calendar screen already knows which addresses belong to whom), an explicit
-  choice always winning, and falling back to what the app did before the setting existed so a phone
-  that has been delivering for months does not change its mind on a version bump.
+  nobody named on it goes. `Foreword.Domain/Install/OwnerColumn` replaces all three — **inferred, never
+  asked**: an address entered on the calendar screen names the person outright, and otherwise the
+  signed-in account is compared with the shared vault's `OwnerAccount` (cached per install as
+  `CredentialStore.HouseholdAccount` by `VaultSync` on every vault read) — the same account is the
+  account holder (`WithMailboxes[0]`), any other is the partner (`WithMailboxes[1]`), and an unowned
+  vault proposes nothing. It falls back to what the app did before the answer existed, so a phone that
+  has been delivering for months does not change its mind on a version bump. Settings only *says* whose
+  phone it is; the old picker is gone.
   `NobodyIsTheDefaultTests` is the guard; naming a person is *not* the offence, since the household
   roster, the per-column hues and the vision prompt all name all four and all of those are about the
   **columns**, which exist on both installs.
@@ -295,24 +299,28 @@ surfacing anything that cannot be built as drawn rather than substituting:
   `storyworthtelling-secrets.json`, which both installs read and only one writes (`VaultOwnership`), so
   a per-install field there would be restored from the first phone onto the second and its owner's
   handwriting would start filing under somebody else — silently. So `InstallOptions` is its own bag,
-  built fresh by the head and never deserialised from a shared document, backed up to
-  `PersonalVault` (`storyworthtelling-personal.json`, one file per person in their own Drive).
+  built fresh by the head and never deserialised from a shared document. Since the owner is inferred
+  rather than chosen, Foreword no longer writes the `PersonalVault` at all (its `OwnerColumn`/`OwnerPhoto`
+  fields stay on the record so existing files still round-trip); Score remains its consumer.
   `SharedVaultHoldsHouseholdFactsTests` enumerates the shared section's fields so a new one is a
-  decision. **`PersonalVaultAccess` now lives in `Storyworthtelling.Voice`**, moved out of
-  `Codex.Ui.Android` when Foreword became its second consumer — nothing in it was ever Android, the
-  platform half is the Drive glue, and the move gave it its first tests.
-- **The maker's mark belongs to the install, not the repository.** `/Branding/owner.png` is still
-  embedded and is still the fallback (so the phone that has been printing it keeps it), but
-  `Storyworthtelling.Paper/OwnerMark` prefers a photo chosen in Settings, squared by
-  `MedallionImage.Plan` (pure) + `MedallionCrop` (the Skia half, so the head names no Skia type) and
-  kept in the personal vault. **Two SkiaSharp behaviours here were written the obvious way and both
-  were wrong:** `SKBitmap.Decode` **throws** on unreadable bytes rather than returning null, so a file
-  picked out of a folder that was not an image would have thrown out of a settings screen; and
-  disposing the bitmap being replaced is a **use-after-free** — touching a disposed `SKBitmap` is not
-  an `ObjectDisposedException`, it is a native access violation that takes the process down with no
-  managed exception and no stack, and a delivery composing a page while somebody picks a new photo
-  holds exactly that reference. Both were read out of the library with a probe after assuming wrong;
-  the guard that found them crashed the test host, which is what it was for.
+  decision.
+- **The maker's mark is the owner's drawn mark — the one Folio prints.** The brief's first page used to
+  carry a photo medallion (`OwnerMark`, a photo picked in Settings, else `/Branding/owner.png`); it now
+  draws **`Storyworthtelling.Paper/OwnersMark`** — the canted oval pierced by an M, moved out of Folio so
+  both documents share one path. Folio gives it the jacket's colourway; the brief has no jacket, so it
+  takes the page's ink on its own ground, which is Folio's own no-jacket case. The photo picker,
+  `OwnerMark`, `MedallionImage` and `MedallionCrop` are deleted (`EmbeddedBranding` remains, now with no
+  printing consumer). `ForewordPageTests.TheMarkIsDrawnNotAPhotograph` asserts the first page holds no
+  image.
+- **Home is found, not asked.** Settings used to ask for the address *and* a latitude/longitude. Now
+  `HomeLocator` fills whatever is missing: the address from the account's own home address via the
+  People API (`GooglePeopleClient`, scope `user.addresses.read`, asked for **on its own** through
+  `DeviceAccountSignIn.TokenFor` rather than added to the delivery token — widening that would put a
+  consent screen in front of the calendar and stop the mornings), and the point by geocoding it
+  (`GoogleGeocodingClient`, same Maps key, **Geocoding API must be enabled on the project**). A typed
+  address always wins; a set point is never re-geocoded. The fields appear only when a lookup comes back
+  empty. Unverified on a device: whether the People API's `home` address is the one Maps labels Home for
+  this account, and the extra consent screen.
 - **A `CollectionDefinition` on a test class makes xUnit discover nothing at all**, silently — the
   marker has to be its own class. The only sign was a suite going from 75 tests to 74.
 - **Prayer delivers in its own `try` inside `DeliveryWorker`**, with its own outcome preference

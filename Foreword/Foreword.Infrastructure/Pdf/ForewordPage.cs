@@ -18,7 +18,7 @@ namespace Foreword.Infrastructure.Pdf;
 /// </summary>
 internal static class ForewordPage
 {
-    private const double MedallionSize = 96;
+    private const double MarkSize = 96;
     private const double RuleHeight = 2;
 
     private static readonly SKColor Identity = AppIdentityTokens.ForewordSunrise;
@@ -136,7 +136,7 @@ internal static class ForewordPage
         var detailFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary);
         var lineHeight = SkiaPageLayout.LineHeight(nameFont) + 4;
 
-        var top = layout.BottomY - MedallionSize - 24 - rows.Count * lineHeight;
+        var top = layout.BottomY - MarkSize - 24 - rows.Count * lineHeight;
 
         foreach (var row in rows)
         {
@@ -152,22 +152,21 @@ internal static class ForewordPage
     }
 
     /// <summary>
-    /// The maker's mark (§13): this install's medallion and the line that says who set the paper.
-    /// Drawn without the medallion when there is none — a household that has not chosen a photo gets
-    /// a page with no mark rather than an exception in the middle of a delivery.
+    /// The maker's mark (§13): the owner's drawn mark and the line that says who set the paper.
+    ///
+    /// <para>The same mark Folio prints on a report cover, not a photograph. There it takes the
+    /// jacket's colourway; the brief has no jacket, so it takes the page's own ink on its own paper —
+    /// which is exactly what Folio does for a cover that has none.</para>
     /// </summary>
     private static void DrawMakersMark(SkiaPageLayout layout, bool hasContents)
     {
         var markFont = SkiaPageLayout.Sans(PaperTypeScale.Label, bold: true);
         var bottom = layout.BottomY;
 
-        if (OwnerMark.Medallion is { } medallion)
-        {
-            var left = SkiaPageLayout.Margin + (layout.ContentWidth - MedallionSize) / 2;
-            var top = bottom - MedallionSize - 14;
-
-            layout.DrawCircularBitmap(medallion, left, top, MedallionSize);
-        }
+        var left = SkiaPageLayout.Margin + (layout.ContentWidth - MarkSize) / 2;
+        var top = bottom - MarkSize - 14;
+        layout.DrawOwnersMark(left, top, MarkSize,
+            SkiaPageLayout.Ground, SkiaPageLayout.Ink, SkiaPageLayout.Ink);
 
         layout.DrawText("SET AND DELIVERED BY FOREWORD", markFont,
             SkiaPageLayout.Margin, bottom - 12, layout.ContentWidth, 12,

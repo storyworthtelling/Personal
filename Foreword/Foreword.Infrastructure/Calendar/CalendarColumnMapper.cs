@@ -35,13 +35,13 @@ public class CalendarColumnMapper
     /// <summary>
     /// Whose phone this is (Release I).
     ///
-    /// <para>The owner's explicit choice if they made one, otherwise proposed from the account
-    /// signed in here. It is the answer to every question that used to have one person's name
+    /// <para>Inferred from the account signed in here — by an address entered on the calendar
+    /// screen, else by whether it is the account that owns the shared vault. It is the answer to every question that used to have one person's name
     /// written into it: where a note with nobody on it goes, and which column an event falls into
     /// when nothing else can tell.</para>
     /// </summary>
     public PersonColumn Owner =>
-        OwnerColumn.Resolve(install.Owner, install.AccountEmail, Addresses());
+        OwnerColumn.Resolve(install.AccountEmail, Addresses(), install.HouseholdAccount);
 
     public IReadOnlyList<CalendarEvent> Assign(IEnumerable<CalendarEvent> events)
     {

@@ -58,14 +58,36 @@ public static class DeviceAccountSignIn
 
     // Fetches a token interactively (passing the activity) so the Calendar/Tasks consent screen
     // is shown now, rather than failing silently in the background job later.
-    private static Task EnsureConsent(Activity activity, string email)
+    private static Task EnsureConsent(Activity activity, string email) =>
+        EnsureConsent(activity, email, DeviceAccountTokenProvider.TokenScope);
+
+    private static Task EnsureConsent(Activity activity, string email, string tokenType)
     {
         var manager = AccountManager.Get(activity)!;
         var account = new Account(email, "com.google");
         var tcs = new TaskCompletionSource<bool>();
-        manager.GetAuthToken(account, DeviceAccountTokenProvider.TokenScope, null, activity,
+        manager.GetAuthToken(account, tokenType, null, activity,
             new ConsentCallback(tcs), null);
         return tcs.Task;
+    }
+
+    /// <summary>
+    /// A token for one extra scope, asked for on its own rather than added to the delivery token —
+    /// adding it there would put a new consent screen in front of the calendar and the tasks, and the
+    /// morning would stop until somebody answered it. Consent is shown interactively first, then the
+    /// token is read the same way the delivery reads its own.
+    /// </summary>
+    public static async Task<string?> TokenFor(Activity activity, string scope)
+    {
+        var email = CredentialStore.GoogleAccountEmail;
+        if (string.IsNullOrEmpty(email))
+            return null;
+
+        var tokenType = "oauth2:" + scope;
+        await EnsureConsent(activity, email, tokenType);
+
+        return await Task.Run(() => AccountManager.Get(activity)!
+            .BlockingGetAuthToken(new Account(email, "com.google"), tokenType, true));
     }
 
     private sealed class ConsentCallback(TaskCompletionSource<bool> tcs)

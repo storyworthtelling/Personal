@@ -12,19 +12,20 @@ namespace Foreword.Infrastructure.Install;
 /// Putting it in that document would mean the second install restoring the first install's answer
 /// and then quietly filing its owner's handwriting under somebody else.</para>
 ///
-/// <para>So these are built fresh by the head from the phone's own settings, never deserialised
-/// from a shared document, and backed up to the <c>PersonalVault</c> — the per-person file in that
-/// person's own Drive, which exists for exactly this distinction.</para>
+/// <para>So these are built fresh by the head from the phone's own settings and never deserialised
+/// from a shared document. Nothing here is chosen, so nothing needs backing up: both are facts the
+/// phone reads back from Google on a fresh install.</para>
 /// </summary>
 public class InstallOptions
 {
-    /// <summary>
-    /// Who this install belongs to, as an explicit choice. Null means the app works it out from the
-    /// signed-in account — somebody on a shared household account has to be able to say who they
-    /// are and be believed, and everybody else should never have to answer at all.
-    /// </summary>
-    public PersonColumn? Owner { get; set; }
-
     /// <summary>The account signed in here, which is what proposes the owner.</summary>
     public string AccountEmail { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The account that owns the household's shared vault, as last read from it. The phone signed in
+    /// to it is the account holder's, and a phone signed in to any other is the partner's — so whose
+    /// phone this is never has to be asked. Cached per install because the vault is read at startup
+    /// and the answer is needed on every delivery.
+    /// </summary>
+    public string HouseholdAccount { get; set; } = string.Empty;
 }
