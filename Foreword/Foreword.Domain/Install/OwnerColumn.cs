@@ -13,10 +13,11 @@ namespace Foreword.Domain.Install;
 /// "nothing is hardcoded to one person": not a rename, but the places where one person was the
 /// assumption nobody had to state.</para>
 ///
-/// <para>It is <b>proposed</b> from the signed-in account rather than asked for, because the app
-/// already has that fact and the calendar screen already knows which addresses belong to whom. An
-/// explicit choice always wins over the proposal — somebody signed in to a shared household account
-/// has to be able to say who they are and be believed.</para>
+/// <para>It is <b>inferred</b> from the signed-in account and never asked. Two facts answer it,
+/// both of which the app already has: an address entered on the calendar screen names the person
+/// outright, and otherwise the household's shared vault records the account that owns it — the
+/// account holder — so the phone signed in to that account is theirs and a phone signed in to any
+/// other account is their partner's.</para>
 /// </summary>
 public static class OwnerColumn
 {
@@ -26,10 +27,17 @@ public static class OwnerColumn
     /// <para>Only the people who have a mailbox can be proposed. A child's column is filled by the
     /// calendar an event came from and never by an address, so proposing one from a signed-in
     /// account would mean believing a field that cannot work.</para>
+    ///
+    /// <para><paramref name="householdAccount"/> is the shared vault's owner. The vault has one
+    /// writer and two readers: the writer is the first person with a mailbox, and the reader that is
+    /// not the writer is the second. A vault nobody has claimed yet says nothing, because guessing
+    /// "partner" from an empty owner would make the first phone to install the app somebody
+    /// else's.</para>
     /// </summary>
     public static PersonColumn? Propose(
         string? accountEmail,
-        IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> addresses)
+        IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> addresses,
+        string? householdAccount)
     {
         if (string.IsNullOrWhiteSpace(accountEmail))
         {
@@ -45,30 +53,39 @@ public static class OwnerColumn
                 continue;
             }
 
-            if (theirs.Any(address => string.Equals(
-                address?.Trim(), account, StringComparison.OrdinalIgnoreCase)))
+            if (theirs.Any(address => Same(address, account)))
             {
                 return person;
             }
         }
 
-        return null;
+        if (string.IsNullOrWhiteSpace(householdAccount))
+        {
+            return null;
+        }
+
+        return Same(householdAccount, account)
+            ? PersonIdentity.WithMailboxes[0]
+            : PersonIdentity.WithMailboxes[1];
     }
 
     /// <summary>
-    /// The column this install belongs to: what the owner chose, else what the account proposes,
-    /// else what the app did before this setting existed.
+    /// The column this install belongs to: what the account proposes, else what the app did before
+    /// this existed.
     ///
     /// <para>That last fallback matters more than it looks. A phone that has been delivering since
-    /// before there was a setting must behave on the update exactly as it did the morning before —
+    /// before there was an answer must behave on the update exactly as it did the morning before —
     /// an app that quietly changes whose column a note lands in, on a version bump, is worse than
-    /// one that never had the setting.</para>
+    /// one that never had the answer.</para>
     /// </summary>
     public static PersonColumn Resolve(
-        PersonColumn? chosen,
         string? accountEmail,
-        IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> addresses) =>
-        chosen
-            ?? Propose(accountEmail, addresses)
+        IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> addresses,
+        string? householdAccount) =>
+        Propose(accountEmail, addresses, householdAccount)
             ?? PersonIdentity.WithMailboxes[0];
+
+    // Google returns an address in whatever case it was typed.
+    private static bool Same(string? a, string b) =>
+        string.Equals(a?.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
 }

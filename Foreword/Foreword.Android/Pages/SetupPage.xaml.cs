@@ -1,13 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
-using Microsoft.Maui.Media;
-using Foreword.Domain.Calendar;
-using Foreword.Domain.Install;
-using Foreword.Domain.Models;
 using Foreword.Infrastructure.Calendar;
-using Storyworthtelling.Maui;
-using Storyworthtelling.Maui.Views;
-using Storyworthtelling.Paper;
+using Foreword.Infrastructure.Google;
+using Foreword.Infrastructure.Maps;
 using Foreword.Domain.Health;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
@@ -29,9 +24,6 @@ namespace Foreword.Android.Pages;
 /// </summary>
 public partial class SetupPage : BinderPage
 {
-    /// <summary>The mark's preview, big enough to recognise a face in and no bigger.</summary>
-    private const int PreviewDp = 72;
-
     public SetupPage()
     {
         InitializeComponent();
@@ -83,6 +75,7 @@ public partial class SetupPage : BinderPage
             : $"{count} set up";
 
         RenderMaps();
+        _ = LocateHomeAsync();
         RenderSources();
         RenderInstall();
         RenderPrayer();
@@ -112,199 +105,25 @@ public partial class SetupPage : BinderPage
     // ---- This install ======================================================
 
     /// <summary>
-    /// Whose phone this is, and the mark it signs with.
+    /// Whose phone this is — said, not asked.
     ///
-    /// <para>The owner is <b>proposed</b> from the signed-in account, so most installs never answer
-    /// it — the row shows who the app thinks this is and lets them disagree. A row that demanded an
-    /// answer would be a question with an obvious answer asked of everybody, which is the kind of
-    /// setup step this app does not have.</para>
+    /// <para>Inferred from the signed-in account: an address entered on the calendar screen names the
+    /// person outright, and otherwise the account that owns the shared vault is the account holder and
+    /// any other account is their partner. A row that asked would be a question with an obvious answer
+    /// put to everybody, which is the kind of setup step this app does not have.</para>
     /// </summary>
     private void RenderInstall()
     {
-        ThisInstall.Clear();
-
         var owner = IPlatformApplication.Current!.Services
             .GetRequiredService<CalendarColumnMapper>().Owner;
+        var email = CredentialStore.GoogleAccountEmail;
 
-        var people = PersonIdentity.WithMailboxes.Select(person => person.ToString()).ToArray();
-        var segmented = new PaperSegmented(people, owner.ToString());
-        segmented.Picked += picked =>
-        {
-            if (Enum.TryParse<PersonColumn>(picked, out var chosen))
-            {
-                CredentialStore.OwnerColumn = chosen;
-                BackUpThisInstall();
-                RenderInstall();
-            }
-        };
+        OwnerLabel.Text = $"{owner}'s";
 
-        ThisInstall.Add(Field("Whose phone this is", segmented));
-        ThisInstall.Add(Rule());
-        ThisInstall.Add(Field("Your mark", MarkRow()));
-
-        InstallCaption.Text = string.IsNullOrEmpty(CredentialStore.GoogleAccountEmail)
+        InstallCaption.Text = string.IsNullOrEmpty(email)
             ? "Sign in to Google and this fills itself in."
-            : $"Proposed from {CredentialStore.GoogleAccountEmail}. A note with nobody named on it "
-                + $"goes to {owner}.";
+            : $"Worked out from {email}. A note with nobody named on it goes to {owner}.";
     }
-
-    private View MarkRow()
-    {
-        var chosen = !string.IsNullOrEmpty(CredentialStore.OwnerPhoto);
-
-        var button = new Button
-        {
-            Text = chosen ? "Choose another" : "Choose a photo",
-            Style = PaperResources.Token<Style>("SecondaryButton"),
-            HorizontalOptions = LayoutOptions.Start,
-        };
-
-        button.Clicked += async (_, _) => await ChooseMark();
-
-        var row = new VerticalStackLayout { Spacing = DesignTokens.Space.X2 };
-        row.Add(new Label
-        {
-            Text = chosen
-                ? "Your own photo, on every document this phone builds."
-                : "Not chosen — your documents carry the household's mark.",
-            Style = PaperResources.Token<Style>("CardRowDescription"),
-        });
-
-        // The chosen photo, shown SQUARE and filling its box — that is the shape it is stored at
-        // (MedallionImage.Plan centre-crops to a square) and the shape the bookplate window wants.
-        // The circular mask belongs to the PRINTED maker's mark, where §13 puts a ring around it;
-        // a lone circle on a settings screen is just a crop nobody asked for.
-        if (chosen && Preview() is { } preview)
-        {
-            row.Add(preview);
-        }
-
-        row.Add(button);
-
-        return row;
-    }
-
-    /// <summary>
-    /// The stored mark, at the size a row can carry it. Square and edge to edge: it is a picture of
-    /// a person, not a bullet.
-    /// </summary>
-    private static View? Preview()
-    {
-        try
-        {
-            var bytes = Convert.FromBase64String(CredentialStore.OwnerPhoto);
-
-            return new Border
-            {
-                Stroke = PaperResources.Colour("Hairline"),
-                StrokeThickness = DesignTokens.Shape.HairlineDp,
-                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
-                {
-                    CornerRadius = new CornerRadius(DesignTokens.Shape.RadiusCard),
-                },
-                HorizontalOptions = LayoutOptions.Start,
-                Content = new Image
-                {
-                    Source = ImageSource.FromStream(() => new MemoryStream(bytes)),
-                    WidthRequest = PreviewDp,
-                    HeightRequest = PreviewDp,
-                    Aspect = Aspect.AspectFill,
-                },
-            };
-        }
-        catch (FormatException)
-        {
-            // A vault that restored something that is not base64. The row still works without it.
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Picks a photo, squares it, and keeps it. The cropping is done by the library that prints,
-    /// so this screen never names a Skia type; every failure in there is a null, because the bytes
-    /// came from a file picker and "that was not an image" is an ordinary Tuesday.
-    /// </summary>
-    private async Task ChooseMark()
-    {
-        try
-        {
-            if (await MediaPicker.Default.PickPhotoAsync(
-                new MediaPickerOptions { Title = "Your mark" }) is not { } picked)
-            {
-                return;
-            }
-
-            using var stream = await picked.OpenReadAsync();
-            using var buffer = new MemoryStream();
-            await stream.CopyToAsync(buffer);
-            var source = buffer.ToArray();
-
-            if (MedallionCrop.Measure(source) is not { } size
-                || MedallionImage.Plan(size.Width, size.Height) is not { } plan)
-            {
-                InstallCaption.Text = "That file could not be read as a photo. Nothing was changed.";
-                return;
-            }
-
-            var square = MedallionCrop.SquarePng(
-                source, plan.SourceX, plan.SourceY, plan.SourceEdge, plan.TargetEdge);
-
-            if (square is null)
-            {
-                InstallCaption.Text = "That photo could not be squared up. Nothing was changed.";
-                return;
-            }
-
-            CredentialStore.OwnerPhoto = Convert.ToBase64String(square);
-
-            // So the next document composed carries it, without waiting for a restart.
-            PersonalSync.Apply();
-
-            BackUpThisInstall();
-            RenderInstall();
-        }
-        catch (Exception)
-        {
-            // A cancelled picker, a permission refused, a file that vanished. None of them is worth
-            // more than the row staying as it was.
-            InstallCaption.Text = "No photo was chosen. Nothing was changed.";
-        }
-    }
-
-    /// <summary>
-    /// Mirrors this install's two answers to the person's own vault, so a factory reset costs the
-    /// passphrase rather than the photo. Fire-and-forget: the phone is the source of truth.
-    /// </summary>
-    private static void BackUpThisInstall() => _ = Task.Run(async () =>
-    {
-        try
-        {
-            await IPlatformApplication.Current!.Services
-                .GetRequiredService<PersonalSync>()
-                .PublishAsync(CancellationToken.None);
-        }
-        catch (Exception)
-        {
-            // The backup is a convenience; the answer is already on the phone.
-        }
-    });
-
-    private static View Field(string label, View control) => new VerticalStackLayout
-    {
-        Padding = new Thickness(16, 12),
-        Spacing = DesignTokens.Space.X1,
-        Children =
-        {
-            new Label { Text = label, Style = PaperResources.Token<Style>("CardRowTitle") },
-            control,
-        },
-    };
-
-    private static View Rule() => new BoxView
-    {
-        HeightRequest = DesignTokens.Shape.HairlineDp,
-        Color = PaperResources.Colour("Hairline"),
-    };
 
     // ---- Prayer ============================================================
 
@@ -347,10 +166,7 @@ public partial class SetupPage : BinderPage
             MapsKeyEntry.Text = CredentialStore.MapsApiKey;
         }
 
-        HomeAddressEntry.Text = CredentialStore.HomeAddress;
-        HomePointEntry.Text = CredentialStore.HomeLatitude == 0 && CredentialStore.HomeLongitude == 0
-            ? string.Empty
-            : $"{CredentialStore.HomeLatitude}, {CredentialStore.HomeLongitude}";
+        RenderHome();
     }
 
     private void OnReplaceMapsKey(object sender, EventArgs e)
@@ -367,8 +183,155 @@ public partial class SetupPage : BinderPage
     private void OnMapsKeyChanged(object sender, TextChangedEventArgs e) =>
         CredentialStore.MapsApiKey = (e.NewTextValue ?? string.Empty).Trim();
 
-    private void OnHomeAddressChanged(object sender, TextChangedEventArgs e) =>
-        CredentialStore.HomeAddress = (e.NewTextValue ?? string.Empty).Trim();
+    // ---- Home: found, not asked ============================================
+
+    /// <summary>The owner pressed Change: the address field opens over the found one.</summary>
+    private bool changingHome;
+
+    /// <summary>A lookup is running, so the row says so instead of asking.</summary>
+    private bool lookingForHome;
+
+    /// <summary>
+    /// Once per visit to Settings. The lookup can put a consent screen in front of the owner, and
+    /// asking again every time they come back from a sub-page would be nagging.
+    /// </summary>
+    private bool homeLookedUp;
+
+    private static HomeLocation StoredHome() =>
+        new(CredentialStore.HomeAddress, CredentialStore.HomeLatitude, CredentialStore.HomeLongitude);
+
+    /// <summary>
+    /// The home row. Found, it is one line and a Change button; the address field appears only once a
+    /// lookup has come back empty (or the owner asked to change it), and the point field only when
+    /// Google could not place the address. While a lookup runs the row says so — a status sentence,
+    /// not a spinner.
+    /// </summary>
+    private void RenderHome()
+    {
+        var home = StoredHome();
+        var settled = homeLookedUp && !lookingForHome;
+        var askAddress = changingHome || (settled && !home.HasAddress);
+        var askPoint = !changingHome && settled && home.HasAddress && !home.HasPoint;
+
+        HomeSummaryLabel.Text = lookingForHome
+            ? "Looking for home in your Google account…"
+            : home.HasAddress
+                ? home.Address
+                : string.IsNullOrEmpty(CredentialStore.GoogleAccountEmail)
+                    ? "Sign in to Google and this fills itself in, or type it below."
+                    : "Not in your Google account — type it below.";
+
+        HomeChangeButton.IsVisible = home.HasAddress && !changingHome && !lookingForHome;
+
+        if (askAddress && !HomeAddressEntry.IsVisible)
+        {
+            HomeAddressEntry.Text = home.Address;
+        }
+
+        HomeAddressEntry.IsVisible = askAddress;
+
+        if (askPoint && !HomePointEntry.IsVisible)
+        {
+            HomePointEntry.Text = string.Empty;
+        }
+
+        HomePointEntry.IsVisible = askPoint;
+        HomePointHint.IsVisible = askPoint;
+    }
+
+    /// <summary>
+    /// Fills in whatever of the house is missing: the address from the account's own home address,
+    /// the point by geocoding it. Nothing already set is replaced. What is found is kept and backed
+    /// up to the vault, beside the Maps key it belongs with.
+    /// </summary>
+    private async Task LocateHomeAsync()
+    {
+        var home = StoredHome();
+        if (lookingForHome || homeLookedUp || (home.HasAddress && home.HasPoint))
+        {
+            homeLookedUp = homeLookedUp || (home.HasAddress && home.HasPoint);
+            RenderHome();
+            return;
+        }
+
+        lookingForHome = true;
+        RenderHome();
+
+        try
+        {
+            var services = IPlatformApplication.Current!.Services;
+            var people = services.GetRequiredService<GooglePeopleClient>();
+
+            var found = await services.GetRequiredService<HomeLocator>().Fill(home, async () =>
+            {
+                if (Platform.CurrentActivity is not { } activity
+                    || await Foreword.Android.Google.DeviceAccountSignIn.TokenFor(
+                        activity, GooglePeopleClient.Scope) is not { } token)
+                {
+                    return null;
+                }
+
+                return await people.HomeAddress(token);
+            });
+
+            if (found != home)
+            {
+                CredentialStore.HomeAddress = found.Address;
+                CredentialStore.HomeLatitude = found.Latitude;
+                CredentialStore.HomeLongitude = found.Longitude;
+                await PublishToVaultAsync();
+            }
+        }
+        catch (Exception)
+        {
+            // Nothing found is not a failure: the fields below simply ask.
+        }
+        finally
+        {
+            lookingForHome = false;
+            homeLookedUp = true;
+            RenderHome();
+        }
+    }
+
+    private void OnChangeHome(object sender, EventArgs e)
+    {
+        changingHome = true;
+        RenderHome();
+        HomeAddressEntry.Focus();
+    }
+
+    private async void OnHomeAddressCompleted(object sender, EventArgs e) => await CommitHomeAddressAsync();
+
+    private async void OnHomeAddressUnfocused(object sender, FocusEventArgs e) => await CommitHomeAddressAsync();
+
+    /// <summary>
+    /// A typed address is the owner's and wins over the account's. A new address makes the old point
+    /// wrong, so it is cleared and the new one geocoded — the point field appears only if that fails.
+    /// </summary>
+    private async Task CommitHomeAddressAsync()
+    {
+        var typed = (HomeAddressEntry.Text ?? string.Empty).Trim();
+        var wasChanging = changingHome;
+        changingHome = false;
+
+        if (typed.Length == 0 || typed == CredentialStore.HomeAddress)
+        {
+            if (wasChanging)
+            {
+                RenderHome();
+            }
+
+            return;
+        }
+
+        CredentialStore.HomeAddress = typed;
+        CredentialStore.HomeLatitude = 0;
+        CredentialStore.HomeLongitude = 0;
+
+        homeLookedUp = false;
+        await LocateHomeAsync();
+    }
 
     /// <summary>
     /// "39.7817, -89.6501" — one field rather than two, because a point is one thing to copy out of
@@ -586,6 +549,11 @@ public partial class SetupPage : BinderPage
             var email = await Foreword.Android.Google.DeviceAccountSignIn.SignIn(activity);
             GoogleStatusLabel.Text = email;
             DestinationLabel.Text = $"Your reMarkable · {email}";
+
+            // A new account can answer both questions this screen used to ask.
+            RenderInstall();
+            homeLookedUp = false;
+            await LocateHomeAsync();
         }
         catch (Exception ex)
         {

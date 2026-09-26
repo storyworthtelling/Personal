@@ -93,18 +93,20 @@
             </Border>
 
             <!-- ==== This install =====================================================
-                 The two things that MUST differ between the household's two phones (Release I):
-                 whose it is, and the mark its documents sign off with. Everything else on this
-                 screen is a household fact and rides the shared vault; these ride the personal
-                 one, in this person's own Drive.
+                 Whose phone this is (Release I). INFERRED, NEVER ASKED: the signed-in account
+                 against the account that owns the household's shared vault — the same account is
+                 the account holder's phone, any other is their partner's. The row only says what
+                 the app worked out; there is nothing to choose.
 
-                 WHOSE PHONE IS PROPOSED, NOT ASKED. The signed-in account answers it, so most
-                 installs never touch this row — it is here for a shared household account, and
-                 for being able to disagree.
+                 The mark the documents sign off with is no longer set here: it is the owner's
+                 drawn mark, the one Folio's report covers carry, not a photograph.
             -->
             <Label Text="This install" Style="{StaticResource GroupLabel}" />
             <Border Style="{StaticResource GroupCard}">
-                <VerticalStackLayout x:Name="ThisInstall" />
+                <VerticalStackLayout Padding="16,12">
+                    <Label Text="Whose phone this is" Style="{StaticResource CardRowTitle}" />
+                    <Label x:Name="OwnerLabel" Style="{StaticResource CardRowDescription}" />
+                </VerticalStackLayout>
             </Border>
             <Label x:Name="InstallCaption" Style="{StaticResource CardCaption}" />
 
@@ -130,7 +132,7 @@
             </Border>
 
             <!-- ==== Weather & drives =================================================
-                 One key for four Maps Platform APIs — routes, weather, pollen, air quality —
+                 One key for the Maps Platform APIs — routes, weather, pollen, air quality, geocoding —
                  because Maps Platform bills a project rather than a product. The house is here
                  beside it because it is what every one of those calls needs: where the day starts
                  and where the forecast is. Shown in the clear rather than masked only for the
@@ -143,7 +145,7 @@
                         <Label Text="Google Maps Platform key" Style="{StaticResource CardRowTitle}" />
                         <Entry x:Name="MapsKeyEntry" Placeholder="Paste the key" TextChanged="OnMapsKeyChanged"
                                IsPassword="True" Style="{StaticResource MonoEntry}" />
-                        <Label Text="Enable Routes, Weather, Pollen and Air Quality on the same project."
+                        <Label Text="Enable Routes, Weather, Pollen, Air Quality and Geocoding on the same project."
                                Style="{StaticResource CardRowDescription}" />
                     </VerticalStackLayout>
 
@@ -157,15 +159,25 @@
                                 Style="{StaticResource QuietButton}" />
                     </Grid>
 
+                    <!-- Home is FOUND, not asked: the Google account's own home address (the one
+                         Maps labels Home), geocoded to the point the forecast needs. The fields
+                         appear only when a lookup comes back empty. -->
                     <VerticalStackLayout Padding="16,12" Spacing="8">
-                        <Label Text="Home" Style="{StaticResource CardRowTitle}" />
-                        <Entry x:Name="HomeAddressEntry" Placeholder="Street, town" TextChanged="OnHomeAddressChanged"
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Home" Style="{StaticResource CardRowTitle}" />
+                                <Label x:Name="HomeSummaryLabel" Style="{StaticResource CardRowDescription}" />
+                            </VerticalStackLayout>
+                            <Button x:Name="HomeChangeButton" Grid.Column="1" Text="Change" Clicked="OnChangeHome"
+                                    Style="{StaticResource QuietButton}" IsVisible="False" />
+                        </Grid>
+                        <Entry x:Name="HomeAddressEntry" Placeholder="Street, town" IsVisible="False"
+                               Completed="OnHomeAddressCompleted" Unfocused="OnHomeAddressUnfocused"
                                Style="{StaticResource MonoEntry}" />
-                        <Label Text="Every drive is measured from wherever that person's day has left them, and from here at the start of the morning."
-                               Style="{StaticResource CardRowDescription}" />
-                        <Entry x:Name="HomePointEntry" Placeholder="Latitude, longitude" TextChanged="OnHomePointChanged"
-                               Style="{StaticResource MonoEntry}" />
-                        <Label Text="The forecast needs a point rather than an address."
+                        <Entry x:Name="HomePointEntry" Placeholder="Latitude, longitude" IsVisible="False"
+                               TextChanged="OnHomePointChanged" Style="{StaticResource MonoEntry}" />
+                        <Label x:Name="HomePointHint" IsVisible="False"
+                               Text="Google could not place that address, and the forecast needs a point."
                                Style="{StaticResource CardRowDescription}" />
                     </VerticalStackLayout>
                 </VerticalStackLayout>
