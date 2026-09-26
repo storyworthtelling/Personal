@@ -48,7 +48,6 @@ public static class PolicyManager
             OwnPackages: PolicyContext.FocusPhonePackages,
             BrowserPackages: QueryBrowserPackages(context),
             OtherHomePackages: QueryOtherHomePackages(context),
-            BlockedPackages: store.Load().BlockedPackages.ToHashSet(),
             DebuggingLockedDown: store.DebuggingLockedDown,
             NeverVisiblePackages: QueryNeverVisiblePackages(context),
             AdminModeActive: adminModeActive);
