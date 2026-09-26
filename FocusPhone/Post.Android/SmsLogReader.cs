@@ -17,7 +17,7 @@ public static class SmsLogReader
     // Telephony.Mms.Addr type values: 137 = from, 151 = to.
     private const string MmsAddrFrom = "137";
     private const string MmsAddrTo = "151";
-    private const int MmsBoxInbox = 1;
+    internal const int MmsBoxInbox = 1;
 
     public static IReadOnlyList<TimelineItem> ReadAll(Context context)
     {
@@ -83,7 +83,10 @@ public static class SmsLogReader
         }
     }
 
-    private static string? ReadMmsAddress(Context context, string id, int messageBox)
+    // Internal rather than private: MmsDownloader's download-completion receiver reads the
+    // same two fields off the row it just landed, to raise a notification without a second,
+    // duplicate copy of this query.
+    internal static string? ReadMmsAddress(Context context, string id, int messageBox)
     {
         var addrType = messageBox == MmsBoxInbox ? MmsAddrFrom : MmsAddrTo;
         using var cursor = context.ContentResolver!.Query(
@@ -100,7 +103,7 @@ public static class SmsLogReader
         return null;
     }
 
-    private static string? ReadMmsText(Context context, string id)
+    internal static string? ReadMmsText(Context context, string id)
     {
         using var cursor = context.ContentResolver!.Query(
             Android.Net.Uri.Parse("content://mms/part")!,
