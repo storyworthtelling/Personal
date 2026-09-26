@@ -52,6 +52,11 @@ internal static class MmsDownloader
             return;
         }
 
+        // The platform writes the downloaded content back into this row, so it needs write
+        // access to a Uri it did not create — holding the SMS role grants Post access to
+        // content://mms itself, not automatically to the platform in the other direction.
+        MmsAccess.GrantToPlatform(context, uri, ActivityFlags.GrantWriteUriPermission | ActivityFlags.GrantReadUriPermission);
+
         // The row's own uri rides as the intent's Data rather than relying on whatever the
         // platform fills in on completion, so the receiver below always knows which row to
         // read regardless of what SmsManager's own callback contract does or doesn't add.

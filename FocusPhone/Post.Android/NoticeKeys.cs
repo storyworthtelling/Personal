@@ -14,4 +14,5 @@ internal static class NoticeKeys
     public const string ProposedDate = "proposed-date";
     public const string Photos = "photos";
     public const string CallNote = "call-note";
+    public const string MmsSend = "mms-send";
 }
