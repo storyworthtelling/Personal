@@ -81,12 +81,12 @@ public class NobodyIsTheDefaultTests
     public void TheInstallStillHasAnOwner()
     {
         var resolved = Domain.Install.OwnerColumn.Resolve(
-            chosen: null,
             accountEmail: "ashley@example.com",
             new Dictionary<Domain.Models.PersonColumn, IReadOnlyList<string>>
             {
                 [Domain.Models.PersonColumn.Ashley] = ["ashley@example.com"],
-            });
+            },
+            householdAccount: null);
 
         Assert.Equal(Domain.Models.PersonColumn.Ashley, resolved);
     }
