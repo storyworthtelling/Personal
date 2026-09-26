@@ -181,7 +181,14 @@ public class TidalPairingActivity : Activity
         try
         {
             OpenInBrowser(url);
-            status = "Finish signing in, and TIDAL will send you back here.";
+
+            // A refusal on TIDAL's page never comes back here, so this is the only record of
+            // what was asked for — the three things the portal must agree with. Nothing
+            // secret: the client id is in every authorize URL, and the PKCE pair is not logged.
+            AudioDiagnostics.LogWarning(
+                "TidalPairingActivity",
+                $"Opened TIDAL sign-in: client {clientId}, redirect {TidalSignIn.RedirectUri}, scope \"{TidalSignIn.Scope}\".");
+            status = TidalSignInFailure.WhileAtTidal;
         }
         catch (ActivityNotFoundException e)
         {

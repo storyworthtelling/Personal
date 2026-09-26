@@ -140,5 +140,10 @@ public record PolicyContext(
         // auth.tidal.com issues the tokens. Score has to use this browser flow because
         // TIDAL reserves its device-code flow for its own apps.
         "tidal.com",
+        // ...and the redirect back to Score once it has. The filter applies to every scheme,
+        // so under URLBlocklist "*" a successful sign-in would otherwise end on Chrome's
+        // "blocked by your administrator" page instead of in Score. Must match
+        // TidalSignIn.RedirectUri's scheme (guarded in TidalSignInReachabilityTests).
+        "com.storyworthtelling.focusphone.audio://*",
     ];
 }

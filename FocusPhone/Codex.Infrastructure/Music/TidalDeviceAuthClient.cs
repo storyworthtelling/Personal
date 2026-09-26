@@ -56,9 +56,9 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
     private const string DeviceAuthUrl = "https://auth.tidal.com/v1/oauth2/device_authorization";
     private const string TokenUrl = "https://auth.tidal.com/v1/oauth2/token";
 
-    // r_usr/w_usr read and write the account's own data; w_sub is what lets playback
-    // charge against the account's subscription rather than only reading its catalogue.
-    private const string Scope = "r_usr w_usr w_sub";
+    // One list for every grant, decided where the sign-in is (see TidalSignIn.Scope for
+    // why it is the developer-portal set).
+    private const string Scope = TidalSignIn.Scope;
 
     private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNameCaseInsensitive = true };
 

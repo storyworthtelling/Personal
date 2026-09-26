@@ -112,4 +112,17 @@ public class TidalSignInFailureTests
             Assert.DoesNotContain("\n", said);
         }
     }
+
+    // The refusal the owner actually hit happens on TIDAL's page, where Score cannot see it, so
+    // the waiting sentence is the only place to say what fixes it: the two settings on the app
+    // in TIDAL's developer portal that the page checks before it shows a password box.
+    [Fact]
+    public void WhileAtTidal_SaysWhatAnErrorOnTidalsPageMeans()
+    {
+        var said = TidalSignInFailure.WhileAtTidal;
+
+        Assert.Contains("redirect", said, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("scopes", said, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("try again", said, StringComparison.OrdinalIgnoreCase);
+    }
 }
