@@ -78,6 +78,26 @@ public record TimelineItem(
 }
 
 /// <summary>
+/// A one-word stand-in for a wordless message's content, so a picture text reads as
+/// "Photo" rather than the bare "[MMS]" placeholder — used both for the timeline row's
+/// snippet and for the incoming notification.
+/// </summary>
+public static class AttachmentSummary
+{
+    public static string Describe(IReadOnlyList<AttachmentRef> attachments)
+    {
+        if (attachments.Count == 0)
+        {
+            return "[MMS]";
+        }
+        var kind = attachments[0].IsImage ? "Photo"
+            : attachments[0].MimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ? "Video"
+            : "Attachment";
+        return attachments.Count == 1 ? kind : $"{kind} +{attachments.Count - 1}";
+    }
+}
+
+/// <summary>
 /// One person's or group's merged history. ContactKey is the representative
 /// key (a person's canonical identity, or the group id); MemberKeys lists every
 /// normalized key that resolved into this thread so the UI can offer each

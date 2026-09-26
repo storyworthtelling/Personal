@@ -1163,6 +1163,15 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             actions.Add(new CardAction("Write a note on this call", () => WriteCallNote(phone)));
         }
 
+        // An MMS with a picture or video attached: this is usually the entire reason the
+        // message was opened, since the snippet itself is just "[MMS]" or a word like
+        // "Photo" standing in for content that was never text in the first place.
+        if (item.Attachments.Count > 0)
+        {
+            actions.Add(new CardAction(
+                Attachments.Label(item.Attachments), () => Attachments.Offer(Host, Overlay, item), Lead: true));
+        }
+
         actions.Add(new CardAction("File", () => FileWithUndo(item)));
         actions.Add(new CardAction("Delete", () => DeleteWithUndo(item), Destructive: true));
         // How Choose actually begins: you see the one you meant first, exactly as a
