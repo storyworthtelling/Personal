@@ -95,8 +95,10 @@ public sealed record PersonalVault
     // the second, and its owner's handwriting would start filing under somebody else's name.
     public string OwnerColumn { get; init; } = string.Empty;
 
-    // The maker's mark this install signs its documents with (DESIGN.md §13), as a base64 PNG.
-    // Square and small by the time it gets here — see MedallionImage.
+    // The photo mark an install once signed its documents with, as a base64 PNG. No longer written:
+    // documents now carry the owner's drawn mark (Storyworthtelling.Paper.OwnersMark). Kept, like
+    // OwnerColumn above (Foreword now infers that instead of storing it), so a file already in
+    // somebody's Drive still round-trips.
     public string OwnerPhoto { get; init; } = string.Empty;
 
     public static PersonalVault Empty { get; } = new();

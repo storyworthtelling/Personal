@@ -1,7 +1,6 @@
-using Folio.Domain.Report;
 using SkiaSharp;
 
-namespace Folio.Infrastructure.Imaging;
+namespace Storyworthtelling.Paper;
 
 /// <summary>
 /// The owner's mark, <b>drawn</b> (F36): a canted oval pierced by an M whose bottom-left and
@@ -12,14 +11,11 @@ namespace Folio.Infrastructure.Imaging;
 /// weight a page needs, and is resampled at every size it is printed at; the approved mark is a path,
 /// so it does all three.</para>
 ///
-/// <para>DESIGN.md §12 permits the mark on a report cover and <b>nowhere in the app</b>, which is why
-/// this sits beside the front matter rather than in a UI kit.</para>
+/// <para>DESIGN.md §12 permits the mark on a printed document and <b>nowhere in the app</b>, which is
+/// why it lives in the library that prints rather than in a UI kit.</para>
 ///
-/// <para>It lives in Folio for now. The mark is shared — Foreword's brief, Flyleaf's cover and
-/// IconStudio all print their own version of it — and the move into
-/// <c>Storyworthtelling.Paper</c> rides its own pull request straight after this release, so that a
-/// regression in somebody else's document is attributable to the change that caused it rather than
-/// to Folio's.</para>
+/// <para>Shared: Folio's report cover prints it in the jacket's own colourway, and Foreword's brief
+/// prints it in the page's ink — the same mark, where the brief used to carry a photograph.</para>
 /// </summary>
 public static class OwnersMark
 {
@@ -40,19 +36,27 @@ public static class OwnersMark
     ];
 
     /// <summary>
-    /// Draws the mark to fill <paramref name="dest"/>, in the colours this report's jacket chose.
+    /// Draws the mark to fill <paramref name="dest"/>, the colours as packed 0xRRGGBB — the shape
+    /// Folio's jacket reading hands back.
     /// </summary>
-    public static void Draw(SKCanvas canvas, SKRect dest, MarkColours colours)
+    public static void Draw(SKCanvas canvas, SKRect dest, int ground, int line, int ink) =>
+        Draw(canvas, dest, Rgb(ground), Rgb(line), Rgb(ink));
+
+    /// <summary>
+    /// Draws the mark to fill <paramref name="dest"/>: the oval filled with <paramref name="ground"/>
+    /// and edged with <paramref name="line"/>, the letter stroked in <paramref name="ink"/>.
+    /// </summary>
+    public static void Draw(SKCanvas canvas, SKRect dest, SKColor ground, SKColor line, SKColor ink)
     {
         canvas.Save();
         canvas.Translate(dest.Left, dest.Top);
         canvas.Scale(dest.Width / Box, dest.Height / Box);
 
-        using (var fill = new SKPaint { Color = Rgb(colours.Ground), IsAntialias = true, Style = SKPaintStyle.Fill })
+        using (var fill = new SKPaint { Color = ground, IsAntialias = true, Style = SKPaintStyle.Fill })
             canvas.DrawOval(OvalCentre, OvalCentre, OvalRadiusX, OvalRadiusY, fill);
         using (var edge = new SKPaint
         {
-            Color = Rgb(colours.Line), IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = OvalStroke,
+            Color = line, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = OvalStroke,
         })
             canvas.DrawOval(OvalCentre, OvalCentre, OvalRadiusX, OvalRadiusY, edge);
 
@@ -64,7 +68,7 @@ public static class OwnersMark
         }
         using (var stroke = new SKPaint
         {
-            Color = Rgb(colours.Ink),
+            Color = ink,
             IsAntialias = true,
             Style = SKPaintStyle.Stroke,
             StrokeWidth = LetterStroke,

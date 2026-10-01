@@ -168,24 +168,14 @@ public static class CredentialStore
     }
 
     /// <summary>
-    /// Whose phone this is, as an explicit choice. Null means the app proposes one from the
-    /// signed-in account — which is the ordinary case, so most installs never answer this.
+    /// The account that owns the household's shared vault, as last read from it. Whose phone this is
+    /// is inferred from it — the signed-in account is the account holder's when it matches, and their
+    /// partner's when it does not — so nobody is asked.
     /// </summary>
-    public static PersonColumn? OwnerColumn
+    public static string HouseholdAccount
     {
-        get => Enum.TryParse<PersonColumn>(
-            Preferences.Get(PreferenceKeys.OwnerColumn, string.Empty), out var column)
-            ? column
-            : null;
-        set => Preferences.Set(
-            PreferenceKeys.OwnerColumn, value?.ToString() ?? string.Empty);
-    }
-
-    /// <summary>This install's maker's mark, as a base64 PNG. Empty means the embedded fallback.</summary>
-    public static string OwnerPhoto
-    {
-        get => Preferences.Get(PreferenceKeys.OwnerPhoto, string.Empty);
-        set => Preferences.Set(PreferenceKeys.OwnerPhoto, value);
+        get => Preferences.Get(PreferenceKeys.HouseholdAccount, string.Empty);
+        set => Preferences.Set(PreferenceKeys.HouseholdAccount, value);
     }
 
     /// <summary>

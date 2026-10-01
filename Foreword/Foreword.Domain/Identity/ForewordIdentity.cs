@@ -82,13 +82,9 @@ public static class PreferenceKeys
     // The reading taste profile's local copy. The canonical one is Drive JSON (D29).
     public const string TasteJson = "TasteJson";
 
-    // Whose phone this is, as the word for a PersonColumn — empty means "work it out from the
-    // signed-in account". Per-install by definition: it is the one setting that MUST differ between
-    // the two phones, which is why it is here and not in the shared calendar-mapping document.
-    public const string OwnerColumn = "OwnerColumn";
-
-    // This install's maker's mark, as a base64 PNG (square and small — see MedallionImage).
-    public const string OwnerPhoto = "OwnerPhoto";
+    // The account that owns the household's shared vault, cached from the last vault read. Whose
+    // phone this is is inferred from it rather than asked.
+    public const string HouseholdAccount = "HouseholdAccount";
 
     // What happened to the prayer document. Kept apart from LastDeliveryOutcome because prayer can
     // fail on its own — it reads a file the rest of the morning does not, behind a passphrase the
@@ -122,6 +118,6 @@ public static class PreferenceKeys
             .. Frozen, WorkScheduleJson, SeenCalendarIds, ScheduledDeliveryTime,
             MapsApiKey, HomeAddress, HomeLatitude, HomeLongitude, TasksJson, AwayJson,
             FeedsJson, NewsCount, OpinionCount, SeenComic, TasteJson, LastPrayerOutcome,
-            OwnerColumn, OwnerPhoto,
+            HouseholdAccount,
         ];
 }

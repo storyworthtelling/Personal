@@ -13,8 +13,10 @@ namespace Foreword.Tests.Install;
 /// of those is wrong in the same quiet way — a hand-written note with nobody named on it goes into
 /// somebody else's column, nothing errors, and the event is simply on the wrong person's day.</para>
 ///
-/// <para>So it is proposed from the account that is signed in, because that is a fact the app
-/// already has, and an explicit choice always wins over the proposal.</para>
+/// <para>So it is inferred from the account that is signed in, because that is a fact the app
+/// already has: an address entered on the calendar screen names the person outright, and otherwise
+/// the shared vault's owner account is the account holder and any other account is their partner.
+/// Nobody is asked.</para>
 /// </summary>
 public class OwnerColumnTests
 {
@@ -25,12 +27,15 @@ public class OwnerColumnTests
             [PersonColumn.Jordan] = ["jordan@example.com"],
         };
 
+    private static readonly IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> NoAddresses =
+        new Dictionary<PersonColumn, IReadOnlyList<string>>();
+
     [Fact]
     public void TheSignedInAccountProposesWhoseInstallThisIs()
     {
         Assert.Equal(
             PersonColumn.Jordan,
-            OwnerColumn.Propose("jordan@example.com", Addresses));
+            OwnerColumn.Propose("jordan@example.com", Addresses, householdAccount: null));
     }
 
     /// <summary>
@@ -40,7 +45,7 @@ public class OwnerColumnTests
     [Fact]
     public void AnyOfTheirAddressesProposesThem()
     {
-        Assert.Equal(PersonColumn.Rowan, OwnerColumn.Propose("rowan@work.example", Addresses));
+        Assert.Equal(PersonColumn.Rowan, OwnerColumn.Propose("rowan@work.example", Addresses, householdAccount: null));
     }
 
     [Fact]
@@ -48,13 +53,13 @@ public class OwnerColumnTests
     {
         Assert.Equal(
             PersonColumn.Jordan,
-            OwnerColumn.Propose("  Jordan@Example.COM ", Addresses));
+            OwnerColumn.Propose("  Jordan@Example.COM ", Addresses, householdAccount: null));
     }
 
     /// <summary>
-    /// An account nobody has claimed proposes nothing. It is not a failure — it is a phone signed
-    /// in to an address that has not been entered on the calendar screen yet, and the honest answer
-    /// is to ask rather than to pick somebody.
+    /// An account nobody has claimed proposes nothing when there is no household account to compare
+    /// it with either. It is not a failure — it is a phone whose vault has not been read yet, and
+    /// picking somebody would be a guess.
     /// </summary>
     [Theory]
     [InlineData("someone.else@example.com")]
@@ -62,7 +67,7 @@ public class OwnerColumnTests
     [InlineData(null)]
     public void AnUnclaimedAccountProposesNothing(string? email)
     {
-        Assert.Null(OwnerColumn.Propose(email, Addresses));
+        Assert.Null(OwnerColumn.Propose(email, Addresses, householdAccount: null));
     }
 
     /// <summary>
@@ -78,45 +83,88 @@ public class OwnerColumnTests
             [PersonColumn.Wren] = ["wren@example.com"],
         };
 
-        Assert.Null(OwnerColumn.Propose("wren@example.com", withAChildsAddress));
+        Assert.Null(OwnerColumn.Propose("wren@example.com", withAChildsAddress, householdAccount: null));
+    }
+
+    // ---- the household account: who owns the shared vault ----
+
+    /// <summary>
+    /// The shared vault records the account that first wrote it, and that account is the household's
+    /// — the account holder. So the phone signed in to it is theirs, with no address entered anywhere.
+    /// </summary>
+    [Fact]
+    public void TheAccountThatOwnsTheVaultIsTheAccountHolder()
+    {
+        Assert.Equal(
+            PersonIdentity.WithMailboxes[0],
+            OwnerColumn.Propose("owner@example.com", NoAddresses, householdAccount: "owner@example.com"));
+    }
+
+    /// <summary>
+    /// And any other account signed in beside it is the partner's: the vault has two readers and one
+    /// writer, and the one that is not the writer is the other person with a mailbox.
+    /// </summary>
+    [Fact]
+    public void AnyOtherAccountIsThePartner()
+    {
+        Assert.Equal(
+            PersonIdentity.WithMailboxes[1],
+            OwnerColumn.Propose("partner@example.com", NoAddresses, householdAccount: "owner@example.com"));
+    }
+
+    [Fact]
+    public void TheHouseholdAccountIsMatchedWithoutCaseOrSurroundingSpace()
+    {
+        Assert.Equal(
+            PersonIdentity.WithMailboxes[0],
+            OwnerColumn.Propose(" Owner@Example.com ", NoAddresses, householdAccount: "owner@example.COM"));
+    }
+
+    /// <summary>
+    /// An address entered on the calendar screen is the more specific fact, so it wins — somebody
+    /// who signed in with the household account on their own phone has said who they are there.
+    /// </summary>
+    [Fact]
+    public void AnEnteredAddressBeatsTheHouseholdAccount()
+    {
+        Assert.Equal(
+            PersonColumn.Jordan,
+            OwnerColumn.Propose("jordan@example.com", Addresses, householdAccount: "jordan@example.com"));
+    }
+
+    /// <summary>
+    /// A vault nobody has written yet says nothing about anybody. Guessing "partner" from an empty
+    /// owner would make the first phone to install the app somebody else's.
+    /// </summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void AnUnownedVaultProposesNothing(string? household)
+    {
+        Assert.Null(OwnerColumn.Propose("someone@example.com", NoAddresses, household));
     }
 
     // ---- what the app actually uses ----
 
-    /// <summary>
-    /// An explicit choice wins. Somebody who signs in with a shared household account, or with an
-    /// address they have not entered anywhere, has to be able to say so and be believed.
-    /// </summary>
     [Fact]
-    public void AnExplicitChoiceBeatsTheProposal()
+    public void TheProposalStands()
     {
         Assert.Equal(
-            PersonColumn.Jordan,
-            OwnerColumn.Resolve(
-                chosen: PersonColumn.Jordan,
-                accountEmail: "owner@example.com",
-                Addresses));
-    }
-
-    [Fact]
-    public void WithNoChoiceTheProposalStands()
-    {
-        Assert.Equal(
-            PersonColumn.Rowan,
-            OwnerColumn.Resolve(chosen: null, accountEmail: "rowan@work.example", Addresses));
+            PersonIdentity.WithMailboxes[1],
+            OwnerColumn.Resolve("partner@example.com", NoAddresses, householdAccount: "owner@example.com"));
     }
 
     /// <summary>
-    /// And with neither, the first person with a mailbox — which is what the app did before this
+    /// With nothing to go on, the first person with a mailbox — which is what the app did before this
     /// existed, so a phone that has been running since before the setting behaves exactly as it did
     /// rather than changing its mind on an update.
     /// </summary>
     [Fact]
-    public void WithNeitherItIsWhatItAlwaysWas()
+    public void WithNothingToGoOnItIsWhatItAlwaysWas()
     {
         Assert.Equal(
             PersonIdentity.WithMailboxes[0],
-            OwnerColumn.Resolve(chosen: null, accountEmail: null, Addresses));
+            OwnerColumn.Resolve(accountEmail: null, Addresses, householdAccount: null));
     }
 
     /// <summary>
@@ -126,7 +174,7 @@ public class OwnerColumnTests
     [Fact]
     public void TheFallbackIsAlwaysSomebodyWithAMailbox()
     {
-        var resolved = OwnerColumn.Resolve(chosen: null, accountEmail: "nobody@example.com", Addresses);
+        var resolved = OwnerColumn.Resolve("nobody@example.com", Addresses, householdAccount: null);
 
         Assert.True(PersonIdentity.HasMailbox(resolved));
     }

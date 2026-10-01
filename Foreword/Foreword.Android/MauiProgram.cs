@@ -74,13 +74,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<IOptions<AnthropicOptions>>(
             _ => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions { ApiKey = CredentialStore.AnthropicApiKey }));
         // Whose phone this is (Release I). Built fresh from this install's own settings and never
-        // deserialised from a shared document — the calendar mapping rides the household vault,
-        // which both installs read, so the per-install answer must not live in it.
+        // deserialised from a shared document. Inferred, never asked: the signed-in account against
+        // the account that owns the shared vault (cached by VaultSync when it reads the vault).
         builder.Services.AddSingleton<IOptions<InstallOptions>>(
             _ => new LiveOptions<InstallOptions>(() => new InstallOptions
             {
-                Owner = CredentialStore.OwnerColumn,
                 AccountEmail = CredentialStore.GoogleAccountEmail,
+                HouseholdAccount = CredentialStore.HouseholdAccount,
             }));
 
         builder.Services.AddSingleton<IOptions<CalendarMappingOptions>>(
@@ -164,6 +164,13 @@ public static class MauiProgram
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddHttpClient<IRouteClient, GoogleRoutesClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        // Home, found rather than asked: the account's own home address (People API) and its point
+        // (Geocoding, on the same Maps key). Settings shows the fields only when these come back empty.
+        builder.Services.AddHttpClient<GooglePeopleClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddHttpClient<GoogleGeocodingClient>()
+            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddTransient<HomeLocator>();
         builder.Services.AddTransient<DailyDeliveryService>();
 
         // Prayer (P9 Release H): the third document. Its own composer and its own two Claude calls,
@@ -218,16 +225,6 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
         builder.Services.AddSingleton<VaultSync>();
-
-        // This person's own vault, in their own Drive — what is theirs rather than the household's
-        // (Release I). Same store and same crypto as the shared one; what differs is who may write
-        // it, which for this file is only the install it belongs to.
-        builder.Services.AddSingleton(sp => new PersonalVaultAccess(
-            new DrivePersonalVaultStore(new DriveTextFile(
-                VoiceDriveFactory(sp), DrivePersonalVaultStore.FileName,
-                sp.GetRequiredService<InMemoryDriveFileIdStore>())),
-            () => CredentialStore.VaultPassphrase));
-        builder.Services.AddSingleton<PersonalSync>();
 
         // The private prayer archive: its own Drive file, encrypted with the same passphrase the
         // vault uses. A separate file rather than a section of the vault, because the vault is read

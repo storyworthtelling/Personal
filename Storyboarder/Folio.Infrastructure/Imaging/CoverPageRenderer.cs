@@ -69,9 +69,10 @@ internal sealed class CoverPageRenderer
         // The mark, at the foot of the column — §12 permits it here and nowhere in the app.
         const float markSize = 74f;
         var markTop = PageGeometry.ContentBottom - markSize;
+        var tones = JacketTones.Read(cover.Jacket);
         OwnersMark.Draw(canvas, new SKRect(
             PageGeometry.ContentLeft, markTop, PageGeometry.ContentLeft + markSize, markTop + markSize),
-            JacketTones.Read(cover.Jacket));
+            tones.Ground, tones.Line, tones.Ink);
 
         var textLeft = PageGeometry.ContentLeft + markSize + 12f;
         using (var forFont = ReportType.Small())
