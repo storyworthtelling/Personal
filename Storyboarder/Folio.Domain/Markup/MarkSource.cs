@@ -7,20 +7,21 @@ namespace Folio.Domain.Markup;
 /// <summary>
 /// Turns the report's findings into marks on the manuscript.
 ///
-/// <para><b>Nothing new is asked of a model.</b> The report already quotes the prose it is talking
-/// about — that is what <c>LineEdit.Excerpt</c> and <c>ShowTellNote.Excerpt</c> are for, "quoted so
-/// the author can find it" — so a mark is that quotation located in the manuscript. Three of the
-/// four marks have a source: a line edit is a <b>query</b>, a passage that runs long is a
-/// <b>dele</b>, and a summary that wants to be a scene is a <b>caret</b>, since a caret is the mark
-/// for something that belongs here and is not here.</para>
+/// <para><b>Nothing new is asked of a model that wasn't already quoting the prose it's talking
+/// about.</b> A line edit, a prose note, and a dialogue note with a real exchange are all
+/// <b>queries</b>; a show-vs-tell passage that runs long, or a scene that does no work, is a
+/// <b>dele</b>; a summary that wants to be a scene is a <b>caret</b>, since a caret is the mark for
+/// something that belongs here and is not here; and a scene that earns its place is a
+/// <b>check</b> — the first real source for it. Before scene beats carried an outcome, nothing in
+/// the report quoted prose that was <i>working</i> (the strengths were stated about the book, not a
+/// sentence), so the check sat in the vocabulary, drawn and tested, with no page ever carrying one.</para>
 ///
-/// <para><b>The check has no source, and that is a finding rather than an omission.</b> Nothing in
-/// the report quotes prose that is <i>working</i>: the strengths are stated about the book, not
-/// about a sentence. So the mark is drawn, tested and part of the vocabulary, and no marked page
-/// carries one until something gives it a quotation to sit under.</para>
+/// <para>Not every source record can anchor: a dialogue note about an aggregate pattern ("all three
+/// sound identical") or a scene beat the model gave no closing quotation for has nothing to point
+/// at, and produces no mark rather than a guessed one.</para>
 ///
-/// <para><b>The suggestion is dropped at this boundary</b>, deliberately and visibly: both source
-/// records carry one, <see cref="Mark"/> has nowhere to put it (F40, guarded by
+/// <para><b>The suggestion is dropped at this boundary</b>, deliberately and visibly: every source
+/// record carries one, <see cref="Mark"/> has nowhere to put it (F40, guarded by
 /// <c>NudgeNeverWriteTests</c>), and this is where the author stops being handed a line to use.</para>
 /// </summary>
 public static class MarkSource
@@ -39,7 +40,7 @@ public static class MarkSource
 
         foreach (var edit in analysis.LineEdits ?? [])
         {
-            Add(marks, index, edit.Excerpt, MarkKind.Query, "Unclear", edit.Reason, edit.Chapter, analysis);
+            Add(marks, index, edit.Excerpt, MarkKind.Query, Label(edit.Kind), edit.Reason, edit.Chapter, analysis);
         }
 
         foreach (var note in analysis.Expansion?.ShowVsTell ?? [])
@@ -49,8 +50,52 @@ public static class MarkSource
             Add(marks, index, note.Excerpt, kind, label, note.Suggestion, note.Chapter, analysis);
         }
 
+        // Prose-style notes are line-by-line (a filter word, a tic), so — like a line edit — the
+        // report's own quoted "evidence" is what the mark anchors to.
+        foreach (var note in analysis.ProseNotes ?? [])
+        {
+            Add(marks, index, note.Evidence, MarkKind.Query, "Prose", note.Fix, note.Chapter, analysis);
+        }
+
+        // A dialogue note anchors only when it quotes a real exchange; an aggregate observation ("all
+        // three sound identical") has nothing to point at and stays a bullet under its own section.
+        foreach (var note in analysis.DialogueNotes ?? [])
+        {
+            Add(marks, index, note.Excerpt, MarkKind.Query, "Dialogue", note.Fix, note.Chapter, analysis);
+        }
+
+        // A scene beat sits at its own close, not a line inside it — the excerpt is quoted from near
+        // the scene's end for exactly that reason. Earning its place is praise (Check, the one mark
+        // that had no source before this); doing no work is struck through, the same verdict a
+        // passage that runs long already carries.
+        foreach (var scene in analysis.SceneBreakdown ?? [])
+        {
+            var kind = scene.Outcome == SceneVerdict.EarnsItsPlace ? MarkKind.Check : MarkKind.Dele;
+            var label = scene.Outcome == SceneVerdict.EarnsItsPlace ? "Earns its place" : "Does no work";
+            Add(marks, index, scene.Excerpt, kind, label, Join(scene.Purpose, scene.Verdict), scene.Chapter, analysis);
+        }
+
         return [.. marks.OrderBy(mark => mark.StartOffset)];
     }
+
+    // The margin word for a line edit — specific to what is actually wrong, since a query mark
+    // promising "Unclear" on a sentence that is really redundant, or clichéd, or just weak, misnames
+    // the note under it. Other (an omitted or unrecognized kind) reads honestly as "an edit" rather
+    // than guessing at a diagnosis the model never gave.
+    private static string Label(LineEditKind kind) => kind switch
+    {
+        LineEditKind.FilterWord => "Filter word",
+        LineEditKind.Redundant => "Redundant",
+        LineEditKind.WeakWord => "Weak word",
+        LineEditKind.Cliche => "Cliché",
+        LineEditKind.Grammar => "Grammar",
+        LineEditKind.Digression => "Digression",
+        LineEditKind.Tone => "Tone",
+        _ => "Line edit",
+    };
+
+    private static string Join(params string?[] parts) =>
+        string.Join(" ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
 
     private static void Add(
         List<Mark> marks, ExcerptIndex index, string? excerpt, MarkKind kind,

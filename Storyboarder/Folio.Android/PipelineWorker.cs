@@ -16,7 +16,7 @@ namespace Folio.Android;
 // period; Success once the pipeline has nothing left to do. All progress is persisted to SQLite,
 // so a novel advances across wakeups and survives reboots.
 //
-// It runs in the FOREGROUND, and that is a measurement rather than a preference. A read is seventeen
+// It runs in the FOREGROUND, and that is a measurement rather than a preference. A read is sixteen
 // whole-manuscript passes; measured on a real 90,000-word novel they come to about fifteen minutes
 // (F49), and a background worker is killed at ten. SetForegroundAsync is WorkManager's own way out of
 // that cap: the cycle becomes a foreground service for its duration, wearing the notification that

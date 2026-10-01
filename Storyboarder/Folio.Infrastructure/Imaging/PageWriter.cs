@@ -245,7 +245,11 @@ internal sealed class PageWriter : IDisposable
     /// </summary>
     public void PacingChart(IReadOnlyList<ChapterTension> curve, IReadOnlyList<PacingFinding> findings)
     {
-        if (curve is not { Count: > 0 })
+        // A single point has no line to draw between it and anything else — a "trend across
+        // chapters" claim needs at least two chapters to trend between. Guarded here too, not just
+        // by the caller: a chart that only fails to draw when its caller remembers to check is a
+        // chart that will draw the orphaned dot again the next time somebody adds a call site.
+        if (curve is not { Count: >= 2 })
             return;
 
         var height = PageGeometry.PacingChartHeight;

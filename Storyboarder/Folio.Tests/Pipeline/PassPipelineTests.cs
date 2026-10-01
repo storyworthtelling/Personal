@@ -113,4 +113,36 @@ public class PassPipelineTests
 
         Assert.Equal("the middle compressed", folded.Verdict.MostNeeds);
     }
+
+    /// <summary>
+    /// The bug the first real report surfaced: the eight section personas' one-line summaries were
+    /// dumped into Themes, overwriting the model's actual answer to "what is this book about" with
+    /// eight unlabeled sentences about structure, pacing, and length. Themes now stands untouched —
+    /// the sections carry their own content forward instead, in <see cref="BookAnalysisResult.SectionReads"/>.
+    /// </summary>
+    [Fact]
+    public void ThemesIsNotOverwrittenBySectionSummaries()
+    {
+        var report = SampleAnalysis.Of() with { Themes = ["perseverance", "found family"] };
+        var sections = new[] { new SectionRead("pacing", "The middle slackens.", []) };
+
+        var folded = report.WithReads([], sections, [], Verdict.Empty);
+
+        Assert.Equal(["perseverance", "found family"], folded.Themes);
+        Assert.Equal("pacing", Assert.Single(folded.SectionReads).PersonaId);
+    }
+
+    /// <summary>A section pass that has not run yet, or ran silent, leaves what is already there.</summary>
+    [Fact]
+    public void SectionReadsThatHaveNotRunLeaveWhatIsThereStanding()
+    {
+        var report = SampleAnalysis.Of() with
+        {
+            SectionReads = [new SectionRead("pacing", "The middle slackens.", [])],
+        };
+
+        var folded = report.WithReads([], [], [], Verdict.Empty);
+
+        Assert.Equal("pacing", Assert.Single(folded.SectionReads).PersonaId);
+    }
 }

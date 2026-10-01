@@ -1,4 +1,5 @@
 using Folio.Domain.Reading;
+using Folio.Domain.Text;
 
 namespace Folio.Tests.Reading;
 
@@ -74,7 +75,7 @@ public class ReadingPromptTests
     [Fact]
     public void AReaderIsToldItIsReadingAlone()
     {
-        var instruction = ReadingPrompt.Instruction(PersonaCatalogue.ById("agent"));
+        var instruction = ReadingPrompt.Instruction(PersonaCatalogue.ById("agent"), StoryLength.Novel);
 
         Assert.Contains("Nobody else's notes", instruction, StringComparison.OrdinalIgnoreCase);
     }
@@ -82,8 +83,45 @@ public class ReadingPromptTests
     [Fact]
     public void ASectionIsToldToLeaveTheRestAlone()
     {
-        var instruction = ReadingPrompt.Instruction(PersonaCatalogue.ById("pacing"));
+        var instruction = ReadingPrompt.Instruction(PersonaCatalogue.ById("pacing"), StoryLength.Novel);
 
         Assert.Contains("Leave every other concern", instruction, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The bug a real device run surfaced: a 1,209-word, one-chapter short story was told, in its own
+    /// system prompt, that it was "the complete novel manuscript" — which is how a Themes section and a
+    /// chapter-by-chapter Pacing curve came back for a book with neither.
+    /// </summary>
+    [Fact]
+    public void AShortManuscriptIsCalledAShortStoryNotANovel()
+    {
+        const string shortManuscript = "A short tale. The hero walked to the castle and knocked on the gate.";
+        var blocks = ReadingPrompt.System(shortManuscript, PersonaCatalogue.ById("pacing"));
+
+        Assert.Contains("short story manuscript", blocks[^1].Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("novel manuscript", blocks[^1].Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ANovelLengthManuscriptIsStillCalledANovel()
+    {
+        var novelManuscript = string.Join(' ', Enumerable.Repeat("word", 90_000));
+        var blocks = ReadingPrompt.System(novelManuscript, PersonaCatalogue.ById("pacing"));
+
+        Assert.Contains("novel manuscript", blocks[^1].Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(StoryLength.ShortStory, "short story")]
+    [InlineData(StoryLength.Novella, "novella")]
+    [InlineData(StoryLength.Novel, "novel")]
+    public void EveryPersonaKindNamesTheActualLength(StoryLength length, string noun)
+    {
+        foreach (var persona in PersonaCatalogue.All)
+        {
+            var instruction = ReadingPrompt.Instruction(persona, length);
+            Assert.Contains($"{noun} manuscript", instruction, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

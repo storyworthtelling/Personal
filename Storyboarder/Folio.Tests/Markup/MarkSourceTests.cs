@@ -33,6 +33,29 @@ public class MarkSourceTests
     }
 
     /// <summary>
+    /// The label names the actual defect — a filter word, a redundant clause, a cliché — rather than
+    /// the single "Unclear" every line edit used to carry regardless of what was really wrong. A model
+    /// reply (or a report saved before <see cref="LineEditKind"/> existed) that never sets it degrades
+    /// to a plain "Line edit" tag rather than a false claim of unclarity.
+    /// </summary>
+    [Theory]
+    [InlineData(LineEditKind.FilterWord, "Filter word")]
+    [InlineData(LineEditKind.Redundant, "Redundant")]
+    [InlineData(LineEditKind.WeakWord, "Weak word")]
+    [InlineData(LineEditKind.Cliche, "Cliché")]
+    [InlineData(LineEditKind.Grammar, "Grammar")]
+    [InlineData(LineEditKind.Digression, "Digression")]
+    [InlineData(LineEditKind.Tone, "Tone")]
+    [InlineData(LineEditKind.Other, "Line edit")]
+    public void TheLabelNamesWhatIsActuallyWrong(LineEditKind kind, string label)
+    {
+        var analysis = With(lineEdits:
+            [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "x", "y") { Kind = kind }]);
+
+        Assert.Equal(label, Assert.Single(MarkSource.From(Manuscript, analysis)).Label);
+    }
+
+    /// <summary>
     /// The one that matters. The excerpt spans the manuscript's own line break, arrives with it
     /// flattened to a space, and carries a curly apostrophe the page does not have.
     /// </summary>
@@ -75,6 +98,82 @@ public class MarkSourceTests
     public void AnExcerptThatIsNotInTheManuscriptIsDroppedRatherThanPlaced()
     {
         var analysis = With(lineEdits: [new LineEdit("Ch. 1", "He mounted his horse and rode north.", "x", "y")]);
+
+        Assert.Empty(MarkSource.From(Manuscript, analysis));
+    }
+
+    /// <summary>
+    /// A prose-style note is line-by-line — a filter word, a tic — so it anchors to the text like a
+    /// line edit does, using the same verbatim quote the report already prints as "evidence".
+    /// </summary>
+    [Fact]
+    public void AProseNoteBecomesAQueryOverItsEvidence()
+    {
+        var analysis = With(prose: [new ProseNote("Ch. 1", "Filter words", "she understood", "Cut the filter.")]);
+
+        var mark = Assert.Single(MarkSource.From(Manuscript, analysis));
+        Assert.Equal(MarkKind.Query, mark.Kind);
+        Assert.Equal("Prose", mark.Label);
+        Assert.Equal("she understood", Manuscript[mark.StartOffset..mark.EndOffset]);
+        Assert.Equal("Cut the filter.", mark.Reason);
+    }
+
+    /// <summary>
+    /// A dialogue note with a real quoted exchange anchors to it, like a prose note. One with no
+    /// excerpt — an aggregate observation such as "all three sound identical" — has nothing to anchor
+    /// to and produces no mark; it stays a bullet under the Dialogue section instead.
+    /// </summary>
+    [Fact]
+    public void ADialogueNoteWithAQuotedExchangeBecomesAQuery()
+    {
+        var analysis = With(dialogue:
+            [new DialogueNote("Ch. 1", "Ruth", "On the nose.", "Trust the subtext.") { Excerpt = "nobody spoke to her" }]);
+
+        var mark = Assert.Single(MarkSource.From(Manuscript, analysis));
+        Assert.Equal(MarkKind.Query, mark.Kind);
+        Assert.Equal("Dialogue", mark.Label);
+        Assert.Equal("nobody spoke to her", Manuscript[mark.StartOffset..mark.EndOffset]);
+    }
+
+    [Fact]
+    public void ADialogueNoteWithNoExcerptProducesNoMark()
+    {
+        var analysis = With(dialogue: [new DialogueNote("Ch. 1", "Ruth, Anna", "All three sound identical.", "Vary the register.")]);
+
+        Assert.Empty(MarkSource.From(Manuscript, analysis));
+    }
+
+    /// <summary>
+    /// A scene that earns its place is praise — the first real source for the Check mark, which has
+    /// stood in the vocabulary since Release G with nothing yet producing it. One that does no work
+    /// is struck through, the same as a passage that runs long. Both sit at the scene's own close.
+    /// </summary>
+    [Fact]
+    public void ASceneThatEarnsItsPlaceIsACheck()
+    {
+        var analysis = With(sceneBreakdown:
+            [new SceneBeat("Ch. 1", "The walk", "Establishes grief.", "Earns its place.")
+                { Excerpt = "nobody spoke to her", Outcome = SceneVerdict.EarnsItsPlace }]);
+
+        var mark = Assert.Single(MarkSource.From(Manuscript, analysis));
+        Assert.Equal(MarkKind.Check, mark.Kind);
+    }
+
+    [Fact]
+    public void ASceneThatDoesNoWorkIsADele()
+    {
+        var analysis = With(sceneBreakdown:
+            [new SceneBeat("Ch. 1", "The walk", "Establishes grief.", "Does no work.")
+                { Excerpt = "nobody spoke to her", Outcome = SceneVerdict.DoesNoWork }]);
+
+        var mark = Assert.Single(MarkSource.From(Manuscript, analysis));
+        Assert.Equal(MarkKind.Dele, mark.Kind);
+    }
+
+    [Fact]
+    public void ASceneBeatWithNoExcerptProducesNoMark()
+    {
+        var analysis = With(sceneBreakdown: [new SceneBeat("Ch. 1", "The walk", "Establishes grief.", "Earns its place.")]);
 
         Assert.Empty(MarkSource.From(Manuscript, analysis));
     }
@@ -176,12 +275,12 @@ public class MarkSourceTests
     }
 
     /// <summary>
-    /// The check mark has no source, and this says so rather than leaving it to be discovered.
-    /// Nothing in the report quotes prose that is working — the strengths are about the book, not
-    /// about a sentence — so no marked page carries one yet.
+    /// Neither a line edit nor a show-vs-tell note is ever praise — a check comes only from a scene
+    /// that earns its place (see <see cref="ASceneThatEarnsItsPlaceIsACheck"/>), the first real
+    /// source for a mark that sat drawn and tested but unreachable from Release G through this.
     /// </summary>
     [Fact]
-    public void NothingInTheReportYetProducesACheck()
+    public void ALineEditOrShowTellNoteNeverProducesACheck()
     {
         var analysis = With(
             lineEdits: [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "x", "y")],
@@ -193,11 +292,17 @@ public class MarkSourceTests
     private static BookAnalysisResult With(
         IReadOnlyList<LineEdit>? lineEdits = null,
         IReadOnlyList<ShowTellNote>? showTell = null,
-        IReadOnlyList<RevisionItem>? plan = null) =>
+        IReadOnlyList<RevisionItem>? plan = null,
+        IReadOnlyList<ProseNote>? prose = null,
+        IReadOnlyList<DialogueNote>? dialogue = null,
+        IReadOnlyList<SceneBeat>? sceneBreakdown = null) =>
         BookAnalysisResult.Empty with
         {
             LineEdits = lineEdits ?? [],
             RevisionPlan = plan ?? [],
             Expansion = new ExpansionReport([], showTell ?? [], LengthAssessment.Empty),
+            ProseNotes = prose ?? [],
+            DialogueNotes = dialogue ?? [],
+            SceneBreakdown = sceneBreakdown ?? [],
         };
 }

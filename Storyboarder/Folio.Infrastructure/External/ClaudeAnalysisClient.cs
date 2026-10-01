@@ -11,6 +11,7 @@ using Folio.Domain.External;
 using Folio.Domain.Health;
 using Folio.Domain.Model;
 using Folio.Domain.Pipeline;
+using Folio.Domain.Text;
 using Folio.Infrastructure.Configuration;
 using Storyworthtelling.Voice.Health;
 
@@ -144,21 +145,31 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "your four sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
         "book — merge duplicates, drop the trivial, keep the author's own words when quoting. Respond " +
         "with ONLY a JSON object: " +
-        "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string}]," +
+        "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string,\"kind\":string}]," +
         "\"proseNotes\":[{\"chapter\":string,\"pattern\":string,\"evidence\":string,\"fix\":string}]," +
-        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string}]," +
-        "\"sceneBreakdown\":[{\"chapter\":string,\"scene\":string,\"purpose\":string,\"verdict\":string}]}. " +
+        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string,\"excerpt\":string}]," +
+        "\"sceneBreakdown\":[{\"chapter\":string,\"scene\":string,\"purpose\":string,\"verdict\":string,\"excerpt\":string,\"outcome\":string}]}. " +
         "lineEdits: specific sentences to cut, tighten, or rewrite — \"excerpt\" quoted verbatim from " +
         "the notes so the author can find it, \"suggestion\" the actual replacement or cut, \"reason\" " +
-        "one short clause. AT MOST 40, chosen for impact. " +
+        "one short clause, \"kind\" the ONE word that names what is actually wrong with the sentence: " +
+        "\"FilterWord\" (she felt/he saw/I thought distancing the reader), \"Redundant\" (says twice what " +
+        "one sentence already said), \"WeakWord\" (a vague or imprecise word choice), \"Cliche\" (a stock " +
+        "phrase or transition), \"Grammar\" (a malformed or ungrammatical sentence), \"Digression\" (an " +
+        "aside that adds nothing), \"Tone\" (a register slip), or \"Other\" if none fit. AT MOST 40, " +
+        "chosen for impact. " +
         "proseNotes: recurring prose-style and voice patterns — repetition, filter words, verbal tics, " +
         "monotonous sentence rhythm, overused constructions, POV slips — with \"evidence\" quoting a " +
         "real example. AT MOST 20. " +
         "dialogueNotes: whether the characters sound distinct from one another, on-the-nose exchanges, " +
-        "and exposition dumped into speech. AT MOST 20. " +
+        "and exposition dumped into speech. \"excerpt\": when the note is about a SPECIFIC exchange, " +
+        "quote it verbatim from the notes; leave \"\" for an aggregate observation with no single " +
+        "exchange to point at (e.g. \"all three sound identical\"). AT MOST 20. " +
         "sceneBreakdown: the scene-by-scene map in reading order — \"scene\" what happens, \"purpose\" " +
         "what it accomplishes for the book (plot, character, theme, information), \"verdict\" whether it " +
-        "earns its place and what is missing if not. Say plainly when a scene does no work. AT MOST 100. " +
+        "earns its place and what is missing if not. Say plainly when a scene does no work. \"excerpt\": " +
+        "quote, verbatim, a short line from near the END of the scene, so the note can sit at the " +
+        "scene's own close — leave \"\" only when the notes give nothing quotable for this scene. " +
+        "\"outcome\": \"EarnsItsPlace\" or \"DoesNoWork\", matching \"verdict\". AT MOST 100. " +
         "Every \"chapter\" is copied from the note the item came from; \"\" only when the notes carry " +
         "none. Use [] when none. No prose outside the JSON.";
 
@@ -433,16 +444,19 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return new CraftReport(
             (dto.LineEdits ?? []).Select(e => new LineEdit(
                 e.Chapter ?? string.Empty, e.Excerpt ?? string.Empty,
-                e.Suggestion ?? string.Empty, e.Reason ?? string.Empty)).ToList(),
+                e.Suggestion ?? string.Empty, e.Reason ?? string.Empty)
+                { Kind = ParseLineEditKind(e.Kind) }).ToList(),
             (dto.ProseNotes ?? []).Select(n => new ProseNote(
                 n.Chapter ?? string.Empty, n.Pattern ?? string.Empty,
                 n.Evidence ?? string.Empty, n.Fix ?? string.Empty)).ToList(),
             (dto.DialogueNotes ?? []).Select(n => new DialogueNote(
                 n.Chapter ?? string.Empty, n.Speakers ?? string.Empty,
-                n.Observation ?? string.Empty, n.Fix ?? string.Empty)).ToList(),
+                n.Observation ?? string.Empty, n.Fix ?? string.Empty)
+                { Excerpt = n.Excerpt ?? string.Empty }).ToList(),
             (dto.SceneBreakdown ?? []).Select(s => new SceneBeat(
                 s.Chapter ?? string.Empty, s.Scene ?? string.Empty,
-                s.Purpose ?? string.Empty, s.Verdict ?? string.Empty)).ToList());
+                s.Purpose ?? string.Empty, s.Verdict ?? string.Empty)
+                { Excerpt = s.Excerpt ?? string.Empty, Outcome = ParseSceneVerdict(s.Outcome) }).ToList());
     }
 
     public async Task<VoiceConsistency> AssessVoiceConsistency(
@@ -607,6 +621,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private static ShowTellDirection ParseShowTellDirection(string? direction) =>
         Enum.TryParse<ShowTellDirection>(direction, ignoreCase: true, out var parsed) ? parsed : ShowTellDirection.Dramatize;
 
+    private static LineEditKind ParseLineEditKind(string? kind) =>
+        Enum.TryParse<LineEditKind>(kind, ignoreCase: true, out var parsed) ? parsed : LineEditKind.Other;
+
+    // Defaults to EarnsItsPlace rather than DoesNoWork: an unparseable outcome should not strike
+    // through a scene the model never actually judged as dead weight.
+    private static SceneVerdict ParseSceneVerdict(string? outcome) =>
+        Enum.TryParse<SceneVerdict>(outcome, ignoreCase: true, out var parsed) ? parsed : SceneVerdict.EarnsItsPlace;
+
     // Snap a free-text priority to the three impact tiers the report groups by; anything unrecognized is the
     // lowest tier so a stray value can't masquerade as urgent.
     private static string NormalizePriority(string? priority)
@@ -635,16 +657,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "before your verdict changed\"}. Every field is required. If you cannot fill one of them you "
         + "have not finished reading: a short answer is worse than none, because the page prints it.";
 
-    private const string RevisionPlanInstruction =
-        "You are given fifteen independent reads of one novel: eight structural sections and seven "
-        + "readers, none of whom saw the others' notes. Produce the author's revision plan. Where "
-        + "several reads name the same thing, that is one item and it ranks higher for it. Reply with "
+    // Built rather than a const: the noun has to name what this manuscript actually is (a 1,200-word
+    // short story is not "one novel"), and that depends on the measured word count these passes never
+    // see the manuscript to derive for themselves.
+    private static string RevisionPlanInstruction(StoryLength length) =>
+        $"You are given fourteen independent reads of one {ManuscriptLength.Noun(length)}: eight structural "
+        + "sections and six readers, none of whom saw the others' notes. Produce the author's revision plan. "
+        + "Where several reads name the same thing, that is one item and it ranks higher for it. Reply with "
         + "JSON only: {\"revisionPlan\": [{\"priority\": \"Must|Should|Consider\", \"chapter\": \"Ch. 12-15\", "
         + "\"issue\": \"what is wrong\", \"suggestedFix\": \"what to do about it — a direction, never "
         + "replacement prose\"}]}. You diagnose and point; you never write the author's sentences for them.";
 
-    private const string VerdictInstruction =
-        "You are given fifteen independent reads of one novel. Write the candid state of this draft. "
+    private static string VerdictInstruction(StoryLength length) =>
+        $"You are given fourteen independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
+        + "state of this draft. "
         // "standing" is the line the author repeats to themselves afterwards, so it is asked for as a
         // sentence rather than as a rating: a page that opens on a number is read as a mark.
         + "Open with \"standing\": ONE short sentence naming where the draft stands (\"The book is "
@@ -706,12 +732,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         string passId,
         IReadOnlyList<SectionRead> sections,
         IReadOnlyList<Review> readers,
+        int wordCount,
         CancellationToken cancellationToken)
     {
-        // The synthesis passes read the other fifteen rather than the manuscript, so they carry no
+        // The synthesis passes read the other fourteen rather than the manuscript, so they carry no
         // cached prefix and cost nothing to run against either model.
         var evidence = JsonSerializer.Serialize(new { sections, readers }, JsonResponse.CaseInsensitive);
-        var instruction = passId == "verdict" ? VerdictInstruction : RevisionPlanInstruction;
+        var length = ManuscriptLength.Classify(wordCount);
+        var instruction = passId == "verdict" ? VerdictInstruction(length) : RevisionPlanInstruction(length);
         var reply = await SendMessage(
             instruction, evidence, cancellationToken, options.PassMaxTokens, model: options.StrongModel);
 
@@ -1097,6 +1125,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Excerpt { get; set; }
         public string? Suggestion { get; set; }
         public string? Reason { get; set; }
+        public string? Kind { get; set; }
     }
 
     private sealed class ProseNoteDto
@@ -1113,6 +1142,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Speakers { get; set; }
         public string? Observation { get; set; }
         public string? Fix { get; set; }
+        public string? Excerpt { get; set; }
     }
 
     private sealed class SceneBeatDto
@@ -1121,6 +1151,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Scene { get; set; }
         public string? Purpose { get; set; }
         public string? Verdict { get; set; }
+        public string? Excerpt { get; set; }
+        public string? Outcome { get; set; }
     }
 
     private sealed class CharacterProfileDto

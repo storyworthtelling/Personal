@@ -1,6 +1,7 @@
 using Folio.Domain.Analysis;
 using Folio.Domain.Imaging;
 using Folio.Domain.Reading;
+using Folio.Domain.Shelf;
 using Folio.Infrastructure.Imaging;
 using Folio.Tests.Support;
 using UglyToad.PdfPig;
@@ -31,10 +32,11 @@ public class ReaderPagesTests
     {
         var pages = PagesOf(Render(Reads()));
 
+        var of = BookLines.Spell(PersonaCatalogue.Readers.Count);
         foreach (var (persona, index) in PersonaCatalogue.Readers.Select((p, i) => (p, i + 1)))
         {
             Assert.True(
-                pages.Any(page => page.Contains($"Reader {index} of seven", StringComparison.OrdinalIgnoreCase)
+                pages.Any(page => page.Contains($"Reader {index} of {of}", StringComparison.OrdinalIgnoreCase)
                     && page.Contains(persona.Name, StringComparison.Ordinal)),
                 $"{persona.Name} has no page of its own. A whole-book read in character is not a "
                 + "paragraph inside somebody else's section.");
@@ -52,8 +54,11 @@ public class ReaderPagesTests
         var pdf = Render(Reads());
         var pages = PagesOf(pdf);
         var folios = FoliosOf(pdf);
-        var contents = pages.FindIndex(page => page.Contains("SEVEN READERS", StringComparison.OrdinalIgnoreCase));
+        var contents = pages.FindIndex(page => page.Contains("READERS", StringComparison.OrdinalIgnoreCase)
+            && page.Contains(BookLines.Spell(PersonaCatalogue.Readers.Count), StringComparison.OrdinalIgnoreCase));
         Assert.True(contents >= 0, "There is no readers' contents page.");
+
+        var of = BookLines.Spell(PersonaCatalogue.Readers.Count);
 
         // The folio printed on a sheet, and the index of that sheet in the file, differ by the front
         // matter — so the row's "p. N" is resolved through the folio the page itself carries.
@@ -64,7 +69,7 @@ public class ReaderPagesTests
 
             Assert.True(turned >= 0, $"The contents sends the author to page {pointer}, which is not in the file.");
             Assert.Contains(persona.Name, pages[turned], StringComparison.Ordinal);
-            Assert.Contains($"Reader {index} of seven", pages[turned], StringComparison.OrdinalIgnoreCase);
+            Assert.Contains($"Reader {index} of {of}", pages[turned], StringComparison.OrdinalIgnoreCase);
         }
     }
 
@@ -81,7 +86,8 @@ public class ReaderPagesTests
     public void NoPageIsAnOrphan()
     {
         var pages = PagesOf(Render(Reads()));
-        var first = pages.FindIndex(page => page.Contains("SEVEN READERS", StringComparison.OrdinalIgnoreCase));
+        var first = pages.FindIndex(page => page.Contains("READERS", StringComparison.OrdinalIgnoreCase)
+            && page.Contains(BookLines.Spell(PersonaCatalogue.Readers.Count), StringComparison.OrdinalIgnoreCase));
         Assert.True(first >= 0, "There is no readers' contents page.");
 
         var orphans = pages

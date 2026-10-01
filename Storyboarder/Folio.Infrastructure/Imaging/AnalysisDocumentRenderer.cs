@@ -172,16 +172,26 @@ public sealed class AnalysisDocumentRenderer
 
         Section(writer, "Themes", analysis.Themes, body, h2);
 
-        // Pacing, with a tension-over-chapters chart when the model returned a curve.
-        if (analysis.PacingNotes is { Count: > 0 } || analysis.PacingCurve is { Count: > 0 })
+        // The five whole-book sections with no other home in the report (Pacing, Voice consistency,
+        // and Series continuity fold into the sections below instead — see SectionFor).
+        RenderWholeBookNotes(writer, analysis.SectionReads, body, bodyItalic, h2, h3);
+
+        // Pacing, with a tension-over-chapters chart when the model returned a curve of at least two
+        // points. A single chapter has nothing to trend between it and — a real manuscript proved
+        // this: the chart degenerated to one point floating above a bare rule, with nothing on the
+        // page saying what either mark was.
+        var pacingSection = SectionFor(analysis.SectionReads, "pacing");
+        if (analysis.PacingNotes is { Count: > 0 } || analysis.PacingCurve is { Count: > 0 } || pacingSection is { HasContent: true })
         {
             writer.Heading("Pacing", h2, Ink, ruled: true);
-            if (analysis.PacingCurve is { Count: > 0 })
+            if (pacingSection is { HasContent: true } && !string.IsNullOrWhiteSpace(pacingSection.Summary))
+                writer.Paragraph(pacingSection.Summary, body, Ink);
+            if (analysis.PacingCurve is { Count: >= 2 })
             {
                 writer.Paragraph("Tension across the chapters — a dip is a place to check the story is still pulling.", bodyItalic, Muted);
                 writer.PacingChart(analysis.PacingCurve, PlacedFindings(analysis));
             }
-            foreach (var note in analysis.PacingNotes ?? [])
+            foreach (var note in (analysis.PacingNotes ?? []).Concat(pacingSection?.Findings ?? []))
                 writer.Bullet(Join(note.Chapter, note.Detail) + Tag(FindingCategory.Pacing, note.Detail, statusByFinding), body, Ink);
             writer.Gap(PageGeometry.SectionGap);
         }
@@ -229,17 +239,24 @@ public sealed class AnalysisDocumentRenderer
         // and over-shown passages to tighten.
         RenderShowVsTell(writer, analysis.Expansion.ShowVsTell, body, bodyBold, bodyItalic, h2);
 
-        RenderVoiceConsistency(writer, analysis.VoiceConsistency, body, bodyBold, bodyItalic, h2);
+        RenderVoiceConsistency(
+            writer, analysis.VoiceConsistency, SectionFor(analysis.SectionReads, "voice-consistency"),
+            body, bodyBold, bodyItalic, h2);
 
         // Series continuity (Phase 5): on a sequel, where this book contradicts the prior book's canon and how it
         // handles the prior book's open threads. Silent for a standalone book or a clean sequel.
-        RenderSeriesContinuity(writer, analysis.SeriesContinuity, body, bodyBold, bodyItalic, h2);
+        RenderSeriesContinuity(
+            writer, analysis.SeriesContinuity, SectionFor(analysis.SectionReads, "series-continuity"),
+            body, bodyBold, bodyItalic, h2);
+
+        // The manuscript is the centre of the report (P10): everything anchored to a place in the
+        // text lives here, before the whole-book sections above give way to the six whole-book
+        // voices below. The scene-by-scene walk follows it — each scene's evidence image above its
+        // notes, the fidelity check — and only then do the readers speak.
+        RenderMarkedManuscript(writer, analysis, manuscript, bodyItalic, h2);
+        RenderScenes(writer, scenes, body, bodyItalic, h2);
 
         RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3);
-
-        // The scene-by-scene walk: each scene's evidence image above its notes — the fidelity check.
-        RenderScenes(writer, scenes, body, bodyItalic, h2);
-        RenderMarkedManuscript(writer, analysis, manuscript, bodyItalic, h2);
 
         // What to do next: first the scenes to ADD (the additive engine — the owner writes short), then the
         // revision plan, both grouped by impact tier.
@@ -293,6 +310,11 @@ public sealed class AnalysisDocumentRenderer
         if (string.IsNullOrWhiteSpace(manuscript))
             return;
 
+        // A real .docx paragraph opened with a literal Word tab has no glyph on the page — see
+        // ManuscriptText. Sanitized once, before marks are indexed, so the marks and the drawn
+        // lines agree on the same offsets throughout.
+        manuscript = ManuscriptText.ForPrint(manuscript);
+
         var marks = MarkSource.From(manuscript, analysis);
         if (marks.Count == 0)
             return;
@@ -300,8 +322,8 @@ public sealed class AnalysisDocumentRenderer
         writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
         writer.Paragraph(
             "Your pages with the findings on them. A caret is something missing, a struck line is "
-            + "something doing no work, an underline is something unclear — and the note in the "
-            + "margin says why. None of them writes the line for you.",
+            + "something doing no work, an underline is something unclear, and a ticked underline is "
+            + "praise — and the note in the margin says why. None of them writes the line for you.",
             bodyItalic, Muted);
 
         MarkedManuscript.Render(writer, manuscript, marks);
@@ -312,9 +334,11 @@ public sealed class AnalysisDocumentRenderer
     }
 
     private static void RenderVoiceConsistency(
-        PageWriter writer, VoiceConsistency voice, SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
+        PageWriter writer, VoiceConsistency voice, SectionRead? section,
+        SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
     {
-        if (string.IsNullOrWhiteSpace(voice.DominantVoice) && voice.Divergences is not { Count: > 0 })
+        if (string.IsNullOrWhiteSpace(voice.DominantVoice) && voice.Divergences is not { Count: > 0 }
+            && section is not { HasContent: true })
             return;
 
         writer.Heading("Authorial voice consistency", h2, Ink, ruled: true);
@@ -322,6 +346,8 @@ public sealed class AnalysisDocumentRenderer
             "Where the manuscript's own prose drifts from its dominant voice — a register slip, a tonal " +
             "wobble. Deliberately distinct voices (a different POV, an embedded letter) are left out.",
             bodyItalic, Muted);
+        if (section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary))
+            writer.Paragraph(section.Summary, body, Ink);
         if (!string.IsNullOrWhiteSpace(voice.DominantVoice))
         {
             writer.Paragraph("The book's voice:", bodyBold, Ink);
@@ -340,14 +366,25 @@ public sealed class AnalysisDocumentRenderer
                 writer.Gap(PageGeometry.TightGap);
             }
         }
+        if (section?.Findings is { Count: > 0 })
+        {
+            writer.Paragraph("Also noted:", bodyBold, Ink);
+            foreach (var finding in section.Findings)
+                writer.Bullet(Join(finding.Chapter, finding.Detail), body, Ink);
+        }
     }
 
     // The cross-book continuity read (Phase 5): contradictions of the prior book's established canon, and the
     // status of the prior book's carried-over open threads. Rendered only when there is something to say — a
     // standalone book or a clean sequel is silent (quiet by default).
     private static void RenderSeriesContinuity(
-        PageWriter writer, SeriesContinuity series, SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
+        PageWriter writer, SeriesContinuity series, SectionRead? section,
+        SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
     {
+        // Quiet by default: a standalone book's own section persona still runs and still has
+        // something to say ("no prior book was provided"), but that is not worth a page — the
+        // section's absence already says it. Only a book with real continuity content earns the page,
+        // and the persona's own summary is welcome once it does.
         if (!series.HasContent)
             return;
 
@@ -359,6 +396,8 @@ public sealed class AnalysisDocumentRenderer
             $"How this book holds together with {against} — where it clashes with what was established, and " +
             "what it does with the threads the previous book left open.",
             bodyItalic, Muted);
+        if (section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary))
+            writer.Paragraph(section.Summary, body, Ink);
 
         if (series.Breaks is { Count: > 0 })
         {
@@ -379,10 +418,55 @@ public sealed class AnalysisDocumentRenderer
                 writer.Bullet(Join(thread.Status, thread.Established), body, Ink);
             writer.Gap(PageGeometry.BlockGap);
         }
+
+        if (section?.Findings is { Count: > 0 })
+        {
+            writer.Paragraph("Also noted:", bodyBold, Ink);
+            foreach (var finding in section.Findings)
+                writer.Bullet(Join(finding.Chapter, finding.Detail), body, Ink);
+        }
+    }
+
+    /// <summary>The section persona whose own read routes to a place other than "Whole-book notes".</summary>
+    private static SectionRead? SectionFor(IReadOnlyList<SectionRead> sections, string personaId) =>
+        sections.FirstOrDefault(section => section.PersonaId == personaId);
+
+    // The three section personas with an existing home elsewhere in the report — folded in by
+    // SectionFor at their own heading rather than printed again here.
+    private static readonly string[] HomedSectionIds = ["pacing", "voice-consistency", "series-continuity"];
+
+    /// <summary>
+    /// Story integrity, Structure, Setup and payoff, Theme hierarchy, and Length: the five whole-book
+    /// sections that had no section of their own before this — their one-line summaries used to be
+    /// dumped into Themes, unlabeled, overwriting the model's actual answer to what the book is about.
+    /// Each now prints under its own persona name, findings and all.
+    /// </summary>
+    private static void RenderWholeBookNotes(
+        PageWriter writer, IReadOnlyList<SectionRead> sectionReads, SKFont body, SKFont bodyItalic, SKFont h2, SKFont h3)
+    {
+        var notes = sectionReads.Where(section => section.HasContent && !HomedSectionIds.Contains(section.PersonaId)).ToList();
+        if (notes.Count == 0)
+            return;
+
+        writer.Heading("Whole-book notes", h2, Ink, ruled: true);
+        writer.Paragraph(
+            "What each whole-book read found, beyond the findings above. Sellability, structure, and " +
+            "whether a stranger finishes it come later, from the six readers.",
+            bodyItalic, Muted);
+
+        foreach (var section in notes)
+        {
+            writer.Heading(PersonaName(section.PersonaId), h3, Ink);
+            if (!string.IsNullOrWhiteSpace(section.Summary))
+                writer.Paragraph(section.Summary, body, Ink);
+            foreach (var finding in section.Findings ?? [])
+                writer.Bullet(Join(finding.Chapter, finding.Detail), body, Ink);
+            writer.Gap(PageGeometry.BlockGap);
+        }
     }
 
     /// <summary>
-    /// The seven readers: a contents page that maps them, then one page each.
+    /// The six readers: a contents page that maps them, then one page each.
     ///
     /// <para>They used to be seven blocks flowed into a single "Reviews" section, which is how a
     /// long read becomes a paragraph nobody finishes. Each read is a whole-book judgement in
@@ -405,7 +489,7 @@ public sealed class AnalysisDocumentRenderer
     }
 
     /// <summary>
-    /// The readers' contents page: the map to the seven sheets that follow.
+    /// The readers' contents page: the map to the six sheets that follow.
     ///
     /// <para>The closing line <b>counts</b> the agreement rather than asserting it, and names the
     /// dissent. A reader who wants nothing changed is information, not a rounding error — and a
@@ -437,10 +521,10 @@ public sealed class AnalysisDocumentRenderer
                 writer.Hairline();
         }
 
-        // The drawing closes this page with a counted consensus — "six of the seven name the middle
+        // The drawing closes this page with a counted consensus — "five of the six name the middle
         // … one asks for no change at all". It is NOT built here, and deliberately: the only count
         // this report can actually take is how many reads carry a weakness, and G23 makes that
-        // always all of them. A line that can only ever say "seven of the seven" is not a count, and
+        // always all of them. A line that can only ever say "six of the six" is not a count, and
         // the drawn claim — which reads are naming the SAME thing — is a judgement about text that
         // belongs to the model that read them. Raised for the owner rather than substituted.
     }
@@ -480,8 +564,8 @@ public sealed class AnalysisDocumentRenderer
 
     /// <summary>
     /// The reader's question, as the catalogue words it — "Could I sell it", "What is wrong with
-    /// it". It is the other half of the page's own label, and it is what makes seven reads read as
-    /// seven questions rather than seven opinions.
+    /// it". It is the other half of the page's own label, and it is what makes six reads read as
+    /// six questions rather than six opinions.
     /// </summary>
     private static string Lens(string personaId) =>
         PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId)?.Question ?? string.Empty;

@@ -1,10 +1,11 @@
 using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Graphics.Platform;
 using Storyworthtelling.Paper;
 
 namespace Folio.Android.Pages;
 
 /// <summary>
-/// The desk itself: a warm plank lit from the top left, its grain drawn rather than rendered.
+/// The desk itself: a warm plank lit from the top left, its grain illustrated rather than rendered.
 ///
 /// <para>It fills the well and sits under everything, which is the composition the frame is for —
 /// the wood is the ground, so the books lie flat and their painted covers face up, and that is the
@@ -14,32 +15,50 @@ namespace Folio.Android.Pages;
 /// far under §17 — so every small label on this screen lies on a note card or a post-it, where it is
 /// the same value it is everywhere else in the suite. <c>MaterialContrastTests</c> holds that.</para>
 ///
-/// <para>The grain is drawn in the same marker-and-pencil hand as the shelf's ledge, so the two
-/// areas read as one world rather than two apps stitched together. It is deterministic: a desk that
-/// re-grained itself on every launch would read as movement.</para>
+/// <para><b>The wood is the owner's own hand-drawn crayon-and-pencil wood grain</b> — a photo of a real
+/// drawing (crayon-colored ground, loose wobbly wood-grain lines sketched over it in colored pencil),
+/// cropped to just the drawn area and tiled rather than stretched (<c>Assets/desk-wood-tile.png</c>):
+/// one small image repeated across the well, the same cached-and-reused shape as
+/// <c>Storyworthtelling.Paper.PaperGrain</c>'s shader tile, so the desk stays consistent with
+/// DESIGN.md §2 rather than embedding one giant per-screen raster. The source photo's own uneven
+/// lighting was flattened and its edges healed for seamless repetition (an image model was tried
+/// first and kept returning a clean engraved-line illustration no prompt could talk it out of — this
+/// is the owner's real drawing instead). It is loaded once from the native Android asset (this head
+/// has no <c>&lt;SingleProject&gt;</c>, so MAUI's <c>Resources/Raw</c> convention is not reliable here
+/// — see the csproj) and reused for every draw. A tile that fails to load (an unusual build, not a
+/// real device) falls back to the plain gradient this replaced, so a desk always paints something
+/// rather than throwing mid-frame.</para>
 /// </summary>
 public sealed class DeskDrawable : IDrawable
 {
     /// <summary>
-    /// Where the grain runs, as a fraction of the plank's height: how far down it starts, how much
-    /// it wanders, and how strongly it takes the pencil.
-    ///
-    /// <para>Fixed rather than generated — a desk that re-grained itself on every launch would read
-    /// as movement. The <b>varying</b> weight is what matters: drawn at one opacity and one spacing,
-    /// nine parallel lines stop reading as wood and start reading as ruled paper, and with the board
-    /// seams on top of them, as tiles. Wood is irregular, and the irregularity has to be in the
-    /// drawing rather than left to the eye.</para>
+    /// The tile's on-screen width in device-independent units, at the source photo's own aspect
+    /// ratio (910×525). Fixed rather than derived from the source image's pixel size, so the grain
+    /// reads at desk scale (close to <see cref="DeskFillerDrawable"/>'s own pencil-and-cup scale)
+    /// regardless of how large the photographed tile itself is.
     /// </summary>
-    private static readonly (float Y, float Wander, float Weight)[] Grain =
-    [
-        (0.061f, 0.010f, 0.22f), (0.139f, -0.008f, 0.13f), (0.207f, 0.013f, 0.26f),
-        (0.298f, -0.011f, 0.10f), (0.372f, 0.009f, 0.21f), (0.455f, 0.014f, 0.15f),
-        (0.548f, -0.012f, 0.24f), (0.617f, 0.008f, 0.11f), (0.704f, -0.013f, 0.20f),
-        (0.791f, 0.011f, 0.14f), (0.878f, -0.009f, 0.23f),
-    ];
+    private const float TileWidth = 340f;
+    private const float TileHeight = TileWidth * 525f / 910f;
+
+    private static readonly Lazy<Microsoft.Maui.Graphics.IImage?> Tile = new(LoadTile);
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
+        if (Tile.Value is { } tile)
+        {
+            canvas.SaveState();
+            canvas.ClipRectangle(dirtyRect);
+            for (var y = dirtyRect.Top; y < dirtyRect.Bottom; y += TileHeight)
+            {
+                for (var x = dirtyRect.Left; x < dirtyRect.Right; x += TileWidth)
+                {
+                    canvas.DrawImage(tile, x, y, TileWidth, TileHeight);
+                }
+            }
+            canvas.RestoreState();
+            return;
+        }
+
         canvas.SaveState();
         canvas.SetFillPaint(
             new LinearGradientPaint
@@ -52,37 +71,18 @@ public sealed class DeskDrawable : IDrawable
             dirtyRect);
         canvas.FillRectangle(dirtyRect);
         canvas.RestoreState();
+    }
 
-        var grain = Color.FromArgb(MaterialTokens.DeskGrainHex);
-        canvas.StrokeLineCap = LineCap.Round;
-
-        // Each line an S rather than a single bend: one curve is an arc, and eleven parallel arcs
-        // are a pattern. Two opposed curves wander.
-        foreach (var (y, wander, weight) in Grain)
+    private static Microsoft.Maui.Graphics.IImage? LoadTile()
+    {
+        try
         {
-            var top = dirtyRect.Top + (dirtyRect.Height * y);
-            var drift = dirtyRect.Height * wander;
-
-            canvas.StrokeColor = grain.WithAlpha(weight);
-            canvas.StrokeSize = weight > 0.18f ? 1.4f : 1f;
-
-            var path = new PathF();
-            path.MoveTo(dirtyRect.Left - 4, top);
-            path.QuadTo(dirtyRect.Left + (dirtyRect.Width * 0.3f), top + drift,
-                dirtyRect.Center.X, top + (drift * 0.35f));
-            path.QuadTo(dirtyRect.Left + (dirtyRect.Width * 0.75f), top - (drift * 0.55f),
-                dirtyRect.Right + 4, top + (drift * 0.15f));
-            canvas.DrawPath(path);
+            using var stream = global::Android.App.Application.Context.Assets!.Open("desk-wood-tile.png");
+            return PlatformImage.FromStream(stream);
         }
-
-        // One board seam, not two, and faint. Two evenly spaced verticals across regular grain is
-        // what turned the desk into a tiled floor.
-        canvas.StrokeColor = grain.WithAlpha(0.07f);
-        canvas.StrokeSize = 1f;
-        var at = dirtyRect.Left + (dirtyRect.Width * 0.62f);
-        var seam = new PathF();
-        seam.MoveTo(at, dirtyRect.Top - 4);
-        seam.QuadTo(at + 7, dirtyRect.Center.Y, at - 5, dirtyRect.Bottom + 4);
-        canvas.DrawPath(seam);
+        catch
+        {
+            return null;
+        }
     }
 }

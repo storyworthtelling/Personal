@@ -152,12 +152,31 @@ public sealed record RevisionItem(
     string Issue,
     string SuggestedFix);
 
+// What is actually wrong with a line edit's sentence — so the manuscript's margin note can say
+// something specific rather than the single catch-all "Unclear" every edit used to carry regardless
+// of whether the problem was a filter word, a redundant clause, or a malformed sentence.
+public enum LineEditKind
+{
+    Other,
+    FilterWord,
+    Redundant,
+    WeakWord,
+    Cliche,
+    Grammar,
+    Digression,
+    Tone
+}
+
 // One sentence (or short passage) to cut, tighten, or rewrite, quoted so the author can find it.
 public sealed record LineEdit(
     string Chapter,
     string Excerpt,
     string Suggestion,
-    string Reason);
+    string Reason)
+{
+    // Defaults to Other for a stored report from before this existed, or a reply that omits it.
+    public LineEditKind Kind { get; init; } = LineEditKind.Other;
+}
 
 // A prose-style or voice pattern: repetition, filter words ("she felt", "he saw"), a verbal tic,
 // monotonous sentence rhythm, an overused construction, or a slip out of the established POV.
@@ -173,7 +192,20 @@ public sealed record DialogueNote(
     string Chapter,
     string Speakers,
     string Observation,
-    string Fix);
+    string Fix)
+{
+    // A verbatim quote of the actual exchange, when the note is about one — not every dialogue note
+    // is: "all three sound identical" is an aggregate observation with nothing to point at. Empty
+    // means exactly that, and MarkSource produces no mark for it.
+    public string Excerpt { get; init; } = string.Empty;
+}
+
+// Whether a scene, once written, earns its place or does no work for the book.
+public enum SceneVerdict
+{
+    EarnsItsPlace,
+    DoesNoWork
+}
 
 // One scene in the scene-by-scene map: what happens, what it accomplishes for the book, and a
 // verdict — which is what surfaces the scenes doing no work.
@@ -181,7 +213,14 @@ public sealed record SceneBeat(
     string Chapter,
     string Scene,
     string Purpose,
-    string Verdict);
+    string Verdict)
+{
+    // A verbatim quote from near the scene's own close, so its mark sits at the end of the scene it
+    // is about rather than floating free of the text. Empty for an older stored report; MarkSource
+    // produces no mark without something to anchor to.
+    public string Excerpt { get; init; } = string.Empty;
+    public SceneVerdict Outcome { get; init; } = SceneVerdict.EarnsItsPlace;
+}
 
 // The craft half of the report (line edits, prose/voice, dialogue, scene map). It is consolidated by
 // its OWN Claude call: together with the story half it is far more output than one call can produce
@@ -247,6 +286,16 @@ public sealed record BookAnalysisResult(
     // series section renders.
     public SeriesContinuity SeriesContinuity { get; init; } = SeriesContinuity.Empty;
 
+    /// <summary>
+    /// The eight whole-book section personas' own reads, carried through <b>whole</b> — not flattened
+    /// into a string, which is what let their summaries overwrite <see cref="Themes"/> in the first
+    /// place. The renderer routes each by <see cref="Reading.SectionRead.PersonaId"/>: three fold into
+    /// a section that already exists for that ground (Pacing, Voice consistency, Series continuity),
+    /// and the rest — Story integrity, Structure, Setup and payoff, Theme hierarchy, Length — get a
+    /// section of their own. Themes keeps the model's own answer to what this book is about.
+    /// </summary>
+    public IReadOnlyList<Reading.SectionRead> SectionReads { get; init; } = [];
+
     public static BookAnalysisResult Empty { get; } = new(
         string.Empty, string.Empty, Array.Empty<CharacterProfile>(), Array.Empty<string>(),
         Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(), Array.Empty<ReportFinding>(),
@@ -275,23 +324,25 @@ public sealed record BookAnalysisResult(
         this with { SeriesContinuity = seriesContinuity };
 
     /// <summary>
-    /// Folds the seventeen reads over the consolidated report.
+    /// Folds the sixteen reads over the consolidated report.
     ///
     /// <para>The readers <b>replace</b> whatever the omnibus reduce produced rather than joining it:
     /// the whole point of a persona pass is that one voice read the whole book, and a page carrying
     /// both would be two different instruments under one name. Sections and synthesis only fill what
     /// they actually found, so a read that has not run yet, or ran and was silent, leaves the
-    /// consolidated report's own answer standing rather than blanking it.</para>
+    /// consolidated report's own answer standing rather than blanking it. Themes is never touched
+    /// here — it is the model's own answer to what the book is about, and the sections are carried
+    /// separately in <see cref="SectionReads"/> for the renderer to route.</para>
     /// </summary>
     public BookAnalysisResult WithReads(
         IReadOnlyList<Review> readers,
-        IReadOnlyList<string> sectionSummaries,
+        IReadOnlyList<Reading.SectionRead> sections,
         IReadOnlyList<RevisionItem> revisionPlan,
         Verdict verdict) =>
         this with
         {
             Reviews = readers is { Count: > 0 } ? readers : Reviews,
-            Themes = sectionSummaries is { Count: > 0 } ? sectionSummaries : Themes,
+            SectionReads = sections is { Count: > 0 } ? sections : SectionReads,
             RevisionPlan = revisionPlan is { Count: > 0 } ? revisionPlan : RevisionPlan,
             Verdict = string.IsNullOrWhiteSpace(verdict.MostNeeds)
                 && verdict.Strengths is not { Count: > 0 }
