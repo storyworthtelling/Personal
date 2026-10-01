@@ -31,19 +31,70 @@ public static class SmsRecordMapper
             SourceId: $"sms:{id}");
     }
 
-    public static TimelineItem? MapMms(string id, long dateSeconds, int messageBox, string? address, string? text)
+    /// <summary>
+    /// <paramref name="allAddresses"/> is every address on the message (from + to + cc +
+    /// bcc), which is what tells a real group text apart from an ordinary 1:1 MMS — a plain
+    /// message is sender-plus-you (two addresses); anything with a third party on it is a
+    /// group. <paramref name="threadId"/> is the system MMS/SMS provider's own conversation
+    /// id, reused as the <see cref="TimelineItem.GroupId"/> rather than building one from the
+    /// address list, since Android already canonicalizes "who is this conversation with"
+    /// consistently across messages.
+    ///
+    /// Participants can end up including the device's own number: an incoming group MMS's
+    /// own address list often lists every recipient, yourself included, and there is no
+    /// reliable way from the provider alone to tell which one that is. Left as-is rather than
+    /// guessed at — an extra name in a group header is a smaller error than a wrongly
+    /// dropped one.
+    ///
+    /// Each address in <paramref name="allAddresses"/> is normalized once to decide group
+    /// membership and build <see cref="TimelineItem.Participants"/>, and the first raw
+    /// spelling seen for each distinct normalized key survives as the matching entry in
+    /// <see cref="TimelineItem.ParticipantAddresses"/> — the two lists describe the same
+    /// people in the same order, one for matching/display, one for anything that has to
+    /// actually reach the number.
+    /// </summary>
+    public static TimelineItem? MapMms(
+        string id, long dateSeconds, int messageBox, string? address, string? text,
+        long threadId = 0, IReadOnlyList<string>? allAddresses = null,
+        IReadOnlyList<AttachmentRef>? attachments = null)
     {
         if (string.IsNullOrEmpty(address) || messageBox is not (MmsInbox or MmsSent))
         {
             return null;
         }
+
+        // One raw address survives per distinct normalized key (first seen), so
+        // ParticipantAddresses and Participants describe the same people in the same
+        // order — the normalized list for matching/display, the raw one for anything
+        // that has to actually reach the number, country code included.
+        var byNormalizedKey = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var raw in allAddresses ?? [])
+        {
+            if (string.IsNullOrEmpty(raw))
+            {
+                continue;
+            }
+            var key = ContactKeyNormalizer.NormalizePhone(raw);
+            byNormalizedKey.TryAdd(key, raw);
+        }
+        var participants = byNormalizedKey.Keys.ToList();
+        var participantAddresses = byNormalizedKey.Values.ToList();
+        var isGroup = participants.Count > 2;
+        var attachmentList = attachments ?? [];
+
         return new TimelineItem(
             TimelineItemKind.Message,
             ContactKeyNormalizer.NormalizePhone(address),
             // Unlike every other telephony table, the MMS date column is in seconds.
             DateTimeOffset.FromUnixTimeSeconds(dateSeconds),
-            string.IsNullOrEmpty(text) ? "[MMS]" : text,
+            string.IsNullOrEmpty(text) ? AttachmentSummary.Describe(attachmentList) : text,
             Incoming: messageBox == MmsInbox,
-            SourceId: $"mms:{id}");
+            SourceId: $"mms:{id}")
+        {
+            GroupId = isGroup ? $"mms:{threadId}" : null,
+            Participants = isGroup ? participants : [],
+            ParticipantAddresses = isGroup ? participantAddresses : [],
+            Attachments = attachmentList,
+        };
     }
 }
