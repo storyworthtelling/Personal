@@ -30,8 +30,15 @@ internal static class AttachmentCache
 
         if (!file.Exists() || file.Length() == 0)
         {
-            var bytes = MailAccess.Attachment(context, item, attachment)
-                ?? throw new InvalidOperationException("The message no longer carries that attachment.");
+            // An MMS attachment's bytes are already on the device, in the system MMS
+            // provider — no network fetch, unlike a Gmail attachment.
+            var bytes = item.Kind == TimelineItemKind.Message
+                ? MmsAttachments.Fetch(context, attachment)
+                : MailAccess.Attachment(context, item, attachment);
+            if (bytes is null)
+            {
+                throw new InvalidOperationException("The message no longer carries that attachment.");
+            }
             System.IO.File.WriteAllBytes(file.AbsolutePath!, bytes);
         }
 

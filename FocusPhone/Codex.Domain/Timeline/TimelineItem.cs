@@ -49,9 +49,15 @@ public record TimelineItem(
     public string? InReplyTo { get; init; }
 
     // Group conversations: a non-null GroupId threads items by the group rather
-    // than by a single person. Participants are the group's member contact keys.
+    // than by a single person. Participants are the group's member contact keys —
+    // ContactKeyNormalizer output, good for matching and display, never for dialing:
+    // it keeps only the last ten digits, which drops the country code a number outside
+    // the NANP needs to actually be reachable. ParticipantAddresses is the original,
+    // unnormalized address for each — one per distinct Participants entry — and is
+    // what an outgoing reply must send to.
     public string? GroupId { get; init; }
     public IReadOnlyList<string> Participants { get; init; } = [];
+    public IReadOnlyList<string> ParticipantAddresses { get; init; } = [];
 
     // The Messages-for-Web conversation this text belongs to; the send/delete
     // target for the gmbridge path.
@@ -78,6 +84,26 @@ public record TimelineItem(
 }
 
 /// <summary>
+/// A one-word stand-in for a wordless message's content, so a picture text reads as
+/// "Photo" rather than the bare "[MMS]" placeholder — used both for the timeline row's
+/// snippet and for the incoming notification.
+/// </summary>
+public static class AttachmentSummary
+{
+    public static string Describe(IReadOnlyList<AttachmentRef> attachments)
+    {
+        if (attachments.Count == 0)
+        {
+            return "[MMS]";
+        }
+        var kind = attachments[0].IsImage ? "Photo"
+            : attachments[0].MimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ? "Video"
+            : "Attachment";
+        return attachments.Count == 1 ? kind : $"{kind} +{attachments.Count - 1}";
+    }
+}
+
+/// <summary>
 /// One person's or group's merged history. ContactKey is the representative
 /// key (a person's canonical identity, or the group id); MemberKeys lists every
 /// normalized key that resolved into this thread so the UI can offer each
@@ -90,6 +116,7 @@ public record ContactThread(
 {
     public IReadOnlyList<string> MemberKeys { get; init; } = [];
     public IReadOnlyList<string> Participants { get; init; } = [];
+    public IReadOnlyList<string> ParticipantAddresses { get; init; } = [];
     public bool IsGroup { get; init; }
     public bool HasUnread { get; init; }
 }

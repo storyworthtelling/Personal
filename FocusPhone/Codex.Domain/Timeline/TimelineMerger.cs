@@ -45,6 +45,16 @@ public class TimelineMerger
             .Distinct()
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToList();
+        // Deduplicated by normalized key again here, not just carried over from each item:
+        // two messages in the same thread can each have picked a different first-seen raw
+        // spelling for the same person, and this is the one place membership is unioned
+        // across all of them.
+        var participantAddresses = ordered
+            .SelectMany(item => item.ParticipantAddresses)
+            .GroupBy(ContactKeyNormalizer.NormalizePhone)
+            .Select(group => group.First())
+            .OrderBy(address => address, StringComparer.Ordinal)
+            .ToList();
 
         // Representative key: the resolved identity for a person, or the group id.
         var representative = isGroup ? threadKey : (memberKeys.Count > 0 ? memberKeys[0] : ordered[0].ContactKey);
@@ -53,6 +63,7 @@ public class TimelineMerger
         {
             MemberKeys = memberKeys,
             Participants = participants,
+            ParticipantAddresses = participantAddresses,
             IsGroup = isGroup,
             HasUnread = ordered.Any(item => item.Unread),
         };

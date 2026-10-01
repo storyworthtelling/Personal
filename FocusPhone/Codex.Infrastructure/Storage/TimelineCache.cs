@@ -31,6 +31,7 @@ public class TimelineCache
         ("attachments", "TEXT"),
         ("mailClass", "INTEGER"),
         ("htmlBody", "TEXT"),
+        ("participantAddresses", "TEXT"),
     };
 
     private readonly SqliteConnection connection;
@@ -86,11 +87,13 @@ public class TimelineCache
             INSERT INTO timelineItems (
                 kind, sourceId, contactKey, timestampUtc, snippet, incoming,
                 subject, body, fromAddress, recipients, carbonCopy, messageId, inReplyTo,
-                groupId, participants, externalConversationId, unread, attachments, mailClass, htmlBody)
+                groupId, participants, externalConversationId, unread, attachments, mailClass, htmlBody,
+                participantAddresses)
             VALUES (
                 $kind, $sourceId, $contactKey, $timestampUtc, $snippet, $incoming,
                 $subject, $body, $fromAddress, $recipients, $carbonCopy, $messageId, $inReplyTo,
-                $groupId, $participants, $externalConversationId, $unread, $attachments, $mailClass, $htmlBody)
+                $groupId, $participants, $externalConversationId, $unread, $attachments, $mailClass, $htmlBody,
+                $participantAddresses)
             ON CONFLICT (kind, sourceId) DO UPDATE SET
                 contactKey = excluded.contactKey,
                 timestampUtc = excluded.timestampUtc,
@@ -113,7 +116,8 @@ public class TimelineCache
                 -- nothing about how Post sorted it, and would otherwise undo the judgement
                 -- (and any correction the owner made) every half hour.
                 mailClass = COALESCE(excluded.mailClass, timelineItems.mailClass),
-                htmlBody = excluded.htmlBody
+                htmlBody = excluded.htmlBody,
+                participantAddresses = excluded.participantAddresses
             """;
         var parameters = new Dictionary<string, SqliteParameter>();
         foreach (var name in new[]
@@ -121,7 +125,7 @@ public class TimelineCache
             "$kind", "$sourceId", "$contactKey", "$timestampUtc", "$snippet", "$incoming",
             "$subject", "$body", "$fromAddress", "$recipients", "$carbonCopy", "$messageId", "$inReplyTo",
             "$groupId", "$participants", "$externalConversationId", "$unread", "$attachments",
-            "$mailClass", "$htmlBody",
+            "$mailClass", "$htmlBody", "$participantAddresses",
         })
         {
             var parameter = upsert.CreateParameter();
@@ -152,6 +156,7 @@ public class TimelineCache
             parameters["$attachments"].Value = Nullable(EncodeAttachments(item.Attachments));
             parameters["$mailClass"].Value = item.MailClass is { } mailClass ? (int)mailClass : DBNull.Value;
             parameters["$htmlBody"].Value = Nullable(item.HtmlBody);
+            parameters["$participantAddresses"].Value = Nullable(EncodeList(item.ParticipantAddresses));
             upsert.ExecuteNonQuery();
         }
         transaction.Commit();
@@ -170,7 +175,8 @@ public class TimelineCache
     private const string SelectColumns = """
         kind, sourceId, contactKey, timestampUtc, snippet, incoming,
         subject, body, fromAddress, recipients, carbonCopy, messageId, inReplyTo,
-        groupId, participants, externalConversationId, unread, attachments, mailClass, htmlBody
+        groupId, participants, externalConversationId, unread, attachments, mailClass, htmlBody,
+        participantAddresses
         """;
 
     public IReadOnlyList<TimelineItem> LoadAll()
@@ -289,6 +295,7 @@ public class TimelineCache
                 Attachments = DecodeAttachments(ReadString(reader, 17)),
                 MailClass = reader.IsDBNull(18) ? null : (Codex.Domain.Post.MailClass)reader.GetInt32(18),
                 HtmlBody = ReadString(reader, 19),
+                ParticipantAddresses = DecodeList(ReadString(reader, 20)),
             });
         }
         return items;

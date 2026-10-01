@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.OS;
 using Android.Provider;
+using Codex.Domain.Post;
 
 namespace Post;
 
@@ -78,9 +79,10 @@ public class SmsDeliverReceiver : BroadcastReceiver
 }
 
 /// <summary>
-/// Incoming MMS, which arrives as a WAP push rather than as a message. Post does not
-/// assemble MMS parts yet, so this exists to satisfy the role requirement and to record
-/// that something arrived rather than to drop it in silence.
+/// Incoming MMS, which arrives as a WAP push carrying only a notification — a transaction id
+/// and a URL to fetch the actual message from, not the message itself. As role holder Post
+/// is responsible for asking the platform to fetch it (<see cref="MmsDownloader"/>); the
+/// notification PDU is parsed by the pure, unit-tested <see cref="MmsNotificationParser"/>.
 /// </summary>
 [BroadcastReceiver(
     Name = "com.storyworthtelling.focusphone.communication.MmsDeliverReceiver",
@@ -89,8 +91,33 @@ public class SmsDeliverReceiver : BroadcastReceiver
 [IntentFilter([SmsRoleComponents.WapPushDeliver], DataMimeType = "application/vnd.wap.mms-message")]
 public class MmsDeliverReceiver : BroadcastReceiver
 {
-    public override void OnReceive(Context? context, Intent? intent) =>
-        PostDiagnostics.LogWarning("Mms", "An MMS arrived; Post does not assemble MMS parts yet.");
+    public override void OnReceive(Context? context, Intent? intent)
+    {
+        if (context is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var pdu = intent?.GetByteArrayExtra("data");
+            var notification = MmsNotificationParser.Parse(pdu);
+            if (notification is null)
+            {
+                PostDiagnostics.LogWarning("Mms", "An MMS notification arrived but could not be read.");
+                return;
+            }
+
+            MmsDownloader.RequestDownload(context, notification);
+        }
+        catch (Exception e)
+        {
+            // Never throw out of a broadcast receiver: it kills the process, and the
+            // carrier still expects a WAP-push response either way.
+            Android.Util.Log.Warn("Post", $"Could not start an MMS download: {e}");
+            PostDiagnostics.LogWarning("Mms", "Could not start an MMS download", e);
+        }
+    }
 }
 
 /// <summary>

@@ -78,7 +78,11 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     // A prepared list row: identity to open, plus the strings the list renders. Titles are
     // resolved off the UI thread (a Contacts query each), so binding and filtering stay cheap.
-    private sealed record ThreadRow(string ContactKey, string Title, string Subtitle, bool HasUnread);
+    // Items rides along too — filing/deleting the whole row needs the thread's own resolved
+    // membership, not a re-derived guess from ContactKey, which for a group is "group:<id>"
+    // and matches no individual item's own ContactKey at all.
+    private sealed record ThreadRow(
+        string ContactKey, string Title, string Subtitle, bool HasUnread, IReadOnlyList<TimelineItem> Items);
 
     public override BinderArea Tab =>
         new("Mailbox", Resource.Drawable.area_mailbox, PaperTheme.PostMark, PaperTheme.PostFill);
@@ -239,9 +243,27 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         // has no pinned actions because what you do here you do to a row.
         ReloadThreads();
         SyncInBackground();
+        CheckPendingMmsSendFailure();
     }
 
     public override void OnPermissionsResult() => ReloadThreads();
+
+    // A group MMS send fails asynchronously, well after the compose dialog and the tap that
+    // dismissed it are both gone — MmsSendReceiver is what actually finds out, and has no
+    // screen of its own to say so from. This is the same "wait behind the fold for the next
+    // time the owner opens Post" pattern the SMS role's own notice and the call-note prompt
+    // already use for exactly that shape of problem.
+    private void CheckPendingMmsSendFailure()
+    {
+        if (!PendingMmsSendFailureStore.TakeFailed(Host))
+        {
+            return;
+        }
+        DogEar.SetNotice(Host, Overlay, NoticeKeys.MmsSend, new DogEar.Notice(
+            "A group text did not go out.",
+            "Post holds the texting role but the last group send failed. It will need to be sent again.",
+            PaperTheme.ProblemMark));
+    }
 
     public override bool GoBack()
     {
@@ -450,7 +472,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         var latest = thread.Items[^1];
         var subtitle =
             $"{RelativeTime.Format(latest.TimestampUtc.LocalDateTime, DateTime.Now)} · {TimelineItemFormatter.Describe(latest)}";
-        return new ThreadRow(thread.ContactKey, title, subtitle, thread.HasUnread);
+        return new ThreadRow(thread.ContactKey, title, subtitle, thread.HasUnread, thread.Items);
     }
 
     private string ThreadTitle(ContactThread thread)
@@ -527,7 +549,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private void FileCorrespondence(ThreadRow row)
     {
         var now = DateTimeOffset.UtcNow;
-        var filed = ItemsFor(row.ContactKey);
+        var filed = row.Items;
         if (filed.Count == 0)
         {
             return;
@@ -560,19 +582,13 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // correspondence has, batched into one fold rather than one per item.
     private void DeleteCorrespondence(ThreadRow row)
     {
-        var items = ItemsFor(row.ContactKey);
-        if (items.Count == 0)
+        if (row.Items.Count == 0)
         {
             return;
         }
 
-        ScheduleBulkDelete(items, $"Deleted {row.Title}.", ReloadThreads);
+        ScheduleBulkDelete(row.Items, $"Deleted {row.Title}.", ReloadThreads);
     }
-
-    private IReadOnlyList<TimelineItem> ItemsFor(string contactKey) =>
-        liveItems.Concat(cachedItems)
-            .Where(item => item.ContactKey == contactKey)
-            .ToList();
 
     // Brings the cache up to date with the mail account. Success is the refreshed list —
     // no toast, no banner, no "last synced" line. A failure folds into the corner and
@@ -663,6 +679,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private LinearLayout? openActionRow;
     private List<TimelineItem> openItems = [];
     private IReadOnlyList<string> openMemberKeys = [];
+    private IReadOnlyList<string> openParticipants = [];
+    private IReadOnlyList<string> openParticipantAddresses = [];
     private bool openIsGroup;
     private string? openBridgeConversationId;
 
@@ -681,6 +699,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private const int PickBridgePhoto = 71;
     private string? pendingPhotoConversationId;
     private string? pendingPhotoNumber;
+    private const int PickGroupMedia = 72;
+    private IReadOnlyList<string>? pendingGroupMediaRecipients;
 
     /// <summary>
     /// Opens one correspondence in-frame — called both from a tap on this area's own list
@@ -889,6 +909,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
 
         openMemberKeys = thread?.MemberKeys ?? [];
+        openParticipants = thread?.Participants ?? [];
+        openParticipantAddresses = thread?.ParticipantAddresses ?? [];
         openIsGroup = thread?.IsGroup ?? false;
         openTitle = OpenThreadTitle(thread);
 
@@ -1102,13 +1124,23 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             return;
         }
         openActionRow.RemoveAllViews();
-        if (openIsGroup)
-        {
-            return; // Group replies need the bridge; no per-channel deep link yet.
-        }
         if (openSelection.IsActive)
         {
             return; // Choosing takes over the row's job; the channel actions come back when it ends.
+        }
+        if (openIsGroup)
+        {
+            // A group has no single number to call or email, but it does have a group MMS
+            // to reply into — the same recipient set every message in it already carries.
+            // ParticipantAddresses (raw, country code intact) is what actually has to reach
+            // each number; Participants is the normalized fallback for an older cached
+            // thread that predates the raw-address column.
+            var groupRecipients = openParticipantAddresses.Count > 0 ? openParticipantAddresses : openParticipants;
+            if (groupRecipients.Count > 0)
+            {
+                AddAction("Text", () => ShowGroupCompose(groupRecipients));
+            }
+            return;
         }
 
         var phone = openMemberKeys.FirstOrDefault(IsPhone) ?? (IsPhone(openContactKey!) ? openContactKey : null);
@@ -1149,6 +1181,11 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             actions.Add(new CardAction("Call back", () => PlaceCall(phone)));
             actions.Add(new CardAction("Text back", () => SendText(phone), Lead: true));
         }
+        else if (openIsGroup && openParticipants.Count > 0)
+        {
+            var groupRecipients = openParticipantAddresses.Count > 0 ? openParticipantAddresses : openParticipants;
+            actions.Add(new CardAction("Text back", () => ShowGroupCompose(groupRecipients), Lead: true));
+        }
 
         var email = openMemberKeys.FirstOrDefault(IsEmail) ?? (IsEmail(openContactKey!) ? openContactKey : null);
         if (item.Kind == TimelineItemKind.Email && email is not null)
@@ -1161,6 +1198,15 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         if (item.Kind == TimelineItemKind.Call && phone is not null)
         {
             actions.Add(new CardAction("Write a note on this call", () => WriteCallNote(phone)));
+        }
+
+        // An MMS with a picture or video attached: this is usually the entire reason the
+        // message was opened, since the snippet itself is just "[MMS]" or a word like
+        // "Photo" standing in for content that was never text in the first place.
+        if (item.Attachments.Count > 0)
+        {
+            actions.Add(new CardAction(
+                Attachments.Label(item.Attachments), () => Attachments.Offer(Host, Overlay, item), Lead: true));
         }
 
         actions.Add(new CardAction("File", () => FileWithUndo(item)));
@@ -1581,8 +1627,99 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         Host.StartActivityForResult(Intent.CreateChooser(intent, "Photo"), PickBridgePhoto);
     }
 
+    // A reply into a group thread: native MMS to every participant at once, since sending
+    // one at a time is not a group reply — it is N separate texts, each missing everyone
+    // else's side of the conversation. Text and a picture/video are separate sends here
+    // (matching the bridge's own "Photo" button above) rather than one message carrying
+    // both; a captioned attachment is a reasonable future step, not required to close the
+    // "nowhere to reply at all" gap this exists for.
+    private void ShowGroupCompose(IReadOnlyList<string> recipients)
+    {
+        var input = new EditText(Host) { Hint = "Message" };
+        new AlertDialog.Builder(Host)
+            .SetTitle("Text")!
+            .SetView(input)!
+            .SetPositiveButton("Send", (_, _) =>
+            {
+                var text = input.Text ?? string.Empty;
+                if (text.Length == 0)
+                {
+                    return;
+                }
+                SendGroupMms(recipients, text, media: []);
+            })!
+            .SetNeutralButton("Attach", (_, _) => PickMediaForGroup(recipients))!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    // One picker for both photos and videos rather than two buttons — AlertDialog has room
+    // for exactly three, already spent on Send/Attach/Cancel.
+    private void PickMediaForGroup(IReadOnlyList<string> recipients)
+    {
+        pendingGroupMediaRecipients = recipients;
+        var intent = new Intent(Intent.ActionGetContent);
+        intent.SetType("*/*");
+        intent.PutExtra(Intent.ExtraMimeTypes, new[] { "image/*", "video/*" });
+        intent.AddCategory(Intent.CategoryOpenable);
+        Host.StartActivityForResult(Intent.CreateChooser(intent, "Attach"), PickGroupMedia);
+    }
+
+    // The send itself is fire-and-forget from here: SmsManager.SendMultimediaMessage is
+    // asynchronous, so there is nothing left to confirm by the time this returns — a
+    // failure surfaces later via PendingMmsSendFailureStore, checked on the next resume,
+    // not from this call site.
+    private void SendGroupMms(IReadOnlyList<string> recipients, string? text, IReadOnlyList<MmsOutboundPart> media)
+    {
+        try
+        {
+            MmsSender.Send(Host, recipients, text, media);
+            Syncs.After(Host, PostAction.Sent);
+        }
+        catch (MmsAttachmentTooLargeException e)
+        {
+            PostDiagnostics.LogWarning("Mms", "Refused an oversized attachment", e);
+            DogEar.ShowNotices(Host, Overlay,
+            [
+                new DogEar.Notice("That attachment is too large to send.",
+                    "It never reached the carrier — pick a smaller photo or video, or trim the clip first.",
+                    PaperTheme.ProblemMark),
+            ]);
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Warn("Post", $"Group MMS send failed: {e}");
+            PostDiagnostics.LogWarning("Mms", "Sending a group text failed", e);
+            DogEar.ShowNotices(Host, Overlay,
+            [
+                new DogEar.Notice("That text did not go out.",
+                    "Post holds the texting role but the send failed before it could even start.",
+                    PaperTheme.ProblemMark),
+            ]);
+        }
+    }
+
     public override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
+        if (requestCode == PickGroupMedia)
+        {
+            var recipients = pendingGroupMediaRecipients;
+            pendingGroupMediaRecipients = null;
+            if (resultCode != Result.Ok || data?.Data is null || recipients is null)
+            {
+                return;
+            }
+            var mediaMime = Host.ContentResolver!.GetType(data.Data) ?? "application/octet-stream";
+            var mediaBytes = ReadBytes(data.Data);
+            if (mediaBytes is null)
+            {
+                return;
+            }
+            var fileName = mediaMime.StartsWith("video/") ? "video" : "photo";
+            SendGroupMms(recipients, text: null, media: [new MmsOutboundPart(fileName, mediaMime, mediaBytes)]);
+            return;
+        }
+
         if (requestCode != PickBridgePhoto || resultCode != Result.Ok || data?.Data is null
             || pendingPhotoConversationId is null)
         {

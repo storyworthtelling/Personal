@@ -105,4 +105,91 @@ public class SmsRecordMapperTests
     {
         Assert.Null(SmsRecordMapper.MapMms("25", T0Seconds, messageBox: 1, address: null, text: "x"));
     }
+
+    [Fact]
+    public void MapMms_TwoAddresses_IsAnOrdinaryOneToOneThread()
+    {
+        var item = SmsRecordMapper.MapMms(
+            "26", T0Seconds, messageBox: 1, address: "5551234567", text: "hi",
+            threadId: 9, allAddresses: ["5551234567", "5559999999"]);
+
+        Assert.NotNull(item);
+        Assert.False(item.IsGroup);
+        Assert.Null(item.GroupId);
+        Assert.Empty(item.Participants);
+    }
+
+    [Fact]
+    public void MapMms_MoreThanTwoAddresses_IsAGroupThreadedByProviderThreadId()
+    {
+        var item = SmsRecordMapper.MapMms(
+            "27", T0Seconds, messageBox: 1, address: "5551234567", text: "group photo",
+            threadId: 42, allAddresses: ["5551234567", "5559999999", "5558888888"]);
+
+        Assert.NotNull(item);
+        Assert.True(item.IsGroup);
+        Assert.Equal("mms:42", item.GroupId);
+        Assert.Equal(["5551234567", "5558888888", "5559999999"], item.Participants.OrderBy(k => k));
+    }
+
+    [Fact]
+    public void MapMms_DuplicateOrUnnormalizedAddresses_DoNotInflateTheGroupCount()
+    {
+        // The carrier lists the sender in "to" as well as "from" on some networks; without
+        // normalizing and de-duplicating first, that alone would misread a 1:1 text as a group.
+        var item = SmsRecordMapper.MapMms(
+            "28", T0Seconds, messageBox: 1, address: "5551234567", text: "hi",
+            threadId: 5, allAddresses: ["+1 (555) 123-4567", "5551234567", "5559999999"]);
+
+        Assert.NotNull(item);
+        Assert.False(item.IsGroup);
+    }
+
+    [Fact]
+    public void MapMms_InternationalAddress_ParticipantAddressesKeepsTheCountryCode()
+    {
+        // Participants (normalized) keeps only the last ten digits — dropping the country
+        // code a non-NANP number needs to actually be reachable. ParticipantAddresses must
+        // carry the original spelling through untouched so a reply can still dial it.
+        var item = SmsRecordMapper.MapMms(
+            "30", T0Seconds, messageBox: 1, address: "5551234567", text: "group photo",
+            threadId: 77, allAddresses: ["5551234567", "5559999999", "+447911123456"]);
+
+        Assert.NotNull(item);
+        Assert.True(item.IsGroup);
+        Assert.Equal(3, item.Participants.Count);
+        Assert.Equal(3, item.ParticipantAddresses.Count);
+        Assert.Contains("+447911123456", item.ParticipantAddresses);
+        Assert.DoesNotContain("7911123456", item.ParticipantAddresses);
+    }
+
+    [Fact]
+    public void MapMms_ParticipantsAndParticipantAddresses_AreSameLengthAndOrder()
+    {
+        var item = SmsRecordMapper.MapMms(
+            "31", T0Seconds, messageBox: 1, address: "5551234567", text: "hi",
+            threadId: 78, allAddresses: ["+1 (555) 123-4567", "5559999999", "+447911123456"]);
+
+        Assert.NotNull(item);
+        Assert.Equal(item.Participants.Count, item.ParticipantAddresses.Count);
+        for (var i = 0; i < item.Participants.Count; i++)
+        {
+            Assert.Equal(ContactKeyNormalizer.NormalizePhone(item.ParticipantAddresses[i]), item.Participants[i]);
+        }
+    }
+
+    [Fact]
+    public void MapMms_CarriesAttachmentsThrough()
+    {
+        var attachment = new AttachmentRef("part:1", "photo.jpg", "image/jpeg", 204_800);
+
+        var item = SmsRecordMapper.MapMms(
+            "29", T0Seconds, messageBox: 1, address: "5551234567", text: null,
+            attachments: [attachment]);
+
+        Assert.NotNull(item);
+        Assert.Equal("Photo", item.Snippet);
+        Assert.Single(item.Attachments);
+        Assert.Equal("photo.jpg", item.Attachments[0].FileName);
+    }
 }
