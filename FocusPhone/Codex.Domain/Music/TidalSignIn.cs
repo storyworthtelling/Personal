@@ -57,10 +57,18 @@ public static class TidalSignIn
     public const string RedirectUri = "com.storyworthtelling.focusphone.audio://tidal-auth";
 
     /// <summary>
-    /// What Score asks the account for: read and write the owner's own data, and
-    /// play against their subscription rather than only reading the catalogue.
+    /// What Score asks the account for, in TIDAL developer-portal scopes: the account's
+    /// country (<c>user.read</c>, which every catalogue call is keyed by), catalogue search
+    /// (<c>search.read</c>), and playback through the Player module (<c>playback</c>).
+    ///
+    /// This was <c>r_usr w_usr w_sub</c> — the scopes TIDAL's own apps use, which a
+    /// portal client is never granted. TIDAL does not answer that with an OAuth error on
+    /// the redirect; its login page refuses the request outright ("Error 1002") and
+    /// never sends the browser back, so nothing reached Score to log. The page also
+    /// refuses a scope not ticked on the app in the dashboard, so this list and that
+    /// page must say the same thing.
     /// </summary>
-    public const string Scope = "r_usr w_usr w_sub";
+    public const string Scope = "user.read search.read playback";
 
     /// <summary>The URL to open in the browser.</summary>
     public static string AuthorizeUrl(string clientId, string redirectUri, string challenge, string state)

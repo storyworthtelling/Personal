@@ -88,6 +88,27 @@ public class TidalSignInTests
         Assert.False(string.IsNullOrWhiteSpace(query["scope"]));
     }
 
+    // The owner's "Error 1002" was TIDAL's login page refusing the authorize request, before
+    // any redirect: Score asked for r_usr/w_usr/w_sub, the scopes of TIDAL's own apps, which a
+    // developer-portal client is never granted. It must ask only for portal scopes, and exactly
+    // the ones ticked on the app in the dashboard — so this list is the checklist for that page.
+    [Fact]
+    public void AuthorizeUrl_AsksForTheDeveloperPortalScopesScoreUses()
+    {
+        var query = Query(TidalSignIn.AuthorizeUrl("cid", Redirect, "c", "s"));
+
+        Assert.Equal(["playback", "search.read", "user.read"], query["scope"].Split(' ').Order());
+    }
+
+    [Theory]
+    [InlineData("r_usr")]
+    [InlineData("w_usr")]
+    [InlineData("w_sub")]
+    public void Scope_CarriesNoneOfTidalsInternalAppScopes(string legacy)
+    {
+        Assert.DoesNotContain(legacy, TidalSignIn.Scope.Split(' '));
+    }
+
     [Fact]
     public void AuthorizeUrl_EscapesTheRedirectRatherThanSplittingTheQuery()
     {
@@ -181,6 +202,17 @@ public class TidalSignInReachabilityTests
         // The filter matches a host and its subdomains, so the registrable domain
         // covers both login.tidal.com (the password page) and auth.tidal.com (tokens).
         Assert.Contains("tidal.com", allowed);
+    }
+
+    // Chrome runs under URLBlocklist ["*"] in Admin mode, and the filter applies to every
+    // scheme — so without an entry for Score's own scheme, a sign-in that succeeded on TIDAL's
+    // page would end on "blocked by your administrator" instead of coming back to Score.
+    [Fact]
+    public void TheLoginBrowser_MayHandTheRedirectBackToScore()
+    {
+        var scheme = new Uri(TidalSignIn.RedirectUri).Scheme;
+
+        Assert.Contains($"{scheme}://*", Codex.Domain.Policy.PolicyContext.LoginBrowserUrlAllowlist);
     }
 
     [Fact]

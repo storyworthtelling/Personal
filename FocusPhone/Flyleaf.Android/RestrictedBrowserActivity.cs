@@ -145,6 +145,24 @@ public class RestrictedBrowserActivity : Activity
         ShowStatus($"Saving {fileName} to Downloads…");
     }
 
+    /// <summary>
+    /// Hands a suite app's OAuth redirect to that app and closes, the way a Custom Tab does:
+    /// the sign-in is finished, and this page has nothing left to show.
+    /// </summary>
+    public void HandBack(string redirect)
+    {
+        try
+        {
+            StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(redirect)));
+            Finish();
+        }
+        catch (ActivityNotFoundException)
+        {
+            // The app that asked for the sign-in is not installed to receive it.
+            ShowBlockedPage(redirect);
+        }
+    }
+
     public void ShowBlockedPage(string blockedUrl)
     {
         // Styled entirely from DesignTokens; fonts come from the shared assets
@@ -206,6 +224,15 @@ public class RestrictedBrowserActivity : Activity
                 && policy.IsNavigationAllowed(origin, targetUri))
             {
                 return false;
+            }
+
+            // A suite app's own sign-in redirect (Score's TIDAL code coming back) goes to that
+            // app rather than to the Blocked page — the one non-web scheme handed on.
+            if (target is not null && Uri.TryCreate(target, UriKind.Absolute, out var redirectUri)
+                && SuiteRedirect.IsSuiteRedirect(redirectUri))
+            {
+                activity.HandBack(target);
+                return true;
             }
 
             // A same-domain page loads above; anything else is off-limits — unless
