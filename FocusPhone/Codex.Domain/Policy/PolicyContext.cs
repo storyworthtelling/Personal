@@ -9,7 +9,6 @@ public record PolicyContext(
     IReadOnlySet<string> OwnPackages,
     IReadOnlySet<string> BrowserPackages,
     IReadOnlySet<string> OtherHomePackages,
-    IReadOnlySet<string> BlockedPackages,
     bool DebuggingLockedDown,
     // The never-visible categories (games / social / dating / gambling / short-form), hard-suspended
     // and not reversible in Admin — computed by the head via HardBlock.Detect over installed apps.
