@@ -29,9 +29,11 @@ public static class PolicyPlanBuilder
 
         var suspended = new HashSet<string>(context.BrowserPackages);
         suspended.UnionWith(context.OtherHomePackages);
-        suspended.UnionWith(context.BlockedPackages);
         // The never-visible categories (games/social/dating/gambling/short-form) are hard-suspended
-        // and never released — not by the Admin blocklist, not by the allowlist below.
+        // and never released — not by the Admin blocklist, not by the allowlist below. The owner's
+        // manual per-app block is deliberately NOT suspended here: a blocked app is only kept off
+        // the shelf (ShelfSceneBuilder filters it out of the tray), so a block never interrupts a
+        // background function (sync, alarms, notifications) the owner still relies on.
         suspended.UnionWith(context.NeverVisiblePackages);
         suspended.ExceptWith(context.OwnPackages);
         // Suspending the Play Store would break background auto-updates; it is
