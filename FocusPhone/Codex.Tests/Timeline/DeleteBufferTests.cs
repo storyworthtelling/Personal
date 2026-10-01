@@ -68,4 +68,58 @@ public class DeleteBufferTests
         Assert.True(buffer.IsPending(text));
         Assert.False(buffer.IsPending(call));
     }
+
+    // MailboxArea shares one DeleteBuffer between the UI thread (Schedule/Undo, from a tap
+    // and the undo timer) and a background Task.Run (Filter, from the reload/merge path).
+    // A plain Dictionary is not safe under that access pattern — a concurrent read during a
+    // resize can corrupt its buckets and throw from inside the background task, unhandled.
+    // This won't deterministically reproduce every interleaving, but it reliably caught the
+    // unsynchronized version failing (via a thrown exception or a corrupted read) before the
+    // locking fix, across thousands of concurrent Schedule/Undo/Filter/TakeDue calls.
+    [Fact]
+    public async Task ConcurrentScheduleUndoAndFilter_NeverThrowsOrCorrupts()
+    {
+        var buffer = new DeleteBuffer();
+        var items = Enumerable.Range(0, 50).Select(i => Item($"m{i}")).ToList();
+        const int iterations = 2000;
+        Exception? failure = null;
+
+        var writer = Task.Run(() =>
+        {
+            try
+            {
+                for (var i = 0; i < iterations; i++)
+                {
+                    var item = items[i % items.Count];
+                    buffer.Schedule(item, Now, Window);
+                    buffer.Undo(item.Kind, item.SourceId);
+                }
+            }
+            catch (Exception e)
+            {
+                failure = e;
+            }
+        });
+
+        var reader = Task.Run(() =>
+        {
+            try
+            {
+                for (var i = 0; i < iterations; i++)
+                {
+                    _ = buffer.Filter(items).ToList();
+                    _ = buffer.Pending.Count;
+                    _ = buffer.TakeDue(Now - Window);
+                }
+            }
+            catch (Exception e)
+            {
+                failure = e;
+            }
+        });
+
+        await Task.WhenAll(writer, reader);
+
+        Assert.Null(failure);
+    }
 }

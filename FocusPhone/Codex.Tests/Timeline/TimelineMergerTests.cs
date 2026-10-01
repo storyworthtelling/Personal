@@ -139,6 +139,35 @@ public class TimelineMergerTests
     }
 
     [Fact]
+    public void Merge_GroupItemsWithDifferingRawSpellings_UnionsOneAddressPerNormalizedKey()
+    {
+        // Two messages in the same group can each carry a differently-spelled raw address
+        // for the same international contact (e.g. one dropped the leading "+"); the merged
+        // thread must still resolve to exactly one address per participant, and it must keep
+        // the country code rather than the normalized, undialable last-ten-digits form.
+        var groupItemA = new TimelineItem(
+            TimelineItemKind.Message, "5551110000", T0, "hi all", Incoming: true, SourceId: "g1")
+        {
+            GroupId = "conv-77",
+            Participants = ["5551110000", "7911123456"],
+            ParticipantAddresses = ["5551110000", "+447911123456"],
+        };
+        var groupItemB = groupItemA with
+        {
+            ContactKey = "7911123456",
+            TimestampUtc = T0.AddMinutes(5),
+            SourceId = "g2",
+            ParticipantAddresses = ["5551110000", "447911123456"],
+        };
+
+        var thread = Assert.Single(new TimelineMerger().Merge([groupItemA, groupItemB]));
+
+        Assert.Equal(2, thread.ParticipantAddresses.Count);
+        Assert.Contains(thread.ParticipantAddresses, address => address.EndsWith("447911123456", StringComparison.Ordinal));
+        Assert.DoesNotContain("7911123456", thread.ParticipantAddresses);
+    }
+
+    [Fact]
     public void Merge_MarksThreadUnread_WhenAnyItemIsUnread()
     {
         var read = new TimelineItem(TimelineItemKind.Message, "alice", T0, "read", Incoming: true, SourceId: "m1");
