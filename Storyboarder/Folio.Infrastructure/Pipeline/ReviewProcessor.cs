@@ -125,7 +125,7 @@ public sealed class ReviewProcessor : IPipelineStep
         // soonest Waiting if any is merely deferred, else Idle.
         var novels = await db.Novels
             .Where(n => n.Stage != ProjectStage.Completed && n.Stage != ProjectStage.Failed &&
-                        n.Stage != ProjectStage.Cancelled)
+                        n.Stage != ProjectStage.Cancelled && n.DeletedAtUtc == null)
             .OrderBy(n => n.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -995,8 +995,8 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 2g) The seventeen reads. Eight whole-book sections on the standard model, then seven readers
-        // on the strong one, then the two synthesis passes that read the other fifteen.
+        // 2g) The sixteen reads. Eight whole-book sections on the standard model, then six readers
+        // on the strong one, then the two synthesis passes that read the other fourteen.
         //
         // One pass per turn, each persisted the moment it succeeds, because each is a separate model
         // call costing real money: a reader that comes back short must not re-bill the fourteen that
@@ -1024,6 +1024,7 @@ public sealed class ReviewProcessor : IPipelineStep
                             due.Id,
                             await ReadSections(db, novel.Id, cancellationToken),
                             await ReadReaders(db, novel.Id, cancellationToken),
+                            novel.WordCount,
                             cancellationToken),
                         JsonResponse.CaseInsensitive)
                     : due.Persona!.Kind == PersonaKind.Reader
@@ -1046,6 +1047,44 @@ public sealed class ReviewProcessor : IPipelineStep
                 return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
             }
 
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 2h) Paint the jacket (a Gemini call), if nothing has painted or set one yet. Its own resumable
+        // step, gated on CoverPath/CoverAttempted rather than a column of its own — there is no report field
+        // to hold, only a file and a flag. A refusal (ImageContentBlockedException) settles CoverAttempted
+        // without a retry, the same as a scene left without an image: a cover is evidence, not the report,
+        // and the render must never wait on one. Skipped entirely once the owner has set or repainted a
+        // cover by hand — ProjectService's own SetCoverAsync path, not this gate.
+        if (novel.CoverPath is null && !novel.CoverAttempted)
+        {
+            if (!geminiLimiter.TryAcquire())
+                return ProcessResult.Waiting(geminiLimiter.TimeUntilNext(), novel.Id);
+
+            var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
+                         ?? BookAnalysisResult.Empty;
+
+            try
+            {
+                var jacket = await gemini.GenerateJacket(novel.Title, report.Genre, report.Logline, novel.ArtStyle, cancellationToken);
+                novel.CoverPath = imageStore.Save(
+                    Path.Combine(novel.Id.ToString(), "covers", $"{Guid.NewGuid():N}.png"), jacket);
+                novel.CoverIsOwners = false;
+                novel.LastError = null;
+            }
+            catch (ImageContentBlockedException blocked)
+            {
+                logger.LogWarning("Manuscript {NovelId} left without a painted jacket after a refusal: {Reason}",
+                    novel.Id, blocked.Reason);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+            }
+
+            novel.CoverAttempted = true;
             Touch(novel);
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.DidWork(novel.Id);
@@ -1074,7 +1113,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
-                // The seventeen reads, folded last so the readers replace the omnibus reduce's reviews
+                // The sixteen reads, folded last so the readers replace the omnibus reduce's reviews
                 // rather than sitting beside them.
                 var sections = await ReadSections(db, novel.Id, cancellationToken);
                 var readers = await ReadReaders(db, novel.Id, cancellationToken);
@@ -1084,10 +1123,7 @@ public sealed class ReviewProcessor : IPipelineStep
                     .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity)
                     .WithReads(
                         readers,
-                        sections.Where(section => section.HasContent)
-                            .Select(section => section.Summary)
-                            .Where(summary => !string.IsNullOrWhiteSpace(summary))
-                            .ToList(),
+                        sections.Where(section => section.HasContent).ToList(),
                         synthesis.RevisionPlan,
                         synthesis.Verdict);
                 // The draft's own text, which the report marks the findings onto (Release G). Read
@@ -1805,7 +1841,7 @@ public sealed class ReviewProcessor : IPipelineStep
             .Where(pass => pass.NovelId == novelId && pass.Json != null && ids.Contains(pass.PassId))
             .ToListAsync(cancellationToken);
 
-        // Ordered by the catalogue, not by when they finished: the report prints the seven in a fixed
+        // Ordered by the catalogue, not by when they finished: the report prints the six in a fixed
         // order and a retry must not move a reader's page.
         return rows
             .Select(row => JsonSerializer.Deserialize<Review>(row.Json!, JsonResponse.CaseInsensitive))

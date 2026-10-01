@@ -63,6 +63,17 @@ public class Novel
     public bool CoverIsOwners { get; set; }
 
     /// <summary>
+    /// Whether the pipeline has already tried to paint this book's jacket.
+    ///
+    /// <para>Billed once, like expansion or delivery: a refused jacket
+    /// (<see cref="Folio.Domain.Pipeline.ImageContentBlockedException"/>) settles this to true with
+    /// <see cref="CoverPath"/> still null, so the worker does not repaint a book Gemini has already
+    /// declined rather than deferring it forever. It never gates a repaint the owner asks for by hand
+    /// — <c>ProjectService.ReplaceCoverAsync</c>/<c>SetPaintedCoverAsync</c> do not read it.</para>
+    /// </summary>
+    public bool CoverAttempted { get; set; }
+
+    /// <summary>
     /// How long the manuscript is, measured once when it is read in.
     ///
     /// <para>A column rather than a derivation: the shelf draws every spine's width from it, and the
@@ -80,6 +91,17 @@ public class Novel
     /// <i>Put on the shelf</i> does.</para>
     /// </summary>
     public DateTimeOffset? ShelvedAtUtc { get; set; }
+
+    /// <summary>
+    /// When the owner deleted this book, or null while it is live.
+    ///
+    /// <para>Set the moment "Delete" is chosen — before the undo window closes, not after — because
+    /// deleting is undo-first (DESIGN.md §6) and the fold has to have something to put back. The
+    /// owner's rows and files are not actually removed until the window closes without being turned;
+    /// this column is what the Desk's and the Shelf's own listings, and the pipeline's unit of work,
+    /// exclude in the meantime rather than showing a book that is about to be gone.</para>
+    /// </summary>
+    public DateTimeOffset? DeletedAtUtc { get; set; }
 
     public Guid? SeriesId { get; set; }
 
@@ -345,9 +367,9 @@ public class BookAnalysis
 }
 
 /// <summary>
-/// One persona's pass over one draft — seventeen rows per read.
+/// One persona's pass over one draft — sixteen rows per read.
 ///
-/// <para><b>Why a row each rather than seventeen columns.</b> Every pass is a separate model call
+/// <para><b>Why a row each rather than sixteen columns.</b> Every pass is a separate model call
 /// costing real money, so each has to succeed, fail and retry on its own: a reader that came back
 /// short must not re-bill the fourteen passes that were fine. That is the same reason the craft,
 /// voice and expansion halves already have their own columns — this is the same rule at the scale

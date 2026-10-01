@@ -107,6 +107,12 @@ public sealed class ChapterDetector
         if (overlapping.Count == 1)
             return (overlapping[0].Number, overlapping[0].Label);
 
+        // A span touching every chapter there is doesn't localize anything — on a short manuscript
+        // that fits in one chunk, "Chapters 1–2" would sit on every finding in the report identically,
+        // which is indistinguishable from no citation at all. Say plainly that it's the whole book.
+        if (overlapping.Count == chapters.Count)
+            return (overlapping[0].Number, WholeManuscriptLabel);
+
         return (overlapping[0].Number, $"Chapters {overlapping[0].Number}–{overlapping[^1].Number}");
     }
 

@@ -307,6 +307,9 @@ namespace Folio.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("CoverAttempted")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("CoverIsOwners")
                         .HasColumnType("INTEGER");
 
@@ -314,6 +317,9 @@ namespace Folio.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("DeletedAtUtc")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("DesignBibleConsolidated")
