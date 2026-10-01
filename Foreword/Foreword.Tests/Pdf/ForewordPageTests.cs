@@ -64,6 +64,43 @@ public class ForewordPageTests
         Assert.Contains("SET AND DELIVERED BY FOREWORD", page, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The mark is the owner's <b>drawn</b> mark — the canted oval and M that Folio's report covers
+    /// carry — not a photograph. A drawn mark is vector, so the first page holds no image at all; a
+    /// photo medallion would put one there, which is how this would come back.
+    /// </summary>
+    [Fact]
+    public void TheMarkIsDrawnNotAPhotograph()
+    {
+        using var document = PdfDocument.Open(new MemoryStream(Brief("A quiet Sunday.", Article("One"))));
+
+        Assert.Empty(document.GetPage(1).GetImages());
+    }
+
+    [Fact]
+    public void TheMarkIsTheSharedOneFolioPrints()
+    {
+        var pdf = Path.Combine(Root(), "Foreword.Infrastructure", "Pdf");
+        var page = File.ReadAllText(Path.Combine(pdf, "ForewordPage.cs"));
+        var layout = File.ReadAllText(Path.Combine(pdf, "SkiaPageLayout.cs"));
+
+        Assert.Contains("DrawOwnersMark(", page, StringComparison.Ordinal);
+        Assert.Contains("OwnersMark.Draw(", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("Medallion", page, StringComparison.Ordinal);
+    }
+
+    private static string Root()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Foreword.sln")))
+        {
+            dir = dir.Parent;
+        }
+
+        Assert.NotNull(dir);
+        return dir!.FullName;
+    }
+
     [Fact]
     public void TheOwnersVoiceIsOnIt()
     {
