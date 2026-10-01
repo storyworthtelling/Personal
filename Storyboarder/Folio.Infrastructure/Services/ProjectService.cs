@@ -585,7 +585,7 @@ public sealed class ProjectService
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var ids = await db.Novels
-            .Where(n => n.ShelvedAtUtc != null)
+            .Where(n => n.ShelvedAtUtc != null && n.DeletedAtUtc == null)
             .OrderByDescending(n => n.ShelvedAtUtc)
             .Select(n => n.Id)
             .ToListAsync(cancellationToken);
@@ -639,6 +639,41 @@ public sealed class ProjectService
     }
 
     /// <summary>
+    /// Marks a book deleted — undo-first (§6). This is not <see cref="DeleteAsync"/>: nothing on
+    /// disk or in the row itself is touched, so it hides at once from <see cref="ListAsync"/> and
+    /// <see cref="ListShelvedAsync"/> and <see cref="RestoreAsync"/> can put it back exactly as it
+    /// was. The caller is responsible for the real delete once its own undo window has closed
+    /// without being turned; this method only marks the moment the owner asked.
+    /// </summary>
+    public async Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null || novel.DeletedAtUtc is not null)
+            return;
+
+        novel.DeletedAtUtc = clock.UtcNow;
+        novel.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Takes a soft delete back. The undo behind the dog-ear for <see cref="SoftDeleteAsync"/> — the
+    /// book was never actually touched, so this just clears the mark.
+    /// </summary>
+    public async Task RestoreAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var novel = await db.Novels.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (novel is null || novel.DeletedAtUtc is null)
+            return;
+
+        novel.DeletedAtUtc = null;
+        novel.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// How long a manuscript is. Whitespace-separated runs, which is what the report counts too —
     /// two different answers to "how long is this book" on the same screen is worse than either.
     /// </summary>
@@ -655,7 +690,7 @@ public sealed class ProjectService
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var ids = await db.Novels
-            .Where(n => n.ShelvedAtUtc == null)
+            .Where(n => n.ShelvedAtUtc == null && n.DeletedAtUtc == null)
             .OrderByDescending(n => n.CreatedAtUtc)
             .Select(n => n.Id)
             .ToListAsync(cancellationToken);

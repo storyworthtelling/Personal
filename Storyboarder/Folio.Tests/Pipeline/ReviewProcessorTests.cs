@@ -49,7 +49,7 @@ public class ReviewProcessorTests : IDisposable
         claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("ink-wash watercolor, muted palette");
 
-        // The seventeen reads. Stubbed for real rather than left to Moq's defaults: a default-valued
+        // The sixteen reads. Stubbed for real rather than left to Moq's defaults: a default-valued
         // Task<T> completes with null, which the pipeline records as a finished pass — so the step
         // would appear to work while reading nothing, which is the failure PassPipelineTests names.
         claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -72,8 +72,8 @@ public class ReviewProcessorTests : IDisposable
 
         claude.Setup(c => c.Synthesise(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<SectionRead>>(), It.IsAny<IReadOnlyList<Review>>(),
-                It.IsAny<CancellationToken>()))
-            .Returns((string passId, IReadOnlyList<SectionRead> sections, IReadOnlyList<Review> readers, CancellationToken _) =>
+                It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Returns((string passId, IReadOnlyList<SectionRead> sections, IReadOnlyList<Review> readers, int _, CancellationToken _) =>
             {
                 synthesisReads.Add(passId);
                 sectionsSeenBySynthesis = sections.Count;
@@ -168,6 +168,10 @@ public class ReviewProcessorTests : IDisposable
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
                 It.IsAny<double?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => SampleImages.Png());
+
+        gemini.Setup(g => g.GenerateJacket(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => SampleImages.Png());
     }
 
     public void Dispose()
@@ -218,12 +222,12 @@ public class ReviewProcessorTests : IDisposable
     // Drains the pipeline the way the worker does, advancing the clock past any backoff wait so a
     // rescheduled unit becomes due. Bails out after a generous cycle cap so a stuck test fails fast.
     /// <summary>
-    /// End to end: all seventeen reads run, each once, in plan order — and the synthesis passes see
-    /// the other fifteen, which is the only thing that makes them synthesis rather than a sixteenth
-    /// opinion.
+    /// End to end: all sixteen reads run, each once, in plan order — and the synthesis passes see
+    /// the other fourteen, which is the only thing that makes them synthesis rather than a
+    /// fifteenth opinion.
     /// </summary>
     [Fact]
-    public async Task EverySeventeenReadsRunOnceAndTheSynthesisSeesThemAll()
+    public async Task EverySixteenReadsRunOnceAndTheSynthesisSeesThemAll()
     {
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor());
@@ -235,12 +239,12 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(["todo", "verdict"], synthesisReads);
 
         Assert.Equal(8, sectionsSeenBySynthesis);
-        Assert.Equal(7, readersSeenBySynthesis);
+        Assert.Equal(6, readersSeenBySynthesis);
 
         // One row per pass, all settled, so a re-run bills nothing again.
         using var context = database.NewContext();
         var rows = context.PassReads.Where(pass => pass.NovelId == id).ToList();
-        Assert.Equal(17, rows.Count);
+        Assert.Equal(16, rows.Count);
         Assert.All(rows, row => Assert.NotNull(row.Json));
     }
 
@@ -280,6 +284,72 @@ public class ReviewProcessorTests : IDisposable
         // The rendered report opens as a valid PDF.
         using var document = PdfReader.Open(analysis.PdfPath!, PdfDocumentOpenMode.ReadOnly);
         Assert.True(document.PageCount > 0);
+    }
+
+    /// <summary>
+    /// A book soft-deleted mid-review (DESIGN.md §6's undo window) must not keep being worked on —
+    /// spending a model call on a book the owner is about to lose for good is billed for nothing.
+    /// </summary>
+    [Fact]
+    public async Task ADeletedBookIsNeverAdvanced()
+    {
+        var id = SeedManuscript();
+        using (var context = database.NewContext())
+        {
+            var novel = context.Novels.Single(n => n.Id == id);
+            novel.DeletedAtUtc = clock.UtcNow;
+            context.SaveChanges();
+        }
+
+        var result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(ProcessOutcome.Idle, result.Outcome);
+        using var check = database.NewContext();
+        Assert.Equal(ProjectStage.Created, check.Novels.Single(n => n.Id == id).Stage);
+    }
+
+    /// <summary>
+    /// A book with no jacket gets one painted by the pipeline itself — the gap the first real device
+    /// run surfaced: the app only ever painted a cover from a manual Settings action, so a book run
+    /// end to end never got one.
+    /// </summary>
+    [Fact]
+    public async Task Review_PaintsAJacket_WhenNoneIsSetOrPainted()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == id);
+        Assert.True(novel.CoverAttempted);
+        Assert.NotNull(novel.CoverPath);
+        Assert.True(File.Exists(novel.CoverPath));
+        Assert.False(novel.CoverIsOwners);
+    }
+
+    /// <summary>
+    /// A jacket Gemini refuses is a smaller loss than a report that never completes: the review still
+    /// reaches Completed, CoverAttempted settles so the worker does not retry a moment the model has
+    /// already declined, and CoverPath stays null so the render falls back to the page's own ink.
+    /// </summary>
+    [Fact]
+    public async Task Review_StillCompletes_WhenTheJacketIsRefused()
+    {
+        gemini.Setup(g => g.GenerateJacket(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ImageContentBlockedException("refused", ImageBlockReason.Safety));
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        using var context = database.NewContext();
+        var novel = context.Novels.Single(n => n.Id == id);
+        Assert.Equal(ProjectStage.Completed, novel.Stage);
+        Assert.True(novel.CoverAttempted);
+        Assert.Null(novel.CoverPath);
+
+        var analysis = context.BookAnalyses.Single(a => a.NovelId == id);
+        Assert.Equal(WorkStatus.Completed, analysis.PdfStatus);
     }
 
     [Fact]

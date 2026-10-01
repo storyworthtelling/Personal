@@ -115,7 +115,7 @@ public interface IClaudeAnalysisClient
     /// <summary>
     /// One whole-book section pass, read in character by <paramref name="persona"/>.
     ///
-    /// <para>The manuscript is passed whole and <b>first</b>, because the seventeen passes share it as
+    /// <para>The manuscript is passed whole and <b>first</b>, because the sixteen passes share it as
     /// a cached prefix and anything persona-specific in front of it would make each pass a different
     /// prefix — measured at roughly $17 a draft against $2 (F50). <c>ReadingPrompt</c> is the one place
     /// that ordering is decided, and every implementation of this goes through it.</para>
@@ -132,13 +132,17 @@ public interface IClaudeAnalysisClient
     Task<Review> ReadAsReader(Persona persona, string manuscript, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The two synthesis passes, which read the other fifteen rather than the manuscript: the revision
-    /// plan, then the verdict. They run last for that reason.
+    /// The two synthesis passes, which read the other fourteen rather than the manuscript: the revision
+    /// plan, then the verdict. They run last for that reason. <paramref name="wordCount"/> is the
+    /// manuscript's own measured length — not re-derived here, since the passes never see the
+    /// manuscript itself — so the prompt can call the book what it actually is (short story, novella,
+    /// or novel) rather than assuming "novel".
     /// </summary>
     Task<SynthesisRead> Synthesise(
         string passId,
         IReadOnlyList<SectionRead> sections,
         IReadOnlyList<Review> readers,
+        int wordCount,
         CancellationToken cancellationToken);
 }
 

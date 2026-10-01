@@ -277,14 +277,37 @@ public class ChapterDetectorTests
     [Fact]
     public void Locate_ChunkStraddlingABreak_CitesTheWholeSpan()
     {
-        var text = "Chapter 1\n\n" + Body("It") + "\n\nChapter 2\n\n" + Body("It") + "\n\nChapter 3\n\n" + Body("It");
+        // Four chapters so the chunk below (spanning 1 through 3) leaves the fourth untouched — a
+        // genuinely partial span, distinct from Locate_ChunkSpanningEveryChapter below.
+        var text = "Chapter 1\n\n" + Body("It") + "\n\nChapter 2\n\n" + Body("It") + "\n\nChapter 3\n\n" + Body("It")
+            + "\n\nChapter 4\n\n" + Body("It");
         var chapters = Detector.Detect(text);
 
-        // A chunk running from inside chapter 1 to inside chapter 3 overlaps all three.
+        // A chunk running from inside chapter 1 to inside chapter 3 overlaps three of the four.
         var citation = ChapterDetector.Locate(chapters, 2, chapters[2].StartOffset + 3);
 
         Assert.Equal(1, citation.Number);
         Assert.Equal("Chapters 1–3", citation.Label);
+    }
+
+    /// <summary>
+    /// A short manuscript fits in one text chunk; if a stray in-story line ("Chapter 2,321.43") gets
+    /// detected as a heading, that one chunk overlaps <i>every</i> chapter there is, and the old
+    /// "Chapters 1–2" fallback cited every finding in the report identically — useless on a book this
+    /// short, since it never actually localizes anything. A citation that touches every chapter says
+    /// "Whole manuscript" instead.
+    /// </summary>
+    [Fact]
+    public void Locate_ChunkSpanningEveryChapter_CitesTheWholeManuscript()
+    {
+        var text = "Well, here goes nothing:\n\nChapter 2,321.43\n\n" + Body("It");
+        var chapters = Detector.Detect(text);
+        Assert.Equal(2, chapters.Count);   // "Opening" + the detected in-story heading
+
+        var citation = ChapterDetector.Locate(chapters, 0, text.Length);
+
+        Assert.Equal(1, citation.Number);
+        Assert.Equal(ChapterDetector.WholeManuscriptLabel, citation.Label);
     }
 
     [Fact]
