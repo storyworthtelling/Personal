@@ -67,9 +67,13 @@ public class SharedVaultHoldsHouseholdFactsTests
     [Fact]
     public void ThePerInstallBagStillCarriesTheOwner()
     {
-        var options = new InstallOptions { AccountEmail = "jordan@example.com" };
+        var options = new InstallOptions
+        {
+            AccountEmail = "jordan@example.com",
+            HouseholdAccount = "owner@example.com",
+        };
 
-        Assert.Null(options.Owner);
         Assert.Equal("jordan@example.com", options.AccountEmail);
+        Assert.Equal("owner@example.com", options.HouseholdAccount);
     }
 }

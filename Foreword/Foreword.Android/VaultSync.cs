@@ -22,7 +22,7 @@ public sealed class VaultSync
 
     // Writes Foreword's credentials into the vault, leaving every other app's section untouched.
     public Task<SecretsVaultPublishResult> PublishAsync(CancellationToken cancellationToken) =>
-        vault.PublishAsync(v => v with
+        vault.PublishAsync(v => RememberHousehold(v) with
         {
             Nyt = new NytSecrets(CredentialStore.NytSessionCookie, CredentialStore.NytApiKey),
             Remarkable = new RemarkableSecrets(CredentialStore.RemarkableDeviceToken),
@@ -55,7 +55,7 @@ public sealed class VaultSync
         if (result.Status != SecretsVaultStatus.Loaded)
             return;
 
-        var vaultData = result.Vault;
+        var vaultData = RememberHousehold(result.Vault);
         // Seed the Drive-by-ID cache so well-known files resolve by remembered id (surviving a rename).
         foreach (var (name, id) in vaultData.DriveFileIds)
             fileIdStore.Set(name, id);
@@ -76,6 +76,15 @@ public sealed class VaultSync
             CredentialStore.HomeLatitude = vaultData.Maps.HomeLatitude;
             CredentialStore.HomeLongitude = vaultData.Maps.HomeLongitude;
         }
+    }
+
+    // Whose phone this is is inferred from the account that owns the shared vault, so every read of
+    // the vault refreshes the cached owner. An unowned vault leaves the cache as it was.
+    private static SecretsVault RememberHousehold(SecretsVault read)
+    {
+        if (!string.IsNullOrWhiteSpace(read.OwnerAccount))
+            CredentialStore.HouseholdAccount = read.OwnerAccount.Trim();
+        return read;
     }
 
     private static void FillIfEmpty(string current, string fromVault, Action<string> set)

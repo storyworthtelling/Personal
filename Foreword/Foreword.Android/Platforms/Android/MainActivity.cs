@@ -39,21 +39,11 @@ public class MainActivity : MauiAppCompatActivity
         {
             var sync = IPlatformApplication.Current!.Services.GetRequiredService<VaultSync>();
             sync.RestoreAsync(CancellationToken.None).GetAwaiter().GetResult();
-
-            // And this person's own vault: whose install this is, and the mark its documents sign
-            // off with. A separate file because those are the two things that MUST differ between
-            // the household's two installs (Release I).
-            var personal = IPlatformApplication.Current!.Services.GetRequiredService<PersonalSync>();
-            personal.RestoreAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
         catch
         {
             // Ignore: restore is a convenience; the Settings page always accepts the credentials manually.
         }
-
-        // Whatever the mark is now — restored, already local, or absent — hand it to the library
-        // that prints, so the first document composed after launch carries it.
-        PersonalSync.Apply();
     });
 
     protected override void OnActivityResult(
