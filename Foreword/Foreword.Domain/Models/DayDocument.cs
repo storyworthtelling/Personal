@@ -1,3 +1,4 @@
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 
@@ -14,6 +15,12 @@ public sealed record DayDocument
 {
     public required DateOnly Date { get; init; }
     public required DayAgenda Agenda { get; init; }
+
+    /// <summary>
+    /// The columns this morning prints, left to right: this account's people, then Watch. They come
+    /// from the account's own setup in Foreword, so the page never knows anybody's name in advance.
+    /// </summary>
+    public IReadOnlyList<PersonColumn> Columns { get; init; } = ColumnLayout.Unset.Printed;
 
     /// <summary>The seven-day outlook: non-routine events only.</summary>
     public IReadOnlyList<CalendarEvent> Outlook { get; init; } = [];

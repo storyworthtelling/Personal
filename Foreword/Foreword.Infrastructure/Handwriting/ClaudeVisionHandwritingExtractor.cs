@@ -3,9 +3,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Health;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
+using Foreword.Infrastructure.Calendar;
 using Storyworthtelling.Voice.Health;
 
 namespace Foreword.Infrastructure.Handwriting;
@@ -24,7 +26,7 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
         "ink in the 'write below' region near the bottom of the page. Transcribe each hand-written " +
         "future event or task. Respond with ONLY a JSON array (no prose). Each element: " +
         "{\"text\": string, \"when\": ISO-8601 date or date-time or null, " +
-        "\"column\": one of \"Rowan\",\"Jordan\",\"Wren\",\"Linden\",\"Watch\" or null, " +
+        "\"column\": one of the column names given with the page, exactly as written, or null, " +
         "\"isTask\": boolean (true for a to-do, false for a calendar event), " +
         "\"confidence\": number 0..1 for how confident you are in the transcription}. " +
         "If the region is empty, return []. Use low confidence when the writing is hard to read.";
@@ -33,18 +35,27 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
     private readonly AnthropicOptions options;
     private readonly ILogger<ClaudeVisionHandwritingExtractor> logger;
     private readonly ICredentialHealthSink? healthSink;
+    private readonly IOptions<CalendarMappingOptions>? mapping;
 
+    // The column names are this account's own (set up in Foreword), so they reach the model in the
+    // message rather than the cached instruction: the instruction stays one cached prefix whatever
+    // anybody's columns are called, and the code never holds a name.
     public ClaudeVisionHandwritingExtractor(
         HttpClient httpClient,
         IOptions<AnthropicOptions> options,
         ILogger<ClaudeVisionHandwritingExtractor> logger,
-        ICredentialHealthSink? healthSink = null)
+        ICredentialHealthSink? healthSink = null,
+        IOptions<CalendarMappingOptions>? mapping = null)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
         this.logger = logger;
         this.healthSink = healthSink;
+        this.mapping = mapping;
     }
+
+    private IReadOnlyList<PersonColumn> Columns =>
+        (mapping?.Value.Layout() ?? ColumnLayout.Unset).Printed;
 
     public async Task<IReadOnlyList<ParsedNote>> Extract(byte[] annotatedPdf)
     {
@@ -81,7 +92,11 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
                                 data = Convert.ToBase64String(annotatedPdf)
                             }
                         },
-                        new { type = "text", text = "Transcribe the hand-written notes." }
+                        new
+                        {
+                            type = "text",
+                            text = $"Transcribe the hand-written notes. The columns are: {string.Join(", ", Columns)}."
+                        }
                     }
                 }
             }
@@ -164,6 +179,14 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
     private static DateTime? ParseDate(string? value) =>
         DateTime.TryParse(value, out var parsed) ? parsed : null;
 
-    private static PersonColumn? ParseColumn(string? value) =>
-        Enum.TryParse<PersonColumn>(value, ignoreCase: true, out var column) ? column : null;
+    // Only one of this account's columns. A name the model offers that is not one reads as no column,
+    // and the note goes where an unnamed note goes, rather than into a column the page does not print.
+    private PersonColumn? ParseColumn(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var named = new PersonColumn(value);
+        return Columns.Contains(named) ? Columns.First(c => c == named) : null;
+    }
 }

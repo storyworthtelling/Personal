@@ -51,7 +51,7 @@ public class DeliveryWorker : Worker
             if (CredentialStore.IsGoogleConfigured)
             {
                 var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
-                daily.EnsureKidCalendars().GetAwaiter().GetResult();
+                daily.EnsureColumnCalendars().GetAwaiter().GetResult();
                 daily.DeliverDailyDocuments(today).GetAwaiter().GetResult();
 
                 // The third document, in its own try. Prayer is the one part of the morning that

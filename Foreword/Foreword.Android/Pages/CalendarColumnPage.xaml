@@ -5,7 +5,7 @@
              x:Class="Foreword.Android.Pages.CalendarColumnPage"
              Title="Calendar">
     <!--
-        C2: which column one calendar feeds. Watch is the fifth column — games, fixtures and
+        C2: which column one calendar feeds. Watch is the last column — games, fixtures and
         anything you follow rather than attend.
 
         Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c

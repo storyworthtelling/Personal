@@ -10,14 +10,14 @@ public class OutlookSelectorTests
 
     private static CalendarEvent Event(
         string title,
-        PersonColumn column = PersonColumn.Rowan,
+        PersonColumn? column = null,
         EventKind kind = EventKind.Normal,
         RecurrenceFrequency recurrence = RecurrenceFrequency.None,
         int? recurrenceCount = null) =>
         new()
         {
             Title = title,
-            Columns = [column],
+            Columns = [column ?? Household.Alex],
             Kind = kind,
             Recurrence = recurrence,
             RecurrenceCount = recurrenceCount,

@@ -84,13 +84,13 @@ public class PrayerPrintingTests
             Held("dad", 9),
             Held("the team decision", 12) with { Answered = Today },
             Held("the Kellers", 21),
-            Held("Wren", 44),
+            Held("Riley", 44),
         };
 
         var printed = PrayerPrinting.ForToday(requests, Today);
 
         Assert.Equal(
-            ["dad", "the Kellers", "Wren", "the team decision"],
+            ["dad", "the Kellers", "Riley", "the team decision"],
             printed.Rows.Select(row => Read(row.Text)));
     }
 

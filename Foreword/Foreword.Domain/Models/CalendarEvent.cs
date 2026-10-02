@@ -37,7 +37,7 @@ public class CalendarEvent
     public IReadOnlyList<string> Guests { get; init; } = [];
 
     // WHICH COLUMNS the event belongs to — a set, because one event can belong to several people
-    // (D31). "Wren and Linden to swimming" is one event in two columns, not two events and not a guess
+    // (D31). "Riley and Jo to swimming" is one event in two columns, not two events and not a guess
     // between them. Assigned by CalendarColumnMapper via ColumnSet.Resolve, and never empty: an
     // event in the calendar and on no page is the one outcome worse than being in the wrong column.
     /// <summary>

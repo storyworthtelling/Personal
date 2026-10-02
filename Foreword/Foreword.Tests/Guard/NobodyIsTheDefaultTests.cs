@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Foreword.Tests.Calendar;
 using Xunit;
 
 namespace Foreword.Tests.Guard;
@@ -10,15 +11,14 @@ namespace Foreword.Tests.Guard;
 /// nobody had noticed were questions: where a hand-written note goes when nobody is named on it,
 /// which column an event falls into when none of the three sources can tell, what a
 /// <c>CalendarEvent</c> is in before anyone sets it. Each of those was
-/// <c>PersonColumn.Rowan</c>, written as an initialiser or a <c>??</c>, and on a second install every
+/// one person's column, written as an initialiser or a <c>??</c>, and on a second install every
 /// one of them is wrong in the same silent way — the event lands on the wrong person's day, nothing
 /// errors, and the only sign is somebody reading their sheet and not recognising it.</para>
 ///
-/// <para><b>Naming a person is not the offence.</b> The household roster names all four, the
-/// composer gives each column its own hue, and the vision prompt lists the four a note can be
-/// attributed to — all of those are about the <i>columns</i>, which exist on both installs. What is
-/// forbidden is a person standing in as the answer when the real answer is "whoever this phone
-/// belongs to", which is <see cref="Domain.Install.OwnerColumn"/>.</para>
+/// <para>The columns themselves are now the account's own choices (see
+/// <see cref="ColumnsAreDataTests"/>), so no person can be written in at all. This guard stays for
+/// the shape it caught: a column standing in as the answer when the real answer is "whoever this
+/// phone belongs to", which is <see cref="Domain.Install.OwnerColumn"/>.</para>
 /// </summary>
 public class NobodyIsTheDefaultTests
 {
@@ -81,14 +81,15 @@ public class NobodyIsTheDefaultTests
     public void TheInstallStillHasAnOwner()
     {
         var resolved = Domain.Install.OwnerColumn.Resolve(
-            accountEmail: "jordan@example.com",
+            accountEmail: "sam@example.com",
             new Dictionary<Domain.Models.PersonColumn, IReadOnlyList<string>>
             {
-                [Domain.Models.PersonColumn.Jordan] = ["jordan@example.com"],
+                [Household.Sam] = ["sam@example.com"],
             },
-            householdAccount: null);
+            householdAccount: null,
+            Household.Layout);
 
-        Assert.Equal(Domain.Models.PersonColumn.Jordan, resolved);
+        Assert.Equal(Household.Sam, resolved);
     }
 
     private static bool Skip(string file) =>

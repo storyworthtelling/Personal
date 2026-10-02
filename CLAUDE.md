@@ -231,9 +231,28 @@ surfacing anything that cannot be built as drawn rather than substituting:
   `SharedEventMode` picks between one spanning box and a box per column with a "with …" line
   (**D32**). An **unmapped** calendar is held and named on the page (**D34**); one the owner
   answered with "not printed" is dropped silently, which is the difference between them.
-  **`CalendarMappingCodec` is the one place the stored shape is decided** — it must register
-  `JsonStringEnumConverter`, because every column in every document already on a phone is the word
-  "Rowan", never the number 0, and the vault carries a copy of that document under a frozen key.
+  **`CalendarMappingCodec` is the one place the stored shape is decided**, and
+  `CalendarMappingCodec.ReadMapping` is the one way to read the mapping — it migrates a document an
+  older app wrote, so the screens and the morning can never see two layouts of one document.
+- **The columns are each account's own choices, set up in Foreword — never names in the code.**
+  They were an enum of one household's four people, which put real names in a public repository and
+  fixed the page to one family. `PersonColumn` is now a name (a struct, compared without case,
+  stored as its word — exactly what the enum always wrote, so old documents read unchanged), and the
+  only column the code knows is `PersonColumn.Watch`. `ColumnLayout` (Domain) is the account's
+  columns in print order plus which of them have a Google account of their own (only those can be
+  invited, so only those get an address field). It is stored in `CalendarMappingOptions.Columns`
+  (`ColumnChoice` — not `ColumnDefinition`, which would collide with MAUI's grid type in every page)
+  with per-column `Keywords`, and edited on the **Columns** screen (`CalendarColumnsPage`, off
+  Calendars) through `ColumnEdits`, which renames or removes a column in *every* rule that names it.
+  `CalendarMappingMigration` rebuilds a layout from an old document by its shape alone: the
+  `<Name>Keywords` properties become `Keywords`, and people who can be invited (an address entered,
+  or their own primary calendar — an email-address id, not a `…calendar.google.com` one) come first.
+  Columns without an account get a Google calendar made for them (`EnsureColumnCalendars`); hues
+  follow print order; the handwriting prompt lists the account's columns in the message rather than
+  the cached instruction. The choices back up to the account's **personal** vault
+  (`PersonalVault.CalendarMappingJson`/`WorkScheduleJson`), not the shared one, whose old copy only
+  the household-owner account restores from. `ColumnsAreDataTests` is the guard; tests use an
+  invented household (`Foreword.Tests/Calendar/Household.cs`).
 - **The rename froze five things, and every one of them is invisible** — nothing fails at build
   time if they move, and nothing fails loudly at run time either; the app just quietly stops
   delivering, or comes up with empty settings. `Foreword.Tests/Guard/ForewordInvariantsTests.cs`

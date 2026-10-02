@@ -19,7 +19,7 @@ public class TaskBandsTests
     public void MostThingsHappenDuringTheDay()
     {
         Assert.Equal(TaskBand.DuringTheDay, TaskBands.For(Task("Call Mom")));
-        Assert.Equal(TaskBand.DuringTheDay, TaskBands.For(Task("Order Wren's cleats")));
+        Assert.Equal(TaskBand.DuringTheDay, TaskBands.For(Task("Order Riley's cleats")));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class TaskBandsTests
     public void SomeThingsAreObviouslyEvening()
     {
         Assert.Equal(TaskBand.Evening, TaskBands.For(Task("Bins out")));
-        Assert.Equal(TaskBand.Evening, TaskBands.For(Task("Sign Wren's permission slip tonight")));
+        Assert.Equal(TaskBand.Evening, TaskBands.For(Task("Sign Riley's permission slip tonight")));
     }
 
     [Fact]

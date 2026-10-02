@@ -10,7 +10,7 @@ namespace Foreword.Tests.Calendar;
 ///
 /// <para>Both silent outcomes are bad in their own way and the old behaviour was the first: an
 /// unmapped calendar fell to the default column, so a new calendar the owner subscribed to —
-/// somebody's sports fixtures, a school newsletter feed — started printing into Rowan's column
+/// somebody's sports fixtures, a school newsletter feed — started printing into Alex's column
 /// without anything having asked. Dropping it instead would be worse: the owner would be looking
 /// for something that had never arrived, with nothing anywhere to say why.</para>
 ///
@@ -23,12 +23,12 @@ public class HeldCalendarsTests
         new() { Title = title, SourceCalendarId = calendarId };
 
     private static readonly IReadOnlySet<string> Known =
-        new HashSet<string> { "rowan@work", "family@group" };
+        new HashSet<string> { "alex@work", "family@group" };
 
     [Fact]
     public void AKnownCalendarIsNotHeld()
     {
-        var split = HeldCalendars.Split([From("rowan@work")], Known);
+        var split = HeldCalendars.Split([From("alex@work")], Known);
 
         Assert.Single(split.Printed);
         Assert.Empty(split.Held);
@@ -51,7 +51,7 @@ public class HeldCalendarsTests
     public void TheEventsOfAHeldCalendarDoNotReachThePage()
     {
         var split = HeldCalendars.Split(
-            [From("rowan@work", "Standup"), From("scouts@group", "Pack meeting")], Known);
+            [From("alex@work", "Standup"), From("scouts@group", "Pack meeting")], Known);
 
         Assert.Equal(["Standup"], split.Printed.Select(e => e.Title));
     }
@@ -96,7 +96,7 @@ public class HeldCalendarsTests
     [Fact]
     public void NothingIsHeldWhenEveryCalendarIsKnown()
     {
-        var split = HeldCalendars.Split([From("rowan@work"), From("family@group")], Known);
+        var split = HeldCalendars.Split([From("alex@work"), From("family@group")], Known);
 
         Assert.Equal(2, split.Printed.Count);
         Assert.Empty(split.Held);

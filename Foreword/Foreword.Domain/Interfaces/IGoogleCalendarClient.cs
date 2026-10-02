@@ -16,7 +16,7 @@ public interface IGoogleCalendarClient
     Task AddEvent(CalendarEvent calendarEvent);
 
     // Ensures a calendar with the given summary exists, returning its id. Used to
-    // auto-create the Wren and Linden calendars on first run.
+    // create a calendar for each column whose person has no account of their own.
     Task<string> EnsureCalendar(string summary);
 
     // The id/summary of every calendar in the account's calendar list.
