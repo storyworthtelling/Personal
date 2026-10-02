@@ -64,10 +64,10 @@ was never built. `C1` costs no new Google work.
 
 **F33 — every unmapped calendar prints into one column.** `CalendarColumnMapper.Resolve` falls
 through to `DefaultColumn`, and `FetchEvents` iterates **every** calendar on the account
-unconditionally. A subscribed US Holidays or Birthdays calendar currently lands in Matt's column.
+unconditionally. A subscribed US Holidays or Birthdays calendar currently lands in the first person's column.
 
-**F34 — the work schedule has no UI at all.** `WorkScheduleOptions` is hardcoded (Matt
-08:00–16:00, Ashley 08:00–15:30; off-keywords Off/PTO/Vacation). Changing a shift means changing a
+**F34 — the work schedule has no UI at all.** `WorkScheduleOptions` is hardcoded (one person
+08:00–16:00, the other 08:00–15:30; off-keywords Off/PTO/Vacation). Changing a shift means changing a
 default and rebuilding.
 
 **F35 — the calendar mapping is hand-typed JSON.** `SetupPage.xaml`'s `CalendarMappingEditor` is a
@@ -245,7 +245,7 @@ behalf — it stays listed with its status until removed.
 The prayer document, private Drive transcription, type-level isolation + guard.
 → *Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c — `P1`, `P2`.*
 
-### Release I — Ashley's install
+### Release I — the partner's install
 A second install against her credentials and tablet. Nothing hardcoded to one person.
 → *Mockups: https://claude.ai/code/artifact/6bb65b0d-04da-47f3-bf72-a04020217e0c — `F1`.*
 
@@ -275,7 +275,7 @@ names what was reintroduced.
 | G9 | A finished task never reaches the paper | Mark one done and render; it must not print |
 | G10 | The work block is drawn **behind** what sits inside it (B3) | Append the synthetic block last; it paints over the meetings |
 | G11 | Overlapping events split the column (B2) | Draw both full-width; the guard must catch the collision |
-| G12 | An unmapped calendar prints nothing (D34, F33) | Fall through to `DefaultColumn`; US Holidays lands in Matt's column |
+| G12 | An unmapped calendar prints nothing (D34, F33) | Fall through to `DefaultColumn`; US Holidays lands in the first person's column |
 | G13 | A shared event is drawn once, never duplicated per column (D32) | Emit a copy per participant in the contiguous case |
 | G14 | Every UI text role matches the kit's table (Release B) | Introduce a letterspaced label or an italic-sans run |
 | G15 | JDK 21 pinned in the workflow | Remove `setup-java`; the runner inherits 17 and the build fails as PR #161 did |

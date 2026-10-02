@@ -1,6 +1,7 @@
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Install;
 using Foreword.Domain.Models;
+using Foreword.Tests.Calendar;
 using Xunit;
 
 namespace Foreword.Tests.Install;
@@ -9,7 +10,7 @@ namespace Foreword.Tests.Install;
 /// Whose phone this is.
 ///
 /// <para>Foreword has only ever run on one, and the answer was baked in as a default:
-/// <c>PersonColumn.Matt</c>, in four places, none of them a setting. On a second install every one
+/// <c>Household.Alex</c>, in four places, none of them a setting. On a second install every one
 /// of those is wrong in the same quiet way — a hand-written note with nobody named on it goes into
 /// somebody else's column, nothing errors, and the event is simply on the wrong person's day.</para>
 ///
@@ -23,8 +24,8 @@ public class OwnerColumnTests
     private static readonly IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Addresses =
         new Dictionary<PersonColumn, IReadOnlyList<string>>
         {
-            [PersonColumn.Matt] = ["storyworthtelling@gmail.com", "matt@work.example"],
-            [PersonColumn.Ashley] = ["ashley@example.com"],
+            [Household.Alex] = ["alex.home@example.com", "alex@work.example"],
+            [Household.Sam] = ["sam@example.com"],
         };
 
     private static readonly IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> NoAddresses =
@@ -34,8 +35,8 @@ public class OwnerColumnTests
     public void TheSignedInAccountProposesWhoseInstallThisIs()
     {
         Assert.Equal(
-            PersonColumn.Ashley,
-            OwnerColumn.Propose("ashley@example.com", Addresses, householdAccount: null));
+            Household.Sam,
+            OwnerColumn.Propose("sam@example.com", Addresses, householdAccount: null, Household.Layout));
     }
 
     /// <summary>
@@ -45,15 +46,15 @@ public class OwnerColumnTests
     [Fact]
     public void AnyOfTheirAddressesProposesThem()
     {
-        Assert.Equal(PersonColumn.Matt, OwnerColumn.Propose("matt@work.example", Addresses, householdAccount: null));
+        Assert.Equal(Household.Alex, OwnerColumn.Propose("alex@work.example", Addresses, householdAccount: null, Household.Layout));
     }
 
     [Fact]
     public void AddressesAreMatchedWithoutCaseOrSurroundingSpace()
     {
         Assert.Equal(
-            PersonColumn.Ashley,
-            OwnerColumn.Propose("  Ashley@Example.COM ", Addresses, householdAccount: null));
+            Household.Sam,
+            OwnerColumn.Propose("  Sam@Example.COM ", Addresses, householdAccount: null, Household.Layout));
     }
 
     /// <summary>
@@ -67,7 +68,7 @@ public class OwnerColumnTests
     [InlineData(null)]
     public void AnUnclaimedAccountProposesNothing(string? email)
     {
-        Assert.Null(OwnerColumn.Propose(email, Addresses, householdAccount: null));
+        Assert.Null(OwnerColumn.Propose(email, Addresses, householdAccount: null, Household.Layout));
     }
 
     /// <summary>
@@ -80,10 +81,10 @@ public class OwnerColumnTests
     {
         var withAChildsAddress = new Dictionary<PersonColumn, IReadOnlyList<string>>(Addresses)
         {
-            [PersonColumn.Gwen] = ["gwen@example.com"],
+            [Household.Riley] = ["riley@example.com"],
         };
 
-        Assert.Null(OwnerColumn.Propose("gwen@example.com", withAChildsAddress, householdAccount: null));
+        Assert.Null(OwnerColumn.Propose("riley@example.com", withAChildsAddress, householdAccount: null, Household.Layout));
     }
 
     // ---- the household account: who owns the shared vault ----
@@ -96,8 +97,8 @@ public class OwnerColumnTests
     public void TheAccountThatOwnsTheVaultIsTheAccountHolder()
     {
         Assert.Equal(
-            PersonIdentity.WithMailboxes[0],
-            OwnerColumn.Propose("owner@example.com", NoAddresses, householdAccount: "owner@example.com"));
+            Household.Layout.WithAccounts[0],
+            OwnerColumn.Propose("owner@example.com", NoAddresses, householdAccount: "owner@example.com", Household.Layout));
     }
 
     /// <summary>
@@ -108,16 +109,16 @@ public class OwnerColumnTests
     public void AnyOtherAccountIsThePartner()
     {
         Assert.Equal(
-            PersonIdentity.WithMailboxes[1],
-            OwnerColumn.Propose("partner@example.com", NoAddresses, householdAccount: "owner@example.com"));
+            Household.Layout.WithAccounts[1],
+            OwnerColumn.Propose("partner@example.com", NoAddresses, householdAccount: "owner@example.com", Household.Layout));
     }
 
     [Fact]
     public void TheHouseholdAccountIsMatchedWithoutCaseOrSurroundingSpace()
     {
         Assert.Equal(
-            PersonIdentity.WithMailboxes[0],
-            OwnerColumn.Propose(" Owner@Example.com ", NoAddresses, householdAccount: "owner@example.COM"));
+            Household.Layout.WithAccounts[0],
+            OwnerColumn.Propose(" Owner@Example.com ", NoAddresses, householdAccount: "owner@example.COM", Household.Layout));
     }
 
     /// <summary>
@@ -128,8 +129,8 @@ public class OwnerColumnTests
     public void AnEnteredAddressBeatsTheHouseholdAccount()
     {
         Assert.Equal(
-            PersonColumn.Ashley,
-            OwnerColumn.Propose("ashley@example.com", Addresses, householdAccount: "ashley@example.com"));
+            Household.Sam,
+            OwnerColumn.Propose("sam@example.com", Addresses, householdAccount: "sam@example.com", Household.Layout));
     }
 
     /// <summary>
@@ -141,7 +142,7 @@ public class OwnerColumnTests
     [InlineData(null)]
     public void AnUnownedVaultProposesNothing(string? household)
     {
-        Assert.Null(OwnerColumn.Propose("someone@example.com", NoAddresses, household));
+        Assert.Null(OwnerColumn.Propose("someone@example.com", NoAddresses, household, Household.Layout));
     }
 
     // ---- what the app actually uses ----
@@ -150,8 +151,8 @@ public class OwnerColumnTests
     public void TheProposalStands()
     {
         Assert.Equal(
-            PersonIdentity.WithMailboxes[1],
-            OwnerColumn.Resolve("partner@example.com", NoAddresses, householdAccount: "owner@example.com"));
+            Household.Layout.WithAccounts[1],
+            OwnerColumn.Resolve("partner@example.com", NoAddresses, householdAccount: "owner@example.com", Household.Layout));
     }
 
     /// <summary>
@@ -163,8 +164,8 @@ public class OwnerColumnTests
     public void WithNothingToGoOnItIsWhatItAlwaysWas()
     {
         Assert.Equal(
-            PersonIdentity.WithMailboxes[0],
-            OwnerColumn.Resolve(accountEmail: null, Addresses, householdAccount: null));
+            Household.Layout.WithAccounts[0],
+            OwnerColumn.Resolve(accountEmail: null, Addresses, householdAccount: null, Household.Layout));
     }
 
     /// <summary>
@@ -174,8 +175,8 @@ public class OwnerColumnTests
     [Fact]
     public void TheFallbackIsAlwaysSomebodyWithAMailbox()
     {
-        var resolved = OwnerColumn.Resolve("nobody@example.com", Addresses, householdAccount: null);
+        var resolved = OwnerColumn.Resolve("nobody@example.com", Addresses, householdAccount: null, Household.Layout);
 
-        Assert.True(PersonIdentity.HasMailbox(resolved));
+        Assert.True(Household.Layout.HasAccount(resolved));
     }
 }

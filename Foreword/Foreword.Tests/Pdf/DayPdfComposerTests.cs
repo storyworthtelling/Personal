@@ -4,6 +4,7 @@ using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 using Foreword.Infrastructure.Pdf;
 using PdfSharp.Pdf.IO;
+using Foreword.Tests.Calendar;
 using Xunit;
 
 namespace Foreword.Tests.Pdf;
@@ -58,16 +59,16 @@ public class DayPdfComposerTests
     [Fact]
     public void ADriveDrawsWithoutDisturbingThePage()
     {
-        var soccer = TimedEvent(PersonColumn.Ashley, 16, 17, "Soccer practice", "Veterans Park");
+        var soccer = TimedEvent(Household.Sam, 16, 17, "Soccer practice", "Veterans Park");
 
         var agenda = new DayAgenda
         {
             Date = Today,
-            Events = [TimedEvent(PersonColumn.Ashley, 15, 16, "Vet"), soccer],
+            Events = [TimedEvent(Household.Sam, 15, 16, "Vet"), soccer],
             Travel = TravelTable.Of("Home", [("Home", "Veterans Park", 25)]),
         };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda });
 
         Assert.Equal(4, PageCount(pdf));
         using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
@@ -86,13 +87,13 @@ public class DayPdfComposerTests
             Date = Today,
             Events =
             [
-                TimedEvent(PersonColumn.Matt, 9, 10, "First"),
-                TimedEvent(PersonColumn.Matt, 9, 10, "Second"),
-                TimedEvent(PersonColumn.Matt, 9, 10, "Third"),
+                TimedEvent(Household.Alex, 9, 10, "First"),
+                TimedEvent(Household.Alex, 9, 10, "Second"),
+                TimedEvent(Household.Alex, 9, 10, "Third"),
             ],
         };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda });
 
         using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
         var page = document.GetPage(1).Text;
@@ -108,10 +109,10 @@ public class DayPdfComposerTests
         var agenda = new DayAgenda
         {
             Date = Today,
-            Events = [TimedEvent(PersonColumn.Matt, 9, 10, "Standup")],
+            Events = [TimedEvent(Household.Alex, 9, 10, "Standup")],
         };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda });
 
         using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
         Assert.DoesNotContain("Also today", document.GetPage(1).Text, StringComparison.Ordinal);
@@ -131,7 +132,7 @@ public class DayPdfComposerTests
             HeldCalendars = ["scouts@group"],
         };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda });
 
         using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
         Assert.Contains("scouts@group", document.GetPage(1).Text, StringComparison.Ordinal);
@@ -143,7 +144,7 @@ public class DayPdfComposerTests
     {
         var agenda = new DayAgenda { Date = Today, Events = [] };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda });
 
         using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
         Assert.DoesNotContain("no column yet", document.GetPage(1).Text, StringComparison.Ordinal);
@@ -155,11 +156,11 @@ public class DayPdfComposerTests
         var agenda = new DayAgenda
         {
             Date = Today,
-            Events = [TimedEvent(PersonColumn.Matt, 9, 10, "Standup")]
+            Events = [TimedEvent(Household.Alex, 9, 10, "Standup")]
         };
-        var outlook = new[] { TimedEvent(PersonColumn.Ashley, 12, 13, "Dentist") };
+        var outlook = new[] { TimedEvent(Household.Sam, 12, 13, "Dentist") };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda, Outlook = outlook });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda, Outlook = outlook });
 
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
         Assert.Equal(4, PageCount(pdf));
@@ -170,7 +171,7 @@ public class DayPdfComposerTests
     {
         var agenda = new DayAgenda { Date = Today, Events = [] };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda });
 
         Assert.True(pdf.Length > 0);
         Assert.Equal(4, PageCount(pdf));
@@ -182,7 +183,7 @@ public class DayPdfComposerTests
         var agenda = new DayAgenda { Date = Today, Events = [] };
         var carryovers = new[] { new ParsedNote { Text = "illegible scribble", Confidence = 0.2 } };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda, UnreadableCarryovers = carryovers });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda, UnreadableCarryovers = carryovers });
 
         Assert.True(PageCount(pdf) >= 2);
     }
@@ -195,15 +196,15 @@ public class DayPdfComposerTests
             Date = Today,
             Events =
             [
-                TimedEvent(PersonColumn.Matt, 8, 16, "Work"),
-                TimedEvent(PersonColumn.Ashley, 8, 15, "Work"),
-                TimedEvent(PersonColumn.Gwen, 9, 12, "School"),
-                TimedEvent(PersonColumn.Eva, 13, 14, "Nap"),
+                TimedEvent(Household.Alex, 8, 16, "Work"),
+                TimedEvent(Household.Sam, 8, 15, "Work"),
+                TimedEvent(Household.Riley, 9, 12, "School"),
+                TimedEvent(Household.Jo, 13, 14, "Nap"),
                 TimedEvent(PersonColumn.Watch, 19, 22, "Red Sox")
             ]
         };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda });
 
         Assert.Equal(4, PageCount(pdf));
     }
@@ -218,16 +219,16 @@ public class DayPdfComposerTests
     public void TheDocumentIsAlwaysItsFourPages()
     {
         var empty = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today,
             Agenda = new DayAgenda { Date = Today, Events = [] },
         });
 
         var full = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today,
-            Agenda = new DayAgenda { Date = Today, Events = [TimedEvent(PersonColumn.Matt, 9, 10, "Standup")] },
-            Outlook = [TimedEvent(PersonColumn.Ashley, 12, 13, "Dentist")],
+            Agenda = new DayAgenda { Date = Today, Events = [TimedEvent(Household.Alex, 9, 10, "Standup")] },
+            Outlook = [TimedEvent(Household.Sam, 12, 13, "Dentist")],
             Tasks = [Printed("Call Mom")],
             Weather = Forecast(),
         });
@@ -241,7 +242,7 @@ public class DayPdfComposerTests
     public void EveryPageCarriesTheWholeTabStrip()
     {
         var pdf = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today,
             Agenda = new DayAgenda { Date = Today, Events = [] },
             Weather = Forecast(),
@@ -265,7 +266,7 @@ public class DayPdfComposerTests
     public void ThePagesAreInTheBoundOrder()
     {
         var pdf = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today,
             Agenda = new DayAgenda { Date = Today, Events = [] },
             Weather = Forecast(),
@@ -288,7 +289,7 @@ public class DayPdfComposerTests
     public void TasksAreDrawnUnderTheirBands()
     {
         var pdf = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today,
             Agenda = new DayAgenda { Date = Today, Events = [] },
             Tasks =
@@ -317,7 +318,7 @@ public class DayPdfComposerTests
     public void AMorningWithNoForecastSaysSo()
     {
         var pdf = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today,
             Agenda = new DayAgenda { Date = Today, Events = [] },
         });
@@ -337,10 +338,10 @@ public class DayPdfComposerTests
         var agenda = new DayAgenda { Date = Today, Events = [] };
 
         var withVoice = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today, Agenda = agenda, Voice = "Otherwise a quiet Sunday.",
         });
-        var without = composer.Compose(new DayDocument { Date = Today, Agenda = agenda });
+        var without = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = Today, Agenda = agenda });
 
         using var spoken = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(withVoice));
         using var silent = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(without));
@@ -361,16 +362,16 @@ public class DayPdfComposerTests
     [Fact]
     public void AMeetingInsideTheWorkBlockIsDrawnInsideIt()
     {
-        var work = TimedEvent(PersonColumn.Matt, 9, 17, "Work");
+        var work = TimedEvent(Household.Alex, 9, 17, "Work");
         work.Kind = EventKind.WorkBlock;
 
         var pdf = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today,
             Agenda = new DayAgenda
             {
                 Date = Today,
-                Events = [work, TimedEvent(PersonColumn.Matt, 9, 10, "Standup")],
+                Events = [work, TimedEvent(Household.Alex, 9, 10, "Standup")],
             },
         });
 
@@ -399,14 +400,14 @@ public class DayPdfComposerTests
             Events =
             [
                 // Four at once: two are drawn, two fall to the list.
-                TimedEvent(PersonColumn.Matt, 9, 10, "First"),
-                TimedEvent(PersonColumn.Matt, 9, 10, "Second"),
-                TimedEvent(PersonColumn.Matt, 9, 10, "Third"),
-                TimedEvent(PersonColumn.Matt, 9, 10, "Fourth"),
+                TimedEvent(Household.Alex, 9, 10, "First"),
+                TimedEvent(Household.Alex, 9, 10, "Second"),
+                TimedEvent(Household.Alex, 9, 10, "Third"),
+                TimedEvent(Household.Alex, 9, 10, "Fourth"),
             ],
         };
 
-        var pdf = composer.Compose(new DayDocument { Date = agenda.Date, Agenda = agenda });
+        var pdf = composer.Compose(new DayDocument { Columns = Household.Layout.Printed, Date = agenda.Date, Agenda = agenda });
 
         using var document = UglyToad.PdfPig.PdfDocument.Open(new MemoryStream(pdf));
         var words = document.GetPage(1).GetWords().ToList();
@@ -430,7 +431,7 @@ public class DayPdfComposerTests
     public void UnreadableCarryoversAreListedForReEntry()
     {
         var pdf = composer.Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Today,
             Agenda = new DayAgenda { Date = Today, Events = [] },
             UnreadableCarryovers = [new ParsedNote { Text = "illegible scribble", Confidence = 0.2 }],

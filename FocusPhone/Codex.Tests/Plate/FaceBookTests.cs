@@ -118,8 +118,8 @@ public class FaceBookTests
             .Learn("c1", "Robin", Near(0.99f, 0.01f, 0))
             .Correct("c2", "Ruth", face);
 
-        var ashley = book.People.Single(person => person.ContactId == "c1");
-        Assert.DoesNotContain(ashley.Faces, stored => stored.SequenceEqual(face));
+        var robin = book.People.Single(person => person.ContactId == "c1");
+        Assert.DoesNotContain(robin.Faces, stored => stored.SequenceEqual(face));
     }
 
     [Fact]

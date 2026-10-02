@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -224,6 +222,13 @@ public static class MauiProgram
                 VoiceDriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
+        // This account's own vault, in its own Drive: the calendar choices live here because they
+        // differ between the household's installs, where the shared vault holds what they have in common.
+        builder.Services.AddSingleton(sp =>
+            new PersonalVaultAccess(
+                new DrivePersonalVaultStore(new DriveTextFile(
+                    VoiceDriveFactory(sp), DrivePersonalVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())),
+                () => CredentialStore.VaultPassphrase));
         builder.Services.AddSingleton<VaultSync>();
 
         // The private prayer archive: its own Drive file, encrypted with the same passphrase the
@@ -261,28 +266,5 @@ public static class MauiProgram
         builder.Logging.AddProvider(DeliveryFileLogger.Instance);
 
         return builder.Build();
-    }
-
-    private static readonly JsonSerializerOptions MappingJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter() }
-    };
-
-    // Parses the saved calendar-mapping JSON into options, falling back to defaults when empty
-    // or malformed so a bad paste never breaks delivery.
-    private static CalendarMappingOptions ParseMapping(string json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return new CalendarMappingOptions();
-        try
-        {
-            return JsonSerializer.Deserialize<CalendarMappingOptions>(json, MappingJsonOptions)
-                ?? new CalendarMappingOptions();
-        }
-        catch (JsonException)
-        {
-            return new CalendarMappingOptions();
-        }
     }
 }

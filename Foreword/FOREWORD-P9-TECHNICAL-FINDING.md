@@ -225,7 +225,7 @@ this (Q157).
 **R5 — the free routing servers have no SLA** and Valhalla asks for an `X-Client-Id`. Moot given
 D12 chose Google Maps, but recorded in case that reverses.
 
-**R6 — Ashley's rM2 renders a colour document in grayscale.** D14 ships one colour document with
+**R6 — the partner's rM2 renders a colour document in grayscale.** D14 ships one colour document with
 no device detection (F21). DESIGN.md requires every role to carry a non-colour cue so it survives
 desaturation, but the owner chose to **trust the bible rather than guard it** (T47). If a
 colour-only distinction slips in, her rendering degrades and nothing catches it.
@@ -413,7 +413,7 @@ off `main`; none merges until its CI run is green.
 | **F — Tasks** | Smart tasks, standing items, weather/daylight/season/work-day rules, Google Tasks mirror, away pause | The lawn moves itself |
 | **G — The brief** | Voiced opening, xkcd, This-Day factoid, article instrumentation (D21), dedupe, feeds, section order | The reading |
 | **H — Prayer** | Prayer document, private Drive transcription, type-level isolation + guard | The fourth seat |
-| **I — Ashley's install** | Second install against her credentials and tablet | Nothing is hardcoded to one person |
+| **I — the partner's install** | Second install against her credentials and tablet | Nothing is hardcoded to one person |
 | **Score refit** | Per-area colour coding, separate PR (Gate 1 Q90) | The bible and the code agreeing |
 
 ---

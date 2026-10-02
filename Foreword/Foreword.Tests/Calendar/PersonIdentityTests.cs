@@ -5,7 +5,7 @@ using Xunit;
 namespace Foreword.Tests.Calendar;
 
 /// <summary>
-/// Which of the four has an email address, and therefore which of them can be routed by one.
+/// Which of the people has a Google account, and therefore which of them can be routed by one.
 ///
 /// <para>The owner's correction: the parents have addresses; the girls do not. Their days reach the
 /// page on calendars shared between the parents, so a child's column is filled by the calendar an
@@ -22,27 +22,27 @@ public class PersonIdentityTests
     [Fact]
     public void TheParentsHaveMailboxes()
     {
-        Assert.True(PersonIdentity.HasMailbox(PersonColumn.Matt));
-        Assert.True(PersonIdentity.HasMailbox(PersonColumn.Ashley));
+        Assert.True(Household.Layout.HasAccount(Household.Alex));
+        Assert.True(Household.Layout.HasAccount(Household.Sam));
     }
 
     [Fact]
     public void TheChildrenDoNot()
     {
-        Assert.False(PersonIdentity.HasMailbox(PersonColumn.Gwen));
-        Assert.False(PersonIdentity.HasMailbox(PersonColumn.Eva));
+        Assert.False(Household.Layout.HasAccount(Household.Riley));
+        Assert.False(Household.Layout.HasAccount(Household.Jo));
     }
 
     /// <summary>Watch is a column, not a person, so there is nobody there to have an address.</summary>
     [Fact]
     public void TheWatchColumnIsNotAPerson()
     {
-        Assert.False(PersonIdentity.HasMailbox(PersonColumn.Watch));
+        Assert.False(Household.Layout.HasAccount(PersonColumn.Watch));
     }
 
     [Fact]
     public void TheAddressableOnesAreTheParentsInColumnOrder()
     {
-        Assert.Equal([PersonColumn.Matt, PersonColumn.Ashley], PersonIdentity.WithMailboxes);
+        Assert.Equal([Household.Alex, Household.Sam], Household.Layout.WithAccounts);
     }
 }

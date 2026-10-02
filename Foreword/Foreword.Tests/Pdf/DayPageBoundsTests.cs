@@ -5,6 +5,7 @@ using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 using Foreword.Infrastructure.Pdf;
 using UglyToad.PdfPig;
+using Foreword.Tests.Calendar;
 using Xunit;
 
 namespace Foreword.Tests.Pdf;
@@ -100,31 +101,31 @@ public class DayPageBoundsTests
         };
 
         return new DayPdfComposer().Compose(new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = Day,
             Agenda = new DayAgenda
             {
                 Date = Day,
                 Events =
                 [
-                    At(PersonColumn.Matt, 9, 17, "Work", "The office"),
-                    At(PersonColumn.Matt, 9, 10, "Standup with the whole platform team"),
-                    At(PersonColumn.Ashley, 15, 16, "Vet — Ruby"),
-                    At(PersonColumn.Gwen, 8, 15, "School", "The school"),
-                    At(PersonColumn.Gwen, 16, 17, "Soccer practice", "Veterans Park"),
-                    At(PersonColumn.Eva, 13, 14, "Piano"),
+                    At(Household.Alex, 9, 17, "Work", "The office"),
+                    At(Household.Alex, 9, 10, "Standup with the whole platform team"),
+                    At(Household.Sam, 15, 16, "Vet — Ruby"),
+                    At(Household.Riley, 8, 15, "School", "The school"),
+                    At(Household.Riley, 16, 17, "Soccer practice", "Veterans Park"),
+                    At(Household.Jo, 13, 14, "Piano"),
                     At(PersonColumn.Watch, 19, 22, "Eagles v Cowboys"),
                 ],
                 Travel = TravelTable.Of("Home", [("The school", "Veterans Park", 25)]),
             },
-            Voice = "Two of Ashley's land on top of each other at half three, and the lawn has moved to today.",
+            Voice = "Two of Sam's land on top of each other at half three, and the lawn has moved to today.",
             ChecklistVoice = "Eight things, and the lawn is the only one that will take you an hour.",
-            Outlook = [At(PersonColumn.Eva, 16, 17, "Eva — orthodontist follow-up appointment")],
+            Outlook = [At(Household.Jo, 16, 17, "Jo — orthodontist follow-up appointment")],
             Tasks =
             [
                 Printed("Vitamins"),
                 Printed("Mow the lawn", Day.AddDays(-1)),
-                Printed("Book Eva's orthodontist follow-up appointment"),
+                Printed("Book Jo's orthodontist follow-up appointment"),
                 Printed("Bins out"),
             ],
             Weather = Forecast(),

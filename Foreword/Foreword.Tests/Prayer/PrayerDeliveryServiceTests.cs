@@ -308,8 +308,8 @@ public class PrayerDeliveryServiceTests
                 [
                     new PrayerRequest
                     {
-                        Id = "gwen",
-                        Text = PrayerText.Of("Gwen, settling in"),
+                        Id = "riley",
+                        Text = PrayerText.Of("Riley, settling in"),
                         Held = Today.AddDays(-44),
                     },
                 ],

@@ -7,7 +7,7 @@ namespace Foreword.Tests.Calendar;
 /// <summary>
 /// D31: who an event belongs to is a <b>set</b>, and the three sources are read in a fixed order.
 ///
-/// <para>"Gwen and Eva to swimming" is one event in two columns. It used to be one event in Gwen's
+/// <para>"Riley and Jo to swimming" is one event in two columns. It used to be one event in Riley's
 /// column, because the family calendar matched the first name it recognised and stopped.</para>
 /// </summary>
 public class ColumnSetTests
@@ -15,26 +15,26 @@ public class ColumnSetTests
     private static readonly IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Addresses =
         new Dictionary<PersonColumn, IReadOnlyList<string>>
         {
-            [PersonColumn.Matt] = ["matt@example.com"],
-            [PersonColumn.Ashley] = ["ashley@example.com"],
-            [PersonColumn.Gwen] = ["gwen@example.com"],
-            [PersonColumn.Eva] = ["eva@example.com"],
+            [Household.Alex] = ["alex@example.com"],
+            [Household.Sam] = ["sam@example.com"],
+            [Household.Riley] = ["riley@example.com"],
+            [Household.Jo] = ["jo@example.com"],
         };
 
     private static readonly IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Names =
         new Dictionary<PersonColumn, IReadOnlyList<string>>
         {
-            [PersonColumn.Matt] = ["Matt"],
-            [PersonColumn.Ashley] = ["Ashley"],
-            [PersonColumn.Gwen] = ["Gwen"],
-            [PersonColumn.Eva] = ["Eva"],
+            [Household.Alex] = ["Alex"],
+            [Household.Sam] = ["Sam"],
+            [Household.Riley] = ["Riley"],
+            [Household.Jo] = ["Jo"],
         };
 
-    private static ColumnRouting Shared(PersonColumn fallback = PersonColumn.Matt) =>
-        new(Column: null, Addresses, Names, Default: fallback);
+    private static ColumnRouting Shared(PersonColumn? fallback = null) =>
+        new(Household.Layout.People, Column: null, Addresses, Names, Default: fallback ?? Household.Alex);
 
     private static ColumnRouting MappedTo(PersonColumn column) =>
-        new(column, Addresses, Names, Default: PersonColumn.Matt);
+        new(Household.Layout.People, column, Addresses, Names, Default: Household.Alex);
 
     private static CalendarEvent Event(string title, params string[] guests) =>
         new() { Title = title, Guests = guests };
@@ -44,18 +44,18 @@ public class ColumnSetTests
     [Fact]
     public void AnInvitedPersonGetsTheEvent()
     {
-        var columns = ColumnSet.Resolve(Event("Swimming", "gwen@example.com"), Shared());
+        var columns = ColumnSet.Resolve(Event("Swimming", "riley@example.com"), Shared());
 
-        Assert.Equal([PersonColumn.Gwen], columns);
+        Assert.Equal([Household.Riley], columns);
     }
 
     [Fact]
     public void TwoInvitedPeopleBothGetIt()
     {
         var columns = ColumnSet.Resolve(
-            Event("Swimming", "gwen@example.com", "eva@example.com"), Shared());
+            Event("Swimming", "riley@example.com", "jo@example.com"), Shared());
 
-        Assert.Equal([PersonColumn.Gwen, PersonColumn.Eva], columns);
+        Assert.Equal([Household.Riley, Household.Jo], columns);
     }
 
     /// <summary>
@@ -66,22 +66,22 @@ public class ColumnSetTests
     public void AGuestWhoIsNotOneOfTheFourIsIgnored()
     {
         var columns = ColumnSet.Resolve(
-            Event("Swimming", "gwen@example.com", "someone@else.com"), Shared());
+            Event("Swimming", "riley@example.com", "someone@else.com"), Shared());
 
-        Assert.Equal([PersonColumn.Gwen], columns);
+        Assert.Equal([Household.Riley], columns);
     }
 
     /// <summary>
-    /// The guest list wins over the title. If Eva is invited and the title says Gwen, Eva is going —
+    /// The guest list wins over the title. If Jo is invited and the title says Riley, Jo is going —
     /// somebody typed the title, somebody else sent the invitation, and only one of those is a
     /// record of who is attending.
     /// </summary>
     [Fact]
     public void TheGuestListOutranksTheTitle()
     {
-        var columns = ColumnSet.Resolve(Event("Gwen to swimming", "eva@example.com"), Shared());
+        var columns = ColumnSet.Resolve(Event("Riley to swimming", "jo@example.com"), Shared());
 
-        Assert.Equal([PersonColumn.Eva], columns);
+        Assert.Equal([Household.Jo], columns);
     }
 
     /// <summary>
@@ -91,29 +91,29 @@ public class ColumnSetTests
     [Fact]
     public void AnAddressMatchesWhateverItsCase()
     {
-        var columns = ColumnSet.Resolve(Event("Swimming", "Gwen@Example.COM"), Shared());
+        var columns = ColumnSet.Resolve(Event("Swimming", "Riley@Example.COM"), Shared());
 
-        Assert.Equal([PersonColumn.Gwen], columns);
+        Assert.Equal([Household.Riley], columns);
     }
 
     // ---- source 2: the title ----
 
     /// <summary>
     /// EVERY name in the title, not the first. This is the bug D31 exists to fix: the family
-    /// calendar matched Gwen, returned, and Eva never appeared.
+    /// calendar matched Riley, returned, and Jo never appeared.
     /// </summary>
     [Fact]
     public void EveryNameInTheTitleCountsNotJustTheFirst()
     {
-        var columns = ColumnSet.Resolve(Event("Gwen and Eva to swimming"), Shared());
+        var columns = ColumnSet.Resolve(Event("Riley and Jo to swimming"), Shared());
 
-        Assert.Equal([PersonColumn.Gwen, PersonColumn.Eva], columns);
+        Assert.Equal([Household.Riley, Household.Jo], columns);
     }
 
     [Fact]
     public void ANameInTheTitleIsMatchedWithoutRegardToCase()
     {
-        Assert.Equal([PersonColumn.Eva], ColumnSet.Resolve(Event("EVA to swimming"), Shared()));
+        Assert.Equal([Household.Jo], ColumnSet.Resolve(Event("JO to swimming"), Shared()));
     }
 
     // ---- source 3: nobody named on a shared calendar ----
@@ -126,7 +126,7 @@ public class ColumnSetTests
     {
         var columns = ColumnSet.Resolve(Event("Dinner"), Shared());
 
-        Assert.Equal(ColumnSet.People, columns);
+        Assert.Equal(Household.Layout.People, columns);
     }
 
     // ---- a calendar that belongs to one person ----
@@ -140,17 +140,17 @@ public class ColumnSetTests
     public void AMappedCalendarKeepsItsOwnColumnWhoeverIsInvited()
     {
         var columns = ColumnSet.Resolve(
-            Event("Standup", "ashley@example.com"), MappedTo(PersonColumn.Matt));
+            Event("Standup", "sam@example.com"), MappedTo(Household.Alex));
 
-        Assert.Equal([PersonColumn.Matt], columns);
+        Assert.Equal([Household.Alex], columns);
     }
 
     [Fact]
     public void AMappedCalendarIgnoresNamesInTheTitleToo()
     {
-        var columns = ColumnSet.Resolve(Event("Call with Gwen"), MappedTo(PersonColumn.Matt));
+        var columns = ColumnSet.Resolve(Event("Call with Riley"), MappedTo(Household.Alex));
 
-        Assert.Equal([PersonColumn.Matt], columns);
+        Assert.Equal([Household.Alex], columns);
     }
 
     // ---- the set is never empty ----

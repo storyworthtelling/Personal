@@ -1,3 +1,4 @@
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
 using Foreword.Domain.Time;
 
@@ -8,11 +9,25 @@ public class WorkScheduleOptions
 {
     public const string SectionName = "WorkSchedule";
 
-    public List<WorkShift> Shifts { get; set; } =
-    [
-        new() { Person = PersonColumn.Matt, Start = "08:00", End = "16:00" },
-        new() { Person = PersonColumn.Ashley, Start = "08:00", End = "15:30" }
-    ];
+    public List<WorkShift> Shifts { get; set; } = [];
+
+    /// <summary>
+    /// What an install that has never saved a schedule starts with: a weekday block for each of the
+    /// first two people with an account, whoever this account's columns say they are. The hours are
+    /// the ones the app always started with; the people are no longer written into it.
+    /// </summary>
+    public static WorkScheduleOptions Defaults(ColumnLayout layout) => new()
+    {
+        Shifts = layout.WithAccounts
+            .Take(2)
+            .Select((person, i) => new WorkShift
+            {
+                Person = person,
+                Start = "08:00",
+                End = i == 0 ? "16:00" : "15:30",
+            })
+            .ToList(),
+    };
 
     // Title keywords on an all-day event that mark a day off (suppresses the work block and
     // surfaces the day on the outlook).

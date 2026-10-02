@@ -20,7 +20,7 @@ public class EventOverflowTests
     private static CalendarEvent At(int startHour, int endHour, string title) => new()
     {
         Title = title,
-        Columns = [PersonColumn.Matt],
+        Columns = [Household.Alex],
         Start = Day.ToDateTime(new TimeOnly(startHour, 0)),
         End = Day.ToDateTime(new TimeOnly(endHour, 0)),
     };
@@ -105,7 +105,7 @@ public class EventOverflowTests
         {
             Title = "Work",
             Kind = EventKind.WorkBlock,
-            Columns = [PersonColumn.Matt],
+            Columns = [Household.Alex],
             Start = Day.ToDateTime(new TimeOnly(9, 0)),
             End = Day.ToDateTime(new TimeOnly(17, 0)),
         };
