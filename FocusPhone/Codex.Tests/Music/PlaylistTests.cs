@@ -71,9 +71,9 @@ public class PlaylistTests
     [Fact]
     public void APlaylistCanRememberWhoSentIt()
     {
-        var list = Playlist.Manual("p1", "Sunday", ["1"]) with { From = "Ashley" };
+        var list = Playlist.Manual("p1", "Sunday", ["1"]) with { From = "Robin" };
 
-        Assert.Equal("Ashley", list.From);
+        Assert.Equal("Robin", list.From);
         Assert.Equal(PlaylistKind.Manual, list.Kind);
     }
 
@@ -85,8 +85,8 @@ public class PlaylistTests
         Assert.Equal("Rules · 2 tracks", Playlist.FromRules("b", "B", new PlaylistRules(
             RuleMatch.All, [new PlaylistRule(TrackField.Artist, RuleOperator.Is, "Switchfoot")])).Describe(Catalog));
         Assert.Equal("Generated · 1 track", Playlist.Generated("c", "C", ["3"]).Describe(Catalog));
-        Assert.Equal("2 tracks · from Ashley",
-            (Playlist.Manual("d", "D", ["1", "2"]) with { From = "Ashley" }).Describe(Catalog));
+        Assert.Equal("2 tracks · from Robin",
+            (Playlist.Manual("d", "D", ["1", "2"]) with { From = "Robin" }).Describe(Catalog));
     }
 
     [Fact]

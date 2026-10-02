@@ -25,15 +25,15 @@ public class MapsSecretsTests
     {
         var vault = SecretsVault.Empty with
         {
-            Maps = new MapsSecrets("key-abc", "12 Elm St, Montclair NJ", 40.8259, -74.2090),
+            Maps = new MapsSecrets("key-abc", "100 Main St, Springfield IL", 39.7817, -89.6501),
         };
 
         var restored = JsonSerializer.Deserialize<SecretsVault>(JsonSerializer.Serialize(vault))!;
 
         Assert.Equal("key-abc", restored.Maps.ApiKey);
-        Assert.Equal("12 Elm St, Montclair NJ", restored.Maps.HomeAddress);
-        Assert.Equal(40.8259, restored.Maps.HomeLatitude);
-        Assert.Equal(-74.2090, restored.Maps.HomeLongitude);
+        Assert.Equal("100 Main St, Springfield IL", restored.Maps.HomeAddress);
+        Assert.Equal(39.7817, restored.Maps.HomeLatitude);
+        Assert.Equal(-89.6501, restored.Maps.HomeLongitude);
     }
 
     /// <summary>

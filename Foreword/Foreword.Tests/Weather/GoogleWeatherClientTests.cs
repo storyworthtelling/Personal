@@ -128,8 +128,8 @@ public class GoogleWeatherClientTests
             Options.Create(new MapsOptions
             {
                 ApiKey = "key-abc",
-                HomeLatitude = 40.8259,
-                HomeLongitude = -74.2090,
+                HomeLatitude = 39.7817,
+                HomeLongitude = -89.6501,
             }));
 
     private static string Route(HttpRequestMessage request)

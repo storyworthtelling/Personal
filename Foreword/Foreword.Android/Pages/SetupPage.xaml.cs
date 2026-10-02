@@ -334,7 +334,7 @@ public partial class SetupPage : BinderPage
     }
 
     /// <summary>
-    /// "40.8259, -74.2090" — one field rather than two, because a point is one thing to copy out of
+    /// "39.7817, -89.6501" — one field rather than two, because a point is one thing to copy out of
     /// a map and two fields is two chances to paste half of it. A value that is not a pair is
     /// ignored rather than half-applied: a latitude saved without its longitude would put the
     /// household's forecast on a meridian.

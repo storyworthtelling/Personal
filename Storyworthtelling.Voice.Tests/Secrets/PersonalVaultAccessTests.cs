@@ -73,12 +73,12 @@ public class PersonalVaultAccessTests
             CancellationToken.None);
 
         await access.PublishAsync(
-            vault => vault with { OwnerColumn = "Ashley" }, CancellationToken.None);
+            vault => vault with { OwnerColumn = "Partner" }, CancellationToken.None);
 
         var loaded = await access.LoadAsync(CancellationToken.None);
 
         Assert.Equal("token", loaded.Vault.TidalAccount.RefreshToken);
-        Assert.Equal("Ashley", loaded.Vault.OwnerColumn);
+        Assert.Equal("Partner", loaded.Vault.OwnerColumn);
     }
 
     /// <summary>
@@ -90,7 +90,7 @@ public class PersonalVaultAccessTests
     {
         var (owner, drive) = Build();
         await owner.PublishAsync(
-            vault => vault with { OwnerColumn = "Matt" }, CancellationToken.None);
+            vault => vault with { OwnerColumn = "Holder" }, CancellationToken.None);
 
         var onDrive = drive.Content;
         var writes = drive.Writes;
@@ -99,7 +99,7 @@ public class PersonalVaultAccessTests
             new DrivePersonalVaultStore(drive), () => "not the passphrase");
 
         Assert.False(await wrong.PublishAsync(
-            vault => vault with { OwnerColumn = "Ashley" }, CancellationToken.None));
+            vault => vault with { OwnerColumn = "Partner" }, CancellationToken.None));
 
         Assert.Equal(onDrive, drive.Content);
         Assert.Equal(writes, drive.Writes);
@@ -110,7 +110,7 @@ public class PersonalVaultAccessTests
     {
         var (owner, drive) = Build();
         await owner.PublishAsync(
-            vault => vault with { OwnerColumn = "Matt" }, CancellationToken.None);
+            vault => vault with { OwnerColumn = "Holder" }, CancellationToken.None);
 
         var wrong = new PersonalVaultAccess(
             new DrivePersonalVaultStore(drive), () => "not the passphrase");
@@ -136,7 +136,7 @@ public class PersonalVaultAccessTests
             (await access.LoadAsync(CancellationToken.None)).Status);
 
         Assert.False(await access.PublishAsync(
-            vault => vault with { OwnerColumn = "Ashley" }, CancellationToken.None));
+            vault => vault with { OwnerColumn = "Partner" }, CancellationToken.None));
 
         Assert.Null(drive.Content);
         Assert.Equal(0, drive.Writes);
@@ -157,7 +157,7 @@ public class PersonalVaultAccessTests
             (await access.LoadAsync(CancellationToken.None)).Status);
 
         Assert.False(await access.PublishAsync(
-            vault => vault with { OwnerColumn = "Ashley" }, CancellationToken.None));
+            vault => vault with { OwnerColumn = "Partner" }, CancellationToken.None));
     }
 
     /// <summary>
@@ -173,7 +173,7 @@ public class PersonalVaultAccessTests
             (await access.LoadAsync(CancellationToken.None)).Status);
 
         Assert.True(await access.PublishAsync(
-            vault => vault with { OwnerColumn = "Ashley" }, CancellationToken.None));
+            vault => vault with { OwnerColumn = "Partner" }, CancellationToken.None));
 
         Assert.NotNull(drive.Content);
     }
