@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Personal projects repository — primarily background automation apps, with occasional MAUI mobile apps and Angular frontends. Projects are added incremenledger; update this file with project-specific build/test commands when a new one lands.
 
+## This repository is public — keep personal information out
+
+The repository is (or is about to be) **public**: every file, every branch, every pull request and every commit message in the history can be read by anyone, and a commit pushed once stays retrievable by its hash even after a force-push. Treat everything committed as published.
+
+- **Never commit the owner's or the household's real data.** No real balances, debts, account or card numbers (not even the last four), interest rates, payment amounts, income, transactions or lender lists; no real addresses, phone numbers, coordinates, email addresses other than placeholders; no real calendar entries, messages, prayer or journal text, contacts, photos, or anything exported from the owner's Drive, Sheets, Gmail or phone.
+- **Fixtures, mockups and docs use made-up data.** Invent names and figures (`example.com` addresses, `555-01xx` numbers, fictional lenders and amounts). A design mockup or a technical finding that needs "the real numbers" describes their shape, never the values. Screenshots and rendered PNGs count: they carry whatever the page showed.
+- **Data the app genuinely needs at runtime lives in the owner's Drive, not the repo** — read through the `IDriveTextFile` seam (and encrypted with the vault passphrase where it is sensitive), the same way the secrets vault, the prayer archive and the household snapshot already work. Embedding it as a resource ships it in the source *and* in every APK on the public release.
+- **Keys and tokens stay where they are:** GitHub Actions secrets and the encrypted Drive vault. Never in code, config, logs, test output or commit messages.
+- **If personal data does land in a commit,** say so at once rather than covering it with a follow-up commit. A later commit hides it from the tree, not from the history; removing it means rewriting the branch and asking GitHub to purge the old commits, which is the owner's decision.
+
 ## Design
 
 **`DESIGN.md` at the repo root is the Paper & Ink design bible** — the single source of truth for palette, typography, motion, materiality, spacing, components, PDF page specs, icon specs, voice, and accessibility across every project. Rules that matter when writing code:
