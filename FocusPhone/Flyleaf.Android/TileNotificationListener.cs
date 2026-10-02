@@ -1,6 +1,7 @@
 using Android.Service.Notification;
 using Android.App;
 using Android.Content;
+using Codex.Domain.Calls;
 
 namespace Flyleaf;
 
@@ -34,9 +35,39 @@ public class TileNotificationListener : NotificationListenerService
         BroadcastActivePackages();
     }
 
-    public override void OnNotificationPosted(StatusBarNotification? sbn) => BroadcastActivePackages();
+    // One per bound listener: a rebind starts with no memory of what was ringing, which at worst
+    // opens a still-ringing call screen once more.
+    private readonly IncomingCallSurfacer calls = new();
 
-    public override void OnNotificationRemoved(StatusBarNotification? sbn) => BroadcastActivePackages();
+    public override void OnNotificationPosted(StatusBarNotification? sbn)
+    {
+        SurfaceIfRinging(sbn);
+        BroadcastActivePackages();
+    }
+
+    public override void OnNotificationRemoved(StatusBarNotification? sbn)
+    {
+        if (sbn?.Key is { } key)
+        {
+            calls.Removed(key);
+        }
+        BroadcastActivePackages();
+    }
+
+    // The lockdown's disabled status bar also disables notification alerts, so a ringing call's
+    // heads-up card never appears (see CallScreen). Open the call screen the dialer asked for.
+    private void SurfaceIfRinging(StatusBarNotification? sbn)
+    {
+        if (sbn?.Key is not { } key || sbn.Notification is not { } notification)
+        {
+            return;
+        }
+        var kind = CallScreen.Classify(notification);
+        if (calls.ShouldSurface(key, kind) && CallScreen.Target(notification, kind) is { } target)
+        {
+            CallScreen.Open(target);
+        }
+    }
 
     private void BroadcastActivePackages()
     {
@@ -50,6 +81,8 @@ public class TileNotificationListener : NotificationListenerService
             // Listener access not granted yet (pre-provisioning); nothing to report.
             return;
         }
+
+        CallScreen.UpdateCurrent(active);
 
         // Highest urgency wins per package (a quiet download-progress notification shouldn't
         // mute a genuinely urgent one from the same app).
