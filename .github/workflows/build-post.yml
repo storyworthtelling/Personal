@@ -16,8 +16,19 @@ on:
       - 'Storyworthtelling.Voice/**'
       - '.github/workflows/build-post.yml'
 
+# A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
+# for both. main is never cancelled: every main run publishes to the rolling release.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
+  # Branch pushes run the tests and nothing else — Actions minutes are the budget, and signing an
+  # APK on every push of a working branch, then again on merge, is where they went. main (and a
+  # manual "Run workflow", which is how a branch gets its APK compiled when it needs one) runs the
+  # tests inside the build job instead, so one runner does both rather than two.
   test:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +44,7 @@ jobs:
         run: dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj
 
   build:
-    needs: test
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # actions: write lets the prune step delete artifacts from older runs;
     # contents: write lets the rolling-release step publish the signed APK.
@@ -47,6 +58,11 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android heads, which would require the Android workload.
+      - name: Run tests
+        run: dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj
 
       # Post is plain .NET-for-Android (not MAUI), so the lighter 'android'
       # workload is sufficient.
