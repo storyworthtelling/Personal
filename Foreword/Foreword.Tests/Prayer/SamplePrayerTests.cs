@@ -33,9 +33,9 @@ public class SamplePrayerTests
                 new PrintedRequest(
                     PrayerText.Of("The Kellers, moving"), "held 3 weeks", false),
                 new PrintedRequest(
-                    PrayerText.Of("Wren, settling into the new class"), "held 6 weeks", false),
+                    PrayerText.Of("Riley, settling into the new class"), "held 6 weeks", false),
                 new PrintedRequest(
-                    PrayerText.Of("Jordan's Boston trip"), "held 4 days", false),
+                    PrayerText.Of("Sam's Boston trip"), "held 4 days", false),
                 new PrintedRequest(
                     PrayerText.Of("Work — the decision about the team"), "answered", true),
             ],

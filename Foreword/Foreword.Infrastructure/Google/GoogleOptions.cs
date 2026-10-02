@@ -1,6 +1,6 @@
 namespace Foreword.Infrastructure.Google;
 
-// OAuth credentials (one-time consent on the owner's account) plus calendar-creation settings.
+// OAuth credentials (one-time consent on the owner's account) and calendar settings.
 public class GoogleOptions
 {
     public const string SectionName = "Google";
@@ -14,8 +14,4 @@ public class GoogleOptions
 
     // Calendar that transcribed events are written to (the user's primary by default).
     public string AddEventCalendarId { get; set; } = "primary";
-
-    // Summaries for the kid calendars auto-created on first run.
-    public string GwenCalendarName { get; set; } = "Wren";
-    public string EvaCalendarName { get; set; } = "Linden";
 }

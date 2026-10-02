@@ -9,8 +9,8 @@ namespace Foreword.Infrastructure.Calendar;
 /// <summary>
 /// Assigns each event the <b>set</b> of columns it belongs to (D31).
 ///
-/// <para>It used to return one column and stop at the first name it recognised, which is how "Wren
-/// and Linden to swimming" became Wren's alone. The decision itself now lives in
+/// <para>It used to return one column and stop at the first name it recognised, which is how "Riley
+/// and Jo to swimming" became Riley's alone. The decision itself now lives in
 /// <see cref="ColumnSet"/>, which is pure and tested; this reads the configuration and hands it
 /// over.</para>
 ///
@@ -41,7 +41,14 @@ public class CalendarColumnMapper
     /// when nothing else can tell.</para>
     /// </summary>
     public PersonColumn Owner =>
-        OwnerColumn.Resolve(install.AccountEmail, Addresses(), install.HouseholdAccount);
+        OwnerColumn.Resolve(install.AccountEmail, Addresses(), install.HouseholdAccount, Layout);
+
+    /// <summary>
+    /// The columns this account set up in Foreword, in print order. Read on every use rather than
+    /// cached, because the options are live: a column added on the Columns screen is on the next
+    /// page without a restart.
+    /// </summary>
+    public ColumnLayout Layout => options.Layout();
 
     public IReadOnlyList<CalendarEvent> Assign(IEnumerable<CalendarEvent> events)
     {
@@ -77,7 +84,7 @@ public class CalendarColumnMapper
 
     public IReadOnlyList<PersonColumn> Resolve(CalendarEvent calendarEvent) =>
         IsEveryone(calendarEvent.SourceCalendarId)
-            ? ColumnSet.People
+            ? Layout.People
             : ColumnSet.Resolve(calendarEvent, RoutingFor(calendarEvent.SourceCalendarId));
 
     private ColumnRouting RoutingFor(string calendarId)
@@ -87,14 +94,14 @@ public class CalendarColumnMapper
         // FamilyCalendarId is the shorthand for the one that already exists.
         if (IsSplit(calendarId))
         {
-            return new ColumnRouting(Column: null, Addresses(), Names(), FallbackColumn);
+            return new ColumnRouting(Layout.People, Column: null, Addresses(), Names(), FallbackColumn);
         }
 
         PersonColumn? column = options.CalendarColumns.TryGetValue(calendarId, out var mapped)
             ? mapped
             : FallbackColumn;
 
-        return new ColumnRouting(column, Addresses(), Names(), FallbackColumn);
+        return new ColumnRouting(Layout.People, column, Addresses(), Names(), FallbackColumn);
     }
 
     /// <summary>
@@ -126,11 +133,6 @@ public class CalendarColumnMapper
             pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value);
 
     private IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Names() =>
-        new Dictionary<PersonColumn, IReadOnlyList<string>>
-        {
-            [PersonColumn.Wren] = options.GwenKeywords,
-            [PersonColumn.Linden] = options.EvaKeywords,
-            [PersonColumn.Rowan] = options.MattKeywords,
-            [PersonColumn.Jordan] = options.AshleyKeywords,
-        };
+        options.Keywords.ToDictionary(
+            pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value);
 }

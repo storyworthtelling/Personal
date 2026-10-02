@@ -122,7 +122,7 @@ public partial class MainPage : BinderPage
                 if (CredentialStore.IsGoogleConfigured)
                 {
                     var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
-                    await daily.EnsureKidCalendars();
+                    await daily.EnsureColumnCalendars();
                     await daily.DeliverDailyDocuments(today);
                 }
 

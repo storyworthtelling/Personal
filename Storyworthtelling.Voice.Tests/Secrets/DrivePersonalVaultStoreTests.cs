@@ -36,6 +36,38 @@ public class DrivePersonalVaultStoreTests
         Assert.Equal("refresh-ghi", loaded.Vault.TidalAccount.RefreshToken);
     }
 
+    // Foreword's calendar choices — the columns this account prints and which calendar feeds which —
+    // are the account's own, so they ride its personal vault rather than the household's shared one.
+    [Fact]
+    public async Task CarriesThisAccountsCalendarChoices()
+    {
+        var file = new InMemoryTextFile();
+        var store = new DrivePersonalVaultStore(file);
+
+        await store.SaveAsync(
+            PersonalVault.Empty with { CalendarMappingJson = "{\"Columns\":[]}", WorkScheduleJson = "{\"Shifts\":[]}" },
+            Pass,
+            default);
+        var loaded = (await store.LoadAsync(Pass, default)).Vault;
+
+        Assert.Equal("{\"Columns\":[]}", loaded.CalendarMappingJson);
+        Assert.Equal("{\"Shifts\":[]}", loaded.WorkScheduleJson);
+        Assert.DoesNotContain("Columns", file.Content);
+    }
+
+    // A file written before the calendar choices moved here reads with them empty, not as corrupt.
+    [Fact]
+    public async Task AnOlderFileHasNoCalendarChoicesYet()
+    {
+        var file = new InMemoryTextFile();
+        await new DrivePersonalVaultStore(file).SaveAsync(Signed("user-1", "refresh-ghi"), Pass, default);
+
+        var loaded = await new DrivePersonalVaultStore(file).LoadAsync(Pass, default);
+
+        Assert.Equal(PersonalVaultStatus.Loaded, loaded.Status);
+        Assert.Equal(string.Empty, loaded.Vault.CalendarMappingJson);
+    }
+
     // Same guarantee the shared vault gives: what reaches Drive is opaque. A personal
     // vault holds someone's subscription token, so a plaintext write would be worse
     // here than in the shared file, not better.
