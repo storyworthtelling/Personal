@@ -6,6 +6,7 @@ using Android.OS;
 using Android.Views;
 using Android.Widget;
 using Codex.Domain.Apps;
+using Codex.Domain.Calls;
 using Codex.Domain.Design;
 using Codex.Domain.Policy;
 using Codex.Ui;
@@ -38,6 +39,8 @@ public class HomeActivity : Activity
     private FrameLayout? root;
     private Button? setDefaultLauncherButton;
     private Button? setDefaultBrowserButton;
+    private LinearLayout? callBar;
+    private Button? callButton;
     private const int RequestBrowserRoleCode = 4200;
 
     // The Google account is used for the vault-backed update-token restore and the cover-load
@@ -177,6 +180,19 @@ public class HomeActivity : Activity
             Gravity = GravityFlags.Center,
             TopMargin = PaperTheme.Dp(this, DesignTokens.Space.X12),
         });
+
+        // The way back into a phone call. The lockdown's disabled status bar takes the ongoing-call
+        // chip and the shade with it, so leaving the call screen (or pressing Home while it rang)
+        // left the call with nowhere to return to. Pinned while a call lasts, gone the moment it ends.
+        callButton = PaperUi.PrimaryButton(this, string.Empty, OpenCurrentCall);
+        callBar = PaperUi.BottomBar(this, callButton);
+        callBar.SetBackgroundColor(PaperTheme.Paper);
+        callBar.Visibility = ViewStates.Gone;
+        root.AddView(callBar, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+        {
+            Gravity = GravityFlags.Bottom,
+        });
         return root;
     }
 
@@ -187,6 +203,7 @@ public class HomeActivity : Activity
         UpdateClock();
         UpdateSetDefaultLauncherButton();
         UpdateSetDefaultBrowserButton();
+        UpdateCallBar();
         timeTickReceiver = new TimeTickReceiver(UpdateClock);
         RegisterReceiver(timeTickReceiver, new IntentFilter(Intent.ActionTimeTick));
         notificationsReceiver = new NotificationsChangedReceiver(OnNotificationsChanged);
@@ -257,6 +274,29 @@ public class HomeActivity : Activity
             notificationPriorities[package] = priority;
         }
         shelf?.RefreshBookmarks();
+        UpdateCallBar();
+    }
+
+    private void UpdateCallBar()
+    {
+        var (kind, target) = CallScreen.Current;
+        var label = CallNotice.ActionLabel(kind);
+        if (label is null || target is null)
+        {
+            callBar!.Visibility = ViewStates.Gone;
+            return;
+        }
+        callButton!.Text = label;
+        callBar!.Visibility = ViewStates.Visible;
+    }
+
+    private void OpenCurrentCall()
+    {
+        if (CallScreen.Current.Target is not { } target || !CallScreen.Open(target))
+        {
+            // The call ended between the bar being drawn and the tap.
+            callBar!.Visibility = ViewStates.Gone;
+        }
     }
 
     // ---- Interactions ----
