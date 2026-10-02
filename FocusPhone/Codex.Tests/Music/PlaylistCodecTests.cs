@@ -42,9 +42,9 @@ public class PlaylistCodecTests
     [Fact]
     public void RoundTripsProvenance()
     {
-        IReadOnlyList<Playlist> lists = [Playlist.Manual("a", "Sunday", ["1"]) with { From = "Jordan" }];
+        IReadOnlyList<Playlist> lists = [Playlist.Manual("a", "Sunday", ["1"]) with { From = "Robin" }];
 
-        Assert.Equal("Jordan", PlaylistCodec.Decode(PlaylistCodec.Encode(lists))[0].From);
+        Assert.Equal("Robin", PlaylistCodec.Decode(PlaylistCodec.Encode(lists))[0].From);
     }
 
     // Nothing stored yet is the ordinary first-run case, not a fault.
