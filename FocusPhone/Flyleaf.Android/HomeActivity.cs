@@ -239,9 +239,21 @@ public class HomeActivity : Activity
                 activity.StartActivity(confirm);
                 return;
             }
+            var succeeded = status == (int)PackageInstallStatus.Success;
+            var reason = intent?.GetStringExtra(PackageInstaller.ExtraStatusMessage) ?? $"status {status}";
+            var package = intent?.GetStringExtra(PackageInstaller.ExtraPackageName) ?? "an app";
+            if (!succeeded)
+            {
+                // A refused uninstall used to clear the notice and reload an unchanged shelf — exactly
+                // "nothing happened". Record why, and say so on the dog-ear.
+                new PolicyAuditStore(activity).Record(PolicyEventKind.UninstallFailed,
+                    $"Uninstall of {package} was refused by the platform ({reason}).");
+            }
             activity.RunOnUiThread(() =>
             {
-                DogEar.SetNotice(activity, activity.root!, UninstallNoticeKey, null);
+                DogEar.SetNotice(activity, activity.root!, UninstallNoticeKey, succeeded
+                    ? null
+                    : new DogEar.Notice("Couldn't uninstall", reason, PaperTheme.ProblemMark));
                 activity.ReloadScene();
             });
         }
