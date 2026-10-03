@@ -350,7 +350,11 @@ public class HomeActivity : Activity
         }
         actions.Add(("Feature on home", () => ShowFeaturePicker(package, label)));
         actions.Add(("Block", () => BlockWithUndo(package, label)));
-        actions.Add(("Uninstall", () => UninstallApp(package, label)));
+        if (package != PackageName)
+        {
+            // Every app can be removed except Flyleaf itself, the device owner holding the lockdown.
+            actions.Add(("Uninstall", () => UninstallApp(package, label)));
+        }
         ShowPaperMenu(label, actions);
     }
 
