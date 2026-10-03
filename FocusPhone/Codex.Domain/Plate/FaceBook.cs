@@ -36,7 +36,7 @@ public readonly record struct FaceMatch(string ContactId, string Name, double Cl
 /// that already exists.</para>
 ///
 /// <para><b>It suggests; the owner decides.</b> Every match is a question — "is this
-/// Jordan?" — and a confirmation teaches it, which is what makes the forgiving threshold the
+/// Robin?" — and a confirmation teaches it, which is what makes the forgiving threshold the
 /// right one: a wrong suggestion costs a tap, a missed one costs a name nobody offered. A
 /// correction is permanent, exactly as Post's sender promotions are.</para>
 ///

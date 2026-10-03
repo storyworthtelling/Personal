@@ -11,7 +11,7 @@ public class WorkScheduleAugmenterTests
     private static readonly DateOnly Weekend = new(2026, 6, 6);   // Saturday
 
     private static WorkScheduleAugmenter CreateAugmenter() =>
-        new(Options.Create(new WorkScheduleOptions()));
+        new(Options.Create(WorkScheduleOptions.Defaults(Household.Layout)));
 
     private static CalendarEvent AllDay(PersonColumn column, string title, DateOnly date) =>
         new()
@@ -29,28 +29,28 @@ public class WorkScheduleAugmenterTests
         var result = CreateAugmenter().Augment([], Weekday);
 
         var blocks = result.Where(e => e.Kind == EventKind.WorkBlock).ToList();
-        Assert.Contains(blocks, b => b.Columns.Contains(PersonColumn.Rowan));
-        Assert.Contains(blocks, b => b.Columns.Contains(PersonColumn.Jordan));
+        Assert.Contains(blocks, b => b.Columns.Contains(Household.Alex));
+        Assert.Contains(blocks, b => b.Columns.Contains(Household.Sam));
     }
 
     [Fact]
-    public void Augment_MattBlockRunsEightToFour()
+    public void Augment_FirstPersonsBlockRunsEightToFour()
     {
         var result = CreateAugmenter().Augment([], Weekday);
 
-        var rowan = result.Single(e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(PersonColumn.Rowan));
-        Assert.Equal(new TimeOnly(8, 0), TimeOnly.FromDateTime(rowan.Start));
-        Assert.Equal(new TimeOnly(16, 0), TimeOnly.FromDateTime(rowan.End));
+        var alex = result.Single(e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(Household.Alex));
+        Assert.Equal(new TimeOnly(8, 0), TimeOnly.FromDateTime(alex.Start));
+        Assert.Equal(new TimeOnly(16, 0), TimeOnly.FromDateTime(alex.End));
     }
 
     [Fact]
-    public void Augment_AshleyBlockRunsEightToThreeThirty()
+    public void Augment_SecondPersonsBlockRunsEightToThreeThirty()
     {
         var result = CreateAugmenter().Augment([], Weekday);
 
-        var jordan = result.Single(e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(PersonColumn.Jordan));
-        Assert.Equal(new TimeOnly(8, 0), TimeOnly.FromDateTime(jordan.Start));
-        Assert.Equal(new TimeOnly(15, 30), TimeOnly.FromDateTime(jordan.End));
+        var sam = result.Single(e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(Household.Sam));
+        Assert.Equal(new TimeOnly(8, 0), TimeOnly.FromDateTime(sam.Start));
+        Assert.Equal(new TimeOnly(15, 30), TimeOnly.FromDateTime(sam.End));
     }
 
     [Fact]
@@ -64,18 +64,18 @@ public class WorkScheduleAugmenterTests
     [Fact]
     public void Augment_SuppressesWorkBlockWhenAllDayOffEventPresent()
     {
-        var off = AllDay(PersonColumn.Rowan, "Off", Weekday);
+        var off = AllDay(Household.Alex, "Off", Weekday);
 
         var result = CreateAugmenter().Augment([off], Weekday);
 
-        Assert.DoesNotContain(result, e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(PersonColumn.Rowan));
-        Assert.Contains(result, e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(PersonColumn.Jordan));
+        Assert.DoesNotContain(result, e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(Household.Alex));
+        Assert.Contains(result, e => e.Kind == EventKind.WorkBlock && e.Columns.Contains(Household.Sam));
     }
 
     [Fact]
     public void Augment_MarksAllDayOffEventAsOffDay()
     {
-        var off = AllDay(PersonColumn.Rowan, "Off", Weekday);
+        var off = AllDay(Household.Alex, "Off", Weekday);
 
         var result = CreateAugmenter().Augment([off], Weekday);
 

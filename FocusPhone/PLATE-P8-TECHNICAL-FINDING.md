@@ -324,7 +324,7 @@ but will not name the people in it**. So recognition cannot come from either. It
 locally, in the order it learns: ML Kit **Face Detection** crops faces → a bundled
 MobileFaceNet-class TensorFlow Lite model embeds each one → the owner labels a face once →
 later faces are matched by nearest neighbour against the stored labels, with a confidence
-floor and an "is this Jordan?" fold when it is unsure.
+floor and an "is this Robin?" fold when it is unsure.
 
 Nothing about that leaves the device, and the parts that decide anything — thresholds,
 tie-breaks, when to ask rather than assert — are pure and testable in `Codex.Domain`. The
@@ -539,7 +539,7 @@ recognition in its own release.
 | **A** | Guardrails | The rename with app id, keystore and versionCode frozen · `build-plate.yml` · Camera out of `build-flyleaf.yml` · every guard in §4, each watched to fail · the package id collapsed to one constant. **Nothing else.** |
 | **B** | The camera | The Photos bug (§2.2) · video, front lens, flash, the true-ratio window (§2.5) · scanning with our own multi-page assembly, QR restored, reMarkable to root (§2.3) · kit adoption and restyle · the inbound reads (§3). |
 | **C** | The Darkroom | The room, the editor (crop, tint, filters), culling, and the Claude captions (§2.1, §2.7). |
-| **D** | Recognition | Detection → embeddings → the labelled store → matching, and the "is this Jordan?" fold (§2.6). |
+| **D** | Recognition | Detection → embeddings → the labelled store → matching, and the "is this Robin?" fold (§2.6). |
 
 **A is deliberately almost empty**, and that is the point: it proves the in-place upgrade and
 the update channel before a single feature rides on either. It is also the only release whose
