@@ -1,6 +1,6 @@
-using Ledger.Domain.Time;
+using Index.Domain.Time;
 
-namespace Ledger.Infrastructure.Time;
+namespace Index.Infrastructure.Time;
 
 public sealed class SystemClock : IClock
 {

@@ -256,14 +256,18 @@
                 </VerticalStackLayout>
             </Border>
 
-            <!-- The quiet foot line: which build is actually on the phone. The update channel
-                 installs silently and most updates change nothing visible, so without it
-                 "did that land?" has no answer on the device. Matches Flyleaf's, via the one
-                 shared Storyworthtelling.Updates.BuildLine formatter. -->
-            <Label x:Name="BuildLineLabel"
-                   Style="{StaticResource MonoLabel}"
-                   HorizontalOptions="Center"
-                   Margin="0,32,0,0" />
+            <!-- The quiet foot line: which build is actually on the phone, now with the owner's
+                 mark standing beside it. The update channel installs silently and most updates
+                 change nothing visible, so without the build line "did that land?" has no answer
+                 on the device; the medallion says whose morning this is. Matches Flyleaf's, via
+                 the one shared Storyworthtelling.Updates.BuildLine formatter. -->
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="0,32,0,0">
+                <Image Grid.Column="0" Source="owner_medallion.png" WidthRequest="40" HeightRequest="40"
+                       VerticalOptions="Center" />
+                <Label x:Name="BuildLineLabel" Grid.Column="1"
+                       Style="{StaticResource MonoLabel}"
+                       VerticalOptions="Center" />
+            </Grid>
         </VerticalStackLayout>
     </ScrollView>
 </pages:BinderPage>

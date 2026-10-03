@@ -326,7 +326,7 @@ on-device test plan to settle.
   300-row paging and a generation counter. Verified, not re-planned. The navigation half is P7's, and the
   649-line `ThreadsActivity` / 504-line `ThreadActivity` are broken up by the Areas structure.
 - **Roadmap #4** — narrowed and sharpened. **Balances** cross to Index; **bills** stay in Post showing amount
-  and due date. Parsing is general, not limited to Evergreen Home Lending and Cobblestone Finance. Post parses, Index consumes.
+  and due date. Parsing is general, not limited to any one lender (the examples used while building it were a home-improvement lender and a consumer-finance lender). Post parses, Index consumes.
 - **CLAUDE.md's note that `GmBridgeClient` "compiles to a stub"** — true locally, but CI has always built the
   `.aar`, so shipped APKs carry the real bridge. After this phase the stub path is gone entirely.
 - **The design interview's "call transcript summary"** — not deliverable (F3). Replaced by the owner's own

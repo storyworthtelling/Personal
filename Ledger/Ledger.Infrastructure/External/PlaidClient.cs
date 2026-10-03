@@ -3,13 +3,13 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using Ledger.Domain.External;
-using Ledger.Domain.Health;
-using Ledger.Domain.Pipeline;
-using Ledger.Infrastructure.Configuration;
+using Index.Domain.External;
+using Index.Domain.Health;
+using Index.Domain.Pipeline;
+using Index.Infrastructure.Configuration;
 using Storyworthtelling.Voice.Health;
 
-namespace Ledger.Infrastructure.External;
+namespace Index.Infrastructure.External;
 
 // The Plaid aggregator client. Every request posts a JSON body carrying the client_id/secret (Plaid
 // authenticates in the body, not headers) to the environment host from PlaidOptions. Provider
@@ -63,6 +63,33 @@ public sealed class PlaidClient : IPlaidClient
             OptionalString(root, "hosted_link_url"));
     }
 
+    // D150: Plaid's update-mode Link token — the request carries access_token instead of the fresh-Link
+    // products/required_if_supported_products pair, since the existing Item already carries its own
+    // products and Plaid infers them from it rather than accepting a second declaration. Reconstructed
+    // against Plaid's documented update-mode shape; not yet exercised against a live update-mode
+    // session (see the phase's own "not verified" list).
+    public async Task<PlaidLinkToken> CreateUpdateLinkTokenAsync(string existingAccessToken, CancellationToken cancellationToken)
+    {
+        var opts = options.Value;
+        var payload = new
+        {
+            client_id = opts.ClientId,
+            secret = opts.Secret,
+            client_name = "Index",
+            language = "en",
+            country_codes = new[] { "US" },
+            user = new { client_user_id = "index-owner" },
+            access_token = existingAccessToken,
+            hosted_link = new { }
+        };
+
+        using var document = await PostAsync("/link/token/create", payload, cancellationToken);
+        var root = document.RootElement;
+        return new PlaidLinkToken(
+            root.GetProperty("link_token").GetString() ?? string.Empty,
+            OptionalString(root, "hosted_link_url"));
+    }
+
     public async Task<PlaidLinkResult?> GetLinkResultAsync(string linkToken, CancellationToken cancellationToken)
     {
         var opts = options.Value;
@@ -86,9 +113,13 @@ public sealed class PlaidClient : IPlaidClient
                 if (string.IsNullOrEmpty(publicToken))
                     continue;
                 string? institutionName = null;
+                string? institutionId = null;
                 if (item.TryGetProperty("institution", out var institution))
+                {
                     institutionName = OptionalString(institution, "name");
-                return new PlaidLinkResult(publicToken, institutionName);
+                    institutionId = OptionalString(institution, "institution_id");
+                }
+                return new PlaidLinkResult(publicToken, institutionName, institutionId);
             }
         }
 
@@ -148,9 +179,9 @@ public sealed class PlaidClient : IPlaidClient
                 OptionalString(account, "type") ?? string.Empty,
                 OptionalString(account, "subtype"),
                 OptionalString(balances, "iso_currency_code"),
-                OptionalDouble(balances, "current"),
-                OptionalDouble(balances, "available"),
-                OptionalDouble(balances, "limit")));
+                OptionalDecimal(balances, "current"),
+                OptionalDecimal(balances, "available"),
+                OptionalDecimal(balances, "limit")));
         }
         return accounts;
     }
@@ -171,9 +202,9 @@ public sealed class PlaidClient : IPlaidClient
             {
                 result.Add(new PlaidLiability(
                     OptionalString(item, "account_id") ?? string.Empty,
-                    OptionalDouble(item, "last_statement_balance"),
+                    OptionalDecimal(item, "last_statement_balance"),
                     OptionalDate(item, "next_payment_due_date"),
-                    OptionalDouble(item, "minimum_payment_amount"),
+                    OptionalDecimal(item, "minimum_payment_amount"),
                     PurchaseApr(item)));
             }
         }
@@ -182,14 +213,14 @@ public sealed class PlaidClient : IPlaidClient
         {
             foreach (var item in mortgage.EnumerateArray())
             {
-                double? rate = null;
+                decimal? rate = null;
                 if (item.TryGetProperty("interest_rate", out var interest))
-                    rate = OptionalDouble(interest, "percentage");
+                    rate = OptionalDecimal(interest, "percentage");
                 result.Add(new PlaidLiability(
                     OptionalString(item, "account_id") ?? string.Empty,
                     null,
                     OptionalDate(item, "next_payment_due_date"),
-                    OptionalDouble(item, "next_monthly_payment"),
+                    OptionalDecimal(item, "next_monthly_payment"),
                     rate));
             }
         }
@@ -200,10 +231,10 @@ public sealed class PlaidClient : IPlaidClient
             {
                 result.Add(new PlaidLiability(
                     OptionalString(item, "account_id") ?? string.Empty,
-                    OptionalDouble(item, "last_statement_balance"),
+                    OptionalDecimal(item, "last_statement_balance"),
                     OptionalDate(item, "next_payment_due_date"),
-                    OptionalDouble(item, "minimum_payment_amount"),
-                    OptionalDouble(item, "interest_rate_percentage")));
+                    OptionalDecimal(item, "minimum_payment_amount"),
+                    OptionalDecimal(item, "interest_rate_percentage")));
             }
         }
 
@@ -222,7 +253,9 @@ public sealed class PlaidClient : IPlaidClient
             access_token = accessToken,
             start_date = startDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             end_date = endDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            options = new { count, offset = 0, account_ids = accountIds }
+            // include_personal_finance_category: Plaid returns personal_finance_category (primary +
+            // detailed) only when asked — it is what PlaidCategoryMap reads (R8).
+            options = new { count, offset = 0, account_ids = accountIds, include_personal_finance_category = true }
         };
 
         using var document = await PostAsync("/transactions/get", payload, cancellationToken);
@@ -233,6 +266,7 @@ public sealed class PlaidClient : IPlaidClient
 
         foreach (var transaction in transactions.EnumerateArray())
         {
+            transaction.TryGetProperty("personal_finance_category", out var category);
             result.Add(new PlaidTransaction(
                 OptionalString(transaction, "transaction_id") ?? string.Empty,
                 OptionalString(transaction, "account_id") ?? string.Empty,
@@ -241,7 +275,10 @@ public sealed class PlaidClient : IPlaidClient
                 OptionalString(transaction, "merchant_name"),
                 OptionalDouble(transaction, "amount") ?? 0,
                 OptionalString(transaction, "iso_currency_code"),
-                transaction.TryGetProperty("pending", out var pending) && pending.ValueKind == JsonValueKind.True));
+                transaction.TryGetProperty("pending", out var pending) && pending.ValueKind == JsonValueKind.True,
+                OptionalString(transaction, "pending_transaction_id"),
+                OptionalString(category, "primary"),
+                OptionalString(category, "detailed")));
         }
         return result;
     }
@@ -251,6 +288,42 @@ public sealed class PlaidClient : IPlaidClient
         var opts = options.Value;
         var payload = new { client_id = opts.ClientId, secret = opts.Secret, access_token = accessToken };
         using var _ = await PostAsync("/item/remove", payload, cancellationToken);
+    }
+
+    // Plaid's institution directory lookup (/institutions/get_by_id — Plaid's public API docs, same
+    // family as /accounts/balance/get above: client_id/secret in the body, no access_token — this is
+    // metadata about the bank itself, not about one Item). country_codes is required the same way
+    // CreateLinkTokenAsync's is; include_optional_metadata: true is what makes Plaid return
+    // primary_color at all, since it is optional metadata omitted by default.
+    public async Task<PlaidInstitution> GetInstitutionAsync(string institutionId, CancellationToken cancellationToken)
+    {
+        var opts = options.Value;
+        var payload = new
+        {
+            client_id = opts.ClientId,
+            secret = opts.Secret,
+            institution_id = institutionId,
+            country_codes = new[] { "US" },
+            options = new { include_optional_metadata = true }
+        };
+
+        using var document = await PostAsync("/institutions/get_by_id", payload, cancellationToken);
+        var institution = document.RootElement.GetProperty("institution");
+        return new PlaidInstitution(
+            OptionalString(institution, "institution_id") ?? institutionId,
+            OptionalString(institution, "name") ?? string.Empty,
+            OptionalString(institution, "primary_color"));
+    }
+
+    // /item/get answers "which bank is this Item?" from the access token alone. institution_id is
+    // nullable in Plaid's response (an Item with no directory institution), which reads here as null.
+    public async Task<string?> GetItemInstitutionIdAsync(string accessToken, CancellationToken cancellationToken)
+    {
+        var opts = options.Value;
+        var payload = new { client_id = opts.ClientId, secret = opts.Secret, access_token = accessToken };
+
+        using var document = await PostAsync("/item/get", payload, cancellationToken);
+        return OptionalString(document.RootElement.GetProperty("item"), "institution_id");
     }
 
     private async Task<JsonDocument> PostAsync<T>(string path, T payload, CancellationToken cancellationToken)
@@ -305,15 +378,15 @@ public sealed class PlaidClient : IPlaidClient
     }
 
     // The purchase APR is the rate a balance checker wants to show; fall back to the first reported APR.
-    private static double? PurchaseApr(JsonElement credit)
+    private static decimal? PurchaseApr(JsonElement credit)
     {
         if (!credit.TryGetProperty("aprs", out var aprs) || aprs.ValueKind != JsonValueKind.Array)
             return null;
 
-        double? first = null;
+        decimal? first = null;
         foreach (var apr in aprs.EnumerateArray())
         {
-            var value = OptionalDouble(apr, "apr_percentage");
+            var value = OptionalDecimal(apr, "apr_percentage");
             first ??= value;
             if (OptionalString(apr, "apr_type") == "purchase_apr")
                 return value;
@@ -327,10 +400,21 @@ public sealed class PlaidClient : IPlaidClient
             ? value.GetString()
             : null;
 
+    // Transaction amounts (PlaidTransaction.Amount) are out of scope for this migration — Release E
+    // introduces the Transaction entity itself — so this stays double for now.
     private static double? OptionalDouble(JsonElement element, string name) =>
         element.ValueKind == JsonValueKind.Object &&
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
             ? value.GetDouble()
+            : null;
+
+    // Money paths (balances, credit limits, liabilities, APRs) read as decimal rather than double —
+    // 0.1 + 0.2 is not 0.3 in binary floating point, and Index sums and zero-checks these values
+    // where Ledger only ever displayed them.
+    private static decimal? OptionalDecimal(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object &&
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetDecimal()
             : null;
 
     // Plaid dates are "YYYY-MM-DD"; treat them as a calendar date at UTC midnight.

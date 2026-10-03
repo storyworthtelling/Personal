@@ -1,6 +1,6 @@
 using global::Android.Accounts;
 
-namespace Ledger.Android.Google;
+namespace Index.Android.Google;
 
 // Supplies Google access tokens for the device account chosen during sign-in, using the core Android
 // AccountManager. No Play Services binding is required. Scope is full Drive: Ledger reads the shared

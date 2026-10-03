@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Ledger.Domain.Time;
+namespace Index.Domain.Time;
 
 /// <summary>
 /// 12-hour, analog-sensibility time formats per DESIGN.md §11:

@@ -85,20 +85,20 @@ public class MoneyMailTests
 
     // ---- what crosses to Index ----
 
-    // The payload is balance and date only. Deliberately minimal: Index needs to know what
-    // is owed and when it was true, and nothing about who the owner banks with belongs in
-    // an intent that any signed app could receive.
+    // The payload is balance, date, and — the owner's own, deliberate exception — a sender
+    // name. Everything else about who the owner banks with still stays out of it.
     [Fact]
-    public void OnlyABalanceCrossesToIndex()
+    public void OnlyABalanceAndSenderCrossToIndex()
     {
         var facts = new MoneyFacts(AmountDue: 75m, DueOn: new DateOnly(2026, 9, 15), Balance: 2500m,
             AsOf: new DateOnly(2026, 9, 1));
 
-        var payload = IndexHandoff.PayloadFor(facts);
+        var payload = IndexHandoff.PayloadFor(facts, senderName: "Evergreen Home Lending");
 
         Assert.NotNull(payload);
         Assert.Equal(2500m, payload!.Balance);
         Assert.Equal(new DateOnly(2026, 9, 1), payload.AsOf);
+        Assert.Equal("Evergreen Home Lending", payload.SenderName);
     }
 
     // Nothing to send is not an empty send. Index sees the email again on a later sync,
@@ -108,7 +108,7 @@ public class MoneyMailTests
     {
         var facts = new MoneyFacts(AmountDue: 75m, DueOn: new DateOnly(2026, 9, 15), Balance: null, AsOf: null);
 
-        Assert.Null(IndexHandoff.PayloadFor(facts));
+        Assert.Null(IndexHandoff.PayloadFor(facts, senderName: "Evergreen Home Lending"));
     }
 
     // A balance with no date is still worth sending — Index can stamp it with arrival —
@@ -116,10 +116,21 @@ public class MoneyMailTests
     [Fact]
     public void ABalanceWithNoDateStillCrosses()
     {
-        var payload = IndexHandoff.PayloadFor(new MoneyFacts(null, null, Balance: 2500m, AsOf: null));
+        var payload = IndexHandoff.PayloadFor(new MoneyFacts(null, null, Balance: 2500m, AsOf: null), senderName: null);
 
         Assert.NotNull(payload);
         Assert.Null(payload!.AsOf);
+    }
+
+    // A balance with no sender name is still worth sending too — Plate's statement path has
+    // no sender extraction built yet — but it must say so rather than inventing one.
+    [Fact]
+    public void ABalanceWithNoSenderStillCrosses()
+    {
+        var payload = IndexHandoff.PayloadFor(new MoneyFacts(null, null, Balance: 2500m, AsOf: null), senderName: null);
+
+        Assert.NotNull(payload);
+        Assert.Null(payload!.SenderName);
     }
 
     // The wire shape. It is a contract with another app, so it is pinned: a key renamed on
@@ -133,6 +144,7 @@ public class MoneyMailTests
         Assert.Equal("com.storyworthtelling.index.RECEIVE_BALANCE", IndexHandoff.Permission);
         Assert.Equal("balance", IndexHandoff.BalanceExtra);
         Assert.Equal("asOf", IndexHandoff.AsOfExtra);
+        Assert.Equal("sender", IndexHandoff.SenderExtra);
     }
 
     // A balance is money and must not be handed over as a double: 0.1 + 0.2 is not 0.3,
@@ -152,5 +164,33 @@ public class MoneyMailTests
         var extras = IndexHandoff.Extras(new IndexBalance(2500m, AsOf: null));
 
         Assert.False(extras.ContainsKey(IndexHandoff.AsOfExtra));
+    }
+
+    // The one exception to "nothing about who the owner banks with belongs in an intent" —
+    // the owner's own, deliberate override, recorded in IndexHandoff's doc comment.
+    [Fact]
+    public void ASenderNameCrossesWhenPresent()
+    {
+        var extras = IndexHandoff.Extras(new IndexBalance(2500.10m, new DateOnly(2026, 9, 1), SenderName: "Evergreen Home Lending"));
+
+        Assert.Equal("Evergreen Home Lending", extras[IndexHandoff.SenderExtra]);
+    }
+
+    // A sender-less balance carries no sender key at all, rather than an empty one — mirrors
+    // the dateless case above, for the same reason.
+    [Fact]
+    public void ASenderlessBalanceCarriesNoSenderKeyAtAll()
+    {
+        var extras = IndexHandoff.Extras(new IndexBalance(2500m, AsOf: null, SenderName: null));
+
+        Assert.False(extras.ContainsKey(IndexHandoff.SenderExtra));
+    }
+
+    [Fact]
+    public void ABlankSenderNameCarriesNoSenderKeyAtAll()
+    {
+        var extras = IndexHandoff.Extras(new IndexBalance(2500m, AsOf: null, SenderName: "   "));
+
+        Assert.False(extras.ContainsKey(IndexHandoff.SenderExtra));
     }
 }

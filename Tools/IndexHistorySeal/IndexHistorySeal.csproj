@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>IndexHistorySeal</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The sealing and the history shape live in the app's own projects, so the tool that writes the file
+         and the app that reads it cannot drift apart. Ledger.Infrastructure also targets Android; a console
+         has no use for that TFM, so ask for the desktop one only (the same switch the tests use). -->
+    <ProjectReference Include="..\..\Ledger\Ledger.Domain\Ledger.Domain.csproj" />
+    <ProjectReference Include="..\..\Ledger\Ledger.Infrastructure\Ledger.Infrastructure.csproj"
+                      AdditionalProperties="LedgerTfms=net10.0" />
+  </ItemGroup>
+</Project>

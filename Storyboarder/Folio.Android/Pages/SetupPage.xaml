@@ -131,9 +131,13 @@
             <!-- Build number at the foot: version name + code + package id, so it's readable which build is
                  installed even on a locked-down phone with no access to system app info. The update channel
                  installs silently and most updates change nothing visible, so without it "did that land?"
-                 has no answer on the device. -->
-            <Label x:Name="BuildInfoLabel" Style="{StaticResource MonoLabel}"
-                   FontSize="{StaticResource LabelSize}" HorizontalTextAlignment="Center" Margin="0,16,0,0" />
+                 has no answer on the device. The maker's mark sits beside it (D146). -->
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="0,16,0,0">
+                <Image Grid.Column="0" Source="owner_medallion.png" WidthRequest="40" HeightRequest="40"
+                       VerticalOptions="Center" />
+                <Label x:Name="BuildInfoLabel" Grid.Column="1" Style="{StaticResource MonoLabel}"
+                       FontSize="{StaticResource LabelSize}" VerticalOptions="Center" />
+            </Grid>
         </VerticalStackLayout>
     </ScrollView>
 

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Ledger.Infrastructure.External;
+namespace Index.Infrastructure.External;
 
 // Shared JSON options for parsing Plaid replies.
 internal static class JsonResponse

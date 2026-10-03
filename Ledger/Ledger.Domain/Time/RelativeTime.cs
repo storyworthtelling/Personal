@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Ledger.Domain.Time;
+namespace Index.Domain.Time;
 
 /// <summary>
 /// Relative list timestamps per DESIGN.md §11: the shortest honest phrase,

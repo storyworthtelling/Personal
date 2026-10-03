@@ -1,5 +1,6 @@
 using Codex.Domain.Apps;
 using Codex.Domain.Design;
+using Codex.Domain.Policy;
 using Xunit;
 
 namespace Codex.Tests.Apps;
@@ -10,8 +11,8 @@ public class BookClothPaletteTests
     public void ForPackage_IsStable_AcrossCalls()
     {
         Assert.Equal(
-            BookClothPalette.ForPackage("com.storyworthtelling.ledger"),
-            BookClothPalette.ForPackage("com.storyworthtelling.ledger"));
+            BookClothPalette.ForPackage("com.storyworthtelling.storyboarder"),
+            BookClothPalette.ForPackage("com.storyworthtelling.storyboarder"));
     }
 
     [Fact]
@@ -50,8 +51,8 @@ public class BookClothPaletteTests
     public void For_AgreesWithForPackage()
     {
         Assert.Equal(
-            BookClothPalette.ForPackage("com.storyworthtelling.ledger"),
-            BookClothPalette.For("com.storyworthtelling.ledger"));
+            BookClothPalette.ForPackage("com.storyworthtelling.storyboarder"),
+            BookClothPalette.For("com.storyworthtelling.storyboarder"));
     }
 
     // DESIGN.md §12: "Score's binding is cream linen with the rule, flourishes and
@@ -146,5 +147,21 @@ public class BookClothPaletteTests
     {
         Assert.True(BookClothPalette.MarksInvertToInk(
             BookClothPalette.ForPackage(HomeFeatureSet.AudioPackage)));
+    }
+
+    /// <summary>
+    /// Index is bound in the deeper green of its identity hue, by a deliberate binding rather
+    /// than whatever the hash lands on (the hash is for third-party apps). The cloth is a
+    /// registered token, never a literal here, and it is a dark cloth, so the shelf's marks
+    /// stay cream against it.
+    /// </summary>
+    [Fact]
+    public void IndexIsBoundInItsDeepenedIdentityGreen()
+    {
+        var cloth = BookClothPalette.ForPackage(PolicyContext.IndexPackage);
+
+        Assert.Equal(DesignTokens.Identity.Index.Cloth, cloth);
+        Assert.NotEqual(BookClothPalette.For(PolicyContext.IndexPackage), cloth);
+        Assert.False(BookClothPalette.MarksInvertToInk(cloth));
     }
 }

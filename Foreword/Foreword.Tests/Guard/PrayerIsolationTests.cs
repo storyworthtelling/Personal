@@ -94,29 +94,34 @@ public class PrayerIsolationTests
     [Fact]
     public void NoPublicComposerOrGoogleWriterNamesAPrayerType()
     {
-        string[] publicSurfaces =
-        [
-            "Foreword.Infrastructure/Pdf/PdfComposer.cs",
-            "Foreword.Infrastructure/Pdf/ForewordPage.cs",
-            "Foreword.Infrastructure/Pdf/DayPdfComposer.cs",
-            "Foreword.Infrastructure/Pdf/ChecklistPage.cs",
-            "Foreword.Infrastructure/Tasks/ClaudeTaskReader.cs",
-            "Foreword.Infrastructure/Handwriting/ClaudeVisionHandwritingExtractor.cs",
-            "Foreword.Infrastructure/Google/GoogleTasksClient.cs",
-            "Foreword.Infrastructure/Google/GoogleCalendarClient.cs",
-        ];
+        var publicSurfaces = new Dictionary<string, string>
+        {
+            ["Foreword.Infrastructure/Pdf/PdfComposer.cs"] = Path.Combine(Root(), "Foreword.Infrastructure/Pdf/PdfComposer.cs"),
+            ["Foreword.Infrastructure/Pdf/ForewordPage.cs"] = Path.Combine(Root(), "Foreword.Infrastructure/Pdf/ForewordPage.cs"),
+            ["Foreword.Infrastructure/Pdf/DayPdfComposer.cs"] = Path.Combine(Root(), "Foreword.Infrastructure/Pdf/DayPdfComposer.cs"),
+            ["Foreword.Infrastructure/Pdf/ChecklistPage.cs"] = Path.Combine(Root(), "Foreword.Infrastructure/Pdf/ChecklistPage.cs"),
+            ["Foreword.Infrastructure/Tasks/ClaudeTaskReader.cs"] = Path.Combine(Root(), "Foreword.Infrastructure/Tasks/ClaudeTaskReader.cs"),
+            ["Foreword.Infrastructure/Google/GoogleTasksClient.cs"] = Path.Combine(Root(), "Foreword.Infrastructure/Google/GoogleTasksClient.cs"),
+            ["Foreword.Infrastructure/Google/GoogleCalendarClient.cs"] = Path.Combine(Root(), "Foreword.Infrastructure/Google/GoogleCalendarClient.cs"),
+            // Moved out of Foreword entirely into the shared Storyworthtelling.Handwriting library
+            // (Index-P11 Release F). Still checked here because it used to be one of Foreword's own
+            // public surfaces — even though the shared library has no reference to Foreword.Domain
+            // at all, so it is now structurally unable to name a Prayer type, which is a stronger
+            // guarantee than the regex below, not a weaker one.
+            ["Storyworthtelling.Handwriting/ClaudeVisionHandwritingExtractor.cs"] =
+                Path.Combine(Root(), "..", "Storyworthtelling.Handwriting", "ClaudeVisionHandwritingExtractor.cs"),
+        };
 
         var offenders = new List<string>();
 
-        foreach (var relative in publicSurfaces)
+        foreach (var (label, path) in publicSurfaces)
         {
-            var path = Path.Combine(Root(), relative);
-            Assert.True(File.Exists(path), $"{relative} has moved; this guard is now watching nothing.");
+            Assert.True(File.Exists(path), $"{label} has moved; this guard is now watching nothing.");
 
             var source = File.ReadAllText(path);
             foreach (Match match in Regex.Matches(source, @"\b(PrayerText|PrayerDocument|JournalEntry|IPrayerReader|PrayerRequest)\b"))
             {
-                offenders.Add($"{relative}: {match.Value}");
+                offenders.Add($"{label}: {match.Value}");
             }
         }
 

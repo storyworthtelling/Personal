@@ -2,7 +2,7 @@ using global::Android.Accounts;
 using global::Android.App;
 using global::Android.Content;
 
-namespace Ledger.Android.Google;
+namespace Index.Android.Google;
 
 // Native "Sign in with Google" via the core Android AccountManager: shows the system picker of Google
 // accounts already on the device, then requests read-only Drive consent for the chosen account so Ledger

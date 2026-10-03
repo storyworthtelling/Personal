@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using Xunit;
 
-namespace Ledger.Tests.Guard;
+namespace Index.Tests.Guard;
 
 /// <summary>
 /// Every screen in Ledger carries the binder shell: the in-page header with its area's rule, and
