@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Foreword.Domain.Models;
+using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Handwriting;
 using Xunit;
 
@@ -20,9 +21,21 @@ public class ClaudeVisionHandwritingExtractorTests
         var extractor = new ClaudeVisionHandwritingExtractor(
             httpClient,
             Options.Create(new AnthropicOptions { ApiKey = "test-key", Model = "test-model" }),
-            NullLogger<ClaudeVisionHandwritingExtractor>.Instance);
+            NullLogger<ClaudeVisionHandwritingExtractor>.Instance,
+            mapping: Options.Create(Mapping));
         return (extractor, requests);
     }
+
+    // The household's columns, as the account set them up in Foreword. The extractor offers the
+    // model these names and nothing else.
+    private static readonly CalendarMappingOptions Mapping = new()
+    {
+        Columns =
+        [
+            new ColumnChoice { Name = "Alex", HasAccount = true },
+            new ColumnChoice { Name = "Jo" },
+        ],
+    };
 
     private sealed record CapturedRequest(bool HasApiKey, bool HasVersion, string Body);
 
@@ -37,16 +50,42 @@ public class ClaudeVisionHandwritingExtractorTests
     public async Task Extract_ParsesEventNote()
     {
         var (extractor, _) = Create(AnthropicReply(
-            """[{"text":"Eva dentist","when":"2026-06-10T09:00:00","column":"Eva","isTask":false,"confidence":0.9}]"""));
+            """[{"text":"Jo dentist","when":"2026-06-10T09:00:00","column":"Jo","isTask":false,"confidence":0.9}]"""));
 
         var notes = await extractor.Extract(FakePdf);
 
         var note = Assert.Single(notes);
-        Assert.Equal("Eva dentist", note.Text);
-        Assert.Equal(PersonColumn.Eva, note.Column);
+        Assert.Equal("Jo dentist", note.Text);
+        Assert.Equal(new PersonColumn("Jo"), note.Column);
         Assert.False(note.IsTask);
         Assert.Equal(0.9, note.Confidence);
         Assert.Equal(new DateTime(2026, 6, 10, 9, 0, 0), note.When);
+    }
+
+    /// <summary>
+    /// The model is told which columns this account has, since the code no longer knows — and the
+    /// list rides in the message, not the cached instruction, so changing a column does not cost the
+    /// cache.
+    /// </summary>
+    [Fact]
+    public async Task Extract_OffersTheModelThisAccountsColumns()
+    {
+        var (extractor, requests) = Create(AnthropicReply("[]"));
+
+        await extractor.Extract(FakePdf);
+
+        var body = Assert.Single(requests).Body;
+        Assert.Contains("The columns are: Alex, Jo, Watch.", body);
+    }
+
+    /// <summary>A name that is not one of this account's columns is no column at all.</summary>
+    [Fact]
+    public async Task Extract_ANameThatIsNotAColumnIsIgnored()
+    {
+        var (extractor, _) = Create(AnthropicReply(
+            """[{"text":"Pat dentist","when":null,"column":"Pat","isTask":false,"confidence":0.9}]"""));
+
+        Assert.Null(Assert.Single(await extractor.Extract(FakePdf)).Column);
     }
 
     [Fact]

@@ -69,11 +69,11 @@ public class SharedVaultHoldsHouseholdFactsTests
     {
         var options = new InstallOptions
         {
-            AccountEmail = "ashley@example.com",
+            AccountEmail = "sam@example.com",
             HouseholdAccount = "owner@example.com",
         };
 
-        Assert.Equal("ashley@example.com", options.AccountEmail);
+        Assert.Equal("sam@example.com", options.AccountEmail);
         Assert.Equal("owner@example.com", options.HouseholdAccount);
     }
 }

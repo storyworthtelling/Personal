@@ -10,8 +10,8 @@ namespace Foreword.Domain.Calendar;
 ///
 /// <para><b>A box in each column otherwise</b>, at its true time and full height, with a line naming
 /// who else is there. That second mode exists because two groups at the same hour interleave across
-/// the columns and there is no horizontal room left — Matt and Gwen doing one thing while Ashley and
-/// Eva do another cannot both span. Stacking them vertically was tried and rejected: it draws a
+/// the columns and there is no horizontal room left — Alex and Riley doing one thing while Sam and
+/// Jo do another cannot both span. Stacking them vertically was tried and rejected: it draws a
 /// two-hour event as a one-hour one, which is a lie about the day rather than a compromise about the
 /// drawing. A notch and a tie rule were tried too; the tie read as a strikethrough.</para>
 /// </summary>
@@ -21,13 +21,14 @@ public static class SharedEventMode
     /// Whether <paramref name="e"/> may be drawn as one box across its columns.
     ///
     /// <para>Two conditions, and both are about not painting over something. The columns must be
-    /// <b>contiguous</b>, because a box over Matt and Gwen would silently cover Ashley's ten
+    /// <b>contiguous</b>, because a box over Alex and Riley would silently cover Sam's ten
     /// o'clock between them. And nothing else may overlap it in any of those columns, because a
     /// span occupies the full width and has nowhere to move.</para>
     /// </summary>
-    public static bool Spans(CalendarEvent e, IReadOnlyList<CalendarEvent> sameDay)
+    public static bool Spans(
+        CalendarEvent e, IReadOnlyList<CalendarEvent> sameDay, IReadOnlyList<PersonColumn> printed)
     {
-        var columns = Indices(e);
+        var columns = Indices(e, printed);
         if (columns.Count < 2)
         {
             return false;   // one person is not a shared event
@@ -41,12 +42,12 @@ public static class SharedEventMode
         return !sameDay.Any(other =>
             !ReferenceEquals(other, e)
             && Overlaps(e, other)
-            && Indices(other).Any(columns.Contains));
+            && Indices(other, printed).Any(columns.Contains));
     }
 
     /// <summary>
     /// Who else is at this event, for the line the per-column mode carries. It names the
-    /// <b>others</b>: a box in Gwen's column reading "with Gwen" would be telling her about herself.
+    /// <b>others</b>: a box in Riley's column reading "with Riley" would be telling her about herself.
     /// Empty when nobody else is there, so the caller draws nothing rather than an empty label.
     /// </summary>
     public static string WithLine(CalendarEvent e, PersonColumn reader)
@@ -58,10 +59,23 @@ public static class SharedEventMode
 
     /// <summary>
     /// The event's columns as ordered indices, in the order the page draws them, so "contiguous"
-    /// means what it looks like on the page rather than what the enum happens to declare.
+    /// means what it looks like on the page. A column this account does not print has no place.
     /// </summary>
-    private static List<int> Indices(CalendarEvent e) =>
-        e.Columns.Select(c => (int)c).Distinct().Order().ToList();
+    private static List<int> Indices(CalendarEvent e, IReadOnlyList<PersonColumn> printed) =>
+        e.Columns.Select(c => IndexOf(printed, c)).Where(i => i >= 0).Distinct().Order().ToList();
+
+    private static int IndexOf(IReadOnlyList<PersonColumn> printed, PersonColumn column)
+    {
+        for (var i = 0; i < printed.Count; i++)
+        {
+            if (printed[i] == column)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     // Touching is not overlapping: a ten o'clock that begins as a nine-to-ten ends is not in its
     // hour, and taking the span away for it would cost the page a box it could have had.

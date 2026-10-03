@@ -12,6 +12,7 @@ using Foreword.Infrastructure.Delivery;
 using Foreword.Infrastructure.Google;
 using Foreword.Infrastructure.Handwriting;
 using Storyworthtelling.Remarkable;
+using Foreword.Tests.Calendar;
 using Xunit;
 
 namespace Foreword.Tests.Delivery;
@@ -58,7 +59,6 @@ public class DailyDeliveryServiceTests
             taskReader.Object, dayComposer.Object, weather.Object, routes.Object,
             handwriting.Object, remarkable.Object,
             Options.Create(new AnthropicOptions { ConfidenceThreshold = 0.6 }),
-            Options.Create(new GoogleOptions()),
             NullLogger<DailyDeliveryService>.Instance);
 
     /// <summary>Foreword's own rules. Empty unless a test puts something in it.</summary>
@@ -106,13 +106,13 @@ public class DailyDeliveryServiceTests
     public async Task StillReadsBackWhatTheOldBuildLeftOnTheTablet()
     {
         SetupYesterdayDoc(YesterdayCalendar, "cal-y",
-            [new ParsedNote { Text = "Eva recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = PersonColumn.Eva, IsTask = false, Confidence = 0.95 }]);
+            [new ParsedNote { Text = "Jo recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = Household.Jo, IsTask = false, Confidence = 0.95 }]);
         SetupYesterdayDoc(YesterdayChecklist, "chk-y",
             [new ParsedNote { Text = "renew passport", IsTask = true, Confidence = 0.9 }]);
 
         await CreateService().DeliverDailyDocuments(Date);
 
-        calendar.Verify(c => c.AddEvent(It.Is<CalendarEvent>(e => e.Title == "Eva recital")), Times.Once);
+        calendar.Verify(c => c.AddEvent(It.Is<CalendarEvent>(e => e.Title == "Jo recital")), Times.Once);
         tasks.Verify(t => t.AddTask("renew passport", It.IsAny<DateOnly?>()), Times.Once);
         remarkable.Verify(r => r.MoveToTrash("cal-y"), Times.Once);
         remarkable.Verify(r => r.MoveToTrash("chk-y"), Times.Once);
@@ -217,11 +217,11 @@ public class DailyDeliveryServiceTests
     public async Task HighConfidenceEventNote_IsAddedToCalendar()
     {
         SetupYesterdayDoc(YesterdayCalendar, "cal-y",
-            [new ParsedNote { Text = "Eva recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = PersonColumn.Eva, IsTask = false, Confidence = 0.95 }]);
+            [new ParsedNote { Text = "Jo recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = Household.Jo, IsTask = false, Confidence = 0.95 }]);
 
         await CreateService().DeliverDailyDocuments(Date);
 
-        calendar.Verify(c => c.AddEvent(It.Is<CalendarEvent>(e => e.Title == "Eva recital" && e.Columns.Contains(PersonColumn.Eva))), Times.Once);
+        calendar.Verify(c => c.AddEvent(It.Is<CalendarEvent>(e => e.Title == "Jo recital" && e.Columns.Contains(Household.Jo))), Times.Once);
     }
 
     [Fact]

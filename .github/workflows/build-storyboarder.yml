@@ -18,8 +18,19 @@ on:
       - 'Storyworthtelling.Remarkable.Tests/**'
       - '.github/workflows/build-storyboarder.yml'
 
+# A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
+# for both. main is never cancelled: every main run publishes to the rolling release.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
+  # Branch pushes run the tests and nothing else — Actions minutes are the budget, and signing an
+  # APK on every push of a working branch, then again on merge, is where they went. main (and a
+  # manual "Run workflow", which is how a branch gets its APK compiled when it needs one) runs the
+  # tests inside the build job instead, so one runner does both rather than two.
   test:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +58,7 @@ jobs:
         run: dotnet test Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj
 
   build:
-    needs: test
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # actions: write lets the prune step delete artifacts from older runs;
     # contents: write lets the rolling-release step publish the signed APK.
@@ -61,6 +72,23 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android head, which would require the MAUI/Android workload. The
+      # -p:FolioTfms switch keeps Infrastructure single-targeted at net10.0.
+      - name: Run tests
+        run: >
+          dotnet test Storyboarder/Folio.Tests/Folio.Tests.csproj
+          -p:FolioTfms=net10.0
+
+      # The shared owner's-voice library (net10.0, pure .NET) ships in the APK; its own tests run here so
+      # a change to it is verified in the same workflow that rebuilds Folio.
+      - name: Run voice tests
+        run: dotnet test Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj
+
+      # The shared reMarkable delivery library also ships in the APK; its tests run here too.
+      - name: Run reMarkable tests
+        run: dotnet test Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android

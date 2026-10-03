@@ -2,6 +2,7 @@ using Foreword.Domain.Models;
 using Foreword.Domain.Tasks;
 using Foreword.Domain.Weather;
 using Foreword.Infrastructure.Pdf;
+using Foreword.Tests.Calendar;
 using Xunit;
 
 namespace Foreword.Tests.Pdf;
@@ -43,16 +44,16 @@ public class SampleDayTests
             Date = day,
             Events =
             [
-                At(PersonColumn.Matt, 9, 12, "Work", "The office", EventKind.WorkBlock),
-                At(PersonColumn.Matt, 9, 10, "Standup"),
-                At(PersonColumn.Matt, 13, 17, "Work", "The office", EventKind.WorkBlock),
-                At(PersonColumn.Matt, 14, 15, "Release review"),
-                At(PersonColumn.Ashley, 9, 15, "Work", null, EventKind.WorkBlock),
-                At(PersonColumn.Ashley, 10, 11, "Team sync"),
-                At(PersonColumn.Ashley, 15, 16, "Vet — Ruby"),
-                At(PersonColumn.Gwen, 8, 15, "School", "The school"),
-                At(PersonColumn.Gwen, 16, 17, "Soccer practice", "Veterans Park"),
-                At(PersonColumn.Eva, 13, 14, "Piano"),
+                At(Household.Alex, 9, 12, "Work", "The office", EventKind.WorkBlock),
+                At(Household.Alex, 9, 10, "Standup"),
+                At(Household.Alex, 13, 17, "Work", "The office", EventKind.WorkBlock),
+                At(Household.Alex, 14, 15, "Release review"),
+                At(Household.Sam, 9, 15, "Work", null, EventKind.WorkBlock),
+                At(Household.Sam, 10, 11, "Team sync"),
+                At(Household.Sam, 15, 16, "Vet — Ruby"),
+                At(Household.Riley, 8, 15, "School", "The school"),
+                At(Household.Riley, 16, 17, "Soccer practice", "Veterans Park"),
+                At(Household.Jo, 13, 14, "Piano"),
                 At(PersonColumn.Watch, 19, 22, "Eagles v Cowboys"),
             ],
             Travel = Foreword.Domain.Calendar.TravelTable.Of("Home",
@@ -65,15 +66,15 @@ public class SampleDayTests
         };
 
         var document = new DayDocument
-        {
+        { Columns = Household.Layout.Printed,
             Date = day,
             Agenda = agenda,
-            Voice = "Two of Ashley\u2019s land on top of each other at half three, and the lawn has moved to today.",
+            Voice = "Two of Sam\u2019s land on top of each other at half three, and the lawn has moved to today.",
             ChecklistVoice = "Eight things, and the lawn is the only one that will take you an hour.",
             Outlook =
             [
-                At(PersonColumn.Eva, 16, 17, "Eva \u2014 orthodontist"),
-                At(PersonColumn.Gwen, 18, 19, "Gwen \u2014 game"),
+                At(Household.Jo, 16, 17, "Jo \u2014 orthodontist"),
+                At(Household.Riley, 18, 19, "Riley \u2014 game"),
             ],
             Tasks =
             [
@@ -82,11 +83,11 @@ public class SampleDayTests
                     kind: TaskKind.Smart),
                 Printed("Read the brief", kind: TaskKind.Rule),
                 Printed("Call Mom"),
-                Printed("Book Eva\u2019s orthodontist follow-up", due: day.AddDays(5)),
+                Printed("Book Jo\u2019s orthodontist follow-up", due: day.AddDays(5)),
                 Printed("Pick up the dry cleaning"),
-                Printed("Order Gwen\u2019s cleats"),
+                Printed("Order Riley\u2019s cleats"),
                 Printed("Bins out", note: "collection is Monday", kind: TaskKind.Rule),
-                Printed("Sign Gwen\u2019s permission slip tonight"),
+                Printed("Sign Riley\u2019s permission slip tonight"),
             ],
             Weather = new WeatherReport
             {

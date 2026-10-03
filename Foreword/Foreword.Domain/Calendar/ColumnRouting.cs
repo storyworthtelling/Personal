@@ -5,6 +5,10 @@ namespace Foreword.Domain.Calendar;
 /// <summary>
 /// What is known about how one calendar's events reach the columns.
 /// </summary>
+/// <param name="People">
+/// This account's people, in print order — the columns an event can be split across. Set up in
+/// Foreword, never written into the code.
+/// </param>
 /// <param name="Column">
 /// The column this calendar maps to, or null if it is <b>shared</b> — a calendar that can carry
 /// several people, whose events are split by who is named on them.
@@ -23,6 +27,7 @@ namespace Foreword.Domain.Calendar;
 /// model is never asked to guess who is going.
 /// </param>
 public sealed record ColumnRouting(
+    IReadOnlyList<PersonColumn> People,
     PersonColumn? Column,
     IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Addresses,
     IReadOnlyDictionary<PersonColumn, IReadOnlyList<string>> Names,
@@ -30,7 +35,7 @@ public sealed record ColumnRouting(
 
 /// <summary>
 /// Who an event belongs to (decision D31). One event can belong to several people, so the answer is
-/// a <b>set</b>: "swimming, Gwen and Eva" is one event in two columns, not two events or a guess
+/// a <b>set</b>: "swimming, Riley and Jo" is one event in two columns, not two events or a guess
 /// between them.
 ///
 /// <para>Three sources, in this order, and the order is the decision:</para>
@@ -38,9 +43,9 @@ public sealed record ColumnRouting(
 ///   <item><b>Guests on the event.</b> An invited address is a fact where a name in a title is a
 ///   heuristic. <c>ResponseStatus</c> is deliberately <b>ignored</b> — a family that never answers
 ///   an invitation would otherwise get nothing, which is the common case rather than an edge one. A
-///   guest outside the four is ignored entirely rather than widening the set.</item>
+///   guest who is none of the people is ignored entirely rather than widening the set.</item>
 ///   <item><b>Every name matched in the title</b>, not the first. Matching only the first is how
-///   "Gwen and Eva to swimming" became Gwen's alone.</item>
+///   "Riley and Jo to swimming" became Riley's alone.</item>
 ///   <item><b>Nobody named on a shared calendar means everybody</b> — which is what a calendar
 ///   called Family means.</item>
 /// </list>
@@ -51,10 +56,6 @@ public sealed record ColumnRouting(
 /// </summary>
 public static class ColumnSet
 {
-    /// <summary>The four people. <see cref="PersonColumn.Watch"/> is a column, not a person.</summary>
-    public static readonly IReadOnlyList<PersonColumn> People =
-        [PersonColumn.Matt, PersonColumn.Ashley, PersonColumn.Gwen, PersonColumn.Eva];
-
     public static IReadOnlyList<PersonColumn> Resolve(CalendarEvent e, ColumnRouting routing)
     {
         // A calendar mapped to one person needs no splitting: its events are that person's, whoever
@@ -65,7 +66,7 @@ public static class ColumnSet
             return [mapped];
         }
 
-        var invited = People
+        var invited = routing.People
             .Where(person => Matches(e.Guests, routing.Addresses, person))
             .ToList();
 
@@ -74,7 +75,7 @@ public static class ColumnSet
             return invited;
         }
 
-        var named = People
+        var named = routing.People
             .Where(person => Named(e.Title, routing.Names, person))
             .ToList();
 
@@ -85,7 +86,7 @@ public static class ColumnSet
 
         // Nobody named on a shared calendar: everybody. This is the branch that makes a calendar
         // called Family behave like one.
-        return People;
+        return routing.People;
     }
 
     private static bool Matches(

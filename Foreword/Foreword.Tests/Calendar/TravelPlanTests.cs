@@ -25,7 +25,7 @@ public class TravelPlanTests
     {
         Title = title,
         Location = location,
-        Columns = [PersonColumn.Ashley],
+        Columns = [Household.Sam],
         Start = Day.ToDateTime(new TimeOnly(startHour, startMinute)),
         End = Day.ToDateTime(new TimeOnly(endHour, endMinute)),
     };
@@ -139,7 +139,7 @@ public class TravelPlanTests
         var school = At(8, 30, 15, 0, "School", "The school");
         var work = At(9, 0, 15, 30, "Shift", "The office");
         var soccer = At(16, 0, 17, 0, "Soccer practice", "Veterans Park");
-        soccer.Columns = [PersonColumn.Gwen, PersonColumn.Matt];
+        soccer.Columns = [Household.Riley, Household.Alex];
 
         var routes = Routes(
             ("The school", "Veterans Park", 12),
@@ -245,7 +245,7 @@ public class TravelPlanTests
             Title = "Holiday",
             IsAllDay = true,
             Location = "Anywhere",
-            Columns = [PersonColumn.Ashley],
+            Columns = [Household.Sam],
             Start = Day.ToDateTime(TimeOnly.MinValue),
             End = Day.ToDateTime(TimeOnly.MaxValue),
         };

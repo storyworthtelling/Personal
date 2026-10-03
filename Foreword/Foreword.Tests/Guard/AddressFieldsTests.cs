@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
+using Foreword.Tests.Calendar;
 using Xunit;
 
 namespace Foreword.Tests.Guard;
@@ -8,7 +9,7 @@ namespace Foreword.Tests.Guard;
 /// <summary>
 /// No screen offers an email address field for somebody who has no email address.
 ///
-/// <para>The girls' days reach the page on calendars shared between the parents, so their columns
+/// <para>A child's days reach the page on calendars a parent owns, so their columns
 /// are filled by the calendar an event came from — never by an invitation, because there is no
 /// account to invite. An address field offered for one of them is a field that <b>cannot work</b>:
 /// whatever is typed into it never matches a guest, nothing errors, and every event goes on landing
@@ -17,7 +18,8 @@ namespace Foreword.Tests.Guard;
 /// looks exactly like the loop that is right.</para>
 ///
 /// <para>So the loop is pinned: address rows are built over
-/// <see cref="PersonIdentity.WithMailboxes"/>, never over <c>ColumnSet.People</c>.</para>
+/// <see cref="ColumnLayout.WithAccounts"/> — the people this account said have one — never over
+/// every column.</para>
 /// </summary>
 public class AddressFieldsTests
 {
@@ -44,7 +46,7 @@ public class AddressFieldsTests
                 }
 
                 var over = match.Groups["over"].Value;
-                if (over is not ("PersonIdentity.WithMailboxes" or "settings.Mapping.PersonAddresses"))
+                if (over is not ("settings.Layout.WithAccounts" or "settings.Mapping.PersonAddresses"))
                 {
                     offenders.Add($"{Path.GetFileName(file)}: foreach over {over}");
                 }
@@ -52,7 +54,7 @@ public class AddressFieldsTests
         }
 
         Assert.True(offenders.Count == 0,
-            "These build an address field for everybody, including the two who have no email "
+            "These build an address field for everybody, including the people who have no email "
             + "address at all — a field that can never match anything and never says so:\n"
             + string.Join("\n", offenders));
     }
@@ -66,23 +68,24 @@ public class AddressFieldsTests
     public void AnInvitedParentIsStillRoutedByTheirAddress()
     {
         var routing = new ColumnRouting(
+            Household.Layout.People,
             Column: null,
             Addresses: new Dictionary<PersonColumn, IReadOnlyList<string>>
             {
-                [PersonColumn.Ashley] = ["ashley@example.com"],
+                [Household.Sam] = ["sam@example.com"],
             },
             Names: new Dictionary<PersonColumn, IReadOnlyList<string>>(),
-            Default: PersonColumn.Matt);
+            Default: Household.Alex);
 
         var invited = new CalendarEvent
         {
             Title = "Parent evening",
-            Guests = ["ashley@example.com"],
+            Guests = ["sam@example.com"],
             Start = DateTime.Today.AddHours(19),
             End = DateTime.Today.AddHours(20),
         };
 
-        Assert.Equal([PersonColumn.Ashley], ColumnSet.Resolve(invited, routing));
+        Assert.Equal([Household.Sam], ColumnSet.Resolve(invited, routing));
     }
 
     /// <summary>The braced block starting at <paramref name="open"/>, counted rather than matched.</summary>

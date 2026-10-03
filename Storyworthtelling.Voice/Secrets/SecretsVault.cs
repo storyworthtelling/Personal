@@ -101,6 +101,15 @@ public sealed record PersonalVault
     // somebody's Drive still round-trips.
     public string OwnerPhoto { get; init; } = string.Empty;
 
+    // Foreword's calendar choices: the columns this account prints, which calendar feeds which, the
+    // words and addresses that route to each person, and the work blocks. They are this account's
+    // own — another account on the same household sets up its own — so they are kept here, in this
+    // person's Drive, rather than in the shared vault, whose copy only ever held the first install's.
+    // Stored as the same JSON the app keeps on the phone, so restoring is a copy, not a translation.
+    public string CalendarMappingJson { get; init; } = string.Empty;
+
+    public string WorkScheduleJson { get; init; } = string.Empty;
+
     public static PersonalVault Empty { get; } = new();
 }
 

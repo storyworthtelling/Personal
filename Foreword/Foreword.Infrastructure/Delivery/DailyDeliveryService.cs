@@ -7,7 +7,6 @@ using Foreword.Domain.Models;
 using Foreword.Domain.Tasks;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Handwriting;
-using Foreword.Infrastructure.Google;
 using Storyworthtelling.Remarkable;
 
 namespace Foreword.Infrastructure.Delivery;
@@ -29,7 +28,6 @@ public class DailyDeliveryService(
     IHandwritingExtractor handwriting,
     IRemarkableClient remarkable,
     IOptions<AnthropicOptions> anthropicOptions,
-    IOptions<GoogleOptions> googleOptions,
     ILogger<DailyDeliveryService> logger)
 {
     private const int OutlookDays = 6; // today + 6 = a seven-day window
@@ -52,6 +50,7 @@ public class DailyDeliveryService(
             Tasks = tasks,
             Weather = weather,
             UnreadableCarryovers = carryovers,
+            Columns = columnMapper.Layout.Printed,
         };
 
         if (await TryUpload(DayTitles.Document(date), dayComposer.Compose(document)))
@@ -60,11 +59,14 @@ public class DailyDeliveryService(
             logger.LogWarning("Skipping trash of yesterday's documents because the upload failed for {Date}", date);
     }
 
-    // Creates the Gwen and Eva calendars if they do not yet exist. Called once at startup.
-    public async Task EnsureKidCalendars()
+    // Gives each column whose person has no Google account of their own a calendar to be filled
+    // from, named for the column, if it does not exist yet. Their days can only reach the page on a
+    // calendar somebody else owns, so setting up the column is not finished until there is one.
+    // Called at startup; EnsureCalendar finds an existing calendar by name rather than duplicating it.
+    public async Task EnsureColumnCalendars()
     {
-        var options = googleOptions.Value;
-        foreach (var name in new[] { options.GwenCalendarName, options.EvaCalendarName })
+        var layout = columnMapper.Layout;
+        foreach (var name in layout.People.Where(p => !layout.HasAccount(p)).Select(p => p.Name))
         {
             try
             {
@@ -301,7 +303,7 @@ public class DailyDeliveryService(
             var home = TravelTable.NothingMeasured.Home;
             var legs = new List<(string From, string To)>();
 
-            foreach (var column in ColumnSet.People)
+            foreach (var column in columnMapper.Layout.People)
             {
                 var day = agenda.Events.Where(e => e.Columns.Contains(column)).ToList();
 

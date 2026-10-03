@@ -30,13 +30,13 @@ public class HomeLookupTests
           "metadata": { "primary": false },
           "type": "work",
           "formattedType": "Work",
-          "formattedValue": "1 Office Park\nNewark, NJ 07102\nUS"
+          "formattedValue": "1 Office Park\nSpringfield, IL 62702\nUS"
         },
         {
           "metadata": { "primary": true },
           "type": "home",
           "formattedType": "Home",
-          "formattedValue": "12 Elm Street\nMontclair, NJ 07042\nUS"
+          "formattedValue": "100 Main Street\nSpringfield, IL 62701\nUS"
         }
       ]
     }
@@ -46,8 +46,8 @@ public class HomeLookupTests
     {
       "results": [
         {
-          "formatted_address": "12 Elm St, Montclair, NJ 07042, USA",
-          "geometry": { "location": { "lat": 40.8259, "lng": -74.2090 } }
+          "formatted_address": "100 Main St, Springfield, IL 62701, USA",
+          "geometry": { "location": { "lat": 39.7817, "lng": -89.6501 } }
         }
       ],
       "status": "OK"
@@ -64,7 +64,7 @@ public class HomeLookupTests
 
         var home = await client.HomeAddress("token-123");
 
-        Assert.Equal("12 Elm Street, Montclair, NJ 07042, US", home);
+        Assert.Equal("100 Main Street, Springfield, IL 62701, US", home);
         var request = Assert.Single(captured);
         Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
         Assert.Equal("token-123", request.Headers.Authorization?.Parameter);
@@ -79,7 +79,7 @@ public class HomeLookupTests
     public async Task AWorkAddressIsNotHome()
     {
         const string workOnly = """
-        { "addresses": [ { "type": "work", "formattedValue": "1 Office Park\nNewark, NJ" } ] }
+        { "addresses": [ { "type": "work", "formattedValue": "1 Office Park\nSpringfield, IL" } ] }
         """;
 
         Assert.Null(await new GooglePeopleClient(Http([], workOnly)).HomeAddress("t"));
@@ -110,15 +110,15 @@ public class HomeLookupTests
         var captured = new List<HttpRequestMessage>();
         var client = new GoogleGeocodingClient(Http(captured, GeocodeJson), Maps("key-abc"));
 
-        var point = await client.Locate("12 Elm Street, Montclair, NJ");
+        var point = await client.Locate("100 Main Street, Springfield, IL");
 
         Assert.NotNull(point);
-        Assert.Equal(40.8259, point!.Value.Latitude, 4);
-        Assert.Equal(-74.2090, point.Value.Longitude, 4);
+        Assert.Equal(39.7817, point!.Value.Latitude, 4);
+        Assert.Equal(-89.6501, point.Value.Longitude, 4);
 
         var query = Assert.Single(captured).RequestUri!.Query;
         Assert.Contains("key=key-abc", query, StringComparison.Ordinal);
-        Assert.Contains("address=12%20Elm%20Street", query, StringComparison.Ordinal);
+        Assert.Contains("address=100%20Main%20Street", query, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -142,7 +142,7 @@ public class HomeLookupTests
         var captured = new List<HttpRequestMessage>();
         var client = new GoogleGeocodingClient(Http(captured, GeocodeJson), Maps(string.Empty));
 
-        Assert.Null(await client.Locate("12 Elm Street"));
+        Assert.Null(await client.Locate("100 Main Street"));
         Assert.Empty(captured);
     }
 
@@ -153,11 +153,11 @@ public class HomeLookupTests
     {
         var locator = Locator(GeocodeJson);
 
-        var home = await locator.Fill(new HomeLocation(string.Empty, 0, 0), () => Task.FromResult<string?>("12 Elm Street, Montclair"));
+        var home = await locator.Fill(new HomeLocation(string.Empty, 0, 0), () => Task.FromResult<string?>("100 Main Street, Springfield"));
 
-        Assert.Equal("12 Elm Street, Montclair", home.Address);
+        Assert.Equal("100 Main Street, Springfield", home.Address);
         Assert.True(home.HasPoint);
-        Assert.Equal(40.8259, home.Latitude, 4);
+        Assert.Equal(39.7817, home.Latitude, 4);
     }
 
     /// <summary>An address already entered is the owner's, and is never replaced by the account's.</summary>
@@ -170,7 +170,7 @@ public class HomeLookupTests
         var home = await locator.Fill(new HomeLocation("The farmhouse, Route 9", 0, 0), () =>
         {
             askedTheAccount = true;
-            return Task.FromResult<string?>("12 Elm Street");
+            return Task.FromResult<string?>("100 Main Street");
         });
 
         Assert.False(askedTheAccount);
@@ -184,10 +184,10 @@ public class HomeLookupTests
         var captured = new List<HttpRequestMessage>();
         var locator = new HomeLocator(new GoogleGeocodingClient(Http(captured, GeocodeJson), Maps("key")));
 
-        var home = await locator.Fill(new HomeLocation("12 Elm Street", 41.0, -74.0), () => Task.FromResult<string?>(null));
+        var home = await locator.Fill(new HomeLocation("100 Main Street", 40.0, -89.0), () => Task.FromResult<string?>(null));
 
         Assert.Empty(captured);
-        Assert.Equal(41.0, home.Latitude);
+        Assert.Equal(40.0, home.Latitude);
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public class HomeLookupTests
     public async Task WhenTheAddressCannotBePlacedThePointIsStillMissing()
     {
         var home = await Locator("""{ "results": [], "status": "ZERO_RESULTS" }""")
-            .Fill(new HomeLocation("12 Elm Street", 0, 0), () => Task.FromResult<string?>(null));
+            .Fill(new HomeLocation("100 Main Street", 0, 0), () => Task.FromResult<string?>(null));
 
         Assert.True(home.HasAddress);
         Assert.False(home.HasPoint);

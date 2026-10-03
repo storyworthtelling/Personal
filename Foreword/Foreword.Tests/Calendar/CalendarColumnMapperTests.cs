@@ -10,8 +10,28 @@ public class CalendarColumnMapperTests
 {
     private static CalendarColumnMapper CreateMapper(
         CalendarMappingOptions options, string accountEmail = "") =>
-        new(Options.Create(options),
+        new(Options.Create(WithHousehold(options)),
             Options.Create(new Foreword.Infrastructure.Install.InstallOptions { AccountEmail = accountEmail }));
+
+    // The household's own setup, as Foreword's Columns screen would have stored it: the four people,
+    // the two with accounts, and each person's name as the word that routes to them. A test that
+    // sets its own columns or words keeps them.
+    private static CalendarMappingOptions WithHousehold(CalendarMappingOptions options)
+    {
+        if (options.Columns.Count == 0)
+        {
+            options.Columns = Household.Layout.People
+                .Select(p => new ColumnChoice { Name = p.Name, HasAccount = Household.Layout.HasAccount(p) })
+                .ToList();
+        }
+
+        foreach (var person in Household.Layout.People)
+        {
+            options.Keywords.TryAdd(person, [person.Name]);
+        }
+
+        return options;
+    }
 
     private static CalendarEvent Event(string calendarId, string title = "Thing") =>
         new() { Title = title, SourceCalendarId = calendarId };
@@ -21,10 +41,10 @@ public class CalendarColumnMapperTests
     {
         var mapper = CreateMapper(new CalendarMappingOptions
         {
-            CalendarColumns = { ["ashley-work@group"] = PersonColumn.Ashley }
+            CalendarColumns = { ["sam-work@group"] = Household.Sam }
         });
 
-        Assert.Equal([PersonColumn.Ashley], mapper.Resolve(Event("ashley-work@group")));
+        Assert.Equal([Household.Sam], mapper.Resolve(Event("sam-work@group")));
     }
 
     [Fact]
@@ -41,31 +61,31 @@ public class CalendarColumnMapperTests
     [Fact]
     public void Resolve_UnmappedCalendarFallsBackToDefaultColumn()
     {
-        var mapper = CreateMapper(new CalendarMappingOptions { DefaultColumn = PersonColumn.Matt });
+        var mapper = CreateMapper(new CalendarMappingOptions { DefaultColumn = Household.Alex });
 
-        Assert.Equal([PersonColumn.Matt], mapper.Resolve(Event("church@group")));
+        Assert.Equal([Household.Alex], mapper.Resolve(Event("church@group")));
     }
 
     [Fact]
-    public void Resolve_FamilyCalendarRoutesGwenByKeyword()
+    public void Resolve_FamilyCalendarRoutesRileyByKeyword()
     {
         var mapper = CreateMapper(new CalendarMappingOptions { FamilyCalendarId = "family@group" });
 
-        Assert.Equal([PersonColumn.Gwen], mapper.Resolve(Event("family@group", "Gwen dentist appt")));
+        Assert.Equal([Household.Riley], mapper.Resolve(Event("family@group", "Riley dentist appt")));
     }
 
     [Fact]
-    public void Resolve_FamilyCalendarRoutesEvaByKeyword()
+    public void Resolve_FamilyCalendarRoutesJoByKeyword()
     {
         var mapper = CreateMapper(new CalendarMappingOptions { FamilyCalendarId = "family@group" });
 
-        Assert.Equal([PersonColumn.Eva], mapper.Resolve(Event("family@group", "Eva soccer practice")));
+        Assert.Equal([Household.Jo], mapper.Resolve(Event("family@group", "Jo soccer practice")));
     }
 
     /// <summary>
     /// CHANGED BY D31, and this is the change stated plainly. An event on the shared calendar that
-    /// names nobody used to fall to the default column — so "Family dinner" was Matt's, and only
-    /// Matt's. Nobody named on a shared calendar now means EVERYBODY, which is what a calendar
+    /// names nobody used to fall to the default column — so "Family dinner" was Alex's, and only
+    /// Alex's. Nobody named on a shared calendar now means EVERYBODY, which is what a calendar
     /// called Family means.
     /// </summary>
     [Fact]
@@ -74,10 +94,10 @@ public class CalendarColumnMapperTests
         var mapper = CreateMapper(new CalendarMappingOptions
         {
             FamilyCalendarId = "family@group",
-            DefaultColumn = PersonColumn.Matt
+            DefaultColumn = Household.Alex
         });
 
-        Assert.Equal(ColumnSet.People, mapper.Resolve(Event("family@group", "Family dinner")));
+        Assert.Equal(Household.Layout.People, mapper.Resolve(Event("family@group", "Family dinner")));
     }
 
     /// <summary>Every name in the title, not the first — the bug D31 exists to fix.</summary>
@@ -87,8 +107,8 @@ public class CalendarColumnMapperTests
         var mapper = CreateMapper(new CalendarMappingOptions { FamilyCalendarId = "family@group" });
 
         Assert.Equal(
-            [PersonColumn.Gwen, PersonColumn.Eva],
-            mapper.Resolve(Event("family@group", "Gwen and Eva to swimming")));
+            [Household.Riley, Household.Jo],
+            mapper.Resolve(Event("family@group", "Riley and Jo to swimming")));
     }
 
     /// <summary>An invited address is a fact; it is read before the title (D31).</summary>
@@ -98,17 +118,17 @@ public class CalendarColumnMapperTests
         var mapper = CreateMapper(new CalendarMappingOptions
         {
             FamilyCalendarId = "family@group",
-            PersonAddresses = { [PersonColumn.Eva] = ["eva@example.com"] },
+            PersonAddresses = { [Household.Jo] = ["jo@example.com"] },
         });
 
         var invited = new CalendarEvent
         {
-            Title = "Gwen to swimming",
+            Title = "Riley to swimming",
             SourceCalendarId = "family@group",
-            Guests = ["eva@example.com"],
+            Guests = ["jo@example.com"],
         };
 
-        Assert.Equal([PersonColumn.Eva], mapper.Resolve(invited));
+        Assert.Equal([Household.Jo], mapper.Resolve(invited));
     }
 
     /// <summary>D33: split by name is available to any calendar, not only the family one.</summary>
@@ -121,8 +141,8 @@ public class CalendarColumnMapperTests
         });
 
         Assert.Equal(
-            [PersonColumn.Gwen, PersonColumn.Eva],
-            mapper.Resolve(Event("scouts@group", "Gwen and Eva to the pack meeting")));
+            [Household.Riley, Household.Jo],
+            mapper.Resolve(Event("scouts@group", "Riley and Jo to the pack meeting")));
     }
 
     /// <summary>
@@ -137,7 +157,7 @@ public class CalendarColumnMapperTests
             EveryoneCalendars = { "holidays@group" },
         });
 
-        Assert.Equal(ColumnSet.People, mapper.Resolve(Event("holidays@group", "Thanksgiving")));
+        Assert.Equal(Household.Layout.People, mapper.Resolve(Event("holidays@group", "Thanksgiving")));
     }
 
     /// <summary>
@@ -149,7 +169,7 @@ public class CalendarColumnMapperTests
     {
         var mapper = CreateMapper(new CalendarMappingOptions
         {
-            CalendarColumns = { ["matt@work"] = PersonColumn.Matt },
+            CalendarColumns = { ["alex@work"] = Household.Alex },
             FamilyCalendarId = "family@group",
             SplitCalendars = { "scouts@group" },
             EveryoneCalendars = { "holidays@group" },
@@ -159,7 +179,7 @@ public class CalendarColumnMapperTests
         var known = mapper.KnownCalendars();
 
         Assert.Equal(
-            new[] { "family@group", "holidays@group", "matt@work", "scouts@group", "spam@group" },
+            new[] { "alex@work", "family@group", "holidays@group", "scouts@group", "spam@group" },
             known.Order(StringComparer.Ordinal));
     }
 
@@ -168,13 +188,13 @@ public class CalendarColumnMapperTests
     {
         var mapper = CreateMapper(new CalendarMappingOptions
         {
-            CalendarColumns = { ["w@group"] = PersonColumn.Ashley }
+            CalendarColumns = { ["w@group"] = Household.Sam }
         });
         var events = new[] { Event("w@group"), Event("unmapped@group") };
 
         var assigned = mapper.Assign(events);
 
-        Assert.Equal([PersonColumn.Ashley], assigned[0].Columns);
-        Assert.Equal([PersonColumn.Matt], assigned[1].Columns);
+        Assert.Equal([Household.Sam], assigned[0].Columns);
+        Assert.Equal([Household.Alex], assigned[1].Columns);
     }
 }

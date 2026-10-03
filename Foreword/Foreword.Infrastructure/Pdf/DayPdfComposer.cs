@@ -57,8 +57,11 @@ public class DayPdfComposer : IDayPdfComposer
     private static readonly SKColor OffDayFill =
         PaperPalette.ResolveRole(ColorRole.Resolved, ColorTier.Wash, UiColorProfile.DocumentColor);
 
-    private static readonly PersonColumn[] Columns =
-        [PersonColumn.Matt, PersonColumn.Ashley, PersonColumn.Gwen, PersonColumn.Eva, PersonColumn.Watch];
+    // Each person's column takes the next of these hues, in print order (§9), and Watch the
+    // neutral one. The columns are the account's own; the hues only follow their order, so the
+    // page needs no idea who anybody is to tell them apart.
+    private static readonly ColorRole[] PersonHues =
+        [ColorRole.Action, ColorRole.Reference, ColorRole.Positive, ColorRole.Caution, ColorRole.InProgress];
 
     public byte[] Compose(DayDocument document)
     {
@@ -67,7 +70,7 @@ public class DayPdfComposer : IDayPdfComposer
         // Page 1 — the day itself.
         DayPageFurniture.Draw(layout, DaySection.Day, DayTitles.PageHeading(document.Date));
         DrawVoice(layout, document.Voice);
-        DrawTimelinePage(layout, document.Agenda, document.UnreadableCarryovers);
+        DrawTimelinePage(layout, document.Agenda, document.UnreadableCarryovers, document.Columns);
 
         // Page 2 — the weather, on the timeline's own 6am-10pm axis so an event and the weather at
         // that hour line up vertically across the two sheets.
@@ -78,7 +81,7 @@ public class DayPdfComposer : IDayPdfComposer
         // Page 3 — the week ahead.
         layout.NewPage();
         DayPageFurniture.Draw(layout, DaySection.Outlook, "The week ahead");
-        DrawOutlookPage(layout, document.Date, document.Outlook);
+        DrawOutlookPage(layout, document.Date, document.Outlook, document.Columns);
 
         // Page 4 — the checklist. Ticking happens here and nowhere else: Foreword has no tick
         // control anywhere in the app.
@@ -121,7 +124,10 @@ public class DayPdfComposer : IDayPdfComposer
     internal static float StripHeight(SKFont eventFont) => (float)SkiaPageLayout.LineHeight(eventFont) + 2;
 
     private static void DrawTimelinePage(
-        SkiaPageLayout layout, DayAgenda agenda, IReadOnlyList<ParsedNote> unreadableCarryovers)
+        SkiaPageLayout layout,
+        DayAgenda agenda,
+        IReadOnlyList<ParsedNote> unreadableCarryovers,
+        IReadOnlyList<PersonColumn> columns)
     {
         var titleFont = SkiaPageLayout.Sans(PaperTypeScale.Title, bold: true);
         var headerFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary, bold: true);
@@ -135,14 +141,14 @@ public class DayPdfComposer : IDayPdfComposer
         // Stops clear of the binder edge rather than running under the tab strip.
         var gridRight = DayPageFurniture.ContentRight(layout);
         var colsLeft = gridLeft + HourGutter;
-        var colWidth = (gridRight - colsLeft) / Columns.Length;
+        var colWidth = (gridRight - colsLeft) / columns.Count;
         var timelineTop = gridTop + HeaderHeight;
         var gridBottom = layout.BottomY - HandwritingReserve;
         var hourHeight = (gridBottom - timelineTop) / HourSpan;
 
         // Column headers.
-        for (var i = 0; i < Columns.Length; i++)
-            layout.DrawText(Columns[i].ToString(), headerFont,
+        for (var i = 0; i < columns.Count; i++)
+            layout.DrawText(columns[i].ToString(), headerFont,
                 colsLeft + i * colWidth, gridTop, colWidth, HeaderHeight, TextAlign.Center);
 
         // Hour rows + labels.
@@ -156,7 +162,7 @@ public class DayPdfComposer : IDayPdfComposer
         }
 
         // Column separators.
-        for (var i = 0; i <= Columns.Length; i++)
+        for (var i = 0; i <= columns.Count; i++)
         {
             var x = colsLeft + i * colWidth;
             layout.DrawLine(x, gridTop, x, gridBottom, SkiaPageLayout.InkMuted, 0.5f);
@@ -164,11 +170,11 @@ public class DayPdfComposer : IDayPdfComposer
         layout.DrawLine(gridLeft, gridTop, gridLeft, gridBottom, SkiaPageLayout.InkMuted, 0.5f);
 
         // All-day events stack as strips at the top of their column.
-        var allDayOffset = new double[Columns.Length];
+        var allDayOffset = new double[columns.Count];
         foreach (var e in agenda.Events.Where(e => e.IsAllDay))
         {
             // Once in EVERY column it belongs to (D31). One event can be several people's.
-            foreach (var col in e.Columns.Select(ColumnIndex).Where(c => c >= 0).Distinct())
+            foreach (var col in e.Columns.Select(c => ColumnIndex(columns, c)).Where(c => c >= 0).Distinct())
             {
                 var x = colsLeft + col * colWidth;
                 var y = timelineTop + allDayOffset[col];
@@ -185,11 +191,11 @@ public class DayPdfComposer : IDayPdfComposer
         var alsoToday = new List<(CalendarEvent Event, PersonColumn Column)>();
 
         var timed = agenda.Events.Where(e => !e.IsAllDay).ToList();
-        var spanned = timed.Where(e => SharedEventMode.Spans(e, timed)).ToList();
+        var spanned = timed.Where(e => SharedEventMode.Spans(e, timed, columns)).ToList();
 
         foreach (var e in spanned)
         {
-            var cols = e.Columns.Select(ColumnIndex).Where(c => c >= 0).Order().ToList();
+            var cols = e.Columns.Select(c => ColumnIndex(columns, c)).Where(c => c >= 0).Order().ToList();
             if (cols.Count == 0) continue;
 
             if (Window(e, hourHeight, timelineTop, stripHeight) is not { } window) continue;
@@ -201,7 +207,7 @@ public class DayPdfComposer : IDayPdfComposer
             // The corner tag names who it is for. A spanning box already shows WHICH columns, so
             // the tag is confirmation rather than the only signal — which is why it is allowed to
             // be truncated away on a narrow span rather than pushing the title out.
-            layout.DrawText(layout.Truncate(Who(e), eventFont, colWidth * cols.Count - 4), eventFont,
+            layout.DrawText(layout.Truncate(Who(e, columns), eventFont, colWidth * cols.Count - 4), eventFont,
                 x + 1, y + 1, colWidth * cols.Count - 4, stripHeight, TextAlign.TopRight,
                 SkiaPageLayout.InkMuted);
         }
@@ -209,9 +215,9 @@ public class DayPdfComposer : IDayPdfComposer
         // The drive before an event, drawn as a hatched band in its column (Gate 1 · Q74). Under
         // the events, so a band never hides one; an unreachable drive takes the caution hue,
         // because that one is worth interrupting the page for.
-        for (var col = 0; col < Columns.Length; col++)
+        for (var col = 0; col < columns.Count; col++)
         {
-            var inColumn = timed.Where(e => e.Columns.Any(c => ColumnIndex(c) == col)).ToList();
+            var inColumn = timed.Where(e => e.Columns.Any(c => ColumnIndex(columns, c) == col)).ToList();
 
             // Per column, so each person's drive starts where THEIR day has left them — and so an
             // event both a child and a driving parent are on gets a band in both their columns,
@@ -243,10 +249,10 @@ public class DayPdfComposer : IDayPdfComposer
         // Everything else, one column at a time so overlapping events share the width rather than
         // paint over each other (B2), and so a work block is drawn first, behind what sits inside it
         // (B3). EventLanes decides both; this only lays the answer out.
-        for (var col = 0; col < Columns.Length; col++)
+        for (var col = 0; col < columns.Count; col++)
         {
             var inColumn = timed
-                .Where(e => !spanned.Contains(e) && e.Columns.Any(c => ColumnIndex(c) == col))
+                .Where(e => !spanned.Contains(e) && e.Columns.Any(c => ColumnIndex(columns, c) == col))
                 .ToList();
 
             var laid = EventLanes.Place(inColumn);
@@ -254,7 +260,7 @@ public class DayPdfComposer : IDayPdfComposer
             // Anything past the legible width is written down instead of drawn (B2's other half).
             foreach (var extra in EventLanes.Overflow(laid))
             {
-                alsoToday.Add((extra.Event, Columns[col]));
+                alsoToday.Add((extra.Event, columns[col]));
             }
 
             foreach (var placed in EventLanes.Drawn(laid))
@@ -288,7 +294,7 @@ public class DayPdfComposer : IDayPdfComposer
                 // A shared event drawn per column says who else is there (D32), under its title and
                 // only if the box is tall enough to hold a second line — a "with" line that pushed
                 // the title out would cost more than it explains.
-                var with = SharedEventMode.WithLine(e, Columns[col]);
+                var with = SharedEventMode.WithLine(e, columns[col]);
                 if (with.Length > 0 && !placed.IsContainer && height >= stripHeight * 2)
                 {
                     layout.DrawText(layout.Truncate(with, eventFont, laneWidth - 4), eventFont,
@@ -312,7 +318,10 @@ public class DayPdfComposer : IDayPdfComposer
     /// the foot of the Day page, so there is only ever one place to put a pen.</para>
     /// </summary>
     private static void DrawOutlookPage(
-        SkiaPageLayout layout, DateOnly today, IReadOnlyList<CalendarEvent> outlook)
+        SkiaPageLayout layout,
+        DateOnly today,
+        IReadOnlyList<CalendarEvent> outlook,
+        IReadOnlyList<PersonColumn> columns)
     {
         var dayFont = SkiaPageLayout.Sans(PaperTypeScale.Secondary, bold: true);
         var dateFont = SkiaPageLayout.Sans(PaperTypeScale.Label);
@@ -382,7 +391,7 @@ public class DayPdfComposer : IDayPdfComposer
 
                 // The left rule is the column the event belongs to, so a week's worth of "whose is
                 // this" is answered by colour rather than by reading every line.
-                layout.DrawRect(x + 4, y, RuleWidth, itemHeight, fill: ColumnMark(e));
+                layout.DrawRect(x + 4, y, RuleWidth, itemHeight, fill: ColumnMark(e, columns));
                 layout.DrawWrappedIn(text, itemFont, x + 4 + RuleWidth + 3, y, textWidth, maxLines: 3);
 
                 y += itemHeight + ItemGap;
@@ -455,33 +464,45 @@ public class DayPdfComposer : IDayPdfComposer
 
     /// <summary>
     /// Who an event is for, as the outlook prints it. Everybody reads as "Everyone" rather than as
-    /// four names, which is what a whole-family event actually means and a third of a line shorter.
+    /// every name, which is what a whole-family event actually means and a third of a line shorter.
     /// </summary>
     /// <summary>
     /// The hue of the column an event belongs to (§9), for the rule down the left of an outlook
     /// item. An event in several columns takes the first, because a two-colour rule two points wide
     /// is a smudge rather than a signal.
     /// </summary>
-    private static SKColor ColumnMark(CalendarEvent e) =>
-        PaperPalette.ResolveRole(
-            (e.Columns.FirstOrDefault()) switch
-            {
-                PersonColumn.Matt => ColorRole.Action,
-                PersonColumn.Ashley => ColorRole.Reference,
-                PersonColumn.Gwen => ColorRole.Positive,
-                PersonColumn.Eva => ColorRole.Caution,
-                _ => ColorRole.Resolved,
-            },
-            ColorTier.Mark, UiColorProfile.DocumentColor);
+    private static SKColor ColumnMark(CalendarEvent e, IReadOnlyList<PersonColumn> columns)
+    {
+        var people = columns.Where(c => !c.IsWatch).ToList();
+        var index = e.Columns.Count > 0 ? people.IndexOf(e.Columns[0]) : -1;
+        var role = index >= 0 ? PersonHues[index % PersonHues.Length] : ColorRole.Resolved;
 
-    private static string Who(CalendarEvent e) =>
-        ColumnSet.People.All(e.Columns.Contains)
+        return PaperPalette.ResolveRole(role, ColorTier.Mark, UiColorProfile.DocumentColor);
+    }
+
+    private static string Who(CalendarEvent e, IReadOnlyList<PersonColumn> columns)
+    {
+        var people = columns.Where(c => !c.IsWatch).ToList();
+
+        return people.Count > 1 && people.All(e.Columns.Contains)
             ? "Everyone"
             : string.Join(", ", e.Columns);
+    }
 
     private static double stripHeightFor(SKFont font) => SkiaPageLayout.LineHeight(font);
 
-    private static int ColumnIndex(PersonColumn column) => Array.IndexOf(Columns, column);
+    private static int ColumnIndex(IReadOnlyList<PersonColumn> columns, PersonColumn column)
+    {
+        for (var i = 0; i < columns.Count; i++)
+        {
+            if (columns[i] == column)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     private static double HoursFromStart(DateTime time) =>
         (time.Hour + time.Minute / 60.0) - StartHour;

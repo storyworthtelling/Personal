@@ -13,15 +13,15 @@ public class FaceBookCodecTests
     public void AKnownPersonComesBackKnown()
     {
         var book = FaceBook.Empty
-            .Learn("c1", "Ashley", [1, 0, 0])
-            .Learn("c1", "Ashley", [0.2f, 0.98f, 0])
+            .Learn("c1", "Robin", [1, 0, 0])
+            .Learn("c1", "Robin", [0.2f, 0.98f, 0])
             .Learn("c2", "Ruth", [0, 0, 1]);
 
         var back = FaceBookCodec.Read(FaceBookCodec.Write(book));
 
         Assert.Equal(2, back.People.Count);
-        Assert.Equal("Ashley", back.Nearest([1, 0, 0]).Name);
-        Assert.Equal("Ashley", back.Nearest([0.2f, 0.98f, 0]).Name);
+        Assert.Equal("Robin", back.Nearest([1, 0, 0]).Name);
+        Assert.Equal("Robin", back.Nearest([0.2f, 0.98f, 0]).Name);
         Assert.Equal("Ruth", back.Nearest([0, 0, 1]).Name);
     }
 
