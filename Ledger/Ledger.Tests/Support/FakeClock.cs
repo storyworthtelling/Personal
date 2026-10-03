@@ -1,6 +1,6 @@
-using Ledger.Domain.Time;
+using Index.Domain.Time;
 
-namespace Ledger.Tests.Support;
+namespace Index.Tests.Support;
 
 // Deterministic clock for testing time-dependent logic without real waits.
 public sealed class FakeClock(DateTimeOffset start) : IClock

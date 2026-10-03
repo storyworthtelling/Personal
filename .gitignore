@@ -11,15 +11,6 @@ publish/
 # agent, never meant to be committed.
 .claude/worktrees/
 
-# Ledger's launcher icon is generated, not committed — unlike the other apps',
-# whose IconStudio output is checked in. Ledger's CI build regenerates it before
-# packaging (see CLAUDE.md), so the console's output here is build output. Listed
-# explicitly rather than as Resources/** because Resources/Styles is real source.
-Ledger/Ledger.Android/Resources/drawable/
-Ledger/Ledger.Android/Resources/drawable-nodpi/
-Ledger/Ledger.Android/Resources/mipmap-*/
-Ledger/Ledger.Android/Resources/values/
-
 # graphify — entirely rebuildable, local CPU work only (no LLM, no network for
 # --code-only, ~25s cold / ~1-2s incremental). Community IDs reshuffle on every
 # cluster-only run even with no real change, so committing graph.json made every

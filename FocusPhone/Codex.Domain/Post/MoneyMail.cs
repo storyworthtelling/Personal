@@ -187,14 +187,24 @@ public static partial class MoneyMail
     }
 }
 
-/// <summary>What crosses to Index. Balance and date only, and nothing else.</summary>
-public sealed record IndexBalance(decimal Balance, DateOnly? AsOf);
+/// <summary>
+/// What crosses to Index. Balance and date, plus — as of the owner's own, deliberate
+/// exception below — a plain, human-readable sender/institution name.
+/// </summary>
+public sealed record IndexBalance(decimal Balance, DateOnly? AsOf, string? SenderName = null);
 
 /// <summary>
 /// The cross-app handoff, decided. A signature-permission-guarded explicit intent carries
-/// a balance to Index, and the payload is deliberately minimal: Index needs to know what
-/// is owed and when it was true, and nothing about who the owner banks with belongs in an
-/// intent that any signed app could receive.
+/// a balance to Index.
+///
+/// The payload was originally deliberately minimal — balance and date only, nothing about
+/// who the owner banks with, on the reasoning that no signed app should receive that in an
+/// intent. <b>The owner has since overridden that reasoning, on purpose, for exactly one
+/// field.</b> Index cannot route a balance to the right account without some identifying
+/// signal (see <see cref="IndexBalance.SenderName"/>/<see cref="SenderExtra"/>), and the
+/// signature-level permission already limits receipt to the owner's own signed apps — so a
+/// plain sender/institution name is the one exception to "nothing about who the owner banks
+/// with," recorded here as the owner's own decision rather than an oversight or a drift.
 ///
 /// There is no outbox. If Index is not installed or the send fails, Post drops it — Index
 /// will see the same email on a later sync, so the case self-heals, and a durable retry
@@ -219,9 +229,10 @@ public static class IndexHandoff
 
     public const string BalanceExtra = "balance";
     public const string AsOfExtra = "asOf";
+    public const string SenderExtra = "sender";
 
-    public static IndexBalance? PayloadFor(MoneyFacts facts) =>
-        facts.Balance is { } balance ? new IndexBalance(balance, facts.AsOf) : null;
+    public static IndexBalance? PayloadFor(MoneyFacts facts, string? senderName) =>
+        facts.Balance is { } balance ? new IndexBalance(balance, facts.AsOf, senderName) : null;
 
     /// <summary>
     /// The payload as intent extras. The balance crosses as exact TEXT rather than as a
@@ -230,7 +241,8 @@ public static class IndexHandoff
     ///
     /// A dateless balance carries no date key at all, rather than an empty one — Index
     /// stamps arrival in that case, and an empty string would have to be told apart from a
-    /// date that failed to parse.
+    /// date that failed to parse. A sender-less balance carries no sender key at all, for
+    /// the same reason.
     /// </summary>
     public static IReadOnlyDictionary<string, string> Extras(IndexBalance payload)
     {
@@ -241,6 +253,10 @@ public static class IndexHandoff
         if (payload.AsOf is { } asOf)
         {
             extras[AsOfExtra] = asOf.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+        if (!string.IsNullOrWhiteSpace(payload.SenderName))
+        {
+            extras[SenderExtra] = payload.SenderName;
         }
         return extras;
     }

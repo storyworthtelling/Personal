@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:LedgerBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:Index.Android.Pages"
+             x:Class="Index.Android.Pages.SavingsPage">
+    <!-- Same convention SnowballPage.xaml already established: none of this screen's materials (graph
+         paper, index cards, post-its, the Accounts|Growth switch) map onto declarative bindings, so
+         the whole screen is built in code-behind. This file exists only so LedgerBinderShellTests'
+         root-element check passes and so InitializeComponent() has a generated partial to resolve
+         against. -->
+</pages:LedgerBinderPage>

@@ -1,0 +1,3589 @@
+{
+ "source": "Synthetic Debt Snowball history for tests - every name and figure is invented",
+ "weeks": [
+  "2023-06-02",
+  "2023-06-09",
+  "2023-06-16",
+  "2023-06-23",
+  "2023-06-30",
+  "2023-07-07",
+  "2023-07-14",
+  "2023-07-21",
+  "2023-07-28",
+  "2023-08-04",
+  "2023-08-11",
+  "2023-08-18",
+  "2023-08-25",
+  "2023-09-01",
+  "2023-09-08",
+  "2023-09-15",
+  "2023-09-22",
+  "2023-09-29",
+  "2023-10-06",
+  "2023-10-13",
+  "2023-10-20",
+  "2023-10-27",
+  "2023-11-03",
+  "2023-11-10",
+  "2023-11-17",
+  "2023-11-24",
+  "2023-12-01",
+  "2023-12-08",
+  "2023-12-15",
+  "2023-12-22",
+  "2023-12-29",
+  "2024-01-05",
+  "2024-01-12",
+  "2024-01-19",
+  "2024-01-26",
+  "2024-02-02",
+  "2024-02-09",
+  "2024-02-16",
+  "2024-02-23",
+  "2024-03-01",
+  "2024-03-08",
+  "2024-03-15",
+  "2024-03-22",
+  "2024-03-29",
+  "2024-04-05",
+  "2024-04-12",
+  "2024-04-19",
+  "2024-04-26",
+  "2024-05-03",
+  "2024-05-10",
+  "2024-05-17",
+  "2024-05-24",
+  "2024-05-31",
+  "2024-06-07",
+  "2024-06-14",
+  "2024-06-21",
+  "2024-06-28",
+  "2024-07-05",
+  "2024-07-12",
+  "2024-07-19",
+  "2024-07-26",
+  "2024-08-02",
+  "2024-08-09",
+  "2024-08-16",
+  "2024-08-23",
+  "2024-08-30",
+  "2024-09-06",
+  "2024-09-13",
+  "2024-09-20",
+  "2024-09-27"
+ ],
+ "loans": [
+  "Northfield Student Loans 1",
+  "Northfield Student Loans 2",
+  "Cedar Hollow Bank",
+  "Bluebird Visa",
+  "Skyline Miles",
+  "Meridian Card",
+  "Lakeside Credit Union",
+  "Harbor Auto Finance",
+  "Cobblestone Finance",
+  "Maple Ridge Mortgage"
+ ],
+ "rows": [
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-06-02",
+   "balance": 5880.42
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-06-09",
+   "balance": 5765.06
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-06-16",
+   "balance": 5570.88
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-06-23",
+   "balance": 5378.02
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-06-30",
+   "balance": 5205.62
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-07-07",
+   "balance": 5071.96
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-07-14",
+   "balance": 4931.57
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-07-21",
+   "balance": 4728.93
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-07-28",
+   "balance": 4561.72
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-08-04",
+   "balance": 4418.36
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-08-11",
+   "balance": 4251.39
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-08-18",
+   "balance": 4115.29
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-08-25",
+   "balance": 3986.58
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-09-01",
+   "balance": 3880.35
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-09-08",
+   "balance": 3677.02
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-09-15",
+   "balance": 3553.53
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-09-22",
+   "balance": 3401.47
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-09-29",
+   "balance": 3199.94
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-10-06",
+   "balance": 3027.25
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-10-13",
+   "balance": 2882.14
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-10-20",
+   "balance": 2682.95
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-10-27",
+   "balance": 2569.13
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-11-03",
+   "balance": 2436.6
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-11-10",
+   "balance": 2294.91
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-11-17",
+   "balance": 2180.06
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-11-24",
+   "balance": 2068.32
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-12-01",
+   "balance": 1876.88
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-12-08",
+   "balance": 1701.95
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-12-15",
+   "balance": 1548.94
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-12-22",
+   "balance": 1432.21
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2023-12-29",
+   "balance": 1314.45
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-01-05",
+   "balance": 1130.75
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-01-12",
+   "balance": 942.99
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-01-19",
+   "balance": 734.06
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-01-26",
+   "balance": 568.43
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-02-02",
+   "balance": 367.32
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-02-09",
+   "balance": 172.44
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-02-16",
+   "balance": 70.45
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-02-23",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-03-01",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-03-08",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-03-15",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-03-22",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-03-29",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-04-05",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-04-12",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-04-19",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-04-26",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-05-03",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-05-10",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-05-17",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-05-24",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-05-31",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-06-07",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-06-14",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-06-21",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-06-28",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-07-05",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-07-12",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-07-19",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-07-26",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-08-02",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-08-09",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-08-16",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-08-23",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-08-30",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-09-06",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-09-13",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-09-20",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 1",
+   "week": "2024-09-27",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-06-02",
+   "balance": 7904.36
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-06-09",
+   "balance": 7797.44
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-06-16",
+   "balance": 7623.96
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-06-23",
+   "balance": 7490.55
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-06-30",
+   "balance": 7381.17
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-07-07",
+   "balance": 7192.69
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-07-14",
+   "balance": 7030.78
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-07-21",
+   "balance": 6918.11
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-07-28",
+   "balance": 6733.92
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-08-04",
+   "balance": 6634.58
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-08-11",
+   "balance": 6518.72
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-08-18",
+   "balance": 6390.42
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-08-25",
+   "balance": 6222.73
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-09-01",
+   "balance": 6058.22
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-09-08",
+   "balance": 5953.56
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-09-15",
+   "balance": 5810.06
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-09-22",
+   "balance": 5680.96
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-09-29",
+   "balance": 5552.61
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-10-06",
+   "balance": 5368.39
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-10-13",
+   "balance": 5223.67
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-10-20",
+   "balance": 5092.58
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-10-27",
+   "balance": 4923.79
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-11-03",
+   "balance": 4811.9
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-11-10",
+   "balance": 4688.28
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-11-17",
+   "balance": 4513.85
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-11-24",
+   "balance": 4366.23
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-12-01",
+   "balance": 4265.86
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-12-08",
+   "balance": 4127.53
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-12-15",
+   "balance": 3993.98
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-12-22",
+   "balance": 3807.28
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2023-12-29",
+   "balance": 3677.98
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-01-05",
+   "balance": 3523.7
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-01-12",
+   "balance": 3399.48
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-01-19",
+   "balance": 3286.2
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-01-26",
+   "balance": 3128.36
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-02-02",
+   "balance": 2987.14
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-02-09",
+   "balance": 2850.49
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-02-16",
+   "balance": 2721.17
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-02-23",
+   "balance": 2574.06
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-03-01",
+   "balance": 2450.14
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-03-08",
+   "balance": 2310.2
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-03-15",
+   "balance": 2133.82
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-03-22",
+   "balance": 2019.41
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-03-29",
+   "balance": 1859.1
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-04-05",
+   "balance": 1718.78
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-04-12",
+   "balance": 1527.66
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-04-19",
+   "balance": 1347.7
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-04-26",
+   "balance": 1239.62
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-05-03",
+   "balance": 1058.5
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-05-10",
+   "balance": 880.45
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-05-17",
+   "balance": 786.89
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-05-24",
+   "balance": 685.1
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-05-31",
+   "balance": 563.01
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-06-07",
+   "balance": 406.08
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-06-14",
+   "balance": 227.78
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-06-21",
+   "balance": 64.53
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-06-28",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-07-05",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-07-12",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-07-19",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-07-26",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-08-02",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-08-09",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-08-16",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-08-23",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-08-30",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-09-06",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-09-13",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-09-20",
+   "balance": 0.0
+  },
+  {
+   "loan": "Northfield Student Loans 2",
+   "week": "2024-09-27",
+   "balance": 0.0
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-06-02",
+   "balance": 3533.76
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-06-09",
+   "balance": 3485.8
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-06-16",
+   "balance": 3429.12
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-06-23",
+   "balance": 3358.62
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-06-30",
+   "balance": 3314.73
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-07-07",
+   "balance": 3252.04
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-07-14",
+   "balance": 3184.02
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-07-21",
+   "balance": 3138.38
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-07-28",
+   "balance": 3061.54
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-08-04",
+   "balance": 3013.45
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-08-11",
+   "balance": 2974.41
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-08-18",
+   "balance": 2932.06
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-08-25",
+   "balance": 2863.12
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-09-01",
+   "balance": 2820.24
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-09-08",
+   "balance": 2759.74
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-09-15",
+   "balance": 2717.38
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-09-22",
+   "balance": 2658.7
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-09-29",
+   "balance": 2599.78
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-10-06",
+   "balance": 2558.61
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-10-13",
+   "balance": 2492.0
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-10-20",
+   "balance": 2416.11
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-10-27",
+   "balance": 2353.87
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-11-03",
+   "balance": 2305.46
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-11-10",
+   "balance": 2241.11
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-11-17",
+   "balance": 2170.01
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-11-24",
+   "balance": 2120.96
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-12-01",
+   "balance": 2079.02
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-12-08",
+   "balance": 2030.43
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-12-15",
+   "balance": 1977.62
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-12-22",
+   "balance": 1931.77
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2023-12-29",
+   "balance": 1893.12
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-01-05",
+   "balance": 1853.61
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-01-12",
+   "balance": 1801.83
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-01-19",
+   "balance": 1742.81
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-01-26",
+   "balance": 1671.84
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-02-02",
+   "balance": 1607.1
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-02-09",
+   "balance": 1533.11
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-02-16",
+   "balance": 1489.06
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-02-23",
+   "balance": 1433.42
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-03-01",
+   "balance": 1383.29
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-03-08",
+   "balance": 1326.5
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-03-15",
+   "balance": 1258.02
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-03-22",
+   "balance": 1202.83
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-03-29",
+   "balance": 1135.69
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-04-05",
+   "balance": 1075.18
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-04-12",
+   "balance": 1035.91
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-04-19",
+   "balance": 993.04
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-04-26",
+   "balance": 921.23
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-05-03",
+   "balance": 866.24
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-05-10",
+   "balance": 797.69
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-05-17",
+   "balance": 759.58
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-05-24",
+   "balance": 698.75
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-05-31",
+   "balance": 642.91
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-06-07",
+   "balance": 576.73
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-06-14",
+   "balance": 505.59
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-06-21",
+   "balance": 446.35
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-06-28",
+   "balance": 376.2
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-07-05",
+   "balance": 329.27
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-07-12",
+   "balance": 273.36
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-07-19",
+   "balance": 205.95
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-07-26",
+   "balance": 130.65
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-08-02",
+   "balance": 77.72
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-08-09",
+   "balance": 25.92
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-08-16",
+   "balance": 0.0
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-08-23",
+   "balance": 0.0
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-08-30",
+   "balance": 0.0
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-09-06",
+   "balance": 0.0
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-09-13",
+   "balance": 0.0
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-09-20",
+   "balance": 0.0
+  },
+  {
+   "loan": "Cedar Hollow Bank",
+   "week": "2024-09-27",
+   "balance": 0.0
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-06-02",
+   "balance": 15612.48
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-06-09",
+   "balance": 15586.16
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-06-16",
+   "balance": 15553.1
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-06-23",
+   "balance": 15533.47
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-06-30",
+   "balance": 15515.46
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-07-07",
+   "balance": 15496.19
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-07-14",
+   "balance": 15465.8
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-07-21",
+   "balance": 15448.25
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-07-28",
+   "balance": 15429.75
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-08-04",
+   "balance": 15407.99
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-08-11",
+   "balance": 15383.98
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-08-18",
+   "balance": 15357.6
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-08-25",
+   "balance": 15334.8
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-09-01",
+   "balance": 15309.12
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-09-08",
+   "balance": 15291.58
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-09-15",
+   "balance": 15259.15
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-09-22",
+   "balance": 15226.92
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-09-29",
+   "balance": 15193.44
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-10-06",
+   "balance": 15164.35
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-10-13",
+   "balance": 15141.59
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-10-20",
+   "balance": 15122.86
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-10-27",
+   "balance": 15099.99
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-11-03",
+   "balance": 15068.45
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-11-10",
+   "balance": 15050.01
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-11-17",
+   "balance": 15030.17
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-11-24",
+   "balance": 14997.84
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-12-01",
+   "balance": 14974.78
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-12-08",
+   "balance": 14952.13
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-12-15",
+   "balance": 14920.57
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-12-22",
+   "balance": 14896.91
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2023-12-29",
+   "balance": 14871.02
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-01-05",
+   "balance": 14852.9
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-01-12",
+   "balance": 14828.33
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-01-19",
+   "balance": 14808.6
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-01-26",
+   "balance": 14781.69
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-02-02",
+   "balance": 14755.51
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-02-09",
+   "balance": 14728.13
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-02-16",
+   "balance": 14703.56
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-02-23",
+   "balance": 14682.12
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-03-01",
+   "balance": 14660.43
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-03-08",
+   "balance": 14637.5
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-03-15",
+   "balance": 14611.82
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-03-22",
+   "balance": 14589.37
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-03-29",
+   "balance": 14557.97
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-04-05",
+   "balance": 14524.17
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-04-12",
+   "balance": 14498.07
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-04-19",
+   "balance": 14465.78
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-04-26",
+   "balance": 14444.29
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-05-03",
+   "balance": 14425.22
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-05-10",
+   "balance": 14395.63
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-05-17",
+   "balance": 14370.8
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-05-24",
+   "balance": 14350.41
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-05-31",
+   "balance": 14321.91
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-06-07",
+   "balance": 14297.04
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-06-14",
+   "balance": 14280.17
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-06-21",
+   "balance": 14260.23
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-06-28",
+   "balance": 14229.75
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-07-05",
+   "balance": 14208.95
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-07-12",
+   "balance": 14187.35
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-07-19",
+   "balance": 14164.02
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-07-26",
+   "balance": 14130.07
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-08-02",
+   "balance": 14099.36
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-08-09",
+   "balance": 14067.84
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-08-16",
+   "balance": 14034.88
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-08-23",
+   "balance": 14016.48
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-08-30",
+   "balance": 13999.24
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-09-06",
+   "balance": 13981.11
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-09-13",
+   "balance": 13950.19
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-09-20",
+   "balance": 13930.63
+  },
+  {
+   "loan": "Bluebird Visa",
+   "week": "2024-09-27",
+   "balance": 13905.25
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-06-02",
+   "balance": 13090.4
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-06-09",
+   "balance": 13059.53
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-06-16",
+   "balance": 13036.68
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-06-23",
+   "balance": 13002.37
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-06-30",
+   "balance": 12976.07
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-07-07",
+   "balance": 12946.76
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-07-14",
+   "balance": 12912.84
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-07-21",
+   "balance": 12881.58
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-07-28",
+   "balance": 12847.25
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-08-04",
+   "balance": 12828.86
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-08-11",
+   "balance": 12808.69
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-08-18",
+   "balance": 12774.93
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-08-25",
+   "balance": 12745.34
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-09-01",
+   "balance": 12726.46
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-09-08",
+   "balance": 12696.37
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-09-15",
+   "balance": 12662.46
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-09-22",
+   "balance": 12632.47
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-09-29",
+   "balance": 12610.85
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-10-06",
+   "balance": 12579.9
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-10-13",
+   "balance": 12559.01
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-10-20",
+   "balance": 12534.69
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-10-27",
+   "balance": 12513.42
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-11-03",
+   "balance": 12489.41
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-11-10",
+   "balance": 12472.39
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-11-17",
+   "balance": 12446.14
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-11-24",
+   "balance": 12418.02
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-12-01",
+   "balance": 12391.2
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-12-08",
+   "balance": 12366.75
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-12-15",
+   "balance": 12338.68
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-12-22",
+   "balance": 12309.23
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2023-12-29",
+   "balance": 12282.19
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-01-05",
+   "balance": 12257.76
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-01-12",
+   "balance": 12226.32
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-01-19",
+   "balance": 12195.25
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-01-26",
+   "balance": 12166.85
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-02-02",
+   "balance": 12137.55
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-02-09",
+   "balance": 12119.68
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-02-16",
+   "balance": 12096.88
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-02-23",
+   "balance": 12064.36
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-03-01",
+   "balance": 12036.73
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-03-08",
+   "balance": 12016.2
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-03-15",
+   "balance": 11983.9
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-03-22",
+   "balance": 11954.92
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-03-29",
+   "balance": 11930.25
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-04-05",
+   "balance": 11905.77
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-04-12",
+   "balance": 11875.92
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-04-19",
+   "balance": 11850.55
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-04-26",
+   "balance": 11824.3
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-05-03",
+   "balance": 11790.68
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-05-10",
+   "balance": 11760.82
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-05-17",
+   "balance": 11735.49
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-05-24",
+   "balance": 11708.76
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-05-31",
+   "balance": 11680.56
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-06-07",
+   "balance": 11663.28
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-06-14",
+   "balance": 11632.96
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-06-21",
+   "balance": 11604.45
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-06-28",
+   "balance": 11577.18
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-07-05",
+   "balance": 11553.08
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-07-12",
+   "balance": 11531.33
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-07-19",
+   "balance": 11512.52
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-07-26",
+   "balance": 11485.82
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-08-02",
+   "balance": 11455.63
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-08-09",
+   "balance": 11423.27
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-08-16",
+   "balance": 11398.62
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-08-23",
+   "balance": 11364.76
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-08-30",
+   "balance": 11338.75
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-09-06",
+   "balance": 11313.83
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-09-13",
+   "balance": 11293.71
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-09-20",
+   "balance": 11270.51
+  },
+  {
+   "loan": "Skyline Miles",
+   "week": "2024-09-27",
+   "balance": 11238.9
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-06-02",
+   "balance": 11000.36
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-06-09",
+   "balance": 10948.72
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-06-16",
+   "balance": 10883.33
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-06-23",
+   "balance": 10827.62
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-06-30",
+   "balance": 10786.21
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-07-07",
+   "balance": 10745.94
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-07-14",
+   "balance": 10682.12
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-07-21",
+   "balance": 10626.06
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-07-28",
+   "balance": 10569.47
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-08-04",
+   "balance": 10531.07
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-08-11",
+   "balance": 10493.71
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-08-18",
+   "balance": 10442.92
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-08-25",
+   "balance": 10385.55
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-09-01",
+   "balance": 10346.52
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-09-08",
+   "balance": 10296.48
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-09-15",
+   "balance": 10233.23
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-09-22",
+   "balance": 10179.93
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-09-29",
+   "balance": 10133.78
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-10-06",
+   "balance": 10083.79
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-10-13",
+   "balance": 10034.71
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-10-20",
+   "balance": 9992.51
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-10-27",
+   "balance": 9943.23
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-11-03",
+   "balance": 9903.44
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-11-10",
+   "balance": 9839.62
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-11-17",
+   "balance": 9786.04
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-11-24",
+   "balance": 9733.52
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-12-01",
+   "balance": 9675.52
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-12-08",
+   "balance": 9612.54
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-12-15",
+   "balance": 9548.35
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-12-22",
+   "balance": 9502.77
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2023-12-29",
+   "balance": 9448.23
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-01-05",
+   "balance": 9394.79
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-01-12",
+   "balance": 9341.32
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-01-19",
+   "balance": 9282.79
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-01-26",
+   "balance": 9224.59
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-02-02",
+   "balance": 9161.22
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-02-09",
+   "balance": 9125.51
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-02-16",
+   "balance": 9079.35
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-02-23",
+   "balance": 9044.56
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-03-01",
+   "balance": 8982.26
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-03-08",
+   "balance": 8931.24
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-03-15",
+   "balance": 8893.68
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-03-22",
+   "balance": 8831.64
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-03-29",
+   "balance": 8798.04
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-04-05",
+   "balance": 8740.67
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-04-12",
+   "balance": 8684.4
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-04-19",
+   "balance": 8619.58
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-04-26",
+   "balance": 8576.17
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-05-03",
+   "balance": 8517.85
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-05-10",
+   "balance": 8461.67
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-05-17",
+   "balance": 8399.86
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-05-24",
+   "balance": 8337.81
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-05-31",
+   "balance": 8279.06
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-06-07",
+   "balance": 8233.22
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-06-14",
+   "balance": 8195.76
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-06-21",
+   "balance": 8134.24
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-06-28",
+   "balance": 8067.94
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-07-05",
+   "balance": 8018.61
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-07-12",
+   "balance": 7959.6
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-07-19",
+   "balance": 7900.92
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-07-26",
+   "balance": 7865.31
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-08-02",
+   "balance": 7819.35
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-08-09",
+   "balance": 7764.32
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-08-16",
+   "balance": 7719.45
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-08-23",
+   "balance": 7666.52
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-08-30",
+   "balance": 7609.53
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-09-06",
+   "balance": 7556.28
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-09-13",
+   "balance": 7512.44
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-09-20",
+   "balance": 7469.86
+  },
+  {
+   "loan": "Meridian Card",
+   "week": "2024-09-27",
+   "balance": 7412.36
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-06-02",
+   "balance": 17656.4
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-06-09",
+   "balance": 17624.89
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-06-16",
+   "balance": 17605.17
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-06-23",
+   "balance": 17571.33
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-06-30",
+   "balance": 17537.16
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-07-07",
+   "balance": 17512.02
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-07-14",
+   "balance": 17479.87
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-07-21",
+   "balance": 17445.75
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-07-28",
+   "balance": 17414.83
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-08-04",
+   "balance": 17377.99
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-08-11",
+   "balance": 17341.54
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-08-18",
+   "balance": 17321.52
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-08-25",
+   "balance": 17295.04
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-09-01",
+   "balance": 17269.34
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-09-08",
+   "balance": 17238.22
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-09-15",
+   "balance": 17208.83
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-09-22",
+   "balance": 17178.25
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-09-29",
+   "balance": 17148.35
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-10-06",
+   "balance": 17123.41
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-10-13",
+   "balance": 17102.3
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-10-20",
+   "balance": 17080.68
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-10-27",
+   "balance": 17056.62
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-11-03",
+   "balance": 17024.65
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-11-10",
+   "balance": 16994.42
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-11-17",
+   "balance": 16956.6
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-11-24",
+   "balance": 16919.65
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-12-01",
+   "balance": 16884.51
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-12-08",
+   "balance": 16856.52
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-12-15",
+   "balance": 16825.87
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-12-22",
+   "balance": 16805.24
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2023-12-29",
+   "balance": 16784.67
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-01-05",
+   "balance": 16754.02
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-01-12",
+   "balance": 16717.26
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-01-19",
+   "balance": 16685.44
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-01-26",
+   "balance": 16650.81
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-02-02",
+   "balance": 16614.72
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-02-09",
+   "balance": 16584.97
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-02-16",
+   "balance": 16550.51
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-02-23",
+   "balance": 16530.18
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-03-01",
+   "balance": 16511.42
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-03-08",
+   "balance": 16474.65
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-03-15",
+   "balance": 16452.01
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-03-22",
+   "balance": 16421.11
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-03-29",
+   "balance": 16395.5
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-04-05",
+   "balance": 16369.01
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-04-12",
+   "balance": 16337.38
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-04-19",
+   "balance": 16312.04
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-04-26",
+   "balance": 16278.68
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-05-03",
+   "balance": 16247.77
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-05-10",
+   "balance": 16224.78
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-05-17",
+   "balance": 16198.28
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-05-24",
+   "balance": 16166.22
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-05-31",
+   "balance": 16130.68
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-06-07",
+   "balance": 16098.25
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-06-14",
+   "balance": 16065.41
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-06-21",
+   "balance": 16036.24
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-06-28",
+   "balance": 16006.33
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-07-05",
+   "balance": 15983.43
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-07-12",
+   "balance": 15951.42
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-07-19",
+   "balance": 15929.19
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-07-26",
+   "balance": 15896.71
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-08-02",
+   "balance": 15865.52
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-08-09",
+   "balance": 15833.94
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-08-16",
+   "balance": 15803.41
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-08-23",
+   "balance": 15780.43
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-08-30",
+   "balance": 15745.44
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-09-06",
+   "balance": 15712.91
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-09-13",
+   "balance": 15684.67
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-09-20",
+   "balance": 15651.29
+  },
+  {
+   "loan": "Lakeside Credit Union",
+   "week": "2024-09-27",
+   "balance": 15620.4
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-06-02",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-06-09",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-06-16",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-06-23",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-06-30",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-07-07",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-07-14",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-07-21",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-07-28",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-08-04",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-08-11",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-08-18",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-08-25",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-09-01",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-09-08",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-09-15",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-09-22",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-09-29",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-10-06",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-10-13",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-10-20",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-10-27",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-11-03",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-11-10",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-11-17",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-11-24",
+   "balance": 0.0
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-12-01",
+   "balance": 29430.4
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-12-08",
+   "balance": 29356.29
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-12-15",
+   "balance": 29229.1
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-12-22",
+   "balance": 29132.01
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2023-12-29",
+   "balance": 29006.9
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-01-05",
+   "balance": 28904.66
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-01-12",
+   "balance": 28784.97
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-01-19",
+   "balance": 28697.71
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-01-26",
+   "balance": 28610.39
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-02-02",
+   "balance": 28525.48
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-02-09",
+   "balance": 28425.25
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-02-16",
+   "balance": 28352.66
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-02-23",
+   "balance": 28271.67
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-03-01",
+   "balance": 28161.63
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-03-08",
+   "balance": 28076.26
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-03-15",
+   "balance": 27979.85
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-03-22",
+   "balance": 27840.63
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-03-29",
+   "balance": 27709.94
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-04-05",
+   "balance": 27595.48
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-04-12",
+   "balance": 27486.45
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-04-19",
+   "balance": 27361.28
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-04-26",
+   "balance": 27279.13
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-05-03",
+   "balance": 27152.9
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-05-10",
+   "balance": 27071.35
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-05-17",
+   "balance": 26978.26
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-05-24",
+   "balance": 26899.04
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-05-31",
+   "balance": 26819.8
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-06-07",
+   "balance": 26708.35
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-06-14",
+   "balance": 26600.63
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-06-21",
+   "balance": 26474.95
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-06-28",
+   "balance": 26339.62
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-07-05",
+   "balance": 26221.01
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-07-12",
+   "balance": 26110.21
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-07-19",
+   "balance": 25988.75
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-07-26",
+   "balance": 25853.43
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-08-02",
+   "balance": 25768.34
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-08-09",
+   "balance": 25640.88
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-08-16",
+   "balance": 25542.15
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-08-23",
+   "balance": 25422.94
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-08-30",
+   "balance": 25316.35
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-09-06",
+   "balance": 25231.15
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-09-13",
+   "balance": 25105.98
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-09-20",
+   "balance": 25024.65
+  },
+  {
+   "loan": "Harbor Auto Finance",
+   "week": "2024-09-27",
+   "balance": 24912.4
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-06-02",
+   "balance": 41784.8
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-06-09",
+   "balance": 41722.82
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-06-16",
+   "balance": 41660.57
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-06-23",
+   "balance": 41589.0
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-06-30",
+   "balance": 41503.22
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-07-07",
+   "balance": 41450.35
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-07-14",
+   "balance": 41353.61
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-07-21",
+   "balance": 41293.43
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-07-28",
+   "balance": 41236.88
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-08-04",
+   "balance": 41178.61
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-08-11",
+   "balance": 41101.64
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-08-18",
+   "balance": 41027.43
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-08-25",
+   "balance": 40929.69
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-09-01",
+   "balance": 40828.52
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-09-08",
+   "balance": 40768.01
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-09-15",
+   "balance": 40695.03
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-09-22",
+   "balance": 40594.18
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-09-29",
+   "balance": 40503.11
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-10-06",
+   "balance": 40401.85
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-10-13",
+   "balance": 40300.47
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-10-20",
+   "balance": 40232.98
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-10-27",
+   "balance": 40141.15
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-11-03",
+   "balance": 40072.34
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-11-10",
+   "balance": 40008.87
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-11-17",
+   "balance": 39906.25
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-11-24",
+   "balance": 39808.52
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-12-01",
+   "balance": 39726.01
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-12-08",
+   "balance": 39645.48
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-12-15",
+   "balance": 39585.98
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-12-22",
+   "balance": 39488.43
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2023-12-29",
+   "balance": 39387.26
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-01-05",
+   "balance": 39316.05
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-01-12",
+   "balance": 39255.83
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-01-19",
+   "balance": 39162.91
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-01-26",
+   "balance": 39088.55
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-02-02",
+   "balance": 38988.0
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-02-09",
+   "balance": 38890.63
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-02-16",
+   "balance": 38816.03
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-02-23",
+   "balance": 38753.61
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-03-01",
+   "balance": 38674.84
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-03-08",
+   "balance": 38601.99
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-03-15",
+   "balance": 38512.04
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-03-22",
+   "balance": 38455.16
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-03-29",
+   "balance": 38364.0
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-04-05",
+   "balance": 38302.24
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-04-12",
+   "balance": 38247.67
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-04-19",
+   "balance": 38176.83
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-04-26",
+   "balance": 38085.15
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-05-03",
+   "balance": 38003.89
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-05-10",
+   "balance": 37908.02
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-05-17",
+   "balance": 37823.49
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-05-24",
+   "balance": 37762.39
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-05-31",
+   "balance": 37687.94
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-06-07",
+   "balance": 37629.19
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-06-14",
+   "balance": 37535.75
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-06-21",
+   "balance": 37435.9
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-06-28",
+   "balance": 37337.16
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-07-05",
+   "balance": 37257.92
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-07-12",
+   "balance": 37196.5
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-07-19",
+   "balance": 37100.64
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-07-26",
+   "balance": 37041.03
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-08-02",
+   "balance": 36988.48
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-08-09",
+   "balance": 36934.81
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-08-16",
+   "balance": 36843.61
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-08-23",
+   "balance": 36788.31
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-08-30",
+   "balance": 36716.09
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-09-06",
+   "balance": 36622.47
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-09-13",
+   "balance": 36557.28
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-09-20",
+   "balance": 36496.08
+  },
+  {
+   "loan": "Cobblestone Finance",
+   "week": "2024-09-27",
+   "balance": 36402.8
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-06-02",
+   "balance": 183079.36
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-06-09",
+   "balance": 182942.14
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-06-16",
+   "balance": 182777.71
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-06-23",
+   "balance": 182572.77
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-06-30",
+   "balance": 182418.08
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-07-07",
+   "balance": 182215.84
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-07-14",
+   "balance": 182083.97
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-07-21",
+   "balance": 181939.98
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-07-28",
+   "balance": 181756.45
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-08-04",
+   "balance": 181630.88
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-08-11",
+   "balance": 181476.15
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-08-18",
+   "balance": 181305.64
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-08-25",
+   "balance": 181138.18
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-09-01",
+   "balance": 181017.98
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-09-08",
+   "balance": 180857.56
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-09-15",
+   "balance": 180733.96
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-09-22",
+   "balance": 180605.0
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-09-29",
+   "balance": 180412.43
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-10-06",
+   "balance": 180191.07
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-10-13",
+   "balance": 180068.6
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-10-20",
+   "balance": 179955.97
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-10-27",
+   "balance": 179746.28
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-11-03",
+   "balance": 179582.94
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-11-10",
+   "balance": 179432.04
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-11-17",
+   "balance": 179213.42
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-11-24",
+   "balance": 179023.41
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-12-01",
+   "balance": 178898.71
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-12-08",
+   "balance": 178670.99
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-12-15",
+   "balance": 178539.93
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-12-22",
+   "balance": 178312.66
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2023-12-29",
+   "balance": 178088.08
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-01-05",
+   "balance": 177899.86
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-01-12",
+   "balance": 177778.22
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-01-19",
+   "balance": 177559.65
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-01-26",
+   "balance": 177341.08
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-02-02",
+   "balance": 177127.52
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-02-09",
+   "balance": 176949.73
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-02-16",
+   "balance": 176832.72
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-02-23",
+   "balance": 176638.52
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-03-01",
+   "balance": 176482.98
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-03-08",
+   "balance": 176326.47
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-03-15",
+   "balance": 176129.49
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-03-22",
+   "balance": 175972.34
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-03-29",
+   "balance": 175785.88
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-04-05",
+   "balance": 175672.77
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-04-12",
+   "balance": 175522.17
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-04-19",
+   "balance": 175385.0
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-04-26",
+   "balance": 175242.11
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-05-03",
+   "balance": 175045.3
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-05-10",
+   "balance": 174826.72
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-05-17",
+   "balance": 174672.92
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-05-24",
+   "balance": 174527.54
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-05-31",
+   "balance": 174338.14
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-06-07",
+   "balance": 174156.58
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-06-14",
+   "balance": 174028.18
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-06-21",
+   "balance": 173861.02
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-06-28",
+   "balance": 173721.49
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-07-05",
+   "balance": 173512.06
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-07-12",
+   "balance": 173291.04
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-07-19",
+   "balance": 173128.42
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-07-26",
+   "balance": 172938.06
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-08-02",
+   "balance": 172746.66
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-08-09",
+   "balance": 172600.79
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-08-16",
+   "balance": 172424.45
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-08-23",
+   "balance": 172217.03
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-08-30",
+   "balance": 172000.22
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-09-06",
+   "balance": 171857.53
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-09-13",
+   "balance": 171725.21
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-09-20",
+   "balance": 171530.67
+  },
+  {
+   "loan": "Maple Ridge Mortgage",
+   "week": "2024-09-27",
+   "balance": 171350.0
+  }
+ ]
+}

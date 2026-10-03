@@ -1,4 +1,5 @@
 using Codex.Domain.Design;
+using Codex.Domain.Policy;
 
 namespace Codex.Domain.Apps;
 
@@ -54,6 +55,10 @@ public static class BookClothPalette
             // near-black lens, and §12 warns that a binding harmonising with its art makes the
             // book the hardest of six to pick out of the row.
             [HomeFeatureSet.CameraPackage] = DesignTokens.Identity.Plate.Ground,
+
+            // Index: the deeper green of its identity hue, the one binding that is the identity
+            // deepened rather than a contrast to the art. Dark, so the marks stay cream.
+            [PolicyContext.IndexPackage] = DesignTokens.Identity.Index.Cloth,
         };
 
     /// <summary>The cloth tone (a DesignTokens hex string) for a package — the binding it was

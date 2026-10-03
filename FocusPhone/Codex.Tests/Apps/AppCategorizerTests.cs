@@ -111,7 +111,7 @@ public class AppCategorizerTests
     public void OwnerPrefixApp_IsAllowed_EvenIfHandlesWebIntents()
     {
         var ownApp = new AppInfo(
-            "com.storyworthtelling.ledger", HandlesHttpViewIntents: true, IsCategoryGame: false);
+            "com.storyworthtelling.index", HandlesHttpViewIntents: true, IsCategoryGame: false);
 
         Assert.Equal(AppVerdict.Allowed, categorizer.Categorize(ownApp, ContentRating.Unknown));
     }

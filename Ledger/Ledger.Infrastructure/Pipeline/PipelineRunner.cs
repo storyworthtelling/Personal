@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Ledger.Domain.Time;
+using Index.Domain.Time;
 
-namespace Ledger.Infrastructure.Pipeline;
+namespace Index.Infrastructure.Pipeline;
 
 public enum RunResult
 {

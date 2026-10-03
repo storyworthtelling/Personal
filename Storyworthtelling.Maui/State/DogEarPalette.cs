@@ -15,6 +15,8 @@ public static class DogEarPalette
         DogEarHue.Caution => "CautionMark",
         DogEarHue.Resolved => "ResolvedMark",
         DogEarHue.Action => "ActionMark",
+        DogEarHue.Reference => "ReferenceMark",
+        DogEarHue.Progress => "ProgressMark",
         _ => throw new ArgumentOutOfRangeException(nameof(hue), hue, "No token is registered for this hue."),
     };
 }

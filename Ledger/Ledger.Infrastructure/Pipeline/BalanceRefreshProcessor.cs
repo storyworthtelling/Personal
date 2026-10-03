@@ -1,14 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Ledger.Domain.External;
-using Ledger.Domain.Model;
-using Ledger.Domain.Pipeline;
-using Ledger.Domain.Time;
-using Ledger.Infrastructure.Configuration;
-using Ledger.Infrastructure.Persistence;
+using Index.Domain.External;
+using Index.Domain.Model;
+using Index.Domain.Pipeline;
+using Index.Domain.Time;
+using Index.Infrastructure.Configuration;
+using Index.Infrastructure.Persistence;
+using Index.Infrastructure.Services;
 
-namespace Ledger.Infrastructure.Pipeline;
+namespace Index.Infrastructure.Pipeline;
 
 // Advances the refresh pipeline by one institution per call, idempotently and resumably. State lives
 // entirely in the database, so the worker resumes after pauses, rate limits, or restarts simply by
@@ -46,8 +47,12 @@ public sealed class BalanceRefreshProcessor : IPipelineStep
         // worker; it is recorded as the soonest Waiting so the cycle can defer instead of spinning.
         // Failed institutions are skipped until the user reconnects. This mirrors the resumable dispatch
         // in the repo's other on-device pipelines.
+        // A hand-entered institution (Release C, empty AccessToken — AccountService.AddManualAccountAsync's
+        // own convention for "no Plaid Item behind this") is never selected here: calling Plaid with an
+        // empty access token would fail every cycle and eventually flip it to Failed, which would then
+        // wrongly raise AccountNotices' "needs reconnecting" for an account that was never connected.
         var institutions = await db.Institutions
-            .Where(i => i.RefreshStatus != WorkStatus.Failed)
+            .Where(i => i.RefreshStatus != WorkStatus.Failed && i.AccessToken != string.Empty)
             .OrderBy(i => i.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -77,6 +82,7 @@ public sealed class BalanceRefreshProcessor : IPipelineStep
             .Where(a => a.InstitutionId == institution.Id)
             .ToListAsync(cancellationToken);
 
+        var refreshed = false;
         try
         {
             var balances = await plaid.GetBalancesAsync(institution.AccessToken, cancellationToken);
@@ -93,6 +99,7 @@ public sealed class BalanceRefreshProcessor : IPipelineStep
             institution.LastRefreshedUtc = now;
             institution.NextAttemptAtUtc = now.AddHours(options.RefreshIntervalHours);
             logger.LogInformation("Refreshed {Name}: {Count} accounts.", institution.Name, balances.Count);
+            refreshed = true;
         }
         catch (RateLimitException ex)
         {
@@ -121,6 +128,13 @@ public sealed class BalanceRefreshProcessor : IPipelineStep
                     institution.Name, institution.Attempts);
             }
         }
+
+        // The once-only colour backfill (1.3 / R-G8). Deliberately outside the try above: a lookup that
+        // is throttled or fails must neither be mistaken for a failed refresh nor reschedule it. It runs
+        // only after a refresh that worked, so a bank Plaid is already refusing is not also asked about
+        // its colour, and it never throws (InstitutionColorLookup logs and returns).
+        if (refreshed)
+            await InstitutionColorLookup.ResolveAsync(institution, plaid, now, logger, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -178,6 +192,7 @@ public sealed class BalanceRefreshProcessor : IPipelineStep
         account.AvailableBalance = incoming.Available;
         account.CreditLimit = incoming.Limit;
         account.BalanceAsOfUtc = now;
+        account.BalanceSource = BalanceSource.Plaid; // Plaid's own figure again, e.g. after a reconnect that Post covered for
 
         // Clear any prior liabilities detail; it is re-applied below only if still reported.
         account.LastStatementBalance = null;

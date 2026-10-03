@@ -18,6 +18,8 @@
     <!-- Shared credential-health seam (ICredentialHealthSink) reported by the NYT/reMarkable/Anthropic clients. -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
+    <!-- Shared hand-written-note extraction library (Index-P11 Release F). -->
+    <ProjectReference Include="..\..\Storyworthtelling.Handwriting\Storyworthtelling.Handwriting.csproj" />
     <!-- Shared paper-composition library: the Skia layout + PDF assembly the documents now render with. -->
     <ProjectReference Include="..\..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
   </ItemGroup>

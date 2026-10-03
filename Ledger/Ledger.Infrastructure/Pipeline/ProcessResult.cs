@@ -1,4 +1,4 @@
-namespace Ledger.Infrastructure.Pipeline;
+namespace Index.Infrastructure.Pipeline;
 
 public enum ProcessOutcome
 {

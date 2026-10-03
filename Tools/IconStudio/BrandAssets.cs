@@ -26,6 +26,13 @@ public static class BrandAssets
         "Foreword/Foreword.Android/Resources/drawable-nodpi/owner_medallion.png",
         "FocusPhone/Post.Android/Resources/drawable-nodpi/owner_medallion.png",
         "Ledger/Ledger.Android/Resources/drawable-nodpi/owner_medallion.png",
+        // Added for Index P11 §S3: Flyleaf, Score and Plate never had a medallion target at all
+        // (not merely an unwired asset, like Post/Folio/Foreword/Index were before D146's Settings
+        // wiring) — the maker's mark could not have appeared on their Settings screens even if
+        // someone had already added the <Image>, because IconStudio never wrote the file.
+        "FocusPhone/Flyleaf.Android/Resources/drawable-nodpi/owner_medallion.png",
+        "FocusPhone/Score.Android/Resources/drawable-nodpi/owner_medallion.png",
+        "FocusPhone/Plate.Android/Resources/drawable-nodpi/owner_medallion.png",
     ];
 
     public static IReadOnlyList<string> Write(string repoRoot)

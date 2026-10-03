@@ -3,11 +3,11 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Ledger.Infrastructure.Persistence;
+using Index.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace Ledger.Infrastructure.Migrations
+namespace Index.Infrastructure.Migrations
 {
     [DbContext(typeof(LedgerDbContext))]
     [Migration("20260718000000_InitialCreate")]
@@ -19,7 +19,7 @@ namespace Ledger.Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
 
-            modelBuilder.Entity("Ledger.Domain.Model.Account", b =>
+            modelBuilder.Entity("Index.Domain.Model.Account", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -82,7 +82,7 @@ namespace Ledger.Infrastructure.Migrations
                     b.ToTable("Accounts");
                 });
 
-            modelBuilder.Entity("Ledger.Domain.Model.Institution", b =>
+            modelBuilder.Entity("Index.Domain.Model.Institution", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -125,16 +125,16 @@ namespace Ledger.Infrastructure.Migrations
                     b.ToTable("Institutions");
                 });
 
-            modelBuilder.Entity("Ledger.Domain.Model.Account", b =>
+            modelBuilder.Entity("Index.Domain.Model.Account", b =>
                 {
-                    b.HasOne("Ledger.Domain.Model.Institution", null)
+                    b.HasOne("Index.Domain.Model.Institution", null)
                         .WithMany("Accounts")
                         .HasForeignKey("InstitutionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Ledger.Domain.Model.Institution", b =>
+            modelBuilder.Entity("Index.Domain.Model.Institution", b =>
                 {
                     b.Navigation("Accounts");
                 });

@@ -137,6 +137,21 @@ public static class DesignTokens
             public const string Text = "#613F62";
             public const string Deep = "#442D44";
         }
+
+        /// <summary>
+        /// Index — the bookplate green (OKLCH 129 degrees), of which Flyleaf's shelf needs only
+        /// the BINDING: the identity hue deepened rather than a separately chosen colour. The
+        /// full ladder lives with Index (and in IconStudio's Tokens.cs, which this cloth is
+        /// held identical to by a source-level parity guard).
+        ///
+        /// Index's hue is the Positive role's by recorded departure (DESIGN.md §3), so none of
+        /// its tiers belongs in the identity-versus-role separation theory, and none is added
+        /// here beyond the cloth.
+        /// </summary>
+        public static class Index
+        {
+            public const string Cloth = "#4E5F3A";
+        }
     }
 
     /// <summary>

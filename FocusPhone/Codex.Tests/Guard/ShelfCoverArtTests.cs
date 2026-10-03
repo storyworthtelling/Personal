@@ -1,4 +1,5 @@
 using Codex.Domain.Policy;
+using Codex.Domain.Post;
 using Xunit;
 
 namespace Codex.Tests.Guard;
@@ -17,7 +18,7 @@ namespace Codex.Tests.Guard;
 ///
 /// <para>So the rule is stated over the whole suite rather than over the featured six, and an app
 /// with no art is named here rather than being indistinguishable from one that was forgotten.
-/// Giving Ledger or Canonizer a cover means deleting a line from <see cref="NoArtYet"/>, which is a
+/// Giving Canonizer a cover means deleting a line from <see cref="NoArtYet"/>, which is a
 /// decision somebody makes on purpose.</para>
 /// </summary>
 public class ShelfCoverArtTests
@@ -32,19 +33,32 @@ public class ShelfCoverArtTests
         (PolicyContext.PlatePackage, "Plate"),
         (PolicyContext.AudioPackage, "Score"),
         (PolicyContext.ForewordPackage, "Foreword"),
-        ("com.storyworthtelling.ledger", "Ledger"),
+        (PolicyContext.IndexPackage, "Index"),
         ("com.storyworthtelling.storyboarder", "Canonizer"),
     ];
 
     /// <summary>
     /// The apps with no painting yet. They fall back to the launcher icon on purpose, and that is
-    /// the one case where the fallback is honest. Neither has cover art in <c>Branding/</c>.
+    /// the one case where the fallback is honest. Canonizer has no cover art in <c>Branding/</c>;
+    /// the Ledger app is retired (its package id is Index's now), so it is not a book at all.
     /// </summary>
     private static readonly string[] NoArtYet =
     [
-        "com.storyworthtelling.ledger",
         "com.storyworthtelling.storyboarder",
     ];
+
+    /// <summary>
+    /// The shelf's Index package is the id Index ships under — the same one Post's balance
+    /// handoff names — and not the retired Ledger app's, whose package id Index took over.
+    /// </summary>
+    [Fact]
+    public void TheShelfNamesIndexByItsShippingPackageNotTheRetiredLedgerOne()
+    {
+        Assert.Equal("com.storyworthtelling.index", PolicyContext.IndexPackage);
+        Assert.Equal(IndexHandoff.Package, PolicyContext.IndexPackage);
+        Assert.StartsWith(PolicyContext.OwnerPackagePrefix, PolicyContext.IndexPackage, StringComparison.Ordinal);
+        Assert.DoesNotContain(SuiteBooks, book => book.Package.EndsWith(".ledger", StringComparison.Ordinal));
+    }
 
     [Fact]
     public void EverySuiteBookOnTheShelfHasAWindowIllustration()
@@ -110,6 +124,7 @@ public class ShelfCoverArtTests
             _ when package == PolicyContext.PlatePackage => "CameraPackage",
             _ when package == PolicyContext.AudioPackage => "AudioPackage",
             _ when package == PolicyContext.ForewordPackage => "ForewordPackage",
+            _ when package == PolicyContext.IndexPackage => "IndexPackage",
             _ => null,
         };
 

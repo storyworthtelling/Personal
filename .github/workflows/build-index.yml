@@ -1,0 +1,179 @@
+name: Build Index APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'Ledger/Ledger.Android/**'
+      - 'Ledger/Ledger.Infrastructure/**'
+      - 'Ledger/Ledger.Domain/**'
+      - 'Ledger/Ledger.Tests/**'
+      - 'Tools/IconStudio/**'
+      - '.github/workflows/build-index.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android head, which would require the MAUI/Android workload. The
+      # -p:LedgerTfms switch keeps Infrastructure single-targeted at net10.0.
+      - name: Run tests
+        run: >
+          dotnet test Ledger/Ledger.Tests/Ledger.Tests.csproj
+          -p:LedgerTfms=net10.0
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    # actions: write lets the prune step delete artifacts from older runs;
+    # contents: write lets the rolling-release step publish the signed APK.
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      # Generate the native adaptive launcher-icon resources (mipmaps + colors.xml) and the branding
+      # medallion/grain into Ledger.Android/Resources via the committed IconStudio console. Index
+      # commits its generated icons like every other head (Ledger was the one exception), so this
+      # step is here to keep them in step with the spec on every build, not to produce them for the
+      # first time.
+      - name: Generate launcher icon
+        run: dotnet run --project Tools/IconStudio -- --repo-root .
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/index.keystore
+
+      - name: Compute versionCode
+        id: version
+        uses: ./.github/actions/version-code
+        with:
+          band: 1
+
+      - name: Build APK
+        working-directory: Ledger
+        run: >
+          dotnet publish Ledger.Android -f net10.0-android -c Release
+          -p:ApplicationVersion=${{ steps.version.outputs.code }}
+          -p:ApplicationDisplayVersion=1.0.${{ github.run_number }}
+          -p:AndroidPackageFormat=apk
+          -p:AndroidKeyStore=true
+          -p:AndroidSigningKeyStore=/tmp/index.keystore
+          -p:AndroidSigningKeyAlias=${{ secrets.KEY_ALIAS }}
+          -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }}
+          -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
+
+      # Prove the freshly-shipped package id is actually in the APK and FAIL the build if it is
+      # not — Index's first ship, so nothing has verified this yet the way the frozen-id checks on
+      # the older heads do.
+      - name: APP ID CHECK
+        working-directory: Ledger
+        run: |
+          set -e
+          echo "=== APP ID CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          APK=$(ls -1 Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          echo "--- $APK"
+          BADGING=$("$AAPT2" dump badging "$APK")
+          echo "$BADGING" | head -2
+          echo "$BADGING" | grep -q "name='com.storyworthtelling.index'" || {
+            echo "FAIL: Index's APK does not carry the com.storyworthtelling.index ApplicationId."
+            exit 1
+          }
+          echo "ok: com.storyworthtelling.index present"
+          echo "=== END APP ID CHECK ==="
+
+      # Prove the launcher icon is actually in the APK and FAIL the build if it is not. This head does
+      # not set <SingleProject>true</SingleProject>, so anything under Platforms/Android/Resources is
+      # silently dropped and android:icon resolves to empty; this gate reads the resolved android:icon
+      # back out of the APK (grep the log for "ICON CHECK").
+      - name: ICON CHECK
+        working-directory: Ledger
+        run: |
+          set -e
+          echo "=== ICON CHECK ==="
+          APK=$(ls -1 Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          [ -z "$APK" ] && APK=$(ls -1 Ledger.Android/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
+          echo "APK: $APK"
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
+          echo "aapt2: $AAPT2"
+          BADGING=$("$AAPT2" dump badging "$APK" 2>/dev/null)
+          echo "--- manifest application icon (aapt2 dump badging) ---"
+          echo "$BADGING" | grep -Ei 'application(-icon)?:|launchable-activity' || echo "(aapt2 badging produced no icon line)"
+          echo "--- packaged icon resources (unzip -l) ---"
+          unzip -l "$APK" | grep -Ei 'mipmap|appicon' || echo "(no mipmap/appicon entries found in APK)"
+          echo "--- packaged fonts (unzip -l) ---"
+          echo "fonts packaged: $(unzip -l "$APK" | grep -ci '\.ttf')"
+          echo "=== END ICON CHECK ==="
+          APPICON=$(echo "$BADGING" | grep -E '^application:' | sed -n "s/.*icon='\([^']*\)'.*/\1/p")
+          if [ -z "$APPICON" ]; then
+            echo "ICON CHECK FAILED: android:icon is empty — the launcher icon is not packaged/resolved."
+            exit 1
+          fi
+          echo "ICON CHECK PASSED: android:icon = $APPICON"
+
+      # All eight shared fonts, as build-plate.yml checks them — Ledger's/build-ledger.yml's FONT
+      # CHECK never existed, so this is new coverage for this head rather than a widened one.
+      - name: FONT CHECK
+        working-directory: Ledger
+        run: |
+          set -e
+          echo "=== FONT CHECK ==="
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSerif4-Black SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular PinyonScript-Regular"
+          APK=$(ls -1 Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          echo "--- $APK"
+          ENTRIES=$(unzip -l "$APK")
+          # Matched by name, not by path: a MAUI head packages fonts under assets/ while the native
+          # heads use assets/fonts/, and pinning the wrong one would fail for the wrong reason.
+          for font in $FONTS; do
+            if ! echo "$ENTRIES" | grep -q "$font.ttf"; then
+              echo "FAIL: Index is missing $font.ttf"
+              echo "$ENTRIES" | grep -i '\.ttf' || echo "(no .ttf entries at all)"
+              exit 1
+            fi
+          done
+          echo "ok: all eight fonts packaged"
+          echo "=== END FONT CHECK ==="
+
+      # Keep only the latest run's artifacts: delete artifacts from older runs of
+      # this workflow before uploading, which also frees storage so the upload succeeds.
+      - name: Prune old artifacts
+        uses: ./.github/actions/prune-old-artifacts
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Index-Android
+          path: Ledger/Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      # Publish the signed APK to the rolling "apps-latest" release the phone's
+      # update channel installs from. main only — feature-branch builds must never
+      # reach the device.
+      - name: Publish to rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/publish-rolling-release
+        with:
+          apks: Ledger/Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk
