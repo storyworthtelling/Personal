@@ -77,8 +77,10 @@ public static class AdaptiveIconRenderer
         // A spec with PlateImage already HAS its window illustration: the painting is the
         // whole of what the shelf wants, and the shelf draws the bookplate around it. Baking
         // this spec's own keyline in would put a second one inside the shelf's, at a different
-        // scale. So the art goes down alone.
-        if (plate is not null)
+        // scale. So the art goes down alone — unless a spec opts in with CoverDrawsGlyph because its
+        // Glyph draws something the shelf cannot supply. None does now: Index's corner flourishes
+        // (D119) doubled the shelf's own brackets, so its cover is window only like the rest.
+        if (plate is not null && !spec.CoverDrawsGlyph)
         {
             surface.Canvas.DrawBitmap(plate, CentreSquare(plate), new SKRect(0, 0, px, px));
             return Encode(surface);
@@ -93,6 +95,7 @@ public static class AdaptiveIconRenderer
             surface.Canvas.Clear(SKColor.Parse(spec.BackgroundHex));
         }
 
+        DrawPlate(surface.Canvas, spec, px, plate);
         spec.Glyph(surface.Canvas, px);
         return Encode(surface);
     }

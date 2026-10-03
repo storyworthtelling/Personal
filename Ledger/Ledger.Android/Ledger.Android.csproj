@@ -3,9 +3,19 @@
     <TargetFramework>net10.0-android</TargetFramework>
     <OutputType>Exe</OutputType>
     <UseMaui>true</UseMaui>
-    <RootNamespace>Ledger.Android</RootNamespace>
-    <ApplicationId>com.storyworthtelling.ledger</ApplicationId>
-    <ApplicationTitle>Ledger</ApplicationTitle>
+    <RootNamespace>Index.Android</RootNamespace>
+    <ApplicationId>com.storyworthtelling.index</ApplicationId>
+    <ApplicationTitle>Index</ApplicationTitle>
+    <!-- Release C finding: without <SingleProject>, the .NET-for-Android SDK's own default for
+         $(AndroidManifest) is "AndroidManifest.xml" or "Properties\AndroidManifest.xml" — it NEVER
+         looks at Platforms\Android\AndroidManifest.xml, which is purely a MAUI SingleProject
+         convention wired by the MAUI SDK when that flag is set. So the file at that path (added in
+         Release B for the <queries> package-visibility block, and where this release's
+         RECEIVE_BALANCE <permission> declaration was added) was being SILENTLY IGNORED by every build
+         until this line — confirmed by diffing the merged manifest in obj/ with and without it. This
+         points the build at the existing file rather than moving it, since nothing else in this repo
+         assumes SingleProject's path convention. -->
+    <AndroidManifest>Platforms\Android\AndroidManifest.xml</AndroidManifest>
     <!-- versionCode comes from the shared .github/actions/version-code action (band 1), like
          every other app in the suite: band * 100,000,000 + minutes since 2020-01-01 UTC. This
          value is only the fallback for a local build; CI always overrides it with -p. It used to
@@ -36,12 +46,9 @@
          owner in their voice (degrading to neutral copy when unavailable). -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
-    <!-- Only for BinderTabs (the binder tab strip component) — Ledger's Balances/Settings pages
-         wire into it directly rather than adopting the kit's Paper.xaml/PaperKit dictionary.
-         BinderTabs reads its own internal tokens ("Hairline"/"Ink"/"Paper"/"FieldLabel") through
-         PaperResources, which walks the Application's merged resources — Ledger's own
-         Resources/Styles/DesignTokens.xaml already registers all four under those exact names,
-         so this is the minimal wiring rather than a full kit migration. -->
+    <!-- The full Paper & Ink kit (Release B, Guard G12): Paper.xaml/PaperKit merged in App.xaml.cs,
+         PaperFonts.Register in MauiProgram, and BinderTabs reading its tokens through
+         PaperResources. Index owns no palette of its own — see Ledger.Tests/Design/KitAdoptionTests. -->
     <ProjectReference Include="..\..\Storyworthtelling.Maui\Storyworthtelling.Maui.csproj" />
   </ItemGroup>
 
@@ -51,12 +58,12 @@
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
   </ItemGroup>
 
-  <!-- The shared Paper & Ink fonts (aliases still registered in MauiProgram, unchanged — this head
-       does not adopt PaperFonts.Register). Packaged via the Storyworthtelling.Maui project
-       reference above instead of Ledger's own glob of the same files, following Foreword's and
-       Folio's precedent of dropping their own MauiFont glob once that reference exists, rather than
-       shipping two MauiFont items pointing at the same physical files. The CI FONT CHECK proves
-       they are still packaged in the APK. -->
+  <!-- The shared Paper & Ink fonts, all eight now registered via PaperFonts.Register in
+       MauiProgram (Release B) rather than this head's own six-font glob. Packaged via the
+       Storyworthtelling.Maui project reference above instead of Ledger's own glob of the same
+       files, following Foreword's and Folio's precedent of dropping their own MauiFont glob once
+       that reference exists, rather than shipping two MauiFont items pointing at the same physical
+       files. The CI FONT CHECK proves they are still packaged in the APK. -->
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />

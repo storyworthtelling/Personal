@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace Ledger.Android;
+namespace Index.Android;
 
 // Captures the background refresh log to a file so it can be viewed and shared from the Settings page
 // to diagnose problems (an institution that won't connect, repeated retries, a rate-limit wall).
@@ -32,7 +32,7 @@ public sealed class PipelineFileLogger : ILoggerProvider, ILogger
     {
         // The refresh log is for the app's own diagnostics. Framework categories (EF Core's per-command
         // SQL, MAUI) log at Information and would drown the file, so capture those only at Warning+.
-        var isOwn = categoryName.StartsWith("Ledger", StringComparison.Ordinal);
+        var isOwn = categoryName.StartsWith("Index", StringComparison.Ordinal);
         return new CategoryLogger(this, ShortCategory(categoryName), isOwn ? LogLevel.Information : LogLevel.Warning);
     }
 

@@ -1,12 +1,14 @@
 using Microsoft.Maui.Dispatching;
 using Microsoft.Maui.Graphics;
+using Storyworthtelling.Maui.Layout;
 using Storyworthtelling.Maui.State;
 
 namespace Storyworthtelling.Maui.Views;
 
 /// <summary>
 /// Draws a folded top-right page corner, the same fold Post draws (DESIGN.md §7, §13): the page
-/// curls to reveal a coloured underside, and the undo form adds a back-turn arrow.
+/// curls to reveal a coloured underside, and the undo form adds a back-turn arrow. The shape is mockup
+/// 17's, taken from <see cref="DogEarGeometry"/> so the native fold draws the same one.
 ///
 /// <para>The geometry is Post's <c>FoldView</c>, member for member — a dog-ear is <b>two</b>
 /// triangles, and shipping only the first is what once made this read as a coloured corner tag
@@ -17,9 +19,6 @@ namespace Storyworthtelling.Maui.Views;
 /// </summary>
 public sealed class FoldDrawable : IDrawable
 {
-    /// <summary>The crease's shadow, as a fraction of full ink. Darkest where the halves meet.</summary>
-    private const float CreaseAlpha = 60f / 255f;
-
     private readonly Func<string, Color> token;
 
     public FoldDrawable(Func<string, Color> token)
@@ -49,63 +48,56 @@ public sealed class FoldDrawable : IDrawable
         canvas.FillColor = token(DogEarPalette.TokenFor(fold.Hue));
         canvas.FillPath(hole, WindingMode.NonZero);
 
-        // The flap: the corner reflected across the crease. For a square fold the corner at (w,0)
-        // lands at (0,h), which is what makes the turned-down triangle the mirror of the hole
-        // rather than a second copy of it.
+        // The flap: the corner turned over and lying back across the page, in paper. Mockup 17 draws
+        // its loose tip lifted off the page (6,34 of 40) rather than running to the foot of the fold,
+        // and flat — the shading that used to grade it is not in the drawing.
         var flap = new PathF();
         flap.MoveTo(0, 0);
         flap.LineTo(w, h);
-        flap.LineTo(0, h);
+        flap.LineTo(DogEarGeometry.Scale(DogEarGeometry.FlapTip.X, w), DogEarGeometry.Scale(DogEarGeometry.FlapTip.Y, h));
         flap.Close();
-
-        // Lit along the crease and falling away toward the loose tip: a flat fill reads as a
-        // triangle sitting on the page, a graded one as paper lifting off it. The stops run
-        // perpendicular to the crease, so the light follows the fold. MAUI states a gradient in
-        // relative coordinates and maps them onto the rect passed to SetFillPaint.
-        canvas.SetFillPaint(
-            new LinearGradientPaint(
-                [
-                    new PaintGradientStop(0f, token("PaperBright")),
-                    new PaintGradientStop(1f, token("PaperShade")),
-                ],
-                new Point(0.5, 0.5),
-                new Point(0, 1)),
-            dirtyRect);
+        canvas.FillColor = token("PaperDeep");
         canvas.FillPath(flap, WindingMode.NonZero);
 
-        // The flap's own edge, so it separates from the page it is lying on.
+        // The crease: a hairline between the halves.
         canvas.StrokeColor = token("Hairline");
         canvas.StrokeSize = DesignTokens.Shape.HairlineDp;
-        canvas.DrawPath(flap);
-
-        // The crease itself. Drawn through the canvas alpha rather than a mixed colour, so no
-        // value is invented here that the token file does not carry.
-        canvas.SaveState();
-        canvas.Alpha = CreaseAlpha;
-        canvas.StrokeColor = token("Ink");
-        canvas.StrokeSize = 2 * DesignTokens.Shape.HairlineDp;
         canvas.DrawLine(0, 0, w, h);
-        canvas.RestoreState();
 
         if (!fold.ShowsBackArrow)
         {
             return;
         }
 
-        // A small back-turn arrow, and ONLY on the undo fold: it is what says this one reverses
-        // the act rather than turning to something waiting.
-        // Microsoft.Maui.Font (the font registry's) and Microsoft.Maui.Graphics.Font (the canvas's)
-        // are both in scope here, and the bare name is a compile error, not a warning — the same
-        // CS0104 that sat in Codex.Ui.Android for weeks because CI was the only thing compiling it.
-        canvas.Font = new Microsoft.Maui.Graphics.Font(
-            "SerifSemibold", FontWeights.SemiBold, FontStyleType.Normal);
-        canvas.FontSize = ArrowSize;
-        canvas.FontColor = token("Paper");
-        canvas.DrawString("↶", w * 0.66f, h * 0.42f, HorizontalAlignment.Center);
+        // The back-turn arrow, and ONLY on the undo fold: it is what says this one reverses the act
+        // rather than turning to something waiting. Two strokes — an arc and a head — taken from the
+        // mockup's own SVG through DogEarGeometry; it used to be a glyph set in a serif font.
+        canvas.StrokeColor = token("PaperBright");
+        canvas.StrokeSize = DogEarGeometry.Scale(DogEarGeometry.ArrowStroke, w);
+        canvas.StrokeLineCap = LineCap.Round;
+        canvas.StrokeLineJoin = LineJoin.Round;
+
+        var arc = new PathF();
+        var points = DogEarGeometry.ArrowArc(ArrowSegments);
+        arc.MoveTo(DogEarGeometry.Scale(points[0].X, w), DogEarGeometry.Scale(points[0].Y, h));
+        for (var i = 1; i < points.Count; i++)
+        {
+            arc.LineTo(DogEarGeometry.Scale(points[i].X, w), DogEarGeometry.Scale(points[i].Y, h));
+        }
+
+        canvas.DrawPath(arc);
+
+        var head = new PathF();
+        var wings = DogEarGeometry.ArrowHead;
+        head.MoveTo(DogEarGeometry.Scale(wings[0].X, w), DogEarGeometry.Scale(wings[0].Y, h));
+        head.LineTo(DogEarGeometry.Scale(wings[1].X, w), DogEarGeometry.Scale(wings[1].Y, h));
+        head.LineTo(DogEarGeometry.Scale(wings[2].X, w), DogEarGeometry.Scale(wings[2].Y, h));
+        canvas.DrawPath(head);
     }
 
-    /// <summary>The arrow's size. Not a type-size token: it is a drawn mark, not text on a page.</summary>
-    private const float ArrowSize = 18f;
+    /// <summary>How many straight segments the arrow's arc is flattened to: at 40dp a circle of radius
+    /// 5.2 this fine is indistinguishable from the true curve.</summary>
+    private const int ArrowSegments = 32;
 }
 
 /// <summary>
@@ -122,8 +114,9 @@ public sealed class FoldDrawable : IDrawable
 /// </summary>
 public class DogEar : GraphicsView
 {
-    /// <summary>The fold's reach into the page. Square, so the flap mirrors the hole exactly.</summary>
-    public const int SizeDp = 72;
+    /// <summary>The fold's reach into the page: mockup 17's 40dp, square so the hole and the flap meet on
+    /// the crease. It was 72dp, which on Accounts overlapped the status line and the first card.</summary>
+    public const int SizeDp = DogEarGeometry.SizeDp;
 
     private readonly FoldDrawable painter;
     private readonly DogEarState state;

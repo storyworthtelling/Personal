@@ -13,15 +13,21 @@ namespace Storyworthtelling.Maui.Views;
 /// <para>There is no Save behind it. Each tap commits, which is why <see cref="SegmentedChoice"/>
 /// reports whether anything actually changed: tapping the option already picked must not write the
 /// same value again.</para>
+///
+/// <para>By default the control is as wide as its words. <c>fillWidth</c> gives every segment an equal share
+/// of the row instead (mockup 4's <c>.seg span{flex:1}</c>), for a form whose boxes all run the full width.
+/// It is additive and off, so existing callers are unchanged.</para>
 /// </summary>
 public sealed class PaperSegmented : Border
 {
     private readonly SegmentedChoice choice;
     private readonly Grid row = new();
     private readonly List<Label> labels = [];
+    private readonly bool fillWidth;
 
-    public PaperSegmented(IEnumerable<string> options, string? picked = null)
+    public PaperSegmented(IEnumerable<string> options, string? picked = null, bool fillWidth = false)
     {
+        this.fillWidth = fillWidth;
         choice = new SegmentedChoice(options, picked);
 
         Stroke = PaperResources.Colour("Hairline");
@@ -31,7 +37,7 @@ public sealed class PaperSegmented : Border
             CornerRadius = DesignTokens.Shape.RadiusCard,
         };
         Padding = 0;
-        HorizontalOptions = LayoutOptions.Start;
+        HorizontalOptions = fillWidth ? LayoutOptions.Fill : LayoutOptions.Start;
         Content = row;
 
         Build();
@@ -46,12 +52,14 @@ public sealed class PaperSegmented : Border
     {
         foreach (var option in choice.Options)
         {
-            row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            row.ColumnDefinitions.Add(new ColumnDefinition(fillWidth ? GridLength.Star : GridLength.Auto));
 
             var label = new Label
             {
                 Text = option,
                 Style = PaperResources.Token<Style>("SegmentLabel"),
+                // A filled-width segment is wider than its word: the word sits in the middle of it.
+                HorizontalTextAlignment = fillWidth ? TextAlignment.Center : TextAlignment.Start,
             };
 
             var cell = new Grid

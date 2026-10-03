@@ -108,6 +108,17 @@ public class BinderTabs : ContentView
     private void Rebuild()
     {
         strip.Children.Clear();
+
+        // Fills the whole gutter with the active area's cloth, as Codex.Ui.Android's BinderTabs
+        // (UpdateGutterColor) already does natively (DESIGN.md §9, D121) — otherwise the gaps
+        // between and around the tabs fall through to whatever the page behind this view is,
+        // instead of reading as the same cloth the tabs around them wear. Set ahead of the early
+        // return below so it holds even before the strip has a height to lay tabs out in, and
+        // before there are any areas at all.
+        strip.BackgroundColor = activeIndex >= 0 && activeIndex < areas.Count
+            ? areas[activeIndex].Cloth
+            : PaperResources.Colour("Paper");
+
         if (areas.Count == 0)
         {
             return;

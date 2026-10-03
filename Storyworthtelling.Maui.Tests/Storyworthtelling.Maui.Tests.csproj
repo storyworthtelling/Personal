@@ -34,6 +34,7 @@
     <Compile Include="..\Storyworthtelling.Maui\DesignTokens.cs" Link="Kit\DesignTokens.cs" />
     <Compile Include="..\Storyworthtelling.Maui\Layout\*.cs" Link="Kit\Layout\%(Filename)%(Extension)" />
     <Compile Include="..\Storyworthtelling.Maui\State\*.cs" Link="Kit\State\%(Filename)%(Extension)" />
+    <Compile Include="..\Storyworthtelling.Maui\Time\*.cs" Link="Kit\Time\%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

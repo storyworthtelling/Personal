@@ -39,6 +39,12 @@ public record PolicyContext(
     // draws it: without an entry it fell back to the launcher icon, which Android masks round.
     public const string ForewordPackage = "com.storyworthtelling.dailyloader";
 
+    // Index, the household money app (the former Ledger, whose "com.storyworthtelling.ledger"
+    // id is retired). Like Foreword it is a sibling repo app rather than a FocusPhone head. It
+    // is named here because the shelf draws it cover-out; the sibling-book test itself is the
+    // owner prefix above, which already covers it.
+    public const string IndexPackage = "com.storyworthtelling.index";
+
     public const string PlayStorePackage = "com.android.vending";
 
     // A protected system package: DevicePolicyManager.SetPackagesSuspended refuses to suspend

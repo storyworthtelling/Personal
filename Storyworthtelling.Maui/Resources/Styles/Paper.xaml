@@ -33,14 +33,15 @@
     <!-- "The pen": signatures, editorial marks, and the colour of the owner's voice. -->
     <Color x:Key="InkBlue">#2C3E5E</Color>
 
-    <!-- The mark tier of the roles a dog-ear can carry (DESIGN.md §3). Only the four the fold
-         actually names: a role in the dictionary that nothing draws is a colour waiting to be
+    <!-- The mark tier of the roles a dog-ear can carry (DESIGN.md §3). Only the six the fold
+         actually names (Reference and Progress joined for mockup 17's Waiting page): a role in the dictionary that nothing draws is a colour waiting to be
          misused. The palette guard checks each of these against PaperColorTokens by name. -->
     <Color x:Key="ProblemMark">#9E434B</Color>
     <Color x:Key="CautionMark">#805F00</Color>
     <Color x:Key="ResolvedMark">#68645E</Color>
     <Color x:Key="ActionMark">#38734A</Color>
     <Color x:Key="ReferenceMark">#4C6787</Color>
+    <Color x:Key="ProgressMark">#18717C</Color>
 
     <!-- The fill tier, which §9's binder strip needs and nothing else does: the coloured cloth an
          INACTIVE tab is cut from. Only the three the strip actually cuts a tab out of — an area

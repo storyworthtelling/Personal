@@ -422,7 +422,7 @@ public static class PaperUi
 
     /// <summary>
     /// The quiet line at the foot of a Settings screen: app name, versionName, package id, in
-    /// mono, centred, at Label size.
+    /// mono, at Label size, with the owner's maker's mark beside it (Suite S3).
     ///
     /// <para>It answers one question the device cannot otherwise answer. There is no adb after
     /// the cutover and the update channel installs silently, so an update that changes nothing
@@ -434,8 +434,15 @@ public static class PaperUi
     /// channel's business, the name is the owner's. A package manager that refuses prints
     /// <c>?</c> rather than a blank, so a failed lookup does not read as an app with no version.
     /// </para>
+    ///
+    /// <para>The mark is resolved by resource <b>name</b> rather than a generated
+    /// <c>Resource.Drawable</c> id: this method lives in the shared library, so no single head's
+    /// generated <c>Resource</c> class is visible here (the same technique Flyleaf's
+    /// <c>BookendGlyphPainter</c> already uses to resolve a per-app drawable by name).
+    /// <c>GetIdentifier</c> degrades to 0 — no image, text only — for a head that has not
+    /// generated the asset, rather than throwing.</para>
     /// </summary>
-    public static TextView BuildNumber(Activity activity, string appName)
+    public static View BuildNumber(Activity activity, string appName)
     {
         string? versionName = null;
         try
@@ -450,8 +457,32 @@ public static class PaperUi
 
         var line = Text(activity, BuildLine.Format(appName, versionName, activity.PackageName),
             DesignTokens.TypeSp.Label, PaperTheme.InkMuted, PaperTheme.Mono(activity));
-        line.Gravity = GravityFlags.CenterHorizontal;
-        return line;
+
+        var row = new LinearLayout(activity) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterHorizontal);
+
+        var markId = activity.Resources?.GetIdentifier("owner_medallion", "drawable", activity.PackageName) ?? 0;
+        if (markId != 0)
+        {
+            var mark = new ImageView(activity);
+            mark.SetImageResource(markId);
+            var markSize = PaperTheme.Dp(activity, 40);
+            var markParams = new LinearLayout.LayoutParams(markSize, markSize)
+            {
+                Gravity = GravityFlags.CenterVertical,
+                RightMargin = PaperTheme.Dp(activity, DesignTokens.Space.X3),
+            };
+            row.AddView(mark, markParams);
+        }
+
+        var lineParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
+        {
+            Gravity = GravityFlags.CenterVertical,
+        };
+        row.AddView(line, lineParams);
+
+        return row;
     }
 
     /// <summary>

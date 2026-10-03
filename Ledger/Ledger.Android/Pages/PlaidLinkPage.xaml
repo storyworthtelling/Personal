@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <pages:LedgerBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:pages="clr-namespace:Ledger.Android.Pages"
-             x:Class="Ledger.Android.Pages.PlaidLinkPage">
+             xmlns:pages="clr-namespace:Index.Android.Pages"
+             x:Class="Index.Android.Pages.PlaidLinkPage">
     <!-- The header and the binder strip come from LedgerBinderPage; this is the well between them.
-         The pinned bar (Done / Cancel) is built in code-behind via SetBar. Not a WebView: Plaid
-         opens in the system browser (see this class's own remarks for why), so nothing here is an
-         embedded OAuth flow the frame would sit awkwardly around. -->
-    <VerticalStackLayout Padding="0,8,0,0" Spacing="16" VerticalOptions="Start">
-        <Label x:Name="StatusLabel" Style="{StaticResource StatusLine}"
-               Text="Preparing a secure connection…" />
-        <Label x:Name="InstructionsLabel" Style="{StaticResource StatusLine}"
-               Text="Plaid opens in your browser so banks like Redwood Bank that block in-app windows can sign you in. When you finish and return here, tap Done." />
-        <Button x:Name="OpenButton" Text="Open connection page" Clicked="OnOpenClicked" IsEnabled="False" />
-    </VerticalStackLayout>
+         Mockup 5 draws three states written straight onto the graph paper (Admin mode needed, Admin
+         mode open, back from Chrome), so the content is one stack that code-behind fills per state,
+         and the graph-paper ground is inserted behind it there. The pinned bar (one button, or none)
+         is built in code-behind via SetBar. Not a WebView: Plaid opens in real Chrome (see this
+         class's own remarks for why). -->
+    <Grid x:Name="Ground">
+        <ScrollView>
+            <VerticalStackLayout x:Name="BodyStack" Padding="24,16,16,24" Spacing="14" VerticalOptions="Start" />
+        </ScrollView>
+    </Grid>
 </pages:LedgerBinderPage>

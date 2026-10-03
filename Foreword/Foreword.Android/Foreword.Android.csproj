@@ -42,6 +42,9 @@
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+    <!-- Shared hand-written-note extraction library (Index-P11 Release F): MauiProgram wires
+         Foreword's own instruction text and credential id into the shared extractor directly. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Handwriting\Storyworthtelling.Handwriting.csproj" />
     <!-- The shared Paper & Ink kit: the role table, the component styles, and the eight fonts with
          their aliases. It replaces this head's private DesignTokens.xaml and its own MauiFont glob —
          a head that packages the fonts itself can register an alias for a face the kit does not

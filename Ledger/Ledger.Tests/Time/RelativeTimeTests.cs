@@ -1,6 +1,6 @@
-using Ledger.Domain.Time;
+using Index.Domain.Time;
 
-namespace Ledger.Tests.Time;
+namespace Index.Tests.Time;
 
 // The list-timestamp voice (DESIGN.md §11), shared verbatim across the repo's apps and pinned here so
 // Ledger's copy can't drift.

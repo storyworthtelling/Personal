@@ -224,24 +224,6 @@ public static class Glyphs
         canvas.DrawCircle(c, c + 0.17f * s, 0.04f * s, accent);
     }
 
-    /// <summary>Ledger: four ink ledger strokes struck through by the terracotta fifth mark.</summary>
-    public static void Ledger(SKCanvas canvas, float s)
-    {
-        using var ink = InkStroke(s);
-        using var accent = AccentStroke(s);
-        var c = s / 2;
-        var half = s * 0.16f;
-        var spacing = s * 0.10f;
-        var startX = c - 1.5f * spacing;
-        for (var i = 0; i < 4; i++)
-        {
-            var x = startX + i * spacing;
-            canvas.DrawLine(x, c - half, x, c + half, ink);
-        }
-        // The fifth mark: a terracotta diagonal striking through the group.
-        canvas.DrawLine(startX - spacing * 0.4f, c + half, startX + 3 * spacing + spacing * 0.4f, c - half, accent);
-    }
-
     /// <summary>Foreword: folded sheet, terracotta dog-ear.</summary>
     public static void FoldedPaper(SKCanvas canvas, float s)
     {
@@ -402,6 +384,97 @@ public static class Glyphs
     /// a near-black lens, which is why the cloth is light and the keyline is dark.
     /// </summary>
     public static void PlatePlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Ink);
+
+    /// <summary>
+    /// Index's cover (D115, D117, D119): the same keyline-only window every cover ships, plus
+    /// the one thing D119 adds — a corner flourish (the mockup's bracket, bulging toward the corner), drawn once for the
+    /// top-left and <b>reflected</b>, never rotated, into the other three (an asymmetric mark
+    /// rotated instead of mirrored has no mirror line and reads as a pinwheel — the reason
+    /// <c>PlateFramingMirrorsOnBothAxes</c> exists). Both the keyline and the flourish are drawn
+    /// in <paramref name="frameColor"/>'s own cream, so the flourish reads as the window's own
+    /// line-work rather than a second colour set beside it.
+    ///
+    /// <para>The flourishes sit entirely inside <see cref="FullBleedInset"/>'s own outer margin
+    /// — closer to the edge than the window itself, which is what "the window inset to clear
+    /// them" means — so the round launcher mask crops them exactly the way it already crops the
+    /// keyline: invisible on the launcher, visible on the shelf cover and the legacy square,
+    /// where the full square shows (D119's own reasoning for why the round icon differs).</para>
+    /// </summary>
+    public static void IndexPlate(SKCanvas canvas, float s)
+    {
+        CoverKeyline(canvas, s, Tokens.Paper);
+        DrawCornerFlourish(canvas, s, 0, 0, flipX: false, flipY: false, Tokens.Paper);
+        DrawCornerFlourish(canvas, s, s, 0, flipX: true, flipY: false, Tokens.Paper);
+        DrawCornerFlourish(canvas, s, 0, s, flipX: false, flipY: true, Tokens.Paper);
+        DrawCornerFlourish(canvas, s, s, s, flipX: true, flipY: true, Tokens.Paper);
+    }
+
+    // Well inside FullBleedInset (0.12): the flourish's 34-unit square sits MarginRel in from the corner
+    // and is BoxRel wide, so it ends at 0.12 and every stroke stays in the corner square the window
+    // never enters (mockup 1's own .fl is 34px on a 300px cover; this is the same drawing, scaled).
+    private const float FlourishMarginRel = 0.020f;
+    private const float FlourishBoxRel = 0.100f;
+
+    // The mockup's SVG (Ledger/design/mockup-01.html, ".shelfcover .fl.tl", viewBox 0 0 34 34), path data
+    // verbatim: a bracket that BULGES TOWARD THE CORNER, a second arc inside it drawn at 60%, a curl at
+    // the foot, and a dot.
+    private const float FlourishUnits = 34f;
+    private const string FlourishBracket = "M2 32 C2 14 14 2 32 2";
+    private const string FlourishSecondArc = "M8 32 C8 18 18 8 32 8";
+    private const string FlourishCurl = "M2 32 C6 30 8 26 8 22 C8 18 5 16 3 18 C1 20 3 23 6 22";
+    private const float FlourishDotX = 14f;
+    private const float FlourishDotY = 14f;
+    private const float FlourishDotRadius = 1.6f;
+    private const float FlourishStroke = 1.5f;
+    private const float FlourishSecondArcOpacity = 0.6f;
+
+    // Draws the top-left flourish, then mirrors it into position for whichever corner
+    // (pivotX, pivotY) names — a reflection about that corner's own axis/axes, never a rotation.
+    private static void DrawCornerFlourish(SKCanvas canvas, float s, float pivotX, float pivotY, bool flipX, bool flipY, SKColor color)
+    {
+        canvas.Save();
+        canvas.Translate(pivotX, pivotY);
+        canvas.Scale(flipX ? -1 : 1, flipY ? -1 : 1);
+        DrawFlourishTopLeft(canvas, s, color);
+        canvas.Restore();
+    }
+
+    // The corner bracket (D119) in the mockup's own drawing — see the constants above. It never reaches
+    // the corner point itself; the bracket leaves each edge steeply and rounds toward the corner.
+    private static void DrawFlourishTopLeft(SKCanvas canvas, float s, SKColor color)
+    {
+        canvas.Save();
+        canvas.Translate(s * FlourishMarginRel, s * FlourishMarginRel);
+        canvas.Scale(s * FlourishBoxRel / FlourishUnits);
+
+        using var bracket = SKPath.ParseSvgPathData(FlourishBracket);
+        using var secondArc = SKPath.ParseSvgPathData(FlourishSecondArc);
+        using var curl = SKPath.ParseSvgPathData(FlourishCurl);
+
+        using var line = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = FlourishStroke,
+            StrokeCap = SKStrokeCap.Round,
+            Color = color,
+            IsAntialias = true,
+        };
+        using var faint = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = FlourishStroke,
+            StrokeCap = SKStrokeCap.Round,
+            Color = color.WithAlpha((byte)(color.Alpha * FlourishSecondArcOpacity)),
+            IsAntialias = true,
+        };
+        using var dot = new SKPaint { Style = SKPaintStyle.Fill, Color = color, IsAntialias = true };
+
+        canvas.DrawPath(bracket, line);
+        canvas.DrawPath(secondArc, faint);
+        canvas.DrawPath(curl, line);
+        canvas.DrawCircle(FlourishDotX, FlourishDotY, FlourishDotRadius, dot);
+        canvas.Restore();
+    }
 
     private static SKRect Inset(SKRect r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
 }

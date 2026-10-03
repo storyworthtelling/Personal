@@ -1,6 +1,6 @@
 using Storyworthtelling.Voice.Health;
 
-namespace Ledger.Android;
+namespace Index.Android;
 
 // The device-side credential health store: the Plaid client reports Ok/Failing through the
 // ICredentialHealthSink seam (it runs on the background refresh worker), and the Settings page reads the

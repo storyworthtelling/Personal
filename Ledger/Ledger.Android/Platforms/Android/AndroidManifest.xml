@@ -9,9 +9,19 @@
   <uses-permission android:name="android.permission.WAKE_LOCK" />
   <!-- Required for WorkManager on API 33+ -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-  <!-- Package visibility (Android 11+): the Plaid connect page resolves the default browser so it can
-       detect the FocusPhone restricted viewer and guide the owner elsewhere instead of dead-ending. -->
+  <!-- Post's frozen IndexHandoff contract (FocusPhone/Codex.Domain/Post/MoneyMail.cs, read-only to
+       this app): Index itself must declare this permission (Post only requires the RECEIVING app hold
+       it) at protectionLevel="signature" — every com.storyworthtelling app shares one keystore for the
+       update channel, so this costs nothing and stops any other app on the phone from feeding Index a
+       fabricated balance. Guard G2 (IndexHandoffContractTests) checks this line's name against
+       IndexHandoff.Permission byte-for-byte. -->
+  <permission android:name="com.storyworthtelling.index.RECEIVE_BALANCE" android:protectionLevel="signature" />
+  <!-- Package visibility (Android 11+). The connect page asks whether Chrome is suspended, which is
+       how it tells that the FocusPhone's Admin mode is open (the default browser stays Flyleaf's
+       restricted viewer either way, so it cannot). Without the <package> entry Android hides Chrome
+       from this app and PackageManager reports it as not installed. -->
   <queries>
+    <package android:name="com.android.chrome" />
     <intent>
       <action android:name="android.intent.action.VIEW" />
       <category android:name="android.intent.category.BROWSABLE" />

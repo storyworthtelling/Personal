@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 
-namespace Ledger.Tests.Support;
+namespace Index.Tests.Support;
 
 // Records outgoing requests (and their bodies) and returns queued responses in order, so a test can
 // drive the typed Plaid HttpClient through multiple calls and assert exactly what was sent.

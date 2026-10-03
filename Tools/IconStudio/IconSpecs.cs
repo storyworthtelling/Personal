@@ -29,6 +29,17 @@ namespace IconStudio;
 /// which is what a hand-placed export of the background layer looks like. Generating it
 /// from the same spec as the icon is what stops the two drifting apart again.
 /// </param>
+/// <param name="CoverDrawsGlyph">
+/// Whether the shelf cover (<see cref="CoverImage"/>) runs the ordinary background + windowed
+/// plate + <see cref="Glyph"/> construction, rather than shipping the bare, cropped painting
+/// alone. Every other cover with a <see cref="PlateImage"/> ships the art alone — the shelf
+/// already draws its own cloth, rule and title band around it, and baking a second keyline in
+/// would double one up at a different scale (see <c>AdaptiveIconRenderer.RenderCover</c>).
+/// Index was briefly the one exception (D119: its corner flourishes are <see cref="Glyph"/>'s
+/// own top layer), and so doubled the shelf's own brackets; the shelf owns the rule, the title
+/// band and the brackets, so Index's cover is window only too and no spec sets this now. The
+/// flourishes remain on the launcher icon, where the round mask crops them.
+/// </param>
 public sealed record IconSpec(
     string App,
     string ResourceRoot,
@@ -39,7 +50,8 @@ public sealed record IconSpec(
     string? GroundImage = null,
     string? PlateImage = null,
     float PlateInset = Glyphs.FullBleedInset,
-    string? CoverImage = null);
+    string? CoverImage = null,
+    bool CoverDrawsGlyph = false);
 
 public static class IconSpecs
 {
@@ -82,6 +94,18 @@ public static class IconSpecs
         // this head's values/colors.xml is the one the MAUI resource glob actually packages.
         new("Foreword", "Foreword/Foreword.Android/Resources", "ic_launcher", true, Glyphs.ForewordPlate,
             Tokens.ForewordSunriseHex, PlateImage: "Branding/foreword-cover.png"),
-        new("Ledger", "Ledger/Ledger.Android/Resources", "appicon", true, Glyphs.Ledger),
+        // Index's icon IS its cover, like Post's/Folio's/Plate's/Foreword's: the deep
+        // bookplate-green binding as the ground and the coin-staircase painting filling the
+        // window, keylined in cream — with one departure (D119): a quarter-curve flourish
+        // reflected into each corner, entirely inside FullBleedInset's own outer margin, so the
+        // round-masked launcher crops it away and only the legacy square
+        // shows it. Its shelf COVER is the bare painting like every other cover (the shelf draws
+        // its own rule, band and brackets, and the flourish would double them). Replaces the retired
+        // Ledger spec (Index is the same package's rebrand, not an additional app) — Index
+        // commits its generated icons like every other head, since Ledger was the one
+        // exception to that.
+        new("Index", "Ledger/Ledger.Android/Resources", "appicon", true, Glyphs.IndexPlate,
+            Tokens.IndexClothHex, PlateImage: "Branding/index-cover.png",
+            CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_index.png"),
     ];
 }
