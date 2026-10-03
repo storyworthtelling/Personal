@@ -41,6 +41,29 @@ public class PolicyPlanBuilderTests
     }
 
     [Fact]
+    public void RestrictionsToClear_IncludesRetiredUninstallBlock_ThatAnEarlierBuildMayHaveLeftSet()
+    {
+        // AddUserRestriction persists on the device until cleared, so a restriction dropped from the
+        // plan stays in force forever unless something removes it (silent uninstall was refused with
+        // DELETE_FAILED_USER_RESTRICTED for exactly this reason).
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        var toClear = AndroidUserRestrictions.ToClear(plan.UserRestrictions);
+
+        Assert.Contains(AndroidUserRestrictions.NoUninstallApps, toClear);
+        Assert.Contains(AndroidUserRestrictions.NoControlApps, toClear);
+        Assert.DoesNotContain(AndroidUserRestrictions.NoSafeBoot, toClear);
+    }
+
+    [Fact]
+    public void RestrictionsToClear_NeverClearsAPlannedRestriction()
+    {
+        var toClear = AndroidUserRestrictions.ToClear([AndroidUserRestrictions.NoUninstallApps]);
+
+        Assert.DoesNotContain(AndroidUserRestrictions.NoUninstallApps, toClear);
+    }
+
+    [Fact]
     public void NeverVisiblePackages_AreSuspended_AndNotReleasedByTheAllowlist()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext(
