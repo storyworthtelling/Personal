@@ -55,7 +55,7 @@ public class AccountsCosmeticSourceTests
     }
 
     [Fact]
-    public void ALimitAndAPaymentAreWholeDollarsOnEveryAccountCard()
+    public void ALimitIsWholeDollarsAndAPaymentRoundsUpOnEveryAccountCard()
     {
         var main = Source(MainPagePath);
 
@@ -63,7 +63,10 @@ public class AccountsCosmeticSourceTests
         {
             var body = MethodBody(main, method);
             var wholes = Regex.Matches(body, @"AccountsMoney\.Whole\(").Count;
-            Assert.True(wholes >= 2, $"{method} must print the payment and the limit through AccountsMoney.Whole (found {wholes}).");
+            var payments = Regex.Matches(body, @"AccountsMoney\.Payment\(").Count;
+            Assert.True(wholes >= 1, $"{method} must print the limit through AccountsMoney.Whole (found {wholes}).");
+            Assert.True(payments >= 1, $"{method} must print the payment through AccountsMoney.Payment, which rounds up (found {payments}).");
+            Assert.DoesNotContain("NextPaymentAmount is { } amt ? AccountsMoney.Whole(", body, StringComparison.Ordinal);
         }
     }
 

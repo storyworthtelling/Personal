@@ -345,10 +345,10 @@ public partial class MainPage : LedgerBinderPage
         IReadOnlyList<IndexCardRow> rows;
         if (account.Kind is AccountKind.Credit or AccountKind.Loan)
         {
-            // A payment and a limit are whole dollars; only the balance keeps its cents (mockup 11).
+            // A payment (rounded up) and a limit (nearest) are whole dollars; only the balance keeps its cents (mockup 11).
             var due = AccountCardText.DueLine(
                 account.NextPaymentDueDate,
-                account.NextPaymentAmount is { } amt ? AccountsMoney.Whole(amt, account.IsoCurrencyCode) : null);
+                account.NextPaymentAmount is { } amt ? AccountsMoney.Payment(amt, account.IsoCurrencyCode) : null);
             // D125: the one wording of a card's limit (AccountCardText.LimitLine).
             var limit = AccountCardText.LimitLine(
                 account.CreditLimit is { } creditLimit ? AccountsMoney.Whole(creditLimit, account.IsoCurrencyCode) : null);
@@ -838,11 +838,11 @@ public partial class MainPage : LedgerBinderPage
 
         if (account.Kind is AccountKind.Credit or AccountKind.Loan)
         {
-            // A payment and a limit are whole dollars ("Due Oct 6 · $285", "of $23,000"); only the balance
+            // A payment (rounded up) and a limit are whole dollars ("Due Oct 6 · $286", "of $23,000"); only the balance
             // keeps its cents (mockup 2).
             var due = AccountCardText.DueLine(
                 account.NextPaymentDueDate,
-                account.NextPaymentAmount is { } amt ? AccountsMoney.Whole(amt, account.IsoCurrencyCode) : null);
+                account.NextPaymentAmount is { } amt ? AccountsMoney.Payment(amt, account.IsoCurrencyCode) : null);
             // D125: the same "of $limit" for a hand-entered card as for a Plaid one, whatever the account's source.
             var limit = AccountCardText.LimitLine(
                 account.CreditLimit is { } creditLimit ? AccountsMoney.Whole(creditLimit, account.IsoCurrencyCode) : null);

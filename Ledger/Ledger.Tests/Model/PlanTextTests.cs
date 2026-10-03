@@ -27,17 +27,28 @@ public class PlanTextTests
     }
 
     [Theory]
-    [InlineData("465.38", "$465 a week now")]
+    [InlineData("465.38", "$466 a week now")]
+    [InlineData("465.00", "$465 a week now")]
+    [InlineData("465.01", "$466 a week now")]
     [InlineData("80", "$80 a week now")]
-    public void WhatALoanIsPaidEachWeekIsWholeDollars(string payment, string expected)
+    public void WhatALoanIsPaidEachWeekIsWholeDollarsRoundedUp(string payment, string expected)
     {
         Assert.Equal(expected, PlanText.WeeklyNow(decimal.Parse(payment, System.Globalization.CultureInfo.InvariantCulture)));
     }
 
     [Fact]
-    public void TheFocusFigureOnThePostItIsWholeDollarsPerWeek()
+    public void TheFocusFigureOnThePostItIsWholeDollarsPerWeekRoundedUp()
     {
-        Assert.Equal("$545/wk", PlanText.AsFocus(545.25m));
+        Assert.Equal("$546/wk", PlanText.AsFocus(545.25m));
+        Assert.Equal("$545/wk", PlanText.AsFocus(545.00m));
+    }
+
+    [Fact]
+    public void ALimitAndAPaceKeepRoundingToNearestWhileAPaymentRoundsUp()
+    {
+        Assert.Equal("of $140", PlanText.OfLimit(140.42m));
+        Assert.Equal("$305 a month", PlanText.Pace(305.42m));
+        Assert.Equal("$141 a week now", PlanText.WeeklyNow(140.42m));
     }
 
     [Fact]

@@ -5,8 +5,9 @@ namespace Index.Domain.Model;
 /// <summary>
 /// The figures and sentences on Snowball's cards, Budget's cards and Savings' cards and post-its that
 /// Phase 4 pinned to the mockups (6, 7, 8, 9, 16), as pure functions so a test can hold them to what the
-/// mockup prints rather than a page being read for them. Money goes through <see cref="PlanMoney"/>: limits,
-/// payments and weekly figures are whole dollars, balances keep their cents. Every apostrophe is U+2019.
+/// mockup prints rather than a page being read for them. Money goes through <see cref="PlanMoney"/>: limits
+/// and paces are whole dollars to the nearest, payments and weekly payment figures are whole dollars rounded
+/// UP, balances keep their cents. Every apostrophe is U+2019.
 /// </summary>
 public static class PlanText
 {
@@ -26,11 +27,11 @@ public static class PlanText
     /// <summary>"Paid off Jul 16, 2027": a loan card's first line.</summary>
     public static string PaidOff(DateOnly date) => $"Paid off {date.ToString("MMM d, yyyy", Invariant)}";
 
-    /// <summary>"$465 a week now": what a loan is paid each week today.</summary>
-    public static string WeeklyNow(decimal weeklyPayment) => $"{PlanMoney.Whole(weeklyPayment)} a week now";
+    /// <summary>"$466 a week now" for 465.38: what a loan is paid each week today, rounded up.</summary>
+    public static string WeeklyNow(decimal weeklyPayment) => $"{PlanMoney.Payment(weeklyPayment)} a week now";
 
-    /// <summary>"$545/wk": the focus loan's payment once it is the focus, on the post-it.</summary>
-    public static string AsFocus(decimal weeklyPayment) => $"{PlanMoney.Whole(weeklyPayment)}/wk";
+    /// <summary>"$546/wk" for 545.25: the focus loan's payment once it is the focus, on the post-it, rounded up.</summary>
+    public static string AsFocus(decimal weeklyPayment) => $"{PlanMoney.Payment(weeklyPayment)}/wk";
 
     /// <summary>"of $625": the limit under a Budget card's meter.</summary>
     public static string OfLimit(decimal limit) => $"of {PlanMoney.Whole(limit)}";

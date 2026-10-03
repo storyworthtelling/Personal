@@ -63,7 +63,7 @@ public sealed class WorksheetPlanBuilder
         var weeklyPaymentTotal = loansInFocusOrder.Sum(x => x.Account.NextPaymentAmount ?? 0m);
 
         var fridayCount = LeftToAssignCalculator.FridaysInMonth(targetYearMonth);
-        var paymentsWhole = WholeDollars.Floor(weeklyPaymentTotal * fridayCount);
+        var paymentsWhole = WholeDollars.Ceiling(weeklyPaymentTotal * fridayCount);
         var lastMonthWhole = WholeDollars.Floor(lastMonthSpending);
 
         long incomeWhole;

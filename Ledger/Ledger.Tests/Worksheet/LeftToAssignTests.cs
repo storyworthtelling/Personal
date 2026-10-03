@@ -47,7 +47,7 @@ public class LeftToAssignTests
         const decimal weeklyTotal = 1_250m;
         const decimal flatWeeksPerMonth = 52m / 12m;
 
-        var naivePayments = WholeDollars.Floor(weeklyTotal * flatWeeksPerMonth);
+        var naivePayments = WholeDollars.Ceiling(weeklyTotal * flatWeeksPerMonth);
 
         var real = LeftToAssignCalculator.Calculate(9_350m, weeklyTotal, LeftToAssignCalculator.FridaysInMonth(2026, 10), 1_906m);
 
