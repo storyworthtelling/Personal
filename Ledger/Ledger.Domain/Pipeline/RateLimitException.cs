@@ -1,4 +1,4 @@
-namespace Ledger.Domain.Pipeline;
+namespace Index.Domain.Pipeline;
 
 // How a provider rate-limit / quota condition should be handled by the retry machinery.
 public enum RateLimitKind

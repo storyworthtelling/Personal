@@ -94,4 +94,35 @@ public static class Tokens
     public static readonly SKColor FlyleafWarm = SKColor.Parse(FlyleafWarmHex);
     public static readonly SKColor FlyleafMark = SKColor.Parse(FlyleafMarkHex);
     public static readonly SKColor FlyleafDeep = SKColor.Parse(FlyleafDeepHex);
+
+    // Index: the bookplate green, OKLCH hue 129°, locked at gate 3 (D115, D117). Sampled from
+    // the cover painting itself — the median of its green pixels, at the art's own chroma — the
+    // same method Folio's olive and Foreword's sunrise used before it.
+    //
+    // This is a RECORDED DEPARTURE from DESIGN.md §3's ≥20°-from-every-role floor: 129° is 0°
+    // from the Positive role (`#517025` mark, OKLCH ~129°) — Index's identity hue and Positive
+    // ARE the same hue. It is recorded here rather than resampled or rotated because D116 makes
+    // the collision inert rather than a status/identity ambiguity: Index's own pages draw NO
+    // Positive role anywhere — a paid-off loan is Resolved (settled, crossed out per D12) rather
+    // than shown Positive, and an under-limit budget line takes no colour at all — so nothing on
+    // an Index page could be mistaken for the identity wearing a status. It is a single, named
+    // exception carved into the suite's hue-separation guard for Index against Positive only;
+    // every other role, and every other app's identity, still has to clear 20° from Index.
+    public const string IndexFillHex = "#B6C3A9";
+    public const string IndexGroundHex = "#839372";
+    public const string IndexMarkHex = "#596C45";
+    public const string IndexTextHex = "#475735";
+    public const string IndexDeepHex = "#2F3C21";
+
+    // The binding, and deliberately NOT required to match the identity hue (see Folio's and
+    // Post's cloth comments above): §12 does not require a cloth to match the identity, and
+    // Index's cloth is simply the identity hue deepened rather than a separately chosen colour.
+    public const string IndexClothHex = "#4E5F3A";
+
+    public static readonly SKColor IndexFill = SKColor.Parse(IndexFillHex);
+    public static readonly SKColor IndexGround = SKColor.Parse(IndexGroundHex);
+    public static readonly SKColor IndexMark = SKColor.Parse(IndexMarkHex);
+    public static readonly SKColor IndexText = SKColor.Parse(IndexTextHex);
+    public static readonly SKColor IndexDeep = SKColor.Parse(IndexDeepHex);
+    public static readonly SKColor IndexCloth = SKColor.Parse(IndexClothHex);
 }

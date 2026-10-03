@@ -403,5 +403,79 @@ public static class Glyphs
     /// </summary>
     public static void PlatePlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Ink);
 
+    /// <summary>
+    /// Index's cover (D115, D117, D119): the same keyline-only window every cover ships, plus
+    /// the one thing D119 adds — a quarter-curve flourish at each corner, drawn once for the
+    /// top-left and <b>reflected</b>, never rotated, into the other three (an asymmetric mark
+    /// rotated instead of mirrored has no mirror line and reads as a pinwheel — the reason
+    /// <c>PlateFramingMirrorsOnBothAxes</c> exists). Both the keyline and the flourish are drawn
+    /// in <paramref name="frameColor"/>'s own cream, so the flourish reads as the window's own
+    /// line-work rather than a second colour set beside it.
+    ///
+    /// <para>The flourishes sit entirely inside <see cref="FullBleedInset"/>'s own outer margin
+    /// — closer to the edge than the window itself, which is what "the window inset to clear
+    /// them" means — so the round launcher mask crops them exactly the way it already crops the
+    /// keyline: invisible on the launcher, visible on the shelf cover and the legacy square,
+    /// where the full square shows (D119's own reasoning for why the round icon differs).</para>
+    /// </summary>
+    public static void IndexPlate(SKCanvas canvas, float s)
+    {
+        CoverKeyline(canvas, s, Tokens.Paper);
+        DrawCornerFlourish(canvas, s, 0, 0, flipX: false, flipY: false, Tokens.Paper);
+        DrawCornerFlourish(canvas, s, s, 0, flipX: true, flipY: false, Tokens.Paper);
+        DrawCornerFlourish(canvas, s, 0, s, flipX: false, flipY: true, Tokens.Paper);
+        DrawCornerFlourish(canvas, s, s, s, flipX: true, flipY: true, Tokens.Paper);
+    }
+
+    // Well inside FullBleedInset (0.12): the outer reach of the flourish (margin + 2*reach) never
+    // exceeds ~0.095, so it cannot meet the keylined window's edge at 0.12 in either axis.
+    private const float FlourishMarginRel = 0.020f;
+    private const float FlourishReachRel = 0.075f;
+
+    // Draws the top-left flourish, then mirrors it into position for whichever corner
+    // (pivotX, pivotY) names — a reflection about that corner's own axis/axes, never a rotation.
+    private static void DrawCornerFlourish(SKCanvas canvas, float s, float pivotX, float pivotY, bool flipX, bool flipY, SKColor color)
+    {
+        canvas.Save();
+        canvas.Translate(pivotX, pivotY);
+        canvas.Scale(flipX ? -1 : 1, flipY ? -1 : 1);
+        DrawFlourishTopLeft(canvas, s, color);
+        canvas.Restore();
+    }
+
+    // A quarter-curve bracket (D119) tucked into the corner: two concentric arcs sweeping from
+    // the left edge to the top edge, with a small maker's dot between them — never reaching the
+    // corner point itself, the same restraint the mockup's own flourish drew.
+    private static void DrawFlourishTopLeft(SKCanvas canvas, float s, SKColor color)
+    {
+        var margin = s * FlourishMarginRel;
+        var reach = s * FlourishReachRel;
+
+        using var outer = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = s * 0.011f,
+            StrokeCap = SKStrokeCap.Round,
+            Color = color,
+            IsAntialias = true,
+        };
+        using var inner = new SKPaint
+        {
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = s * 0.009f,
+            StrokeCap = SKStrokeCap.Round,
+            Color = color.WithAlpha((byte)(color.Alpha * 0.6f)),
+            IsAntialias = true,
+        };
+        using var dot = new SKPaint { Style = SKPaintStyle.Fill, Color = color, IsAntialias = true };
+
+        canvas.DrawArc(new SKRect(margin, margin, margin + (reach * 2), margin + (reach * 2)), 90, 90, false, outer);
+
+        var innerReach = reach * 0.6f;
+        canvas.DrawArc(new SKRect(margin, margin, margin + (innerReach * 2), margin + (innerReach * 2)), 90, 90, false, inner);
+
+        canvas.DrawCircle(margin + (reach * 0.42f), margin + (reach * 0.42f), s * 0.006f, dot);
+    }
+
     private static SKRect Inset(SKRect r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);
 }

@@ -61,6 +61,19 @@ public class ReadRequestTests
         Assert.Equal("2026-08-31", extras[IndexHandoff.AsOfExtra]);
     }
 
+    // Plate has no statement-OCR sender-name extraction built yet (ReadRequest's own doc
+    // comment) — it passes senderName: null, so the sender key must still be absent, exactly
+    // like an old Post send with no sender resolved.
+    [Fact]
+    public void AStatementStillCarriesNoSenderKey()
+    {
+        var facts = MoneyMail.Read(null, "Your current balance is $2,500.00 as of 2026-08-31.");
+        var extras = ReadRequest.StatementExtras(facts);
+
+        Assert.NotNull(extras);
+        Assert.False(extras!.ContainsKey(IndexHandoff.SenderExtra));
+    }
+
     [Fact]
     public void AStatementWithNoBalanceIsNothingToSend()
     {

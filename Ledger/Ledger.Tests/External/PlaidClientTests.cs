@@ -1,11 +1,11 @@
 using System.Net;
 using Microsoft.Extensions.Options;
-using Ledger.Domain.Pipeline;
-using Ledger.Infrastructure.Configuration;
-using Ledger.Infrastructure.External;
-using Ledger.Tests.Support;
+using Index.Domain.Pipeline;
+using Index.Infrastructure.Configuration;
+using Index.Infrastructure.External;
+using Index.Tests.Support;
 
-namespace Ledger.Tests.External;
+namespace Index.Tests.External;
 
 public class PlaidClientTests
 {
@@ -52,8 +52,8 @@ public class PlaidClientTests
         Assert.Equal("depository", account.Type);
         Assert.Equal("checking", account.Subtype);
         Assert.Equal("USD", account.IsoCurrencyCode);
-        Assert.Equal(110.0, account.Current);
-        Assert.Equal(100.5, account.Available);
+        Assert.Equal(110.0m, account.Current);
+        Assert.Equal(100.5m, account.Available);
         Assert.Null(account.Limit);
     }
 
@@ -111,14 +111,14 @@ public class PlaidClientTests
         Assert.Equal(2, liabilities.Count);
 
         var card = liabilities.Single(l => l.AccountId == "card1");
-        Assert.Equal(500.25, card.LastStatementBalance);
-        Assert.Equal(25.0, card.NextPaymentAmount);
-        Assert.Equal(19.99, card.Apr); // the purchase APR is preferred over the balance-transfer APR
+        Assert.Equal(500.25m, card.LastStatementBalance);
+        Assert.Equal(25.0m, card.NextPaymentAmount);
+        Assert.Equal(19.99m, card.Apr); // the purchase APR is preferred over the balance-transfer APR
         Assert.Equal(new DateTimeOffset(2026, 8, 15, 0, 0, 0, TimeSpan.Zero), card.NextPaymentDueDate);
 
         var mortgage = liabilities.Single(l => l.AccountId == "mort1");
-        Assert.Equal(3.5, mortgage.Apr);
-        Assert.Equal(1200.0, mortgage.NextPaymentAmount);
+        Assert.Equal(3.5m, mortgage.Apr);
+        Assert.Equal(1200.0m, mortgage.NextPaymentAmount);
         Assert.Null(mortgage.LastStatementBalance);
     }
 
@@ -174,6 +174,63 @@ public class PlaidClientTests
         Assert.Contains("\"start_date\":\"2026-07-01\"", body);
         Assert.Contains("\"end_date\":\"2026-07-19\"", body);
         Assert.Contains("\"account_ids\":[\"acc1\"]", body);
+    }
+
+    [Fact]
+    public async Task GetTransactions_AsksPlaidForThePersonalFinanceCategory_AndReadsItAndThePendingPointer()
+    {
+        var (client, handler) = Create();
+        handler.Enqueue(HttpStatusCode.OK, """
+        {
+          "transactions": [
+            {
+              "transaction_id": "posted-1",
+              "pending_transaction_id": "pending-1",
+              "account_id": "acc1",
+              "date": "2026-07-15",
+              "name": "WHOLEFDS",
+              "merchant_name": "Whole Foods",
+              "amount": 42.50,
+              "iso_currency_code": "USD",
+              "pending": false,
+              "personal_finance_category": {
+                "primary": "FOOD_AND_DRINK",
+                "detailed": "FOOD_AND_DRINK_GROCERIES",
+                "confidence_level": "VERY_HIGH"
+              }
+            },
+            {
+              "transaction_id": "bare-1",
+              "pending_transaction_id": null,
+              "account_id": "acc1",
+              "date": "2026-07-14",
+              "name": "SOMETHING",
+              "amount": 3.00,
+              "pending": true,
+              "personal_finance_category": null
+            }
+          ],
+          "total_transactions": 2,
+          "request_id": "r"
+        }
+        """);
+
+        var transactions = await client.GetTransactionsAsync(
+            "access-token", new[] { "acc1" }, new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 19), 250, CancellationToken.None);
+
+        // Plaid only returns personal_finance_category when the request opts in (R8).
+        Assert.Contains("\"include_personal_finance_category\":true", handler.RequestBodies[0]);
+        Assert.Contains("\"account_ids\":[\"acc1\"]", handler.RequestBodies[0]);
+
+        var posted = transactions[0];
+        Assert.Equal("pending-1", posted.PendingTransactionId);
+        Assert.Equal("FOOD_AND_DRINK", posted.CategoryPrimary);
+        Assert.Equal("FOOD_AND_DRINK_GROCERIES", posted.CategoryDetailed);
+
+        var bare = transactions[1];
+        Assert.Null(bare.PendingTransactionId);
+        Assert.Null(bare.CategoryPrimary);
+        Assert.Null(bare.CategoryDetailed);
     }
 
     [Fact]
@@ -263,7 +320,7 @@ public class PlaidClientTests
     {
         var (client, handler) = Create();
         // Plaid populates item_add_results a short, variable time AFTER the OAuth redirect returns
-        // (pronounced for app-to-app OAuth banks like Chase), so the first reads see an empty session
+        // (pronounced for app-to-app OAuth banks), so the first reads see an empty session
         // and only a later one carries the public_token.
         handler.EnqueueOk("""{ "link_sessions": [] }""");
         handler.EnqueueOk("""{ "link_sessions": [] }""");
@@ -271,7 +328,7 @@ public class PlaidClientTests
         {
           "link_sessions": [
             { "results": { "item_add_results": [
-              { "public_token": "public-sandbox-99", "institution": { "name": "Chase" } } ] } }
+              { "public_token": "public-sandbox-99", "institution": { "name": "Redwood Bank" } } ] } }
           ]
         }
         """);
@@ -283,7 +340,7 @@ public class PlaidClientTests
 
         Assert.NotNull(result);
         Assert.Equal("public-sandbox-99", result!.PublicToken);
-        Assert.Equal("Chase", result.InstitutionName);
+        Assert.Equal("Redwood Bank", result.InstitutionName);
         Assert.Equal(3, handler.Requests.Count); // stopped polling the instant the token appeared
     }
 
@@ -326,5 +383,72 @@ public class PlaidClientTests
         Assert.Contains("\"products\":[\"transactions\"]", body);
         Assert.Contains("\"required_if_supported_products\":[\"liabilities\"]", body);
         Assert.Contains("hosted_link", body);
+    }
+
+    [Fact]
+    public async Task GetInstitution_ParsesPrimaryColor()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("""
+        {
+          "institution": {
+            "institution_id": "ins_13",
+            "name": "PNC Bank",
+            "primary_color": "#025a2f"
+          },
+          "request_id": "r"
+        }
+        """);
+
+        var institution = await client.GetInstitutionAsync("ins_13", CancellationToken.None);
+
+        Assert.Equal("ins_13", institution.InstitutionId);
+        Assert.Equal("PNC Bank", institution.Name);
+        Assert.Equal("#025a2f", institution.PrimaryColorHex);
+
+        var body = handler.RequestBodies[0];
+        Assert.Contains("\"institution_id\":\"ins_13\"", body);
+        Assert.Contains("\"include_optional_metadata\":true", body);
+        Assert.Equal(
+            "https://sandbox.plaid.com/institutions/get_by_id", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task GetInstitution_ParsesAbsentColor_AsNull()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("""
+        { "institution": { "institution_id": "ins_1", "name": "Small Credit Union" }, "request_id": "r" }
+        """);
+
+        var institution = await client.GetInstitutionAsync("ins_1", CancellationToken.None);
+
+        Assert.Null(institution.PrimaryColorHex);
+    }
+
+    [Fact]
+    public async Task GetItemInstitutionId_ReadsItemInstitutionId_FromTheAccessToken()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("""
+        { "item": { "item_id": "item-1", "institution_id": "ins_13" }, "request_id": "r" }
+        """);
+
+        var institutionId = await client.GetItemInstitutionIdAsync("access-1", CancellationToken.None);
+
+        Assert.Equal("ins_13", institutionId);
+        Assert.Contains("\"access_token\":\"access-1\"", handler.RequestBodies[0]);
+        Assert.Equal("https://sandbox.plaid.com/item/get", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task GetItemInstitutionId_NullInstitutionId_ReadsAsNull()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("""
+        { "item": { "item_id": "item-1", "institution_id": null }, "request_id": "r" }
+        """);
+
+        Assert.Null(await client.GetItemInstitutionIdAsync("access-1", CancellationToken.None));
     }
 }

@@ -12,6 +12,11 @@ using Foreword.Infrastructure.Delivery;
 using Foreword.Infrastructure.Google;
 using Foreword.Infrastructure.Handwriting;
 using Storyworthtelling.Remarkable;
+// Foreword's own ParsedNote (Foreword.Domain.Models, PersonColumn and all — via the plain
+// "using Foreword.Domain.Models;" above) and the shared extractor's generic ParsedNote share a
+// name, so the shared one is aliased here rather than imported unqualified.
+using SharedParsedNote = Storyworthtelling.Handwriting.ParsedNote;
+using SharedHandwritingExtractor = Storyworthtelling.Handwriting.IHandwritingExtractor;
 using Foreword.Tests.Calendar;
 using Xunit;
 
@@ -28,7 +33,7 @@ public class DailyDeliveryServiceTests
     private readonly Mock<IDayPdfComposer> dayComposer = new();
     private readonly Mock<IWeatherClient> weather = new();
     private readonly Mock<IRouteClient> routes = new();
-    private readonly Mock<IHandwritingExtractor> handwriting = new();
+    private readonly Mock<SharedHandwritingExtractor> handwriting = new();
     private readonly Mock<IRemarkableClient> remarkable = new();
     private readonly Mock<ITaskReadingClient> taskReader = new();
     private readonly FakeTaskStore taskStore = new();
@@ -48,10 +53,14 @@ public class DailyDeliveryServiceTests
         taskReader.Setup(r => r.Read(It.IsAny<string>())).ReturnsAsync((ForewordTask?)null);
     }
 
+    // The columns this account prints: the invented household every test uses.
+    private static readonly List<ColumnChoice> HouseholdColumns =
+        [.. Household.Layout.People.Select(p => new ColumnChoice { Name = p.Name, HasAccount = Household.Layout.HasAccount(p) })];
+
     private DailyDeliveryService CreateService() =>
         new(calendar.Object, tasks.Object,
             new CalendarColumnMapper(
-                Options.Create(new CalendarMappingOptions()),
+                Options.Create(new CalendarMappingOptions { Columns = HouseholdColumns }),
                 Options.Create(new Foreword.Infrastructure.Install.InstallOptions())),
             new WorkScheduleAugmenter(Options.Create(new WorkScheduleOptions())),
             new OutlookSelector(),
@@ -75,7 +84,7 @@ public class DailyDeliveryServiceTests
         public AwayPause Away { get; set; } = AwayPause.None;
     }
 
-    private void SetupYesterdayDoc(string title, string id, IReadOnlyList<ParsedNote> notes)
+    private void SetupYesterdayDoc(string title, string id, IReadOnlyList<SharedParsedNote> notes)
     {
         // Distinct bytes per document. Moq matches a byte[] argument STRUCTURALLY, so two documents
         // with the same content would make the second Extract setup shadow the first — and a test
@@ -106,9 +115,9 @@ public class DailyDeliveryServiceTests
     public async Task StillReadsBackWhatTheOldBuildLeftOnTheTablet()
     {
         SetupYesterdayDoc(YesterdayCalendar, "cal-y",
-            [new ParsedNote { Text = "Jo recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = Household.Jo, IsTask = false, Confidence = 0.95 }]);
+            [new SharedParsedNote { Text = "Jo recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = Household.Jo.Name, IsTask = false, Confidence = 0.95 }]);
         SetupYesterdayDoc(YesterdayChecklist, "chk-y",
-            [new ParsedNote { Text = "renew passport", IsTask = true, Confidence = 0.9 }]);
+            [new SharedParsedNote { Text = "renew passport", IsTask = true, Confidence = 0.9 }]);
 
         await CreateService().DeliverDailyDocuments(Date);
 
@@ -125,7 +134,7 @@ public class DailyDeliveryServiceTests
     public async Task ReadsBackYesterdaysMergedDocument()
     {
         SetupYesterdayDoc("The Day 2026-06-01", "day-y",
-            [new ParsedNote { Text = "renew passport", IsTask = true, Confidence = 0.9 }]);
+            [new SharedParsedNote { Text = "renew passport", IsTask = true, Confidence = 0.9 }]);
 
         await CreateService().DeliverDailyDocuments(Date);
 
@@ -217,18 +226,34 @@ public class DailyDeliveryServiceTests
     public async Task HighConfidenceEventNote_IsAddedToCalendar()
     {
         SetupYesterdayDoc(YesterdayCalendar, "cal-y",
-            [new ParsedNote { Text = "Jo recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = Household.Jo, IsTask = false, Confidence = 0.95 }]);
+            [new SharedParsedNote { Text = "Jo recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = Household.Jo.Name, IsTask = false, Confidence = 0.95 }]);
 
         await CreateService().DeliverDailyDocuments(Date);
 
         calendar.Verify(c => c.AddEvent(It.Is<CalendarEvent>(e => e.Title == "Jo recital" && e.Columns.Contains(Household.Jo))), Times.Once);
     }
 
+    /// <summary>
+    /// The model answered with a name this account does not print. It reads as no column, so the
+    /// note goes where an unnamed note goes, not into a column the page never shows.
+    /// </summary>
+    [Fact]
+    public async Task EventNote_NamingAColumnTheAccountDoesNotPrint_GoesToTheOwnersColumn()
+    {
+        SetupYesterdayDoc(YesterdayCalendar, "cal-y",
+            [new SharedParsedNote { Text = "stranger recital", When = new DateTime(2026, 6, 10, 18, 0, 0), Column = "Nobody", IsTask = false, Confidence = 0.95 }]);
+
+        await CreateService().DeliverDailyDocuments(Date);
+
+        calendar.Verify(c => c.AddEvent(It.Is<CalendarEvent>(e =>
+            e.Title == "stranger recital" && !e.Columns.Contains(new PersonColumn("Nobody")))), Times.Once);
+    }
+
     [Fact]
     public async Task HighConfidenceTaskNote_IsAddedToTasks()
     {
         SetupYesterdayDoc(YesterdayChecklist, "chk-y",
-            [new ParsedNote { Text = "renew passport", IsTask = true, Confidence = 0.9 }]);
+            [new SharedParsedNote { Text = "renew passport", IsTask = true, Confidence = 0.9 }]);
 
         await CreateService().DeliverDailyDocuments(Date);
 
@@ -239,7 +264,7 @@ public class DailyDeliveryServiceTests
     public async Task LowConfidenceNote_IsCarriedOverNotAdded()
     {
         SetupYesterdayDoc(YesterdayCalendar, "cal-y",
-            [new ParsedNote { Text = "illegible", IsTask = false, Confidence = 0.2 }]);
+            [new SharedParsedNote { Text = "illegible", IsTask = false, Confidence = 0.2 }]);
 
         IReadOnlyList<ParsedNote>? captured = null;
         dayComposer.Setup(c => c.Compose(It.IsAny<DayDocument>()))

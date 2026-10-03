@@ -25,10 +25,16 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal("#CA662D", Tokens.ForewordSunriseHex);
     }
 
-    // A paper-background app, and by now there is exactly one. Every FocusPhone head stands on
-    // its own identity ground, Foreword on its sunrise, and Folio joined them when its cover
-    // landed — so Ledger is the last spec that still exercises the flat-paper path at all.
-    private static IconSpec PaperSpec => IconSpecs.All.First(s => s.App == "Ledger");
+    // A paper-background app: none of the seven shipped apps take this path any more (Index,
+    // replacing Ledger, is the last to gain a cover of its own — every FocusPhone head stands on
+    // its own identity ground, Foreword on its sunrise, and Folio and Index joined them when
+    // their covers landed). Rather than let AdaptiveIconRenderer's flat-paper branch lose its
+    // test coverage entirely, this is a synthetic spec built only for these tests — not one
+    // IconSpecs.All registers — that exercises it directly. Glyphs.Ledger still draws it: no
+    // IconSpec names the function any more, though a comment in Ledger.Android/Pages still
+    // does, so the function itself stays rather than being deleted out from under that comment.
+    private static IconSpec PaperSpec => new(
+        "FlatPaperProbe", "IconStudio.Tests/FlatPaperProbe", "appicon", false, Glyphs.Ledger);
     private static IconSpec FlyleafSpec => IconSpecs.All.First(s => s.App == "FocusPhone.Launcher");
     private static IconSpec ForewordSpec => IconSpecs.All.First(s => s.App == "Foreword");
 
@@ -45,7 +51,7 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Equal(IconSpecs.All.Count, IconSpecs.All.Select(s => s.ResourceRoot).Distinct().Count());
         Assert.Contains(IconSpecs.All, s => s.App == "Folio" && s.Name == "appicon");
         Assert.Contains(IconSpecs.All, s => s.App == "Foreword" && s.Name == "ic_launcher");
-        Assert.Contains(IconSpecs.All, s => s.App == "Ledger" && s.Name == "appicon");
+        Assert.Contains(IconSpecs.All, s => s.App == "Index" && s.Name == "appicon");
     }
 
     // A spec with painted artwork reads it from the repo, so a scratch root needs a
@@ -208,7 +214,11 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void EveryCoverIconIsFullBleedAndFramesNothingOutsideItsWindow()
     {
-        var covers = IconSpecs.All.Where(spec => spec.PlateImage is not null).ToList();
+        // Index is a named exception (D119): its corner flourishes are drawn outside the window
+        // on purpose — see IndexFlourishesAreOutsideTheWindowAndMirrorOnBothAxes below, which
+        // covers exactly what this generic assertion cannot for it. Every other cover keeps the
+        // keyline-only shape this test still holds them to.
+        var covers = IconSpecs.All.Where(spec => spec.PlateImage is not null && spec.App != "Index").ToList();
 
         Assert.NotEmpty(covers);
         foreach (var spec in covers)
@@ -218,6 +228,55 @@ public class AdaptiveIconRendererTests : IDisposable
             using var glyph = GlyphOnly(spec);
             Assert.Equal(0, InkOutsideWindow(glyph, spec.PlateInset));
         }
+    }
+
+    /// <summary>
+    /// Index's own version of the test above: its flourishes must sit OUTSIDE the window (that
+    /// is the whole point of D119) but must not cross into it, and each corner must be the
+    /// top-left's reflection rather than an independent shape or a rotation.
+    /// </summary>
+    [Fact]
+    public void IndexFlourishesAreOutsideTheWindowAndMirrorOnBothAxes()
+    {
+        var spec = IconSpecs.All.Single(s => s.App == "Index");
+        using var glyph = GlyphOnly(spec);
+
+        // The flourishes are there: ink outside the window, where the generic test above
+        // requires none for every other cover.
+        Assert.True(InkOutsideWindow(glyph, spec.PlateInset) > 0,
+            "expected Index's corner flourishes outside the window; found none");
+
+        // But the window itself stays clear — the flourish never reaches in far enough to
+        // touch the art (D119: "the window inset to clear them").
+        var edge = (int)(glyph.Width * spec.PlateInset);
+        Assert.Equal(0, glyph.GetPixel(edge + 4, edge + 4).Alpha);
+        Assert.Equal(0, glyph.GetPixel(glyph.Width - edge - 5, edge + 4).Alpha);
+        Assert.Equal(0, glyph.GetPixel(edge + 4, glyph.Height - edge - 5).Alpha);
+        Assert.Equal(0, glyph.GetPixel(glyph.Width - edge - 5, glyph.Height - edge - 5).Alpha);
+
+        // Reflection, not rotation: compared over the outer margin only, the same tolerance
+        // and reasoning PlateFramingMirrorsOnBothAxes uses for Post.
+        const int Tolerance = 16;
+        var mismatches = 0;
+        for (var y = 0; y < glyph.Height / 2; y++)
+        {
+            for (var x = 0; x < glyph.Width / 2; x++)
+            {
+                if (x > edge && y > edge)
+                {
+                    continue; // inside the window
+                }
+                var here = glyph.GetPixel(x, y);
+                if (Differs(here, glyph.GetPixel(glyph.Width - 1 - x, y), Tolerance)
+                    || Differs(here, glyph.GetPixel(x, glyph.Height - 1 - y), Tolerance))
+                {
+                    mismatches++;
+                }
+            }
+        }
+
+        Assert.True(mismatches < 50,
+            $"{mismatches} pixels break the flourish's mirror lines — a corner has drifted or rotated.");
     }
 
     // The glyph layer alone, with no ground and no plate art beneath it.
@@ -290,18 +349,20 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void LineArtGlyphsDrawInkAndExactlyOneTerracottaDetail()
     {
-        // Score, Post, Plate, Foreword and Folio are deliberately not in this set. Each one's icon IS
-        // its cover — a keyboard on a painted ground, a mailbox painting set into an indigo
-        // plate, a lens set into a mauve one, an engraved doorstep set into a sunrise one —
-        // rather than an ink glyph on paper, so none has an ink line to count or a terracotta
-        // detail to find. Their covers are checked by their own tests instead.
+        // Score, Post, Plate, Foreword, Folio and Index are deliberately not in this set. Each
+        // one's icon IS its cover — a keyboard on a painted ground, a mailbox painting set into
+        // an indigo plate, a lens set into a mauve one, an engraved doorstep set into a sunrise
+        // one, a coin staircase set into a bookplate-green one — rather than an ink glyph on
+        // paper, so none has an ink line to count or a terracotta detail to find. Their covers
+        // are checked by their own tests instead.
         //
         // Plate joined them when its cover landed, and the pixel this test stopped finding is
         // the point: it was counting the terracotta dot on Glyphs.Lens, the pre-rebrand Camera
         // icon in an accent P4 retired. DESIGN.md §12 says a cover carries "no single accent
-        // detail", so a cover that still had one would be the bug.
+        // detail", so a cover that still had one would be the bug. Index joined them the same
+        // way: its keyline and flourish are cream, not ink, and carry no terracotta at all.
         foreach (var spec in IconSpecs.All.Where(
-            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio")))
+            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio" or "Index")))
         {
             using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);

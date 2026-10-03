@@ -30,12 +30,60 @@ aggregator with a free personal Trial plan (real production data, capped at 10 c
    choose the **sandbox** environment, and **Save**.
 4. Tap **Connect an account** → the Plaid Hosted Link page opens in your **browser** → finish signing in,
    return to Ledger, and tap **Done**. The account list populates after the first refresh. (Link opens in
-   an external browser, not an in-app WebView, because OAuth banks like **Chase**, Bank of America, and
-   Wells Fargo block embedded WebViews and error out — a real browser is the only surface they complete in.)
+   an external browser, not an in-app WebView, because OAuth banks (the large national ones) block
+   embedded WebViews and error out — a real browser is the only surface they complete in.)
 5. When you're happy, switch the environment to **production** and connect your real institutions.
 
-Expect the four bank/card accounts plus a mortgage to connect cleanly; auto loans (e.g. Driveway),
-home-improvement loans (e.g. GreenSky), and some credit unions may not be supported by Plaid.
+Expect the four bank/card accounts plus a mortgage to connect cleanly; auto loans,
+home-improvement loans, and some credit unions may not be supported by Plaid.
+
+## Importing your Debt Snowball history
+
+The Snowball's History side is seeded from the weekly balances you have kept in your own **"Debt Snowball"
+Google Sheet** (tab **"Loans Over Time"**: one column per Friday, one row per loan). That history is your
+finances, and this repository is public, so it is **not** in the source or in the APK: it lives in your own
+Drive as an encrypted file, sealed with the same vault passphrase the rest of the suite uses, and Index reads it
+once, on your owner install, the first time the Snowball page opens. Her install never reads it.
+
+1. **Export the tab as JSON** in this shape (figures here are invented):
+
+   ```json
+   {
+     "source": "Debt Snowball sheet, tab Loans Over Time",
+     "weeks": ["2024-01-05", "2024-01-12"],
+     "loans": ["Example Student Loans", "Example Card"],
+     "rows": [
+       { "loan": "Example Student Loans", "week": "2024-01-05", "balance": 4200.00 },
+       { "loan": "Example Student Loans", "week": "2024-01-12", "balance": 4155.50 },
+       { "loan": "Example Card",          "week": "2024-01-05", "balance": 880.25 },
+       { "loan": "Example Card",          "week": "2024-01-12", "balance": 861.10 }
+     ]
+   }
+   ```
+
+   Every `week` is a `yyyy-MM-dd` date listed in `weeks`; every `loan` is listed in `loans` and is spelled
+   as the account is named in Index (or its bank is); a `balance` is a non-negative number; a loan and week
+   appear at most once. A loan that was not yet on the sheet in an early week is `0`, or has no row. A week
+   the sheet filled in by formula is kept exactly as recorded.
+2. **Seal it** with the vault passphrase. The passphrase is never a command-line argument: set it in the
+   environment for the one command, or leave it unset and type it at the no-echo prompt.
+
+   ```bash
+   INDEX_VAULT_PASSPHRASE='…' dotnet run --project Tools/IndexHistorySeal -- history.json sealed.json
+   ```
+
+   It checks the file is the shape above, prints only counts ("Sealed 70 weeks, 10 loans …"), writes only the
+   encrypted output (no plaintext copy, no temporary file) and will not overwrite an existing file without
+   `--force`. Delete `history.json` afterwards: the plaintext is the one thing that must not be kept in the
+   repository, a synced folder or a chat.
+3. **Upload** `sealed.json` to the **root of your Google Drive** and name it
+   `storyworthtelling-index-snowball-history.json`.
+4. **Open Index** on your phone and go to Snowball. With the vault passphrase set in Settings and the loans
+   connected, the History appears; Index remembers that it has imported and does not ask Drive again. If the
+   file is missing, the passphrase is missing or wrong, or Drive cannot be reached, nothing is shown or lost —
+   Index tries again the next time you open the page (no more than once every few minutes).
+
+Tests: `dotnet test Tools/IndexHistorySeal.sln` (the tool) and the Index suite above (the import).
 
 ## Security note (single-user, personal)
 
@@ -73,7 +121,7 @@ reboot to see a new icon.
 The connect flow (Hosted Link → `public_token` → exchange) is the one seam to finalize against Plaid's
 current Hosted Link documentation; the refresh/storage/display path is fully covered by tests. The hosted
 Link URL is opened in an **external browser** (an Android Custom Tab via `Browser.Default.OpenAsync`), not
-an embedded WebView: OAuth institutions such as **Chase**, Bank of America, and Wells Fargo fingerprint the
+an embedded WebView: OAuth institutions (the large national banks) fingerprint the
 browser environment and refuse to render their login inside a WebView (a generic "this part of our site
 isn't working" error), so a real browser is the only surface that completes. When the user returns and
 taps **Done**, the app polls `/link/token/get` for the completed session — the same finish step regardless
@@ -81,7 +129,7 @@ of which browser completed it.
 
 On the owner's **FocusPhone** the device-owner policy suspends every real browser and pins FocusPhone's own
 single-domain WebView as the default http/https handler, so opening Plaid Link there would dead-end (a
-WebView Chase blocks, confined to one domain so the OAuth redirect is refused). `PlaidLinkPage` detects this
+WebView the large banks block, confined to one domain so the OAuth redirect is refused). `PlaidLinkPage` detects this
 up front (`ConnectBrowserPolicy.IsRestrictedViewer`, keyed off the resolved default-browser package) and,
 instead of minting an unusable link token, tells the owner to connect banks on a browser-capable phone — the
 encrypted vault backup restores the access token onto the FocusPhone, where the daily refresh needs no

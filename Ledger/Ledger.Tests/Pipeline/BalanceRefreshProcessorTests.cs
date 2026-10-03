@@ -2,14 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Ledger.Domain.External;
-using Ledger.Domain.Model;
-using Ledger.Domain.Pipeline;
-using Ledger.Infrastructure.Configuration;
-using Ledger.Infrastructure.Pipeline;
-using Ledger.Tests.Support;
+using Index.Domain.External;
+using Index.Domain.Model;
+using Index.Domain.Pipeline;
+using Index.Infrastructure.Configuration;
+using Index.Infrastructure.Pipeline;
+using Index.Tests.Support;
 
-namespace Ledger.Tests.Pipeline;
+namespace Index.Tests.Pipeline;
 
 // The refresh step the worker drains. State lives entirely in SQLite so a refresh resumes across
 // wakeups; these tests pin the due-selection, upsert, liabilities, and failure/backoff behavior.
@@ -48,10 +48,10 @@ public class BalanceRefreshProcessorTests
     }
 
     private static PlaidAccount Depository(string id) =>
-        new(id, "Checking", "Gold Checking", "1234", "depository", "checking", "USD", 110.0, 100.0, null);
+        new(id, "Checking", "Gold Checking", "1234", "depository", "checking", "USD", 110.0m, 100.0m, null);
 
     private static PlaidAccount Credit(string id) =>
-        new(id, "Rewards Card", null, "5678", "credit", "credit card", "USD", -500.0, null, 1000.0);
+        new(id, "Rewards Card", null, "5678", "credit", "credit card", "USD", -500.0m, null, 1000.0m);
 
     [Fact]
     public async Task DueInstitution_WritesBalances_MarksCompleted_SchedulesNextDay()
@@ -79,7 +79,7 @@ public class BalanceRefreshProcessorTests
         var account = Assert.Single(institution.Accounts);
         Assert.Equal("acc1", account.AccountId);
         Assert.Equal(AccountKind.Depository, account.Kind);
-        Assert.Equal(110.0, account.CurrentBalance);
+        Assert.Equal(110.0m, account.CurrentBalance);
         Assert.Equal(Now, account.BalanceAsOfUtc);
 
         // A depository-only Item needs no Liabilities call.
@@ -98,16 +98,16 @@ public class BalanceRefreshProcessorTests
         plaid.Setup(p => p.GetBalancesAsync("access-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { Credit("card1") });
         plaid.Setup(p => p.GetLiabilitiesAsync("access-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new[] { new PlaidLiability("card1", 500.25, due, 25.0, 19.99) });
+            .ReturnsAsync(new[] { new PlaidLiability("card1", 500.25m, due, 25.0m, 19.99m) });
 
         await Create(db, plaid.Object, clock).ProcessNextAsync(CancellationToken.None);
 
         using var context = db.CreateDbContext();
         var account = context.Accounts.Single(a => a.InstitutionId == id);
         Assert.Equal(AccountKind.Credit, account.Kind);
-        Assert.Equal(500.25, account.LastStatementBalance);
-        Assert.Equal(25.0, account.NextPaymentAmount);
-        Assert.Equal(19.99, account.Apr);
+        Assert.Equal(500.25m, account.LastStatementBalance);
+        Assert.Equal(25.0m, account.NextPaymentAmount);
+        Assert.Equal(19.99m, account.Apr);
         Assert.Equal(due, account.NextPaymentDueDate);
         plaid.Verify(p => p.GetLiabilitiesAsync("access-1", It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -136,13 +136,13 @@ public class BalanceRefreshProcessorTests
         plaid.Setup(p => p.GetBalancesAsync("access-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[]
             {
-                new PlaidAccount("acc1", "Checking", "Gold Checking", "1234", "depository", "checking", "USD", 222.0, 200.0, null)
+                new PlaidAccount("acc1", "Checking", "Gold Checking", "1234", "depository", "checking", "USD", 222.0m, 200.0m, null)
             });
         await processor.ProcessNextAsync(CancellationToken.None);
 
         using var context = db.CreateDbContext();
         var account = Assert.Single(context.Accounts.Where(a => a.InstitutionId == id));
-        Assert.Equal(222.0, account.CurrentBalance);
+        Assert.Equal(222.0m, account.CurrentBalance);
     }
 
     [Fact]

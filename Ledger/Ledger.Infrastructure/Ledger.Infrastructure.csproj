@@ -14,6 +14,12 @@
     <ProjectReference Include="..\Ledger.Domain\Ledger.Domain.csproj" />
     <!-- Shared credential-health seam (ICredentialHealthSink) reported by the Plaid client. -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+    <!-- Release F (Index-P11): the worksheet's vector PDF (VectorPdfSink, PaperColorTokens,
+         PaperTypeScale), its delivery to the reMarkable, and its hand-written read-back. All three are
+         net10.0 pure-.NET libraries, referenced directly like Storyworthtelling.Voice above. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Handwriting\Storyworthtelling.Handwriting.csproj" />
   </ItemGroup>
 
   <!-- Cross-target packages. -->

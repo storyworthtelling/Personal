@@ -114,6 +114,7 @@ Registered ladders (per-app `Design/DesignTokens.cs`, §19):
 | Post | `#B9B9D4` | `#A1A1C7` | `#5C5894` | `#494676` | `#333252` | 285° | reference, 32° |
 | Plate | `#C8B5C8` | `#B69BB6` | `#7A4F7B` | `#613F62` | `#442D44` | 326° | problem, 50° |
 | Folio | `#C1C197` | `#919059` | `#6B681E` | `#575410` | `#3B3902` | 107° | positive, 21° |
+| Index | `#B6C3A9` | `#839372` | `#596C45` | `#475735` | `#2F3C21` | 129° | positive, 0° |
 
 Flyleaf's three tiers predate the five-tier ladder and are **provisional** pending a resample.
 
@@ -125,6 +126,20 @@ Release I: they lived in `Tools/IconStudio/Tokens.cs` and in no table, so the su
 check — which enumerates its apps by hand — simply did not know about them. `Folio.Tests`'
 `IdentityLadderTests` now covers them, and adds the half the suite's copy never did: distance from
 every *other* app's committed identity, which is a different failure from crowding a role.
+
+*Index* is the suite's one departure the 20° floor itself does not survive. Its identity hue is
+the bookplate cover's own green, sampled at **129°** — the same hue the Positive role sits at, a
+**0° separation** where the floor asks for 20°. It is recorded here rather than resampled or
+rotated because D116 makes the collision **inert rather than ambiguous**: Index draws no Positive
+role anywhere on its own pages — a paid-off loan is Resolved (settled, crossed out per D12)
+rather than shown Positive, and an under-limit budget line takes no colour at all — so there is
+nothing on an Index page a Positive-role green could be mistaken for. It is a single, named
+exception, for Index against Positive only; every other role, and every other app's identity,
+still has to clear 20° from Index. **`FocusPhone/Codex.Tests/Design/DesignTokensTests.cs` carries
+no exception mechanism today** — `IdentityTiersStayClearOfEverySemanticRole` is a flat assertion
+against every non-neutral role with no per-app or per-role exception list at all, so adding
+Index's named exception (guards G9/G10) means building that mechanism, not just adding an entry
+to one that already exists. That is Release B's work, not this one's.
 
 ### Contrast (binding)
 
@@ -299,6 +314,10 @@ Two markers, taking their cue from the Mockup 01 icon direction:
 
   The fold has **two jobs, and never both at once**. As a **notice** it marks something waiting and you *turn* to it when ready, with no clock running; it is **scoped to its page**, so on a list it holds what waits for the app and inside an item it holds what waits for that item. As an **undo** it carries a **back-turn arrow**, turns to nothing, and *reverses the act* on tap; it holds 6s (§7) and **overrides any notice fold** for that window, because an undo is a closing window rather than something that waits. Nothing else in the app announces itself: errors and pending decisions live behind the fold, never as banners or cards on the page.
 
+  **Turning a notice fold turns the page to a Waiting page** (mockup 17, D162) — not an action card over the page: a Serif header, the page rule, a status line ("For Accounts · newest first"), and what waits written straight onto the graph paper, in the app's own binder frame with the area's tab still lit. Each notice is what happened and what to do next (§14), static and neutral, with a thin bar in its role colour, a **date** beside its headline in the relative-time rule (§14) and at most one secondary-button action. The page is **newest first by date**: dated notices run latest to earliest, undated ones keep a stable order of their own, and a notice an owner states again unchanged keeps its place. A notice goes when its cause does, and the page is live: if the last one resolves while it is open it says "Nothing waiting."
+
+  The fold carries **six hues**, one per role it can report: Problem (a broken connection), Caution (something going stale), Action (the undo), Resolved, **Reference** (slate: something only worth knowing, such as how much of a plan's allowance is used) and **Progress** (teal: waiting, not wrong, the colour Score's Playing area and Index's Snowball already wear). Reference and Progress joined the kit's `DogEarHue` and the native `DogEar.Hues` together, so the component stays one across the MAUI and native heads. The ear is 40dp, in the page's top-right corner flush to the binder gutter, with the flap's loose tip lifted off the page and the back-turn arrow drawn as a stroked arc and head, not a glyph.
+
 Push stays almost silent (§1): only new comms earn a buzz; everything else waits as a quiet dog-ear/bookmark or arrives on the reMarkable.
 
 ---
@@ -311,7 +330,7 @@ Push stays almost silent (§1): only new comms earn a buzz; everything else wait
 - **Error template (binding):** *what happened* + *what to do next*.
 - **Numbers & units:** counts "12 of 40"; durations "42 min"; interpuncts (·) join metadata; em-dashes (—) join clause-level status.
 - **Toggles name the thing, not the verb** ("Listening Genius", not "Enable Listening Genius").
-- **Owner's voice.** Functional labels/buttons/status/errors stay **static-neutral** (never sent to a model). **Situational messaging** — welcome, empty-state invitations, book-complete notes, and error copy — may be **voiced** in the owner's voice, set in the calligraphy hand, but must **degrade silently to the neutral fallback** (and, for errors, to the §14 template — the voiced form never delays or replaces the fix). See `Storyworthtelling.Voice`.
+- **Owner's voice.** Functional labels/buttons/status/errors stay **static-neutral** (never sent to a model). **Situational messaging** — welcome, empty-state invitations, book-complete notes, and the one-line summaries an app names — may be **voiced** in the owner's voice, set in the calligraphy hand, but must **degrade silently to the neutral fallback** (or hide the line). **Errors are never voiced**: they stay in the template above, and each app keeps its voiced occasions as a closed list. A voiced line is built only from facts the app hands it, and never from a raw amount or an account's identity. See `Storyworthtelling.Voice`.
 
 ---
 

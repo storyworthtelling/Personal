@@ -8,7 +8,7 @@ namespace Storyworthtelling.Google;
 
 /// <summary>
 /// The sign-in-once broker: one Google account per install (persisted app-side in the vault's per-person
-/// section — the wife's separate install binds to her own account, #10), reached with per-app minimal
+/// section — the partner's separate install binds to her own account, #10), reached with per-app minimal
 /// scopes. It centralises the Drive-service construction every app's <c>MauiProgram</c> duplicates today, so
 /// apps stop hand-rolling their own <c>DriveService</c> factory closures. The native <c>AccountManager</c>
 /// picker and token minting stay in each Android head and are supplied here as a token delegate, keeping this

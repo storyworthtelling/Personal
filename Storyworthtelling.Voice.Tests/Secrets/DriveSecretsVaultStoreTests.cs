@@ -50,7 +50,7 @@ public class DriveSecretsVaultStoreTests
             Gemini = new GeminiSecrets("g-key"),
             Plaid = new PlaidSecrets("cid", "secret", "production")
             {
-                Items = [new PlaidItem("item-1", "access-1", "Chase")]
+                Items = [new PlaidItem("item-1", "access-1", "Redwood Bank")]
             },
             GitHubUpdateToken = "ghp_token"
         };

@@ -1,4 +1,4 @@
-namespace Ledger.Domain.Pipeline;
+namespace Index.Domain.Pipeline;
 
 // Pure exponential-backoff calculator with jitter and an optional server-supplied Retry-After
 // floor. The result is persisted as an institution's NextAttemptAtUtc, so backoff survives restarts.

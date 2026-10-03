@@ -1,9 +1,9 @@
-using Ledger.Domain.Model;
-using Ledger.Infrastructure.Services;
-using Ledger.Tests.Support;
+using Index.Domain.Model;
+using Index.Infrastructure.Services;
+using Index.Tests.Support;
 using Xunit;
 
-namespace Ledger.Tests.Services;
+namespace Index.Tests.Services;
 
 // Backing up the per-Item Plaid access tokens to the shared secrets vault and restoring them after a
 // reinstall (the FocusPhone cutover wipes the on-device database).
@@ -18,13 +18,13 @@ public class AccountServiceVaultTests
     {
         using var db = new TestDatabase();
         var service = Create(db);
-        await service.AddInstitutionAsync("item-1", "access-1", "Chase", default);
+        await service.AddInstitutionAsync("item-1", "access-1", "Redwood Bank", default);
         await service.AddInstitutionAsync("item-2", "access-2", "PNC", default);
 
         var credentials = await service.GetInstitutionCredentialsAsync(default);
 
         Assert.Collection(credentials,
-            c => Assert.Equal(("item-1", "access-1", "Chase"), (c.ItemId, c.AccessToken, c.Name)),
+            c => Assert.Equal(("item-1", "access-1", "Redwood Bank"), (c.ItemId, c.AccessToken, c.Name)),
             c => Assert.Equal(("item-2", "access-2", "PNC"), (c.ItemId, c.AccessToken, c.Name)));
     }
 
@@ -35,7 +35,7 @@ public class AccountServiceVaultTests
         var service = Create(db);
 
         var added = await service.RestoreInstitutionsAsync(
-            [new InstitutionCredential("item-1", "access-1", "Chase")], default);
+            [new InstitutionCredential("item-1", "access-1", "Redwood Bank")], default);
 
         Assert.Equal(1, added);
         var institutions = await service.GetInstitutionsAsync(default);
@@ -50,11 +50,11 @@ public class AccountServiceVaultTests
     {
         using var db = new TestDatabase();
         var service = Create(db);
-        await service.AddInstitutionAsync("item-1", "access-1", "Chase", default);
+        await service.AddInstitutionAsync("item-1", "access-1", "Redwood Bank", default);
 
         var added = await service.RestoreInstitutionsAsync(
             [
-                new InstitutionCredential("item-1", "stale-token", "Chase"), // already present — skipped
+                new InstitutionCredential("item-1", "stale-token", "Redwood Bank"), // already present — skipped
                 new InstitutionCredential("item-2", "access-2", "PNC")
             ], default);
 

@@ -45,9 +45,15 @@ public static class ReadRequest
     /// of the same payload rather than a second dialect of it — Index must not have to know
     /// which app spoke. Null when there is no balance: a fabricated one would reach Index
     /// and be believed, which is far worse than one the owner has to read themselves.
+    ///
+    /// Sender name is passed as <c>null</c> deliberately: statement OCR has no
+    /// institution-name extraction built yet (per this file's own doc comment, this path has
+    /// never been exercised against a real device). A future release that builds OCR'd
+    /// sender-name extraction from a scanned statement's header can populate this without
+    /// another contract change — the field already exists on the wire.
     /// </summary>
     public static IReadOnlyDictionary<string, string>? StatementExtras(MoneyFacts facts) =>
-        IndexHandoff.PayloadFor(facts) is { } payload ? IndexHandoff.Extras(payload) : null;
+        IndexHandoff.PayloadFor(facts, senderName: null) is { } payload ? IndexHandoff.Extras(payload) : null;
 
     private static void Add(Dictionary<string, string> extras, string key, string value)
     {

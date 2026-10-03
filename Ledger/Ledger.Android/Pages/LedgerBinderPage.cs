@@ -1,6 +1,8 @@
+using Microsoft.Maui.ApplicationModel;
+using Storyworthtelling.Maui;
 using Storyworthtelling.Maui.Views;
 
-namespace Ledger.Android.Pages;
+namespace Index.Android.Pages;
 
 /// <summary>
 /// The shape every screen in Ledger has: an in-page header with its area's rule, the content, and
@@ -25,9 +27,125 @@ public abstract class LedgerBinderPage : ContentPage
     private readonly ContentView well = new();
     private readonly ContentView barSlot = new();
 
+    // The dog-ear's place: the page's own top-right corner, which is the right edge of the content
+    // column and so flush to the binder gutter (mockup 17: top 0, right 66dp). It spans the header and
+    // the well rather than living in the well, where it sat below the header and over the first card.
+    private readonly ContentView cornerSlot = new()
+    {
+        HorizontalOptions = LayoutOptions.End,
+        VerticalOptions = LayoutOptions.Start,
+    };
+
+    // Set while this page has taken over the window's soft-input mode and the insets listener (see
+    // HidesBarForKeyboard); remembered so the way the window was before is put back.
+    private KeyboardInsetsListener? keyboardListener;
+    private global::Android.Views.SoftInput? softInputBefore;
+
     protected LedgerBinderPage()
     {
         NavigationPage.SetHasNavigationBar(this, false);
+    }
+
+    /// <summary>
+    /// True on a page with text fields, which asks for what mockups 4 and 15 draw: "the keyboard pushes the
+    /// page up so the field being typed in stays in view; the pinned bar hides while it's open". While the
+    /// page is showing it sets the window to resize for the keyboard (so the page's scroll view is what
+    /// shrinks, and the focused field can be scrolled into the space that is left) and listens for the
+    /// keyboard's insets, hiding the bar slot while the keyboard is up and showing it again after. The bar's
+    /// own content is never touched, so what <see cref="SetBar"/> set is exactly what comes back.
+    /// </summary>
+    protected virtual bool HidesBarForKeyboard => false;
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        if (HidesBarForKeyboard)
+        {
+            AttachKeyboard();
+        }
+    }
+
+    protected override void OnDisappearing()
+    {
+        DetachKeyboard();
+        base.OnDisappearing();
+    }
+
+    private void AttachKeyboard()
+    {
+        var window = Platform.CurrentActivity?.Window;
+        if (window is null || keyboardListener is not null)
+        {
+            return;
+        }
+
+        softInputBefore = window.Attributes?.SoftInputMode;
+        window.SetSoftInputMode(global::Android.Views.SoftInput.AdjustResize);
+
+        keyboardListener = new KeyboardInsetsListener(open => barSlot.IsVisible = !open);
+        window.DecorView.SetOnApplyWindowInsetsListener(keyboardListener);
+    }
+
+    private void DetachKeyboard()
+    {
+        var window = Platform.CurrentActivity?.Window;
+        if (keyboardListener is null)
+        {
+            return;
+        }
+
+        window?.DecorView.SetOnApplyWindowInsetsListener(null);
+        if (window is not null && softInputBefore is { } before)
+        {
+            window.SetSoftInputMode(before);
+        }
+
+        keyboardListener.Dispose();
+        keyboardListener = null;
+        softInputBefore = null;
+        barSlot.IsVisible = true; // the bar is never left hidden by a page that has gone
+    }
+
+    /// <summary>
+    /// Keeps a field in view while it is typed in: when <paramref name="entry"/> takes focus, the page's
+    /// scroll view scrolls it into the part of the page the keyboard has left. Waits a beat for the
+    /// keyboard to finish opening, because the viewport it scrolls within is the shrunken one.
+    /// </summary>
+    protected void KeepVisibleWhenFocused(ScrollView scroll, Entry entry)
+    {
+        entry.Focused += (_, _) => Dispatcher.DispatchDelayed(
+            TimeSpan.FromMilliseconds(250), () => _ = scroll.ScrollToAsync(entry, ScrollToPosition.MakeVisible, animated: true));
+    }
+
+    /// <summary>
+    /// True on a page that has work to finish before it is left (Settings: the fields it saves as they
+    /// are left). Turning a tab, or pressing back, then waits for <see cref="BeforeLeavingAsync"/> first.
+    /// </summary>
+    protected virtual bool CommitsBeforeLeaving => false;
+
+    /// <summary>What a page with <see cref="CommitsBeforeLeaving"/> finishes before it goes.</summary>
+    protected virtual Task BeforeLeavingAsync() => Task.CompletedTask;
+
+    /// <summary>Back on a page that commits before leaving: finish, then pop. A page that does not asks
+    /// nothing of this.</summary>
+    protected override bool OnBackButtonPressed()
+    {
+        if (!CommitsBeforeLeaving)
+        {
+            return base.OnBackButtonPressed();
+        }
+
+        _ = PopAfterCommitAsync();
+        return true; // handled: the pop happens once the commit has
+    }
+
+    private async Task PopAfterCommitAsync()
+    {
+        await BeforeLeavingAsync();
+        if (Navigation.NavigationStack.Count > 1)
+        {
+            await Navigation.PopAsync();
+        }
     }
 
     /// <summary>Which tab is lit. A detail screen lights the area it was opened from.</summary>
@@ -37,9 +155,8 @@ public abstract class LedgerBinderPage : ContentPage
     /// Puts the frame around whatever this page's XAML built. Call it once, after
     /// <c>InitializeComponent</c>. <see cref="PaperPageHeader"/> reads its own "DisplayLabel"
     /// style through <c>PaperResources</c>, which walks the app's merged resources rather than
-    /// any one dictionary's own entries — so it resolves against Ledger's existing
-    /// DesignTokens.xaml (which registers that same name) without Ledger merging the kit's own
-    /// style dictionary.
+    /// any one dictionary's own entries — so it resolves against the kit's Paper.xaml, merged in
+    /// App.xaml.cs (Release B).
     /// </summary>
     protected void Wrap(LedgerArea area, string title)
     {
@@ -74,7 +191,10 @@ public abstract class LedgerBinderPage : ContentPage
         // whole width: the bar belongs to the page you are on, not to the binder.
         page.Children.Add(column);
         page.Children.Add(strip);
+        page.Children.Add(cornerSlot);
         page.Children.Add(barSlot);
+        Grid.SetRow(cornerSlot, 0);
+        Grid.SetColumn(cornerSlot, 0);
         Grid.SetRow(column, 0);
         Grid.SetColumn(column, 0);
         Grid.SetRow(strip, 0);
@@ -85,6 +205,12 @@ public abstract class LedgerBinderPage : ContentPage
 
         Content = page;
     }
+
+    /// <summary>
+    /// Puts the page's dog-ear in its corner. Call it with the page's <c>DogEar</c> once; the frame owns
+    /// the placement so no screen decides for itself where the corner is.
+    /// </summary>
+    protected void SetCorner(View ear) => cornerSlot.Content = ear;
 
     /// <summary>
     /// The pinned bar (§7). Buttons in order, the primary one last — it takes the width that is
@@ -115,7 +241,10 @@ public abstract class LedgerBinderPage : ContentPage
                 new BoxView
                 {
                     HeightRequest = 1,
-                    Color = (Color)Application.Current!.Resources["Hairline"],
+                    // Not the indexer: it looks only at a dictionary's own entries, while
+                    // PaperResources.Colour walks what has been merged into it — and "Hairline"
+                    // now arrives from the kit by merge, not from a dictionary this head owns.
+                    Color = PaperResources.Colour("Hairline"),
                 },
                 row,
             },
@@ -132,17 +261,51 @@ public abstract class LedgerBinderPage : ContentPage
     {
         var chosen = (LedgerArea)index;
 
+        if (CommitsBeforeLeaving)
+        {
+            await BeforeLeavingAsync();
+        }
+
         await Navigation.PopToRootAsync(animated: false);
 
-        if (chosen != LedgerArea.Balances)
+        if (chosen != LedgerArea.Accounts)
         {
             await Navigation.PushAsync(Root(chosen), animated: false);
         }
     }
 
+    // Savings is real as of Release G (mockups 9/16); Snowball (Release D, mockup 6) and Budget
+    // (Release E, mockups 7/8) already were.
     private static Page Root(LedgerArea area) => area switch
     {
         LedgerArea.Settings => IPlatformApplication.Current!.Services.GetRequiredService<SetupPage>(),
-        _ => throw new ArgumentOutOfRangeException(nameof(area), area, "Balances is the navigation root."),
+        LedgerArea.Snowball => IPlatformApplication.Current!.Services.GetRequiredService<SnowballPage>(),
+        LedgerArea.Budget => IPlatformApplication.Current!.Services.GetRequiredService<BudgetPage>(),
+        LedgerArea.Savings => IPlatformApplication.Current!.Services.GetRequiredService<SavingsPage>(),
+        _ => throw new ArgumentOutOfRangeException(nameof(area), area, "Accounts is the navigation root."),
     };
+}
+
+/// <summary>
+/// Reports whether the soft keyboard is showing, from the window's insets (API 30's IME inset — the app's
+/// floor is 34, see the csproj). Hands the insets straight on to the view's own handling afterwards, so
+/// listening changes nothing about how the window lays out.
+/// </summary>
+internal sealed class KeyboardInsetsListener(Action<bool> changed)
+    : Java.Lang.Object, global::Android.Views.View.IOnApplyWindowInsetsListener
+{
+    private bool? lastOpen;
+
+    public global::Android.Views.WindowInsets OnApplyWindowInsets(
+        global::Android.Views.View v, global::Android.Views.WindowInsets insets)
+    {
+        var open = insets.IsVisible(global::Android.Views.WindowInsets.Type.Ime());
+        if (lastOpen != open)
+        {
+            lastOpen = open;
+            changed(open);
+        }
+
+        return v.OnApplyWindowInsets(insets) ?? insets;
+    }
 }

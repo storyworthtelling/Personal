@@ -188,7 +188,7 @@ public class ArchiveBackupTests
                 Subject = i % 2 == 0 ? "Re: Dinner plans" : "Following up",
                 Body = body,
                 FromAddress = $"person{i % 25}@example.com",
-                Recipients = ["storyworthtelling@gmail.com"],
+                Recipients = ["recipient@example.com"],
             };
             ghosts.Add(new Ghost(item, Now.AddMinutes(-i)));
         }

@@ -1,7 +1,7 @@
-using Ledger.Domain.Health;
+using Index.Domain.Health;
 using Xunit;
 
-namespace Ledger.Tests.Health;
+namespace Index.Tests.Health;
 
 public class PlaidFailureTests
 {
