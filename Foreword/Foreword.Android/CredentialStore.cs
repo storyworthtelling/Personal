@@ -54,7 +54,7 @@ public static class CredentialStore
     // here, which then unlocks restoring the NYT cookie/key, the reMarkable token, and the Anthropic key
     // from Drive. Empty means this app doesn't yet participate in the vault.
     // The work shifts and the off-day words. WorkScheduleOptions was hardcoded with no screen at
-    // all — Rowan 08:00–16:00, Jordan 08:00–15:30 — so changing a shift meant changing a default and
+    // all — two people's hours written into the defaults — so changing a shift meant changing a default and
     // building the app. C1's foot edits this.
     public static string WorkScheduleJson
     {

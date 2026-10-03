@@ -11,7 +11,7 @@ public sealed record CalendarSplit(
 ///
 /// <para>Never silently printed, never silently dropped — both silent outcomes are bad in their own
 /// way, and the old behaviour was the first: an unmapped calendar fell to the default column, so a
-/// calendar the owner subscribed to started printing into Rowan's column without anything having
+/// calendar the owner subscribed to started printing into the first person's column without anything having
 /// asked. Dropping it instead would be worse: they would be looking for something that never
 /// arrived, with nothing anywhere to say why.</para>
 ///

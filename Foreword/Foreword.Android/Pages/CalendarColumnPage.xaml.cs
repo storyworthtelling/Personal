@@ -37,13 +37,14 @@ public partial class CalendarColumnPage : BinderPage
 
         var current = settings.RuleName(calendarId);
 
-        foreach (var person in ColumnSet.People)
+        // This account's own columns, as set up on the Columns screen.
+        foreach (var person in settings.Layout.People)
         {
             Add(Choices, person.ToString(), current == person.ToString(),
                 () => settings.SetRule(calendarId, person, false, false, false));
         }
 
-        // Watch is the fifth column — games, fixtures and anything you follow rather than attend.
+        // Watch is the last column — games, fixtures and anything you follow rather than attend.
         Add(Choices, PersonColumn.Watch.ToString(), current == PersonColumn.Watch.ToString(),
             () => settings.SetRule(calendarId, PersonColumn.Watch, false, false, false));
 

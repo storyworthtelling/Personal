@@ -43,7 +43,7 @@ public partial class CalendarSplitPage : BinderPage
     {
         Words.Clear();
 
-        foreach (var person in ColumnSet.People)
+        foreach (var person in settings.Layout.People)
         {
             AddWordRow(person);
         }
@@ -81,9 +81,10 @@ public partial class CalendarSplitPage : BinderPage
     {
         Addresses.Clear();
 
-        // The two who have one. An address field for Wren or Linden could never match anything and
-        // would never say so — see PersonIdentity, and the guard that pins this loop.
-        foreach (var person in PersonIdentity.WithMailboxes)
+        // Only the people marked as having a Google account of their own. An address field for
+        // anybody else could never match anything and would never say so — see ColumnLayout, and
+        // the guard that pins this loop.
+        foreach (var person in settings.Layout.WithAccounts)
         {
             AddAddressRow(person);
         }
@@ -205,11 +206,13 @@ public partial class CalendarSplitPage : BinderPage
         }
 
         PreviewCaption.Text = string.Empty;
+        var people = settings.Layout.People;
         var routing = new ColumnRouting(
+            people,
             Column: null,
-            Addresses: ColumnSet.People.ToDictionary(
+            Addresses: people.ToDictionary(
                 p => p, p => (IReadOnlyList<string>)(settings.Mapping.PersonAddresses.TryGetValue(p, out var a) ? a : [])),
-            Names: ColumnSet.People.ToDictionary(p => p, p => (IReadOnlyList<string>)settings.WordsFor(p)),
+            Names: people.ToDictionary(p => p, p => (IReadOnlyList<string>)settings.WordsFor(p)),
             // The SAME fallback the morning will use, not this screen's own reading of it. A
             // preview free to disagree with the delivery is worse than no preview.
             Default: IPlatformApplication.Current!.Services
@@ -218,7 +221,7 @@ public partial class CalendarSplitPage : BinderPage
         foreach (var e in events.OrderBy(e => e.Start))
         {
             var columns = ColumnSet.Resolve(e, routing);
-            var goes = ColumnSet.People.All(columns.Contains)
+            var goes = people.All(columns.Contains)
                 ? "Everyone"
                 : string.Join(" · ", columns);
 

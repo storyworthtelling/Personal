@@ -12,8 +12,8 @@ namespace Foreword.Tests.Calendar;
 ///
 /// <para><b>A box in each column otherwise</b>, at its true time and full height, with a line
 /// naming who else is there. This mode exists because two groups at the same hour interleave across
-/// the columns and there is no horizontal room left: Rowan and Wren doing one thing while Jordan and
-/// Linden do another cannot both span. Stacking them vertically was tried and rejected — it draws a
+/// the columns and there is no horizontal room left: Alex and Riley doing one thing while Sam and
+/// Jo do another cannot both span. Stacking them vertically was tried and rejected — it draws a
 /// two-hour event as a one-hour one, which is a lie about the day rather than a compromise about
 /// the drawing.</para>
 /// </summary>
@@ -33,9 +33,9 @@ public class SharedEventModeTests
     [Fact]
     public void AnEventForOnePersonIsNeverSpanned()
     {
-        var swimming = Event("Swimming", 9, 10, PersonColumn.Wren);
+        var swimming = Event("Swimming", 9, 10, Household.Riley);
 
-        Assert.False(SharedEventMode.Spans(swimming, [swimming]));
+        Assert.False(SharedEventMode.Spans(swimming, [swimming], Household.Layout.Printed));
     }
 
     /// <summary>
@@ -44,36 +44,36 @@ public class SharedEventModeTests
     [Fact]
     public void AdjacentPeopleAloneInTheirHourGetOneBox()
     {
-        var swimming = Event("Swimming", 9, 10, PersonColumn.Wren, PersonColumn.Linden);
+        var swimming = Event("Swimming", 9, 10, Household.Riley, Household.Jo);
 
-        Assert.True(SharedEventMode.Spans(swimming, [swimming]));
+        Assert.True(SharedEventMode.Spans(swimming, [swimming], Household.Layout.Printed));
     }
 
     /// <summary>
-    /// The owner's own objection, and the reason the second mode exists: Rowan and Wren doing one
-    /// thing while Jordan and Linden do another. The columns interleave, so neither can span without
+    /// The owner's own objection, and the reason the second mode exists: Alex and Riley doing one
+    /// thing while Sam and Jo do another. The columns interleave, so neither can span without
     /// crossing the other.
     /// </summary>
     [Fact]
     public void TwoInterleavedGroupsInTheSameHourEachDrawPerColumn()
     {
-        var ours = Event("Museum", 10, 12, PersonColumn.Rowan, PersonColumn.Wren);
-        var theirs = Event("Football", 10, 12, PersonColumn.Jordan, PersonColumn.Linden);
+        var ours = Event("Museum", 10, 12, Household.Alex, Household.Riley);
+        var theirs = Event("Football", 10, 12, Household.Sam, Household.Jo);
 
-        Assert.False(SharedEventMode.Spans(ours, [ours, theirs]));
-        Assert.False(SharedEventMode.Spans(theirs, [ours, theirs]));
+        Assert.False(SharedEventMode.Spans(ours, [ours, theirs], Household.Layout.Printed));
+        Assert.False(SharedEventMode.Spans(theirs, [ours, theirs], Household.Layout.Printed));
     }
 
     /// <summary>
     /// People who are not side by side cannot share a box without swallowing the column between
-    /// them — a box over Rowan and Wren would silently cover Jordan's ten o'clock.
+    /// them — a box over Alex and Riley would silently cover Sam's ten o'clock.
     /// </summary>
     [Fact]
     public void PeopleWhoAreNotSideBySideDrawPerColumn()
     {
-        var e = Event("Errand", 9, 10, PersonColumn.Rowan, PersonColumn.Wren);
+        var e = Event("Errand", 9, 10, Household.Alex, Household.Riley);
 
-        Assert.False(SharedEventMode.Spans(e, [e]));
+        Assert.False(SharedEventMode.Spans(e, [e], Household.Layout.Printed));
     }
 
     /// <summary>
@@ -83,23 +83,23 @@ public class SharedEventModeTests
     [Fact]
     public void SomethingElseInOneOfTheColumnsTakesTheSpanAway()
     {
-        var swimming = Event("Swimming", 9, 11, PersonColumn.Wren, PersonColumn.Linden);
-        var piano = Event("Piano", 10, 11, PersonColumn.Linden);
+        var swimming = Event("Swimming", 9, 11, Household.Riley, Household.Jo);
+        var piano = Event("Piano", 10, 11, Household.Jo);
 
-        Assert.False(SharedEventMode.Spans(swimming, [swimming, piano]));
+        Assert.False(SharedEventMode.Spans(swimming, [swimming, piano], Household.Layout.Printed));
     }
 
     /// <summary>
-    /// Something in a column the event does not touch is irrelevant. A busy Rowan does not break the
+    /// Something in a column the event does not touch is irrelevant. A busy Alex does not break the
     /// girls' swimming lesson.
     /// </summary>
     [Fact]
     public void SomethingInAnUnrelatedColumnDoesNotTakeTheSpanAway()
     {
-        var swimming = Event("Swimming", 9, 10, PersonColumn.Wren, PersonColumn.Linden);
-        var standup = Event("Standup", 9, 10, PersonColumn.Rowan);
+        var swimming = Event("Swimming", 9, 10, Household.Riley, Household.Jo);
+        var standup = Event("Standup", 9, 10, Household.Alex);
 
-        Assert.True(SharedEventMode.Spans(swimming, [swimming, standup]));
+        Assert.True(SharedEventMode.Spans(swimming, [swimming, standup], Household.Layout.Printed));
     }
 
     /// <summary>
@@ -109,10 +109,10 @@ public class SharedEventModeTests
     [Fact]
     public void AnEventThatOnlyTouchesDoesNotTakeTheSpanAway()
     {
-        var swimming = Event("Swimming", 9, 10, PersonColumn.Wren, PersonColumn.Linden);
-        var piano = Event("Piano", 10, 11, PersonColumn.Linden);
+        var swimming = Event("Swimming", 9, 10, Household.Riley, Household.Jo);
+        var piano = Event("Piano", 10, 11, Household.Jo);
 
-        Assert.True(SharedEventMode.Spans(swimming, [swimming, piano]));
+        Assert.True(SharedEventMode.Spans(swimming, [swimming, piano], Household.Layout.Printed));
     }
 
     /// <summary>
@@ -122,37 +122,37 @@ public class SharedEventModeTests
     [Fact]
     public void AWholeFamilyEventSpansAllFour()
     {
-        var dinner = Event("Dinner", 18, 19, [.. ColumnSet.People]);
+        var dinner = Event("Dinner", 18, 19, [.. Household.Layout.People]);
 
-        Assert.True(SharedEventMode.Spans(dinner, [dinner]));
+        Assert.True(SharedEventMode.Spans(dinner, [dinner], Household.Layout.Printed));
     }
 
     /// <summary>
     /// Who else is there, for the line the per-column mode carries. It names the others, not
-    /// everyone — a box in Wren's column saying "with Wren" would be telling her about herself.
+    /// everyone — a box in Riley's column saying "with Riley" would be telling her about herself.
     /// </summary>
     [Fact]
     public void TheWithLineNamesTheOthersNotTheReader()
     {
-        var swimming = Event("Swimming", 9, 10, PersonColumn.Wren, PersonColumn.Linden);
+        var swimming = Event("Swimming", 9, 10, Household.Riley, Household.Jo);
 
-        Assert.Equal("with Linden", SharedEventMode.WithLine(swimming, PersonColumn.Wren));
-        Assert.Equal("with Wren", SharedEventMode.WithLine(swimming, PersonColumn.Linden));
+        Assert.Equal("with Jo", SharedEventMode.WithLine(swimming, Household.Riley));
+        Assert.Equal("with Riley", SharedEventMode.WithLine(swimming, Household.Jo));
     }
 
     [Fact]
     public void TheWithLineIsEmptyForAnEventNobodyElseIsAt()
     {
-        var dentist = Event("Dentist", 9, 10, PersonColumn.Rowan);
+        var dentist = Event("Dentist", 9, 10, Household.Alex);
 
-        Assert.Equal(string.Empty, SharedEventMode.WithLine(dentist, PersonColumn.Rowan));
+        Assert.Equal(string.Empty, SharedEventMode.WithLine(dentist, Household.Alex));
     }
 
     [Fact]
     public void TheWithLineNamesSeveralOthers()
     {
-        var dinner = Event("Dinner", 18, 19, [.. ColumnSet.People]);
+        var dinner = Event("Dinner", 18, 19, [.. Household.Layout.People]);
 
-        Assert.Equal("with Jordan, Wren, Linden", SharedEventMode.WithLine(dinner, PersonColumn.Rowan));
+        Assert.Equal("with Sam, Riley, Jo", SharedEventMode.WithLine(dinner, Household.Alex));
     }
 }

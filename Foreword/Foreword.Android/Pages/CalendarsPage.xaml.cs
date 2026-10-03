@@ -38,6 +38,18 @@ public partial class CalendarsPage : BinderPage
     }
 
     /// <summary>
+    /// Every calendar screen hangs off this one, so leaving it is when the edits made in them —
+    /// columns, rules, words, shifts — are backed up to this account's personal vault. Not awaited:
+    /// the backup is best-effort and never holds the screen, and it reports failure by returning
+    /// false rather than throwing.
+    /// </summary>
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _ = IPlatformApplication.Current!.Services.GetService<VaultSync>()?.PublishCalendarAsync(CancellationToken.None);
+    }
+
+    /// <summary>
     /// Reads the list from Google. A failure is a status sentence, not a dialog — and the screen
     /// still renders, from the mapping already stored, so a phone with no signal can still be read.
     /// </summary>
@@ -63,6 +75,13 @@ public partial class CalendarsPage : BinderPage
 
         var arrived = NewCalendars.Since(calendars.Keys, settings.SeenCalendarIds);
         var known = calendars.Keys.Where(id => !arrived.Contains(id)).ToList();
+
+        // The columns come first: every calendar below is answered with one of them. They are this
+        // account's own, set up here rather than written into the app.
+        var columns = Row("Columns", string.Join(" · ", settings.Layout.Printed), string.Empty);
+        Tap(columns, async () => await Navigation.PushAsync(new CalendarColumnsPage()));
+        Groups.Add(GroupLabel("Your columns"));
+        Groups.Add(Card([columns]));
 
         if (known.Count > 0)
         {

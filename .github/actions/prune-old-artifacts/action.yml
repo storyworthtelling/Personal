@@ -44,23 +44,26 @@ runs:
               github.paginate(github.rest.actions.listWorkflowRuns, {
                 owner, repo, workflow_id: workflowId, per_page: 100,
               }));
+            const olderRuns = new Set(runs.map((run) => run.id).filter((id) => id !== context.runId));
+
+            // One repo-wide artifact listing, filtered to this workflow's older runs. Asking each
+            // run for its artifacts instead cost one API call per run ever made — about 35 seconds
+            // of billed runner time per build, and growing with the history.
+            const artifacts = await withRetry('listArtifactsForRepo', () =>
+              github.paginate(github.rest.actions.listArtifactsForRepo, {
+                owner, repo, per_page: 100,
+              }));
 
             let deleted = 0;
-            for (const run of runs) {
-              if (run.id === context.runId) continue;
-              const artifacts = await withRetry('listWorkflowRunArtifacts', () =>
-                github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
-                  owner, repo, run_id: run.id, per_page: 100,
-                }));
-              for (const artifact of artifacts) {
-                try {
-                  await withRetry('deleteArtifact', () =>
-                    github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id }));
-                  core.info(`Deleted artifact '${artifact.name}' (id ${artifact.id}) from run ${run.id}.`);
-                  deleted++;
-                } catch (error) {
-                  core.warning(`Could not delete artifact '${artifact.name}' (id ${artifact.id}): ${error.message}`);
-                }
+            for (const artifact of artifacts) {
+              if (artifact.expired || !olderRuns.has(artifact.workflow_run?.id)) continue;
+              try {
+                await withRetry('deleteArtifact', () =>
+                  github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id }));
+                core.info(`Deleted artifact '${artifact.name}' (id ${artifact.id}) from run ${artifact.workflow_run.id}.`);
+                deleted++;
+              } catch (error) {
+                core.warning(`Could not delete artifact '${artifact.name}' (id ${artifact.id}): ${error.message}`);
               }
             }
             core.info(`Pruned ${deleted} artifact(s) from older runs of workflow ${workflowId}.`);
