@@ -43,7 +43,7 @@ public static class AppTrayLayout
                 continue;
             }
 
-            // The owner's other apps (Canonizer, Ledger, Foreword, …) always sit loose at the
+            // The owner's other apps (Canonizer, Index, Foreword, …) always sit loose at the
             // root — never foldered — so an override can't move them.
             if (IsRepoApp(app.PackageName))
             {

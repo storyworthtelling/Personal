@@ -1,6 +1,6 @@
 using global::Google.Apis.Http;
 
-namespace Ledger.Android.Google;
+namespace Index.Android.Google;
 
 // Routes the Google API client's own HttpClient through AndroidMessageHandler. Android's SELinux policy
 // blocks the raw sockets the default SocketsHttpHandler opens in an app process, so the Google SDK

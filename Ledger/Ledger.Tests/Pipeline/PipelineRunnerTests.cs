@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Ledger.Infrastructure.Pipeline;
-using Ledger.Tests.Support;
+using Index.Infrastructure.Pipeline;
+using Index.Tests.Support;
 
-namespace Ledger.Tests.Pipeline;
+namespace Index.Tests.Pipeline;
 
 // The drain loop the Android WorkManager worker runs each cycle. It must finish promptly with a result
 // the worker can map to WorkManager's Success/Retry, never sleeping through a long backoff.

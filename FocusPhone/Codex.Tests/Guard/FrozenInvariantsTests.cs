@@ -818,6 +818,7 @@ public class FrozenInvariantsTests
     [InlineData("Plate", "PlateGroundHex", "Ground")]
     [InlineData("Plate", "PlateMarkHex", "Mark")]
     [InlineData("Plate", "PlateDeepHex", "Deep")]
+    [InlineData("Index", "IndexClothHex", "Cloth")]
     public void IconStudioIdentityHexesMatchTheDomainLadder(string app, string hexName, string tier)
     {
         var tokens = File.ReadAllText(Path.Combine(RepoRoot(), "Tools", "IconStudio", "Tokens.cs"));
@@ -840,6 +841,7 @@ public class FrozenInvariantsTests
         ("Plate", "Ground") => DesignTokens.Identity.Plate.Ground,
         ("Plate", "Mark") => DesignTokens.Identity.Plate.Mark,
         ("Plate", "Deep") => DesignTokens.Identity.Plate.Deep,
+        ("Index", "Cloth") => DesignTokens.Identity.Index.Cloth,
         _ => throw new ArgumentOutOfRangeException(nameof(tier), $"{app}.{tier} is not a mapped ladder tier."),
     };
 

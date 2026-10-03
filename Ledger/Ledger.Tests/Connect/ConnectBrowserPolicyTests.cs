@@ -1,7 +1,7 @@
-using Ledger.Domain.Connect;
+using Index.Domain.Connect;
 using Xunit;
 
-namespace Ledger.Tests.Connect;
+namespace Index.Tests.Connect;
 
 public class ConnectBrowserPolicyTests
 {

@@ -1,4 +1,4 @@
-namespace Ledger.Domain.Health;
+namespace Index.Domain.Health;
 
 // Classifies a Plaid error_code as a credentials problem (the client id/secret entered on the Settings
 // page are wrong) versus anything else — a per-item login/token problem, a rate limit, a transient error.

@@ -22,11 +22,11 @@ public class AppTrayLayoutTests
     public void RepoApps_GoToRoot_NotFoldersOrLoose()
     {
         var model = Build(
-            [App("com.storyworthtelling.storyboarder"), App("com.storyworthtelling.ledger"),
+            [App("com.storyworthtelling.storyboarder"), App("com.storyworthtelling.index"),
              App("com.storyworthtelling.dailyloader")]);
 
         Assert.Equal(
-            new[] { "com.storyworthtelling.storyboarder", "com.storyworthtelling.ledger", "com.storyworthtelling.dailyloader" },
+            new[] { "com.storyworthtelling.storyboarder", "com.storyworthtelling.index", "com.storyworthtelling.dailyloader" },
             model.RepoApps.Select(a => a.PackageName));
         Assert.Empty(model.Folders);
         Assert.Empty(model.LooseApps);
@@ -95,11 +95,11 @@ public class AppTrayLayoutTests
     [Fact]
     public void OverrideOnRepoApp_IsIgnored_RepoAppStaysAtRoot()
     {
-        var overrides = new Dictionary<string, string> { ["com.storyworthtelling.ledger"] = CategoryCatalog.Finance };
+        var overrides = new Dictionary<string, string> { ["com.storyworthtelling.index"] = CategoryCatalog.Finance };
 
-        var model = Build([App("com.storyworthtelling.ledger")], overrides);
+        var model = Build([App("com.storyworthtelling.index")], overrides);
 
-        Assert.Equal("com.storyworthtelling.ledger", Assert.Single(model.RepoApps).PackageName);
+        Assert.Equal("com.storyworthtelling.index", Assert.Single(model.RepoApps).PackageName);
         Assert.Empty(model.Folders);
     }
 

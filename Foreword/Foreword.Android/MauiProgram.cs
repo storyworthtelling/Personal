@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Maui.Controls.Hosting;
 using Microsoft.Maui.Hosting;
+using Foreword.Domain.Health;
 using Foreword.Domain.Interfaces;
 using Foreword.Infrastructure.Brief;
 using Foreword.Infrastructure.Calendar;
@@ -16,6 +17,7 @@ using Foreword.Infrastructure.Pdf;
 using Foreword.Infrastructure.Install;
 using Foreword.Infrastructure.Prayer;
 using Foreword.Android.Google;
+using Storyworthtelling.Handwriting;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
@@ -71,6 +73,11 @@ public static class MauiProgram
             }));
         builder.Services.AddSingleton<IOptions<AnthropicOptions>>(
             _ => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions { ApiKey = CredentialStore.AnthropicApiKey }));
+        // The shared Storyworthtelling.Handwriting extractor owns its own options shape (it does
+        // not know Foreword's AnthropicOptions, which is shared with the task reader and the two
+        // Prayer composers) — same key, same source, just its own IOptions<T> registration.
+        builder.Services.AddSingleton<IOptions<ClaudeVisionOptions>>(
+            _ => new LiveOptions<ClaudeVisionOptions>(() => new ClaudeVisionOptions { ApiKey = CredentialStore.AnthropicApiKey }));
         // Whose phone this is (Release I). Built fresh from this install's own settings and never
         // deserialised from a shared document. Inferred, never asked: the signed-in account against
         // the account that owns the shared vault (cached by VaultSync when it reads the vault).
@@ -154,7 +161,23 @@ public static class MauiProgram
         builder.Services.AddTransient<TaskEditor>();
         builder.Services.AddHttpClient<ITaskReadingClient, ClaudeTaskReader>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
-        builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>()
+        // Storyworthtelling.Handwriting (Index-P11 Release F): Foreword supplies its own exact
+        // instruction wording and its shared Anthropic
+        // credential id as constructor arguments, which is why this is a factory registration
+        // rather than the bare AddHttpClient<TClient, TImplementation>() every other typed client
+        // here uses — ActivatorUtilities cannot resolve a plain string constructor parameter.
+        builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>(
+            (httpClient, sp) => new ClaudeVisionHandwritingExtractor(
+                HandwritingInstruction.Text,
+                CredentialIds.Anthropic,
+                httpClient,
+                sp.GetRequiredService<IOptions<ClaudeVisionOptions>>(),
+                sp.GetRequiredService<ILogger<ClaudeVisionHandwritingExtractor>>(),
+                sp.GetService<ICredentialHealthSink>(),
+                // The account's own column names ride beside each page (read live, so a column
+                // added on the Columns screen is on the next read), never in the cached instruction.
+                () => HandwritingInstruction.Message(
+                    sp.GetRequiredService<IOptions<CalendarMappingOptions>>().Value.Layout().Printed)))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         // Maps Platform: the drives on the calendar page and everything on the weather page. Both
         // degrade to nothing without a key, so the morning still goes out before one is entered.

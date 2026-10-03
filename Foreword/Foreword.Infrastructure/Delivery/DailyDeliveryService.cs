@@ -25,7 +25,7 @@ public class DailyDeliveryService(
     IDayPdfComposer dayComposer,
     IWeatherClient weather,
     IRouteClient routes,
-    IHandwritingExtractor handwriting,
+    Storyworthtelling.Handwriting.IHandwritingExtractor handwriting,
     IRemarkableClient remarkable,
     IOptions<AnthropicOptions> anthropicOptions,
     ILogger<DailyDeliveryService> logger)
@@ -136,7 +136,7 @@ public class DailyDeliveryService(
                     if (note.Confidence >= threshold)
                         await ApplyNote(note);
                     else
-                        carryovers.Add(note);
+                        carryovers.Add(ToCarryover(note));
                 }
             }
             catch (Exception ex)
@@ -148,7 +148,7 @@ public class DailyDeliveryService(
         return (carryovers, docIds);
     }
 
-    private async Task ApplyNote(ParsedNote note)
+    private async Task ApplyNote(Storyworthtelling.Handwriting.ParsedNote note)
     {
         if (note.IsTask)
         {
@@ -164,12 +164,38 @@ public class DailyDeliveryService(
             Title = note.Text,
             // Nobody named on it means whoever wrote it — which is whoever this phone belongs to,
             // not whoever the app was first written for (Release I).
-            Columns = [note.Column ?? columnMapper.Owner],
+            Columns = [ParseColumn(note.Column) ?? columnMapper.Owner],
             Start = start,
             End = isAllDay ? start.Date.AddDays(1) : start.AddHours(1),
             IsAllDay = isAllDay
         });
         logger.LogInformation("Added event from handwriting: {Text}", note.Text);
+    }
+
+    // Yesterday's low-confidence notes are carried into today's document as Foreword's own
+    // ParsedNote (PersonColumn and all) so the timeline page can print them for re-entry — the
+    // shared extractor's ParsedNote.Column is a raw string precisely because the shared library
+    // does not know about PersonColumn.
+    private ParsedNote ToCarryover(Storyworthtelling.Handwriting.ParsedNote note) => new()
+    {
+        Text = note.Text,
+        When = note.When,
+        Column = ParseColumn(note.Column),
+        IsTask = note.IsTask,
+        Confidence = note.Confidence
+    };
+
+    // Only one of this account's printed columns. A name the model offers that is not one reads as
+    // no column, and the note goes where an unnamed note goes, rather than into a column the page
+    // does not print.
+    private PersonColumn? ParseColumn(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var named = new PersonColumn(value);
+        var printed = columnMapper.Layout.Printed;
+        return printed.Contains(named) ? printed.First(c => c == named) : null;
     }
 
     private async Task<bool> TryUpload(string title, byte[] pdf)

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:LedgerBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:Index.Android.Pages"
+             x:Class="Index.Android.Pages.AddManualAccountPage">
+    <!-- Everything is built in code-behind, matching MainPage/PlaidLinkPage's convention: this XAML
+         exists only to satisfy LedgerBinderShellTests and InitializeComponent(). -->
+</pages:LedgerBinderPage>

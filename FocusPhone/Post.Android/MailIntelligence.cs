@@ -132,9 +132,28 @@ internal static class MailIntelligence
         }
 
         var facts = MoneyMail.Read(item.Subject, item.Body);
-        if (IndexHandoff.PayloadFor(facts) is { } payload)
+        var senderName = ResolveSenderName(context, item.ContactKey);
+        if (IndexHandoff.PayloadFor(facts, senderName) is { } payload)
         {
             IndexCourier.Send(context, payload);
+        }
+    }
+
+    // ContactNameResolver already handles the not-in-contacts case gracefully (falls back to
+    // the raw key — the email address itself for the common bill/statement sender), but a
+    // ContentResolver call can still throw for reasons that have nothing to do with this
+    // balance handoff (e.g. no ContentResolver on a torn-down context). A lookup failure here
+    // must not break the handoff, so it degrades to no sender name rather than propagating.
+    private static string? ResolveSenderName(Context context, string contactKey)
+    {
+        try
+        {
+            return ContactNameResolver.DisplayName(context, contactKey);
+        }
+        catch (Exception e)
+        {
+            Android.Util.Log.Info("Post", $"Could not resolve sender name for Index handoff: {e.Message}");
+            return null;
         }
     }
 

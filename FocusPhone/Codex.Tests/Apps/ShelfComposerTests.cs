@@ -35,7 +35,7 @@ public class ShelfComposerTests
     public void Order_IsClockHomeSiblingCategoriesLoose()
     {
         var tray = new TrayModel(
-            RepoApps: [App("com.storyworthtelling.ledger")],
+            RepoApps: [App("com.storyworthtelling.index")],
             Folders: [Folder(CategoryCatalog.Finance, "Finance", "folder_finance", "com.some.bank")],
             LooseApps: [App("com.unknown.mystery")]);
 
@@ -47,7 +47,7 @@ public class ShelfComposerTests
             s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.True(s.Home); },   // home 1
             s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.True(s.Home); },   // home 2
             s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.True(s.Home); },   // home 3
-            s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.False(s.Home); Assert.Equal("com.storyworthtelling.ledger", s.Entries[0].Key); }, // sibling
+            s => { Assert.Equal(ShelfFace.CoverOut, s.Face); Assert.False(s.Home); Assert.Equal("com.storyworthtelling.index", s.Entries[0].Key); }, // sibling
             s => { Assert.Equal(ShelfFace.SpineOut, s.Face); Assert.Equal("Finance", s.BookendName); }, // category
             s => { Assert.Equal(ShelfFace.SpineOut, s.Face); Assert.Null(s.BookendName); Assert.Equal("com.unknown.mystery", s.Entries[0].Key); }); // loose
     }

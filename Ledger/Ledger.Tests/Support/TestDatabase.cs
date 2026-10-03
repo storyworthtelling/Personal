@@ -1,8 +1,8 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Ledger.Infrastructure.Persistence;
+using Index.Infrastructure.Persistence;
 
-namespace Ledger.Tests.Support;
+namespace Index.Tests.Support;
 
 // A throwaway SQLite database held in memory for the lifetime of one test. The connection stays open
 // so the schema persists across the DbContext instances a test creates. Implements IDbContextFactory

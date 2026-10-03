@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Microsoft.Maui.Hosting;
-using Ledger.Infrastructure.Persistence;
+using Index.Infrastructure.Persistence;
 
 // Declare permissions via assembly attributes so MAUI's manifest merger always includes them.
 [assembly: UsesPermission(global::Android.Manifest.Permission.Internet)]
@@ -12,7 +12,7 @@ using Ledger.Infrastructure.Persistence;
 [assembly: UsesPermission(global::Android.Manifest.Permission.WakeLock)]
 [assembly: UsesPermission("android.permission.POST_NOTIFICATIONS")]
 
-namespace Ledger.Android.Platforms.Android;
+namespace Index.Android.Platforms.Android;
 
 // The launcher icon is set here, not in Platforms/Android/AndroidManifest.xml: this head does not set
 // <SingleProject>true</SingleProject>, so MAUI never wires that XML manifest into the build (the same

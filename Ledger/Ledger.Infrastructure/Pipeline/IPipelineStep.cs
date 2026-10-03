@@ -1,4 +1,4 @@
-namespace Ledger.Infrastructure.Pipeline;
+namespace Index.Infrastructure.Pipeline;
 
 // One advance of the pipeline. Implemented by BalanceRefreshProcessor; abstracted so the drain loop
 // (PipelineRunner) is unit-testable without a real database or Plaid access.

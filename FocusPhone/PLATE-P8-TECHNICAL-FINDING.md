@@ -114,7 +114,8 @@ builds passed on exactly the code CI rejected.
 
 **`build-post.yml` still has no JDK pin.** Plate's ML Kit bindings are the same class of
 dependency — third-party `.aar` payloads whose class-file version we do not control — and
-Plate cannot be compiled locally at all, so there would be no local pass to mislead us and no
+Plate could not be compiled locally at the time of this finding (it can when dl.google.com is
+reachable, see CLAUDE.md), so there would be no local pass to mislead us and no
 warning either. **`build-plate.yml` pins JDK 21 from the start** (§2.9).
 
 **F6 — the Domain suite runs here, and it is the only compiler this phase has.**
@@ -530,7 +531,7 @@ is not a guard.
 **Four releases, not one.** The owner's original "all of it, one release" answered a question
 about video, the front camera and flash. The scope has since roughly tripled — multi-page
 scanning with our own PDF assembly, the Darkroom, an editor, Claude captions and a
-face-recognition subsystem — into the one head that cannot be compiled here, with CI down.
+face-recognition subsystem — into the one head whose bindings were not compiled here at the time, with CI down.
 Put back to the owner, they chose **guardrails, then the camera, then the Darkroom**, with
 recognition in its own release.
 

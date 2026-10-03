@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:LedgerBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:Index.Android.Pages"
+             x:Class="Index.Android.Pages.BudgetPage">
+    <!-- Same convention as MainPage.xaml (see its own remarks): the whole screen is built in
+         code-behind, since graph paper / index cards / post-its / meters don't map onto declarative
+         bindings any more cleanly here than they do on Accounts. This file exists only so
+         LedgerBinderShellTests' EveryPageIsALedgerBinderPage checks the root element of every
+         *.xaml under Pages/, and so InitializeComponent() has something to resolve. -->
+</pages:LedgerBinderPage>

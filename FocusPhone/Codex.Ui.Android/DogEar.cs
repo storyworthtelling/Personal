@@ -38,7 +38,26 @@ public static class DogEar
     /// an action is optional, because most notices are things to know rather than things to do.
     /// </summary>
     public sealed record Notice(
-        string Headline, string Detail, Color Hue, string? ActionLabel = null, Action? OnAction = null);
+        string Headline, string Detail, Color Hue, string? ActionLabel = null, Action? OnAction = null,
+        DateTimeOffset? At = null);
+
+    /// <summary>
+    /// The colour of each functional role a notice can carry, by the same names as the MAUI kit's
+    /// <c>DogEarHue</c> — Problem, Caution, Action, Resolved and, new with mockup 17's Waiting page,
+    /// <b>Reference</b> (slate: only worth knowing) and <b>Progress</b> (teal: waiting, not wrong). The
+    /// native fold takes a <see cref="Color"/> rather than a role, so these are what a caller reaches
+    /// for instead of picking a <see cref="PaperTheme"/> field by hand; a guard keeps the two lists the
+    /// same length and the same names.
+    /// </summary>
+    public static class Hues
+    {
+        public static Color Problem => PaperTheme.ProblemMark;
+        public static Color Caution => PaperTheme.CautionMark;
+        public static Color Action => PaperTheme.Accent;
+        public static Color Resolved => PaperTheme.ResolvedMark;
+        public static Color Reference => PaperTheme.ReferenceMark;
+        public static Color Progress => PaperTheme.ProgressMark;
+    }
 
     // What is waiting, per host. Held off to the side rather than on the view because the
     // notice fold is removed and rebuilt whenever an undo takes the corner, and the list has
@@ -47,12 +66,34 @@ public static class DogEar
 
     private sealed class NoticeBox
     {
-        // Keyed, and newest first. Several parts of a screen raise notices independently —
-        // the shell watches the SMS role while the list watches the sync — and a plain
-        // replace would mean whichever spoke last silently erased the other.
-        public List<(string Key, Notice Notice)> Entries { get; } = [];
+        // Keyed. Several parts of a screen raise notices independently — the shell watches the SMS
+        // role while the list watches the sync — and a plain replace would mean whichever spoke last
+        // silently erased the other. The ORDER is NoticeOrder's (the MAUI kit's DogEarState uses a
+        // byte-parallel copy): newest first by date, undated ones in a stable order, and a notice
+        // stated again, unchanged, keeps its place.
+        private readonly Dictionary<string, Notice> byKey = [];
+        private readonly NoticeOrder order = new();
 
-        public IReadOnlyList<Notice> Notices => Entries.Select(entry => entry.Notice).ToList();
+        public IReadOnlyList<Notice> Notices => order.Keys.Select(key => byKey[key]).ToList();
+
+        public void Set(string key, Notice? notice)
+        {
+            if (notice is null)
+            {
+                byKey.Remove(key);
+                order.Remove(key);
+                return;
+            }
+
+            byKey[key] = notice;
+            order.Set(key, notice.At, $"{notice.Headline}\u001f{notice.Detail}\u001f{notice.Hue}\u001f{notice.ActionLabel}");
+        }
+
+        public void Clear()
+        {
+            byKey.Clear();
+            order.Clear();
+        }
     }
 
     /// <summary>
@@ -62,12 +103,7 @@ public static class DogEar
     /// </summary>
     public static void SetNotice(Context context, FrameLayout host, string key, Notice? notice)
     {
-        var box = Waiting.GetOrCreateValue(host);
-        box.Entries.RemoveAll(entry => entry.Key == key);
-        if (notice is not null)
-        {
-            box.Entries.Insert(0, (key, notice)); // newest first (§13)
-        }
+        Waiting.GetOrCreateValue(host).Set(key, notice);
 
         if (host.FindViewWithTag(HostTag) is null)
         {
@@ -82,8 +118,14 @@ public static class DogEar
     public static void ShowNotices(Context context, FrameLayout host, IReadOnlyList<Notice> notices)
     {
         var box = Waiting.GetOrCreateValue(host);
-        box.Entries.Clear();
-        box.Entries.AddRange(notices.Select((notice, index) => ($"anon-{index}", notice)));
+        box.Clear();
+
+        // The list arrives in display order, and undated notices show most-recently-set first, so set
+        // them last-to-first to keep the order the caller gave.
+        for (var index = notices.Count - 1; index >= 0; index--)
+        {
+            box.Set($"anon-{index}", notices[index]);
+        }
 
         // An undo is a closing window and outranks anything that merely waits, so it keeps the
         // corner; the notices reappear the moment it is gone.
@@ -98,7 +140,7 @@ public static class DogEar
     /// <summary>Flattens the notice fold and forgets everything that was waiting.</summary>
     public static void ClearNotices(FrameLayout host)
     {
-        Waiting.GetOrCreateValue(host).Entries.Clear();
+        Waiting.GetOrCreateValue(host).Clear();
         if (host.FindViewWithTag(NoticeTag) is View existing)
         {
             host.RemoveView(existing);
@@ -119,7 +161,7 @@ public static class DogEar
         }
 
         // One fold, no count (§13): the corner says something waits, not how much.
-        var size = PaperTheme.Dp(context, 72);
+        var size = PaperTheme.Dp(context, DogEarGeometry.SizeDp);
         var fold = new FoldView(context, notices[0].Headline, timer: null, showsBackArrow: false, hue: notices[0].Hue)
         {
             Tag = NoticeTag,
@@ -131,6 +173,10 @@ public static class DogEar
         fold.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.StandardMs).Start();
     }
 
+    // Turning a NOTICE fold no longer opens the ActionCard popup (D162): it turns the page to a
+    // full Waiting screen instead — a Serif header, the rule, and every notice written straight
+    // onto the page, newest first, with no count. The undo fold above (Show/Dismiss) is unchanged;
+    // this is only what happens when there is nothing to reverse and the corner turns TO something.
     private static void OpenNotices(Context context, FrameLayout host)
     {
         var notices = Waiting.GetOrCreateValue(host).Notices;
@@ -139,15 +185,7 @@ public static class DogEar
             return;
         }
 
-        var lines = notices
-            .Select(notice => new CardAction(
-                notice.Headline,
-                () => notice.OnAction?.Invoke(),
-                Detail: notice.ActionLabel is null ? notice.Detail : $"{notice.Detail}\n{notice.ActionLabel}",
-                Hue: notice.Hue))
-            .ToArray();
-
-        ActionCard.Show(context, host, "Waiting", subtitle: null, lines);
+        WaitingActivity.Launch(context, notices);
     }
 
     private static readonly Java.Lang.String NoticeTag = new("paper-dog-ear-notice");
@@ -163,7 +201,7 @@ public static class DogEar
             host.RemoveView(notice);
         }
 
-        var size = PaperTheme.Dp(context, 72);
+        var size = PaperTheme.Dp(context, DogEarGeometry.SizeDp);
         var handler = new Handler(Looper.MainLooper!);
         var fold = new FoldView(context, undoHint, handler, showsBackArrow: true, hue: PaperTheme.Accent)
         {
@@ -220,6 +258,10 @@ public static class DogEar
     // TO something rather than reversing anything.
     private sealed class FoldView : View
     {
+        // How many straight segments the arrow's arc is flattened to; at 40dp indistinguishable
+        // from the true curve.
+        private const int ArrowSegments = 32;
+
         private readonly float density;
         private readonly bool showsBackArrow;
         private readonly Color hue;
@@ -245,7 +287,8 @@ public static class DogEar
             float w = Width, h = Height;
 
             // A dog-ear is TWO triangles, and shipping only the first is what made this
-            // read as a coloured corner tag rather than a folded page.
+            // read as a coloured corner tag rather than a folded page. The shape is mockup 17's,
+            // from DogEarGeometry — the same numbers the MAUI kit's painter draws.
             //
             // The crease runs (0,0) to (w,h). Above it is the HOLE: the part of the page
             // that is no longer there, so what shows is whatever the fold is carrying.
@@ -260,46 +303,57 @@ public static class DogEar
             hole.Close();
             canvas.DrawPath(hole, underside);
 
-            // The flap: the corner reflected across the crease. For a square fold the
-            // corner at (w,0) lands at (0,h), which is what makes the turned-down
-            // triangle the mirror of the hole rather than a second copy of it.
+            // The flap: flat paper, its loose tip lifted off the page (6,34 of 40) rather than
+            // running to the foot of the fold.
             using var flap = new Android.Graphics.Path();
             flap.MoveTo(0, 0);
             flap.LineTo(w, h);
-            flap.LineTo(0, h);
+            flap.LineTo(
+                DogEarGeometry.Scale(DogEarGeometry.FlapTip.X, w),
+                DogEarGeometry.Scale(DogEarGeometry.FlapTip.Y, h));
             flap.Close();
 
-            using var back = new Paint { AntiAlias = true };
-            // Lit along the crease and falling away toward the loose tip: a flat fill
-            // reads as a triangle sitting on the page, a graded one as paper lifting
-            // off it. Perpendicular to the crease, so the light follows the fold.
-            back.SetShader(new LinearGradient(
-                w * 0.5f, h * 0.5f, 0, h,
-                PaperTheme.PaperBright, PaperTheme.PaperShade, Shader.TileMode.Clamp!));
+            using var back = new Paint { AntiAlias = true, Color = PaperTheme.PaperDeep };
             canvas.DrawPath(flap, back);
 
-            // The flap's own edge, so it separates from the page it is lying on.
-            using var lip = new Paint { AntiAlias = true, StrokeWidth = density, Color = PaperTheme.Hairline };
-            lip.SetStyle(Paint.Style.Stroke);
-            canvas.DrawPath(flap, lip);
-
-            // The crease itself, darkest where the two halves meet.
-            using var shadow = new Paint { AntiAlias = true, StrokeWidth = 2 * density };
-            shadow.SetStyle(Paint.Style.Stroke);
-            shadow.Color = new Color(PaperTheme.Ink.R, PaperTheme.Ink.G, PaperTheme.Ink.B, (byte)60);
-            canvas.DrawLine(0, 0, w, h, shadow);
+            // The crease: a hairline between the halves.
+            using var crease = new Paint { AntiAlias = true, StrokeWidth = density, Color = PaperTheme.Hairline };
+            crease.SetStyle(Paint.Style.Stroke);
+            canvas.DrawLine(0, 0, w, h, crease);
 
             if (!showsBackArrow)
             {
                 return;
             }
 
-            // A small back-turn arrow (↶), and ONLY on the undo fold: it is what says this
-            // one reverses the act rather than turning to something waiting.
-            using var mark = new Paint(PaintFlags.AntiAlias) { Color = PaperTheme.Paper, TextAlign = Paint.Align.Center };
-            mark.SetTypeface(PaperTheme.SerifSemibold(Context!));
-            mark.TextSize = 18 * density;
-            canvas.DrawText("↶", w * 0.66f, h * 0.42f, mark);
+            // The back-turn arrow, and ONLY on the undo fold: it is what says this one reverses
+            // the act rather than turning to something waiting. Two round-capped strokes — an arc
+            // and a head — from the mockup's own SVG; it used to be a glyph set in a serif font.
+            using var mark = new Paint(PaintFlags.AntiAlias)
+            {
+                Color = PaperTheme.PaperBright,
+                StrokeWidth = DogEarGeometry.Scale(DogEarGeometry.ArrowStroke, w),
+                StrokeCap = Paint.Cap.Round,
+                StrokeJoin = Paint.Join.Round,
+            };
+            mark.SetStyle(Paint.Style.Stroke);
+
+            using var arc = new Android.Graphics.Path();
+            var points = DogEarGeometry.ArrowArc(ArrowSegments);
+            arc.MoveTo(DogEarGeometry.Scale(points[0].X, w), DogEarGeometry.Scale(points[0].Y, h));
+            for (var i = 1; i < points.Count; i++)
+            {
+                arc.LineTo(DogEarGeometry.Scale(points[i].X, w), DogEarGeometry.Scale(points[i].Y, h));
+            }
+
+            canvas.DrawPath(arc, mark);
+
+            using var head = new Android.Graphics.Path();
+            var wings = DogEarGeometry.ArrowHead;
+            head.MoveTo(DogEarGeometry.Scale(wings[0].X, w), DogEarGeometry.Scale(wings[0].Y, h));
+            head.LineTo(DogEarGeometry.Scale(wings[1].X, w), DogEarGeometry.Scale(wings[1].Y, h));
+            head.LineTo(DogEarGeometry.Scale(wings[2].X, w), DogEarGeometry.Scale(wings[2].Y, h));
+            canvas.DrawPath(head, mark);
         }
     }
 }

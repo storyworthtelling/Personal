@@ -10,14 +10,26 @@ public enum DogEarHue
     Caution,
     Action,
     Resolved,
+
+    /// <summary>Slate: something only worth knowing (mockup 17's Trial notice).</summary>
+    Reference,
+
+    /// <summary>Teal: waiting, not wrong (mockup 8's unreadable budget box) — the role Score's Playing
+    /// area and Index's Snowball wear.</summary>
+    Progress,
 }
 
 /// <summary>
 /// One thing waiting behind the fold. The action is optional: most notices are things to know
 /// rather than things to do.
+///
+/// <para><paramref name="At"/> is when the cause began — the date the Waiting page prints beside the
+/// headline and orders newest-first by. It is optional and trails every older parameter, so a caller
+/// written before it existed is unchanged and its notices simply print no date.</para>
 /// </summary>
 public sealed record DogEarNotice(
-    string Headline, string Detail, DogEarHue Hue, string? ActionLabel = null, Action? OnAction = null);
+    string Headline, string Detail, DogEarHue Hue, string? ActionLabel = null, Action? OnAction = null,
+    DateTimeOffset? At = null);
 
 /// <summary>
 /// What the corner shows right now. <see cref="Expires"/> is null for a notice, which is the whole
@@ -40,16 +52,28 @@ public sealed record DogEarFold(string Headline, DogEarHue Hue, bool ShowsBackAr
 /// </summary>
 public sealed class DogEarState
 {
-    // Keyed, and newest first. Several parts of a screen raise notices independently, and a plain
-    // replace would mean whichever spoke last silently erased the other.
-    private readonly List<(string Key, DogEarNotice Notice)> waiting = [];
+    // Keyed. Several parts of a screen raise notices independently, and a plain replace would mean
+    // whichever spoke last silently erased the other. The order is NoticeOrder's: newest first by date,
+    // and a notice stated again, unchanged, keeps its place.
+    private readonly Dictionary<string, DogEarNotice> waiting = [];
+    private readonly NoticeOrder order = new();
 
     private DogEarNotice? undoHint;
     private Action? onUndo;
     private DateTimeOffset undoExpires;
 
-    /// <summary>Everything waiting, newest first. The corner names one of them; this is the list.</summary>
-    public IReadOnlyList<DogEarNotice> Notices => waiting.Select(entry => entry.Notice).ToList();
+    /// <summary>
+    /// Raised when what the Waiting page would show has changed: a notice arrived, changed its words,
+    /// date or role, or was withdrawn. NOT raised when an owner states the same notice again, which
+    /// screens do on every render — a page listening for this would otherwise redraw on each one.
+    /// </summary>
+    public event Action? NoticesChanged;
+
+    /// <summary>
+    /// Everything waiting, newest first by date (see <see cref="NoticeOrder"/>). The corner names one of
+    /// them; this is the list.
+    /// </summary>
+    public IReadOnlyList<DogEarNotice> Notices => order.Keys.Select(key => waiting[key]).ToList();
 
     /// <summary>
     /// Sets or clears ONE owner's notice, leaving everyone else's alone. Passing null withdraws it.
@@ -57,15 +81,36 @@ public sealed class DogEarState
     /// </summary>
     public void SetNotice(string key, DogEarNotice? notice)
     {
-        waiting.RemoveAll(entry => entry.Key == key);
-        if (notice is not null)
+        if (notice is null)
         {
-            waiting.Insert(0, (key, notice));
+            waiting.Remove(key);
+            if (order.Remove(key))
+            {
+                NoticesChanged?.Invoke();
+            }
+
+            return;
+        }
+
+        // The stored notice is always the latest one stated, so its action is current; whether anyone
+        // is TOLD is the order's call, since a fresh lambda alone is not a change.
+        waiting[key] = notice;
+        var fingerprint = $"{notice.Headline}\u001f{notice.Detail}\u001f{notice.Hue}\u001f{notice.ActionLabel}";
+        if (order.Set(key, notice.At, fingerprint))
+        {
+            NoticesChanged?.Invoke();
         }
     }
 
     /// <summary>Flattens the notice fold and forgets everything that was waiting.</summary>
-    public void ClearNotices() => waiting.Clear();
+    public void ClearNotices()
+    {
+        waiting.Clear();
+        if (order.Clear())
+        {
+            NoticesChanged?.Invoke();
+        }
+    }
 
     /// <summary>
     /// Folds the corner for a destructive act. One at a time: a new act replaces a fold still
@@ -108,9 +153,13 @@ public sealed class DogEarState
             return new DogEarFold(undoHint!.Headline, undoHint.Hue, ShowsBackArrow: true, undoExpires);
         }
 
-        return waiting.Count == 0
-            ? null
-            : new DogEarFold(waiting[0].Notice.Headline, waiting[0].Notice.Hue, ShowsBackArrow: false, Expires: null);
+        if (order.Count == 0)
+        {
+            return null;
+        }
+
+        var newest = waiting[order.Keys[0]];
+        return new DogEarFold(newest.Headline, newest.Hue, ShowsBackArrow: false, Expires: null);
     }
 
     private bool UndoIsOpen(DateTimeOffset now) => undoHint is not null && now < undoExpires;
