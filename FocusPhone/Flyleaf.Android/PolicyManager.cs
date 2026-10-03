@@ -66,6 +66,11 @@ public static class PolicyManager
             dpm.AddUserRestriction(admin, restriction);
         }
 
+        foreach (var restriction in AndroidUserRestrictions.ToClear(plan.UserRestrictions))
+        {
+            dpm.ClearUserRestriction(admin, restriction);
+        }
+
         if (plan.EnforceAutoTime)
         {
             dpm.SetAutoTimeEnabled(admin, true);
