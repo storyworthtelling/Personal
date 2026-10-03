@@ -144,14 +144,16 @@ jobs:
           APK=$(ls -1 Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
           echo "--- $APK"
           ENTRIES=$(unzip -l "$APK")
+          # Matched by name, not by path: a MAUI head packages fonts under assets/ while the native
+          # heads use assets/fonts/, and pinning the wrong one would fail for the wrong reason.
           for font in $FONTS; do
-            if ! echo "$ENTRIES" | grep -q "assets/fonts/$font.ttf"; then
-              echo "FAIL: Index is missing assets/fonts/$font.ttf"
+            if ! echo "$ENTRIES" | grep -q "$font.ttf"; then
+              echo "FAIL: Index is missing $font.ttf"
               echo "$ENTRIES" | grep -i '\.ttf' || echo "(no .ttf entries at all)"
               exit 1
             fi
           done
-          echo "ok: all eight fonts at assets/fonts/"
+          echo "ok: all eight fonts packaged"
           echo "=== END FONT CHECK ==="
 
       # Keep only the latest run's artifacts: delete artifacts from older runs of
