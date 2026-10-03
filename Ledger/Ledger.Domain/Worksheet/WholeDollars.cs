@@ -2,7 +2,8 @@ namespace Index.Domain.Worksheet;
 
 /// <summary>
 /// D154: every figure printed on the worksheet is whole dollars, rounded DOWN — never to nearest,
-/// never with cents.
+/// never with cents — except a PAYMENT (the month's Snowball payments), which rounds UP
+/// (<see cref="Ceiling"/>).
 ///
 /// <para><b>Guard G19's exact failure mode:</b> flooring a combined total computed from unrounded
 /// numbers can disagree with the sum of the parts' OWN already-floored figures by up to a dollar,
@@ -17,6 +18,13 @@ namespace Index.Domain.Worksheet;
 public static class WholeDollars
 {
     public static long Floor(decimal amount) => (long)Math.Floor(amount);
+
+    /// <summary>
+    /// A PAYMENT figure, rounded UP to the next whole dollar (the owner's rule: a payment shown in whole
+    /// dollars never reads less than what is owed). The same direction as <c>PlanMoney.Payment</c>, but
+    /// kept as the worksheet's own integer so a printed total can still be built from printed parts.
+    /// </summary>
+    public static long Ceiling(decimal amount) => (long)Math.Ceiling(amount);
 
     public static long SumOfFlooredParts(IEnumerable<decimal> parts) => parts.Sum(Floor);
 }

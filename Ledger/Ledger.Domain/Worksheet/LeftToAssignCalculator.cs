@@ -41,15 +41,16 @@ public static class LeftToAssignCalculator
     }
 
     /// <summary>
-    /// Each of the three printed lines is floored from its own raw figure BEFORE the subtraction, never
-    /// combined first and floored once at the end (Guard G19) — which also means the result below is
+    /// Each of the three printed lines is rounded from its own raw figure BEFORE the subtraction — income and
+    /// last month's spending floored, the month's payments rounded UP (a payment never reads less than what is
+    /// owed) — never combined first and rounded once at the end (Guard G19) — which also means the result below is
     /// automatically a whole dollar, with no further rounding step of its own to get wrong.
     /// </summary>
     public static LeftToAssignResult Calculate(
         decimal projectedMonthlyIncome, decimal weeklyPaymentTotal, int fridayCount, decimal lastMonthSpending)
     {
         var income = WholeDollars.Floor(projectedMonthlyIncome);
-        var payments = WholeDollars.Floor(weeklyPaymentTotal * fridayCount);
+        var payments = WholeDollars.Ceiling(weeklyPaymentTotal * fridayCount);
         var lastMonth = WholeDollars.Floor(lastMonthSpending);
         var leftToAssign = income - payments - lastMonth;
         return new LeftToAssignResult(income, fridayCount, payments, lastMonth, leftToAssign);

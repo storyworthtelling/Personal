@@ -154,7 +154,7 @@ tell the two installs apart. That is an accepted limit, not a bug to chase; it i
 unverified until a device.
 
 ### I13 — The paper *(D151, D154, D156, D157)*
-Whole dollars, rounded down. Three write-in category lines on the worksheet (two on Release H's
+Whole dollars, rounded down — except the month's Snowball payments, which round up (owner decision: payments round up). Three write-in category lines on the worksheet (two on Release H's
 denser page, 30pt rows). The follow-up's suggestions: over → trim the lines furthest above last
 month, largest rise first, never below last month's figure, set-aside untouched; under → the
 remainder to the extra debt payment. An empty box takes the suggestion.
@@ -394,7 +394,7 @@ names what was reintroduced. G1–G6 come from the finding; G7 onward from Gate 
 | G16 | `UpdateModeReconnectTests`: a reconnect's link token carries the Item's access token (D150) | Create a fresh link token; a repair spends a Trial Item |
 | G17 | `ProductionOnlyTests`: no sandbox or development host reachable from the app (D144) | Honour the vault's `Environment` |
 | G18 | `WorksheetRegionsTests`: the painter and the prompt read the same boxes | Hardcode a box in the painter |
-| G19 | `WholeDollarsTests`: every printed figure floored, the printed parts sum (D154) | Round to nearest |
+| G19 | `WholeDollarsTests`: every printed figure floored (a payment ceiled), the printed parts sum (D154) | Round to nearest |
 | G20 | `LeftToAssignTests`: payments × the Fridays in the month (D155) | Use 52 ÷ 12 weeks |
 | G21 | `FollowUpSuggestionTests`: largest rise first, never below last month, set-aside untouched; under goes to the extra payment (D156) | Trim proportionally; trim a savings line |
 | G22 | `IncomeProjectionTests`: projected from the pattern, not the month's deposits (D102); "not sure" below confidence (D103) | Sum the calendar month's deposits; a three-paycheck month inflates the income |

@@ -266,7 +266,7 @@ Grouped so each brief owns disjoint files.
 
 | Group | Items |
 |---|---|
-| **Money and type** | Limits, payments and weekly figures in whole dollars ("of $625", "$465 a week now", "$545/wk"); balances keep cents. U+2212 minus. Curly apostrophes in copy. Debt-free date in mono. History note's possessive ("1 month's"). |
+| **Money and type** | Limits in whole dollars, rounded to nearest ("of $625"); **payments round up** to the next whole dollar, never down ("$466 a week now" for 465.38, "$546/wk", "Due Oct 6 · $286" for 285.42, and the worksheet's "Snowball payments" line) through the one `PlanMoney.Payment` formatter that `AccountsMoney.Payment` delegates to; balances keep cents. U+2212 minus. Curly apostrophes in copy. Debt-free date in mono. History note's possessive ("1 month's"). |
 | **Chevrons** | Real down/up chevron shapes replace "▸/▾" on Accounts, Snowball, Budget and Savings cards. |
 | **Spacing** | Cards 8dp apart, heading to card 8dp, group margin 22dp; well padding 24/16; graph paper behind the page header; post-it overlaps and indents (`-6 4 4 22`); no extra rule under the Budget month line. |
 | **Materials** | Soft ink (not muted) on index-card secondary text and post-it footers; boxed `MonoEntry` fields with a `$` prefix and `%` suffix; required tint; the Add chooser and action cards use the paper-deep 86% haze over the whole page with icons and semibold green on the primary row. |

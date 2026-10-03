@@ -5,6 +5,7 @@ using Index.Infrastructure.Services;
 using Index.Infrastructure.Worksheet;
 using Index.Tests.Support;
 using Moq;
+using UglyToad.PdfPig;
 using Xunit;
 
 namespace Index.Tests.Worksheet;
@@ -76,6 +77,35 @@ public class WorksheetPlanBuilderTests
         var plan = await builder.BuildAsync("2026-01", default); // nothing recorded for December
 
         Assert.Equal(0, plan.LastMonthSpendingWholeDollars);
+
+        db.Dispose();
+    }
+
+    [Fact]
+    public async Task ASnowballPaymentsLineRoundsTheMonthsPaymentsUpAndPrintsThatFigureOnThePage()
+    {
+        var (builder, _, db) = Create(new IncomeEstimate(9_350.60m, true, null, []));
+        await using (var context = db.CreateDbContext())
+        {
+            var institution = new Institution { Name = "Harbor Credit", AccessToken = string.Empty, CreatedAtUtc = Now.UtcDateTime };
+            institution.Accounts.Add(new Account
+            {
+                Name = "Harbor Plus", Kind = AccountKind.Loan, CurrentBalance = 4_000m, Apr = 0.12m, NextPaymentAmount = 285.42m,
+            });
+            context.Institutions.Add(institution);
+            await context.SaveChangesAsync();
+        }
+
+        var plan = await builder.BuildAsync("2026-10", default);
+
+        // 285.42 x 5 Fridays = 1,427.10: the page asks for 1,428, never 1,427 (the old floor) or 1,427 (nearest).
+        Assert.Equal(1_428, plan.SnowballPaymentsWholeDollars);
+        Assert.Equal(9_350 - 1_428 - plan.LastMonthSpendingWholeDollars, plan.LeftToAssignWholeDollars);
+
+        using var document = PdfDocument.Open(new MemoryStream(WorksheetPainter.Paint(plan)));
+        var words = document.GetPages().SelectMany(p => p.GetWords()).Select(w => w.Text).ToList();
+        Assert.Contains("\u2212$1,428", words);
+        Assert.DoesNotContain("\u2212$1,427", words);
 
         db.Dispose();
     }

@@ -166,6 +166,25 @@ public class SnowballServiceTests
     }
 
     [Fact]
+    public async Task AWeeklyPaymentFigureOnTheLoanCardsRoundsUpToTheNextWholeDollar()
+    {
+        using var db = new TestDatabase();
+        await SeedLoanAsync(db, "First", 1000m, 0.10m, 285.42m);
+        await SeedLoanAsync(db, "Second", 2000m, 0.10m, 140.42m);
+
+        var service = Create(db);
+        var summary = await service.GetSummaryAsync(default);
+
+        var first = summary.LoansInDisplayOrder.Single(l => l.Name == "First");
+        var second = summary.LoansInDisplayOrder.Single(l => l.Name == "Second");
+
+        Assert.Equal(285.42m, first.WeeklyPaymentNow);
+        Assert.Equal("$286 a week now", PlanText.WeeklyNow(first.WeeklyPaymentNow));
+        Assert.Equal("$286/wk", PlanText.AsFocus(first.FocusedWeeklyPayment));
+        Assert.Equal("$141 a week now", PlanText.WeeklyNow(second.WeeklyPaymentNow));
+    }
+
+    [Fact]
     public async Task RecordCurrentWeekSnapshot_IsDedupedAtWrite_ARerunTheSameWeekAddsNothing()
     {
         using var db = new TestDatabase();
