@@ -94,6 +94,30 @@ public class IndexInvariantsTests
         Assert.DoesNotContain("ApplicationName = \"Ledger\"", program, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Everything a person can read must say Index. The launcher label and the Google application
+    /// name were caught by their own guards, but the name Plaid Link shows ("Ledger wants to connect
+    /// to your bank") and the logcat tag sat in string literals nothing was looking at. A literal
+    /// "Ledger" in the app's own code is either one of those or a leftover; the frozen identifiers
+    /// are lowercase (<c>ledger.db</c>, <c>ledger-refresh</c>) and so are not caught here.
+    /// </summary>
+    [Fact]
+    public void NoStringLiteralInTheAppNamesItLedger()
+    {
+        var offenders = AppFiles("*.cs")
+            .Where(file => !Relative(file).Contains("/Ledger.Tests/", StringComparison.Ordinal))
+            .SelectMany(file => File.ReadLines(file)
+                .Select((line, index) => (file, line: line.Trim(), number: index + 1)))
+            .Where(entry => !entry.line.StartsWith("//", StringComparison.Ordinal))
+            .Where(entry => entry.line.Contains("\"Ledger\"", StringComparison.Ordinal))
+            .Select(entry => $"{Relative(entry.file)}:{entry.number}")
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            "These still call the app Ledger where a person (or Plaid, or logcat) can read it; use "
+            + $"IndexIdentity.DisplayName:\n{string.Join("\n", offenders)}");
+    }
+
     // ---- the refresh worker, which WorkManager persists by class name ----
 
     /// <summary>

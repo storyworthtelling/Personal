@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Microsoft.Maui.Hosting;
 using Index.Infrastructure.Persistence;
+using Index.Domain.Identity;
 
 // Declare permissions via assembly attributes so MAUI's manifest merger always includes them.
 [assembly: UsesPermission(global::Android.Manifest.Permission.Internet)]
@@ -73,7 +74,7 @@ public class MainApplication : MauiApplication
 
     private sealed class CrashLogger : Java.Lang.Object, Java.Lang.Thread.IUncaughtExceptionHandler
     {
-        private const string LogTag = "Ledger";
+        private const string LogTag = IndexIdentity.DisplayName;
         private readonly Java.Lang.Thread.IUncaughtExceptionHandler? previous;
 
         public CrashLogger(Java.Lang.Thread.IUncaughtExceptionHandler? previous)
