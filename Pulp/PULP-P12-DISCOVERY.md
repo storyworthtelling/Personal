@@ -500,3 +500,8 @@ Raised by the answers above and owed a measured answer, not an assumption:
 - **D210 · Children and service profiles** — the **attestation route**: a child may start titles
   only on services where the owner has PIN-locked every adult profile and ticked "adult profiles are
   PIN-locked" for that service in Settings. Any other service blocks a child's hand-off (D44).
+- **D211 · Gate 2 approved** — `PULP-P12-TECHNICAL-FINDING.md` as written, with §6 resolved.
+
+## Gate 3 — screens, one at a time
+
+Process (owner, D211): one screen per round; every decision, question and approval is put as chips.
