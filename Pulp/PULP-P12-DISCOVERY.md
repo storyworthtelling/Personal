@@ -563,3 +563,9 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D241 · Leagues and teams fold** — a folded league is one line (badge, name, state); a league opens to teams, a team to its games. Only the league closest to season's end, and its teams with unwatched recordings, start open; what the viewer opens stays open.
 - **D242 · The spoiler hold is a single tag** — a 'Spoilers' tag on the league's line; no explanation card and no 'held' lines; held items are simply absent; tapping the tag peeks once (refines D70, D183, D237, D239).
 - **D243 · Screen 7, Sports (revision 5) — approved**, logos and game chips kept.
+- **D244 · The Calendar page shows the viewer's own and shared items only** — own shows and teams,
+  plans they're in, shared playlists. The household Google calendar still carries everyone's,
+  labelled (D147), for Foreword.
+- **D245 · Two weeks ahead.**
+- **D246 · No bottom bar on Calendar.**
+- **D247 · Screen 8, Calendar — approved** with D244–D246.
