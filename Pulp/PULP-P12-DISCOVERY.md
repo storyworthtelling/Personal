@@ -468,3 +468,9 @@ Raised by the answers above and owed a measured answer, not an assumption:
   centre of the free window, so every tier clears the in-progress teal and the reference slate by
   ≥20° after hex rounding. Ladder vividness (measured 0.075 vs vivid 0.095) and the deep night-blue
   cloth are offered in the design book for the owner's choice.
+- **D202 · Identity: Marigold, 63°** — supersedes D201's blue. OKLCH **63°**, mark chroma 0.095,
+  on the suite's shared lightness ladder: fill `#CEB7A3` · ground `#BF9E82` · mark `#86541F` ·
+  text `#6B4219` · deep `#4B3015`; **cloth `#F6A24E`** (light binding, rule/flourishes/title in
+  ink, ink on cloth 6.25:1 — Score's and Plate's construction). 22° from Flyleaf's amber and 22°
+  from the caution ochre; the only yellow-orange that clears §3's floor at every tier after hex
+  rounding. To be registered in DESIGN.md §3/§19 and the hue-separation guard at implementation.
