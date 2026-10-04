@@ -194,3 +194,42 @@ Target: ~200 questions before mockups (owner, round 1).
   D59 from teams to leagues; the D70 hold applies to the child's own followed games too).
 - **D73 · Plans name viewers** — a plan picks who it's for, **defaulting to just the person
   making it**.
+- **D74 · TV home** — after "who's watching": **Continue Watching in big posters**, then that
+  viewer's playlists as rows.
+- **D75 · Other TV apps** — reachable **only through Pulp's Settings**.
+- **D76 · The voice on the TV** — **wanted**, but its form is open: the owner expects the **whole
+  visual dictionary to differ on the TV**, so it is settled with the TV's design language.
+- **D77 · Trailers never autoplay** — on the TV or anywhere; a trailer plays only when asked.
+- **D78 · TV look** — **explored at the mockup gate** (two or three directions drawn).
+- **D79 · A TV design document** — **DESIGN.md does not govern the TV** (nor, later, the watch).
+  The TV gets **its own design document**, written and approved at the mockup gate. Light-only,
+  the binder frame and the rest of DESIGN.md are not binding there.
+- **D80 · Remote** — D-pad/select/back plus **voice search via the remote mic**, **long-press
+  select = action card**, and **the phone as keyboard** for TV search.
+- **D81 · Idle TV** — **photo-album screensavers from Google Photos**. (Gate 2: since 2025
+  Google's Photos Library API only reads app-created content, so a third-party app reading the
+  household's albums needs the Picker API; Google TV's own ambient mode already shows Photos
+  albums natively, and may be the honest route.)
+- **D82 · Cast gesture** — **a TV toggle in the header**: once on, every play goes to the TV until
+  switched back.
+- **D83 · TV off or busy** — **wake it (HDMI-CEC) and take over**, as Cast does.
+- **D84 · Who's watching on a send** — **picked on the phone when sending** (you, together, a
+  child — a child's send is subject to D44).
+- **D85 · Phone as remote** — **basic play/pause via the playing app's media session**, where the
+  TV exposes it (gate 2 measures it, across the device boundary).
+- **D86 · Service setup** — tick the service, choose its **plan tier** (ads / no ads, 4K), and
+  **map its profiles to viewers** (feeds D11, D44 and D28).
+- **D87 · Cost** — Pulp keeps no prices; it **counts hand-offs per service and hands the usage to
+  Index**, which shows it beside the subscription charge. (An Index change; its scope — this
+  phase or Index's next — is asked separately.)
+- **D88 · Adding viewers** — **Settings → Household, either adult**: name, adult or child, and a
+  child's rating ceiling.
+- **D89 · Avatars** — **drawn monograms**; no photos (no children's pictures in Drive).
+- **D90 · Index usage, both halves now** — Pulp publishes per-service hand-off counts over a
+  signature-guarded intent (the Post→Index pattern), **and** Index's receiver and its usage line
+  beside the subscription charge are built in this phase. (Index needs its own mockup for that
+  line.)
+- **D91 · On the Flyleaf bookcase** — a **cover-out sibling book**, like Foreword and Index.
+- **D92 · Which apps Flyleaf hides** — **exactly the services ticked in Pulp**: Pulp publishes their
+  package ids; Flyleaf hides those and only those.
+- **D93 · No fallback** — if Pulp is missing or broken, the streaming apps stay hidden. Accepted.
