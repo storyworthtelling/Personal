@@ -44,6 +44,17 @@ public static class AppIdentityTokens
     // disqualifying for an identity token. IdentityLadderTests reads the ladder, never this.
     public const string FolioClothHex = "#B32738";
 
+    // Pulp: marigold, OKLCH hue 63°, mark chroma 0.095, on the suite's shared lightness ladder
+    // (D202). 22° from Flyleaf's amber mark (41°) and 22° from the caution ochre (85°). Yellow-orange
+    // text tiers have to be browns to carry text on paper, so the bright marigold lives on the cloth:
+    // a light binding with the rule, flourishes and title in ink (6.25:1).
+    public const string PulpFillHex = "#CEB7A3";
+    public const string PulpGroundHex = "#BF9E82";
+    public const string PulpMarkHex = "#86541F";
+    public const string PulpTextHex = "#6B4219";
+    public const string PulpDeepHex = "#4B3015";
+    public const string PulpClothHex = "#F6A24E";
+
     public static SKColor ForewordFill { get; } = SKColor.Parse(ForewordFillHex);
     public static SKColor ForewordGround { get; } = SKColor.Parse(ForewordGroundHex);
     public static SKColor ForewordSunrise { get; } = SKColor.Parse(ForewordSunriseHex);
@@ -55,4 +66,11 @@ public static class AppIdentityTokens
     public static SKColor FolioText { get; } = SKColor.Parse(FolioTextHex);
     public static SKColor FolioDeep { get; } = SKColor.Parse(FolioDeepHex);
     public static SKColor FolioCloth { get; } = SKColor.Parse(FolioClothHex);
+
+    public static SKColor PulpFill { get; } = SKColor.Parse(PulpFillHex);
+    public static SKColor PulpGround { get; } = SKColor.Parse(PulpGroundHex);
+    public static SKColor PulpMark { get; } = SKColor.Parse(PulpMarkHex);
+    public static SKColor PulpText { get; } = SKColor.Parse(PulpTextHex);
+    public static SKColor PulpDeep { get; } = SKColor.Parse(PulpDeepHex);
+    public static SKColor PulpCloth { get; } = SKColor.Parse(PulpClothHex);
 }

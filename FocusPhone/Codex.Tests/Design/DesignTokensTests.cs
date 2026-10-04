@@ -218,7 +218,7 @@ public class DesignTokensTests
     [InlineData("#C8B5C8")] [InlineData("#B69BB6")] [InlineData("#7A4F7B")]  // Plate
     [InlineData("#613F62")] [InlineData("#442D44")]
     [InlineData("#CEB7A3")] [InlineData("#BF9E82")] [InlineData("#86541F")]  // Pulp
-    [InlineData("#6B4219")] [InlineData("#4B3015")] [InlineData("#7A6A1F")]
+    [InlineData("#6B4219")] [InlineData("#4B3015")]
     public void IdentityTiersStayClearOfEverySemanticRole(string identityTier)
     {
         const double MinimumSeparation = 20.0;

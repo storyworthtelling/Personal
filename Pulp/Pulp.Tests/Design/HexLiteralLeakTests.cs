@@ -15,7 +15,7 @@ public class HexLiteralLeakTests
     private static readonly Regex HexColour = new("\"#[0-9A-Fa-f]{6,8}\"");
 
     private static readonly Regex TypeSize = new(
-        @"\b(TextSize|FontSize)\s*=\s*[0-9]|SetTextSize\(\s*(ComplexUnitType\.\w+\s*,\s*)?[0-9]");
+        @"\b(TextSize|FontSize)\s*=\s*[0-9]|SetTextSize\(\s*([\w.]+\s*,\s*)?[0-9]");
 
     [Fact]
     public void NoColourHexLiteralOutsideTokenFiles()
@@ -37,6 +37,8 @@ public class HexLiteralLeakTests
     [InlineData("view.TextSize = 14f;")]
     [InlineData("view.SetTextSize(ComplexUnitType.Sp, 16);")]
     [InlineData("label.FontSize = 12;")]
+    [InlineData("view.SetTextSize(Android.Util.ComplexUnitType.Sp, 16);")]
+    [InlineData("view.SetTextSize(18f);")]
     public void TheTypeSizeDetectorRecognisesALiteral(string line)
     {
         Assert.Matches(TypeSize, line);

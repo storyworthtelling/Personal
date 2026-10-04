@@ -618,3 +618,17 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D274 · Plan approved** (`PULP-P12-PLAN.md`) with its choices: `Pulp/` layout (P1), a `Player`
   posture on the shared `PaperWebView` for trailers and highlights (P2), one PR for the phase (P4).
   Release A starts.
+
+## Release A decisions
+
+- **D275 · Identity moves to Amber, 70° — supersedes D202's marigold.** Release A's app-against-app
+  guard found the marigold (63°) only 16.3° from **Foreword's sunrise (47°)**, an identity the
+  gate-3 colour work missed (it measured against DESIGN.md §3's table, which omits Foreword's). No
+  yellow-orange clears both Foreword (needs ≥67°) and the caution ochre (needs ≤65°). The owner chose
+  **Amber 70°**: fill `#CCB8A2` · ground `#BCA080` · mark `#835618` · text `#684414` · deep `#493113` ·
+  cloth `#F7AC4D` (ink on cloth 6.72:1; mark/text/deep on paper 5.98/8.15/11.42). Every tier clears
+  Foreword by ≥22.4°, Flyleaf's mark by ≥28.7°, every other role and app by more — and sits **14.3°
+  from the caution ochre**, a **recorded departure** like Index's against Positive: **Pulp draws no
+  Caution on its own pages**, enforced by a guard, so nothing on a Pulp page can be read as "consider
+  this". (Flyleaf's warm icon ground, 61.5°, is ~8.5° away; no guard compares that tier between apps —
+  noted, not a departure.)

@@ -125,4 +125,27 @@ public static class Tokens
     public static readonly SKColor IndexText = SKColor.Parse(IndexTextHex);
     public static readonly SKColor IndexDeep = SKColor.Parse(IndexDeepHex);
     public static readonly SKColor IndexCloth = SKColor.Parse(IndexClothHex);
+
+    // Pulp: marigold, OKLCH hue 63°, mark chroma 0.095, on the suite's shared lightness ladder
+    // (D202). It sits 22° from Flyleaf's amber mark (41°) and 22° from the caution ochre (85°) —
+    // the only yellow-orange that clears §3's 20° floor against both at every tier after hex
+    // rounding. Yellow-orange text tiers have to be browns to carry text on paper, so the bright
+    // marigold lives on the cloth alone.
+    public const string PulpFillHex = "#CEB7A3";
+    public const string PulpGroundHex = "#BF9E82";
+    public const string PulpMarkHex = "#86541F";
+    public const string PulpTextHex = "#6B4219";
+    public const string PulpDeepHex = "#4B3015";
+
+    // The binding: a LIGHT cloth with the rule, flourishes and title in ink (6.25:1) — Score's and
+    // Plate's construction. It is on the identity hue, unlike Folio's, at a chroma no text tier can
+    // carry.
+    public const string PulpClothHex = "#F6A24E";
+
+    public static readonly SKColor PulpFill = SKColor.Parse(PulpFillHex);
+    public static readonly SKColor PulpGround = SKColor.Parse(PulpGroundHex);
+    public static readonly SKColor PulpMark = SKColor.Parse(PulpMarkHex);
+    public static readonly SKColor PulpText = SKColor.Parse(PulpTextHex);
+    public static readonly SKColor PulpDeep = SKColor.Parse(PulpDeepHex);
+    public static readonly SKColor PulpCloth = SKColor.Parse(PulpClothHex);
 }

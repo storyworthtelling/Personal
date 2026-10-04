@@ -5,13 +5,13 @@ namespace Pulp.Tests.Guard;
 /// <summary>
 /// G6 — Pulp plays nothing itself. It finds what to watch and hands off to the service's own app;
 /// in-app playback is ruled out by the services' terms and by DRM (finding §2.1). A player package
-/// or a protected-media grant arriving here would be the first step down a road that cannot end in
+/// or a protected-media grant (<c>RESOURCE_PROTECTED_MEDIA_ID</c>, whose wire value is <c>android.webkit.resource.PROTECTED_MEDIA_ID</c>) arriving here would be the first step down a road that cannot end in
 /// a working app, and nothing about it would fail until a device refused to decode a frame.
 /// </summary>
 public class PlaysNothingTests
 {
     private static readonly Regex Forbidden = new(
-        @"Media3|ExoPlayer|Android\.Media\.MediaPlayer|\bMediaPlayer\b|\bVideoView\b|RESOURCE_PROTECTED_MEDIA_ID|ProtectedMediaId",
+        @"Media3|ExoPlayer|Android\.Media\.MediaPlayer|\bMediaPlayer\b|\bVideoView\b|PROTECTED_MEDIA_ID|ProtectedMediaId",
         RegexOptions.IgnoreCase);
 
     [Fact]
