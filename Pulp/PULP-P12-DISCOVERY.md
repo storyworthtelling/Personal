@@ -602,3 +602,6 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D267 · The launcher icon is full bleed** — the painting fills the mask, no marigold border and no
   keyline (the shelf cover keeps the binding).
 - **D268 · Screen 14, the book (revision 2) — approved.**
+- **D269 · Index's usage line counts times opened through Pulp** (hand-offs) per calendar month.
+- **D270 · "Not opened in Pulp since …" appears after two months unused**, in the same muted ink.
+- **D271 · Screen 15, Index's usage line — approved.**
