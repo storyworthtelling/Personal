@@ -414,3 +414,41 @@ Target: ~200 questions before mockups (owner, round 1).
 - **D189 · Folder `Pulp/` at the repo root** — its own solution (`Pulp.Domain`,
   `Pulp.Infrastructure`, `Pulp.Android`, `Pulp.Tests`), referencing `Codex.Ui.Android` for
   Paper & Ink. (This log moved from `Marquee/` with it.)
+- **D190 · Children in P12** — **filters, requests and per-adult PINs now**; the **allowance,
+  bedtime and school-day calendar (D132–D137, D154–D157) arrive with the TV phase**.
+- **D191 · No TV path in P12** — hand-off is to the phone's own app; the title page names the
+  service so it can be started on the TV by hand.
+- **D192 · Who's watching on the phone** — **Play asks only when casting** (a TV-phase matter);
+  in P12 Play is simply the current view's viewer (the owner, or the child switched to). How
+  "together" (D98) is marked without a cast is D194.
+- **D193 · Integrations stay in P12** as its last release: Flyleaf hiding (D92) and Index usage
+  (D90).
+- **D194 · "Together" is deferred to the TV phase** — with it, the cheating line (D99, D102). In
+  P12 every viewer's progress is their own.
+- **D195 · Voice facts about the other adult** — **only together-show progress** (so a TV-phase
+  matter); never anything from the other's private Continue Watching.
+- **D196 · Mockup round 1** — **cover studies + Continue Watching, a title page, Discover (stack
+  and search), a playlist**. Round 2: Sports, Calendar, Settings, children's views, action cards.
+- **D197 · Discovery closes** at this round (~200 questions asked across 50 rounds); gate 2 next.
+
+## Carried to gate 2 (the technical finding)
+
+Raised by the answers above and owed a measured answer, not an assumption:
+
+1. **In-app playback** (D2) — embedded web players, Widevine in a WebView, each service's terms.
+2. **Choosing / confirming a service profile** per service (D11, D44) — and therefore which
+   services a child can start through Pulp at all.
+3. **Finished detection** — other apps' media sessions via a notification listener (D30, D182);
+   per-service sign-ins that expose real history (D144).
+4. **Deep links** — per-service schemes, title vs home landing, how a mis-landing is detected
+   (D122), channel links for live TV (D57), and recordings vs the live feed (D55).
+5. **Availability source** — free only (D138), US (D51), subscription + free + live (D52),
+   cheapest rent/buy (D53), rating *reasons* (D36), trailers (D19, D34), posters only (D37).
+6. **Sports data** — free schedules, standings, brackets for D56's leagues (D139); official league
+   YouTube highlights (D71).
+7. **Shared household file** — a two-writer merge-safe format (D46), encrypted (D47), and its
+   cross-account visibility.
+8. **The Pulp calendar** — created and shared from the owner's account (D145).
+9. **Index hand-off** (D90) and **Flyleaf hiding** (D92) — the two cross-app contracts.
+10. **Frozen identifiers** — `com.storyworthtelling.pulp` (D188), the Drive file names, any
+    registered component names, guarded by tests from the first build.
