@@ -388,3 +388,16 @@ Target: ~200 questions before mockups (owner, round 1).
 - **D176 · No Discover stacks on the TV at all** — supersedes D26's "stack follows whoever was
   picked". The TV's Discover is search and trailers.
 - **D177 · The TV forgets on power-off** (D26).
+- **D178 · Switching to a child (phone)** — a **secondary button in the bottom bar**. (DESIGN.md §7
+  shows the bar only when a screen has a primary action; where the switch sits on screens without
+  one is drawn at the mockup gate.)
+- **D179 · A child's view is marked by a line with the child's name under the header.** No
+  monograms anywhere except the choice page.
+- **D180 · Monograms are ink only** — no per-viewer colour.
+- **D181 · A child's phone time does not count** — the allowance is spent **only on the TV**.
+- **D182 · A game is watched** when the media session reaches its end; otherwise the D30 fallback
+  (handed off = watched); unwatched can always be marked.
+- **D183 · "Dismiss" on the D70 hold is a peek** — opens the standings/highlights once without
+  removing the game; the hold returns.
+- **D184 · Preseason / playoffs** — a **status chip on each game**.
+- **D185 · Competitions** — following a team brings **all its competitions**.
