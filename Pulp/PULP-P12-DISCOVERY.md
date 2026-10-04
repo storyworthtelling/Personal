@@ -582,3 +582,4 @@ Process (owner, D211): one screen per round; every decision, question and approv
   the picker, beside the playlists (supersedes D252's separate card action).
 - **D255 · A parent's favorite above a child's ceiling also allow-lists it** for that child (D12);
   a block-list entry still wins and that child's Favorites is greyed in the picker.
+- **D256 · Screen 10, the action card (revision 3) — approved.**
