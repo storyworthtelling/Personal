@@ -249,6 +249,10 @@
   .pk-r.off{opacity:.45}
   .pk-r.new{font-weight:600;font-size:14px}
   .dv-sec.open{background:#F1EBDD}
+  .cb{width:20px;height:20px;border:1.5px solid #C0BDB9;border-radius:5px;flex:none;display:grid;place-items:center;background:#fff}
+  .cb.on{background:#38734A;border-color:#38734A}
+  .cb svg{width:14px;height:14px}
+  .pk-r .nk{margin-left:auto;font-size:11px;font-weight:600;padding:0 7px;border-radius:9px;border:1px solid #C0BDB9;color:#54514B}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -260,7 +264,7 @@
   </header>
 
   <section id="screen-picker">
-    <h2>Screen 11 · Add to… (the picker)</h2>
+    <h2>Screen 11 · Add to… (the picker) · revision 2</h2>
     <div class="note"><p><b>The inline accordion picker</b> (§7: it expands in place, no dialog), drawn opening from the title page's <b>Add to…</b>. The same list opens from the action card and Discover's <b>+</b>. Invented lists and children ("Robin", "Juniper").</p></div>
     <div class="mock-wrap">
       
@@ -291,13 +295,13 @@
         <div class="pk">
           <div class="pk-h">Add Saltmarsh to</div>
           <div class="pk-g">Playlists</div>
-          <div class="pk-r on"><span>Rainy Sundays</span><span class="m">shared</span><svg class="tk" viewBox="0 0 16 16" fill="none" stroke="#38734A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></div>
-          <div class="pk-r"><span>Long winter shows</span><span class="m">yours</span></div>
-          <div class="pk-r"><span>Mysteries</span><span class="m">shared</span></div>
+          <div class="pk-r on"><span class="cb on"><svg viewBox="0 0 16 16" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></span><span>Rainy Sundays</span><span class="m">shared</span></div>
+          <div class="pk-r on"><span class="cb on"><svg viewBox="0 0 16 16" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></span><span>Long winter shows</span><span class="m">yours</span></div>
+          <div class="pk-r"><span class="cb"></span><span>Mysteries</span><span class="m">shared</span></div>
           <div class="pk-r new"><span>New playlist…</span></div>
           <div class="pk-g">Favorites</div>
-          <div class="pk-r"><span>Robin</span><span class="m">allow-lists it · TV-14 is above Robin's band</span></div>
-          <div class="pk-r off"><span>Juniper</span><span class="m">blocked for Juniper</span></div>
+          <div class="pk-r"><span class="cb"></span><span>Robin</span><span class="nk">Above band</span></div>
+          <div class="pk-r off"><span class="cb"></span><span>Juniper</span><span class="nk">Blocked</span></div>
         </div>
         <div class="dv-bar"><div class="dv-sec open">Add to… ▴</div><div class="dv-btn">Play S1 · E3</div></div>
       </div>
@@ -306,8 +310,8 @@
         <ul>
           <li><b>It grows up out of the bar</b>, over the page's lower half, and the button shows it's open. Tap outside or the button again to fold it.</li>
           <li><b>Two groups</b> (D254): your <b>Playlists</b> (shared or yours, last-used first, D109) and each child's <b>Favorites</b>.</li>
-          <li><b>A tap toggles</b>: a pine tick appears, which is the success state, with no toast (§7). Untoggling is undo-first.</li>
-          <li><b>Favorites above a child's ceiling</b> say so in muted words, "allow-lists it", because adding is approval (D255). A <b>blocked</b> title greys that child's row with the reason.</li>
+          <li><b>Checkboxes, for adding to several at once</b> (D257): each row carries the §7 checkbox, filled pine when on. Each tick takes effect as it's made, which is the success state, with no toast. Unticking is undo-first. Drawn with two playlists ticked.</li>
+          <li><b>A child's row carries one small neutral badge</b> (D258): <b>Above band</b> when the title is over that child's ceiling (ticking it allow-lists it, D255), <b>Blocked</b> when it's on their block-list (the row is greyed and can't be ticked).</li>
           <li><b>New playlist…</b> names one in place (personal by default; shared is a switch on the playlist).</li>
           <li>Model-made playlists (D104) start from <b>Playlists</b>, not here.</li>
         </ul>
