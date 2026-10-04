@@ -561,3 +561,4 @@ Process (owner, D211): one screen per round; every decision, question and approv
   held".
 - **D240 · Championships: followed leagues only.**
 - **D241 · Leagues and teams fold** — a folded league is one line (badge, name, state); a league opens to teams, a team to its games. Only the league closest to season's end, and its teams with unwatched recordings, start open; what the viewer opens stays open.
+- **D242 · The spoiler hold is a single tag** — a 'Spoilers' tag on the league's line; no explanation card and no 'held' lines; held items are simply absent; tapping the tag peeks once (refines D70, D183, D237, D239).

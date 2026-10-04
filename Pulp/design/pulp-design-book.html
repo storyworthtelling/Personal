@@ -212,6 +212,7 @@
   .th{display:flex;align-items:center;gap:8px;min-height:40px;font-size:15px;font-weight:600}
   .th .cv{margin-left:auto}
   .th .bd{width:18px;height:21px}
+  .sp{margin-left:auto;font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;background:#2C3E5E;color:#FFFFFF}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -223,7 +224,7 @@
   </header>
 
   <section id="screen-sports">
-    <h2>Screen 7 · Sports · revision 4</h2>
+    <h2>Screen 7 · Sports · revision 5</h2>
     <div class="note"><p><b>Organised by league</b> (D67), drawn with <b>invented leagues and teams</b>. No score appears anywhere (D55). Data comes from the league's own feed where its terms allow, otherwise ESPN's (D208).</p></div>
     <div class="mock-wrap">
       <div class="dv">
@@ -240,13 +241,12 @@
           <div class="dv-hdr">Sports</div>
           <div class="dv-rule"></div>
           <div class="srch"><svg viewBox="0 0 18 18" fill="none" stroke="#8A8578" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5"/><path d="m12 12 4 4"/></svg><span>Find a team to follow</span></div>
-          <div class="la open"><div class="lh"><svg class="lb" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#3B536F" stroke="#33322B" stroke-width=".8"/><text x="14" y="17.5" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8.5" fill="#FFFFFF">CFL</text></svg><span class="n">Coastal Football League</span><span class="m">Playoffs</span><svg class="cv" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8.5 7 5.5 10 8.5"/></svg></div>
-            <div class="hold"><b>You're behind on the Harbor Gulls.</b> Standings, highlights and anything that would give the result away are held until you watch Sunday's game.<div class="peek">Peek anyway</div></div>
+          <div class="la open"><div class="lh"><svg class="lb" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#3B536F" stroke="#33322B" stroke-width=".8"/><text x="14" y="17.5" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8.5" fill="#FFFFFF">CFL</text></svg><span class="n">Coastal Football League</span><span class="sp">Spoilers</span><svg class="cv" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8.5 7 5.5 10 8.5"/></svg></div>
             <div class="ta open"><div class="th"><svg class="bd" viewBox="0 0 24 28"><path d="M12 1 22 5v9c0 6.5-4.5 11-10 13C6.5 25 2 20.5 2 14V5z" fill="#085C65" stroke="#33322B" stroke-width=".8"/><text x="12" y="17" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8" fill="#FFFFFF">HG</text></svg><span class="n">Harbor Gulls</span><svg class="cv" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8.5 7 5.5 10 8.5"/></svg></div>
               <div class="gm rec"><div class="l"><div class="t">Gulls at Ridge Foxes</div><div class="s">Sunday · recorded · from the start</div><div class="w">On Gridline TV · channel 7</div></div><span class="ch po">Playoffs</span></div>
             </div>
-            <div class="gm champ"><div class="l"><div class="t">The Coastal Bowl</div><div class="s">Championship · Sun Feb 8 · teams held</div></div><span class="ch po">Final</span></div>
-            <div class="lk">Standings, bracket, highlights <span class="m">&nbsp;held</span></div>
+            <div class="gm champ"><div class="l"><div class="t">The Coastal Bowl</div><div class="s">Championship · Sun Feb 8</div></div><span class="ch po">Final</span></div>
+            
           </div>
           <div class="la"><div class="lh"><svg class="lb" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#6B4219" stroke="#33322B" stroke-width=".8"/><text x="14" y="17.5" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8.5" fill="#FFFFFF">SRL</text></svg><span class="n">Southern Rules League</span><span class="m">Preseason · next Fri</span><svg class="cv" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 5.5 7 8.5 10 5.5"/></svg></div></div>
           <div class="la off"><div class="lh"><svg class="lb" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#8A8578" stroke="#33322B" stroke-width=".8"/><text x="14" y="17.5" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8.5" fill="#FFFFFF">LWH</text></svg><span class="n">Lakeshore Women's Hockey</span><span class="m">Back Nov 8</span><svg class="cv" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 5.5 7 8.5 10 5.5"/></svg></div></div>
@@ -258,7 +258,7 @@
           <li><b>Leagues and teams fold</b> (D241). A folded league is one line: badge, name, and its state ("Preseason · next Fri", "Back Nov 8"). A league opens to its teams, and each team opens to its games.</li>
           <li><b>What starts open:</b> only the league closest to the end of its season, and within it any team with an unwatched recording. Everything else starts folded. What you open stays open.</li>
           <li><b>Order</b> (D235): closest to season's end first; preseason and off-season last.</li>
-          <li><b>The hold</b> (D70, D237) sits at the top of its league. Standings, bracket and highlights collapse to one line marked <b>held</b>. <b>Peek anyway</b> opens them once (D183).</li>
+          <li><b>The hold is one tag</b> (D242): a <b>Spoilers</b> tag on the league's line, and nothing else. No explanation card, no "held" lines: standings, bracket, highlights and revealing games are simply absent until the recording is watched. Tapping the tag peeks once (D183).</li>
           <li><b>Championships</b> sit at league level, outside any team (D239, D240). <b>Badges</b> are content from the feed (D238); the ones here are invented.</li>
           <li>Per team: unwatched recordings, then the next game (D236). Recorded games play from the start; the row names the channel (D55, D57). Adults only (D231).</li>
         </ul>
