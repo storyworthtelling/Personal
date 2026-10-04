@@ -4,13 +4,14 @@ using Xunit;
 namespace Index.Tests.Guard;
 
 /// <summary>
-/// The Guard G1 invariants for Index's own frozen surface — the identifiers that must not move
-/// once Index has shipped a single build. P11's package-id break (D01) means there is no existing
-/// <c>com.storyworthtelling.ledger</c> install to keep alive across the rename, so nothing here
-/// existed to freeze before this phase. But from Index's first ship onward, every one of these is
-/// exactly as load-bearing as Foreword's and Folio's own frozen surfaces: nothing fails at build
-/// time if one of them moves, and nothing fails loudly at run time either. The refresh worker just
-/// quietly stops running, or the app comes up with empty settings. These tests fail instead.
+/// The Guard G1 invariants for Index's own frozen surface — the identifiers that must not move.
+/// Index is the old Ledger renamed in place: it keeps the <c>com.storyworthtelling.ledger</c> package
+/// id, exactly as Foreword, Folio, Post and Plate kept theirs, so a phone that already has Ledger
+/// upgrades it rather than growing a second app beside it (and Google's Android sign-in, which is
+/// registered against the package name, keeps working). Every one of these is as load-bearing as
+/// Foreword's and Folio's own frozen surfaces: nothing fails at build time if one of them moves, and
+/// nothing fails loudly at run time either. The refresh worker just quietly stops running, or the app
+/// comes up with empty settings. These tests fail instead.
 ///
 /// <para>They read the repository by content rather than by project or namespace name, matching
 /// <c>ForewordInvariantsTests</c>/<c>FolioInvariantsTests</c>'s own pattern, so they keep guarding
@@ -28,7 +29,7 @@ public class IndexInvariantsTests
     [Fact]
     public void ApplicationIdIsFrozen()
     {
-        Assert.Equal("com.storyworthtelling.index", IndexIdentity.ApplicationId);
+        Assert.Equal("com.storyworthtelling.ledger", IndexIdentity.ApplicationId);
     }
 
     [Fact]
@@ -122,7 +123,7 @@ public class IndexInvariantsTests
     [Fact]
     public void TheWorkNameIsFrozen()
     {
-        Assert.Contains("\"index-refresh\"", ComponentSource("RefreshWorker"), StringComparison.Ordinal);
+        Assert.Contains("\"ledger-refresh\"", ComponentSource("RefreshWorker"), StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -136,6 +137,40 @@ public class IndexInvariantsTests
     {
         var worker = ComponentSource("RefreshWorker");
         Assert.Contains("$\"{WorkName}-now\"", worker, StringComparison.Ordinal);
+    }
+
+    // ---- the update channel ----
+
+    /// <summary>
+    /// The first P11 build published an APK under the short-lived <c>…index</c> id to the rolling
+    /// release. The locked phone installs any suite APK it does not have yet, so that leftover would
+    /// put a second, separate Index on the phone beside the upgraded Ledger. The workflow that now
+    /// publishes under the real id removes the stray asset in the same run.
+    /// </summary>
+    [Fact]
+    public void ThePublishingWorkflowRemovesTheRetiredIndexIdsApk()
+    {
+        var workflow = File.ReadAllText(Path.Combine(RepoRoot(), ".github", "workflows", "build-index.yml"));
+
+        Assert.Contains("gh release delete-asset apps-latest com.storyworthtelling.index-Signed.apk",
+            workflow, StringComparison.Ordinal);
+    }
+
+    // ---- the database, which an upgrading phone already has ----
+
+    /// <summary>
+    /// The old Ledger's data file. Index opens the same one in place, so a phone keeps its linked
+    /// banks (each Plaid access token lives in this file) instead of arriving empty. A different
+    /// name would not fail anything: the app would create a fresh database beside the old one and
+    /// look as though every bank had been lost.
+    /// </summary>
+    [Fact]
+    public void TheDatabaseKeepsTheOldLedgersFileName()
+    {
+        var program = File.ReadAllText(Path.Combine(
+            RepoRoot(), "Ledger", "Ledger.Android", "MauiProgram.cs"));
+
+        Assert.Contains("Path.Combine(FileSystem.AppDataDirectory, \"ledger.db\")", program, StringComparison.Ordinal);
     }
 
     // ---- the launcher activity ----

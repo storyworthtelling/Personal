@@ -98,7 +98,8 @@ public static class SuiteVersionBands
         new("com.storyworthtelling.focusphone.camera", 1, 200_030),
 
         // Ledger was on a bare run_number — two digits. A rename of its workflow would have reset
-        // it to 1 and bricked its own update channel.
+        // it to 1 and bricked its own update channel. Index is this same app under the same package
+        // id, so this one entry covers it.
         new("com.storyworthtelling.ledger", 1, 58),
 
         // Folio (Canonizer's package) needs a high band for the SAME reason Foreword does, and this
