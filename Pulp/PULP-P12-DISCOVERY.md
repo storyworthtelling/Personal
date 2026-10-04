@@ -547,3 +547,10 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D233 · The voice's reading level for a child** comes from the child's rating-ceiling age band
   (D127); no birthday is stored.
 - **D234 · Screen 6, Favorites (revision 2) — approved.**
+- **D235 · League order** — closest to the end of its season first; preseason and off-season last
+  (an off-season league is one line with its return date).
+- **D236 · Games shown** — unwatched recordings plus the next game per followed team; the full
+  schedule is one tap into the league.
+- **D237 · The hold covers revealing games** — while a team's recording is unwatched, any upcoming
+  game whose existence would reveal a result (a playoff fixture) is held with the standings and
+  highlights (extends D70).
