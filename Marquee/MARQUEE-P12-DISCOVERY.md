@@ -140,3 +140,57 @@ Target: ~200 questions before mockups (owner, round 1).
 - **D48 · The TV's account** — the **owner's Google account**, already on the Chromecast.
 - **D49 · Offline** — nothing: without network there is nothing to watch, so Pulp says so in one
   sentence.
+- **D50 · Platform** — **native Android, one codebase, phone + TV heads** over `Codex.Ui.Android`'s
+  Paper & Ink, with the rules in a pure Domain library both heads share. (So the app lives under
+  `FocusPhone/` beside the other native heads, or beside them in its own folder — a gate-2 call.)
+- **D51 · Region** — **US, English, fixed**.
+- **D52 · Kinds of service** — **subscription streaming, free ad-supported, and live TV / sports**.
+  Not library services. (Live TV is schedules, not titles: its own questions follow.)
+- **D53 · Rent/buy** — offer **only the cheapest high-quality option**, one line, not a price list.
+- **D54 · Live TV** — **followed teams and events**: upcoming games show with where to watch, go
+  on the Pulp calendar, and sit on Continue Watching. No channel guide.
+- **D55 · Sports are never spoiled** — **no scores, ever**. A game **always plays from the
+  beginning** and stays **available as a recording until watched**. (Pulp records nothing itself:
+  this rests on each service's start-over / cloud-DVR and on a deep link reaching the recording,
+  not the live feed. Gate 2 must say per service whether that is possible; where it is not, the
+  finding says so rather than hand off to a live feed mid-game.)
+- **D56 · Which sports** — **US pro leagues, Olympics/international, men's and women's leagues,
+  and some international leagues** (e.g. Australian rules football). Teams are picked in Settings
+  and stored in Drive, never in source.
+- **D57 · Channel links** — deep-link to the channel where the app supports it; otherwise open the
+  service's live section and name the channel.
+- **D58 · Old games** — leave Continue Watching **when the service's recording expires**; where
+  Pulp cannot know, it asks "still want this?" after two weeks.
+- **D59 · Sport for children** — **parent allow-list only**: a child sees a game only for a team a
+  parent added for them.
+- **D60 · Follows** — **per adult**; every followed game goes on the household Pulp calendar,
+  labelled with who follows it.
+- **D61 · Full games only** — no highlights, no condensed replays.
+- **D62 · Phone tabs** — **six**: Continue Watching (home, identity hue) · Playlists · Discover ·
+  **Sports** · **Calendar** · Settings (grey). Six is DESIGN.md §9's drawn ceiling (Score runs six).
+- **D63 · The TV gets its own design** — not the phone's binder frame scaled up; drawn separately
+  at the mockup gate.
+- **D64 · Search by** — **title · person · mood/plain words · team · series or franchise**. Mood
+  search is answered by the model over the shared vault Claude key (cost to be estimated at gate 2).
+- **D65 · Search scope** — **your services first, then "elsewhere"** below a hairline, marked with
+  where and the one rent/buy line (D20, D53).
+- **D66 · Calendar tab** — a **dated list of what's coming** (releases on playlists and Continue
+  Watching, followed games, plans), grouped by day; the same events as the Pulp Google calendar.
+- **D67 · Sports tab** — **organised by league**: **highlights from across the league**, **full-game
+  replays of followed teams**, **standings and playoff brackets**, **preseason and postseason
+  clearly distinguished**. **Adding a team brings its whole league in** if not already followed.
+  (Refines D61: no highlights *of a followed team's games*; league-wide highlights are wanted.
+  Standings and highlights reveal results, which D55 forbids for followed games — reconciled in
+  D70.)
+- **D68 · Plans** — **"plan to watch" on a date**: from a title's action card; goes on the Pulp
+  calendar for both adults.
+- **D69 · Franchise order** — **release order only**.
+- **D70 · The spoiler rule for sport** — while a followed team has an **unwatched recorded game**,
+  that league's **standings and highlights are folded away** behind "you're behind on <team>",
+  and open once the game is watched or dismissed.
+- **D71 · Highlight source** — **official league YouTube channels only, played inside Pulp**
+  (embedded, like trailers).
+- **D72 · A child's sport** — the **full league view, for leagues a parent allowed** (refines
+  D59 from teams to leagues; the D70 hold applies to the child's own followed games too).
+- **D73 · Plans name viewers** — a plan picks who it's for, **defaulting to just the person
+  making it**.
