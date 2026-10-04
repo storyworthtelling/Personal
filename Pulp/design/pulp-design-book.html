@@ -230,6 +230,7 @@
   .svc .k{font-size:12.5px;color:#8A8578}
   .svc .warn{color:#82333B}
   .add{font-size:13.5px;font-weight:600;padding:10px 0 12px;min-height:44px}
+  .svc .nk{display:inline-block;margin-left:6px;font-size:11px;font-weight:600;padding:0 7px;border-radius:9px;border:1px solid #C0BDB9;color:#54514B}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -258,9 +259,9 @@
           <div class="dv-hdr">Settings</div>
           <div class="dv-rule" style="background:#68645E"></div>
           <div class="sg open"><div class="sh"><span>Services</span><span class="m">4 of yours</span><svg class="cv" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8.5 7 5.5 10 8.5"/></svg></div>
-            <div class="svc"><div class="t">Northstar+ <svg class="tk" viewBox="0 0 16 16" fill="none" stroke="#38734A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></div><div class="k">4K · no ads · adult profiles PIN-locked</div><div class="k">Profiles: Sam → "Sam" · Alex → "Alex" · Robin → "Kids"</div></div>
-            <div class="svc"><div class="t">Streamly <svg class="tk" viewBox="0 0 16 16" fill="none" stroke="#38734A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></div><div class="k">4K · no ads · adult profiles PIN-locked</div></div>
-            <div class="svc"><div class="t">Lanternbox <svg class="tk" viewBox="0 0 16 16" fill="none" stroke="#38734A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></div><div class="k">HD · with ads · <span class="warn">not PIN-locked: children can't start titles here</span></div></div>
+            <div class="svc"><div class="t">Northstar+ <svg class="tk" viewBox="0 0 16 16" fill="none" stroke="#38734A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></div><div class="k">4K · no ads</div></div>
+            <div class="svc"><div class="t">Streamly <svg class="tk" viewBox="0 0 16 16" fill="none" stroke="#38734A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></div><div class="k">4K · no ads</div></div>
+            <div class="svc"><div class="t">Lanternbox <svg class="tk" viewBox="0 0 16 16" fill="none" stroke="#38734A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></div><div class="k">HD · with ads <span class="nk">Adults only</span></div></div>
             <div class="svc"><div class="t">Gridline TV <svg class="tk" viewBox="0 0 16 16" fill="none" stroke="#38734A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"/></svg></div><div class="k">Live · 41 channels mapped</div></div>
             <div class="add">Add a service</div>
           </div>
@@ -275,7 +276,8 @@
         <h3>9 · Settings</h3>
         <ul>
           <li><b>Settings is grey</b> (§9): its tab and its header rule take the neutral, never the identity.</li>
-          <li><b>Services</b> (D1, D86): each one you've ticked, with its tier (D29), its profiles mapped to viewers (D86), and whether its adult profiles are PIN-locked, which you attest (D210). A service that isn't locked says plainly that children can't start titles there. A live service lists how many channels are mapped (finding §1.2).</li>
+          <li><b>Services</b> (D1, D86, D248): a short row per service, name and tier (D29). A service whose adult profiles aren't PIN-locked (D210) carries one small neutral <b>Adults only</b> badge (D249). Tapping a service opens its own page: tier, profiles mapped to viewers, the PIN-lock attestation and, for live, its channels.</li>
+          <li><b>Approved</b> (D250); the groups are built from the recorded decisions without further drawings.</li>
           <li><b>Household</b> (D88, D166): viewers, each adult's PIN (D126), and per child the age band, allow-list and block-list (D12, D127–D129). Only the owner adds or removes viewers.</li>
           <li><b>Discover</b>: the stack's size, default three films and two shows (D106).</li>
           <li><b>Vault</b>: the passphrase in the clear, plus each key (availability, ratings, trailers) as "Working ✓" with Replace, or as a field when missing or rejected (credential health).</li>
