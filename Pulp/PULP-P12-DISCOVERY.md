@@ -578,3 +578,7 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D252 · Adults favorite for a child** from the action card ("Favorite for a child…", pick the
   child); it lands on that child's Favorites as a parent's pick (D230).
 - **D253 · A child's star is the request** — no separate "I want this" on the card (narrows D130).
+- **D254 · Favoriting for a child lives under Add to…** — each child's Favorites is a destination in
+  the picker, beside the playlists (supersedes D252's separate card action).
+- **D255 · A parent's favorite above a child's ceiling also allow-lists it** for that child (D12);
+  a block-list entry still wins and that child's Favorites is greyed in the picker.
