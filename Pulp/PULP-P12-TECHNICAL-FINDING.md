@@ -1,6 +1,6 @@
 # Pulp (P12) — Gate 2 technical finding
 
-**Status:** for the owner's approval. Answers the ten items `PULP-P12-DISCOVERY.md` carried to gate 2,
+**Status:** decisions in §6 resolved by the owner (D203–D210); awaiting approval of the finding as a whole. Answers the ten items `PULP-P12-DISCOVERY.md` carried to gate 2,
 surveys the data providers the way Score's P6 WS2 survey did, names the frozen identifiers, and says
 what only the owner's phone can prove. Every figure below was read from the provider's own page or
 the platform's own source on 2026-10-04; links are at the end. **Nothing here names the household's
@@ -254,7 +254,18 @@ Cloud project (all into the vault through Pulp's settings); share the household 
 adult's account; PIN-lock adult profiles on the services children use; grant notification access on
 her phone.
 
-## 6. Decisions this finding needs
+## 6. Decisions this finding needed — resolved
+
+| # | Question | Owner's answer |
+|---|---|---|
+| 1 | TMDB | **Out** (D203) |
+| 2 | Refresh cadence | **Weekly + daily changes feed + on open**, free tier (D204) |
+| 3 | Rating reasons | Owner asked to summarise IMDb; IMDb's Conditions of Use and the MPA's site both forbid scraping without written consent (D205). **Reasons line dropped**; chip only (D207) |
+| 4 | Person / franchise search | **Dropped**; search is title, mood, team (D209) |
+| 5 | Sports data | Owner asked for each league's own site; only MLB's feed carries terms permitting this use (D206). **League feeds where permitted, ESPN for the rest** (D208) |
+| 6 | Children and profiles | **Attestation route** (D210) |
+
+As first put to the owner:
 
 1. **TMDB:** accept that it is out (recommended), or read its AI clause narrowly and use it only on
    paths that never touch a model — which the clause's "in connection with" wording does not obviously
