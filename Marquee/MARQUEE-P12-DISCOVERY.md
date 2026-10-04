@@ -291,3 +291,26 @@ Target: ~200 questions before mockups (owner, round 1).
   calendar** so Foreword prints it.
 - **D125 · Diagnostics** — the suite's exportable log from Settings, **the TV's included** (exported
   via the phone). Ids, not content.
+- **D126 · PINs are per adult** — each adult has their own PIN to leave a child's view (stored
+  salted-hashed, never plain).
+- **D127 · One ceiling** — a child's ceiling is an **age band mapped to both MPA film and US TV
+  ratings**.
+- **D128 · Unrated** — **hidden from a child unless allow-listed**.
+- **D129 · Block-list scope** — by **title, franchise/series, or whole service**. Not keywords.
+- **D130 · A child can "ask"** — a child marks a filtered title "I want this"; it reaches the
+  parents' phones as a request (a dog-ear notice, not a buzz) to approve onto a playlist.
+- **D131 · A child can search**, filtered by D12/D127–D129.
+- **D132 · Screen-time: daily allowance and bedtime cutoff, per child** — and **a child cannot
+  start something they would run out of time for**: a title whose runtime (an episode, a film)
+  exceeds the minutes left in today's allowance, or would run past bedtime, will not hand off.
+  Time is counted from hand-offs (and the media session where gate 2 finds one, D30), so it is an
+  honest approximation, said as such.
+- **D133 · A child's trailers** — only for titles that pass the child's filter.
+- **D134 · Shared time** — spent **per child picked**, **except when an adult is in the picked
+  group**, which spends no child's allowance.
+- **D135 · Out of time** — "About 40 min left today" at the top; **titles too long dim (§8
+  disabled) with "too long for today"**; shorter ones stay playable.
+- **D136 · Extra time** — a parent grants "+N min today" **with their PIN**, on the spot or from
+  their own phone.
+- **D137 · By day** — **school nights (Sun–Thu) and weekends (Fri–Sat)**: two allowance/bedtime
+  pairs per child.
