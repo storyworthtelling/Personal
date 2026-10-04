@@ -197,6 +197,10 @@
   .lk span{color:#8A8578}
   .gm.held .s{font-style:normal;color:#8A8578}
   .lg.off{color:#8A8578;border-bottom-color:#E3DCC9;font-size:15px}
+  .lb{width:22px;height:22px;vertical-align:-5px;margin-right:6px}
+  .bds{display:flex;flex-direction:column;gap:3px;padding-top:2px}
+  .bd{width:18px;height:21px;display:block}
+  .gm.champ .t{font-family:var(--serif);font-weight:600}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -208,7 +212,7 @@
   </header>
 
   <section id="screen-sports">
-    <h2>Screen 7 · Sports · revision 2</h2>
+    <h2>Screen 7 · Sports · revision 3</h2>
     <div class="note"><p><b>Organised by league</b> (D67), drawn with <b>invented leagues and teams</b>. No score appears anywhere (D55). Data comes from the league's own feed where its terms allow, otherwise ESPN's (D208).</p></div>
     <div class="mock-wrap">
       <div class="dv">
@@ -225,17 +229,18 @@
           <div class="dv-hdr">Sports</div>
           <div class="dv-rule"></div>
           <div class="srch"><svg viewBox="0 0 18 18" fill="none" stroke="#8A8578" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5"/><path d="m12 12 4 4"/></svg><span>Find a team to follow</span></div>
-          <div class="lg">Coastal Football League <span class="m">Harbor Gulls</span></div>
+          <div class="lg"><svg class="lb" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#3B536F" stroke="#33322B" stroke-width=".8"/><text x="14" y="17.5" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8.5" fill="#FFFFFF">CFL</text></svg>Coastal Football League <span class="m">Harbor Gulls</span></div>
           <div class="hold"><b>You're behind on the Harbor Gulls.</b> Standings and highlights are folded away until you watch Sunday's game.<div class="peek">Peek anyway</div></div>
-          <div class="gm rec"><div class="l"><div class="t">Gulls at Ridge Foxes</div><div class="s">Sunday · recorded · from the start</div><div class="w">On Gridline TV · channel 7</div></div><span class="ch po">Playoffs</span></div>
+          <div class="gm rec"><div class="bds"><svg class="bd" viewBox="0 0 24 28"><path d="M12 1 22 5v9c0 6.5-4.5 11-10 13C6.5 25 2 20.5 2 14V5z" fill="#085C65" stroke="#33322B" stroke-width=".8"/><text x="12" y="17" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8" fill="#FFFFFF">HG</text></svg><svg class="bd" viewBox="0 0 24 28"><path d="M12 1 22 5v9c0 6.5-4.5 11-10 13C6.5 25 2 20.5 2 14V5z" fill="#82333B" stroke="#33322B" stroke-width=".8"/><text x="12" y="17" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8" fill="#FFFFFF">RF</text></svg></div><div class="l"><div class="t">Gulls at Ridge Foxes</div><div class="s">Sunday · recorded · from the start</div><div class="w">On Gridline TV · channel 7</div></div><span class="ch po">Playoffs</span></div>
           <div class="gm held"><div class="l"><div class="s">The Gulls' next game is held too, because which game it is would tell you Sunday's result.</div></div></div>
-          <div class="lg">Southern Rules League <span class="m">Bayside Kites · Ironbark Rovers</span></div>
-          <div class="gm"><div class="l"><div class="t">Kites v Rovers</div><div class="s">Fri 4:10 am · replay from 9 am</div><div class="w">On Kestrel TV · free</div></div><span class="ch pre">Preseason</span></div>
+          <div class="gm champ"><div class="bds"><svg class="lb" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#3B536F" stroke="#33322B" stroke-width=".8"/><text x="14" y="17.5" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8.5" fill="#FFFFFF">CFL</text></svg></div><div class="l"><div class="t">The Coastal Bowl</div><div class="s">Championship · Sun Feb 8 · teams held</div><div class="w">On Gridline TV · channel 4</div></div><span class="ch po">Final</span></div>
+          <div class="lg"><svg class="lb" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#6B4219" stroke="#33322B" stroke-width=".8"/><text x="14" y="17.5" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8.5" fill="#FFFFFF">SRL</text></svg>Southern Rules League <span class="m">Bayside Kites · Ironbark Rovers</span></div>
+          <div class="gm"><div class="bds"><svg class="bd" viewBox="0 0 24 28"><path d="M12 1 22 5v9c0 6.5-4.5 11-10 13C6.5 25 2 20.5 2 14V5z" fill="#295E3A" stroke="#33322B" stroke-width=".8"/><text x="12" y="17" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8" fill="#FFFFFF">BK</text></svg><svg class="bd" viewBox="0 0 24 28"><path d="M12 1 22 5v9c0 6.5-4.5 11-10 13C6.5 25 2 20.5 2 14V5z" fill="#493200" stroke="#33322B" stroke-width=".8"/><text x="12" y="17" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8" fill="#FFFFFF">IR</text></svg></div><div class="l"><div class="t">Kites v Rovers</div><div class="s">Fri 4:10 am · replay from 9 am</div><div class="w">On Kestrel TV · free</div></div><span class="ch pre">Preseason</span></div>
           <div class="hl"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 3.5v9l7-4.5z"/></svg><span>Round 3 highlights</span><span class="m">9 min</span></div>
           <div class="hl"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 3.5v9l7-4.5z"/></svg><span>Round 2 highlights</span><span class="m">11 min</span></div>
           <div class="lk">Standings <span>›</span></div>
           <div class="lk">Finals bracket <span>›</span></div>
-          <div class="lg off">Lakeshore Women's Hockey <span class="m">North Star Pike · off-season, back Nov 8</span></div>
+          <div class="lg off"><svg class="lb" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="#8A8578" stroke="#33322B" stroke-width=".8"/><text x="14" y="17.5" text-anchor="middle" font-family="Source Sans 3,sans-serif" font-weight="700" font-size="8.5" fill="#FFFFFF">LWH</text></svg>Lakeshore Women's Hockey <span class="m">North Star Pike · off-season, back Nov 8</span></div>
         </div>
       </div>
       <div class="mock-notes">
@@ -245,6 +250,8 @@
           <li><b>Per league</b> (D236): unwatched recordings, then the <b>next game per followed team</b>. The full schedule is one tap into the league.</li>
           <li><b>The spoiler hold</b> (D70, D237): while a followed team has an unwatched recorded game, that league's standings, highlights <b>and any upcoming game that would reveal a result</b> are held. Here the Gulls' next playoff game is held, because its existence says who advanced. <b>Peek anyway</b> opens everything once (D183).</li>
           <li><b>Games</b>: teams, when, where, never a result. A recorded game plays from the start (D55), and the row names the channel (D57). <b>Playoffs</b> and <b>Preseason</b> are chips (D184).</li>
+          <li><b>Badges</b> (D238): each league carries its badge beside its name and each game its two team badges, from the sports feed. They're <b>content, not palette</b>, framed like posters (§7 artwork slot). The badges drawn here are invented.</li>
+          <li><b>Championships are always followed</b> (D239): every followed league's championship game or series appears whether or not your teams are in it. While a hold is up, it shows the date and "teams held".</li>
           <li><b>League highlights</b> play inside Pulp from the league's own channel (D71), only when nothing is held.</li>
           <li><b>Standings</b> and the <b>bracket</b> open as their own pages (drawn later). Find a team is pinned under the header. Adults only (D231).</li>
         </ul>

@@ -554,3 +554,8 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D237 · The hold covers revealing games** — while a team's recording is unwatched, any upcoming
   game whose existence would reveal a result (a playoff fixture) is held with the standings and
   highlights (extends D70).
+- **D238 · League and team badges** — beside each league name and on each game, from the sports
+  feed; treated as content in an artwork slot, not palette.
+- **D239 · Championships are always followed** — every followed league's championship game or
+  series appears whether or not a followed team is in it; under a hold it shows the date with "teams
+  held".
