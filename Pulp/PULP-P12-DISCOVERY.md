@@ -587,3 +587,4 @@ Process (owner, D211): one screen per round; every decision, question and approv
   as made; unticking is undo-first. Playlists stay last-used first (D109).
 - **D258 · A child's row in the picker carries one neutral badge** — "Above band" (ticking
   allow-lists, D255) or "Blocked" (greyed, can't be ticked).
+- **D259 · Screen 11, the picker (revision 2) — approved.**
