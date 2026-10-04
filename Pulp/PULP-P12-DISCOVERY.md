@@ -1,6 +1,6 @@
-# P12 discovery — decisions log
+# P12 discovery — Pulp — decisions log
 
-Working name **Marquee** (under review — see D4). This file records the gate-1 discovery answers
+Name **Pulp** (D16; was the working name Marquee). This file records the gate-1 discovery answers
 as numbered decisions. **Invented data only:** no real subscriptions, titles, viewing history or
 accounts are ever written here; where a decision concerns the household's real services it
 records the *shape* ("picked in Settings, stored in Drive"), never the list.
@@ -401,3 +401,16 @@ Target: ~200 questions before mockups (owner, round 1).
   removing the game; the hold returns.
 - **D184 · Preseason / playoffs** — a **status chip on each game**.
 - **D185 · Competitions** — following a team brings **all its competitions**.
+- **D186 · Release order** — **phone first, then sports, then the integrations** (Flyleaf hiding,
+  Index usage). The TV's place in that order moves out with D187.
+- **D187 · The TV is its own phase** — P12 ships the **phone**; the **TV head gets its own phase
+  with a design pass first** (the P14 watch precedent). Every TV decision recorded here (D13–D15,
+  D17, D26, D63, D74–D85, D95, D102, D116, D143, D165, D167, D174–D177, and the TV half of D132's
+  allowance, which D181 spends only there) **carries to that phase as its starting brief**, not
+  into P12's plan. P12 keeps the shared data (D46) TV-ready and the phone's send-to-TV toggle out
+  until the TV exists.
+- **D188 · App id `com.storyworthtelling.pulp`**, one id for phone and (later) TV, frozen on its
+  first build.
+- **D189 · Folder `Pulp/` at the repo root** — its own solution (`Pulp.Domain`,
+  `Pulp.Infrastructure`, `Pulp.Android`, `Pulp.Tests`), referencing `Codex.Ui.Android` for
+  Paper & Ink. (This log moved from `Marquee/` with it.)
