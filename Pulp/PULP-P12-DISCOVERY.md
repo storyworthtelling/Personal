@@ -532,3 +532,8 @@ Process (owner, D211): one screen per round; every decision, question and approv
   up: the row stays the show (D100 holds), dimmed, reading "Caught up · Season N out <date>", and
   brightens when the season lands. A show with unwatched episodes is unaffected by an upcoming season.
 - **D225 · Screen 4, a playlist — approved**, rows as drawn.
+- **D226 · Recently watched keeps everything, forever** (the viewer's own record; private, D97).
+- **D227 · One row per show**, grouped under the day it was last watched, showing the last episode
+  and — until the show is complete — a pencil progress mark across the whole show.
+- **D228 · Films and shows only** — games are not listed there.
+- **D229 · Screen 5, Recently watched — approved** with D226–D228.
