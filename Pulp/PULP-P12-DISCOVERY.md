@@ -588,3 +588,9 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D258 · A child's row in the picker carries one neutral badge** — "Above band" (ticking
   allow-lists, D255) or "Blocked" (greyed, can't be ticked).
 - **D259 · Screen 11, the picker (revision 2) — approved.**
+- **D260 · What waits behind the dog-ear** — a hand-off that landed on the app's home (D122); a key
+  rejected or a feed unreachable; a household-file problem.
+- **D261 · The lookup allowance is never a notice** — recorded in Diagnostics only. (The owner ticked
+  it in the first question and chose "Diagnostics only" in the second; the specific answer is
+  taken.)
+- **D262 · Screen 12, notices — approved.**
