@@ -574,3 +574,7 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D249 · An unlocked service carries one neutral "Adults only" badge** (no warning text, no colour).
 - **D250 · Screen 9, Settings — approved**; the groups (Household, Discover, Vault, About,
   Diagnostics) and the service page are built from the recorded decisions without further drawings.
+- **D251 · Plan to watch leaves the action card** — plans are made from the title page only.
+- **D252 · Adults favorite for a child** from the action card ("Favorite for a child…", pick the
+  child); it lands on that child's Favorites as a parent's pick (D230).
+- **D253 · A child's star is the request** — no separate "I want this" on the card (narrows D130).
