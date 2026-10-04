@@ -505,3 +505,11 @@ Raised by the answers above and owed a measured answer, not an assumption:
 ## Gate 3 — screens, one at a time
 
 Process (owner, D211): one screen per round; every decision, question and approval is put as chips.
+- **D212 · Screen 1, Continue watching — approved**, with the binder colours as drawn (home
+  marigold · Playlists reference slate · Discover positive leaf · Sports action pine · Calendar
+  in-progress teal · Settings grey; caution ochre kept off the strip) and the row as drawn (poster ·
+  title · next up · where · pencil progress mark with count).
+- **D213 · Home's bottom bar** — secondary **switch to a child and back** ("Watch as a child" /
+  "Back to me"); primary opens **Recently watched** for an adult, **Favorites** for a child.
+- **D214 · Two new pages** — **Recently watched** (adult) and **Favorites** (child), each to be
+  drawn and approved in its own round.
