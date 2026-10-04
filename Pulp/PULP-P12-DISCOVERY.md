@@ -457,3 +457,6 @@ Raised by the answers above and owed a measured answer, not an assumption:
 
 - **D198 · The cover idea** — **06 · To be continued**: the serial's cliffhanger, a figure hanging
   from a ledge above a night city. Round 2 varies crop and style on it.
+- **D199 · Round 2 outcome** — the **original round-1 painting (06)** is the best of the cliffhanger
+  studies. Round 3 shows **that painting projected onto a screen, with a bucket of popcorn on a
+  table in front**.
