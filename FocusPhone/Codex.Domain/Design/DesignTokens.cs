@@ -152,6 +152,31 @@ public static class DesignTokens
         {
             public const string Cloth = "#4E5F3A";
         }
+
+        /// <summary>
+        /// Pulp — marigold, OKLCH 63 degrees (D202), chosen rather than sampled, on the suite's
+        /// shared lightness ladder with a mark chroma of 0.095.
+        ///
+        /// It sits 22 degrees from Flyleaf's amber mark (41) and 22 from the caution ochre (85):
+        /// the only yellow-orange that clears §3's floor against both at every tier after hex
+        /// rounding. A yellow-orange cannot carry text on paper at its own brightness, so the
+        /// text-bearing tiers are browns of that hue and the bright marigold lives on the CLOTH
+        /// alone — a light binding with the rule, flourishes and title in ink (6.25:1), which is
+        /// Score's and Plate's construction.
+        ///
+        /// The full ladder is here rather than only the cloth (as Index's is) because Pulp is a
+        /// cover-out sibling on Flyleaf's shelf and its screens take the ladder too; IconStudio's
+        /// Tokens.cs holds the same six values, checked by DesignTokensTests.
+        /// </summary>
+        public static class Pulp
+        {
+            public const string Fill = "#CEB7A3";
+            public const string Ground = "#BF9E82";
+            public const string Mark = "#86541F";
+            public const string Text = "#6B4219";
+            public const string Deep = "#4B3015";
+            public const string Cloth = "#F6A24E";
+        }
     }
 
     /// <summary>
