@@ -544,3 +544,6 @@ Process (owner, D211): one screen per round; every decision, question and approv
   in a child's view (narrows D42/D72 for the phone: a child's sport waits for the TV phase).
 - **D232 · A voiced line on Favorites, moderated for the child's age** (short words, one idea,
   nothing frightening) — adds a seat to D38/D39's closed list.
+- **D233 · The voice's reading level for a child** comes from the child's rating-ceiling age band
+  (D127); no birthday is stored.
+- **D234 · Screen 6, Favorites (revision 2) — approved.**
