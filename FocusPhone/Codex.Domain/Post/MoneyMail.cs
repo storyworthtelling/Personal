@@ -212,20 +212,22 @@ public sealed record IndexBalance(decimal Balance, DateOnly? AsOf, string? Sende
 /// </summary>
 public static class IndexHandoff
 {
-    /// <summary>Index's package. The intent names it explicitly rather than broadcasting.</summary>
-    public const string Package = "com.storyworthtelling.index";
+    /// <summary>Index's package — still <c>…ledger</c>, since Index is the old Ledger renamed in place and an
+    /// update only upgrades an app whose package name is unchanged. The intent names it explicitly rather
+    /// than broadcasting.</summary>
+    public const string Package = "com.storyworthtelling.ledger";
 
     /// <summary>The receiver, named directly so nothing else can intercept the balance.</summary>
-    public const string Receiver = "com.storyworthtelling.index.BalanceReceiver";
+    public const string Receiver = "com.storyworthtelling.ledger.BalanceReceiver";
 
-    public const string Action = "com.storyworthtelling.index.action.BALANCE";
+    public const string Action = "com.storyworthtelling.ledger.action.BALANCE";
 
     /// <summary>
     /// The permission Index declares at protectionLevel="signature". It costs nothing —
     /// every head already shares one keystore for the update channel — and without it any
     /// app on the phone could feed Index fabricated balances.
     /// </summary>
-    public const string Permission = "com.storyworthtelling.index.RECEIVE_BALANCE";
+    public const string Permission = "com.storyworthtelling.ledger.RECEIVE_BALANCE";
 
     public const string BalanceExtra = "balance";
     public const string AsOfExtra = "asOf";

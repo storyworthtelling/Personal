@@ -17,14 +17,15 @@ namespace Index.Android;
 // period; Success once nothing is due. All progress is persisted to SQLite, so refreshes advance
 // across wakeups and survive reboots.
 //
-// The registered name and WorkName below are frozen from Index's first ship onward, following the
+// The registered name and WorkName below are the old Ledger's, kept as they were, following the
 // Foreword/Folio pattern: WorkManager instantiates the worker by this Java class name from a row
 // persisted on the device, and a moved name means the row names a class that no longer exists —
-// the refresh simply stops, silently.
+// the refresh simply stops, silently. A phone upgrading from Ledger already has that row; a new
+// WorkName would leave it running beside a second schedule.
 [global::Android.Runtime.Register(IndexIdentity.ApplicationId + ".RefreshWorker")]
 public class RefreshWorker : Worker
 {
-    private const string WorkName = "index-refresh";
+    private const string WorkName = "ledger-refresh";
 
     // WorkManager can run the periodic worker and a RunNow one-shot at the same time (separate unique-
     // work chains). This process-wide gate lets only one cycle run at a time; a second wakeup returns

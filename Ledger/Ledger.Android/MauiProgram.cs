@@ -7,6 +7,7 @@ using Microsoft.Maui.Hosting;
 using Microsoft.Maui.Storage;
 using Index.Domain.External;
 using Index.Domain.Health;
+using Index.Domain.Identity;
 using Index.Domain.Household;
 using Index.Domain.Model;
 using Index.Domain.Time;
@@ -115,7 +116,7 @@ public static class MauiProgram
                 return new DriveService(new GoogleClientInitializer
                 {
                     HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                    ApplicationName = "Ledger",
+                    ApplicationName = IndexIdentity.DisplayName,
                     HttpClientFactory = new AndroidGoogleHttpClientFactory()
                 });
             };

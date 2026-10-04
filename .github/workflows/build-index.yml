@@ -96,11 +96,11 @@ jobs:
           echo "--- $APK"
           BADGING=$("$AAPT2" dump badging "$APK")
           echo "$BADGING" | head -2
-          echo "$BADGING" | grep -q "name='com.storyworthtelling.index'" || {
-            echo "FAIL: Index's APK does not carry the com.storyworthtelling.index ApplicationId."
+          echo "$BADGING" | grep -q "name='com.storyworthtelling.ledger'" || {
+            echo "FAIL: Index's APK does not carry the com.storyworthtelling.ledger ApplicationId."
             exit 1
           }
-          echo "ok: com.storyworthtelling.index present"
+          echo "ok: com.storyworthtelling.ledger present"
           echo "=== END APP ID CHECK ==="
 
       # Prove the launcher icon is actually in the APK and FAIL the build if it is not. This head does
@@ -177,3 +177,12 @@ jobs:
         uses: ./.github/actions/publish-rolling-release
         with:
           apks: Ledger/Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk
+
+      # The first P11 build published under a short-lived com.storyworthtelling.index id. The locked
+      # phone installs any suite APK it does not have yet, so that leftover asset would install a
+      # second Index beside the upgraded Ledger. Remove it; a missing asset is the normal case.
+      - name: Remove the retired com.storyworthtelling.index asset
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete-asset apps-latest com.storyworthtelling.index-Signed.apk --yes || echo "no retired asset to remove"
