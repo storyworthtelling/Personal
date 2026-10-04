@@ -559,3 +559,4 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D239 · Championships are always followed** — every followed league's championship game or
   series appears whether or not a followed team is in it; under a hold it shows the date with "teams
   held".
+- **D240 · Championships: followed leagues only.**
