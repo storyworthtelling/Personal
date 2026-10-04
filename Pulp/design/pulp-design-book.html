@@ -176,6 +176,25 @@
   .fv .w{font-size:12px;color:#8A8578}
   .dv-tab.locked{opacity:.45}
   .fv .src{font-size:11.5px;font-weight:600;color:#6B6759}
+  .lg{font-family:var(--serif);font-weight:600;font-size:17px;margin:16px 0 6px;padding-bottom:5px;border-bottom:1.5px solid #33322B}
+  .lg .m{font-family:var(--sans);font-weight:400;font-size:12.5px;color:#8A8578;margin-left:4px}
+  .hold{background:#F1EBDD;border-radius:12px;padding:10px 12px;font-size:13px;color:#6B6759;margin:6px 0}
+  .hold b{color:#33322B}
+  .hold .peek{font-weight:600;color:#33322B;margin-top:6px;font-size:12.5px}
+  .gm{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #E3DCC9}
+  .gm .l{flex:1;min-width:0}
+  .gm .t{font-size:15px}
+  .gm .s{font-size:13px;color:#6B6759}
+  .gm .w{font-size:12.5px;color:#8A8578}
+  .gm.rec .s{color:#33322B}
+  .ch{font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;border:1px solid #E3DCC9;color:#6B6759;white-space:nowrap}
+  .ch.po{border-color:#33322B;color:#33322B}
+  .ch.pre{color:#8A8578}
+  .hl{display:flex;align-items:center;gap:8px;min-height:40px;font-size:14px;border-bottom:1px solid #F1EBDD}
+  .hl svg{width:14px;height:14px;flex:none}
+  .hl .m{margin-left:auto;font-size:12px;color:#8A8578}
+  .lk{display:flex;justify-content:space-between;min-height:40px;align-items:center;font-size:14.5px;font-weight:600;border-bottom:1px solid #F1EBDD}
+  .lk span{color:#8A8578}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -185,6 +204,50 @@
     <h1>Pulp Design Book</h1>
     <p class="lede">The cover comes first and the identity hue is sampled from whichever painting you choose (D114, D115). This round varies the <b>idea</b>, not the style. Every study is painted in one mid-century cover-painting manner, and no colour is named in any prompt.</p>
   </header>
+
+  <section id="screen-sports">
+    <h2>Screen 7 · Sports</h2>
+    <div class="note"><p><b>Organised by league</b> (D67), drawn with <b>invented leagues and teams</b>. No score appears anywhere (D55). Data comes from the league's own feed where its terms allow, otherwise ESPN's (D208).</p></div>
+    <div class="mock-wrap">
+      <div class="dv">
+        <div class="dv-gut"></div><div class="dv-edge"></div>
+        <div class="dv-tabs">
+          <div class="dv-tab off" style="background:#CEB7A3"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="20" height="13" rx="2"/><path d="M11 9v5l4-2.5z"/><path d="M9 22h8"/></svg><span>Watching</span></div>
+          <div class="dv-tab off" style="background:#AEC0D5"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><path d="M8 7h14M8 13h14M8 19h14"/><circle cx="4" cy="7" r="1"/><circle cx="4" cy="13" r="1"/><circle cx="4" cy="19" r="1"/></svg><span>Playlists</span></div>
+          <div class="dv-tab off" style="background:#B1C69A"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="9" height="14" rx="1.5"/><rect x="13" y="4" width="9" height="14" rx="1.5"/></svg><span>Discover</span></div>
+          <div class="dv-tab on" style="color:#295E3A"><svg viewBox="0 0 26 26" fill="none" stroke="#295E3A" stroke-width="1.8" stroke-linecap="round"><circle cx="13" cy="13" r="9"/><path d="M4.5 10c5 2 12 2 17 0M4.5 16c5-2 12-2 17 0M13 4v18"/></svg><span>Sports</span></div>
+          <div class="dv-tab off" style="background:#9BC7CD"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="6" width="18" height="16" rx="2"/><path d="M4 11h18M9 3.5v5M17 3.5v5"/></svg><span>Calendar</span></div>
+          <div class="dv-tab off" style="background:#C0BDB9"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><circle cx="13" cy="13" r="3.4"/><path d="M13 3.5v3M13 19.5v3M3.5 13h3M19.5 13h3M6.2 6.2l2.1 2.1M17.7 17.7l2.1 2.1M19.8 6.2l-2.1 2.1M8.3 17.7l-2.1 2.1"/></svg><span>Settings</span></div>
+        </div>
+        <div class="dv-well">
+          <div class="dv-hdr">Sports</div>
+          <div class="dv-rule"></div>
+          <div class="srch"><svg viewBox="0 0 18 18" fill="none" stroke="#8A8578" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5"/><path d="m12 12 4 4"/></svg><span>Find a team to follow</span></div>
+          <div class="lg">Coastal Football League <span class="m">Harbor Gulls</span></div>
+          <div class="hold"><b>You're behind on the Harbor Gulls.</b> Standings and highlights are folded away until you watch Sunday's game.<div class="peek">Peek anyway</div></div>
+          <div class="gm rec"><div class="l"><div class="t">Gulls at Ridge Foxes</div><div class="s">Sunday · recorded · from the start</div><div class="w">On Gridline TV · channel 7</div></div><span class="ch po">Playoffs</span></div>
+          <div class="gm"><div class="l"><div class="t">Pinewood Owls at Gulls</div><div class="s">Sat 7:30 pm</div><div class="w">On Northstar+</div></div><span class="ch po">Playoffs</span></div>
+          <div class="lg">Southern Rules League <span class="m">Bayside Kites · Ironbark Rovers</span></div>
+          <div class="gm"><div class="l"><div class="t">Kites v Rovers</div><div class="s">Fri 4:10 am · replay from 9 am</div><div class="w">On Kestrel TV · free</div></div><span class="ch pre">Preseason</span></div>
+          <div class="hl"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 3.5v9l7-4.5z"/></svg><span>Round 3 highlights</span><span class="m">9 min</span></div>
+          <div class="hl"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 3.5v9l7-4.5z"/></svg><span>Round 2 highlights</span><span class="m">11 min</span></div>
+          <div class="lk">Standings <span>›</span></div>
+          <div class="lk">Finals bracket <span>›</span></div>
+        </div>
+      </div>
+      <div class="mock-notes">
+        <h3>7 · Sports</h3>
+        <ul>
+          <li><b>One section per league</b>, headed by its name, with the teams you follow beside it. Following a team brings its whole league in (D67) and all its competitions (D185).</li>
+          <li><b>The spoiler hold</b> (D70): while a followed team has an unwatched recorded game, that league's standings and highlights are folded away behind one card. <b>Peek anyway</b> opens them once and the hold returns (D183).</li>
+          <li><b>Games</b>: teams, when, and where, never a result. A recorded game plays from the start (D55); where the service can't land on the recording, the row still names the channel (D57, finding §2.4). <b>Playoffs</b> and <b>Preseason</b> are chips on each game (D184).</li>
+          <li><b>League highlights</b> play inside Pulp from the league's own channel (D71), shown only when no hold is up.</li>
+          <li><b>Standings</b> and the <b>bracket</b> open as their own pages (drawn later).</li>
+          <li>Find a team is pinned under the header. This page is adults only: a child's view has no Sports tab (D231).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
   <section id="screen-fav">
     <h2>Screen 6 · Favorites (a child's view) · revision 2</h2>
