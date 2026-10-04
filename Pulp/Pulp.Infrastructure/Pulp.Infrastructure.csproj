@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pulp's I/O: the household file and the vault read through Storyworthtelling.Voice's
+       IDriveTextFile / VaultEnvelope seam. Empty until Release B/D fills it. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Pulp.Infrastructure</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pulp.Domain\Pulp.Domain.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+  </ItemGroup>
+</Project>
