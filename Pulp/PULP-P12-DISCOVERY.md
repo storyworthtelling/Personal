@@ -527,3 +527,8 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D220 · Vetoes stay struck until Friday**, with "Bring it back".
 - **D221 · Add / veto / trailer are small buttons beside the front poster** (not long-press).
 - **D222 · Screen 3, Discover (revision 2) — approved.**
+- **D223 · A playlist has no bottom bar.**
+- **D224 · Caught-up shows dim on a playlist** — a new season matters only to a viewer who was caught
+  up: the row stays the show (D100 holds), dimmed, reading "Caught up · Season N out <date>", and
+  brightens when the season lands. A show with unwatched episodes is unaffected by an upcoming season.
+- **D225 · Screen 4, a playlist — approved**, rows as drawn.
