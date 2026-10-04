@@ -375,3 +375,16 @@ Target: ~200 questions before mockups (owner, round 1).
 - **D168 · Children's requests** — reach **both adults**; **first answer settles it**, and the other
   phone's notice goes.
 - **D169 · A declined request** quietly leaves the child's list; no message.
+- **D170 · Search field** — pinned under Discover's header; **empty shows the stack**, typing
+  replaces it with results in place.
+- **D171 · Mood search is explicit** — a **Title / Mood chip** beside the field.
+- **D172 · Results** — **top 20, "more" below**; yours first, elsewhere after the hairline; the count
+  line reads matches of total.
+- **D173 · A person page** — name, then **their titles by release, yours first**. No photo, no
+  biography.
+- **D174 · Who's watching (TV)** — pick **one or more viewers, then Go**; the group decides
+  filters, time (D134) and "together" (D98).
+- **D175 · Mixed group** — **the strictest child's filter** applies while a child is picked.
+- **D176 · No Discover stacks on the TV at all** — supersedes D26's "stack follows whoever was
+  picked". The TV's Discover is search and trailers.
+- **D177 · The TV forgets on power-off** (D26).
