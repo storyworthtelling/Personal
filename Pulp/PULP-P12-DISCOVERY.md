@@ -474,3 +474,18 @@ Raised by the answers above and owed a measured answer, not an assumption:
   ink, ink on cloth 6.25:1 — Score's and Plate's construction). 22° from Flyleaf's amber and 22°
   from the caution ochre; the only yellow-orange that clears §3's floor at every tier after hex
   rounding. To be registered in DESIGN.md §3/§19 and the hue-separation guard at implementation.
+
+## Gate 2 decisions
+
+- **D203 · TMDB is out** — its API terms forbid use in connection with an AI-based application or an
+  LLM query-response system, which Pulp is (mood search, model playlists, voiced lines).
+- **D204 · Refresh cadence** — **weekly refresh + a daily changes feed + a fresh look on open**,
+  inside the availability source's free 1,000 requests a month. Supersedes D123's "nightly".
+- **D205 · Rating reasons, owner's ask: query and summarise IMDb.** Checked: IMDb's Conditions of Use
+  forbid "data mining, robots, screen scraping … except with our express written consent", and the
+  MPA's own ratings site forbids robots and page-scraping likewise. Put back to the owner (D207).
+- **D206 · Sports, owner's ask: each league's own website.** Checked: MLB's own JSON
+  (`statsapi.mlb.com`) carries an explicit notice permitting "individual, non-commercial, non-bulk
+  use"; the NHL's (`api-web.nhle.com`) is public but carries no terms; the NBA's CDN refuses plain
+  requests (403); the NFL publishes none; most league sites' HTML terms forbid robots. Put back to the
+  owner (D208).
