@@ -78,7 +78,7 @@ public class NoKeysTests
 
     [Theory]
     [InlineData("public void TheDetectorRecognisesAQuotedHexKeyInSourceFiles()")]
-    [InlineData("\"com.storyworthtelling.pulp.WeeklyRefreshWorker\"")]
+    [InlineData("\"com.example.sample.WeeklyRefreshWorker\"")]
     [InlineData("\"storyworthtelling-pulp-household.json\"")]
     [InlineData("Version=\"17.12.0\"")]
     public void TheDetectorIgnoresOrdinarySource(string line)
