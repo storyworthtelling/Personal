@@ -594,3 +594,6 @@ Process (owner, D211): one screen per round; every decision, question and approv
   it in the first question and chose "Diagnostics only" in the second; the specific answer is
   taken.)
 - **D262 · Screen 12, notices — approved.**
+- **D263 · Home's bottom bar never changes** — "Recently watched" stays the primary on an empty home.
+- **D264 · Every empty page is voiced** (D38), each with a neutral Serif italic fallback.
+- **D265 · Screen 13, empty states — approved.**
