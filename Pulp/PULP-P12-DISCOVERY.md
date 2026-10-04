@@ -605,3 +605,10 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D269 · Index's usage line counts times opened through Pulp** (hand-offs) per calendar month.
 - **D270 · "Not opened in Pulp since …" appears after two months unused**, in the same muted ink.
 - **D271 · Screen 15, Index's usage line — approved.**
+- **D272 · Gate waived for the undrawn pages** (owner's decision): a service's own page, the
+  Household group, search results and mood search, standings / bracket / a league's schedule, the
+  prompt-or-seed playlist flow, a film's title page, and Vault + first run are **built from the
+  recorded decisions without mockups** and reviewed in the running app. Every other surface was
+  drawn and approved.
+- **D273 · Gate 3 closed** — fifteen screens approved (D212–D271); the published design book is
+  https://claude.ai/artifact/M5cdj33HaqxnXsdvv2bu4N and committed copies live in `Pulp/design/`.
