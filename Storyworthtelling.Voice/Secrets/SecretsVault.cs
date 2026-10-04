@@ -21,8 +21,8 @@ public sealed record SecretsVault
 
     // Foreword's own Anthropic key for handwriting extraction, separate from the shared Claude voice key.
     //
-    // The WIRE KEY stays "DailyLoader" and always will. There is no naming policy and no other
-    // [JsonPropertyName] in this file, so a property name here is literally the key written to the
+    // The WIRE KEY stays "DailyLoader" and always will. There is no naming policy (the only other
+    // [JsonPropertyName] here is Pulp's, below), so a property name here is literally the key written to the
     // owner's Drive — renaming it would make every existing vault deserialise this section to its
     // empty default, silently, on every phone at once. The calendar mapping JSON is the reason that
     // would hurt: it lives in the vault precisely because it is tedious to reconstruct by hand.
@@ -48,6 +48,17 @@ public sealed record SecretsVault
     // refresh token that carries someone's subscription) is deliberately NOT here: see
     // PersonalVault.
     public TidalSecrets Tidal { get; init; } = new();
+
+    // Pulp's three household API keys: the streaming-availability lookups (what is on which of the
+    // household's services), the rating chip, and the trailers and league highlights. Household
+    // facts, not per-person ones — one key per service however many people watch — so they live
+    // here rather than in PersonalVault.
+    //
+    // The WIRE KEY is "Pulp" and is frozen, pinned with [JsonPropertyName] for the same reason as
+    // Foreword's section above: with no naming policy a property name is the key written to Drive,
+    // so renaming the property would load every existing vault's section as empty, silently.
+    [JsonPropertyName("Pulp")]
+    public PulpSecrets Pulp { get; init; } = new();
 
     // Stable Drive file ids for the suite's well-known JSON files (voice profile/config, this vault, taste
     // profile, audio library), keyed by file name. Lets those files be MOVED in Drive without breaking the
@@ -172,3 +183,11 @@ public sealed record MusicSecrets(string FolderId = "");
 public sealed record TidalSecrets(
     string ClientId = "",
     string ClientSecret = "");
+
+// Pulp's household API keys: the streaming-availability service, the rating service behind the
+// rating chip, and the video service for trailers and league highlights. Written to Drive under the
+// key "Pulp", with these three inner names exactly — see above.
+public sealed record PulpSecrets(
+    string StreamingAvailabilityKey = "",
+    string OmdbKey = "",
+    string YouTubeKey = "");
