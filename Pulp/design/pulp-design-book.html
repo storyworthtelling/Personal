@@ -266,6 +266,8 @@
   .empty{position:absolute;left:24px;right:16px;top:300px;text-align:center;display:flex;flex-direction:column;gap:18px}
   .empty .fallback{font-size:12px;color:#8A8578}
   .empty .fallback i{font-family:var(--serif);font-size:15px;color:#6B6759;display:block;margin-top:4px}
+  .ul{margin:12px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14.5px;color:var(--ink-soft)}
+  .ul b{color:var(--ink)}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -275,6 +277,31 @@
     <h1>Pulp Design Book</h1>
     <p class="lede">The cover comes first and the identity hue is sampled from whichever painting you choose (D114, D115). This round varies the <b>idea</b>, not the style. Every study is painted in one mid-century cover-painting manner, and no colour is named in any prompt.</p>
   </header>
+
+  <section id="screen-cover">
+    <h2>Screen 14 · The book: shelf cover and launcher icon</h2>
+    <div class="note"><p><b>The approved den painting in the marigold binding</b> (D200, D202), in the §12 ex-libris anatomy: cloth, a fine rule on all four sides, mirrored corner flourishes, the painting in a keyline window, and the title band. These are CSS stand-ins; IconStudio draws the real ones.</p></div>
+    <div class="plates" style="--cloth:#F6A24E;--rule:#33322B">
+      <div class="opt">
+        <h3>Shelf cover (cover-out on Flyleaf)</h3>
+        <div class="plate"><div class="window"><img src="p4.jpg" alt="The den painting in the cover window"></div><div class="band">Pulp</div><svg class="fl tl" viewBox="0 0 40 40"><path d="M2 38 V14 Q2 2 14 2 H38 M8 38 V18 Q8 8 18 8 H38" fill="none" stroke="var(--rule)" stroke-width="1.4"/></svg><svg class="fl tr" viewBox="0 0 40 40"><path d="M2 38 V14 Q2 2 14 2 H38 M8 38 V18 Q8 8 18 8 H38" fill="none" stroke="var(--rule)" stroke-width="1.4"/></svg><svg class="fl bl" viewBox="0 0 40 40"><path d="M2 38 V14 Q2 2 14 2 H38 M8 38 V18 Q8 8 18 8 H38" fill="none" stroke="var(--rule)" stroke-width="1.4"/></svg><svg class="fl br" viewBox="0 0 40 40"><path d="M2 38 V14 Q2 2 14 2 H38 M8 38 V18 Q8 8 18 8 H38" fill="none" stroke="var(--rule)" stroke-width="1.4"/></svg></div>
+      </div>
+      <div class="opt">
+        <h3>Launcher icon (no title)</h3>
+        <div class="icons" style="gap:20px">
+          <div class="icon big" style="width:144px;height:144px"><img src="p4.jpg" alt=""></div>
+          <div class="icon big" style="border-radius:50%"><img src="p4.jpg" alt=""></div>
+          <div class="icon small"><img src="p4.jpg" alt=""></div>
+        </div>
+        <ul class="ul">
+          <li><b>Square and round masks</b> at 144, 96 and 48 px: cloth ground, ink keyline, the painting cropped to the screen and the popcorn so it reads small.</li>
+          <li><b>No title</b> on the icon (§12); Android prints the name.</li>
+          <li><b>The maker's mark</b> appears only on the frameless load art, and Pulp has none (D118), so it's on neither.</li>
+          <li>On the Flyleaf bookcase it stands <b>cover-out with the siblings</b> (D91), in its own cloth like every book.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
   <section id="screen-empty">
     <h2>Screen 13 · Empty states</h2>
