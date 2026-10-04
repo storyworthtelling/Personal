@@ -94,4 +94,32 @@ public class SmsRoleTests
 
         Assert.DoesNotContain(lost.Headline, EmptyMailbox.Seeds.SelectMany(seed => seed.Rungs));
     }
+
+    // The role is re-read on every resume, not just a cold launch, so what is remembered
+    // between looks has to survive more than one look. Once Post has held the role, losing
+    // it stays "lost" until it is back — a second glance must not quietly turn "something
+    // took over" into first-run setup the owner already did.
+    [Theory]
+    [InlineData(SmsRoleStatus.Held, false, true)]
+    [InlineData(SmsRoleStatus.Held, true, true)]
+    [InlineData(SmsRoleStatus.Available, true, true)]
+    [InlineData(SmsRoleStatus.Unavailable, true, true)]
+    [InlineData(SmsRoleStatus.Available, false, false)]
+    [InlineData(SmsRoleStatus.Unavailable, false, false)]
+    public void HavingHeldTheRoleIsRememberedUntilItIsBack(SmsRoleStatus status, bool heldBefore, bool expected)
+    {
+        Assert.Equal(expected, SmsRole.Remember(status, heldBefore));
+    }
+
+    [Fact]
+    public void LookingTwiceAfterLosingTheRoleStillSaysItWasLost()
+    {
+        var held = SmsRole.Remember(SmsRoleStatus.Held, heldBefore: false);
+        var afterFirstLook = SmsRole.Remember(SmsRoleStatus.Available, held);
+
+        var secondLook = SmsRole.Decide(SmsRoleStatus.Available, afterFirstLook);
+
+        Assert.True(secondLook.WasLost);
+        Assert.True(secondLook.CanRequest);
+    }
 }
