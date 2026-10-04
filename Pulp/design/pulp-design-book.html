@@ -268,6 +268,8 @@
   .empty .fallback i{font-family:var(--serif);font-size:15px;color:#6B6759;display:block;margin-top:4px}
   .ul{margin:12px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14.5px;color:var(--ink-soft)}
   .ul b{color:var(--ink)}
+  .icon.bleed{overflow:hidden;display:block}
+  .icon.bleed img{width:100%;height:100%;object-fit:cover;object-position:45% 55%;outline:none}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -279,7 +281,7 @@
   </header>
 
   <section id="screen-cover">
-    <h2>Screen 14 · The book: shelf cover and launcher icon</h2>
+    <h2>Screen 14 · The book: shelf cover and launcher icon · revision 2</h2>
     <div class="note"><p><b>The approved den painting in the marigold binding</b> (D200, D202), in the §12 ex-libris anatomy: cloth, a fine rule on all four sides, mirrored corner flourishes, the painting in a keyline window, and the title band. These are CSS stand-ins; IconStudio draws the real ones.</p></div>
     <div class="plates" style="--cloth:#F6A24E;--rule:#33322B">
       <div class="opt">
@@ -289,12 +291,12 @@
       <div class="opt">
         <h3>Launcher icon (no title)</h3>
         <div class="icons" style="gap:20px">
-          <div class="icon big" style="width:144px;height:144px"><img src="p4.jpg" alt=""></div>
-          <div class="icon big" style="border-radius:50%"><img src="p4.jpg" alt=""></div>
-          <div class="icon small"><img src="p4.jpg" alt=""></div>
+          <div class="icon big bleed" style="width:144px;height:144px"><img src="p4.jpg" alt=""></div>
+          <div class="icon big bleed" style="border-radius:50%"><img src="p4.jpg" alt=""></div>
+          <div class="icon small bleed"><img src="p4.jpg" alt=""></div>
         </div>
         <ul class="ul">
-          <li><b>Square and round masks</b> at 144, 96 and 48 px: cloth ground, ink keyline, the painting cropped to the screen and the popcorn so it reads small.</li>
+          <li><b>Full bleed</b> (D267): the painting fills the mask edge to edge, no cloth border and no keyline, like Folio's and every cover icon. The crop holds <b>the screen and the popcorn together</b> (D266). Square and round masks at 144, 96 and 48 px.</li>
           <li><b>No title</b> on the icon (§12); Android prints the name.</li>
           <li><b>The maker's mark</b> appears only on the frameless load art, and Pulp has none (D118), so it's on neither.</li>
           <li>On the Flyleaf bookcase it stands <b>cover-out with the siblings</b> (D91), in its own cloth like every book.</li>
