@@ -513,3 +513,12 @@ Process (owner, D211): one screen per round; every decision, question and approv
   "Back to me"); primary opens **Recently watched** for an adult, **Favorites** for a child.
 - **D214 · Two new pages** — **Recently watched** (adult) and **Favorites** (child), each to be
   drawn and approved in its own round.
+- **D215 · Rating chip, four steps** — kids (G, TV-Y, TV-Y7) positive leaf · family (PG, TV-G,
+  TV-PG) resolved grey · teen (PG-13, TV-14) caution ochre · mature (R, NC-17, TV-MA) problem rose;
+  unrated is a hairline outline with no fill. Each step also differs by label, so the chip reads
+  without colour.
+- **D216 · Choosing the home per title** — the other home is listed under the best one; tapping
+  "open there instead" makes it that title's home from then on (overrides D28 for that title).
+- **D217 · Episodes show number and title only**, the next one included; a tap expands the official
+  synopsis in place.
+- **D218 · Screen 2, the title page — approved** with D215–D217.
