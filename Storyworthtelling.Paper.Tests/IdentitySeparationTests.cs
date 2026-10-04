@@ -37,6 +37,7 @@ public class IdentitySeparationTests
         ("Foreword", "ForewordSunriseHex"),
         ("Folio", "FolioMarkHex"),
         ("Index", "IndexMarkHex"),
+        ("Pulp", "PulpMarkHex"),
     ];
 
     /// <summary>
