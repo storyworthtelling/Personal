@@ -460,3 +460,11 @@ Raised by the answers above and owed a measured answer, not an assumption:
 - **D199 · Round 2 outcome** — the **original round-1 painting (06)** is the best of the cliffhanger
   studies. Round 3 shows **that painting projected onto a screen, with a bucket of popcorn on a
   table in front**.
+- **D200 · The cover** — **3·4, the book-lined den**: the cliffhanger painting projected on a
+  screen at the end of a book-lined room, popcorn on a side table beside an armchair
+  (`Pulp/design/covers/study-r3-04.jpg`).
+- **D201 · A contrast hue** — the identity is a **contrast colour** to the warm painting, sampled
+  from the painting's own projected night sky (cool pixels average 232°), set at **230°**, the
+  centre of the free window, so every tier clears the in-progress teal and the reference slate by
+  ≥20° after hex rounding. Ladder vividness (measured 0.075 vs vivid 0.095) and the deep night-blue
+  cloth are offered in the design book for the owner's choice.
