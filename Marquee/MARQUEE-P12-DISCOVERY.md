@@ -354,3 +354,24 @@ Target: ~200 questions before mockups (owner, round 1).
 - **D155 · Per child** — each child's school days come from their own mapped calendars.
 - **D156 · Tomorrow decides** — tonight is a school night if **tomorrow** is a school day.
 - **D157 · Unreadable calendar** — fall back to **Sun–Thu**, with a quiet dog-ear for a parent.
+- **D158 · Title page bar** — **Play** (primary; here or TV per the header toggle) + **Add to…**
+  (secondary). The trailer sits on the page by the poster.
+- **D159 · Episodes** — a **season accordion** (current season open), episodes as rows: number,
+  title, official synopsis, watched state; tap to play that episode.
+- **D160 · Manual marking** — **long-press** an episode or title → action card: Watched /
+  Unwatched / Watched up to here; undo-first.
+- **D161 · A child's title page** — the **rating chip only**, no advisory text.
+- **D162 · Settings groups** — **Services · Household · Discover · TV · Vault · About ·
+  Diagnostics**. (No Sports group: teams are added from the Sports tab, D67.)
+- **D163 · The other adult's settings** — **only her own viewer and her teams**. This conflicts
+  with D45 (either adult edits children's filters) and D88 (either adult adds viewers) — put back
+  to the owner in the next round (D166).
+- **D164 · No PIN for children's settings** on an adult's own phone.
+- **D165 · TV settings** — **all of them on the TV, behind an adult's PIN**.
+- **D166 · Resolves D163** — **both adults manage the children** (filters, time, allow/block-lists,
+  requests). The other adult's phone may also change **her own viewer and teams**. **Services and
+  adding/removing viewers stay the owner's** (narrows D88).
+- **D167 · Rights follow the person** — her PIN on the TV opens the same set as her phone.
+- **D168 · Children's requests** — reach **both adults**; **first answer settles it**, and the other
+  phone's notice goes.
+- **D169 · A declined request** quietly leaves the child's list; no message.
