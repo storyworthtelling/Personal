@@ -537,3 +537,10 @@ Process (owner, D211): one screen per round; every decision, question and approv
   and — until the show is complete — a pencil progress mark across the whole show.
 - **D228 · Films and shows only** — games are not listed there.
 - **D229 · Screen 5, Recently watched — approved** with D226–D228.
+- **D230 · A child's favorites come from three places** — the child's own star on a title page, a
+  parent's pick, and the titles the child has watched most; each poster says which. Only titles
+  passing the child's filter can appear.
+- **D231 · A child sees three tabs** — Watching, Playlists, Discover. No Sports, Calendar or Settings
+  in a child's view (narrows D42/D72 for the phone: a child's sport waits for the TV phase).
+- **D232 · A voiced line on Favorites, moderated for the child's age** (short words, one idea,
+  nothing frightening) — adds a seat to D38/D39's closed list.
