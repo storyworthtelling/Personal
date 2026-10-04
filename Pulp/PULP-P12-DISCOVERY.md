@@ -569,3 +569,8 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D245 · Two weeks ahead.**
 - **D246 · No bottom bar on Calendar.**
 - **D247 · Screen 8, Calendar — approved** with D244–D246.
+- **D248 · A service row is short** — name and tier; profiles, the PIN-lock attestation and channels
+  live on the service's own page.
+- **D249 · An unlocked service carries one neutral "Adults only" badge** (no warning text, no colour).
+- **D250 · Screen 9, Settings — approved**; the groups (Household, Discover, Vault, About,
+  Diagnostics) and the service page are built from the recorded decisions without further drawings.
