@@ -68,6 +68,31 @@ public class IndexInvariantsTests
             + $"IndexIdentity.ApplicationId:\n{string.Join("\n", stray)}");
     }
 
+    /// <summary>
+    /// The name under the launcher icon comes from the manifest's own <c>android:label</c>, which
+    /// wins over the project's ApplicationTitle. It was left reading "Ledger" after the rename, so
+    /// the new package installed beside the old app looking like a second copy of it. The label has
+    /// to be the display name, and the old name must not survive anywhere a person can read it.
+    /// </summary>
+    [Fact]
+    public void TheLauncherLabelIsTheDisplayName()
+    {
+        var manifest = File.ReadAllText(Path.Combine(
+            RepoRoot(), "Ledger", "Ledger.Android", "Platforms", "Android", "AndroidManifest.xml"));
+
+        Assert.Contains($"android:label=\"{IndexIdentity.DisplayName}\"", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("android:label=\"Ledger\"", manifest, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheGoogleApplicationNameIsTheDisplayName()
+    {
+        var program = File.ReadAllText(Path.Combine(
+            RepoRoot(), "Ledger", "Ledger.Android", "MauiProgram.cs"));
+
+        Assert.DoesNotContain("ApplicationName = \"Ledger\"", program, StringComparison.Ordinal);
+    }
+
     // ---- the refresh worker, which WorkManager persists by class name ----
 
     /// <summary>

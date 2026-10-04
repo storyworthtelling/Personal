@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <application android:allowBackup="true" android:icon="@mipmap/appicon"
                android:roundIcon="@mipmap/appicon_round"
-               android:label="Ledger" android:supportsRtl="true">
+               android:label="Index" android:supportsRtl="true">
   </application>
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
