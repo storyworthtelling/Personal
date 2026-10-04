@@ -231,6 +231,14 @@
   .svc .warn{color:#82333B}
   .add{font-size:13.5px;font-weight:600;padding:10px 0 12px;min-height:44px}
   .svc .nk{display:inline-block;margin-left:6px;font-size:11px;font-weight:600;padding:0 7px;border-radius:9px;border:1px solid #C0BDB9;color:#54514B}
+  .dv-haze{position:absolute;inset:0;background:rgba(241,235,221,.86);z-index:5}
+  .dv-card{position:absolute;left:24px;right:90px;z-index:6;background:#FFFEF8;border:1px solid #E3DCC9;border-radius:12px;overflow:hidden}
+  .dv-card .ch{padding:14px 18px 11px;border-bottom:1px solid #E3DCC9}
+  .dv-card .ch .t{font-family:var(--serif);font-size:17px;font-weight:600;line-height:1.15}
+  .dv-card .ch .s{font-size:12.5px;color:#8A8578;margin-top:2px}
+  .dv-card .act{padding:13px 18px;font-size:15px;border-bottom:1px solid #F1EBDD;display:flex;align-items:center;gap:11px;min-height:48px}
+  .dv-card .act:last-child{border-bottom:none}
+  .dv-card .act svg{width:18px;height:18px;flex:none}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -240,6 +248,58 @@
     <h1>Pulp Design Book</h1>
     <p class="lede">The cover comes first and the identity hue is sampled from whichever painting you choose (D114, D115). This round varies the <b>idea</b>, not the style. Every study is painted in one mid-century cover-painting manner, and no colour is named in any prompt.</p>
   </header>
+
+  <section id="screen-card">
+    <h2>Screen 10 · The action card</h2>
+    <div class="note"><p><b>Long-press a title</b> anywhere (a Continue watching row, a playlist row, a Recently watched row) and this card rises over a paper haze (§7). The actions change with where it's pressed; drawn here from Continue watching.</p></div>
+    <div class="mock-wrap">
+      
+      <div class="dv">
+        <div class="dv-gut"></div><div class="dv-edge"></div>
+        <div class="dv-tabs">
+          <div class="dv-tab on" style="color:#86541F"><svg viewBox="0 0 26 26" fill="none" stroke="#86541F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="20" height="13" rx="2"/><path d="M11 9v5l4-2.5z"/><path d="M9 22h8"/></svg><span>Watching</span></div>
+          <div class="dv-tab off" style="background:#AEC0D5"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><path d="M8 7h14M8 13h14M8 19h14"/><circle cx="4" cy="7" r="1"/><circle cx="4" cy="13" r="1"/><circle cx="4" cy="19" r="1"/></svg><span>Playlists</span></div>
+          <div class="dv-tab off" style="background:#B1C69A"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="9" height="14" rx="1.5"/><rect x="13" y="4" width="9" height="14" rx="1.5"/></svg><span>Discover</span></div>
+          <div class="dv-tab off" style="background:#A5C8AD"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><circle cx="13" cy="13" r="9"/><path d="M4.5 10c5 2 12 2 17 0M4.5 16c5-2 12-2 17 0M13 4v18"/></svg><span>Sports</span></div>
+          <div class="dv-tab off" style="background:#9BC7CD"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="6" width="18" height="16" rx="2"/><path d="M4 11h18M9 3.5v5M17 3.5v5"/></svg><span>Calendar</span></div>
+          <div class="dv-tab off" style="background:#C0BDB9"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><circle cx="13" cy="13" r="3.4"/><path d="M13 3.5v3M13 19.5v3M3.5 13h3M19.5 13h3M6.2 6.2l2.1 2.1M17.7 17.7l2.1 2.1M19.8 6.2l-2.1 2.1M8.3 17.7l-2.1 2.1"/></svg><span>Settings</span></div>
+        </div>
+        <div class="dv-well">
+          <div class="dv-hdr">Continue<br>watching</div>
+          <div class="dv-rule"></div>
+          <div class="dv-voice">The marsh has a new tide in. Bring a blanket and leave the lighthouse to me.</div>
+          <div class="cw">
+            <div class="cw-row"><img src="posters/saltmarsh.jpg" alt=""><div class="l"><div class="t">Saltmarsh <span class="dv-chip new">New episode</span></div><div class="s">S1 · E3 · Low Water</div><div class="w">On Northstar+ · 4K</div><div class="prog"><i style="width:33%"></i></div><div class="pn">E3 of 6</div></div></div>
+            <div class="cw-row"><img src="posters/brass-lantern.jpg" alt=""><div class="l"><div class="t">The Brass Lantern Mysteries</div><div class="s">S2 · E5 · The Ferryman's Coin</div><div class="w">On Streamly · 4K</div><div class="prog"><i style="width:56%"></i></div><div class="pn">E5 of 8</div></div></div>
+            <div class="cw-row"><img src="posters/larkspur.jpg" alt=""><div class="l"><div class="t">The Long Way to Larkspur</div><div class="s">Film · 1h 12m left</div><div class="w">On Kestrel TV · free, with ads</div><div class="prog"><i style="width:39%"></i></div><div class="pn">46 of 118 min</div></div></div>
+            <div class="cw-row"><img src="posters/foxglove-station.jpg" alt=""><div class="l"><div class="t">Foxglove Station</div><div class="s">S3 · E1 · Whiteout</div><div class="w">On Streamly · 4K</div><div class="prog"><i style="width:10%"></i></div><div class="pn">E1 of 10</div></div></div>
+          </div>
+        </div>
+        <div class="dv-bar"><div class="dv-sec">Watch as a child</div><div class="dv-btn">Recently watched</div></div>
+        <div class="dv-haze"></div>
+        <div class="dv-card" style="top:300px">
+          <div class="ch"><div class="t">Saltmarsh</div><div class="s">S1 · E3 · Low Water · Northstar+</div></div>
+          <div class="act"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v10l8-5z"/></svg>Play S1 · E3</div>
+          <div class="act"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9.5 7 13l7.5-8"/></svg>Mark E3 watched</div>
+          <div class="act"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v12M3 9h12"/></svg>Add to…</div>
+          <div class="act"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="12" height="11" rx="1.5"/><path d="M3 7.5h12M6.5 2.5v3M11.5 2.5v3"/></svg>Plan to watch…</div>
+          <div class="act"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h10"/></svg>Remove from Continue watching</div>
+        </div>
+              
+      </div>
+      <div class="mock-notes">
+        <h3>10 · The action card</h3>
+        <ul>
+          <li><b>Centred card over a PaperDeep haze</b>, tap outside to dismiss (§7). Item actions only, never a confirmation.</li>
+          <li><b>From Continue watching:</b> Play the next thing · Mark it watched (D160) · Add to… (the playlist picker, D109) · Plan to watch… (a date, then who, D68, D73) · Remove from Continue watching (undo-first: the dog-ear, §13).</li>
+          <li><b>From a playlist row:</b> Play · Mark watched · Move to another playlist · Remove from this playlist (undo-first).</li>
+          <li><b>From Recently watched:</b> Mark unwatched · Watch again · Remove from history (undo-first).</li>
+          <li><b>From an episode</b> on a title page: Watched · Unwatched · Watched up to here (D160).</li>
+          <li><b>In a child's view</b> the card shows only Play and ★ Favorite (D230); nothing that changes a list.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
   <section id="screen-settings">
     <h2>Screen 9 · Settings</h2>
