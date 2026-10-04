@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <application android:allowBackup="true" android:icon="@mipmap/appicon"
                android:roundIcon="@mipmap/appicon_round"
-               android:label="Ledger" android:supportsRtl="true">
+               android:label="Index" android:supportsRtl="true">
   </application>
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -15,7 +15,7 @@
        update channel, so this costs nothing and stops any other app on the phone from feeding Index a
        fabricated balance. Guard G2 (IndexHandoffContractTests) checks this line's name against
        IndexHandoff.Permission byte-for-byte. -->
-  <permission android:name="com.storyworthtelling.index.RECEIVE_BALANCE" android:protectionLevel="signature" />
+  <permission android:name="com.storyworthtelling.ledger.RECEIVE_BALANCE" android:protectionLevel="signature" />
   <!-- Package visibility (Android 11+). The connect page asks whether Chrome is suspended, which is
        how it tells that the FocusPhone's Admin mode is open (the default browser stays Flyleaf's
        restricted viewer either way, so it cannot). Without the <package> entry Android hides Chrome

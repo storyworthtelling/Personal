@@ -40,7 +40,7 @@ public class ShelfCoverArtTests
     /// <summary>
     /// The apps with no painting yet. They fall back to the launcher icon on purpose, and that is
     /// the one case where the fallback is honest. Canonizer has no cover art in <c>Branding/</c>;
-    /// the Ledger app is retired (its package id is Index's now), so it is not a book at all.
+    /// Index is the former Ledger app under the same package id, so there is no separate Ledger book.
     /// </summary>
     private static readonly string[] NoArtYet =
     [
@@ -48,16 +48,17 @@ public class ShelfCoverArtTests
     ];
 
     /// <summary>
-    /// The shelf's Index package is the id Index ships under — the same one Post's balance
-    /// handoff names — and not the retired Ledger app's, whose package id Index took over.
+    /// Index is the old Ledger renamed in place, so the shelf's Index package is the id that phone
+    /// already carries — the same one Post's balance handoff names. Naming a different id would put
+    /// a second, empty book on the shelf beside the one the owner can actually open.
     /// </summary>
     [Fact]
-    public void TheShelfNamesIndexByItsShippingPackageNotTheRetiredLedgerOne()
+    public void TheShelfNamesIndexByThePackageTheOldLedgerAlreadyCarries()
     {
-        Assert.Equal("com.storyworthtelling.index", PolicyContext.IndexPackage);
+        Assert.Equal("com.storyworthtelling.ledger", PolicyContext.IndexPackage);
         Assert.Equal(IndexHandoff.Package, PolicyContext.IndexPackage);
         Assert.StartsWith(PolicyContext.OwnerPackagePrefix, PolicyContext.IndexPackage, StringComparison.Ordinal);
-        Assert.DoesNotContain(SuiteBooks, book => book.Package.EndsWith(".ledger", StringComparison.Ordinal));
+        Assert.Single(SuiteBooks, book => book.Package == PolicyContext.IndexPackage);
     }
 
     [Fact]
