@@ -452,3 +452,8 @@ Raised by the answers above and owed a measured answer, not an assumption:
 9. **Index hand-off** (D90) and **Flyleaf hiding** (D92) — the two cross-app contracts.
 10. **Frozen identifiers** — `com.storyworthtelling.pulp` (D188), the Drive file names, any
     registered component names, guarded by tests from the first build.
+
+## Gate 3 decisions
+
+- **D198 · The cover idea** — **06 · To be continued**: the serial's cliffhanger, a figure hanging
+  from a ledge above a night city. Round 2 varies crop and style on it.
