@@ -129,6 +129,79 @@ public class DesignTokensTests
             + "(rule, brackets and lettering) would not be legible on the cover.");
     }
 
+    // Pulp's identity ladder: marigold, OKLCH 63 degrees (D202), on the suite's shared
+    // lightness ladder. Pinned as literals because the hue is a decision, not a sample:
+    // the owner first chose a contrast blue, then asked for yellow-orange, and 63 is the
+    // yellow-orange that clears both Flyleaf's amber mark and the caution ochre by 22.
+    // A yellow-orange cannot carry text on paper at its own brightness, so the text tiers
+    // are browns and the bright marigold lives on the cloth alone.
+    [Fact]
+    public void PulpIdentityIsTheApprovedLadder()
+    {
+        Assert.Equal("#CEB7A3", DesignTokens.Identity.Pulp.Fill);
+        Assert.Equal("#BF9E82", DesignTokens.Identity.Pulp.Ground);
+        Assert.Equal("#86541F", DesignTokens.Identity.Pulp.Mark);
+        Assert.Equal("#6B4219", DesignTokens.Identity.Pulp.Text);
+        Assert.Equal("#4B3015", DesignTokens.Identity.Pulp.Deep);
+        Assert.Equal("#F6A24E", DesignTokens.Identity.Pulp.Cloth);
+    }
+
+    [Theory]
+    [InlineData("#86541F", 3.0)]  // marks and UI, incl. the lit binder tab
+    [InlineData("#6B4219", 4.5)]  // identity-colored text at any size
+    [InlineData("#4B3015", 7.0)]  // the deep tier, body-text safe
+    public void PulpIdentityTextTiersClearContrastOnPaper(string tier, double minimum)
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(tier, DesignTokens.Paper);
+        Assert.True(ratio >= minimum, $"{tier} on Paper is {ratio:F2}:1, below {minimum}:1");
+    }
+
+    // Pulp is bound light, like Score and Plate: the rule, flourishes and title on the
+    // marigold cloth are ink, so ink has to clear AA on the cloth itself.
+    [Fact]
+    public void PulpInkFramingClearsContrastOnItsLightBinding()
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, DesignTokens.Identity.Pulp.Cloth);
+        Assert.True(ratio >= 4.5,
+            $"Ink on Pulp's marigold cloth is {ratio:F2}:1, below AA — the inverted framing "
+            + "(rule, flourishes and title) would not be legible on the cover.");
+    }
+
+    // IconStudio paints the icon and the cover from its own copy of the ladder; the Domain
+    // ladder is what the Flyleaf shelf and every screen read. Two copies of a colour need a
+    // check, and the suite's existing one (FrozenInvariantsTests) enumerates apps by hand,
+    // so Pulp is held here, next to the ladder it guards. Read as source: Tools/ is a
+    // separate build.
+    [Theory]
+    [InlineData("PulpFillHex", "Fill")]
+    [InlineData("PulpGroundHex", "Ground")]
+    [InlineData("PulpMarkHex", "Mark")]
+    [InlineData("PulpTextHex", "Text")]
+    [InlineData("PulpDeepHex", "Deep")]
+    [InlineData("PulpClothHex", "Cloth")]
+    public void PulpIconStudioHexesMatchTheDomainLadder(string hexName, string tier)
+    {
+        var tokens = File.ReadAllText(Path.Combine(
+            DesignTestHelpers.FocusPhoneRoot(), "..", "Tools", "IconStudio", "Tokens.cs"));
+
+        var declared = Regex.Match(tokens, $@"{hexName}\s*=\s*""(#[0-9A-Fa-f]{{6}})""");
+        Assert.True(declared.Success,
+            $"IconStudio/Tokens.cs declares no {hexName}, so Pulp's icon and cover cannot stand on "
+            + "its identity and silently fall back to plain paper.");
+
+        var domain = tier switch
+        {
+            "Fill" => DesignTokens.Identity.Pulp.Fill,
+            "Ground" => DesignTokens.Identity.Pulp.Ground,
+            "Mark" => DesignTokens.Identity.Pulp.Mark,
+            "Text" => DesignTokens.Identity.Pulp.Text,
+            "Deep" => DesignTokens.Identity.Pulp.Deep,
+            "Cloth" => DesignTokens.Identity.Pulp.Cloth,
+            _ => throw new ArgumentOutOfRangeException(nameof(tier), $"Pulp.{tier} is not a mapped ladder tier."),
+        };
+        Assert.Equal(domain, declared.Groups[1].Value, ignoreCase: true);
+    }
+
     // §3's actual rule: an identity hue is sampled, then CHECKED against the semantic
     // roles it will sit near, and moved if it crowds one — so a tab never reads as a
     // status. That is a claim about degrees on the OKLCH wheel, and it was previously
@@ -144,6 +217,8 @@ public class DesignTokensTests
     [InlineData("#A1A1C7")] [InlineData("#5C5894")]                          // Post
     [InlineData("#C8B5C8")] [InlineData("#B69BB6")] [InlineData("#7A4F7B")]  // Plate
     [InlineData("#613F62")] [InlineData("#442D44")]
+    [InlineData("#CEB7A3")] [InlineData("#BF9E82")] [InlineData("#86541F")]  // Pulp
+    [InlineData("#6B4219")] [InlineData("#4B3015")] [InlineData("#7A6A1F")]
     public void IdentityTiersStayClearOfEverySemanticRole(string identityTier)
     {
         const double MinimumSeparation = 20.0;
@@ -173,6 +248,7 @@ public class DesignTokensTests
     [InlineData("#A5C8AD")] [InlineData("#B1C69A")] [InlineData("#C0BDB9")] [InlineData("#AEC0D5")]
     [InlineData("#D0BB91")] [InlineData("#E8ACAD")] [InlineData("#9BC7CD")]   // the seven roles
     [InlineData("#AFC0BC")] [InlineData("#B9B9D4")]                            // Score, Post
+    [InlineData("#CEB7A3")]                                                    // Pulp
     public void InkIsLegibleOnEveryBinderTabCloth(string cloth)
     {
         var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, cloth);
