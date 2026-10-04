@@ -583,3 +583,7 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D255 · A parent's favorite above a child's ceiling also allow-lists it** for that child (D12);
   a block-list entry still wins and that child's Favorites is greyed in the picker.
 - **D256 · Screen 10, the action card (revision 3) — approved.**
+- **D257 · The picker has checkboxes** for adding to several lists at once; each tick takes effect
+  as made; unticking is undo-first. Playlists stay last-used first (D109).
+- **D258 · A child's row in the picker carries one neutral badge** — "Above band" (ticking
+  allow-lists, D255) or "Blocked" (greyed, can't be ticked).
