@@ -522,3 +522,7 @@ Process (owner, D211): one screen per round; every decision, question and approv
 - **D217 · Episodes show number and title only**, the next one included; a tap expands the official
   synopsis in place.
 - **D218 · Screen 2, the title page — approved** with D215–D217.
+- **D219 · Discover's piles are literal stacks** — one poster at the front, the rest fanned behind,
+  swipe to flip, "1 of N".
+- **D220 · Vetoes stay struck until Friday**, with "Bring it back".
+- **D221 · Add / veto / trailer are small buttons beside the front poster** (not long-press).
