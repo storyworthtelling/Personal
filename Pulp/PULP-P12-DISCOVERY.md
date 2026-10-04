@@ -489,3 +489,14 @@ Raised by the answers above and owed a measured answer, not an assumption:
   use"; the NHL's (`api-web.nhle.com`) is public but carries no terms; the NBA's CDN refuses plain
   requests (403); the NFL publishes none; most league sites' HTML terms forbid robots. Put back to the
   owner (D208).
+- **D207 · Rating reasons dropped** — the title page shows the **rating chip only** (narrows D36).
+- **D208 · Sports sources** — **league feeds where their terms permit, ESPN's JSON for the rest**,
+  one adapter per source behind one interface; each league's source is named in Settings → About.
+  Today that is MLB's own feed (explicitly permitted for individual, non-commercial use) and ESPN for
+  every other league in D56, including AFL and the women's leagues.
+- **D209 · Person and franchise search dropped** — search is **title, mood and team** (narrows D64).
+  Franchises can still be held on playlists (D100) where the availability source groups them; a
+  franchise *search* is gone.
+- **D210 · Children and service profiles** — the **attestation route**: a child may start titles
+  only on services where the owner has PIN-locked every adult profile and ticked "adult profiles are
+  PIN-locked" for that service in Settings. Any other service blocks a child's hand-off (D44).
