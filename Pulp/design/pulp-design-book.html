@@ -175,6 +175,7 @@
   .fv .t{font-size:14.5px;line-height:1.2;margin-top:4px}
   .fv .w{font-size:12px;color:#8A8578}
   .dv-tab.locked{opacity:.45}
+  .fv .src{font-size:11.5px;font-weight:600;color:#6B6759}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -186,7 +187,7 @@
   </header>
 
   <section id="screen-fav">
-    <h2>Screen 6 · Favorites (a child's view)</h2>
+    <h2>Screen 6 · Favorites (a child's view) · revision 2</h2>
     <div class="note"><p><b>The child's page behind home's primary button</b> (D213). It's drawn in a child's view: the line under the header names the child (D179), and everything shown has passed that child's filter (D12).</p></div>
     <div class="mock-wrap">
       <div class="dv">
@@ -195,19 +196,17 @@
           <div class="dv-tab on" style="color:#86541F"><svg viewBox="0 0 26 26" fill="none" stroke="#86541F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="20" height="13" rx="2"/><path d="M11 9v5l4-2.5z"/><path d="M9 22h8"/></svg><span>Watching</span></div>
           <div class="dv-tab off" style="background:#AEC0D5"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><path d="M8 7h14M8 13h14M8 19h14"/><circle cx="4" cy="7" r="1"/><circle cx="4" cy="13" r="1"/><circle cx="4" cy="19" r="1"/></svg><span>Playlists</span></div>
           <div class="dv-tab off" style="background:#B1C69A"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="9" height="14" rx="1.5"/><rect x="13" y="4" width="9" height="14" rx="1.5"/></svg><span>Discover</span></div>
-          <div class="dv-tab off" style="background:#A5C8AD"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><circle cx="13" cy="13" r="9"/><path d="M4.5 10c5 2 12 2 17 0M4.5 16c5-2 12-2 17 0M13 4v18"/></svg><span>Sports</span></div>
-          <div class="dv-tab off" style="background:#9BC7CD"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="6" width="18" height="16" rx="2"/><path d="M4 11h18M9 3.5v5M17 3.5v5"/></svg><span>Calendar</span></div>
-          <div class="dv-tab off locked" style="background:#C0BDB9"><svg viewBox="0 0 26 26" fill="none" stroke="#33322B" stroke-width="1.8" stroke-linecap="round"><circle cx="13" cy="13" r="3.4"/><path d="M13 3.5v3M13 19.5v3M3.5 13h3M19.5 13h3M6.2 6.2l2.1 2.1M17.7 17.7l2.1 2.1M19.8 6.2l-2.1 2.1M8.3 17.7l-2.1 2.1"/></svg><span>Settings</span></div>
         </div>
         <div class="dv-well">
           <div class="dv-hdr">Favorites</div>
           <div class="dv-rule"></div>
           <div class="kid">Watching as Robin</div>
+          <div class="dv-voice sm">Biscuit found a new map today. Where do you think it goes?</div>
           <div class="fgrid">
-            <div class="fv"><img src="posters/biscuit-brave.jpg" alt=""><div class="t">Biscuit the Brave</div><div class="w">On Streamly</div></div>
-            <div class="fv"><img src="posters/lantern-bugs.jpg" alt=""><div class="t">Lantern Bugs</div><div class="w">On Kestrel TV · free</div></div>
-            <div class="fv"><img src="posters/tidewater.jpg" alt=""><div class="t">Tidewater</div><div class="w">On Streamly</div></div>
-            <div class="fv"><img src="posters/cloudberry-farm.jpg" alt=""><div class="t">Cloudberry Farm</div><div class="w">On Lanternbox</div></div>
+            <div class="fv"><img src="posters/biscuit-brave.jpg" alt=""><div class="t">Biscuit the Brave</div><div class="w">On Streamly</div><div class="src">★ Robin's star</div></div>
+            <div class="fv"><img src="posters/lantern-bugs.jpg" alt=""><div class="t">Lantern Bugs</div><div class="w">On Kestrel TV · free</div><div class="src">Picked by Sam</div></div>
+            <div class="fv"><img src="posters/tidewater.jpg" alt=""><div class="t">Tidewater</div><div class="w">On Streamly</div><div class="src">Watched most</div></div>
+            <div class="fv"><img src="posters/cloudberry-farm.jpg" alt=""><div class="t">Cloudberry Farm</div><div class="w">On Lanternbox</div><div class="src">★ Robin's star</div></div>
           </div>
         </div>
         <div class="dv-bar"><div class="dv-sec">Back to me</div></div>
@@ -215,11 +214,11 @@
       <div class="mock-notes">
         <h3>6 · Favorites</h3>
         <ul>
-          <li><b>Big posters, two across.</b> A child picks by picture, so the art carries the page and the text is short: title and where.</li>
-          <li><b>"Watching as Robin"</b> under the header marks the child's view (D179). No monogram.</li>
-          <li><b>Tapping a poster</b> opens its title page, with the rating chip only (D161). Play works only on services you've attested (D210); elsewhere the button says why, in neutral words.</li>
-          <li><b>Settings is locked</b> in a child's view (drawn dimmed). Leaving the child's view is <b>Back to me</b>, with a PIN only on the TV (D43).</li>
-          <li>Open questions follow as chips: who adds favorites, whether the child gets a voiced line here, and which tabs a child sees.</li>
+          <li><b>Favorites come from three places</b> (D230): the child's own <b>star</b> on a title page, a parent's <b>pick</b>, and the titles the child has <b>watched most</b>. A small line under each poster says which, for the parent reading over a shoulder. Only titles that pass the child's filter can be there at all.</li>
+          <li><b>A child sees three tabs</b> (D231): Watching, Playlists, Discover. No Sports, Calendar or Settings in a child's view.</li>
+          <li><b>A voiced line, moderated for the child's age</b> (D232): short words, one idea, nothing scary, set in the same ink-blue hand. Hidden with no profile or key, like every voiced line.</li>
+          <li><b>Big posters, two across</b>: a child picks by picture. Tapping a poster opens its title page, with the rating chip only (D161). Play works only on attested services (D210).</li>
+          <li>"Watching as Robin" under the header marks the child's view (D179). <b>Back to me</b> leaves it, with a PIN only on the TV (D43).</li>
         </ul>
       </div>
     </div>
