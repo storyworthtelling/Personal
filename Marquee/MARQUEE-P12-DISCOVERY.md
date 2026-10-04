@@ -268,3 +268,26 @@ Target: ~200 questions before mockups (owner, round 1).
 - **D112 · A used-up stack** — a **voiced empty state until Friday**; no refill.
 - **D113 · Model cost** — **no cap and nothing shown**; a rejected key is handled by credential
   health.
+- **D114 · Cover** — **several cover studies at the mockup gate**; the owner chooses.
+- **D115 · Hue follows the art** — the identity hue is **sampled from the chosen cover**, then
+  checked against §3's ≥20° rule; no window is picked ahead of the painting.
+- **D116 · TV banner** — designed **with the TV language** (D79), not a crop of the phone cover.
+- **D117 · Title** — **"Pulp" alone**.
+- **D118 · Cold start — copy Score** — no cover-load overlay: Pulp opens **straight onto its home
+  area** with the **voiced greeting under the header**, hidden until composed (Score's
+  `ScoreActivity` + `VoiceGreeting`, first-open-of-day context included).
+- **D119 · Posters** — DESIGN.md §7's **artwork slot**: hairline keyline, never bled, bookplate
+  fallback; list rows lead with a small poster.
+- **D120 · Rating badges coloured by severity** — the role hues carry the rating's severity (the
+  scale is mapped at the mockup gate, e.g. caution for teen, problem for mature). Documents and
+  greyscale keep a non-colour cue.
+- **D121 · Where-to-watch** — the **service's name in text**, never a third-party logo.
+- **D122 · A failed hand-off** — a **Problem dog-ear** with what happened and what to do next;
+  never a toast. (How Pulp even *knows* a deep link landed on the app's home rather than the title
+  is a gate-2 measurement.)
+- **D123 · Freshness** — a **nightly refresh** of everything on playlists and Continue Watching,
+  plus a fresh look when a title is opened.
+- **D124 · Leaving soon** — marked on the row ("leaves <service> Mar 31") **and put on the Pulp
+  calendar** so Foreword prints it.
+- **D125 · Diagnostics** — the suite's exportable log from Settings, **the TV's included** (exported
+  via the phone). Ids, not content.
