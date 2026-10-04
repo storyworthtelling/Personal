@@ -632,3 +632,13 @@ Process (owner, D211): one screen per round; every decision, question and approv
   Caution on its own pages**, enforced by a guard, so nothing on a Pulp page can be read as "consider
   this". (Flyleaf's warm icon ground, 61.5°, is ~8.5° away; no guard compares that tier between apps —
   noted, not a departure.)
+- **D276 · The teen rating chip takes the Reference slate** (Caution is off-limits, D275): kids positive leaf · family resolved grey · teen reference slate · mature problem rose (amends D215).
+- **D277 · Shelf bindings audited and fixed in this phase** (owner, after asking why Foreword sits
+  brown): Foreword had no chosen binding and fell through to the hash onto the Problem role's deep
+  tier (`#5C1F26`); Folio had no binding (hashed to slate) **and** no window painting on the shelf
+  although `cover_folio.png` ships in Flyleaf (the shelf guard still called it "Canonizer, no art
+  yet"). Fix: Foreword bound in its own light sunrise tier with ink marks (the recommended option; the
+  owner said "fix" without picking a tone); Folio bound in its registered cloth `#B32738` with its
+  painting in the window; Pulp bound in its amber cloth with its cover; and a guard that **every
+  suite book has a chosen binding** so none falls through to the hash again. Flagged commits outside
+  Pulp, as Index's phase did.
