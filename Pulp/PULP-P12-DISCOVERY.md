@@ -612,3 +612,9 @@ Process (owner, D211): one screen per round; every decision, question and approv
   drawn and approved.
 - **D273 · Gate 3 closed** — fifteen screens approved (D212–D271); the published design book is
   https://claude.ai/artifact/M5cdj33HaqxnXsdvv2bu4N and committed copies live in `Pulp/design/`.
+
+## Gate 4
+
+- **D274 · Plan approved** (`PULP-P12-PLAN.md`) with its choices: `Pulp/` layout (P1), a `Player`
+  posture on the shared `PaperWebView` for trailers and highlights (P2), one PR for the phase (P4).
+  Release A starts.

@@ -1,6 +1,6 @@
 # Pulp (P12) — Gate 4 implementation plan
 
-**Status:** for the owner's approval. Builds what `PULP-P12-DISCOVERY.md` (D1–D273) decided,
+**Status:** approved (D274). Builds what `PULP-P12-DISCOVERY.md` (D1–D273) decided,
 `PULP-P12-TECHNICAL-FINDING.md` (approved, D211) measured, and the fifteen approved mockups in
 `Pulp/design/` drew. Nothing here re-opens a decision; where the plan had to choose something the
 decisions left open, it says so under **Plan choices** and the choice is the owner's to overturn.
