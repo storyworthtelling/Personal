@@ -560,3 +560,4 @@ Process (owner, D211): one screen per round; every decision, question and approv
   series appears whether or not a followed team is in it; under a hold it shows the date with "teams
   held".
 - **D240 · Championships: followed leagues only.**
+- **D241 · Leagues and teams fold** — a folded league is one line (badge, name, state); a league opens to teams, a team to its games. Only the league closest to season's end, and its teams with unwatched recordings, start open; what the viewer opens stays open.
