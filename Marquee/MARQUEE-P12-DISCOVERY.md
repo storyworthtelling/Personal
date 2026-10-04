@@ -233,3 +233,38 @@ Target: ~200 questions before mockups (owner, round 1).
 - **D92 · Which apps Flyleaf hides** — **exactly the services ticked in Pulp**: Pulp publishes their
   package ids; Flyleaf hides those and only those.
 - **D93 · No fallback** — if Pulp is missing or broken, the streaming apps stay hidden. Accepted.
+- **D94 · Her phone is unrestricted** — Pulp is a guide there; D92's hiding never applies to it.
+- **D95 · TV updates** — the TV head **self-updates with one confirm** (the `SelfOnly` update role
+  from `Storyworthtelling.Updates`), not device-owner provisioning.
+- **D96 · Continue Watching order** — **most recently watched first**; new episodes and recorded
+  games jump to the top on arrival.
+- **D97 · Private viewing** — each viewer's **Continue Watching is private**; only shared playlists
+  and plans are seen by both.
+- **D98 · Watching together** — a hand-off or send with **both adults picked advances the show for
+  both**; each still sees it on their own Continue Watching.
+- **D99 · Watching ahead is called out — loudly** — on a together show, the one who watched ahead
+  gets an **authorial-voice line shaming them for cheating**. A new **voice seat** (adds to D38's
+  closed list); it is wit, not an error, so §14 allows it, and it degrades to hidden without a
+  profile. Shown only to the one who is ahead.
+- **D100 · Playlists hold** — **films, whole shows, games, and film series/franchises**. Not single
+  seasons or episodes.
+- **D101 · Watched entries** — **struck through in ink and kept**; "hide watched" filters them.
+- **D102 · Where the cheating line shows** — on the cheater's show row **and on the TV** (at
+  "who's watching", in front of everyone). *Read as: the TV line names the cheater; confirm in the
+  TV mockup.*
+- **D103 · Playlist order** — **hand-ordered**, drag to reorder; new entries at the bottom.
+- **D104 · Model-made playlists** — **from a prompt and from a seed title** ("more like this"),
+  resolved against real titles; anything the source cannot find is dropped (Score's `PlaylistPlan`
+  rule).
+- **D105 · No sharing outside the household.**
+- **D106 · Stack size** — **configurable in Settings; default three films and two shows**.
+- **D107 · Stack contents** — **anything**, taste first; titles not on our services carry their
+  where/rent-buy line (D20, D53).
+- **D108 · Two piles** — the stack is **split into films and shows**.
+- **D109 · Adding from the stack** — "Add to…" opens an **inline playlist picker**, last-used first.
+- **D110 · Turnover** — **Friday 6 am local**, built in the background (Score's
+  `FridayPicksWorker` shape).
+- **D111 · Vetoes are permanent** for that viewer unless lifted with "Bring it back".
+- **D112 · A used-up stack** — a **voiced empty state until Friday**; no refill.
+- **D113 · Model cost** — **no cap and nothing shown**; a rejected key is handled by credential
+  health.
