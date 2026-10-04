@@ -601,3 +601,4 @@ Process (owner, D211): one screen per round; every decision, question and approv
   SemiBold, ink on marigold).
 - **D267 · The launcher icon is full bleed** — the painting fills the mask, no marigold border and no
   keyline (the shelf cover keeps the binding).
+- **D268 · Screen 14, the book (revision 2) — approved.**
