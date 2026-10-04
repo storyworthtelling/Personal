@@ -115,6 +115,7 @@ Registered ladders (per-app `Design/DesignTokens.cs`, §19):
 | Plate | `#C8B5C8` | `#B69BB6` | `#7A4F7B` | `#613F62` | `#442D44` | — | 326° | problem, 50° |
 | Folio | `#C1C197` | `#919059` | `#6B681E` | `#575410` | `#3B3902` | `#B32738` | 107° | positive, 21° |
 | Index | `#B6C3A9` | `#839372` | `#596C45` | `#475735` | `#2F3C21` | `#4E5F3A` | 129° | positive, 0° |
+| Pulp | `#CEB7A3` | `#BF9E82` | `#86541F` | `#6B4219` | `#4B3015` | `#F6A24E` | 63° | caution, 22° |
 
 Flyleaf's three tiers predate the five-tier ladder and are **provisional** pending a resample.
 
@@ -142,6 +143,21 @@ no exception mechanism today** — `IdentityTiersStayClearOfEverySemanticRole` i
 against every non-neutral role with no per-app or per-role exception list at all, so adding
 Index's named exception (guards G9/G10) means building that mechanism, not just adding an entry
 to one that already exists. That is Release B's work, not this one's.
+
+*Pulp* is chosen rather than sampled, and the sampling is why. The den painting on its cover
+measures warm, near **75°** — inside the band the caution ochre and Flyleaf's amber already hold.
+The owner first chose a contrast blue sampled from the painting's projected sky (D201), then asked
+for yellow-orange instead (D202). **63°** is the only yellow-orange that clears §3's floor against
+both neighbours at every tier after hex rounding: **22° from Flyleaf's amber mark (41°) and 22° from
+the caution ochre (85°)**, on the suite's shared lightness ladder at a mark chroma of 0.095. A
+yellow-orange cannot carry text on paper at its own brightness, so the text-bearing tiers are browns
+of that hue and the bright **marigold lives on the cloth** (`#F6A24E`) alone — a light binding with
+the rule, flourishes and title in ink (6.25:1), which is Score's and Plate's construction. The full
+ladder is held identical in `Tools/IconStudio/Tokens.cs`, `Storyworthtelling.Paper/AppIdentityTokens.cs`
+and `Codex.Domain` `DesignTokens.Identity.Pulp`. **Open, for the owner:** the 22° figures are against
+Flyleaf and the roles; against Foreword's sunrise mark (47°) the mark sits **16.3°** apart, which
+`IdentitySeparationTests` (every pair of app identities ≥ 20°) fails on. It is not recorded as an
+exception here; whether to accept it as a second recorded pair or move the hue is a decision.
 
 ### Contrast (binding)
 
