@@ -312,8 +312,10 @@ Target: ~200 questions before mockups (owner, round 1).
   disabled) with "too long for today"**; shorter ones stay playable.
 - **D136 · Extra time** — a parent grants "+N min today" **with their PIN**, on the spot or from
   their own phone.
-- **D137 · By day** — **school nights (Sun–Thu) and weekends (Fri–Sat)**: two allowance/bedtime
-  pairs per child.
+- **D137 · By day** — ~~school nights (Sun–Thu) and weekends (Fri–Sat)~~ **revised by the owner:
+  school nights are read from Google Calendar**, so holidays and vacations get the weekend
+  allowance rather than being penalised. Two allowance/bedtime pairs per child (school night /
+  not); which calendar marks school days is D154.
 - **D138 · Data cost** — **free sources only**; gate 2 states what that costs in coverage.
 - **D139 · Sports data** — **the same rule**; gate 2 says whether free sports data covers D56.
 - **D140 · Attribution** — a quiet credits line in **Settings → About**, where terms allow.
@@ -336,3 +338,19 @@ Target: ~200 questions before mockups (owner, round 1).
 - **D148 · Timing** — **timed where a time is known** (games, live premieres), **else all-day**.
 - **D149 · Changes** — a moved date or rescheduled game is **moved silently** by the nightly
   refresh.
+- **D150 · Continue Watching rows** — poster · title · next up · where · **a thin pencil progress
+  mark** ("E5 of 10").
+- **D151 · Tapping a row opens the title page**; play is on the page.
+- **D152 · Caught up** — a show with nothing left out **leaves Continue Watching** and returns when
+  a new episode lands (D21). Refines D31: "until removed" applies while there is something to watch.
+- **D153 · Finished for good** — leaves Continue Watching for good, **stays struck through on
+  playlists** for an easy rewatch.
+- **D154 · Where school days come from** — **Foreword's calendar mapping**: Foreword already maps
+  each child's calendars to that child's column, so Pulp reads the mapping (it lives in the
+  account's personal vault, `PersonalVault.CalendarMappingJson`) rather than asking again. Each
+  Pulp child viewer is linked to a Foreword column. (Open for gate 2: what in a child's mapped
+  calendars *means* "school day" — a recurring school event, or a break marked as one — has to be
+  decided from the real shape of those calendars, described not copied.)
+- **D155 · Per child** — each child's school days come from their own mapped calendars.
+- **D156 · Tomorrow decides** — tonight is a school night if **tomorrow** is a school day.
+- **D157 · Unreadable calendar** — fall back to **Sun–Thu**, with a quiet dog-ear for a parent.
