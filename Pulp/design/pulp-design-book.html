@@ -143,6 +143,24 @@
   .pr.struck .t{text-decoration:line-through;text-decoration-color:#33322B;color:#8A8578}
   .pr.struck img{opacity:.6}
   .pr.dim{opacity:.45}
+  .pile-h .pos{font-family:var(--sans);font-weight:400;font-size:12.5px;color:#8A8578;margin-left:6px}
+  .stk{display:flex;gap:14px;align-items:flex-start;margin-bottom:6px}
+  .deck{position:relative;width:132px;height:198px;flex:none;margin-left:10px}
+  .deck img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;outline:1px solid #E3DCC9;outline-offset:2px;background:#F1EBDD}
+  .deck .b1,.deck .b2{position:absolute;inset:0;background:#F1EBDD;border:1px solid #E3DCC9}
+  .deck .b1{transform:translate(-6px,4px) rotate(-3deg)}
+  .deck .b2{transform:translate(-11px,8px) rotate(-6deg)}
+  .deck.veto img{opacity:.5}
+  .deck.veto::after{content:"";position:absolute;left:-6px;right:-6px;top:46%;height:3px;background:#2C3E5E;transform:rotate(-34deg);border-radius:2px}
+  .stk .info{display:flex;flex-direction:column;gap:6px;min-width:0;padding-top:4px}
+  .stk .t{font-family:var(--serif);font-weight:600;font-size:17px;line-height:1.2}
+  .stk .t.struck{text-decoration:line-through;text-decoration-color:#2C3E5E;color:#8A8578}
+  .stk .w{font-size:12.5px;color:#8A8578;line-height:1.35}
+  .btns{display:flex;gap:8px;margin-top:4px}
+  .ib{width:40px;height:40px;border:1px solid #E3DCC9;border-radius:12px;display:grid;place-items:center;color:#33322B;background:#fff}
+  .ib svg{width:16px;height:16px}
+  .stk .bring{font-size:13px;font-weight:600;color:#2C3E5E;min-height:40px;display:flex;align-items:center}
+  .stk .hint{font-size:11.5px;color:#8A8578}
   footer{border-top:1.5px solid var(--ink);padding-top:16px;font-size:13px;color:var(--ink-muted)}
 </style>
 
@@ -259,31 +277,33 @@
         <div class="dv-well">
           <div class="dv-hdr">Discover</div>
           <div class="dv-rule"></div>
-          <div class="srch"><svg viewBox="0 0 18 18" fill="none" stroke="#8A8578" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5"/><path d="m12 12 4 4"/></svg><span>Search titles, people, teams</span></div>
+          <div class="srch"><svg viewBox="0 0 18 18" fill="none" stroke="#8A8578" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5"/><path d="m12 12 4 4"/></svg><span>Search titles and teams</span></div>
           <div class="chips"><span class="cp on">Title</span><span class="cp">Mood</span></div>
           <div class="dv-status">This week's stack · until Friday</div>
-          <div class="pile-h">Films</div>
-          <div class="pile">
-            <div class="pc"><img src="posters/majestic.jpg" alt=""><div class="t">The Majestic</div><div class="w">On Streamly</div></div>
-            <div class="pc"><img src="posters/high-pass.jpg" alt=""><div class="t">High Pass</div><div class="w">Rent · Reelhouse</div></div>
-            <div class="pc veto"><img src="posters/iron-gate.jpg" alt=""><div class="t">The Iron Gate</div><div class="bring">Bring it back</div></div>
+          <div class="pile-h">Films <span class="pos">1 of 3</span></div>
+          <div class="stk">
+            <div class="deck"><span class="b2"></span><span class="b1"></span><img src="posters/majestic.jpg" alt=""></div>
+            <div class="info"><div class="t">The Majestic</div><div class="w">Film · 1h 44m<br>On Streamly · 4K</div>
+              <div class="btns"><span class="ib" title="Add to…"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></span><span class="ib" title="Not for me"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></span><span class="ib" title="Trailer"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 3.5v9l7-4.5z"/></svg></span></div>
+              <div class="hint">Swipe for the next</div></div>
           </div>
-          <div class="pile-h">Shows</div>
-          <div class="pile">
-            <div class="pc"><img src="posters/orchard-line.jpg" alt=""><div class="t">The Orchard Line</div><div class="w">On Lanternbox · ads</div></div>
-            <div class="pc"><img src="posters/kettle-crow.jpg" alt=""><div class="t">The Cozy Crow</div><div class="w">On Kestrel TV · free</div></div>
+          <div class="pile-h">Shows <span class="pos">1 of 2</span></div>
+          <div class="stk">
+            <div class="deck veto"><span class="b1"></span><img src="posters/orchard-line.jpg" alt=""></div>
+            <div class="info"><div class="t struck">The Orchard Line</div><div class="w">Show · 2 seasons<br>On Lanternbox · with ads</div>
+              <div class="bring">Bring it back</div>
+              <div class="hint">Swipe for the next</div></div>
           </div>
         </div>
       </div>
       <div class="mock-notes">
-        <h3>3 · Discover</h3>
+        <h3>3 · Discover · revision 2</h3>
         <ul>
-          <li><b>Modelled on Score's Discover</b> (D19). The search field is pinned under the header. Empty, the page is the stack; typing replaces it with results in place (D170).</li>
-          <li><b>Title / Mood chip</b> (D171). Mood search reads plain words through the model.</li>
-          <li><b>Two piles, films and shows</b> (D108), default three and two (D106). It turns over Friday at 6 am (D110). There's no voiced opener (D38).</li>
-          <li><b>Anything can be in the stack</b> (D107). High Pass isn't on your services, so it says <b>Rent · Reelhouse</b>, the cheapest high-quality option, on the title page (D53).</li>
-          <li><b>A veto strikes the poster through in ink-blue</b> (Score's veto ink). <b>Bring it back</b> lifts it (D22). It is permanent otherwise (D111).</li>
-          <li>Tapping a poster opens the title page, with the trailer one tap away (D19). Adding opens the inline playlist picker (D109).</li>
+          <li><b>Each pile is a literal stack</b> (D219): one poster at the front with the rest fanned behind. Swipe to the next; "1 of 3" says where you are. Films above, shows below (D108).</li>
+          <li><b>Small buttons beside the front poster</b> (D221): <b>+</b> Add to… (the inline playlist picker, D109), <b>×</b> Not for me, and <b>▷</b> Trailer. Tapping the poster opens the title page.</li>
+          <li><b>A veto</b> strikes the front card in ink-blue and dims it. It <b>stays struck until Friday</b>, with <b>Bring it back</b> where the buttons were (D220, D22). Here the shows pile opens on one.</li>
+          <li>The search field is pinned under the header, with the <b>Title / Mood</b> chip (D170, D171). Search is titles and teams only (D209). Empty shows the stack; typing replaces it in place.</li>
+          <li>The stack turns over Friday at 6 am (D110). Anything can be in it (D107); a title off your services says where and offers the one rent line on its title page (D53).</li>
         </ul>
       </div>
     </div>
