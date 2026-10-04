@@ -104,3 +104,39 @@ Target: ~200 questions before mockups (owner, round 1).
   release**; the date goes to the Pulp calendar (D25).
 - **D33 · Shared playlist editing** — **both adults equally**; last edit per item wins; removals
   are undo-first.
+- **D34 · Trailers** — **play inside Pulp** (embedded player), on phone and TV.
+- **D35 · Trailers are only a look** — watching one changes no taste and no history.
+- **D36 · The title page** — **poster · synopsis · a voiced line giving the reason this title was
+  chosen for you** (from the device owner's taste — a voice seat, D14-of-DESIGN rules apply:
+  degrades to hidden) **· the rating and the reasons for it** (the content advisory, e.g. "for
+  violence and language") **· runtime or episode count**. No cast, no scores. (Gate 2: a source for
+  rating *reasons* — certification alone is common, the advisory text is not.)
+- **D37 · Spoilers** — **no episode stills anywhere; official posters only**. Episode titles and the
+  official synopsis are fine.
+- **D38 · Voice seats** (closed list, DESIGN.md §14; errors never voiced): the title page's
+  **why-this** line (D36) · the **Continue Watching greeting** · **empty states** · **a line per
+  playlist**. Not the Friday stack opener.
+- **D39 · A child's view** — **a gentle voiced line** (a greeting) is allowed for a child.
+- **D40 · reMarkable** — nothing is sent; release dates reach the morning page through the Pulp
+  calendar and Foreword (D25).
+- **D41 · Why-this may name a past title** ("because you finished …") — it may read the device
+  owner's own history back to them. (Only theirs: never another viewer's, never a child's, per D23.)
+- **D42 · A child's view** — **no Discover stack**; the **same interface otherwise, filtered**
+  (D12), with **playlists parents build for them** to browse.
+- **D43 · Leaving a child's view** — choosing an adult from a child's view asks for a **parent
+  PIN** (the owner's own phone needs none).
+- **D44 · The hand-off for a child** — **blocked unless Pulp can confirm the service lands in a
+  kids profile.** Honest consequence: if gate 2 finds no route to confirm that for a service
+  (D11), a child cannot start that service's titles through Pulp at all — the finding has to say,
+  per service, which side of this line it falls.
+- **D45 · Who edits children's filters** — **either adult, from Settings**; changes sync to every
+  device.
+- **D46 · Storage** — **one shared household Drive file, merge-safe**: every change is a dated
+  per-item record so two writers (and the TV) merge without losing an edit. Not a vault section
+  (the vault is one-writer by design). (Gate 2: cross-account visibility of a file one account
+  owns and shares to the other — the same unverified question Index carries.)
+- **D47 · Encrypted** with the **vault passphrase** (`VaultEnvelope`), like Index's household file:
+  viewing history and children's names are personal. The TV takes the passphrase once.
+- **D48 · The TV's account** — the **owner's Google account**, already on the Chromecast.
+- **D49 · Offline** — nothing: without network there is nothing to watch, so Pulp says so in one
+  sentence.
