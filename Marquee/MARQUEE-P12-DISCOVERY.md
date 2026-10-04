@@ -314,3 +314,25 @@ Target: ~200 questions before mockups (owner, round 1).
   their own phone.
 - **D137 · By day** — **school nights (Sun–Thu) and weekends (Fri–Sat)**: two allowance/bedtime
   pairs per child.
+- **D138 · Data cost** — **free sources only**; gate 2 states what that costs in coverage.
+- **D139 · Sports data** — **the same rule**; gate 2 says whether free sports data covers D56.
+- **D140 · Attribution** — a quiet credits line in **Settings → About**, where terms allow.
+- **D141 · What leaves the device** — providers see **title ids and search words only**, never
+  names, viewers or history; the model sees taste summaries, **never a child's data**.
+- **D142 · First run (phone)** — enter the vault passphrase; if the household file exists
+  everything appears, otherwise Settings asks for services, then viewers. No tour.
+- **D143 · First run (TV)** — **paired from a phone**: the TV shows a short code, the owner's phone
+  pairs and hands over the passphrase on the home network. No typing on the TV.
+- **D144 · Service sign-ins** — Pulp signs in to a service **only where that unlocks real watch
+  history** (if gate 2 finds one); its token lives in the **personal vault**. Otherwise Pulp never
+  touches a service password.
+- **D145 · The Pulp calendar** — **created by the owner's install** in the owner's account, shared
+  to the other adult, then found by id (#13).
+- **D146 · Calendar contents** — **new episodes of shows on Continue Watching, releases of playlist
+  titles, followed games** (and plans, D68). **Leaving-soon dates are not on it** — this narrows
+  D124 to the row only.
+- **D147 · Whose, on the shared calendar** — one person's show **does appear, labelled with
+  whose** ("New episode — <show> (<name>)").
+- **D148 · Timing** — **timed where a time is known** (games, live premieres), **else all-day**.
+- **D149 · Changes** — a moved date or rescheduled game is **moved silently** by the nightly
+  refresh.
