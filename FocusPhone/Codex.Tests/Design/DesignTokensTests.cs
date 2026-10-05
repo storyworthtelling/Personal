@@ -129,27 +129,28 @@ public class DesignTokensTests
             + "(rule, brackets and lettering) would not be legible on the cover.");
     }
 
-    // Pulp's identity ladder: marigold, OKLCH 63 degrees (D202), on the suite's shared
-    // lightness ladder. Pinned as literals because the hue is a decision, not a sample:
-    // the owner first chose a contrast blue, then asked for yellow-orange, and 63 is the
-    // yellow-orange that clears both Flyleaf's amber mark and the caution ochre by 22.
-    // A yellow-orange cannot carry text on paper at its own brightness, so the text tiers
-    // are browns and the bright marigold lives on the cloth alone.
+    // Pulp's identity ladder: amber, OKLCH 70 degrees (D275, superseding D202's marigold
+    // 63), on the suite's shared lightness ladder. Pinned as literals because the hue is a
+    // decision, not a sample: the marigold sat 16.3 degrees from Foreword's sunrise (47),
+    // and no yellow-orange clears both Foreword and the caution ochre, so the owner chose
+    // 70 — 22.4 clear of Foreword, and 14.3 from Caution as a RECORDED departure
+    // (RecordedRoleDepartures below). An amber cannot carry text on paper at its own
+    // brightness, so the text tiers are browns and the bright amber lives on the cloth.
     [Fact]
     public void PulpIdentityIsTheApprovedLadder()
     {
-        Assert.Equal("#CEB7A3", DesignTokens.Identity.Pulp.Fill);
-        Assert.Equal("#BF9E82", DesignTokens.Identity.Pulp.Ground);
-        Assert.Equal("#86541F", DesignTokens.Identity.Pulp.Mark);
-        Assert.Equal("#6B4219", DesignTokens.Identity.Pulp.Text);
-        Assert.Equal("#4B3015", DesignTokens.Identity.Pulp.Deep);
-        Assert.Equal("#F6A24E", DesignTokens.Identity.Pulp.Cloth);
+        Assert.Equal("#CCB8A2", DesignTokens.Identity.Pulp.Fill);
+        Assert.Equal("#BCA080", DesignTokens.Identity.Pulp.Ground);
+        Assert.Equal("#835618", DesignTokens.Identity.Pulp.Mark);
+        Assert.Equal("#684414", DesignTokens.Identity.Pulp.Text);
+        Assert.Equal("#493113", DesignTokens.Identity.Pulp.Deep);
+        Assert.Equal("#F7AC4D", DesignTokens.Identity.Pulp.Cloth);
     }
 
     [Theory]
-    [InlineData("#86541F", 3.0)]  // marks and UI, incl. the lit binder tab
-    [InlineData("#6B4219", 4.5)]  // identity-colored text at any size
-    [InlineData("#4B3015", 7.0)]  // the deep tier, body-text safe
+    [InlineData("#835618", 3.0)]  // marks and UI, incl. the lit binder tab
+    [InlineData("#684414", 4.5)]  // identity-colored text at any size
+    [InlineData("#493113", 7.0)]  // the deep tier, body-text safe
     public void PulpIdentityTextTiersClearContrastOnPaper(string tier, double minimum)
     {
         var ratio = DesignTestHelpers.ContrastRatio(tier, DesignTokens.Paper);
@@ -157,13 +158,13 @@ public class DesignTokensTests
     }
 
     // Pulp is bound light, like Score and Plate: the rule, flourishes and title on the
-    // marigold cloth are ink, so ink has to clear AA on the cloth itself.
+    // amber cloth are ink, so ink has to clear AA on the cloth itself (6.72:1).
     [Fact]
     public void PulpInkFramingClearsContrastOnItsLightBinding()
     {
         var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, DesignTokens.Identity.Pulp.Cloth);
         Assert.True(ratio >= 4.5,
-            $"Ink on Pulp's marigold cloth is {ratio:F2}:1, below AA — the inverted framing "
+            $"Ink on Pulp's amber cloth is {ratio:F2}:1, below AA — the inverted framing "
             + "(rule, flourishes and title) would not be legible on the cover.");
     }
 
@@ -207,36 +208,73 @@ public class DesignTokensTests
     // status. That is a claim about degrees on the OKLCH wheel, and it was previously
     // "tested" by asserting two hex strings differ, which any two colors satisfy.
     //
-    // 20 degrees is the floor every registered ladder already clears, the tightest
-    // being Flyleaf's mark at 24 from the problem rose. Resolved is excluded: at 0.010
-    // chroma it is a warm gray, and an angle measured off almost no chroma is not a
-    // hue anyone can see.
+    // 20 degrees is the floor every registered ladder clears but one: Flyleaf's mark at
+    // 24 from the problem rose is the tightest that clears it. Resolved is excluded: at
+    // 0.010 chroma it is a warm gray, and an angle measured off almost no chroma is not
+    // a hue anyone can see.
     [Theory]
-    [InlineData("#C9803A")] [InlineData("#B4552F")] [InlineData("#8A4A22")]  // Flyleaf
-    [InlineData("#93ABA5")] [InlineData("#436A61")]                          // Score
-    [InlineData("#A1A1C7")] [InlineData("#5C5894")]                          // Post
-    [InlineData("#C8B5C8")] [InlineData("#B69BB6")] [InlineData("#7A4F7B")]  // Plate
-    [InlineData("#613F62")] [InlineData("#442D44")]
-    [InlineData("#CEB7A3")] [InlineData("#BF9E82")] [InlineData("#86541F")]  // Pulp
-    [InlineData("#6B4219")] [InlineData("#4B3015")]
-    public void IdentityTiersStayClearOfEverySemanticRole(string identityTier)
+    [InlineData("Flyleaf", "#C9803A")] [InlineData("Flyleaf", "#B4552F")] [InlineData("Flyleaf", "#8A4A22")]
+    [InlineData("Score", "#93ABA5")] [InlineData("Score", "#436A61")]
+    [InlineData("Post", "#A1A1C7")] [InlineData("Post", "#5C5894")]
+    [InlineData("Plate", "#C8B5C8")] [InlineData("Plate", "#B69BB6")] [InlineData("Plate", "#7A4F7B")]
+    [InlineData("Plate", "#613F62")] [InlineData("Plate", "#442D44")]
+    [InlineData("Pulp", "#CCB8A2")] [InlineData("Pulp", "#BCA080")] [InlineData("Pulp", "#835618")]
+    [InlineData("Pulp", "#684414")] [InlineData("Pulp", "#493113")]
+    public void IdentityTiersStayClearOfEverySemanticRole(string app, string identityTier)
     {
-        const double MinimumSeparation = 20.0;
-        const double NearNeutralChroma = 0.02;
-
         var (_, _, hue) = Oklch.FromHex(identityTier);
 
         foreach (var (role, (roleHue, roleChroma)) in PaletteSpec.RoleWheel)
         {
-            if (roleChroma < NearNeutralChroma)
+            if (roleChroma < NearNeutralRoleChroma || RecordedRoleDepartures.Contains((app, role)))
             {
                 continue;
             }
             var separation = Oklch.HueSeparation(hue, roleHue);
-            Assert.True(separation >= MinimumSeparation,
-                $"{identityTier} sits {separation:F1} degrees from the {role} role " +
-                $"(minimum {MinimumSeparation}) — an identity that close reads as a status.");
+            Assert.True(separation >= MinimumRoleSeparation,
+                $"{app}'s {identityTier} sits {separation:F1} degrees from the {role} role " +
+                $"(minimum {MinimumRoleSeparation}) — an identity that close reads as a status.");
         }
+    }
+
+    private const double MinimumRoleSeparation = 20.0;
+    private const double NearNeutralRoleChroma = 0.02;
+
+    // The recorded departures from §3's 20-degree floor: an (app, role) pair the owner
+    // accepted knowingly, each made inert by a rule rather than by distance. Named one by
+    // one so a new departure is a decision someone writes down, never a widened floor.
+    //
+    // Pulp/Caution (D275): amber 70 sits 14.3 degrees from the caution ochre (85). No
+    // yellow-orange clears both Foreword's sunrise (needs >= 67) and Caution (needs <= 65),
+    // and the owner chose amber over leaving Pulp beside Foreword. It is inert because
+    // Pulp draws no Caution on its own pages (Pulp.Tests NoCautionOnPulpPagesTests).
+    //
+    // Index's 0 degrees against Positive is NOT here: Index's ladder is not in this guard
+    // (only its cloth lives in Domain), so it has nothing to be excepted from.
+    private static readonly HashSet<(string App, ColorRole Role)> RecordedRoleDepartures =
+    [
+        ("Pulp", ColorRole.Caution),
+    ];
+
+    // The recorded departure is still where it was recorded. If Pulp drifts closer to
+    // Caution the departure has quietly got worse; if it drifts past the floor the
+    // exception is no longer needed and should be deleted rather than left standing.
+    [Theory]
+    [InlineData("#CCB8A2")] [InlineData("#BCA080")] [InlineData("#835618")]
+    [InlineData("#684414")] [InlineData("#493113")]
+    public void PulpCautionDepartureStaysWhereItWasRecorded(string pulpTier)
+    {
+        Assert.Contains(("Pulp", ColorRole.Caution), RecordedRoleDepartures);
+
+        var separation = Oklch.HueSeparation(
+            Oklch.FromHex(pulpTier).HueDegrees, PaletteSpec.RoleWheel[ColorRole.Caution].Hue);
+
+        Assert.True(separation >= 14.0,
+            $"Pulp's {pulpTier} is now {separation:F1} degrees from Caution, closer than the 14.3 "
+            + "recorded in D275 (14.5 to 15.3 per tier as this guard measures them) — the departure has got worse, which is a new decision, not a drift.");
+        Assert.True(separation < MinimumRoleSeparation,
+            $"Pulp's {pulpTier} is now {separation:F1} degrees from Caution, clear of the "
+            + $"{MinimumRoleSeparation} floor — the recorded departure is no longer needed; delete it.");
     }
 
     // §9: an inactive binder tab is cut from its area's own coloured cloth — the
@@ -248,7 +286,7 @@ public class DesignTokensTests
     [InlineData("#A5C8AD")] [InlineData("#B1C69A")] [InlineData("#C0BDB9")] [InlineData("#AEC0D5")]
     [InlineData("#D0BB91")] [InlineData("#E8ACAD")] [InlineData("#9BC7CD")]   // the seven roles
     [InlineData("#AFC0BC")] [InlineData("#B9B9D4")]                            // Score, Post
-    [InlineData("#CEB7A3")]                                                    // Pulp
+    [InlineData("#CCB8A2")]                                                    // Pulp
     public void InkIsLegibleOnEveryBinderTabCloth(string cloth)
     {
         var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, cloth);

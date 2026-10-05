@@ -154,15 +154,18 @@ public static class DesignTokens
         }
 
         /// <summary>
-        /// Pulp — marigold, OKLCH 63 degrees (D202), chosen rather than sampled, on the suite's
-        /// shared lightness ladder with a mark chroma of 0.095.
+        /// Pulp — amber, OKLCH 70 degrees (D275, superseding D202's marigold 63), chosen rather
+        /// than sampled, on the suite's shared lightness ladder with a mark chroma of 0.095.
         ///
-        /// It sits 22 degrees from Flyleaf's amber mark (41) and 22 from the caution ochre (85):
-        /// the only yellow-orange that clears §3's floor against both at every tier after hex
-        /// rounding. A yellow-orange cannot carry text on paper at its own brightness, so the
-        /// text-bearing tiers are browns of that hue and the bright marigold lives on the CLOTH
-        /// alone — a light binding with the rule, flourishes and title in ink (6.25:1), which is
-        /// Score's and Plate's construction.
+        /// The marigold was found 16.3 degrees from Foreword's sunrise (47) by the app-to-app
+        /// guard, and no yellow-orange clears both Foreword (needs at least 67) and the caution
+        /// ochre (needs at most 65). Amber clears Foreword by at least 22.4 and Flyleaf's mark by
+        /// at least 28.7, and sits 14.3 from Caution: a RECORDED departure from §3's floor, like
+        /// Index's against Positive, made inert by the rule that Pulp draws no Caution on its own
+        /// pages. An amber cannot carry text on paper at its own brightness, so the text-bearing
+        /// tiers are browns of that hue and the bright amber lives on the CLOTH alone — a light
+        /// binding with the rule, flourishes and title in ink (6.72:1), which is Score's and
+        /// Plate's construction.
         ///
         /// The full ladder is here rather than only the cloth (as Index's is) because Pulp is a
         /// cover-out sibling on Flyleaf's shelf and its screens take the ladder too; IconStudio's
@@ -170,12 +173,12 @@ public static class DesignTokens
         /// </summary>
         public static class Pulp
         {
-            public const string Fill = "#CEB7A3";
-            public const string Ground = "#BF9E82";
-            public const string Mark = "#86541F";
-            public const string Text = "#6B4219";
-            public const string Deep = "#4B3015";
-            public const string Cloth = "#F6A24E";
+            public const string Fill = "#CCB8A2";
+            public const string Ground = "#BCA080";
+            public const string Mark = "#835618";
+            public const string Text = "#684414";
+            public const string Deep = "#493113";
+            public const string Cloth = "#F7AC4D";
         }
     }
 

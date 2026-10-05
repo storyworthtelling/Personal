@@ -126,21 +126,22 @@ public static class Tokens
     public static readonly SKColor IndexDeep = SKColor.Parse(IndexDeepHex);
     public static readonly SKColor IndexCloth = SKColor.Parse(IndexClothHex);
 
-    // Pulp: marigold, OKLCH hue 63°, mark chroma 0.095, on the suite's shared lightness ladder
-    // (D202). It sits 22° from Flyleaf's amber mark (41°) and 22° from the caution ochre (85°) —
-    // the only yellow-orange that clears §3's 20° floor against both at every tier after hex
-    // rounding. Yellow-orange text tiers have to be browns to carry text on paper, so the bright
-    // marigold lives on the cloth alone.
-    public const string PulpFillHex = "#CEB7A3";
-    public const string PulpGroundHex = "#BF9E82";
-    public const string PulpMarkHex = "#86541F";
-    public const string PulpTextHex = "#6B4219";
-    public const string PulpDeepHex = "#4B3015";
+    // Pulp: amber, OKLCH hue 70°, mark chroma 0.095, on the suite's shared lightness ladder (D275,
+    // superseding D202's marigold 63°). The marigold sat 16.3° from Foreword's sunrise (47°), and no
+    // yellow-orange clears both Foreword (≥67°) and the caution ochre (≤65°). Amber clears Foreword by
+    // ≥22.4° and Flyleaf's mark by ≥28.7°, and sits 14.3° from Caution — a RECORDED departure, made
+    // inert by Pulp drawing no Caution on its own pages. Amber text tiers have to be browns to carry
+    // text on paper, so the bright amber lives on the cloth alone.
+    public const string PulpFillHex = "#CCB8A2";
+    public const string PulpGroundHex = "#BCA080";
+    public const string PulpMarkHex = "#835618";
+    public const string PulpTextHex = "#684414";
+    public const string PulpDeepHex = "#493113";
 
-    // The binding: a LIGHT cloth with the rule, flourishes and title in ink (6.25:1) — Score's and
+    // The binding: a LIGHT cloth with the rule, flourishes and title in ink (6.72:1) — Score's and
     // Plate's construction. It is on the identity hue, unlike Folio's, at a chroma no text tier can
     // carry.
-    public const string PulpClothHex = "#F6A24E";
+    public const string PulpClothHex = "#F7AC4D";
 
     public static readonly SKColor PulpFill = SKColor.Parse(PulpFillHex);
     public static readonly SKColor PulpGround = SKColor.Parse(PulpGroundHex);
