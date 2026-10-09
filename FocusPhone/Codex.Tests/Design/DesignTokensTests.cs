@@ -203,6 +203,31 @@ public class DesignTokensTests
         Assert.Equal(domain, declared.Groups[1].Value, ignoreCase: true);
     }
 
+    // Foreword's and Folio's shelf bindings (D277) are copies of values registered elsewhere —
+    // Foreword's sunrise in the printed-page identity tokens, Folio's cloth in IconStudio — and a
+    // copy is only as good as the guard that holds it to its source.
+    [Theory]
+    [InlineData("Storyworthtelling.Paper/AppIdentityTokens.cs", "ForewordFillHex", "Foreword.Fill")]
+    [InlineData("Storyworthtelling.Paper/AppIdentityTokens.cs", "ForewordGroundHex", "Foreword.Ground")]
+    [InlineData("Storyworthtelling.Paper/AppIdentityTokens.cs", "ForewordSunriseHex", "Foreword.Mark")]
+    [InlineData("Tools/IconStudio/Tokens.cs", "FolioClothHex", "Folio.Cloth")]
+    public void ShelfBindingCopiesMatchTheirSource(string sourceFile, string hexName, string domainToken)
+    {
+        var source = File.ReadAllText(Path.Combine(DesignTestHelpers.FocusPhoneRoot(), "..", sourceFile));
+        var declared = Regex.Match(source, $@"{hexName}\s*=\s*""(#[0-9A-Fa-f]{{6}})""");
+        Assert.True(declared.Success, $"{sourceFile} declares no {hexName}; the shelf's copy has nothing to agree with.");
+
+        var domain = domainToken switch
+        {
+            "Foreword.Fill" => DesignTokens.Identity.Foreword.Fill,
+            "Foreword.Ground" => DesignTokens.Identity.Foreword.Ground,
+            "Foreword.Mark" => DesignTokens.Identity.Foreword.Mark,
+            "Folio.Cloth" => DesignTokens.Identity.Folio.Cloth,
+            _ => throw new ArgumentOutOfRangeException(nameof(domainToken), $"{domainToken} is not mapped."),
+        };
+        Assert.Equal(domain, declared.Groups[1].Value, ignoreCase: true);
+    }
+
     // §3's actual rule: an identity hue is sampled, then CHECKED against the semantic
     // roles it will sit near, and moved if it crowds one — so a tab never reads as a
     // status. That is a claim about degrees on the OKLCH wheel, and it was previously

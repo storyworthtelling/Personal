@@ -608,11 +608,14 @@ public class HomeActivity : Activity
             // The owner's other repo apps, which the tray draws cover-out on the same shelf. They
             // are not in HomeFeatureSet, which is why Foreword shipped wearing a circle: the
             // featured-six guard could not see it, and the fallback centres the LAUNCHER icon,
-            // which Android masks round. Canonizer has no painting yet and falls back
-            // honestly; ShelfCoverArtTests names it so that stays a decision. Index's cover is
-            // window only: the shelf draws the rule, the title band and the brackets around it.
+            // which Android masks round. Folio's painting shipped here as cover_folio for a whole
+            // phase with no entry, so its book showed the launcher icon (P12, D277). Index's,
+            // Folio's and Pulp's covers are window only: the shelf draws the rule, the title band
+            // and the brackets around them.
             [PolicyContext.ForewordPackage] = Resource.Drawable.cover_foreword,
             [PolicyContext.IndexPackage] = Resource.Drawable.cover_index,
+            [PolicyContext.FolioPackage] = Resource.Drawable.cover_folio,
+            [PolicyContext.PulpPackage] = Resource.Drawable.cover_pulp,
             [HomeFeatureSet.DrivePackage] = Resource.Drawable.cover_drive,
             [HomeFeatureSet.GoogleHomePackage] = Resource.Drawable.cover_googlehome,
         };

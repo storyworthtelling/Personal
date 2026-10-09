@@ -154,6 +154,30 @@ public static class DesignTokens
         }
 
         /// <summary>
+        /// Foreword — sunrise, OKLCH 47 degrees (P9). Flyleaf's shelf needs its BINDING: the light
+        /// ground tier, so the plate's marks invert to ink (Score's and Plate's construction).
+        /// Held identical to Storyworthtelling.Paper's AppIdentityTokens by a source-level parity
+        /// guard. Foreword had no chosen binding until P12 (D277): it fell through to the hash onto
+        /// the Problem role's deep tier, a maroon-brown the owner noticed on the shelf.
+        /// </summary>
+        public static class Foreword
+        {
+            public const string Fill = "#E8B99A";
+            public const string Ground = "#DFA277";
+            public const string Mark = "#CA662D";
+        }
+
+        /// <summary>
+        /// Folio — only the BINDING is needed here: the deep red cloth registered with its olive
+        /// ladder in IconStudio's Tokens.cs (FolioClothHex), deliberately not the olive itself.
+        /// Bound on the shelf from P12 (D277); before that Folio hashed onto a slate.
+        /// </summary>
+        public static class Folio
+        {
+            public const string Cloth = "#B32738";
+        }
+
+        /// <summary>
         /// Pulp — amber, OKLCH 70 degrees (D275, superseding D202's marigold 63), chosen rather
         /// than sampled, on the suite's shared lightness ladder with a mark chroma of 0.095.
         ///
