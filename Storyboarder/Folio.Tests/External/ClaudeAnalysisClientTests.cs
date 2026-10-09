@@ -145,6 +145,25 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task EveryCall_RequestsHighEffort_SoTheNewerModelsKeepTheOldDefault()
+    {
+        // The 5.5 models default to medium effort, where the models Folio was tuned on defaulted to high.
+        // Folio's quality depends on that depth, so high is set explicitly on every request rather than
+        // inherited from a default that changes with the model.
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
+        handler.EnqueueOk(Reply("{}"));
+        handler.EnqueueOk(Reply("{}"));
+
+        await client.ExtractEntities("excerpt", CancellationToken.None);
+        await client.AnalyzeChapter("excerpt", "Chapter 1", [], string.Empty, CancellationToken.None);
+        await client.ConsolidateAnalysis("Title", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        foreach (var body in handler.RequestBodies)
+            Assert.Contains("\"output_config\":{\"effort\":\"high\"}", body);
+    }
+
+    [Fact]
     public async Task ExtractEntities_ToleratesProseAroundJson()
     {
         var (client, handler) = Create();
