@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Playlists: a bulleted list. Drawn from mockup 01's SVG on its 26-unit grid; the stroke colour is a
+     placeholder the binder replaces with SetColorFilter (ink on cloth, the area's hue when active). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp" android:height="26dp"
+    android:viewportWidth="26" android:viewportHeight="26">
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="miter"
+      android:pathData="M8,7H22M8,13H22M8,19H22"/>
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="miter"
+      android:pathData="M3,7A1,1 0 1,0 5,7A1,1 0 1,0 3,7ZM3,13A1,1 0 1,0 5,13A1,1 0 1,0 3,13ZM3,19A1,1 0 1,0 5,19A1,1 0 1,0 3,19Z"/>
+</vector>

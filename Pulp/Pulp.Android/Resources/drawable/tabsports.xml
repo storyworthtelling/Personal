@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sports: a ball with its seams. Drawn from mockup 01's SVG on its 26-unit grid; the stroke colour is a
+     placeholder the binder replaces with SetColorFilter (ink on cloth, the area's hue when active). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp" android:height="26dp"
+    android:viewportWidth="26" android:viewportHeight="26">
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="miter"
+      android:pathData="M4,13A9,9 0 1,0 22,13A9,9 0 1,0 4,13Z"/>
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="miter"
+      android:pathData="M4.5,10C9.5,12 16.5,12 21.5,10M4.5,16C9.5,14 16.5,14 21.5,16M13,4V22"/>
+</vector>
