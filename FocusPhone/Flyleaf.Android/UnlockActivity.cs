@@ -95,9 +95,23 @@ public class UnlockActivity : Activity
         handler.PostDelayed(() =>
         {
             refreshScheduled = false;
-            Render();
+            // Redraw only when something on screen is moving, or the state changed. Rebuilding the admin
+            // page every second would dismiss an open delay dropdown; state changes still redraw here.
+            if (NeedsTickRedraw())
+            {
+                Render();
+            }
             ScheduleRefresh();
         }, 1000);
+    }
+
+    private bool NeedsTickRedraw()
+    {
+        var state = machine!.CurrentState;
+        return state != lastRenderedState
+            || state == UnlockState.Pending
+            || cutover!.IsRunning
+            || cutover.HasExpired;
     }
 
     private void Render()
@@ -127,7 +141,7 @@ public class UnlockActivity : Activity
         {
             case UnlockState.Locked:
                 AddHeader("Locked");
-                AddBody($"Admin access requires a {UnlockStateMachine.UnlockDelay.TotalHours:0}-hour delay. The countdown is visible and can be cancelled at any time.");
+                AddBody($"Admin access requires a {UnlockDelayText.Format(machine.UnlockDelay)} delay. The countdown is visible and can be cancelled at any time.");
                 PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => Transition(machine.RequestUnlock)));
                 break;
 
@@ -161,6 +175,9 @@ public class UnlockActivity : Activity
     {
         AddHeader("Admin mode");
         AddBody("Session ends automatically after 60 minutes.");
+        var delayParams = MatchWrap();
+        delayParams.BottomMargin = PaperTheme.Dp(this, DesignTokens.Space.X3);
+        content!.AddView(DelayRow(), delayParams);
         AddContentButton(PaperUi.SecondaryButton(this, "Unblock apps…", ShowBlockedApps));
         AddContentButton(PaperUi.SecondaryButton(this, "Review policy log…", ShowPolicyLog));
         AddContentButton(PaperUi.SecondaryButton(this, "Set update token…", ShowUpdateTokenPrompt));
@@ -218,6 +235,56 @@ public class UnlockActivity : Activity
         // Re-locking is what re-suspends Chrome; reapply immediately rather than leaving it
         // runnable until some unrelated trigger reapplies policy.
         PinActions(PaperUi.SecondaryButton(this, "Re-lock now", () => TransitionAndReapplyPolicy(machine!.Relock)));
+    }
+
+    // The delay is entered on the admin page, not while Locked: a request in flight (Pending or Ready)
+    // refuses a change (UnlockStateMachine.SetDelay), and admin mode is the only state that can see it.
+    // An amount box and a unit dropdown, so any whole number works: 1 hours, 10 days, 25 months.
+    private LinearLayout DelayRow()
+    {
+        var (amount, unit) = UnlockDelayText.Largest(machine!.UnlockDelay);
+        var amountInput = PaperUi.MonoField(this, "Amount");
+        amountInput.InputType = Android.Text.InputTypes.ClassNumber;
+        amountInput.Text = amount.ToString();
+
+        var units = new[] { "hours", "days", "weeks", "months" };
+        var unitSpinner = new Spinner(this);
+        unitSpinner.Adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem, units);
+        unitSpinner.SetSelection(Array.IndexOf(units, unit));
+
+        var entry = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        entry.SetGravity(GravityFlags.CenterVertical);
+        entry.AddView(amountInput, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        entry.AddView(unitSpinner, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
+        entry.AddView(PaperUi.SecondaryButton(this, "Set", () => SaveDelay($"{amountInput.Text} {units[unitSpinner.SelectedItemPosition]}")));
+
+        var row = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        row.AddView(PaperUi.Secondary(this, "Admin unlock delay"));
+        row.AddView(entry, MatchWrap());
+        return row;
+    }
+
+    private void SaveDelay(string? text)
+    {
+        if (!UnlockDelayText.TryParse(text, out var delay))
+        {
+            inlineStatus = "Enter a whole number and a unit, such as 1 hour, 10 days, 2 weeks or 25 months.";
+            Render();
+            return;
+        }
+        try
+        {
+            machine!.SetDelay(delay);
+        }
+        catch (Exception e) when (e is ArgumentOutOfRangeException or InvalidOperationException)
+        {
+            inlineStatus = e.Message;
+            Render();
+            return;
+        }
+        store!.Save(machine);
+        inlineStatus = $"Admin unlock delay set to {UnlockDelayText.Format(delay)}. It applies to the next request.";
+        Render();
     }
 
     private void ShowBlockedApps()
