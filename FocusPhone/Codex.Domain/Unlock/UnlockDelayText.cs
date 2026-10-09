@@ -48,20 +48,27 @@ public static class UnlockDelayText
         return true;
     }
 
-    /// <summary>The delay in the largest unit that holds it exactly, e.g. "10 days" or "25 months".</summary>
-    public static string Format(TimeSpan delay)
+    /// <summary>The delay in the largest unit that holds it exactly, as an amount and a unit word
+    /// ("hours", "days" or "months"), for the admin page to show in its entry boxes.</summary>
+    public static (long Amount, string Unit) Largest(TimeSpan delay)
     {
         var hours = (long)delay.TotalHours;
         if (hours % (long)HoursPerMonth == 0 && hours >= (long)HoursPerMonth)
         {
-            return Plural(hours / (long)HoursPerMonth, "month");
+            return (hours / (long)HoursPerMonth, "months");
         }
         if (hours % (long)HoursPerDay == 0 && hours >= (long)HoursPerDay)
         {
-            return Plural(hours / (long)HoursPerDay, "day");
+            return (hours / (long)HoursPerDay, "days");
         }
-        return Plural(hours, "hour");
+        return (hours, "hours");
     }
 
-    private static string Plural(long count, string unit) => $"{count} {unit}{(count == 1 ? string.Empty : "s")}";
+    /// <summary>The delay in the largest unit that holds it exactly, e.g. "10 days" or "25 months".</summary>
+    public static string Format(TimeSpan delay)
+    {
+        var (amount, unit) = Largest(delay);
+        var singular = unit.TrimEnd('s');
+        return $"{amount} {singular}{(amount == 1 ? string.Empty : "s")}";
+    }
 }

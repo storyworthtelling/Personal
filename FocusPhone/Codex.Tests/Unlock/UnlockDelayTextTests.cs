@@ -50,4 +50,18 @@ public class UnlockDelayTextTests
     {
         Assert.Equal(expected, UnlockDelayText.Format(TimeSpan.FromHours(hours)));
     }
+
+    [Theory]
+    [InlineData(6, 6, "hours")]
+    [InlineData(240, 10, "days")]
+    [InlineData(336, 14, "days")]
+    [InlineData(720, 1, "months")]
+    [InlineData(18000, 25, "months")]
+    public void Largest_SplitsIntoAmountAndUnitTheOwnerCanEdit(int hours, long amount, string unit)
+    {
+        var (gotAmount, gotUnit) = UnlockDelayText.Largest(TimeSpan.FromHours(hours));
+
+        Assert.Equal(amount, gotAmount);
+        Assert.Equal(unit, gotUnit);
+    }
 }
