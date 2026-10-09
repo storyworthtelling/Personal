@@ -28,9 +28,27 @@ public class FridayStackTests
     ];
 
     private static FridayStack Build(
-        TasteProfile? taste = null, VetoBook? vetoes = null, StackSizes? sizes = null, IEnumerable<StackCandidate>? pool = null) =>
+        TasteProfile? taste = null, VetoBook? vetoes = null, StackSizes? sizes = null, IEnumerable<StackCandidate>? pool = null,
+        IReadOnlySet<TitleId>? watched = null) =>
         FridayStack.Build(
-            Owner, pool ?? Pool, taste ?? TasteProfile.Empty, vetoes ?? VetoBook.For(Sam), sizes ?? StackSizes.Default, Wednesday, Harbor);
+            Owner, pool ?? Pool, taste ?? TasteProfile.Empty, vetoes ?? VetoBook.For(Sam), watched ?? new HashSet<TitleId>(),
+            sizes ?? StackSizes.Default, Wednesday, Harbor);
+
+    // D282: the stack is always something new — a title the viewer has watched is never a candidate,
+    // however well it matches their taste.
+    [Fact]
+    public void ATitleTheViewerHasWatchedIsNeverOffered()
+    {
+        var taste = TasteProfile.From(new Dictionary<string, int> { ["noir"] = 9 });
+        var stack = Build(taste: taste, watched: new HashSet<TitleId> { new("f-noir"), new("s-noir") });
+
+        var offered = stack.Pile(TitleKind.Film, VetoBook.For(Sam)).Concat(stack.Pile(TitleKind.Show, VetoBook.For(Sam)))
+            .Select(card => card.Title)
+            .ToList();
+        Assert.NotEmpty(offered);
+        Assert.DoesNotContain(new TitleId("f-noir"), offered);
+        Assert.DoesNotContain(new TitleId("s-noir"), offered);
+    }
 
     [Fact]
     public void TheDefaultIsThreeFilmsAndTwoShows()
@@ -150,7 +168,7 @@ public class FridayStackTests
         var child = new StackViewer(new ViewerId("kit"), IsChild: true);
 
         var stack = FridayStack.Build(
-            child, Pool, TasteProfile.Empty, VetoBook.For(child.Id), StackSizes.Default, Wednesday, Harbor);
+            child, Pool, TasteProfile.Empty, VetoBook.For(child.Id), new HashSet<TitleId>(), StackSizes.Default, Wednesday, Harbor);
 
         Assert.Empty(stack.Pile(TitleKind.Film, VetoBook.For(child.Id)));
         Assert.Empty(stack.Pile(TitleKind.Show, VetoBook.For(child.Id)));

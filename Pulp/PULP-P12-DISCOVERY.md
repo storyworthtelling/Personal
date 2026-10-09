@@ -642,3 +642,24 @@ Process (owner, D211): one screen per round; every decision, question and approv
   painting in the window; Pulp bound in its amber cloth with its cover; and a guard that **every
   suite book has a chosen binding** so none falls through to the hash again. Flagged commits outside
   Pulp, as Index's phase did.
+
+## Release B rulings (judgement calls the Domain work surfaced)
+
+- **D278 · A manual mark lasts until newer evidence.** The latest watched/unwatched mark beats
+  everything at or before it; anything watched after it counts again, so a title marked unwatched to
+  rewatch is learned as watched once it is finished.
+- **D279 · The end of a title is 95% through.** The closing credits count as the end; a live game
+  that ends counts as watched wherever it stopped; an unknown duration never reaches the end. A
+  number chosen, not measured — revisit after the first device run.
+- **D280 · Watching together shows only what every child may see.** D175's "strictest child wins"
+  read as an intersection: one child's allow-list never opens a title to another, and every child's
+  blocks apply to the group.
+- **D281 · Age bands as built.** TV-G from the youngest band; R and TV-MA only at seventeen; NC-17
+  and X for no child; an unrecognised or historical code is unrated and hidden.
+- **D282 · A blocked service hides a title only when it is the title's only home.** Otherwise the
+  title stays visible and starts elsewhere; starting it on the blocked service is refused.
+- **D283 · The Friday stack never offers a watched title, and each adult has their own taste.**
+  Watched titles are dropped from the candidates; each adult's stack is taught by their own viewing,
+  and anything watched with a child present never counts (D23).
+- **D284 · Revealing fixtures are playoff and championship games.** In a held league every team's
+  revealing next fixture is hidden; regular-season fixtures stay.

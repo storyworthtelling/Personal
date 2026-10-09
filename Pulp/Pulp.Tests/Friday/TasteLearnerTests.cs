@@ -5,7 +5,7 @@ namespace Pulp.Tests.Friday;
 
 /// <summary>
 /// D24: taste is learned passively from what is watched, plus the stack's vetoes — no ratings.
-/// D23: it is the device owner's taste; a child's viewing is never tracked, and a child has none.
+/// D23, D283: each adult's taste is their own viewing; a child's viewing is never tracked, and a child has none.
 /// </summary>
 public class TasteLearnerTests
 {
@@ -57,6 +57,18 @@ public class TasteLearnerTests
         var taste = TasteLearner.Learn(Owner, Children, [Watched("w-alex", "rowing", Alex)], VetoBook.For(Sam));
 
         Assert.Equal(0, taste.Affinity(["rowing"]));
+    }
+
+    // D283: each adult's stack is taught by their own viewing — the other adult is not left without one.
+    [Fact]
+    public void TheOtherAdultLearnsTheirOwnTasteFromTheirOwnViewing()
+    {
+        var alex = new StackViewer(Alex, IsChild: false);
+        var taste = TasteLearner.Learn(
+            alex, Children, [Watched("w-alex", "rowing", Alex), Watched("w-sam", "noir", Sam)], VetoBook.For(Alex));
+
+        Assert.True(taste.Affinity(["rowing"]) > 0);
+        Assert.Equal(0, taste.Affinity(["noir"]));
     }
 
     [Fact]

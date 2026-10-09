@@ -64,7 +64,7 @@ public sealed class VetoBook
 }
 
 /// <summary>
-/// The device owner's taste: a weight per descriptive tag, raised by what they watch and lowered by
+/// One adult's taste: a weight per descriptive tag, raised by what they watch and lowered by
 /// what they veto. No ratings (D24).
 /// </summary>
 public sealed class TasteProfile
@@ -94,32 +94,33 @@ public sealed class TasteProfile
 }
 
 /// <summary>
-/// D24 and D23: taste is learned passively from what the device owner watches, plus their vetoes.
-/// Only the owner's viewing counts — not the other adult's, and never a child's: anything watched
-/// with a child present is a child's viewing too and is left out. A child has no profile at all.
+/// D24, D23 and D283: taste is learned passively from what one adult watches, plus their vetoes.
+/// Each adult has their own — only the viewer's own viewing counts, never the other adult's, and
+/// never a child's: anything watched with a child present is a child's viewing too and is left out.
+/// A child has no profile at all.
 /// </summary>
 public static class TasteLearner
 {
     public static TasteProfile Learn(
-        StackViewer owner,
+        StackViewer viewer,
         IReadOnlyCollection<ViewerId> children,
         IEnumerable<WatchedTitle> watched,
         VetoBook vetoes)
     {
-        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(viewer);
         ArgumentNullException.ThrowIfNull(children);
         ArgumentNullException.ThrowIfNull(watched);
         ArgumentNullException.ThrowIfNull(vetoes);
 
-        if (owner.IsChild || children.Contains(owner.Id))
+        if (viewer.IsChild || children.Contains(viewer.Id))
         {
             return TasteProfile.Empty;
         }
 
-        if (vetoes.Viewer != owner.Id)
+        if (vetoes.Viewer != viewer.Id)
         {
             throw new ArgumentException(
-                $"The vetoes are {vetoes.Viewer}'s, not {owner.Id}'s; one viewer's vetoes never shape another's taste.",
+                $"The vetoes are {vetoes.Viewer}'s, not {viewer.Id}'s; one viewer's vetoes never shape another's taste.",
                 nameof(vetoes));
         }
 
@@ -127,9 +128,9 @@ public static class TasteLearner
         var counted = new HashSet<TitleId>();
         foreach (var title in watched)
         {
-            var owners = title.Viewers.Contains(owner.Id);
+            var theirs = title.Viewers.Contains(viewer.Id);
             var childPresent = title.Viewers.Any(children.Contains);
-            if (owners && !childPresent && counted.Add(title.Title))
+            if (theirs && !childPresent && counted.Add(title.Title))
             {
                 Adjust(weights, title.Tags, 1);
             }

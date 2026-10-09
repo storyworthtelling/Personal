@@ -82,7 +82,8 @@ public sealed class FridayStack
 
     /// <summary>
     /// Builds the stack for the week containing <paramref name="now"/>. Vetoed titles are left out
-    /// (D111); the rest are ranked by the viewer's taste, ties by title id so a rebuild is stable.
+    /// (D111), and so is anything the viewer has already watched — the stack is always something new
+    /// (D282); the rest are ranked by the viewer's taste, ties by title id so a rebuild is stable.
     /// A child gets an empty stack: no taste profile, so nothing to pick by (D23, D26).
     /// </summary>
     public static FridayStack Build(
@@ -90,6 +91,7 @@ public sealed class FridayStack
         IEnumerable<StackCandidate> candidates,
         TasteProfile taste,
         VetoBook vetoes,
+        IReadOnlySet<TitleId> alreadyWatched,
         StackSizes sizes,
         DateTimeOffset now,
         TimeZoneInfo zone)
@@ -98,6 +100,7 @@ public sealed class FridayStack
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(taste);
         ArgumentNullException.ThrowIfNull(vetoes);
+        ArgumentNullException.ThrowIfNull(alreadyWatched);
         ArgumentNullException.ThrowIfNull(sizes);
 
         if (vetoes.Viewer != viewer.Id)
@@ -114,7 +117,7 @@ public sealed class FridayStack
         }
 
         var ranked = candidates
-            .Where(candidate => !vetoes.IsVetoed(candidate.Title))
+            .Where(candidate => !vetoes.IsVetoed(candidate.Title) && !alreadyWatched.Contains(candidate.Title))
             .DistinctBy(candidate => candidate.Title)
             .OrderByDescending(candidate => taste.Affinity(candidate.Tags))
             .ThenBy(candidate => candidate.Title.Value, StringComparer.OrdinalIgnoreCase)
