@@ -5,7 +5,8 @@ namespace Codex.Domain.Web;
 /// stays on the originating link's registrable domain (eTLD+1) — so a link opens but you can't
 /// browse away from its site. Two carve-outs on top: a <b>Google auth host</b> is always allowed
 /// (so a "Sign in with Google" redirect completes across domains), and a <b>social/adult host</b>
-/// is always blocked (even same-domain). Everything else off-domain, and any non-web scheme, is
+/// is always blocked (even same-domain), as is the <b>Play Store's website</b> (matched by host, since
+/// Google shares one registrable domain). Everything else off-domain, and any non-web scheme, is
 /// blocked. Adult content is also blocked network-wide by the filtering DNS.
 /// </summary>
 public class LinkPolicy
@@ -34,6 +35,11 @@ public class LinkPolicy
 
         // Social/adult hosts are blocked even on the same site.
         if (targetDomain is not null && WebHosts.BlockedRegistrableDomains.Contains(targetDomain))
+        {
+            return false;
+        }
+        // The Play Store's website is closed too, by host: it shares Google's registrable domain.
+        if (WebHosts.IsPlayStoreHost(target.Host))
         {
             return false;
         }

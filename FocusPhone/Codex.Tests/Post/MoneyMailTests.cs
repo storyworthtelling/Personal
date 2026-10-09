@@ -139,9 +139,9 @@ public class MoneyMailTests
     [Fact]
     public void TheWireShapeIsPinned()
     {
-        Assert.Equal("com.storyworthtelling.index", IndexHandoff.Package);
-        Assert.Equal("com.storyworthtelling.index.BalanceReceiver", IndexHandoff.Receiver);
-        Assert.Equal("com.storyworthtelling.index.RECEIVE_BALANCE", IndexHandoff.Permission);
+        Assert.Equal("com.storyworthtelling.ledger", IndexHandoff.Package);
+        Assert.Equal("com.storyworthtelling.ledger.BalanceReceiver", IndexHandoff.Receiver);
+        Assert.Equal("com.storyworthtelling.ledger.RECEIVE_BALANCE", IndexHandoff.Permission);
         Assert.Equal("balance", IndexHandoff.BalanceExtra);
         Assert.Equal("asOf", IndexHandoff.AsOfExtra);
         Assert.Equal("sender", IndexHandoff.SenderExtra);

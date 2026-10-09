@@ -34,6 +34,14 @@ public sealed record SmsRoleNotice(bool Speaks, bool CanRequest, bool WasLost, s
 /// </summary>
 public static class SmsRole
 {
+    /// <summary>
+    /// What to remember between looks. The role is read on every resume, so a plain
+    /// "held this time" would turn "something took over" into first-run wording on the
+    /// second look; once Post has held the role, losing it stays lost until it is back.
+    /// </summary>
+    public static bool Remember(SmsRoleStatus status, bool heldBefore) =>
+        status == SmsRoleStatus.Held || heldBefore;
+
     public static SmsRoleNotice Decide(SmsRoleStatus status, bool heldAtLastLaunch) => status switch
     {
         // A working app announcing that it works is the definition of noise, and that

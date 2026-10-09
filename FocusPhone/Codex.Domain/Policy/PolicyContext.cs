@@ -39,11 +39,12 @@ public record PolicyContext(
     // draws it: without an entry it fell back to the launcher icon, which Android masks round.
     public const string ForewordPackage = "com.storyworthtelling.dailyloader";
 
-    // Index, the household money app (the former Ledger, whose "com.storyworthtelling.ledger"
-    // id is retired). Like Foreword it is a sibling repo app rather than a FocusPhone head. It
-    // is named here because the shelf draws it cover-out; the sibling-book test itself is the
-    // owner prefix above, which already covers it.
-    public const string IndexPackage = "com.storyworthtelling.index";
+    // Index, the household money app (the former Ledger, renamed in place: it keeps the
+    // "com.storyworthtelling.ledger" id so a phone upgrades it rather than installing a second app).
+    // Like Foreword it is a sibling repo app rather than a FocusPhone head. It is named here because
+    // the shelf draws it cover-out; the sibling-book test itself is the owner prefix above, which
+    // already covers it.
+    public const string IndexPackage = "com.storyworthtelling.ledger";
 
     // Folio, the manuscript-review app. Its package still says "storyboarder" — Canonizer's id,
     // kept so installed copies upgrade in place. Named here because the shelf draws it cover-out.

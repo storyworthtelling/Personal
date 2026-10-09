@@ -48,7 +48,8 @@ public class AccountStore
     }
 
     /// <summary>
-    /// Whether Post held the SMS role the last time it looked. Kept because the useful
+    /// Whether Post has held the SMS role since it last had it back (<see cref="Codex.Domain.Post.SmsRole.Remember"/>).
+    /// Kept because the useful
     /// question on launch is not "do we hold it" but "did we just lose it" — the same
     /// missing role reads as first-run setup or as something silently breaking texting,
     /// and those want different words.

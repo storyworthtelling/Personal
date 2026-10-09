@@ -1581,6 +1581,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                     ]);
                 }
             })!
+            // A picture or video to one person is a one-recipient MMS — the same send a group
+            // reply uses (see ShowGroupCompose), so it lands in the same thread. Like the group
+            // dialog, Attach closes this one: a typed message is not carried along with it.
+            .SetNeutralButton("Attach", (_, _) => PickMediaForGroup([number]))!
             .SetNegativeButton("Cancel", (_, _) => { })!
             .Show();
     }

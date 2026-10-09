@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Index.Domain.External;
 using Index.Domain.Health;
 using Index.Domain.Pipeline;
+using Index.Domain.Identity;
 using Index.Infrastructure.Configuration;
 using Storyworthtelling.Voice.Health;
 
@@ -37,7 +38,7 @@ public sealed class PlaidClient : IPlaidClient
             client_id = opts.ClientId,
             secret = opts.Secret,
             user = new { client_user_id = "ledger-owner" },
-            client_name = "Ledger",
+            client_name = IndexIdentity.DisplayName,
             language = "en",
             country_codes = new[] { "US" },
             // Plaid requires at least one product in `products` — an empty array is rejected with
@@ -75,7 +76,7 @@ public sealed class PlaidClient : IPlaidClient
         {
             client_id = opts.ClientId,
             secret = opts.Secret,
-            client_name = "Index",
+            client_name = IndexIdentity.DisplayName,
             language = "en",
             country_codes = new[] { "US" },
             user = new { client_user_id = "index-owner" },
