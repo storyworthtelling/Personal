@@ -7,7 +7,7 @@ public sealed class ClaudeOptions
 {
     public const string SectionName = "Claude";
     public string ApiKey { get; set; } = string.Empty;
-    public string Model { get; set; } = "claude-sonnet-4-6";
+    public string Model { get; set; } = "claude-sonnet-5-5";
 
     // The cheap tier, used for the per-chunk analysis notes: genuinely mechanical note-taking against an
     // explicit JSON contract, run once per chunk (the most calls a novel makes), which is what the small
@@ -15,7 +15,7 @@ public sealed class ClaudeOptions
     // dropping minor characters and described sets, so those panels lost their reference sheets — so it
     // moved back to Model. The other work needing the strong model (adapting prose into panels,
     // synthesising the report) has always stayed on Model.
-    public string FastModel { get; set; } = "claude-haiku-4-5-20251001";
+    public string FastModel { get; set; } = "claude-haiku-5-5";
 
     public int MaxTokens { get; set; } = 8_000;
 
@@ -57,14 +57,12 @@ public sealed class ClaudeOptions
     // readers and the two synthesis passes — goes to the strong one, because there the judgement is
     // the product; the eight structural sections go to the standard one.
     //
-    // They are their own settings rather than reusing Model above, and that is deliberate on both
-    // sides. Model is claude-sonnet-4-6, a PREVIOUS-generation model at $3/MTok where current Sonnet
-    // is $2 — so the passes should not inherit it. But every other call in the pipeline uses Model
-    // too, and moving all of them is a separate decision with its own blast radius, not something to
-    // do as a side effect of building the reads. Reversal 2 scopes the switch to the passes; this is
-    // that scope, written down.
-    public string StandardModel { get; set; } = "claude-sonnet-5";
-    public string StrongModel { get; set; } = "claude-opus-5";
+    // They are their own settings rather than reusing Model above, and that is deliberate: every other
+    // call in the pipeline uses Model too, and moving all of them is a separate decision with its own
+    // blast radius, not something to do as a side effect of building the reads. Reversal 2 scopes the
+    // switch to the passes; this is that scope, written down.
+    public string StandardModel { get; set; } = "claude-sonnet-5-5";
+    public string StrongModel { get; set; } = "claude-opus-5-5";
 }
 
 public sealed class GeminiOptions
