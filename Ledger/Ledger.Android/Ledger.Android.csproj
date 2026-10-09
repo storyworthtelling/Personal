@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <UseMaui>true</UseMaui>
     <RootNamespace>Index.Android</RootNamespace>
-    <ApplicationId>com.storyworthtelling.index</ApplicationId>
+    <ApplicationId>com.storyworthtelling.ledger</ApplicationId>
     <ApplicationTitle>Index</ApplicationTitle>
     <!-- Release C finding: without <SingleProject>, the .NET-for-Android SDK's own default for
          $(AndroidManifest) is "AndroidManifest.xml" or "Properties\AndroidManifest.xml" — it NEVER

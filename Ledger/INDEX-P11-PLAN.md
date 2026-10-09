@@ -1,5 +1,12 @@
 # Index (P11) — Gate 4 implementation plan
 
+> **Superseded after the first install: D01 and D02 (a new package id, the old app retired).** The first P11 build
+> took `com.storyworthtelling.index` and landed beside the old Ledger as a second install; Google's Android
+> sign-in, registered against the package name, then pointed at the wrong app. Index keeps
+> `com.storyworthtelling.ledger` and upgrades the old app in place, as Foreword, Folio, Post and Plate did. Where
+> this document says the id is new, there is nothing to uninstall, or the Plaid tokens come back by vault restore,
+> read it as: the phone already has them, and the vault restore is the fallback for a reset phone only.
+
 Built on the Gate 2 finding (`INDEX-P11-TECHNICAL-FINDING.md`, approved) and the Gate 3 mockups
 (all seventeen approved, Gate 3 closed at D162).
 

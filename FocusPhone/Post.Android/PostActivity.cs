@@ -58,6 +58,7 @@ public class PostActivity : Activity
     private int activeIndex;
 
     private FrameLayout content = null!;
+    private FrameLayout overlay = null!;
     private FrameLayout bottomBarSlot = null!;
     private BinderTabs binder = null!;
     private LinearLayout headerSlot = null!;
@@ -99,7 +100,6 @@ public class PostActivity : Activity
 
         CrashReporter.ShowPendingCrash(this);
         RenderContent();
-        CheckSmsRole();
         OpenFromIntent(Intent);
     }
 
@@ -160,11 +160,14 @@ public class PostActivity : Activity
     // can be taken away by something Post never sees — a policy pass, an OS update, the
     // cutover's reset. So it is re-read on every launch rather than assumed from the day
     // it was granted, and what comes back goes behind the fold: it is something waiting,
-    // not something to interrupt the owner with (§13).
+    // not something to interrupt the owner with (§13). Read on every RESUME, not OnCreate:
+    // SingleTask means coming back from switching the default to another app reuses this
+    // running instance, and a check that only ran on a cold launch never saw the role go.
+    // The fold goes on the page overlay, never on `content`, which RenderContent empties.
     private void CheckSmsRole()
     {
         var notice = SmsRoleAccess.CheckOnLaunch(this, new AccountStore(this));
-        DogEar.SetNotice(this, content, NoticeKeys.SmsRole, notice.Speaks
+        DogEar.SetNotice(this, overlay, NoticeKeys.SmsRole, notice.Speaks
             ? new DogEar.Notice(
                 notice.Headline,
                 notice.Detail,
@@ -253,6 +256,7 @@ public class PostActivity : Activity
         // header, which read as "inside the binder tabs" and partly behind the status bar
         // rather than at the very top of the page the way a folded corner should.
         var pageOverlayHost = PaperUi.WrapForTopInset(this, page);
+        overlay = pageOverlayHost;
         foreach (var area in areas)
         {
             area.Overlay = pageOverlayHost; // dog-ears and action cards overlay the whole page
@@ -334,8 +338,9 @@ public class PostActivity : Activity
             area.Resume();
         }
         ApplyPendingArea();
-        CheckPendingCallNotes();
         RenderContent();
+        CheckSmsRole();
+        CheckPendingCallNotes();
     }
 
     // Consumes a switch requested by a secondary screen's binder tap. Cleared unconditionally
@@ -363,7 +368,7 @@ public class PostActivity : Activity
     private void CheckPendingCallNotes()
     {
         var pending = PendingCallNoteStore.Get(this);
-        DogEar.SetNotice(this, content, NoticeKeys.CallNote, pending is null
+        DogEar.SetNotice(this, overlay, NoticeKeys.CallNote, pending is null
             ? null
             : new DogEar.Notice(
                 $"Write a note on your call with {pending.DisplayName}?",
