@@ -8,7 +8,9 @@ namespace Codex.Domain.Unlock;
 /// </summary>
 public class UnlockStateMachine
 {
-    public static readonly TimeSpan UnlockDelay = TimeSpan.FromHours(6);
+    public static readonly TimeSpan DefaultUnlockDelay = TimeSpan.FromHours(6);
+    public static readonly TimeSpan MinimumUnlockDelay = TimeSpan.FromHours(1);
+    public static readonly TimeSpan MaximumUnlockDelay = TimeSpan.FromDays(36525);
     public static readonly TimeSpan AdminDuration = TimeSpan.FromMinutes(60);
 
     private readonly IClock clock;
@@ -25,6 +27,7 @@ public class UnlockStateMachine
             storedState = UnlockState.Locked;
             accumulatedProgress = TimeSpan.Zero;
             lastObservedUtc = clock.UtcNow;
+            UnlockDelay = DefaultUnlockDelay;
         }
         else
         {
@@ -32,8 +35,15 @@ public class UnlockStateMachine
             accumulatedProgress = persisted.AccumulatedProgress;
             lastObservedUtc = persisted.LastObservedUtc;
             adminExpiresAtUtc = persisted.AdminExpiresAtUtc;
+            UnlockDelay = persisted.UnlockDelay ?? DefaultUnlockDelay;
         }
     }
+
+    /// <summary>
+    /// How long the owner waits between requesting admin access and being allowed in. Read when a
+    /// request starts, so it can only be changed while Locked (see <see cref="SetDelay"/>).
+    /// </summary>
+    public TimeSpan UnlockDelay { get; private set; }
 
     public UnlockState CurrentState
     {
@@ -67,6 +77,28 @@ public class UnlockStateMachine
         }
         storedState = UnlockState.Pending;
         accumulatedProgress = TimeSpan.Zero;
+    }
+
+    /// <summary>
+    /// Changes the delay used by future requests. Refused while a request is in flight (Pending or
+    /// Ready): changing it then would shorten or lengthen a countdown the owner is already waiting out.
+    /// Allowed while Locked and while admin mode is open, since no request depends on it then.
+    /// </summary>
+    public void SetDelay(TimeSpan delay)
+    {
+        Touch();
+        if (delay < MinimumUnlockDelay || delay > MaximumUnlockDelay)
+        {
+            throw new ArgumentOutOfRangeException(nameof(delay),
+                $"The admin unlock delay must be between {UnlockDelayText.Format(MinimumUnlockDelay)} and {UnlockDelayText.Format(MaximumUnlockDelay)}; got {UnlockDelayText.Format(delay)}.");
+        }
+        var state = EffectiveState();
+        if (state is UnlockState.Pending or UnlockState.Ready)
+        {
+            throw new InvalidOperationException(
+                $"Cannot change the admin unlock delay while in state {state}; a request is already waiting on it.");
+        }
+        UnlockDelay = delay;
     }
 
     public void CancelRequest()
@@ -104,7 +136,7 @@ public class UnlockStateMachine
     public UnlockData Export()
     {
         Touch();
-        return new UnlockData(storedState, accumulatedProgress, lastObservedUtc, adminExpiresAtUtc);
+        return new UnlockData(storedState, accumulatedProgress, lastObservedUtc, adminExpiresAtUtc, UnlockDelay);
     }
 
     private void Touch()
