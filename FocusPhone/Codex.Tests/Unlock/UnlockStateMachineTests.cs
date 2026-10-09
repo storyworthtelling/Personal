@@ -22,7 +22,7 @@ public class UnlockStateMachineTests
         machine.RequestUnlock();
 
         Assert.Equal(UnlockState.Pending, machine.CurrentState);
-        Assert.Equal(UnlockStateMachine.UnlockDelay, machine.RemainingDelay);
+        Assert.Equal(UnlockStateMachine.DefaultUnlockDelay, machine.RemainingDelay);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class UnlockStateMachineTests
 
         machine.RequestUnlock();
 
-        Assert.Equal(UnlockStateMachine.UnlockDelay, machine.RemainingDelay);
+        Assert.Equal(UnlockStateMachine.DefaultUnlockDelay, machine.RemainingDelay);
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public class UnlockStateMachineTests
         var machine = NewMachine();
         machine.RequestUnlock();
 
-        clock.Advance(UnlockStateMachine.UnlockDelay - TimeSpan.FromMinutes(1));
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay - TimeSpan.FromMinutes(1));
 
         Assert.Equal(UnlockState.Pending, machine.CurrentState);
     }
@@ -67,7 +67,7 @@ public class UnlockStateMachineTests
         var machine = NewMachine();
         machine.RequestUnlock();
 
-        clock.Advance(UnlockStateMachine.UnlockDelay);
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
 
         Assert.Equal(UnlockState.Ready, machine.CurrentState);
     }
@@ -80,7 +80,7 @@ public class UnlockStateMachineTests
 
         clock.Advance(TimeSpan.FromHours(2));
 
-        Assert.Equal(UnlockStateMachine.UnlockDelay - TimeSpan.FromHours(2), machine.RemainingDelay);
+        Assert.Equal(UnlockStateMachine.DefaultUnlockDelay - TimeSpan.FromHours(2), machine.RemainingDelay);
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(UnlockStateMachine.UnlockDelay);
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
 
         machine.EnterAdminMode();
 
@@ -116,7 +116,7 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(UnlockStateMachine.UnlockDelay);
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
         machine.EnterAdminMode();
 
         clock.Advance(UnlockStateMachine.AdminDuration);
@@ -129,7 +129,7 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(UnlockStateMachine.UnlockDelay);
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
         machine.EnterAdminMode();
 
         clock.Advance(UnlockStateMachine.AdminDuration - TimeSpan.FromMinutes(1));
@@ -142,7 +142,7 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(UnlockStateMachine.UnlockDelay);
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
         machine.EnterAdminMode();
 
         machine.Relock();
@@ -155,7 +155,7 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(UnlockStateMachine.UnlockDelay + TimeSpan.FromDays(5));
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay + TimeSpan.FromDays(5));
 
         Assert.Equal(UnlockState.Ready, machine.CurrentState);
     }
@@ -171,7 +171,7 @@ public class UnlockStateMachineTests
         var restored = new UnlockStateMachine(clock, persisted);
 
         Assert.Equal(UnlockState.Pending, restored.CurrentState);
-        Assert.Equal(UnlockStateMachine.UnlockDelay - TimeSpan.FromHours(2), restored.RemainingDelay);
+        Assert.Equal(UnlockStateMachine.DefaultUnlockDelay - TimeSpan.FromHours(2), restored.RemainingDelay);
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public class UnlockStateMachineTests
         clock.Advance(TimeSpan.FromHours(2));
 
         var restored = new UnlockStateMachine(clock, machine.Export());
-        clock.Advance(UnlockStateMachine.UnlockDelay - TimeSpan.FromHours(2));
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay - TimeSpan.FromHours(2));
 
         Assert.Equal(UnlockState.Ready, restored.CurrentState);
     }
@@ -200,7 +200,7 @@ public class UnlockStateMachineTests
         Assert.Equal(UnlockState.Pending, machine.CurrentState);
 
         // Forward again, resuming from the accumulated 4h — one minute short of the delay.
-        clock.Advance(UnlockStateMachine.UnlockDelay - TimeSpan.FromHours(4) - TimeSpan.FromMinutes(1));
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay - TimeSpan.FromHours(4) - TimeSpan.FromMinutes(1));
         Assert.Equal(UnlockState.Pending, machine.CurrentState);
         Assert.Equal(TimeSpan.FromMinutes(1), machine.RemainingDelay);
 
@@ -213,7 +213,7 @@ public class UnlockStateMachineTests
     {
         var machine = NewMachine();
         machine.RequestUnlock();
-        clock.Advance(UnlockStateMachine.UnlockDelay);
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
         machine.EnterAdminMode();
 
         clock.Advance(TimeSpan.FromMinutes(-5));
@@ -228,7 +228,103 @@ public class UnlockStateMachineTests
         Assert.Null(machine.RemainingDelay);
 
         machine.RequestUnlock();
-        clock.Advance(UnlockStateMachine.UnlockDelay);
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
         Assert.Null(machine.RemainingDelay);
+    }
+
+    [Fact]
+    public void Delay_DefaultsToSixHours()
+    {
+        Assert.Equal(TimeSpan.FromHours(6), NewMachine().UnlockDelay);
+    }
+
+    [Fact]
+    public void SetDelay_WhileLocked_GovernsTheNextRequest()
+    {
+        var machine = NewMachine();
+        machine.SetDelay(TimeSpan.FromHours(3));
+
+        machine.RequestUnlock();
+        Assert.Equal(TimeSpan.FromHours(3), machine.RemainingDelay);
+
+        clock.Advance(TimeSpan.FromHours(3));
+        Assert.Equal(UnlockState.Ready, machine.CurrentState);
+    }
+
+    [Fact]
+    public void SetDelay_WhilePending_Throws()
+    {
+        var machine = NewMachine();
+        machine.RequestUnlock();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => machine.SetDelay(TimeSpan.FromHours(1)));
+        Assert.Contains("Pending", ex.Message);
+        Assert.Equal(UnlockStateMachine.DefaultUnlockDelay, machine.UnlockDelay);
+    }
+
+    [Fact]
+    public void SetDelay_WhileReady_Throws()
+    {
+        var machine = NewMachine();
+        machine.RequestUnlock();
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
+
+        Assert.Throws<InvalidOperationException>(() => machine.SetDelay(TimeSpan.FromHours(1)));
+    }
+
+    [Fact]
+    public void SetDelay_WhileAdminActive_Throws()
+    {
+        var machine = NewMachine();
+        machine.RequestUnlock();
+        clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
+        machine.EnterAdminMode();
+
+        Assert.Throws<InvalidOperationException>(() => machine.SetDelay(TimeSpan.FromHours(1)));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(59)]
+    [InlineData(7 * 24 * 60 + 1)]
+    public void SetDelay_OutsideBounds_Throws(int minutes)
+    {
+        var machine = NewMachine();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => machine.SetDelay(TimeSpan.FromMinutes(minutes)));
+        Assert.Equal(UnlockStateMachine.DefaultUnlockDelay, machine.UnlockDelay);
+    }
+
+    [Fact]
+    public void SetDelay_AtBounds_IsAccepted()
+    {
+        var machine = NewMachine();
+
+        machine.SetDelay(UnlockStateMachine.MinimumUnlockDelay);
+        Assert.Equal(TimeSpan.FromHours(1), machine.UnlockDelay);
+
+        machine.SetDelay(UnlockStateMachine.MaximumUnlockDelay);
+        Assert.Equal(TimeSpan.FromDays(7), machine.UnlockDelay);
+    }
+
+    [Fact]
+    public void Delay_SurvivesExportAndRestore()
+    {
+        var machine = NewMachine();
+        machine.SetDelay(TimeSpan.FromHours(2));
+
+        var restored = new UnlockStateMachine(clock, machine.Export());
+
+        Assert.Equal(TimeSpan.FromHours(2), restored.UnlockDelay);
+    }
+
+    [Fact]
+    public void PersistedDataWithoutDelay_FallsBackToDefault()
+    {
+        var persisted = new UnlockData(UnlockState.Locked, TimeSpan.Zero, clock.UtcNow, null);
+
+        var restored = new UnlockStateMachine(clock, persisted);
+
+        Assert.Equal(UnlockStateMachine.DefaultUnlockDelay, restored.UnlockDelay);
     }
 }
