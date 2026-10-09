@@ -39,7 +39,7 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void SpecsCoverAllApps()
     {
-        Assert.Equal(7, IconSpecs.All.Count);
+        Assert.Equal(8, IconSpecs.All.Count);
 
         // Counted by where the resources land, not by what the app is called. The
         // phase renames rebrand one head at a time — Launcher became Flyleaf, Audio
@@ -50,6 +50,30 @@ public class AdaptiveIconRendererTests : IDisposable
         Assert.Contains(IconSpecs.All, s => s.App == "Folio" && s.Name == "appicon");
         Assert.Contains(IconSpecs.All, s => s.App == "Foreword" && s.Name == "ic_launcher");
         Assert.Contains(IconSpecs.All, s => s.App == "Index" && s.Name == "appicon");
+        Assert.Contains(IconSpecs.All, s => s.App == "Pulp" && s.Name == "appicon");
+    }
+
+    // D266/D267: Pulp's icon is the den painting filling the mask — no keyline, no amber border —
+    // set at the shared full-bleed inset so the round mask still holds the screen and the popcorn
+    // together; the shelf cover is the same painting on the amber cloth.
+    [Fact]
+    public void PulpIsTheDenPaintingFullBleedWithNoKeyline()
+    {
+        var pulp = Assert.Single(IconSpecs.All, s => s.App == "Pulp");
+        Assert.Equal("Pulp/Pulp.Android/Resources", pulp.ResourceRoot);
+        Assert.Equal("Branding/pulp-cover.jpg", pulp.PlateImage);
+        Assert.Equal(Glyphs.FullBleedInset, pulp.PlateInset);
+        Assert.Equal(Tokens.PulpClothHex, pulp.BackgroundHex);
+        Assert.Equal("FocusPhone/Flyleaf.Android/Resources/drawable/cover_pulp.png", pulp.CoverImage);
+
+        // Nothing drawn over the art: the glyph leaves a blank canvas blank.
+        using var bitmap = new SKBitmap(64, 64);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.Transparent);
+            pulp.Glyph(canvas, 64);
+        }
+        Assert.All(bitmap.Pixels, pixel => Assert.Equal(0, pixel.Alpha));
     }
 
     // A spec with painted artwork reads it from the repo, so a scratch root needs a
@@ -358,9 +382,10 @@ public class AdaptiveIconRendererTests : IDisposable
         // the point: it was counting the terracotta dot on Glyphs.Lens, the pre-rebrand Camera
         // icon in an accent P4 retired. DESIGN.md §12 says a cover carries "no single accent
         // detail", so a cover that still had one would be the bug. Index joined them the same
-        // way: its keyline and flourish are cream, not ink, and carry no terracotta at all.
+        // way: its keyline and flourish are cream, not ink, and carry no terracotta at all. Pulp
+        // draws nothing over its painting, so it has no line at all.
         foreach (var spec in IconSpecs.All.Where(
-            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio" or "Index")))
+            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio" or "Index" or "Pulp")))
         {
             using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);
