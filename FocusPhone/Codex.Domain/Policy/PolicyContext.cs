@@ -46,6 +46,14 @@ public record PolicyContext(
     // already covers it.
     public const string IndexPackage = "com.storyworthtelling.ledger";
 
+    // Folio, the manuscript-review app. Its package still says "storyboarder" — Canonizer's id,
+    // kept so installed copies upgrade in place. Named here because the shelf draws it cover-out.
+    public const string FolioPackage = "com.storyworthtelling.storyboarder";
+
+    // Pulp, the household's TV and film guide (P12). Frozen from its first build (PulpIdentity in
+    // Pulp.Domain holds the same value). Named here because the shelf draws it cover-out.
+    public const string PulpPackage = "com.storyworthtelling.pulp";
+
     public const string PlayStorePackage = "com.android.vending";
 
     // A protected system package: DevicePolicyManager.SetPackagesSuspended refuses to suspend

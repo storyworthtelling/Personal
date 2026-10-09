@@ -18,7 +18,7 @@ namespace Codex.Tests.Guard;
 ///
 /// <para>So the rule is stated over the whole suite rather than over the featured six, and an app
 /// with no art is named here rather than being indistinguishable from one that was forgotten.
-/// Giving Canonizer a cover means deleting a line from <see cref="NoArtYet"/>, which is a
+/// Giving a book its cover means deleting a line from <see cref="NoArtYet"/>, which is a
 /// decision somebody makes on purpose.</para>
 /// </summary>
 public class ShelfCoverArtTests
@@ -34,18 +34,18 @@ public class ShelfCoverArtTests
         (PolicyContext.AudioPackage, "Score"),
         (PolicyContext.ForewordPackage, "Foreword"),
         (PolicyContext.IndexPackage, "Index"),
-        ("com.storyworthtelling.storyboarder", "Canonizer"),
+        (PolicyContext.FolioPackage, "Folio"),
+        (PolicyContext.PulpPackage, "Pulp"),
     ];
 
     /// <summary>
     /// The apps with no painting yet. They fall back to the launcher icon on purpose, and that is
-    /// the one case where the fallback is honest. Canonizer has no cover art in <c>Branding/</c>;
+    /// the one case where the fallback is honest. Empty since P12: this list still named Folio as
+    /// "Canonizer, no art yet" long after IconStudio began writing <c>cover_folio.png</c> into
+    /// Flyleaf, so Folio's book showed its launcher icon with a painting sitting unused beside it.
     /// Index is the former Ledger app under the same package id, so there is no separate Ledger book.
     /// </summary>
-    private static readonly string[] NoArtYet =
-    [
-        "com.storyworthtelling.storyboarder",
-    ];
+    private static readonly string[] NoArtYet = [];
 
     /// <summary>
     /// Index is the old Ledger renamed in place, so the shelf's Index package is the id that phone
@@ -126,6 +126,8 @@ public class ShelfCoverArtTests
             _ when package == PolicyContext.AudioPackage => "AudioPackage",
             _ when package == PolicyContext.ForewordPackage => "ForewordPackage",
             _ when package == PolicyContext.IndexPackage => "IndexPackage",
+            _ when package == PolicyContext.FolioPackage => "FolioPackage",
+            _ when package == PolicyContext.PulpPackage => "PulpPackage",
             _ => null,
         };
 

@@ -152,6 +152,58 @@ public static class DesignTokens
         {
             public const string Cloth = "#4E5F3A";
         }
+
+        /// <summary>
+        /// Foreword — sunrise, OKLCH 47 degrees (P9). Flyleaf's shelf needs its BINDING: the light
+        /// ground tier, so the plate's marks invert to ink (Score's and Plate's construction).
+        /// Held identical to Storyworthtelling.Paper's AppIdentityTokens by a source-level parity
+        /// guard. Foreword had no chosen binding until P12 (D277): it fell through to the hash onto
+        /// the Problem role's deep tier, a maroon-brown the owner noticed on the shelf.
+        /// </summary>
+        public static class Foreword
+        {
+            public const string Fill = "#E8B99A";
+            public const string Ground = "#DFA277";
+            public const string Mark = "#CA662D";
+        }
+
+        /// <summary>
+        /// Folio — only the BINDING is needed here: the deep red cloth registered with its olive
+        /// ladder in IconStudio's Tokens.cs (FolioClothHex), deliberately not the olive itself.
+        /// Bound on the shelf from P12 (D277); before that Folio hashed onto a slate.
+        /// </summary>
+        public static class Folio
+        {
+            public const string Cloth = "#B32738";
+        }
+
+        /// <summary>
+        /// Pulp — amber, OKLCH 70 degrees (D275, superseding D202's marigold 63), chosen rather
+        /// than sampled, on the suite's shared lightness ladder with a mark chroma of 0.095.
+        ///
+        /// The marigold was found 16.3 degrees from Foreword's sunrise (47) by the app-to-app
+        /// guard, and no yellow-orange clears both Foreword (needs at least 67) and the caution
+        /// ochre (needs at most 65). Amber clears Foreword by at least 22.4 and Flyleaf's mark by
+        /// at least 28.7, and sits 14.3 from Caution: a RECORDED departure from §3's floor, like
+        /// Index's against Positive, made inert by the rule that Pulp draws no Caution on its own
+        /// pages. An amber cannot carry text on paper at its own brightness, so the text-bearing
+        /// tiers are browns of that hue and the bright amber lives on the CLOTH alone — a light
+        /// binding with the rule, flourishes and title in ink (6.72:1), which is Score's and
+        /// Plate's construction.
+        ///
+        /// The full ladder is here rather than only the cloth (as Index's is) because Pulp is a
+        /// cover-out sibling on Flyleaf's shelf and its screens take the ladder too; IconStudio's
+        /// Tokens.cs holds the same six values, checked by DesignTokensTests.
+        /// </summary>
+        public static class Pulp
+        {
+            public const string Fill = "#CCB8A2";
+            public const string Ground = "#BCA080";
+            public const string Mark = "#835618";
+            public const string Text = "#684414";
+            public const string Deep = "#493113";
+            public const string Cloth = "#F7AC4D";
+        }
     }
 
     /// <summary>

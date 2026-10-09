@@ -119,5 +119,8 @@ public static class SuiteVersionBands
         // (yearDigit + MMddHHmm, which reached ~609,060,000 in September 2026). Band 7 puts it
         // above that and lets it upgrade in place. Its display version is 2.0.x regardless.
         new("com.storyworthtelling.dailyloader", 7, 609_999_999),
+
+        // Pulp (P12) is a new package with nothing shipped before; band 9 is unused by any other app.
+        new("com.storyworthtelling.pulp", 9, 0),
     ];
 }

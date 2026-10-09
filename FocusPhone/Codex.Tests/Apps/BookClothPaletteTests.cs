@@ -11,8 +11,8 @@ public class BookClothPaletteTests
     public void ForPackage_IsStable_AcrossCalls()
     {
         Assert.Equal(
-            BookClothPalette.ForPackage("com.storyworthtelling.storyboarder"),
-            BookClothPalette.ForPackage("com.storyworthtelling.storyboarder"));
+            BookClothPalette.ForPackage("com.example.unbound"),
+            BookClothPalette.ForPackage("com.example.unbound"));
     }
 
     [Fact]
@@ -50,9 +50,10 @@ public class BookClothPaletteTests
     [Fact]
     public void For_AgreesWithForPackage()
     {
+        // An app with no chosen binding; a bound suite app deliberately disagrees with the hash.
         Assert.Equal(
-            BookClothPalette.ForPackage("com.storyworthtelling.storyboarder"),
-            BookClothPalette.For("com.storyworthtelling.storyboarder"));
+            BookClothPalette.ForPackage("com.example.unbound"),
+            BookClothPalette.For("com.example.unbound"));
     }
 
     // DESIGN.md §12: "Score's binding is cream linen with the rule, flourishes and
@@ -164,4 +165,64 @@ public class BookClothPaletteTests
         Assert.NotEqual(BookClothPalette.For(PolicyContext.IndexPackage), cloth);
         Assert.False(BookClothPalette.MarksInvertToInk(cloth));
     }
+
+    /// <summary>
+    /// Every suite app that ships an APK is a book somewhere on the shelf — the featured six at
+    /// the top, the sibling apps cover-out further down — and every one of them is bound in a
+    /// chosen cloth. The guard above only ever looked at the featured six, which is how Foreword
+    /// shipped hashed onto the Problem role's deep tier (a maroon-brown the owner noticed on the
+    /// shelf) and Folio onto a slate: neither is featured, so nothing checked them. The list is
+    /// read from PolicyContext's own package constants by reflection, so the next app is covered
+    /// the moment its package is named, not when somebody remembers this test.
+    /// </summary>
+    [Fact]
+    public void EverySuiteBookAnywhereOnTheShelfIsBoundDeliberately()
+    {
+        var suiteBooks = SuitePackagesNamedInPolicy()
+            .Where(package => package != PolicyContext.LauncherPackage)
+            .ToList();
+        Assert.True(suiteBooks.Count >= 7, "Expected the suite's books in PolicyContext; found " + suiteBooks.Count);
+
+        var hashed = suiteBooks.Where(package => !BookClothPalette.HasChosenBinding(package)).ToList();
+
+        Assert.True(hashed.Count == 0,
+            "These suite books fall through to the hash rather than a chosen binding: "
+            + string.Join(", ", hashed));
+    }
+
+    [Fact]
+    public void ForewordIsBoundInItsOwnLightSunriseWithInkMarks()
+    {
+        var cloth = BookClothPalette.ForPackage(PolicyContext.ForewordPackage);
+
+        Assert.Equal(DesignTokens.Identity.Foreword.Ground, cloth);
+        Assert.True(BookClothPalette.MarksInvertToInk(cloth));
+    }
+
+    [Fact]
+    public void FolioIsBoundInItsRegisteredDeepRedClothWithCreamMarks()
+    {
+        var cloth = BookClothPalette.ForPackage(PolicyContext.FolioPackage);
+
+        Assert.Equal(DesignTokens.Identity.Folio.Cloth, cloth);
+        Assert.False(BookClothPalette.MarksInvertToInk(cloth));
+    }
+
+    [Fact]
+    public void PulpIsBoundInItsAmberClothWithInkMarks()
+    {
+        var cloth = BookClothPalette.ForPackage(PolicyContext.PulpPackage);
+
+        Assert.Equal(DesignTokens.Identity.Pulp.Cloth, cloth);
+        Assert.True(BookClothPalette.MarksInvertToInk(cloth));
+    }
+
+    private static IEnumerable<string> SuitePackagesNamedInPolicy() =>
+        typeof(PolicyContext)
+            .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue()!)
+            .Where(value => value.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal)
+                            && value.Length > PolicyContext.OwnerPackagePrefix.Length)
+            .Distinct();
 }

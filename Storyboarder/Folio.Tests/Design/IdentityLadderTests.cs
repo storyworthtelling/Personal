@@ -56,6 +56,8 @@ public class IdentityLadderTests
         ("Post", "#494676"), ("Post", "#333252"),
         ("Plate", "#C8B5C8"), ("Plate", "#B69BB6"), ("Plate", "#7A4F7B"),
         ("Plate", "#613F62"), ("Plate", "#442D44"),
+        ("Pulp", "#CCB8A2"), ("Pulp", "#BCA080"), ("Pulp", "#835618"),
+        ("Pulp", "#684414"), ("Pulp", "#493113"),
     ];
 
     [Theory]

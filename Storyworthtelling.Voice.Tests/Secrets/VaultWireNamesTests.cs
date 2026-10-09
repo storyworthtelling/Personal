@@ -7,8 +7,8 @@ namespace Storyworthtelling.Voice.Tests.Secrets;
 /// <summary>
 /// The vault's JSON keys are its wire format, and they live on the owner's Drive.
 ///
-/// <para>There is no naming policy and no <c>[JsonPropertyName]</c> anywhere in the vault, so a
-/// C# property name <b>is</b> the key written to Drive. That makes every rename of a section a
+/// <para>There is no naming policy, and <c>[JsonPropertyName]</c> appears only where a section's
+/// wire name had to be pinned (Foreword's and Pulp's), so a C# property name <b>is</b> the key written to Drive. That makes every rename of a section a
 /// silent data loss: deserialisation looks for the new name, does not find it, and falls back to
 /// the record's default — empty strings — so the app comes up as though it had never been
 /// configured, on every phone at once. Nothing throws.</para>

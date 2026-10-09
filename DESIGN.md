@@ -115,6 +115,8 @@ Registered ladders (per-app `Design/DesignTokens.cs`, §19):
 | Plate | `#C8B5C8` | `#B69BB6` | `#7A4F7B` | `#613F62` | `#442D44` | — | 326° | problem, 50° |
 | Folio | `#C1C197` | `#919059` | `#6B681E` | `#575410` | `#3B3902` | `#B32738` | 107° | positive, 21° |
 | Index | `#B6C3A9` | `#839372` | `#596C45` | `#475735` | `#2F3C21` | `#4E5F3A` | 129° | positive, 0° |
+| Foreword | `#E8B99A` | `#DFA277` | `#CA662D` | — | — | — | 47° | caution, 29° |
+| Pulp | `#CCB8A2` | `#BCA080` | `#835618` | `#684414` | `#493113` | `#F7AC4D` | 70° | caution, 14° (recorded) |
 
 Flyleaf's three tiers predate the five-tier ladder and are **provisional** pending a resample.
 
@@ -129,7 +131,7 @@ check — which enumerates its apps by hand — simply did not know about them. 
 `IdentityLadderTests` now covers them, and adds the half the suite's copy never did: distance from
 every *other* app's committed identity, which is a different failure from crowding a role.
 
-*Index* is the suite's one departure the 20° floor itself does not survive. Its identity hue is
+*Index* is one of the suite's two departures the 20° floor itself does not survive (the other is Pulp's, below). Its identity hue is
 the bookplate cover's own green, sampled at **129°** — the same hue the Positive role sits at, a
 **0° separation** where the floor asks for 20°. It is recorded here rather than resampled or
 rotated because D116 makes the collision **inert rather than ambiguous**: Index draws no Positive
@@ -137,11 +139,30 @@ role anywhere on its own pages — a paid-off loan is Resolved (settled, crossed
 rather than shown Positive, and an under-limit budget line takes no colour at all — so there is
 nothing on an Index page a Positive-role green could be mistaken for. It is a single, named
 exception, for Index against Positive only; every other role, and every other app's identity,
-still has to clear 20° from Index. **`FocusPhone/Codex.Tests/Design/DesignTokensTests.cs` carries
-no exception mechanism today** — `IdentityTiersStayClearOfEverySemanticRole` is a flat assertion
-against every non-neutral role with no per-app or per-role exception list at all, so adding
-Index's named exception (guards G9/G10) means building that mechanism, not just adding an entry
-to one that already exists. That is Release B's work, not this one's.
+still has to clear 20° from Index. `IdentityTiersStayClearOfEverySemanticRole` gained a named exception list in P12
+(`RecordedRoleDepartures`, built for Pulp); Index's tiers are not yet in that guard, so its departure
+is recorded here in prose only.
+
+*Pulp* is chosen rather than sampled, and the sampling is why. The den painting on its cover
+measures warm, near **75°** — inside the band the caution ochre and Flyleaf's amber already hold.
+The owner first chose a contrast blue sampled from the painting's projected sky (D201), then a
+marigold at 63° (D202). Release A's app-against-app guard (`IdentitySeparationTests`) then found the
+marigold **16.3° from Foreword's sunrise (47°)** — an identity this table had omitted, which is how
+the gate's measurement missed it (Foreword's row is added above). **No yellow-orange clears both**
+Foreword (needs ≥ 67°) and the caution ochre (needs ≤ 65°). The owner chose **Amber, 70°** (D275):
+≥ 22.4° from Foreword's sunrise, ≥ 28.7° from Flyleaf's mark, clear of every other role and app — and
+**14.3° from Caution, the suite's second recorded departure**. Like Index's, it is made inert by a
+rule rather than tolerated: **Pulp draws no Caution on its own pages** (`Pulp.Tests`
+`NoCautionOnPulpPagesTests`), so nothing amber on a Pulp page can be read as "consider this"; the
+teen rating chip the gate drew in Caution takes the Reference slate instead (D276). The departure is
+named in `DesignTokensTests.RecordedRoleDepartures` and pinned by
+`PulpCautionDepartureStaysWhereItWasRecorded`, which fails if Pulp drifts closer to Caution or clears
+it. An amber cannot carry text on paper at its own brightness, so the text-bearing tiers are browns of
+that hue and the bright amber lives on the **cloth** (`#F7AC4D`) — a light binding with the rule,
+flourishes and title in ink (6.72:1), Score's and Plate's construction. The ladder is held identical
+in `Tools/IconStudio/Tokens.cs`, `Storyworthtelling.Paper/AppIdentityTokens.cs` and `Codex.Domain`
+`DesignTokens.Identity.Pulp`. Flyleaf's warm icon ground (61.5°) is ~8.5° away; no guard compares
+that tier between apps, so it is noted rather than recorded.
 
 ### Contrast (binding)
 
