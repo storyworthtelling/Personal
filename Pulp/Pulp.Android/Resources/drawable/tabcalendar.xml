@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Calendar: a page with its two rings. Drawn from mockup 01's SVG on its 26-unit grid; the stroke colour is a
+     placeholder the binder replaces with SetColorFilter (ink on cloth, the area's hue when active). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp" android:height="26dp"
+    android:viewportWidth="26" android:viewportHeight="26">
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="miter"
+      android:pathData="M6,6H20A2,2 0 0,1 22,8V20A2,2 0 0,1 20,22H6A2,2 0 0,1 4,20V8A2,2 0 0,1 6,6Z"/>
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="miter"
+      android:pathData="M4,11H22M9,3.5V8.5M17,3.5V8.5"/>
+</vector>
