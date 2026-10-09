@@ -11,6 +11,8 @@ public class UnlockStateMachine
     public static readonly TimeSpan DefaultUnlockDelay = TimeSpan.FromHours(6);
     public static readonly TimeSpan MinimumUnlockDelay = TimeSpan.FromHours(1);
     public static readonly TimeSpan MaximumUnlockDelay = TimeSpan.FromDays(7);
+    /// <summary>The delays the admin screen offers, in whole hours. Includes <see cref="DefaultUnlockDelay"/>.</summary>
+    public static readonly int[] DelayChoices = [1, 2, 3, 6, 12, 24, 48, 72, 168];
     public static readonly TimeSpan AdminDuration = TimeSpan.FromMinutes(60);
 
     private readonly IClock clock;
@@ -80,8 +82,9 @@ public class UnlockStateMachine
     }
 
     /// <summary>
-    /// Changes the delay for future requests. Refused unless Locked: changing it during a countdown
-    /// (or while admin mode is open) would let a running request be shortened or lengthened.
+    /// Changes the delay used by future requests. Refused while a request is in flight (Pending or
+    /// Ready): changing it then would shorten or lengthen a countdown the owner is already waiting out.
+    /// Allowed while Locked and while admin mode is open, since no request depends on it then.
     /// </summary>
     public void SetDelay(TimeSpan delay)
     {
@@ -91,10 +94,11 @@ public class UnlockStateMachine
             throw new ArgumentOutOfRangeException(nameof(delay),
                 $"The admin unlock delay must be between {MinimumUnlockDelay.TotalHours:0} hour and {MaximumUnlockDelay.TotalDays:0} days; got {delay.TotalMinutes:0} minutes.");
         }
-        if (storedState != UnlockState.Locked)
+        var state = EffectiveState();
+        if (state is UnlockState.Pending or UnlockState.Ready)
         {
             throw new InvalidOperationException(
-                $"Cannot change the admin unlock delay while in state {EffectiveState()}; it can only be changed while Locked.");
+                $"Cannot change the admin unlock delay while in state {state}; a request is already waiting on it.");
         }
         UnlockDelay = delay;
     }

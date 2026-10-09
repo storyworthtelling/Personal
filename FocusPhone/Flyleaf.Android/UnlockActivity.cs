@@ -95,9 +95,23 @@ public class UnlockActivity : Activity
         handler.PostDelayed(() =>
         {
             refreshScheduled = false;
-            Render();
+            // Redraw only when something on screen is moving, or the state changed. Rebuilding the admin
+            // page every second would dismiss an open delay dropdown; state changes still redraw here.
+            if (NeedsTickRedraw())
+            {
+                Render();
+            }
             ScheduleRefresh();
         }, 1000);
+    }
+
+    private bool NeedsTickRedraw()
+    {
+        var state = machine!.CurrentState;
+        return state != lastRenderedState
+            || state == UnlockState.Pending
+            || cutover!.IsRunning
+            || cutover.HasExpired;
     }
 
     private void Render()
@@ -128,9 +142,6 @@ public class UnlockActivity : Activity
             case UnlockState.Locked:
                 AddHeader("Locked");
                 AddBody($"Admin access requires a {machine.UnlockDelay.TotalHours:0}-hour delay. The countdown is visible and can be cancelled at any time.");
-                // The delay is only editable while Locked: a running countdown must not be shortened or
-                // lengthened, so the change is refused in every other state (UnlockStateMachine.SetDelay).
-                AddContentButton(PaperUi.SecondaryButton(this, "Change delay…", ShowDelayPrompt));
                 PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => Transition(machine.RequestUnlock)));
                 break;
 
@@ -164,6 +175,9 @@ public class UnlockActivity : Activity
     {
         AddHeader("Admin mode");
         AddBody("Session ends automatically after 60 minutes.");
+        var delayParams = MatchWrap();
+        delayParams.BottomMargin = PaperTheme.Dp(this, DesignTokens.Space.X3);
+        content!.AddView(DelayRow(), delayParams);
         AddContentButton(PaperUi.SecondaryButton(this, "Unblock apps…", ShowBlockedApps));
         AddContentButton(PaperUi.SecondaryButton(this, "Review policy log…", ShowPolicyLog));
         AddContentButton(PaperUi.SecondaryButton(this, "Set update token…", ShowUpdateTokenPrompt));
@@ -223,49 +237,54 @@ public class UnlockActivity : Activity
         PinActions(PaperUi.SecondaryButton(this, "Re-lock now", () => TransitionAndReapplyPolicy(machine!.Relock)));
     }
 
-    // Whole hours, matching how the delay is described on this screen. The bounds are the machine's
-    // (MinimumUnlockDelay..MaximumUnlockDelay); SetDelay enforces them, so an out-of-range entry is
-    // reported inline rather than trusted here.
-    private void ShowDelayPrompt()
+    // The delay is chosen on the admin page, not while Locked: a request in flight (Pending or Ready)
+    // refuses a change (UnlockStateMachine.SetDelay), and admin mode is the only state that can see it.
+    // The spinner is rebuilt on each admin render, with its selection set before its listener can fire,
+    // so the spurious first selection a Spinner reports on layout cannot write a value the owner never picked.
+    private LinearLayout DelayRow()
     {
-        var input = PaperUi.MonoField(this, "Hours, 1-168");
-        input.InputType = Android.Text.InputTypes.ClassNumber;
-        input.Text = ((int)machine!.UnlockDelay.TotalHours).ToString();
+        var current = Array.IndexOf(UnlockStateMachine.DelayChoices, (int)machine!.UnlockDelay.TotalHours);
+        var spinner = new Spinner(this);
+        spinner.Adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
+            UnlockStateMachine.DelayChoices.Select(DelayLabel).ToArray());
+        if (current >= 0)
+        {
+            spinner.SetSelection(current);
+        }
+        spinner.ItemSelected += (_, e) => OnDelayPicked(e.Position);
 
-        var fields = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        fields.SetPadding(
-            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X4),
-            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), 0);
-        fields.AddView(input);
-
-        new AlertDialog.Builder(this)
-            .SetTitle("Admin unlock delay")!
-            .SetView(fields)!
-            .SetPositiveButton("Save", (_, _) => SaveDelay(input.Text))!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+        row.AddView(PaperUi.Secondary(this, "Admin unlock delay"),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        row.AddView(spinner, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
+        return row;
     }
 
-    private void SaveDelay(string? text)
+    private static string DelayLabel(int hours) =>
+        hours % 24 == 0
+            ? $"{hours / 24} day{(hours == 24 ? string.Empty : "s")}"
+            : $"{hours} hour{(hours == 1 ? string.Empty : "s")}";
+
+    private void OnDelayPicked(int position)
     {
-        if (!int.TryParse(text, out var hours))
+        var hours = UnlockStateMachine.DelayChoices[position];
+        if (TimeSpan.FromHours(hours) == machine!.UnlockDelay)
         {
-            inlineStatus = "Enter a whole number of hours.";
-            Render();
             return;
         }
         try
         {
-            machine!.SetDelay(TimeSpan.FromHours(hours));
+            machine.SetDelay(TimeSpan.FromHours(hours));
         }
-        catch (ArgumentOutOfRangeException e)
+        catch (InvalidOperationException e)
         {
             inlineStatus = e.Message;
             Render();
             return;
         }
         store!.Save(machine);
-        inlineStatus = $"Admin unlock delay set to {hours} hour{(hours == 1 ? string.Empty : "s")}.";
+        inlineStatus = $"Admin unlock delay set to {DelayLabel(hours)}. It applies to the next request.";
         Render();
     }
 

@@ -273,14 +273,31 @@ public class UnlockStateMachineTests
     }
 
     [Fact]
-    public void SetDelay_WhileAdminActive_Throws()
+    public void SetDelay_WhileAdminActive_GovernsTheNextRequestAfterRelock()
     {
         var machine = NewMachine();
         machine.RequestUnlock();
         clock.Advance(UnlockStateMachine.DefaultUnlockDelay);
         machine.EnterAdminMode();
 
-        Assert.Throws<InvalidOperationException>(() => machine.SetDelay(TimeSpan.FromHours(1)));
+        machine.SetDelay(TimeSpan.FromHours(12));
+        machine.Relock();
+        machine.RequestUnlock();
+
+        Assert.Equal(TimeSpan.FromHours(12), machine.RemainingDelay);
+    }
+
+    [Fact]
+    public void DelayChoices_AreAllAcceptedAndIncludeTheDefault()
+    {
+        var machine = NewMachine();
+
+        Assert.Contains(UnlockStateMachine.DefaultUnlockDelay, UnlockStateMachine.DelayChoices.Select(h => TimeSpan.FromHours(h)));
+        foreach (var hours in UnlockStateMachine.DelayChoices)
+        {
+            machine.SetDelay(TimeSpan.FromHours(hours));
+            Assert.Equal(TimeSpan.FromHours(hours), machine.UnlockDelay);
+        }
     }
 
     [Theory]
