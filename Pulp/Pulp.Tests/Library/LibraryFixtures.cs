@@ -21,13 +21,13 @@ internal static class LibraryFixtures
     public static DateTimeOffset DaysAgo(double days) => Now.AddDays(-days);
 
     public static WatchEvent Episode(TitleId show, EpisodeRef episode, DateTimeOffset at) =>
-        new(show, WatchedKind.Show, at, Streamly, episode);
+        new(show, WatchedKind.Show, at, Streamly, episode, Ended: true);
 
     public static WatchEvent PartEpisode(TitleId show, EpisodeRef episode, DateTimeOffset at) =>
         new(show, WatchedKind.Show, at, Streamly, episode, StoppedAt: TimeSpan.FromMinutes(10), Runtime: TimeSpan.FromMinutes(50));
 
     public static WatchEvent FilmFinished(TitleId film, DateTimeOffset at) =>
-        new(film, WatchedKind.Film, at, Streamly);
+        new(film, WatchedKind.Film, at, Streamly, Ended: true);
 
     public static WatchEvent FilmStopped(TitleId film, DateTimeOffset at, int minute, int runtime) =>
         new(film, WatchedKind.Film, at, Streamly, StoppedAt: TimeSpan.FromMinutes(minute), Runtime: TimeSpan.FromMinutes(runtime));

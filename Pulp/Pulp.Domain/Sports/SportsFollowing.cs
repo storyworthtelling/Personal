@@ -3,6 +3,18 @@ using Pulp.Domain.Core;
 namespace Pulp.Domain.Sports;
 
 /// <summary>
+/// What a fixture is. A <see cref="Game"/> is one schedule game, named for its teams ("Away at
+/// Home"); a <see cref="ChampionshipLine"/> is the league's championship as the feed names it — its
+/// own name and date, never its teams — and is the only fixture a held league's postseason may put on
+/// a calendar (D239, D242).
+/// </summary>
+public enum FixtureKind
+{
+    Game,
+    ChampionshipLine,
+}
+
+/// <summary>
 /// An upcoming followed game or championship, with every adult who follows it (D60) — what the
 /// Calendar and the household Google calendar are built from.
 /// </summary>
@@ -13,7 +25,8 @@ public sealed record Fixture(
     DateTimeOffset StartsAt,
     GameStage Stage,
     string Channel,
-    IReadOnlyList<ViewerId> Followers);
+    IReadOnlyList<ViewerId> Followers,
+    FixtureKind Kind);
 
 /// <summary>
 /// Follows are per adult (D60); adding a team brings its whole league in (D67), so a league is
@@ -39,6 +52,12 @@ public static class SportsFollowing
     /// Every game after <paramref name="now"/> that some adult follows, plus each followed league's
     /// championship, labelled with its followers. A championship's followers are everyone following
     /// any team in that league.
+    ///
+    /// Schedule games — playoff and championship-stage ones included, every game of a final series
+    /// included — come back as <see cref="FixtureKind.Game"/>, named for their teams, so a held
+    /// league's calendar drops them all (D284). The feed's <see cref="Championship"/> comes back once
+    /// as <see cref="FixtureKind.ChampionshipLine"/> under its own name, standing in for the schedule
+    /// game that shares its id.
     /// </summary>
     public static IReadOnlyList<Fixture> Fixtures(
         IEnumerable<LeagueFeed> feeds, IReadOnlyCollection<SportsFollow> follows, DateTimeOffset now)
@@ -63,7 +82,7 @@ public static class SportsFollowing
                 if (followers.Count > 0)
                 {
                     fixtures.Add(new Fixture(
-                        game.Id, feed.League.Id, game.Name, game.StartsAt, game.Stage, game.Channel, followers));
+                        game.Id, feed.League.Id, game.Name, game.StartsAt, game.Stage, game.Channel, followers, FixtureKind.Game));
                 }
             }
 
@@ -77,7 +96,8 @@ public static class SportsFollowing
                     championship.StartsAt,
                     GameStage.Championship,
                     string.Empty,
-                    leagueFollowers));
+                    leagueFollowers,
+                    FixtureKind.ChampionshipLine));
             }
         }
 

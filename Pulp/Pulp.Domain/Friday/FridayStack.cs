@@ -1,4 +1,5 @@
 using Pulp.Domain.Core;
+using Pulp.Domain.People;
 
 namespace Pulp.Domain.Friday;
 
@@ -84,10 +85,12 @@ public sealed class FridayStack
     /// Builds the stack for the week containing <paramref name="now"/>. Vetoed titles are left out
     /// (D111), and so is anything the viewer has already watched — the stack is always something new
     /// (D282); the rest are ranked by the viewer's taste, ties by title id so a rebuild is stable.
-    /// A child gets an empty stack: no taste profile, so nothing to pick by (D23, D26).
+    /// A child gets an empty stack: no taste profile, so nothing to pick by (D23, D26). Whether the
+    /// viewer is a child is the <paramref name="roster"/>'s answer; a viewer not on it is refused.
     /// </summary>
     public static FridayStack Build(
-        StackViewer viewer,
+        ViewerId viewer,
+        HouseholdRoster roster,
         IEnumerable<StackCandidate> candidates,
         TasteProfile taste,
         VetoBook vetoes,
@@ -96,24 +99,25 @@ public sealed class FridayStack
         DateTimeOffset now,
         TimeZoneInfo zone)
     {
-        ArgumentNullException.ThrowIfNull(viewer);
+        ArgumentNullException.ThrowIfNull(roster);
         ArgumentNullException.ThrowIfNull(candidates);
         ArgumentNullException.ThrowIfNull(taste);
         ArgumentNullException.ThrowIfNull(vetoes);
         ArgumentNullException.ThrowIfNull(alreadyWatched);
         ArgumentNullException.ThrowIfNull(sizes);
 
-        if (vetoes.Viewer != viewer.Id)
+        var isChild = roster.IsChild(viewer);
+        if (vetoes.Viewer != viewer)
         {
             throw new ArgumentException(
-                $"The vetoes are {vetoes.Viewer}'s, not {viewer.Id}'s; vetoes are per viewer (D111).", nameof(vetoes));
+                $"The vetoes are {vetoes.Viewer}'s, not {viewer}'s; vetoes are per viewer (D111).", nameof(vetoes));
         }
 
         var turnover = FridayTurnover.Current(now, zone);
         var until = FridayTurnover.Next(now, zone);
-        if (viewer.IsChild)
+        if (isChild)
         {
-            return new FridayStack(viewer.Id, turnover, until, [], [], new HashSet<TitleId>());
+            return new FridayStack(viewer, turnover, until, [], [], new HashSet<TitleId>());
         }
 
         var ranked = candidates
@@ -124,7 +128,7 @@ public sealed class FridayStack
             .ToList();
 
         return new FridayStack(
-            viewer.Id,
+            viewer,
             turnover,
             until,
             Pick(ranked, TitleKind.Film, sizes),

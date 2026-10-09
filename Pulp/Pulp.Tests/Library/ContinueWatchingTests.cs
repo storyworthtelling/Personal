@@ -114,7 +114,7 @@ public class ContinueWatchingTests
     [Fact]
     public void AFilmMarkedWatchedByHandLeaves()
     {
-        var marked = new WatchEvent(Tidewater, WatchedKind.Film, DaysAgo(1), null, Evidence: WatchSource.Manual,
+        var marked = new WatchEvent(Tidewater, WatchedKind.Film, DaysAgo(1), null, Evidence: WatchSource.MarkedWatched,
             StoppedAt: TimeSpan.FromMinutes(5), Runtime: TimeSpan.FromMinutes(90));
 
         Assert.Empty(ContinueWatching.Build([FilmStopped(Tidewater, DaysAgo(2), 5, 90), marked], [], Now));

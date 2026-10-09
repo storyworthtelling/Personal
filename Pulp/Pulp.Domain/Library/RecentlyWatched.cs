@@ -1,13 +1,18 @@
 using Pulp.Domain.Core;
+using Pulp.Domain.Watching;
 
 namespace Pulp.Domain.Library;
 
-/// <summary>How a film's last sitting ended, which is what its row says (mockup 5).</summary>
+/// <summary>
+/// How a film stands, which is what its row says (mockup 5) — read off <see cref="Watched.Decide"/>'s
+/// verdict, so a mark by hand either way says so (D278).
+/// </summary>
 public enum FilmEnding
 {
     Finished,
     Stopped,
     MarkedWatched,
+    MarkedUnwatched,
 }
 
 public sealed record RecentRow(
@@ -40,6 +45,7 @@ public static class RecentlyWatched
             .Where(e => e.Kind != WatchedKind.Game)
             .GroupBy(e => e.Title)
             .Select(sittings => Row(sittings.OrderBy(e => e.At).ToList(), episodeCounts))
+            .OfType<RecentRow>()
             .ToList();
 
         return rows
@@ -53,24 +59,31 @@ public static class RecentlyWatched
             .ToList();
     }
 
-    private static RecentRow Row(IReadOnlyList<WatchEvent> ordered, IReadOnlyDictionary<TitleId, int> episodeCounts)
+    private static RecentRow? Row(IReadOnlyList<WatchEvent> ordered, IReadOnlyDictionary<TitleId, int> episodeCounts)
     {
-        var last = ordered[^1];
+        // Marking unwatched is not a sitting: it changes how the title stands, not when it was last
+        // watched. A title with nothing but such marks was never watched and is not listed.
+        var last = ordered.LastOrDefault(e => e.Evidence != WatchSource.MarkedUnwatched);
+        if (last is null)
+        {
+            return null;
+        }
+
         if (last.Kind == WatchedKind.Film)
         {
-            var ending = last.Evidence == WatchSource.Manual
-                ? FilmEnding.MarkedWatched
-                : last.Completed ? FilmEnding.Finished : FilmEnding.Stopped;
-            var progress = ending == FilmEnding.Stopped ? ContinueWatching.Minutes(last) : null;
+            var verdict = Sittings.Verdict(ordered);
+            var ending = verdict.Reason switch
+            {
+                WatchedReason.MarkedWatched => FilmEnding.MarkedWatched,
+                WatchedReason.MarkedUnwatched => FilmEnding.MarkedUnwatched,
+                _ => verdict.IsWatched ? FilmEnding.Finished : FilmEnding.Stopped,
+            };
+            var progress = ending == FilmEnding.Stopped ? Sittings.Progress(ordered) : null;
             return new RecentRow(last.Title, TitleKind.Film, last.At, last.Service, LastEpisode: null, progress, ShowFinished: false, ending);
         }
 
-        var lastEpisode = ordered.LastOrDefault(e => e.Episode is not null)?.Episode;
-        var watchedCount = ordered
-            .Where(e => e.Episode is not null && e.Completed)
-            .Select(e => e.Episode!)
-            .Distinct()
-            .Count();
+        var lastEpisode = ordered.LastOrDefault(e => e.Episode is not null && e.Evidence != WatchSource.MarkedUnwatched)?.Episode;
+        var watchedCount = ContinueWatching.WatchedEpisodes(ordered).Count;
 
         var finished = false;
         ProgressMark? mark = null;

@@ -29,7 +29,7 @@ public class CalendarItemsTests
         new(new TitleId(title), title, TitleKind.Film, date, null, Northstar, playlists);
 
     private static Fixture Game(string id, DateTimeOffset at, GameStage stage, params ViewerId[] followers) =>
-        new(new GameId(id), Coastal, "Harbor Gulls at Ridge Foxes", at, stage, "Gridline TV", followers);
+        new(new GameId(id), Coastal, "Harbor Gulls at Ridge Foxes", at, stage, "Gridline TV", followers, FixtureKind.Game);
 
     private static PlannedViewing Plan(string id, DateOnly date, TimeOnly? time, params ViewerId[] viewers) =>
         new(id, new TitleId("the-majestic"), "The Majestic", date, time, viewers);
@@ -42,6 +42,8 @@ public class CalendarItemsTests
         new(episodes ?? [], releases ?? [], games ?? [], plans ?? []);
 
     private static readonly IReadOnlySet<LeagueId> NothingHeld = new HashSet<LeagueId>();
+    private static readonly IReadOnlyDictionary<ViewerId, IReadOnlySet<LeagueId>> NobodyHolds =
+        new Dictionary<ViewerId, IReadOnlySet<LeagueId>> { [Sam] = NothingHeld, [Alex] = NothingHeld };
 
     [Fact]
     public void EachKindOfSourceBecomesAnItem()
@@ -109,7 +111,7 @@ public class CalendarItemsTests
             [Episode("Saltmarsh", Today.AddDays(1), Sam), Episode("Quarry Road", Today.AddDays(1), Alex)],
             releases: [Release("Low Tide", Today.AddDays(2), new PlaylistShelf("Alex's own", Alex, Shared: false))]);
 
-        var items = CalendarItems.ForHousehold(sources, Today, Zone, NothingHeld);
+        var items = CalendarItems.ForHousehold(sources, Today, Zone, NobodyHolds);
 
         Assert.Equal([Alex], items.Single(item => item.Name == "Quarry Road").Whose);
         Assert.Equal([Sam], items.Single(item => item.Name == "Saltmarsh").Whose);
@@ -122,7 +124,7 @@ public class CalendarItemsTests
     {
         var sources = Sources([Episode("Saltmarsh", Today.AddDays(1), Sam), Episode("Saltmarsh", Today.AddDays(1), Alex)]);
 
-        var item = Assert.Single(CalendarItems.ForHousehold(sources, Today, Zone, NothingHeld));
+        var item = Assert.Single(CalendarItems.ForHousehold(sources, Today, Zone, NobodyHolds));
 
         Assert.Equal([Alex, Sam], item.Whose);
     }
@@ -184,29 +186,69 @@ public class CalendarItemsTests
     [Fact]
     public void AMovedDateKeepsItsKeySoTheEventMovesRatherThanDoubles()
     {
-        var before = Assert.Single(CalendarItems.ForHousehold(Sources([Episode("Saltmarsh", Today.AddDays(1), Sam)]), Today, Zone, NothingHeld));
-        var after = Assert.Single(CalendarItems.ForHousehold(Sources([Episode("Saltmarsh", Today.AddDays(3), Sam)]), Today, Zone, NothingHeld));
+        var before = Assert.Single(CalendarItems.ForHousehold(Sources([Episode("Saltmarsh", Today.AddDays(1), Sam)]), Today, Zone, NobodyHolds));
+        var after = Assert.Single(CalendarItems.ForHousehold(Sources([Episode("Saltmarsh", Today.AddDays(3), Sam)]), Today, Zone, NobodyHolds));
 
         Assert.Equal(before.Key, after.Key);
         Assert.NotEqual(before.When, after.When);
     }
 
     [Fact]
-    public void AHeldLeaguesRevealingGamesAreAbsentButItsChampionshipKeepsItsDate()
+    public void AHeldLeaguesRevealingGamesAreAbsentAndItsRegularSeasonStays()
     {
+        // The championship's own line is proved through SportsFollowing.Fixtures in
+        // HeldFixturesNameNoTeamsTests; a fixture hand-built here with a safe name proves nothing.
         var at = new DateTimeOffset(2026, 10, 12, 1, 0, 0, TimeSpan.Zero);
         var sources = Sources(games:
         [
             Game("playoff", at, GameStage.Playoffs, Sam),
+            Game("final", at.AddDays(1), GameStage.Championship, Sam),
             Game("regular", at, GameStage.RegularSeason, Sam),
-            new Fixture(new GameId("bowl"), Coastal, "The Coastal Bowl", at.AddDays(5), GameStage.Championship, string.Empty, [Sam]),
         ]);
 
         var held = new HashSet<LeagueId> { Coastal };
         var keys = CalendarItems.ForViewer(sources, Sam, Today, Zone, held).Select(item => item.Key).ToList();
 
-        Assert.Equal(["game:regular", "game:bowl"], keys);
+        Assert.Equal(["game:regular"], keys);
         Assert.Equal(3, CalendarItems.ForViewer(sources, Sam, Today, Zone, NothingHeld).Count);
+    }
+
+    [Fact]
+    public void OneAdultsHoldKeepsTheOtherAdultsSpoilerOffTheHouseholdCalendar()
+    {
+        // Sam is behind on the league; Alex is not, and follows the playoff game. The household
+        // calendar is printed for both, so Sam's hold must keep Alex's playoff fixture off it.
+        var at = new DateTimeOffset(2026, 10, 12, 1, 0, 0, TimeSpan.Zero);
+        var sources = Sources(games:
+        [
+            Game("playoff", at, GameStage.Playoffs, Alex),
+            Game("regular", at, GameStage.RegularSeason, Alex),
+        ]);
+
+        var heldByAdult = new Dictionary<ViewerId, IReadOnlySet<LeagueId>>
+        {
+            [Sam] = new HashSet<LeagueId> { Coastal },
+            [Alex] = new HashSet<LeagueId>(),
+        };
+
+        var keys = CalendarItems.ForHousehold(sources, Today, Zone, heldByAdult).Select(item => item.Key).ToList();
+
+        Assert.Equal(["game:regular"], keys);
+    }
+
+    [Fact]
+    public void TheHouseholdCalendarRefusesAFollowerWhoseHoldsItWasNotGiven()
+    {
+        // An adult missing from the holds is not "holding nothing": it is not knowing. Fail loudly.
+        var at = new DateTimeOffset(2026, 10, 12, 1, 0, 0, TimeSpan.Zero);
+        var sources = Sources(games: [Game("playoff", at, GameStage.Playoffs, Alex)]);
+        var heldByAdult = new Dictionary<ViewerId, IReadOnlySet<LeagueId>>
+        {
+            [Sam] = new HashSet<LeagueId> { Coastal },
+        };
+
+        var error = Assert.Throws<ArgumentException>(() => CalendarItems.ForHousehold(sources, Today, Zone, heldByAdult));
+        Assert.Contains("alex", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

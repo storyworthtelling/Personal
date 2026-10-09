@@ -25,6 +25,7 @@ public enum StartRefusal
     NotAHome,
     ServiceBlocked,
     ServiceNotAttested,
+    UnknownService,
 }
 
 public sealed record StartVerdict(StartRefusal Refusal, ViewerId? RefusedFor = null)
@@ -105,14 +106,19 @@ public static class ChildFilter
     /// <summary>
     /// Whether the children may start <paramref name="title"/> on <paramref name="service"/>: the title
     /// must be shown to all of them, the service must be one of its homes and blocked for none of them,
-    /// and the service must be attested or a kids-only app (D210, D44).
+    /// and the service must be attested or a kids-only app (D210, D44). The service is named by id and
+    /// read from <paramref name="catalogue"/>, so nothing a caller builds can claim to be kids-only.
     /// </summary>
     public static StartVerdict CanStart(
-        IReadOnlyCollection<ChildRules> children, TitleFacts title, StreamingService service, AttestedServices attested)
+        IReadOnlyCollection<ChildRules> children,
+        TitleFacts title,
+        ServiceId service,
+        ServiceCatalogue catalogue,
+        AttestedServices attested)
     {
         RequireChildren(children);
         ArgumentNullException.ThrowIfNull(title);
-        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(attested);
 
         var shown = DecideTogether(children, title);
@@ -121,27 +127,33 @@ public static class ChildFilter
             return new StartVerdict(StartRefusal.Hidden, shown.HiddenFor);
         }
 
-        if (!title.Homes.Contains(service.Id))
+        if (!title.Homes.Contains(service))
         {
             return new StartVerdict(StartRefusal.NotAHome);
         }
 
-        var blockedFor = children.FirstOrDefault(child => child.BlockedServices.Contains(service.Id));
+        var blockedFor = children.FirstOrDefault(child => child.BlockedServices.Contains(service));
         if (blockedFor is not null)
         {
             return new StartVerdict(StartRefusal.ServiceBlocked, blockedFor.Child);
         }
 
-        return attested.Covers(service)
+        if (catalogue.ById(service) is null)
+        {
+            return new StartVerdict(StartRefusal.UnknownService);
+        }
+
+        return attested.Covers(service, catalogue)
             ? new StartVerdict(StartRefusal.None)
             : new StartVerdict(StartRefusal.ServiceNotAttested);
     }
 
-    /// <summary>"Adults only" on a service no child may start titles on (D249).</summary>
-    public static ServiceBadge BadgeFor(StreamingService service, AttestedServices attested)
+    /// <summary>"Adults only" on a service no child may start titles on (D249), read from the catalogue.</summary>
+    public static ServiceBadge BadgeFor(ServiceId service, ServiceCatalogue catalogue, AttestedServices attested)
     {
+        ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(attested);
-        return attested.Covers(service) ? ServiceBadge.None : ServiceBadge.AdultsOnly;
+        return attested.Covers(service, catalogue) ? ServiceBadge.None : ServiceBadge.AdultsOnly;
     }
 
     private static bool IsBlocked(ChildRules child, TitleFacts title) =>

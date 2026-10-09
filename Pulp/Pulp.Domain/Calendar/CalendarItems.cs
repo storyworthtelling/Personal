@@ -13,8 +13,11 @@ namespace Pulp.Domain.Calendar;
 /// <item><see cref="ForHousehold"/> — the household Google calendar Foreword prints: everyone's,
 /// each labelled with whose it is (D147).</item>
 /// </list>
-/// A held league's revealing games are absent from both (D242); its championship keeps its date,
-/// under the championship's own name.
+/// A held league's revealing games — every playoff and championship-stage schedule game — are absent
+/// from both (D237, D242, D284); its championship keeps its date only through the feed's own
+/// championship line (<see cref="FixtureKind.ChampionshipLine"/>), under the championship's name and
+/// never its teams. Holds are per adult (D70), so the household calendar, which both adults read,
+/// holds a league when <i>any</i> adult is holding it.
 /// </summary>
 public static class CalendarItems
 {
@@ -29,12 +32,39 @@ public static class CalendarItems
         IReadOnlySet<LeagueId> heldLeagues) =>
         Build(sources, viewer, today, zone, heldLeagues);
 
+    /// <summary>
+    /// The household calendar. <paramref name="heldByAdult"/> is each adult's own held leagues; their
+    /// union is held, because one adult's spoiler printed on the shared calendar spoils the other.
+    /// Every adult who follows a game must have an entry (an empty set when they hold nothing): an
+    /// adult missing from it is not "holding nothing", it is not knowing, so it throws.
+    /// </summary>
     public static IReadOnlyList<CalendarItem> ForHousehold(
         CalendarSources sources,
         DateOnly today,
         TimeZoneInfo zone,
-        IReadOnlySet<LeagueId> heldLeagues) =>
-        Build(sources, null, today, zone, heldLeagues);
+        IReadOnlyDictionary<ViewerId, IReadOnlySet<LeagueId>> heldByAdult)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(heldByAdult);
+
+        var unknown = sources.Games
+            .SelectMany(game => game.Followers)
+            .Distinct()
+            .Where(follower => !heldByAdult.ContainsKey(follower))
+            .Select(follower => follower.Value)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (unknown.Count > 0)
+        {
+            throw new ArgumentException(
+                "The household calendar was not given the spoiler holds of every adult who follows a game; missing: "
+                + string.Join(", ", unknown) + ".",
+                nameof(heldByAdult));
+        }
+
+        var held = heldByAdult.Values.SelectMany(leagues => leagues).ToHashSet();
+        return Build(sources, null, today, zone, held);
+    }
 
     /// <summary>Groups items under their day: all-day items first, then by time.</summary>
     public static IReadOnlyList<CalendarDay> ByDay(IEnumerable<CalendarItem> items)
@@ -78,13 +108,17 @@ public static class CalendarItems
     }
 
     /// <summary>
-    /// D237/D242: a playoff fixture of a held league says who won the round before, so it is absent.
-    /// The championship stays (D239) — its line carries the championship's name, never its teams.
+    /// D237/D242/D284: a playoff or championship-stage game of a held league says who won the round
+    /// before, so it is absent — every game of a final series, not just the one the feed's
+    /// championship shares an id with. The championship stays (D239) only as its own
+    /// <see cref="FixtureKind.ChampionshipLine"/>, which carries the championship's name, never its
+    /// teams. Keyed on the kind, not the stage: a stage says when a game is, not whether its name is
+    /// safe to print.
     /// </summary>
     private static bool IsHeldBack(Fixture game, IReadOnlySet<LeagueId> heldLeagues) =>
         heldLeagues.Contains(game.League)
-        && SpoilerHold.Reveals(game.Stage)
-        && game.Stage != GameStage.Championship;
+        && game.Kind != FixtureKind.ChampionshipLine
+        && SpoilerHold.Reveals(game.Stage);
 
     private static CalendarItem FromEpisode(EpisodeRelease episode, TimeZoneInfo zone) => new(
         "episode:" + Lower(episode.Show.Value) + ":" + episode.Season + ":" + episode.Episode,

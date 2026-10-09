@@ -1,5 +1,6 @@
 using Pulp.Domain.Core;
 using Pulp.Domain.Friday;
+using Pulp.Domain.People;
 
 namespace Pulp.Tests.Friday;
 
@@ -12,8 +13,9 @@ public class TasteLearnerTests
     private static readonly ViewerId Sam = new("sam");
     private static readonly ViewerId Alex = new("alex");
     private static readonly ViewerId Kit = new("kit");
-    private static readonly StackViewer Owner = new(Sam, IsChild: false);
-    private static readonly HashSet<ViewerId> Children = [Kit];
+    private static readonly ViewerId Owner = Sam;
+    private static readonly HouseholdRoster Roster = new(
+        [new HouseholdViewer(Sam, IsChild: false), new HouseholdViewer(Alex, IsChild: false), new HouseholdViewer(Kit, IsChild: true)]);
 
     private static WatchedTitle Watched(string id, string tag, params ViewerId[] viewers) =>
         new(new TitleId(id), [tag], viewers);
@@ -21,7 +23,7 @@ public class TasteLearnerTests
     [Fact]
     public void WhatTheOwnerWatchesRaisesItsTags()
     {
-        var taste = TasteLearner.Learn(Owner, Children, [Watched("w-1", "noir", Sam)], VetoBook.For(Sam));
+        var taste = TasteLearner.Learn(Owner, Roster, [Watched("w-1", "noir", Sam)], VetoBook.For(Sam));
 
         Assert.True(taste.Affinity(["noir"]) > taste.Affinity(["space"]));
     }
@@ -31,14 +33,14 @@ public class TasteLearnerTests
     {
         var vetoes = VetoBook.For(Sam).Veto(new TitleId("v-1"), ["farce"]);
 
-        Assert.True(TasteLearner.Learn(Owner, Children, [], vetoes).Affinity(["farce"]) < 0);
-        Assert.Equal(0, TasteLearner.Learn(Owner, Children, [], vetoes.BringBack(new TitleId("v-1"))).Affinity(["farce"]));
+        Assert.True(TasteLearner.Learn(Owner, Roster, [], vetoes).Affinity(["farce"]) < 0);
+        Assert.Equal(0, TasteLearner.Learn(Owner, Roster, [], vetoes.BringBack(new TitleId("v-1"))).Affinity(["farce"]));
     }
 
     [Fact]
     public void AChildsViewingNeverCounts()
     {
-        var taste = TasteLearner.Learn(Owner, Children, [Watched("w-kid", "puppets", Kit)], VetoBook.For(Sam));
+        var taste = TasteLearner.Learn(Owner, Roster, [Watched("w-kid", "puppets", Kit)], VetoBook.For(Sam));
 
         Assert.Equal(0, taste.Affinity(["puppets"]));
     }
@@ -46,7 +48,7 @@ public class TasteLearnerTests
     [Fact]
     public void ViewingWithAChildPresentIsAChildsViewingTooAndDoesNotCount()
     {
-        var taste = TasteLearner.Learn(Owner, Children, [Watched("w-family", "puppets", Sam, Kit)], VetoBook.For(Sam));
+        var taste = TasteLearner.Learn(Owner, Roster, [Watched("w-family", "puppets", Sam, Kit)], VetoBook.For(Sam));
 
         Assert.Equal(0, taste.Affinity(["puppets"]));
     }
@@ -54,7 +56,7 @@ public class TasteLearnerTests
     [Fact]
     public void TheOtherAdultsViewingIsTheirsNotTheOwners()
     {
-        var taste = TasteLearner.Learn(Owner, Children, [Watched("w-alex", "rowing", Alex)], VetoBook.For(Sam));
+        var taste = TasteLearner.Learn(Owner, Roster, [Watched("w-alex", "rowing", Alex)], VetoBook.For(Sam));
 
         Assert.Equal(0, taste.Affinity(["rowing"]));
     }
@@ -63,9 +65,8 @@ public class TasteLearnerTests
     [Fact]
     public void TheOtherAdultLearnsTheirOwnTasteFromTheirOwnViewing()
     {
-        var alex = new StackViewer(Alex, IsChild: false);
         var taste = TasteLearner.Learn(
-            alex, Children, [Watched("w-alex", "rowing", Alex), Watched("w-sam", "noir", Sam)], VetoBook.For(Alex));
+            Alex, Roster, [Watched("w-alex", "rowing", Alex), Watched("w-sam", "noir", Sam)], VetoBook.For(Alex));
 
         Assert.True(taste.Affinity(["rowing"]) > 0);
         Assert.Equal(0, taste.Affinity(["noir"]));
@@ -74,9 +75,7 @@ public class TasteLearnerTests
     [Fact]
     public void AChildHasNoTasteProfileWhateverTheyWatch()
     {
-        var child = new StackViewer(Kit, IsChild: true);
-
-        var taste = TasteLearner.Learn(child, Children, [Watched("w-kid", "puppets", Kit)], VetoBook.For(Kit));
+        var taste = TasteLearner.Learn(Kit, Roster, [Watched("w-kid", "puppets", Kit)], VetoBook.For(Kit));
 
         Assert.Same(TasteProfile.Empty, taste);
     }
@@ -85,8 +84,35 @@ public class TasteLearnerTests
     public void ATitleWatchedTwiceCountsOnce()
     {
         var taste = TasteLearner.Learn(
-            Owner, Children, [Watched("w-1", "noir", Sam), Watched("w-1", "noir", Sam), Watched("w-2", "space", Sam)], VetoBook.For(Sam));
+            Owner, Roster, [Watched("w-1", "noir", Sam), Watched("w-1", "noir", Sam), Watched("w-2", "space", Sam)], VetoBook.For(Sam));
 
         Assert.Equal(taste.Affinity(["space"]), taste.Affinity(["noir"]));
     }
+
+    // S3: the child is on the roster, so a family sitting counts for nobody's taste — there is no
+    // second, loose set of children that could be stale or empty.
+    [Fact]
+    public void AFamilySittingCountsForNobodysTasteWhenTheChildIsOnTheRoster()
+    {
+        var family = Watched("w-family", "puppets", Sam, Alex, Kit);
+
+        Assert.Equal(0, TasteLearner.Learn(Sam, Roster, [family], VetoBook.For(Sam)).Affinity(["puppets"]));
+        Assert.Equal(0, TasteLearner.Learn(Alex, Roster, [family], VetoBook.For(Alex)).Affinity(["puppets"]));
+    }
+
+    // S3: a viewer nobody has said is an adult is refused, not treated as one.
+    [Fact]
+    public void AViewerNotOnTheRosterIsRefused()
+    {
+        var stranger = new ViewerId("guest-example");
+
+        Assert.Throws<ArgumentException>(() =>
+            TasteLearner.Learn(stranger, Roster, [Watched("w-1", "noir", stranger)], VetoBook.For(stranger)));
+    }
+
+    // S3: an unlisted co-viewer may be a child nobody added; the sitting is refused rather than counted.
+    [Fact]
+    public void ASittingWithAViewerNotOnTheRosterIsRefused() =>
+        Assert.Throws<ArgumentException>(() =>
+            TasteLearner.Learn(Sam, Roster, [Watched("w-1", "puppets", Sam, new ViewerId("guest-example"))], VetoBook.For(Sam)));
 }

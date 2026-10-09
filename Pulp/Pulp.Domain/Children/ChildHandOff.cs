@@ -8,7 +8,9 @@ public sealed record ChildHandOffResult(StartVerdict Verdict, HandOffIntent? Int
 /// <summary>
 /// The hand-off for a child, or for a group with a child in it (G13). The gate is asked first and the
 /// intent is built only on a yes, so a refusal — above all an unattested service (D210) — leaves
-/// nothing behind that a later step could send.
+/// nothing behind that a later step could send. The service is the link's, resolved from the
+/// catalogue: whether it is kids-only and which package the intent is aimed at both come from the
+/// catalogue entry, never from a record the caller built.
 /// </summary>
 public static class ChildHandOff
 {
@@ -16,11 +18,12 @@ public static class ChildHandOff
         IReadOnlyCollection<ChildRules> children,
         TitleFacts title,
         HandOffLink link,
-        StreamingService service,
+        ServiceCatalogue catalogue,
         AttestedServices attested)
     {
         ArgumentNullException.ThrowIfNull(title);
         ArgumentNullException.ThrowIfNull(link);
+        ArgumentNullException.ThrowIfNull(catalogue);
         if (!link.Title.Equals(title.Id))
         {
             throw new ArgumentException(
@@ -28,9 +31,15 @@ public static class ChildHandOff
                 nameof(link));
         }
 
-        var verdict = ChildFilter.CanStart(children, title, service, attested);
-        return verdict.MayStart
-            ? new ChildHandOffResult(verdict, HandOff.For(link, service))
-            : new ChildHandOffResult(verdict, null);
+        var verdict = ChildFilter.CanStart(children, title, link.Service, catalogue, attested);
+        if (!verdict.MayStart)
+        {
+            return new ChildHandOffResult(verdict, null);
+        }
+
+        var entry = catalogue.ById(link.Service)
+            ?? throw new InvalidOperationException(
+                $"The gate allowed '{link.Service}' but the catalogue has no entry for it; the gate refuses unknown services.");
+        return new ChildHandOffResult(verdict, HandOff.For(link, entry));
     }
 }
