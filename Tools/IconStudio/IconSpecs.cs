@@ -107,5 +107,14 @@ public static class IconSpecs
         new("Index", "Ledger/Ledger.Android/Resources", "appicon", true, Glyphs.IndexPlate,
             Tokens.IndexClothHex, PlateImage: "Branding/index-cover.png",
             CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_index.png"),
+        // Pulp's icon IS its cover (D200, D266, D267): the den — the cliffhanger projected on a
+        // screen, the popcorn on the table in front — filling the mask with no keyline and no amber
+        // border. Set at the shared full-bleed inset rather than at zero, because the painting is
+        // portrait and the mask keeps only the middle two-thirds: at zero the popcorn falls out of
+        // the circle, and D266 is that the crop holds the screen and the popcorn together. The
+        // amber cloth is the ground a launcher shows during its parallax, and the shelf binding.
+        new("Pulp", "Pulp/Pulp.Android/Resources", "appicon", true, Glyphs.PulpPlate,
+            Tokens.PulpClothHex, PlateImage: "Branding/pulp-cover.jpg",
+            CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_pulp.png"),
     ];
 }

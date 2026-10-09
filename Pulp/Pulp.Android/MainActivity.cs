@@ -17,8 +17,7 @@ namespace Pulp;
 /// so a later rename of this class or namespace cannot move it (guarded by
 /// <c>PulpInvariantsTests</c>).</para>
 ///
-/// <para>No launcher icon yet: IconStudio generates it later in Release A, so no
-/// <c>Icon</c> is named here and the platform default stands until then.</para>
+/// <para>The launcher icon is named once, on <see cref="PulpApplication"/>.</para>
 /// </summary>
 [Activity(
     Name = PulpIdentity.MainActivityName,
