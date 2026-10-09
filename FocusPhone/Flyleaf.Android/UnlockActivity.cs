@@ -237,18 +237,26 @@ public class UnlockActivity : Activity
         PinActions(PaperUi.SecondaryButton(this, "Re-lock now", () => TransitionAndReapplyPolicy(machine!.Relock)));
     }
 
-    // The delay is typed on the admin page, not while Locked: a request in flight (Pending or Ready)
+    // The delay is entered on the admin page, not while Locked: a request in flight (Pending or Ready)
     // refuses a change (UnlockStateMachine.SetDelay), and admin mode is the only state that can see it.
-    // Free text, so any whole number with a unit works: "1 hour", "10 days", "2 weeks", "25 months".
+    // An amount box and a unit dropdown, so any whole number works: 1 hours, 10 days, 25 months.
     private LinearLayout DelayRow()
     {
-        var input = PaperUi.MonoField(this, "e.g. 10 days, 25 months");
-        input.Text = UnlockDelayText.Format(machine!.UnlockDelay);
+        var (amount, unit) = UnlockDelayText.Largest(machine!.UnlockDelay);
+        var amountInput = PaperUi.MonoField(this, "Amount");
+        amountInput.InputType = Android.Text.InputTypes.ClassNumber;
+        amountInput.Text = amount.ToString();
+
+        var units = new[] { "hours", "days", "weeks", "months" };
+        var unitSpinner = new Spinner(this);
+        unitSpinner.Adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem, units);
+        unitSpinner.SetSelection(Array.IndexOf(units, unit));
 
         var entry = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         entry.SetGravity(GravityFlags.CenterVertical);
-        entry.AddView(input, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        entry.AddView(PaperUi.SecondaryButton(this, "Set", () => SaveDelay(input.Text)));
+        entry.AddView(amountInput, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        entry.AddView(unitSpinner, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
+        entry.AddView(PaperUi.SecondaryButton(this, "Set", () => SaveDelay($"{amountInput.Text} {units[unitSpinner.SelectedItemPosition]}")));
 
         var row = new LinearLayout(this) { Orientation = Orientation.Vertical };
         row.AddView(PaperUi.Secondary(this, "Admin unlock delay"));
