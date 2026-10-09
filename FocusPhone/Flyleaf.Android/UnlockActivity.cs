@@ -127,7 +127,10 @@ public class UnlockActivity : Activity
         {
             case UnlockState.Locked:
                 AddHeader("Locked");
-                AddBody($"Admin access requires a {UnlockStateMachine.UnlockDelay.TotalHours:0}-hour delay. The countdown is visible and can be cancelled at any time.");
+                AddBody($"Admin access requires a {machine.UnlockDelay.TotalHours:0}-hour delay. The countdown is visible and can be cancelled at any time.");
+                // The delay is only editable while Locked: a running countdown must not be shortened or
+                // lengthened, so the change is refused in every other state (UnlockStateMachine.SetDelay).
+                AddContentButton(PaperUi.SecondaryButton(this, "Change delay…", ShowDelayPrompt));
                 PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => Transition(machine.RequestUnlock)));
                 break;
 
@@ -218,6 +221,52 @@ public class UnlockActivity : Activity
         // Re-locking is what re-suspends Chrome; reapply immediately rather than leaving it
         // runnable until some unrelated trigger reapplies policy.
         PinActions(PaperUi.SecondaryButton(this, "Re-lock now", () => TransitionAndReapplyPolicy(machine!.Relock)));
+    }
+
+    // Whole hours, matching how the delay is described on this screen. The bounds are the machine's
+    // (MinimumUnlockDelay..MaximumUnlockDelay); SetDelay enforces them, so an out-of-range entry is
+    // reported inline rather than trusted here.
+    private void ShowDelayPrompt()
+    {
+        var input = PaperUi.MonoField(this, "Hours, 1-168");
+        input.InputType = Android.Text.InputTypes.ClassNumber;
+        input.Text = ((int)machine!.UnlockDelay.TotalHours).ToString();
+
+        var fields = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        fields.SetPadding(
+            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X4),
+            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), 0);
+        fields.AddView(input);
+
+        new AlertDialog.Builder(this)
+            .SetTitle("Admin unlock delay")!
+            .SetView(fields)!
+            .SetPositiveButton("Save", (_, _) => SaveDelay(input.Text))!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    private void SaveDelay(string? text)
+    {
+        if (!int.TryParse(text, out var hours))
+        {
+            inlineStatus = "Enter a whole number of hours.";
+            Render();
+            return;
+        }
+        try
+        {
+            machine!.SetDelay(TimeSpan.FromHours(hours));
+        }
+        catch (ArgumentOutOfRangeException e)
+        {
+            inlineStatus = e.Message;
+            Render();
+            return;
+        }
+        store!.Save(machine);
+        inlineStatus = $"Admin unlock delay set to {hours} hour{(hours == 1 ? string.Empty : "s")}.";
+        Render();
     }
 
     private void ShowBlockedApps()
