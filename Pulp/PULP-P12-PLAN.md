@@ -170,6 +170,21 @@ report what can't be built as drawn". A subagent never pushes, never opens a PR,
 
 ### Release C — the phone, core screens
 
+**Wave 1 (foundations, before any screen):** the data clients, the shell, the voice list and the
+hand-off executor, in disjoint folders. *Added at Release C:* the plan had no step for the four
+data clients the screens read, so they land here.
+
+- **[L3]** `Pulp.Infrastructure` clients — Streaming Availability (titles, offers, deep links,
+  expiry, posters, `/changes`), TVmaze (air dates), OMDb (the rating code only), YouTube Data
+  (trailer ids) — each over `HttpClient`, keys read live from the vault section, faked in tests,
+  reporting credential health; mapped into a `Pulp.Domain/Catalogue` model. **No TMDB** (G7).
+- **[L2]** The shell: `PulpActivity` over `BinderFrame` with the six areas of mockup 01 (Watching,
+  Playlists, Discover, Sports, Calendar, Settings), area hues per DESIGN.md §9 with an area-hue
+  guard, and the pinned bottom bar.
+
+**Wave 2:** the screens below, each from its mockup.
+
+
 All UI **[L2]**, each with its mockup embedded; components from `Codex.Ui.Android` (BinderFrame,
 ArtworkWindow, ActionCard, AccordionPicker, Checkbox, DogEar, FilterField, WaitingActivity).
 
@@ -206,8 +221,9 @@ ArtworkWindow, ActionCard, AccordionPicker, Checkbox, DogEar, FilterField, Waiti
 
 ### Release F — the three cross-app contracts
 
-- **[L3]** Pulp → Index usage (D90, D269–D271): `com.storyworthtelling.index.UsageReceiver`,
-  signature permission `…index.RECEIVE_USAGE`, Index's line under a matching charge (mockup 15).
+- **[L3]** Pulp → Index usage (D90, D269–D271): `com.storyworthtelling.ledger.UsageReceiver` (Index kept the
+  Ledger package id so it upgrades in place — `IndexHandoff.Package`), signature permission
+  `…ledger.RECEIVE_USAGE`, Index's line under a matching charge (mockup 15).
   Contract tests on both sides (`IndexHandoffContractTests` pattern). **G16.**
 - **[L3]** Pulp → Flyleaf hidden apps (D8, D92, D93): Flyleaf's receiver persists the set and its
   tray excludes it; `PolicyContext.PulpPackage`; Pulp's cover-out book on the sibling shelf (D91).
