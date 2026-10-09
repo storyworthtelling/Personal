@@ -48,4 +48,14 @@ public class HandOffNoticeTests
     [Fact]
     public void AMisLandingNoticeNamesTheService() =>
         Assert.Contains("Exampleflix", HandOffNotice.LandedElsewhere("Exampleflix"));
+
+    // D286: nothing played after the hand-off — a hedged sentence, never an alarm.
+    [Fact]
+    public void ANotSeenNoticeNamesTheServiceAndHedges()
+    {
+        var notice = HandOffNotice.NotSeen("Exampleflix");
+
+        Assert.Contains("Exampleflix", notice);
+        Assert.Contains("may not", notice);
+    }
 }

@@ -231,6 +231,21 @@ ArtworkWindow, ActionCard, AccordionPicker, Checkbox, DogEar, FilterField, Waiti
 - **[L3]** Flyleaf → Pulp playback sessions (finding §2.3): Flyleaf's existing listener forwards
   sessions for the packages Pulp named, signature permission `…pulp.RECEIVE_SESSIONS`. **G18.**
 
+### Release G — the locked hand-off (D288)
+
+Added after Release C wave 1, from the watch-journey feasibility study (browser or automated
+playback ruled out: every surveyed service's terms ban automated access, Netflix has no Android
+web player, and Playwright does not run on the phone).
+
+- **[L3]** Pulp → Flyleaf "open locked" request over a signature-guarded broadcast; Flyleaf adds the
+  service's package to the lock task allowlist and starts the deep link in lock task mode, with Home
+  kept as the way out (Flyleaf is Home). **POLICY ENFORCEMENT REVISIT** of the lockdown first.
+- **[L3]** Release: Home, a long pause, the title ending or a title change (from the session relay,
+  Release F) ends lock task and brings Pulp forward; Pulp records progress or marks it watched.
+- **[L3]** Children: only attested or kids-only services (G13 unchanged); lock task keeps them in.
+- **Device-only:** each app's behaviour under lock task, incoming calls, where each deep link lands,
+  and whether each app publishes its position. Nothing here is provable off the phone.
+
 ---
 
 ## 4. The guard ledger

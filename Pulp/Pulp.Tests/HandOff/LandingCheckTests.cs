@@ -7,7 +7,8 @@ namespace Pulp.Tests.HandOff;
 /// D122 — did the deep link land on the title, or on the app's home or another title? Told by the
 /// playing app's media session (finding §2.4), which arrives later through Flyleaf's relay or Pulp's own
 /// listener (Release F), so the check takes the sessions as input. Where the app publishes no title the
-/// check says so — Unknown — rather than guess; only a session for another title is a mis-landing.
+/// check says so — Unknown — rather than guess; only a session for another title is a mis-landing, and
+/// no session at all once the window closes is NotSeen, which the dog-ear mentions quietly (D286).
 /// </summary>
 public class LandingCheckTests
 {
@@ -87,12 +88,13 @@ public class LandingCheckTests
     }
 
     [Fact]
-    public void NoSessionAtAllIsUnknownNotAMisLanding()
+    public void NoSessionAtAllOnceTheWindowClosesIsNotSeen()
     {
-        // A title page that does not autoplay publishes nothing; that is not evidence of a wrong landing.
+        // D286: silence from the service's app is worth a quiet "may not have landed" in the dog-ear —
+        // the owner chose a possible false alarm over a missed wrong landing.
         var verdict = LandingCheck.Decide(Pending(), [], TestCatalogue, Later);
 
-        Assert.Equal(new LandingVerdict(Landing.Unknown, LandingReason.NoSessionSeen), verdict);
+        Assert.Equal(new LandingVerdict(Landing.NotSeen, LandingReason.NoSessionSeen), verdict);
     }
 
     [Fact]
@@ -116,7 +118,7 @@ public class LandingCheckTests
 
         var verdict = LandingCheck.Decide(Pending(), sessions, TestCatalogue, Later);
 
-        Assert.Equal(new LandingVerdict(Landing.Unknown, LandingReason.NoSessionSeen), verdict);
+        Assert.Equal(new LandingVerdict(Landing.NotSeen, LandingReason.NoSessionSeen), verdict);
     }
 
     [Fact]
