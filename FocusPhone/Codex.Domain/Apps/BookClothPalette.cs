@@ -59,7 +59,22 @@ public static class BookClothPalette
             // Index: the deeper green of its identity hue, the one binding that is the identity
             // deepened rather than a contrast to the art. Dark, so the marks stay cream.
             [PolicyContext.IndexPackage] = DesignTokens.Identity.Index.Cloth,
+
+            // Foreword: its own light sunrise ground, marks inverted to ink. Unbound until P12, when
+            // it was found hashed onto the Problem role's deep tier — a maroon-brown on the shelf.
+            [PolicyContext.ForewordPackage] = DesignTokens.Identity.Foreword.Ground,
+
+            // Folio: the deep red cloth its ladder registers, deliberately not its olive identity.
+            // Dark, so the marks stay cream. Unbound until P12 (hashed onto a slate).
+            [PolicyContext.FolioPackage] = DesignTokens.Identity.Folio.Cloth,
+
+            // Pulp: the amber cloth, the one place its bright identity lives. Light, so the marks
+            // invert to ink, as Score's and Plate's do.
+            [PolicyContext.PulpPackage] = DesignTokens.Identity.Pulp.Cloth,
         };
+
+    /// <summary>Whether the package was given a binding, rather than falling through to the hash.</summary>
+    public static bool HasChosenBinding(string package) => Bindings.ContainsKey(package);
 
     /// <summary>The cloth tone (a DesignTokens hex string) for a package — the binding it was
     /// given if it has one, otherwise a stable hash of the id.</summary>
