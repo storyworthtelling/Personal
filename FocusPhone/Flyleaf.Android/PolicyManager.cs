@@ -359,7 +359,9 @@ public static class PolicyManager
     private static void PinRestrictedBrowser(DevicePolicyManager dpm, ComponentName admin, Context context)
     {
         var browser = new ComponentName(context, Java.Lang.Class.FromType(typeof(RestrictedBrowserActivity)));
-        foreach (var scheme in new[] { "http", "https" })
+        // market:// is pinned here too, so the Play Store is never the handler for a Play link: the
+        // restricted browser refuses it and shows its Blocked notice instead.
+        foreach (var scheme in new[] { "http", "https", "market" })
         {
             var filter = new IntentFilter(Intent.ActionView);
             filter.AddCategory(Intent.CategoryDefault);
