@@ -12,8 +12,8 @@ public class VoiceClientTests
     private static readonly VoiceOptions Options = new()
     {
         ApiKey = "sk-test",
-        Model = "claude-sonnet-4-6",
-        FastModel = "claude-haiku-4-5-20251001"
+        Model = "claude-sonnet-5-5",
+        FastModel = "claude-haiku-5-5"
     };
 
     // Builds a non-streaming Anthropic Messages response carrying one text block.
@@ -54,7 +54,7 @@ public class VoiceClientTests
         Assert.Equal("sk-test", request.Headers.GetValues("x-api-key").Single());
 
         var body = handler.RequestBodies.Single();
-        Assert.Contains("claude-haiku-4-5-20251001", body); // cheap tier for the high-frequency compose
+        Assert.Contains("claude-haiku-5-5", body); // cheap tier for the high-frequency compose
         Assert.Contains("welcome", body);
     }
 
@@ -68,8 +68,8 @@ public class VoiceClientTests
             new MessageRequest("welcome", "returning user", HighVisibility: true), CancellationToken.None);
 
         var body = handler.RequestBodies.Single();
-        Assert.Contains("claude-sonnet-4-6", body); // a message the owner reads for its voice runs on the strong tier
-        Assert.DoesNotContain("claude-haiku-4-5-20251001", body);
+        Assert.Contains("claude-sonnet-5-5", body); // a message the owner reads for its voice runs on the strong tier
+        Assert.DoesNotContain("claude-haiku-5-5", body);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class VoiceClientTests
         Assert.Equal(["em-dash asides"], updated.Punctuation);
         Assert.Equal(1, updated.DocumentsAnalyzed); // provenance counted here, not trusted to the model
 
-        Assert.Contains("claude-sonnet-4-6", handler.RequestBodies.Single()); // strong tier for the analysis
+        Assert.Contains("claude-sonnet-5-5", handler.RequestBodies.Single()); // strong tier for the analysis
     }
 
     [Fact]

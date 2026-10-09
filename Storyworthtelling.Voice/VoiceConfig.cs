@@ -6,8 +6,8 @@ namespace Storyworthtelling.Voice;
 // that carries only the key still works.
 public sealed record VoiceConfig(
     string ApiKey,
-    string Model = "claude-sonnet-4-6",
-    string FastModel = "claude-haiku-4-5-20251001")
+    string Model = "claude-sonnet-5-5",
+    string FastModel = "claude-haiku-5-5")
 {
     public static VoiceConfig Empty { get; } = new(string.Empty);
 
