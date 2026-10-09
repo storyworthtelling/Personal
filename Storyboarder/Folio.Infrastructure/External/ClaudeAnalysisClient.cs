@@ -816,11 +816,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         object[] system, string userText, int effectiveMaxTokens, string model,
         CancellationToken cancellationToken)
     {
+        // Effort is set explicitly, never inherited: the 5.5 models default to medium, and Folio's reads and
+        // reports are tuned to the depth the previous default gave. See EveryCall_RequestsHighEffort.
         var payload = new
         {
             model,
             max_tokens = effectiveMaxTokens,
             stream = true,
+            output_config = new { effort = "high" },
             system,
             messages = new[]
             {
