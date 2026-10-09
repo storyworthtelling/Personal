@@ -44,6 +44,19 @@ public static class AppIdentityTokens
     // disqualifying for an identity token. IdentityLadderTests reads the ladder, never this.
     public const string FolioClothHex = "#B32738";
 
+    // Pulp: amber, OKLCH hue 70°, mark chroma 0.095, on the suite's shared lightness ladder (D275,
+    // superseding D202's marigold 63°, which sat 16.3° from Foreword's sunrise). ≥22.4° from Foreword,
+    // ≥28.7° from Flyleaf's mark, and 14.3° from the caution ochre — a recorded departure, inert because
+    // Pulp draws no Caution on its own pages. Amber text tiers have to be browns to carry text on paper,
+    // so the bright amber lives on the cloth: a light binding with the rule, flourishes and title in
+    // ink (6.72:1).
+    public const string PulpFillHex = "#CCB8A2";
+    public const string PulpGroundHex = "#BCA080";
+    public const string PulpMarkHex = "#835618";
+    public const string PulpTextHex = "#684414";
+    public const string PulpDeepHex = "#493113";
+    public const string PulpClothHex = "#F7AC4D";
+
     public static SKColor ForewordFill { get; } = SKColor.Parse(ForewordFillHex);
     public static SKColor ForewordGround { get; } = SKColor.Parse(ForewordGroundHex);
     public static SKColor ForewordSunrise { get; } = SKColor.Parse(ForewordSunriseHex);
@@ -55,4 +68,11 @@ public static class AppIdentityTokens
     public static SKColor FolioText { get; } = SKColor.Parse(FolioTextHex);
     public static SKColor FolioDeep { get; } = SKColor.Parse(FolioDeepHex);
     public static SKColor FolioCloth { get; } = SKColor.Parse(FolioClothHex);
+
+    public static SKColor PulpFill { get; } = SKColor.Parse(PulpFillHex);
+    public static SKColor PulpGround { get; } = SKColor.Parse(PulpGroundHex);
+    public static SKColor PulpMark { get; } = SKColor.Parse(PulpMarkHex);
+    public static SKColor PulpText { get; } = SKColor.Parse(PulpTextHex);
+    public static SKColor PulpDeep { get; } = SKColor.Parse(PulpDeepHex);
+    public static SKColor PulpCloth { get; } = SKColor.Parse(PulpClothHex);
 }

@@ -386,6 +386,15 @@ public static class Glyphs
     public static void PlatePlate(SKCanvas canvas, float s) => CoverKeyline(canvas, s, Tokens.Ink);
 
     /// <summary>
+    /// Pulp's cover, as the launcher icon (D267): nothing at all over the painting. The one cover
+    /// without a keyline, by the owner's decision — the den is already framed by its own projection
+    /// screen, and a keyline around a picture of a screen reads as a second screen.
+    /// </summary>
+    public static void PulpPlate(SKCanvas canvas, float s)
+    {
+    }
+
+    /// <summary>
     /// Index's cover (D115, D117, D119): the same keyline-only window every cover ships, plus
     /// the one thing D119 adds — a corner flourish (the mockup's bracket, bulging toward the corner), drawn once for the
     /// top-left and <b>reflected</b>, never rotated, into the other three (an asymmetric mark

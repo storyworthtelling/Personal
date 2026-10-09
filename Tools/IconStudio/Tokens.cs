@@ -125,4 +125,28 @@ public static class Tokens
     public static readonly SKColor IndexText = SKColor.Parse(IndexTextHex);
     public static readonly SKColor IndexDeep = SKColor.Parse(IndexDeepHex);
     public static readonly SKColor IndexCloth = SKColor.Parse(IndexClothHex);
+
+    // Pulp: amber, OKLCH hue 70°, mark chroma 0.095, on the suite's shared lightness ladder (D275,
+    // superseding D202's marigold 63°). The marigold sat 16.3° from Foreword's sunrise (47°), and no
+    // yellow-orange clears both Foreword (≥67°) and the caution ochre (≤65°). Amber clears Foreword by
+    // ≥22.4° and Flyleaf's mark by ≥28.7°, and sits 14.3° from Caution — a RECORDED departure, made
+    // inert by Pulp drawing no Caution on its own pages. Amber text tiers have to be browns to carry
+    // text on paper, so the bright amber lives on the cloth alone.
+    public const string PulpFillHex = "#CCB8A2";
+    public const string PulpGroundHex = "#BCA080";
+    public const string PulpMarkHex = "#835618";
+    public const string PulpTextHex = "#684414";
+    public const string PulpDeepHex = "#493113";
+
+    // The binding: a LIGHT cloth with the rule, flourishes and title in ink (6.72:1) — Score's and
+    // Plate's construction. It is on the identity hue, unlike Folio's, at a chroma no text tier can
+    // carry.
+    public const string PulpClothHex = "#F7AC4D";
+
+    public static readonly SKColor PulpFill = SKColor.Parse(PulpFillHex);
+    public static readonly SKColor PulpGround = SKColor.Parse(PulpGroundHex);
+    public static readonly SKColor PulpMark = SKColor.Parse(PulpMarkHex);
+    public static readonly SKColor PulpText = SKColor.Parse(PulpTextHex);
+    public static readonly SKColor PulpDeep = SKColor.Parse(PulpDeepHex);
+    public static readonly SKColor PulpCloth = SKColor.Parse(PulpClothHex);
 }
