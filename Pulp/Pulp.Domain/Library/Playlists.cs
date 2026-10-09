@@ -10,7 +10,8 @@ public enum RowDim
 
 /// <summary>
 /// What the library knows about one entry, supplied by the caller. <see cref="Watched"/> is a film
-/// seen or a show finished for good (D153); <see cref="CaughtUp"/> is a show with nothing left out.
+/// seen or a show finished for good (D153), as <see cref="Sittings.Verdict"/> decides it — the one
+/// definition; <see cref="CaughtUp"/> is a show with nothing left out.
 /// </summary>
 public sealed record EntryStanding(
     bool Watched = false,

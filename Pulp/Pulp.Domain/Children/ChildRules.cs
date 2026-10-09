@@ -1,4 +1,5 @@
 using Pulp.Domain.Core;
+using Pulp.Domain.Library;
 using Pulp.Domain.Ratings;
 using Pulp.Domain.Services;
 
@@ -23,14 +24,33 @@ public readonly record struct FranchiseId
 
 /// <summary>
 /// One child's filter as the parents set it (D12, D127–D129, D255): a ceiling, an allow-list of
-/// titles above it, the parents' favorites for the child (which allow-list too), and blocks by title,
+/// titles above it, the parents' picks for the child (which allow-list too), and blocks by title,
 /// franchise or whole service. A narrow input — the household file's own record maps onto it.
+/// The parents' picks are held once, as <see cref="ParentPick"/> records: the filter's
+/// <see cref="ParentFavorites"/> and the child's Favorites both read them from here, so a pick above
+/// the ceiling can never be on one and missing from the other (S4).
 /// </summary>
 public sealed record ChildRules(ViewerId Child, AgeBand Ceiling)
 {
+    private readonly IReadOnlyList<ParentPick> parentPicks = [];
+    private readonly IReadOnlySet<TitleId> parentFavorites = new HashSet<TitleId>();
+
     public IReadOnlySet<TitleId> Allowed { get; init; } = new HashSet<TitleId>();
 
-    public IReadOnlySet<TitleId> ParentFavorites { get; init; } = new HashSet<TitleId>();
+    /// <summary>A parent's picks for this child (D252, D254); each one allow-lists its title (D255).</summary>
+    public IReadOnlyList<ParentPick> ParentPicks
+    {
+        get => parentPicks;
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            parentPicks = value.ToList();
+            parentFavorites = parentPicks.Select(pick => pick.Title).ToHashSet();
+        }
+    }
+
+    /// <summary>The titles of <see cref="ParentPicks"/>; derived, never set on its own.</summary>
+    public IReadOnlySet<TitleId> ParentFavorites => parentFavorites;
 
     public IReadOnlySet<TitleId> BlockedTitles { get; init; } = new HashSet<TitleId>();
 
@@ -62,9 +82,15 @@ public sealed class AttestedServices
         attested = [.. services];
     }
 
-    public bool Covers(StreamingService service)
+    /// <summary>
+    /// Whether a child may start titles on <paramref name="service"/>: its catalogue entry is a
+    /// kids-only app, or the owner has attested it. The entry is looked up here, so whether it is
+    /// kids-only comes from the catalogue alone; a service the catalogue does not know is not covered.
+    /// </summary>
+    public bool Covers(ServiceId service, ServiceCatalogue catalogue)
     {
-        ArgumentNullException.ThrowIfNull(service);
-        return service.KidsOnly || attested.Contains(service.Id);
+        ArgumentNullException.ThrowIfNull(catalogue);
+        var entry = catalogue.ById(service);
+        return entry is not null && (entry.KidsOnly || attested.Contains(entry.Id));
     }
 }

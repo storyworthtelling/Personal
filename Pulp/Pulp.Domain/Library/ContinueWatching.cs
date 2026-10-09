@@ -1,4 +1,5 @@
 using Pulp.Domain.Core;
+using Pulp.Domain.Watching;
 
 namespace Pulp.Domain.Library;
 
@@ -19,7 +20,8 @@ public sealed record ContinueRow(
 /// Continue Watching for one viewer (private, D97). D96: most recently watched first, and an episode
 /// that came out after the last sitting jumps its show to the top. D152: a show with nothing left out
 /// leaves, and comes back when an episode lands. D153: a finished film, or a show watched to its end,
-/// leaves. Games are the Sports rules' business, not this list's. The clock is an argument.
+/// leaves — "finished" and "marked unwatched" both being <see cref="Watched.Decide"/>'s verdict
+/// (D278, D279), so a title marked unwatched comes back. Games are the Sports rules' business, not this list's. The clock is an argument.
 /// </summary>
 public static class ContinueWatching
 {
@@ -40,7 +42,7 @@ public static class ContinueWatching
             var ordered = sittings.OrderBy(e => e.At).ToList();
             var last = ordered[^1];
             var row = last.Kind == WatchedKind.Film
-                ? FilmRow(last)
+                ? FilmRow(ordered)
                 : ShowRow(ordered, scheduleByTitle.GetValueOrDefault(sittings.Key), now);
             if (row is not null)
             {
@@ -54,15 +56,25 @@ public static class ContinueWatching
             .ToList();
     }
 
-    private static ContinueRow? FilmRow(WatchEvent last)
+    private static ContinueRow? FilmRow(IReadOnlyList<WatchEvent> ordered)
     {
-        if (last.Completed)
+        if (Sittings.Verdict(ordered).IsWatched)
         {
             return null;
         }
 
-        return new ContinueRow(last.Title, TitleKind.Film, last.At, NewEpisode: false, NextUp: null, Minutes(last));
+        var last = ordered[^1];
+        return new ContinueRow(last.Title, TitleKind.Film, last.At, NewEpisode: false, NextUp: null, Sittings.Progress(ordered));
     }
+
+    /// <summary>The episodes of a show the viewer has watched, each by <see cref="Sittings.Verdict"/> over its own sittings.</summary>
+    internal static HashSet<EpisodeRef> WatchedEpisodes(IEnumerable<WatchEvent> ordered) =>
+        ordered
+            .Where(e => e.Episode is not null)
+            .GroupBy(e => e.Episode!)
+            .Where(episode => Sittings.Verdict(episode).IsWatched)
+            .Select(episode => episode.Key)
+            .ToHashSet();
 
     private static ContinueRow? ShowRow(IReadOnlyList<WatchEvent> ordered, ShowSchedule? schedule, DateTimeOffset now)
     {
@@ -73,10 +85,7 @@ public static class ContinueWatching
             return new ContinueRow(last.Title, TitleKind.Show, last.At, NewEpisode: false, NextUp: null, Progress: null);
         }
 
-        var watched = ordered
-            .Where(e => e.Episode is not null && e.Completed)
-            .Select(e => e.Episode!)
-            .ToHashSet();
+        var watched = WatchedEpisodes(ordered);
         var furthest = watched.Max();
 
         var left = schedule.Episodes
@@ -102,9 +111,4 @@ public static class ContinueWatching
             nextUp,
             new ProgressMark(nextUp.Number, inSeason, ProgressUnit.Episode));
     }
-
-    internal static ProgressMark? Minutes(WatchEvent sitting) =>
-        sitting.StoppedAt is { } at && sitting.Runtime is { } runtime
-            ? new ProgressMark((int)at.TotalMinutes, (int)runtime.TotalMinutes, ProgressUnit.Minute)
-            : null;
 }

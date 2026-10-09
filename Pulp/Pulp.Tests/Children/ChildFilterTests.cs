@@ -1,5 +1,6 @@
 using Pulp.Domain.Children;
 using Pulp.Domain.Core;
+using Pulp.Domain.Library;
 using Pulp.Domain.Ratings;
 
 namespace Pulp.Tests.Children;
@@ -12,6 +13,9 @@ namespace Pulp.Tests.Children;
 public class ChildFilterTests
 {
     private static readonly TitleId Lantern = new("title-lantern-cove");
+
+    private static ParentPick PickOf(TitleId title) =>
+        new(title, new ViewerId("parent-example-a"), new DateTimeOffset(2026, 3, 1, 20, 0, 0, TimeSpan.Zero));
     private static readonly FranchiseId Harbour = new("franchise-harbour-tales");
     private static readonly ServiceId Flix = new("example-flix");
     private static readonly ServiceId Sample = new("sample-stream");
@@ -72,7 +76,7 @@ public class ChildFilterTests
     [Fact]
     public void AParentsFavoriteAboveTheCeilingAllowListsIt()
     {
-        var verdict = ChildFilter.Decide(Child() with { ParentFavorites = new HashSet<TitleId> { Lantern } }, Title("PG-13"));
+        var verdict = ChildFilter.Decide(Child() with { ParentPicks = [PickOf(Lantern)] }, Title("PG-13"));
 
         Assert.True(verdict.Visible);
         Assert.Equal(FilterReason.ParentFavorite, verdict.Reason);
@@ -84,7 +88,7 @@ public class ChildFilterTests
         var child = Child() with
         {
             Allowed = new HashSet<TitleId> { Lantern },
-            ParentFavorites = new HashSet<TitleId> { Lantern },
+            ParentPicks = [PickOf(Lantern)],
             BlockedTitles = new HashSet<TitleId> { Lantern },
         };
 
@@ -157,7 +161,7 @@ public class ChildFilterTests
             {
                 BlockedTitles = blocked ? new HashSet<TitleId> { Lantern } : new HashSet<TitleId>(),
                 Allowed = allowed ? new HashSet<TitleId> { Lantern } : new HashSet<TitleId>(),
-                ParentFavorites = favorite ? new HashSet<TitleId> { Lantern } : new HashSet<TitleId>(),
+                ParentPicks = favorite ? [PickOf(Lantern)] : [],
             };
 
             var verdict = ChildFilter.Decide(child, Title(rating));

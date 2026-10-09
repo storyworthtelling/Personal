@@ -1,5 +1,6 @@
 using Pulp.Domain.Children;
 using Pulp.Domain.Core;
+using Pulp.Domain.Library;
 using Pulp.Domain.Ratings;
 using Pulp.Domain.Services;
 
@@ -20,9 +21,14 @@ public class ChildHandOffTests
         new ServiceId("sample-stream"), "Samplestream", ["com.example.sample"], "samplestream", ["Samplestream"]);
 
     private static readonly StreamingService Tots = new(
-        new ServiceId("example-tots"), "Exampletots", ["com.example.tots"], "exampletots", ["Exampletots"]) { KidsOnly = true };
+        new ServiceId("example-tots"), "Exampletots", ["com.example.tots"], "exampletots", ["Exampletots"], kidsOnly: true);
+
+    private static readonly ServiceCatalogue Catalogue = new([Flix, Sample, Tots]);
 
     private static readonly TitleId Lantern = new("title-lantern-cove");
+
+    private static ParentPick PickOf(TitleId title) =>
+        new(title, new ViewerId("parent-example-a"), new DateTimeOffset(2026, 3, 1, 20, 0, 0, TimeSpan.Zero));
 
     private static readonly ChildRules Wren = new(new ViewerId("child-wren"), AgeBand.SevenToNine);
 
@@ -35,7 +41,7 @@ public class ChildHandOffTests
     [Fact]
     public void AChildsHandOffToAnAttestedServiceIsBuilt()
     {
-        var result = ChildHandOff.For([Wren], Facts(Flix), Link(Flix), Flix, new AttestedServices([Flix.Id]));
+        var result = ChildHandOff.For([Wren], Facts(Flix), Link(Flix), Catalogue, new AttestedServices([Flix.Id]));
 
         Assert.True(result.Verdict.MayStart);
         Assert.NotNull(result.Intent);
@@ -45,7 +51,7 @@ public class ChildHandOffTests
     [Fact]
     public void AChildsHandOffToAnUnattestedServiceIsRefusedWithNoIntent()
     {
-        var result = ChildHandOff.For([Wren], Facts(Flix, Sample), Link(Sample), Sample, new AttestedServices([Flix.Id]));
+        var result = ChildHandOff.For([Wren], Facts(Flix, Sample), Link(Sample), Catalogue, new AttestedServices([Flix.Id]));
 
         Assert.False(result.Verdict.MayStart);
         Assert.Equal(StartRefusal.ServiceNotAttested, result.Verdict.Refusal);
@@ -65,7 +71,7 @@ public class ChildHandOffTests
         foreach (var band in Enum.GetValues<AgeBand>())
         {
             var child = new ChildRules(new ViewerId("child-wren"), band) { Allowed = new HashSet<TitleId> { Lantern } };
-            var result = ChildHandOff.For([child], Facts(service), Link(service), service, none);
+            var result = ChildHandOff.For([child], Facts(service), Link(service), ServiceCatalogue.Public, none);
 
             Assert.Null(result.Intent);
             Assert.Equal(StartRefusal.ServiceNotAttested, result.Verdict.Refusal);
@@ -78,9 +84,9 @@ public class ChildHandOffTests
     [Fact]
     public void AnAllowListDoesNotStandInForAttestation()
     {
-        var child = Wren with { Allowed = new HashSet<TitleId> { Lantern }, ParentFavorites = new HashSet<TitleId> { Lantern } };
+        var child = Wren with { Allowed = new HashSet<TitleId> { Lantern }, ParentPicks = [PickOf(Lantern)] };
 
-        var result = ChildHandOff.For([child], Facts(Sample), Link(Sample), Sample, new AttestedServices([]));
+        var result = ChildHandOff.For([child], Facts(Sample), Link(Sample), Catalogue, new AttestedServices([]));
 
         Assert.Null(result.Intent);
     }
@@ -91,7 +97,7 @@ public class ChildHandOffTests
         // Attestation is per service, not per child; a group with any child is held to it.
         var older = new ChildRules(new ViewerId("child-older"), AgeBand.ThirteenToSixteen);
 
-        var result = ChildHandOff.For([older, Wren], Facts(Sample), Link(Sample), Sample, new AttestedServices([Flix.Id]));
+        var result = ChildHandOff.For([older, Wren], Facts(Sample), Link(Sample), Catalogue, new AttestedServices([Flix.Id]));
 
         Assert.Null(result.Intent);
     }
@@ -99,7 +105,7 @@ public class ChildHandOffTests
     [Fact]
     public void AKidsOnlyAppNeedsNoAttestation()
     {
-        var result = ChildHandOff.For([Wren], Facts(Tots), Link(Tots), Tots, new AttestedServices([]));
+        var result = ChildHandOff.For([Wren], Facts(Tots), Link(Tots), Catalogue, new AttestedServices([]));
 
         Assert.True(result.Verdict.MayStart);
         Assert.NotNull(result.Intent);
@@ -110,7 +116,7 @@ public class ChildHandOffTests
     {
         var facts = new TitleFacts(Lantern, TitleKind.Film, ContentRating.Parse("R")) { Homes = [Flix.Id] };
 
-        var result = ChildHandOff.For([Wren], facts, Link(Flix), Flix, new AttestedServices([Flix.Id]));
+        var result = ChildHandOff.For([Wren], facts, Link(Flix), Catalogue, new AttestedServices([Flix.Id]));
 
         Assert.Equal(StartRefusal.Hidden, result.Verdict.Refusal);
         Assert.Null(result.Intent);
@@ -121,7 +127,7 @@ public class ChildHandOffTests
     {
         var child = Wren with { BlockedServices = new HashSet<ServiceId> { Flix.Id } };
 
-        var result = ChildHandOff.For([child], Facts(Flix, Sample), Link(Flix), Flix, new AttestedServices([Flix.Id, Sample.Id]));
+        var result = ChildHandOff.For([child], Facts(Flix, Sample), Link(Flix), Catalogue, new AttestedServices([Flix.Id, Sample.Id]));
 
         Assert.Equal(StartRefusal.ServiceBlocked, result.Verdict.Refusal);
         Assert.Null(result.Intent);
@@ -130,7 +136,7 @@ public class ChildHandOffTests
     [Fact]
     public void AServiceThatIsNotOneOfTheTitlesHomesIsRefused()
     {
-        var result = ChildHandOff.For([Wren], Facts(Flix), Link(Sample), Sample, new AttestedServices([Flix.Id, Sample.Id]));
+        var result = ChildHandOff.For([Wren], Facts(Flix), Link(Sample), Catalogue, new AttestedServices([Flix.Id, Sample.Id]));
 
         Assert.Equal(StartRefusal.NotAHome, result.Verdict.Refusal);
         Assert.Null(result.Intent);
@@ -142,13 +148,13 @@ public class ChildHandOffTests
             [Wren],
             Facts(Flix),
             new HandOffLink(new TitleId("title-other"), Flix.Id, new Uri("https://watch.example.com/title/2"), null),
-            Flix,
+            Catalogue,
             new AttestedServices([Flix.Id])));
 
     [Fact]
     public void AnEmptyGroupIsRefusedRatherThanTreatedAsAnAdult() =>
         Assert.Throws<ArgumentException>(() =>
-            ChildHandOff.For([], Facts(Flix), Link(Flix), Flix, new AttestedServices([])));
+            ChildHandOff.For([], Facts(Flix), Link(Flix), Catalogue, new AttestedServices([])));
 
     [Theory]
     [InlineData(false, false, ServiceBadge.AdultsOnly)]
@@ -156,9 +162,49 @@ public class ChildHandOffTests
     [InlineData(false, true, ServiceBadge.None)]
     public void AnUnlockedServiceCarriesTheAdultsOnlyBadge(bool attested, bool kidsOnly, ServiceBadge badge)
     {
-        var service = Sample with { KidsOnly = kidsOnly };
+        var service = new StreamingService(
+            Sample.Id, Sample.Name, Sample.Packages, Sample.SourceId, Sample.MerchantNames, kidsOnly);
         var attestations = new AttestedServices(attested ? [Sample.Id] : []);
 
-        Assert.Equal(badge, ChildFilter.BadgeFor(service, attestations));
+        Assert.Equal(badge, ChildFilter.BadgeFor(service.Id, new ServiceCatalogue([service]), attestations));
+    }
+
+    // S1 probe: the public Netflix entry is not kids-only, and nothing a caller builds can say it is —
+    // the gate reads the catalogue's own entry, so with no attestation a child gets no intent.
+    // (The forged `entry with { KidsOnly = true }` no longer compiles; ChildGateTakesNoServiceRecordTests
+    // holds that.)
+    [Fact]
+    public void ThePublicNetflixEntryUnattestedGivesAChildNoIntent()
+    {
+        var netflix = ServiceCatalogue.Public.ById(new ServiceId("netflix"))!;
+        Assert.False(netflix.KidsOnly);
+
+        var result = ChildHandOff.For([Wren], Facts(netflix), Link(netflix), ServiceCatalogue.Public, new AttestedServices([]));
+
+        Assert.Equal(StartRefusal.ServiceNotAttested, result.Verdict.Refusal);
+        Assert.Null(result.Intent);
+    }
+
+    // S1: the intent's package is the catalogue entry's for the link's service, never another app's.
+    [Fact]
+    public void TheIntentIsAimedAtTheCatalogueEntrysPackage()
+    {
+        var result = ChildHandOff.For([Wren], Facts(Flix), Link(Flix), Catalogue, new AttestedServices([Flix.Id]));
+
+        Assert.NotNull(result.Intent);
+        Assert.Equal(Catalogue.ById(Flix.Id)!.PrimaryPackage, result.Intent.Package);
+    }
+
+    [Fact]
+    public void AServiceTheCatalogueDoesNotKnowIsRefused()
+    {
+        var stray = new ServiceId("stray-example");
+        var facts = new TitleFacts(Lantern, TitleKind.Show, ContentRating.Parse("TV-Y")) { Homes = [stray] };
+        var link = new HandOffLink(Lantern, stray, new Uri("https://watch.example.com/title/100"), null);
+
+        var result = ChildHandOff.For([Wren], facts, link, Catalogue, new AttestedServices([stray]));
+
+        Assert.Equal(StartRefusal.UnknownService, result.Verdict.Refusal);
+        Assert.Null(result.Intent);
     }
 }

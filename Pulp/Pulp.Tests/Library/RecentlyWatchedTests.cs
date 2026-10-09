@@ -102,7 +102,7 @@ public class RecentlyWatchedTests
     [Fact]
     public void AFilmSaysHowItEnded()
     {
-        var marked = new WatchEvent(Larkspur, WatchedKind.Film, DaysAgo(5), null, Evidence: WatchSource.Manual);
+        var marked = new WatchEvent(Larkspur, WatchedKind.Film, DaysAgo(5), null, Evidence: WatchSource.MarkedWatched);
 
         var rows = RecentlyWatched.Build(
             [FilmFinished(Tidewater, DaysAgo(1)), FilmStopped(Larkspur, DaysAgo(2), 46, 118), marked],
@@ -120,7 +120,7 @@ public class RecentlyWatchedTests
     [Fact]
     public void AFilmLastMarkedByHandSaysSo()
     {
-        var marked = new WatchEvent(Larkspur, WatchedKind.Film, DaysAgo(1), null, Evidence: WatchSource.Manual);
+        var marked = new WatchEvent(Larkspur, WatchedKind.Film, DaysAgo(1), null, Evidence: WatchSource.MarkedWatched);
 
         var row = RecentlyWatched.Build([FilmStopped(Larkspur, DaysAgo(2), 46, 118), marked], Counts, Utc)
             .SelectMany(d => d.Rows).Single();

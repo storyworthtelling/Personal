@@ -1,5 +1,6 @@
 using Pulp.Domain.Core;
 using Pulp.Domain.Friday;
+using Pulp.Domain.People;
 
 namespace Pulp.Tests.Friday;
 
@@ -12,7 +13,8 @@ namespace Pulp.Tests.Friday;
 public class FridayStackTests
 {
     private static readonly ViewerId Sam = new("sam");
-    private static readonly StackViewer Owner = new(Sam, IsChild: false);
+    private static readonly ViewerId Kit = new("kit");
+    private static readonly HouseholdRoster Roster = new([new HouseholdViewer(Sam, IsChild: false), new HouseholdViewer(Kit, IsChild: true)]);
     private static readonly TimeZoneInfo Harbor =
         TimeZoneInfo.CreateCustomTimeZone("Invented/Harbor", TimeSpan.FromHours(-5), "Invented Harbor", "Invented Harbor");
     private static readonly DateTimeOffset Wednesday = new(2026, 10, 14, 12, 0, 0, TimeSpan.FromHours(-5));
@@ -31,7 +33,7 @@ public class FridayStackTests
         TasteProfile? taste = null, VetoBook? vetoes = null, StackSizes? sizes = null, IEnumerable<StackCandidate>? pool = null,
         IReadOnlySet<TitleId>? watched = null) =>
         FridayStack.Build(
-            Owner, pool ?? Pool, taste ?? TasteProfile.Empty, vetoes ?? VetoBook.For(Sam), watched ?? new HashSet<TitleId>(),
+            Sam, Roster, pool ?? Pool, taste ?? TasteProfile.Empty, vetoes ?? VetoBook.For(Sam), watched ?? new HashSet<TitleId>(),
             sizes ?? StackSizes.Default, Wednesday, Harbor);
 
     // D282: the stack is always something new — a title the viewer has watched is never a candidate,
@@ -83,7 +85,7 @@ public class FridayStackTests
     public void TasteComesFirst()
     {
         var taste = TasteLearner.Learn(
-            Owner, [], [new WatchedTitle(new TitleId("w-1"), ["noir"], [Sam]), new WatchedTitle(new TitleId("w-2"), ["noir", "space"], [Sam])], VetoBook.For(Sam));
+            Sam, Roster, [new WatchedTitle(new TitleId("w-1"), ["noir"], [Sam]), new WatchedTitle(new TitleId("w-2"), ["noir", "space"], [Sam])], VetoBook.For(Sam));
 
         var stack = Build(taste, sizes: new StackSizes(2, 1));
 
@@ -165,13 +167,22 @@ public class FridayStackTests
     [Fact]
     public void AChildHasNoStack()
     {
-        var child = new StackViewer(new ViewerId("kit"), IsChild: true);
-
         var stack = FridayStack.Build(
-            child, Pool, TasteProfile.Empty, VetoBook.For(child.Id), new HashSet<TitleId>(), StackSizes.Default, Wednesday, Harbor);
+            Kit, Roster, Pool, TasteProfile.Empty, VetoBook.For(Kit), new HashSet<TitleId>(), StackSizes.Default, Wednesday, Harbor);
 
-        Assert.Empty(stack.Pile(TitleKind.Film, VetoBook.For(child.Id)));
-        Assert.Empty(stack.Pile(TitleKind.Show, VetoBook.For(child.Id)));
+        Assert.Empty(stack.Pile(TitleKind.Film, VetoBook.For(Kit)));
+        Assert.Empty(stack.Pile(TitleKind.Show, VetoBook.For(Kit)));
+    }
+
+    // S3: the roster is the one answer to "is this a child"; a viewer it does not name gets no stack
+    // built as if they were an adult.
+    [Fact]
+    public void AViewerNotOnTheRosterIsRefused()
+    {
+        var stranger = new ViewerId("guest-example");
+
+        Assert.Throws<ArgumentException>(() => FridayStack.Build(
+            stranger, Roster, Pool, TasteProfile.Empty, VetoBook.For(stranger), new HashSet<TitleId>(), StackSizes.Default, Wednesday, Harbor));
     }
 
     [Fact]

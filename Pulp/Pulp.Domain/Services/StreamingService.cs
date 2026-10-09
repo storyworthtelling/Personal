@@ -16,7 +16,8 @@ public sealed record StreamingService
         string name,
         IReadOnlyList<string> packages,
         string sourceId,
-        IReadOnlyList<string> merchantNames)
+        IReadOnlyList<string> merchantNames,
+        bool kidsOnly = false)
     {
         ArgumentNullException.ThrowIfNull(packages);
         ArgumentNullException.ThrowIfNull(merchantNames);
@@ -37,6 +38,7 @@ public sealed record StreamingService
         Packages = packages.Select(package => package.Trim()).ToList();
         SourceId = Require(sourceId, nameof(sourceId), id);
         MerchantNames = merchantNames.Select(merchant => merchant.Trim()).ToList();
+        KidsOnly = kidsOnly;
     }
 
     public ServiceId Id { get; }
@@ -55,9 +57,11 @@ public sealed record StreamingService
 
     /// <summary>
     /// A kids-only app (finding §2.2): the app is the child's profile, so it needs no PIN-lock
-    /// attestation before a child may start a title there.
+    /// attestation before a child may start a title there. Set only by the constructor, so a
+    /// catalogue entry cannot be re-badged kids-only with <c>with</c>; the child gate reads it from the
+    /// catalogue's own entry and never from a record a caller hands it.
     /// </summary>
-    public bool KidsOnly { get; init; }
+    public bool KidsOnly { get; }
 
     /// <summary>The package a hand-off is aimed at.</summary>
     public string PrimaryPackage => Packages[0];

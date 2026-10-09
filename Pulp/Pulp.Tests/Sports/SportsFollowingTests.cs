@@ -60,6 +60,8 @@ public class SportsFollowingTests
         Assert.Equal(GameStage.Championship, bowl.Stage);
         Assert.Equal("The Coastal Bowl", bowl.Name);
         Assert.Equal([Sam], bowl.Followers);
+        Assert.Equal(FixtureKind.ChampionshipLine, bowl.Kind);
+        Assert.All(fixtures.Where(fixture => fixture.Id != CoastalBowl), fixture => Assert.Equal(FixtureKind.Game, fixture.Kind));
     }
 
     [Fact]

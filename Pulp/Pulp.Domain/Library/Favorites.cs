@@ -1,3 +1,4 @@
+using Pulp.Domain.Children;
 using Pulp.Domain.Core;
 
 namespace Pulp.Domain.Library;
@@ -26,36 +27,42 @@ public sealed record FavoriteCard(TitleId Title, FavoriteSource Source, ViewerId
 /// <c>watchedMostCount</c> titles the child has watched most. A title is one card, labelled by the
 /// child's own star first, then a parent's pick, then watched-most. Nothing failing the child's
 /// filter appears from any source, nor takes a watched-most place. Newest first.
+/// The parents' picks and the filter both come from the child's one <see cref="ChildRules"/>, so a
+/// pick above the ceiling — which that same record allow-lists (D255) — is never dropped by a filter
+/// built from a second copy of the picks (S4). A title with no facts is hidden, as unrated is (D128).
 /// </summary>
 public static class Favorites
 {
     public static IReadOnlyList<FavoriteCard> For(
+        ChildRules child,
         IEnumerable<ChildStar> stars,
-        IEnumerable<ParentPick> picks,
         IEnumerable<WatchTally> tallies,
         int watchedMostCount,
-        Func<TitleId, bool> passesFilter)
+        Func<TitleId, TitleFacts?> factsFor)
     {
+        ArgumentNullException.ThrowIfNull(child);
         ArgumentNullException.ThrowIfNull(stars);
-        ArgumentNullException.ThrowIfNull(picks);
         ArgumentNullException.ThrowIfNull(tallies);
-        ArgumentNullException.ThrowIfNull(passesFilter);
+        ArgumentNullException.ThrowIfNull(factsFor);
         ArgumentOutOfRangeException.ThrowIfNegative(watchedMostCount);
+
+        bool PassesFilter(TitleId title) => factsFor(title) is { } facts && ChildFilter.Decide(child, facts).Visible;
+        var picks = child.ParentPicks;
 
         var cards = new Dictionary<TitleId, FavoriteCard>();
 
         foreach (var star in stars.OrderByDescending(s => s.At))
         {
-            Offer(cards, new FavoriteCard(star.Title, FavoriteSource.ChildStar, PickedBy: null, star.At), passesFilter);
+            Offer(cards, new FavoriteCard(star.Title, FavoriteSource.ChildStar, PickedBy: null, star.At), PassesFilter);
         }
 
         foreach (var pick in picks.OrderByDescending(p => p.At))
         {
-            Offer(cards, new FavoriteCard(pick.Title, FavoriteSource.ParentPick, pick.Parent, pick.At), passesFilter);
+            Offer(cards, new FavoriteCard(pick.Title, FavoriteSource.ParentPick, pick.Parent, pick.At), PassesFilter);
         }
 
         var mostWatched = tallies
-            .Where(t => t.Times > 0 && !cards.ContainsKey(t.Title) && passesFilter(t.Title))
+            .Where(t => t.Times > 0 && !cards.ContainsKey(t.Title) && PassesFilter(t.Title))
             .GroupBy(t => t.Title)
             .Select(group => group.OrderByDescending(t => t.Times).ThenByDescending(t => t.LastAt).First())
             .OrderByDescending(t => t.Times)

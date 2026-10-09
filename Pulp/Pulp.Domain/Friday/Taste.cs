@@ -1,9 +1,7 @@
 using Pulp.Domain.Core;
+using Pulp.Domain.People;
 
 namespace Pulp.Domain.Friday;
-
-/// <summary>Who a stack or a taste profile is for. A child has neither (D23, D26).</summary>
-public sealed record StackViewer(ViewerId Id, bool IsChild);
 
 /// <summary>
 /// A title someone finished watching, with its descriptive tags and everyone who watched it. The
@@ -97,30 +95,30 @@ public sealed class TasteProfile
 /// D24, D23 and D283: taste is learned passively from what one adult watches, plus their vetoes.
 /// Each adult has their own — only the viewer's own viewing counts, never the other adult's, and
 /// never a child's: anything watched with a child present is a child's viewing too and is left out.
-/// A child has no profile at all.
+/// A child has no profile at all. Who is a child is the <see cref="HouseholdRoster"/>'s answer alone,
+/// and a viewer it does not name — the learner, or anyone in a sitting the learner was part of — is refused.
 /// </summary>
 public static class TasteLearner
 {
     public static TasteProfile Learn(
-        StackViewer viewer,
-        IReadOnlyCollection<ViewerId> children,
+        ViewerId viewer,
+        HouseholdRoster roster,
         IEnumerable<WatchedTitle> watched,
         VetoBook vetoes)
     {
-        ArgumentNullException.ThrowIfNull(viewer);
-        ArgumentNullException.ThrowIfNull(children);
+        ArgumentNullException.ThrowIfNull(roster);
         ArgumentNullException.ThrowIfNull(watched);
         ArgumentNullException.ThrowIfNull(vetoes);
 
-        if (viewer.IsChild || children.Contains(viewer.Id))
+        if (roster.IsChild(viewer))
         {
             return TasteProfile.Empty;
         }
 
-        if (vetoes.Viewer != viewer.Id)
+        if (vetoes.Viewer != viewer)
         {
             throw new ArgumentException(
-                $"The vetoes are {vetoes.Viewer}'s, not {viewer.Id}'s; one viewer's vetoes never shape another's taste.",
+                $"The vetoes are {vetoes.Viewer}'s, not {viewer}'s; one viewer's vetoes never shape another's taste.",
                 nameof(vetoes));
         }
 
@@ -128,9 +126,10 @@ public static class TasteLearner
         var counted = new HashSet<TitleId>();
         foreach (var title in watched)
         {
-            var theirs = title.Viewers.Contains(viewer.Id);
-            var childPresent = title.Viewers.Any(children.Contains);
-            if (theirs && !childPresent && counted.Add(title.Title))
+            // Only a sitting that would count is asked about, and every viewer in it must be on the
+            // roster: an unnamed co-viewer may be a child nobody listed, so it refuses rather than counts.
+            var theirs = title.Viewers.Contains(viewer);
+            if (theirs && !title.Viewers.Any(roster.IsChild) && counted.Add(title.Title))
             {
                 Adjust(weights, title.Tags, 1);
             }
