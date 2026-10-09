@@ -32,6 +32,13 @@ public static class HandOffNotice
         return $"{service} is not installed on this phone. Install it, then open the title again.";
     }
 
+    /// <summary>D286: the window closed with nothing playing from the service's app.</summary>
+    public static string NotSeen(string serviceName)
+    {
+        var service = RequireName(serviceName);
+        return $"Nothing has started playing in {service}, so it may not have opened on the title.";
+    }
+
     public static string LandedElsewhere(string serviceName)
     {
         var service = RequireName(serviceName);

@@ -663,3 +663,19 @@ Process (owner, D211): one screen per round; every decision, question and approv
   and anything watched with a child present never counts (D23).
 - **D284 · Revealing fixtures are playoff and championship games.** In a held league every team's
   revealing next fixture is hidden; regular-season fixtures stay.
+
+## Release C rulings
+
+- **D285 · The Streaming Availability key comes directly from the provider** (movieofthenight.com,
+  `api.movieofthenight.com`, header `X-API-Key`) — the client's default route. The RapidAPI route
+  stays in the code but is not offered in Settings.
+- **D286 · Silence after a hand-off is mentioned.** If the service's app publishes no session at all
+  within the landing window, the dog-ear says quietly that it may not have opened on the title
+  (`Landing.NotSeen`). Chosen over treating silence as unknown, accepting a possible false alarm
+  when the owner browses before pressing play. A different title playing remains the mis-landing.
+- **D287 · Buttons follow the shared phone kit**, not the mockups' darker pine and ink outline: the
+  difference is a drawing difference, and Pulp's buttons match its siblings'.
+- **D288 · The locked hand-off becomes Release G.** Flyleaf opens the service's own app on the title
+  in lock task mode, relays progress, and brings Pulp back at Home, a long pause or the end. Browser
+  or automated playback stays out (terms of use, DRM, Netflix has no Android web player). Needs a
+  policy revisit of Flyleaf's lockdown and per-service device checks.

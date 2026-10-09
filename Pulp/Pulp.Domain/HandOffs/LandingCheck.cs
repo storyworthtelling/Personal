@@ -47,6 +47,13 @@ public enum Landing
 
     /// <summary>Nothing seen can tell; Pulp says so rather than guess.</summary>
     Unknown,
+
+    /// <summary>
+    /// The window closed with no session at all from the service's app (D286). Not a mis-landing —
+    /// a title page waiting for play publishes nothing too — so the dog-ear only says it may not
+    /// have landed.
+    /// </summary>
+    NotSeen,
 }
 
 /// <summary>Which evidence decided the landing, so the dog-ear and the diagnostics can say.</summary>
@@ -68,7 +75,8 @@ public readonly record struct LandingVerdict(Landing Landing, LandingReason Reas
 /// <list type="number">
 /// <item>any that names the title → <see cref="Landing.Landed"/> (an auto-played trailer first does not spoil it);</item>
 /// <item>else any that names another title → <see cref="Landing.LandedElsewhere"/>, the D122 dog-ear;</item>
-/// <item>else sessions with no title, no name to compare, or no session at all → <see cref="Landing.Unknown"/>.</item>
+/// <item>else sessions with no title or no name to compare → <see cref="Landing.Unknown"/>;</item>
+/// <item>no session at all once the window closes → <see cref="Landing.NotSeen"/> (D286).</item>
 /// </list>
 /// No session is <i>not</i> a mis-landing: a title page that waits for the viewer to press play
 /// publishes nothing, exactly like the app's home, and the check cannot tell them apart.
@@ -123,7 +131,7 @@ public static class LandingCheck
 
         return now < until
             ? new LandingVerdict(Landing.Unknown, LandingReason.StillWaiting)
-            : new LandingVerdict(Landing.Unknown, LandingReason.NoSessionSeen);
+            : new LandingVerdict(Landing.NotSeen, LandingReason.NoSessionSeen);
     }
 
     private static bool IsTheServicesApp(string package, PendingHandOff handOff, ServiceCatalogue catalogue) =>
