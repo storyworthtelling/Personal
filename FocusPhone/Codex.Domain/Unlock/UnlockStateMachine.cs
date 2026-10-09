@@ -10,9 +10,7 @@ public class UnlockStateMachine
 {
     public static readonly TimeSpan DefaultUnlockDelay = TimeSpan.FromHours(6);
     public static readonly TimeSpan MinimumUnlockDelay = TimeSpan.FromHours(1);
-    public static readonly TimeSpan MaximumUnlockDelay = TimeSpan.FromDays(7);
-    /// <summary>The delays the admin screen offers, in whole hours. Includes <see cref="DefaultUnlockDelay"/>.</summary>
-    public static readonly int[] DelayChoices = [1, 2, 3, 6, 12, 24, 48, 72, 168];
+    public static readonly TimeSpan MaximumUnlockDelay = TimeSpan.FromDays(36525);
     public static readonly TimeSpan AdminDuration = TimeSpan.FromMinutes(60);
 
     private readonly IClock clock;
@@ -92,7 +90,7 @@ public class UnlockStateMachine
         if (delay < MinimumUnlockDelay || delay > MaximumUnlockDelay)
         {
             throw new ArgumentOutOfRangeException(nameof(delay),
-                $"The admin unlock delay must be between {MinimumUnlockDelay.TotalHours:0} hour and {MaximumUnlockDelay.TotalDays:0} days; got {delay.TotalMinutes:0} minutes.");
+                $"The admin unlock delay must be between {UnlockDelayText.Format(MinimumUnlockDelay)} and {UnlockDelayText.Format(MaximumUnlockDelay)}; got {UnlockDelayText.Format(delay)}.");
         }
         var state = EffectiveState();
         if (state is UnlockState.Pending or UnlockState.Ready)

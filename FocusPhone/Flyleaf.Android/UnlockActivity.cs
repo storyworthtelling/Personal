@@ -141,7 +141,7 @@ public class UnlockActivity : Activity
         {
             case UnlockState.Locked:
                 AddHeader("Locked");
-                AddBody($"Admin access requires a {machine.UnlockDelay.TotalHours:0}-hour delay. The countdown is visible and can be cancelled at any time.");
+                AddBody($"Admin access requires a {UnlockDelayText.Format(machine.UnlockDelay)} delay. The countdown is visible and can be cancelled at any time.");
                 PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => Transition(machine.RequestUnlock)));
                 break;
 
@@ -237,54 +237,45 @@ public class UnlockActivity : Activity
         PinActions(PaperUi.SecondaryButton(this, "Re-lock now", () => TransitionAndReapplyPolicy(machine!.Relock)));
     }
 
-    // The delay is chosen on the admin page, not while Locked: a request in flight (Pending or Ready)
+    // The delay is typed on the admin page, not while Locked: a request in flight (Pending or Ready)
     // refuses a change (UnlockStateMachine.SetDelay), and admin mode is the only state that can see it.
-    // The spinner is rebuilt on each admin render, with its selection set before its listener can fire,
-    // so the spurious first selection a Spinner reports on layout cannot write a value the owner never picked.
+    // Free text, so any whole number with a unit works: "1 hour", "10 days", "2 weeks", "25 months".
     private LinearLayout DelayRow()
     {
-        var current = Array.IndexOf(UnlockStateMachine.DelayChoices, (int)machine!.UnlockDelay.TotalHours);
-        var spinner = new Spinner(this);
-        spinner.Adapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
-            UnlockStateMachine.DelayChoices.Select(DelayLabel).ToArray());
-        if (current >= 0)
-        {
-            spinner.SetSelection(current);
-        }
-        spinner.ItemSelected += (_, e) => OnDelayPicked(e.Position);
+        var input = PaperUi.MonoField(this, "e.g. 10 days, 25 months");
+        input.Text = UnlockDelayText.Format(machine!.UnlockDelay);
 
-        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        row.SetGravity(GravityFlags.CenterVertical);
-        row.AddView(PaperUi.Secondary(this, "Admin unlock delay"),
-            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        row.AddView(spinner, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
+        var entry = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+        entry.SetGravity(GravityFlags.CenterVertical);
+        entry.AddView(input, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        entry.AddView(PaperUi.SecondaryButton(this, "Set", () => SaveDelay(input.Text)));
+
+        var row = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        row.AddView(PaperUi.Secondary(this, "Admin unlock delay"));
+        row.AddView(entry, MatchWrap());
         return row;
     }
 
-    private static string DelayLabel(int hours) =>
-        hours % 24 == 0
-            ? $"{hours / 24} day{(hours == 24 ? string.Empty : "s")}"
-            : $"{hours} hour{(hours == 1 ? string.Empty : "s")}";
-
-    private void OnDelayPicked(int position)
+    private void SaveDelay(string? text)
     {
-        var hours = UnlockStateMachine.DelayChoices[position];
-        if (TimeSpan.FromHours(hours) == machine!.UnlockDelay)
+        if (!UnlockDelayText.TryParse(text, out var delay))
         {
+            inlineStatus = "Enter a whole number and a unit, such as 1 hour, 10 days, 2 weeks or 25 months.";
+            Render();
             return;
         }
         try
         {
-            machine.SetDelay(TimeSpan.FromHours(hours));
+            machine!.SetDelay(delay);
         }
-        catch (InvalidOperationException e)
+        catch (Exception e) when (e is ArgumentOutOfRangeException or InvalidOperationException)
         {
             inlineStatus = e.Message;
             Render();
             return;
         }
         store!.Save(machine);
-        inlineStatus = $"Admin unlock delay set to {DelayLabel(hours)}. It applies to the next request.";
+        inlineStatus = $"Admin unlock delay set to {UnlockDelayText.Format(delay)}. It applies to the next request.";
         Render();
     }
 

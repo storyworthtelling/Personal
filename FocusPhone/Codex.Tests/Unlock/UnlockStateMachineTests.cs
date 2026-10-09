@@ -288,22 +288,21 @@ public class UnlockStateMachineTests
     }
 
     [Fact]
-    public void DelayChoices_AreAllAcceptedAndIncludeTheDefault()
+    public void SetDelay_AcceptsAnyValueInsideTheBounds()
     {
         var machine = NewMachine();
 
-        Assert.Contains(UnlockStateMachine.DefaultUnlockDelay, UnlockStateMachine.DelayChoices.Select(h => TimeSpan.FromHours(h)));
-        foreach (var hours in UnlockStateMachine.DelayChoices)
-        {
-            machine.SetDelay(TimeSpan.FromHours(hours));
-            Assert.Equal(TimeSpan.FromHours(hours), machine.UnlockDelay);
-        }
+        machine.SetDelay(TimeSpan.FromDays(10));
+        Assert.Equal(TimeSpan.FromDays(10), machine.UnlockDelay);
+
+        machine.SetDelay(TimeSpan.FromHours(7));
+        Assert.Equal(TimeSpan.FromHours(7), machine.UnlockDelay);
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(59)]
-    [InlineData(7 * 24 * 60 + 1)]
+    [InlineData((int)(100 * 365.25 * 24 * 60) + 1)]
     public void SetDelay_OutsideBounds_Throws(int minutes)
     {
         var machine = NewMachine();
@@ -321,7 +320,7 @@ public class UnlockStateMachineTests
         Assert.Equal(TimeSpan.FromHours(1), machine.UnlockDelay);
 
         machine.SetDelay(UnlockStateMachine.MaximumUnlockDelay);
-        Assert.Equal(TimeSpan.FromDays(7), machine.UnlockDelay);
+        Assert.Equal(UnlockStateMachine.MaximumUnlockDelay, machine.UnlockDelay);
     }
 
     [Fact]
