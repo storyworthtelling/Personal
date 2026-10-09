@@ -10,7 +10,7 @@ namespace Codex.Tests.Music;
 
 public class DiscoveryClientTests
 {
-    private static readonly VoiceOptions Options = new() { ApiKey = "sk-test", Model = "claude-sonnet-4-6" };
+    private static readonly VoiceOptions Options = new() { ApiKey = "sk-test", Model = "claude-sonnet-5-5" };
 
     private static string MessageResponse(string text) =>
         JsonSerializer.Serialize(new { content = new[] { new { type = "text", text } }, stop_reason = "end_turn" });
@@ -40,7 +40,7 @@ public class DiscoveryClientTests
         Assert.Equal(["b", "a"], selection.TrackIds);
 
         var body = handler.RequestBodies.Single();
-        Assert.Contains("claude-sonnet-4-6", body);
+        Assert.Contains("claude-sonnet-5-5", body);
         Assert.Contains("something mellow", body); // the request seed reached the model
         Assert.Contains("Peace Piece", body);      // the catalog digest reached the model
         Assert.Equal("sk-test", handler.Requests.Single().Headers.GetValues("x-api-key").Single());

@@ -13,8 +13,8 @@ public class TasteProfileClientTests
     private static readonly VoiceOptions Options = new()
     {
         ApiKey = "sk-test",
-        Model = "claude-sonnet-4-6",
-        FastModel = "claude-haiku-4-5-20251001"
+        Model = "claude-sonnet-5-5",
+        FastModel = "claude-haiku-5-5"
     };
 
     private static string MessageResponse(string text) =>
@@ -49,7 +49,7 @@ public class TasteProfileClientTests
         Assert.Equal("sk-test", request.Headers.GetValues("x-api-key").Single());
 
         var body = handler.RequestBodies.Single();
-        Assert.Contains("claude-sonnet-4-6", body); // strong tier for the analysis
+        Assert.Contains("claude-sonnet-5-5", body); // strong tier for the analysis
         Assert.Contains("Jazz", body); // evidence digest reached the model
     }
 
