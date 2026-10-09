@@ -20,12 +20,28 @@ public static class WebHosts
         "ssl.gstatic.com",
     ];
 
+    // The Play Store's website. Matched by host rather than registrable domain: Google is one
+    // registrable domain, so a domain block would close Maps, Search and Gmail along with it.
+    // The Play Store app keeps running (it delivers the owner's app updates); only its web face is shut.
+    private static readonly string[] PlayStoreHostSuffixes =
+    [
+        "play.google.com",
+        "play.app.goo.gl",
+        "market.android.com",
+    ];
+
     /// <summary>Social-media registrable domains blocked in the restricted browser (eTLD+1 match).</summary>
     public static IReadOnlySet<string> BlockedRegistrableDomains { get; } = new HashSet<string>
     {
         "facebook.com", "fb.com", "instagram.com", "twitter.com", "x.com", "tiktok.com",
         "reddit.com", "snapchat.com", "pinterest.com", "tumblr.com",
     };
+
+    /// <summary>True if the host is (or is a subdomain of) the Play Store's website.</summary>
+    public static bool IsPlayStoreHost(string host) =>
+        PlayStoreHostSuffixes.Any(suffix =>
+            host.Equals(suffix, StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith("." + suffix, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>True if the host is (or is a subdomain of) a Google auth host a login may cross to.</summary>
     public static bool IsGoogleAuthHost(string host) =>

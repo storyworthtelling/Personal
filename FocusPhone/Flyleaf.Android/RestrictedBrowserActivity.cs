@@ -24,10 +24,12 @@ namespace Flyleaf;
     Label = "Web",
     Exported = true,
     Theme = "@style/Theme.FocusPhone.Paper")]
+// market:// is the Play Store's own link scheme. It is claimed here, not left to the Play Store, so a
+// market link from another app lands on this page's Blocked notice (LinkPolicy refuses non-web schemes).
 [IntentFilter(
     [Intent.ActionView],
     Categories = [Intent.CategoryDefault, Intent.CategoryBrowsable],
-    DataSchemes = ["http", "https"])]
+    DataSchemes = ["http", "https", "market"])]
 public class RestrictedBrowserActivity : Activity
 {
     private WebView? webView;
