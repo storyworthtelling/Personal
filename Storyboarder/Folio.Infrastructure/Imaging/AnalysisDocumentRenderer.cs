@@ -63,7 +63,7 @@ public sealed class AnalysisDocumentRenderer
         IReadOnlyList<(string Title, int Page)> relative;
         using (var probe = new PageWriter(foot))
         {
-            RenderContent(analysis, titled, draft, probe, manuscript, chapters);
+            RenderContent(analysis, titled, scenes, draft, probe, manuscript, chapters);
             relative = probe.TocEntries.ToList();
             probe.Finish();
         }
@@ -83,13 +83,13 @@ public sealed class AnalysisDocumentRenderer
         covers.AnalysisCover(document, titled);
         covers.AnalysisToc(document, entries);
         document.NewPage();
-        RenderContent(analysis, titled, draft, document, manuscript, chapters);
+        RenderContent(analysis, titled, scenes, draft, document, manuscript, chapters);
         return new AnalysisRenderResult(document.Finish(), frontMatter, entries);
     }
 
     private static void RenderContent(
-        BookAnalysisResult analysis, ReportCover cover, DraftReview review, PageWriter writer,
-        string? manuscript, IReadOnlyList<ChapterSpan>? chapters)
+        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview review,
+        PageWriter writer, string? manuscript, IReadOnlyList<ChapterSpan>? chapters)
     {
         using var body = ReportType.Body();
         using var bodyBold = ReportType.BodyBold();
@@ -178,7 +178,7 @@ public sealed class AnalysisDocumentRenderer
 
         RenderWholeBookNotes(writer, analysis, marked.Unplaced, body, bodyBold, bodyItalic, h2, h3);
 
-        RenderMarkedManuscript(writer, text, marked.Marks, bodyItalic, h2);
+        RenderMarkedManuscript(writer, text, marked.Marks, scenes, bodyItalic, h2);
 
         RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3);
 
@@ -197,24 +197,40 @@ public sealed class AnalysisDocumentRenderer
     /// the book, not a reading of it.
     /// </summary>
     private static void RenderMarkedManuscript(
-        PageWriter writer, string manuscript, IReadOnlyList<Mark> marks, SKFont bodyItalic, SKFont h2)
+        PageWriter writer, string manuscript, IReadOnlyList<Mark> marks, IReadOnlyList<SceneEvidence> scenes,
+        SKFont bodyItalic, SKFont h2)
     {
-        // A hundred and forty pages of unmarked prose is a copy of the book, not a reading of it.
-        if (string.IsNullOrWhiteSpace(manuscript) || marks.Count == 0)
+        scenes ??= [];
+
+        // A hundred and forty pages of unmarked prose is a copy of the book, not a reading of it — but
+        // a scene's block is a reading too, so a book with scenes and no marks still prints.
+        if (!string.IsNullOrWhiteSpace(manuscript) && (marks.Count > 0 || scenes.Count > 0))
+        {
+            writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
+            writer.Paragraph(
+                "Your pages with the findings on them. A caret is something missing, a struck line is "
+                + "something doing no work, an underline is something unclear, and a ticked underline is "
+                + "praise — and the note in the margin says why. None of them writes the line for you. "
+                + "At the end of each scene, a block shows the picture a reader forms from your words, "
+                + "and what the scene is doing.",
+                bodyItalic, Muted);
+
+            MarkedManuscript.Render(writer, manuscript, marks, scenes);
+
+            // Whatever follows starts on its own sheet. After a hundred and forty pages of marked
+            // prose, a section heading four lines under the last one reads as part of the book.
+            writer.NewPage();
+            return;
+        }
+
+        // The source text is not to hand, so there is no page to insert the scenes into. They are
+        // still part of the reading, and are printed in order rather than dropped.
+        if (scenes.Count == 0)
             return;
 
-        writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
-        writer.Paragraph(
-            "Your pages with the findings on them. A caret is something missing, a struck line is "
-            + "something doing no work, an underline is something unclear, and a ticked underline is "
-            + "praise — and the note in the margin says why. None of them writes the line for you.",
-            bodyItalic, Muted);
-
-        MarkedManuscript.Render(writer, manuscript, marks);
-
-        // Whatever follows starts on its own sheet. After a hundred and forty pages of marked prose,
-        // a section heading four lines under the last one reads as part of the book.
-        writer.NewPage();
+        writer.Heading("Scenes", h2, Ink, ruled: true);
+        foreach (var scene in scenes)
+            MarkedManuscript.DrawSceneBlock(writer, scene);
     }
 
     /// <summary>The section persona whose own read routes to a place other than "Whole-book notes".</summary>

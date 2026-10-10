@@ -1,5 +1,7 @@
+using Folio.Domain.Imaging;
 using Folio.Domain.Markup;
 using Folio.Domain.Readiness;
+using Folio.Domain.Report;
 using SkiaSharp;
 using Storyworthtelling.Paper;
 
@@ -26,7 +28,19 @@ internal static class MarkedManuscript
 {
     private const float MarkStroke = 1.1f;
 
-    public static void Render(PageWriter writer, string manuscript, IReadOnlyList<Mark> marks)
+    /// <summary>
+    /// Fewest lines worth carrying on beneath a scene's block. Less than this and the sheet is
+    /// finished: a margin column cannot pack its notes into two lines of room.
+    /// </summary>
+    private const int MinimumRoomInLines = 4;
+
+    /// <param name="scenes">
+    /// Each scene's picture and notes, inserted as a block under the scene's own last line. The
+    /// manuscript is cut at those lines and carries on beneath each block, on the same sheet when
+    /// there is room for it.
+    /// </param>
+    public static void Render(
+        PageWriter writer, string manuscript, IReadOnlyList<Mark> marks, IReadOnlyList<SceneEvidence>? scenes = null)
     {
         if (string.IsNullOrWhiteSpace(manuscript))
             return;
@@ -51,11 +65,67 @@ internal static class MarkedManuscript
             .ToLookup(placed => placed.Line, placed => placed.Mark);
         var anchored = Anchor(all, spans);
 
+        // Each block follows the line its scene ends on; one with no known end follows the last line
+        // rather than being lost. The sort is stable, so scenes ending on one line keep reading order.
+        var pending = new Queue<(int Line, SceneEvidence Scene)>(
+            (scenes ?? [])
+                .Select(scene => (
+                    Line: SceneBlockPlan.LineAfter(manuscript, spans, scene.EndOffset) ?? lines.Count - 1,
+                    Scene: scene))
+                .OrderBy(placed => placed.Line));
+
         var first = 0;
+        var continuePage = false;
         while (first < lines.Count)
         {
-            first = writer.ManuscriptPage(manuscript, lines, first, drawnOn, anchored, prose, note);
+            var limit = pending.Count > 0 ? Math.Max(pending.Peek().Line + 1, first + 1) : lines.Count;
+            first = writer.ManuscriptPage(manuscript, lines, first, limit, continuePage, drawnOn, anchored, prose, note);
+
+            var drew = false;
+            while (pending.Count > 0 && pending.Peek().Line < first)
+            {
+                DrawSceneBlock(writer, pending.Dequeue().Scene);
+                drew = true;
+            }
+
+            // The next scene carries on under the block it just got, unless the block ended the sheet.
+            continuePage = drew && (writer.OnFreshPage || writer.Remaining >= MinimumRoomInLines * MarkupGeometry.LineHeight);
         }
+
+        while (pending.Count > 0)
+            DrawSceneBlock(writer, pending.Dequeue().Scene);
+    }
+
+    /// <summary>
+    /// One scene's block: its citation, the picture a reader forms from the prose — or, for a scene
+    /// that changed, the previous draft's beside it — then what the scene is for and whether it earns
+    /// its place. It spans the whole measure, because it sits between lines of prose rather than
+    /// beside them, and it is kept whole on one sheet where the picture allows.
+    /// </summary>
+    public static void DrawSceneBlock(PageWriter writer, SceneEvidence scene)
+    {
+        using var body = ReportType.Body();
+        using var italic = ReportType.BodyItalic();
+
+        writer.Gap(PageGeometry.BlockGap);
+        writer.KeepTogether(PageGeometry.SceneImageHeight + 80f);
+        writer.Hairline();
+        writer.Paragraph(string.IsNullOrWhiteSpace(scene.Citation) ? "Scene" : scene.Citation, italic, ReportPalette.Rule);
+
+        if (scene.ShowsPair)
+            writer.ScenePair(scene.PreviousImage!, scene.Image!);
+        else if (scene.Image is { Length: > 0 })
+            writer.Image(scene.Image);
+        else
+            writer.Paragraph("Image unavailable for this scene.", italic, ReportPalette.InkMuted);
+
+        if (!string.IsNullOrWhiteSpace(scene.Purpose))
+            writer.Paragraph(scene.Purpose, body, ReportPalette.Ink);
+        if (!string.IsNullOrWhiteSpace(scene.Verdict))
+            writer.Paragraph(scene.Verdict, italic, ReportPalette.InkMuted);
+
+        writer.Hairline();
+        writer.Gap(PageGeometry.BlockGap);
     }
 
     /// <summary>

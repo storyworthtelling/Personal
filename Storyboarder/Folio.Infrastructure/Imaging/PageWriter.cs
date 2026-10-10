@@ -87,6 +87,11 @@ internal sealed class PageWriter : IDisposable
 
     public void Gap(float height) => y += height;
 
+    /// <summary>How far down the sheet the flow has got, and how much of it is left.</summary>
+    public float Remaining => ContentBottom - y;
+
+    public bool OnFreshPage => y <= ContentTop + 0.5f;
+
     // Break to a fresh page if the next `height` points wouldn't fit, so a block (a scene's image +
     // citation) isn't split across a page boundary.
     public void KeepTogether(float height)
@@ -403,16 +408,25 @@ internal sealed class PageWriter : IDisposable
     /// decision). Which is why this returns a line number rather than taking one.</para>
     /// </summary>
     public int ManuscriptPage(
-        string manuscript, IReadOnlyList<TextSpan> lines, int first,
+        string manuscript, IReadOnlyList<TextSpan> lines, int first, int limit, bool continuePage,
         ILookup<int, Mark> drawnOn, ILookup<int, Mark> anchored, SKFont prose, SKFont noteFont)
     {
-        NewPage();
+        // A run of lines either opens a fresh sheet or carries on beneath what is already on this one
+        // — a scene's block, which is small beside a sheet and should not cost the next scene one.
+        if (!continuePage)
+            NewPage();
+
+        var origin = continuePage ? y : ContentTop;
+        var available = continuePage ? ContentBottom - origin : (float)MarkupGeometry.ContentHeight;
+        var perPage = continuePage
+            ? Math.Max((int)(available / (float)MarkupGeometry.LineHeight), 1)
+            : MarkupGeometry.LinesPerPage;
 
         var lineHeight = (float)MarkupGeometry.LineHeight;
         var textLeft = ContentLeft;
         var marginLeft = ContentLeft + (float)MarkupGeometry.MarginLeft;
         var noteWidth = (float)MarkupGeometry.MarginWidth;
-        var last = Math.Min(first + MarkupGeometry.LinesPerPage, lines.Count);
+        var last = Math.Min(Math.Min(first + perPage, lines.Count), limit);
 
         // What each line's notes come to, in the order the notes will be packed.
         var wanted = new List<(int Line, double AnchorY, double Height)>();
@@ -428,7 +442,7 @@ internal sealed class PageWriter : IDisposable
             }
         }
 
-        var packed = MarginColumn.Place(wanted, (float)MarkupGeometry.ContentHeight);
+        var packed = MarginColumn.Place(wanted, available);
         var printable = Math.Max((int)Math.Ceiling(packed.TextHeight / lineHeight), 1);
         last = Math.Min(first + printable, last);
 
@@ -439,7 +453,7 @@ internal sealed class PageWriter : IDisposable
                 if (span.Length == 0)
                     continue;
 
-                var baseline = ContentTop + ((i - first) * lineHeight) + prose.Size;
+                var baseline = origin + ((i - first) * lineHeight) + prose.Size;
                 canvas.DrawText(manuscript[span.Start..span.End], textLeft, baseline, prose, ink);
 
                 foreach (var mark in drawnOn[i])
@@ -454,14 +468,14 @@ internal sealed class PageWriter : IDisposable
 
             DrawNote(
                 packed.Notes[n], wanted[n].Line, wrapped[n], anchored[wanted[n].Line].First(),
-                marginLeft, noteWidth, noteFont, lineHeight, prose.Size);
+                marginLeft, noteWidth, noteFont, lineHeight, prose.Size, origin);
         }
 
         // The page draws in absolute coordinates, so the flowing cursor has to be told where the
         // manuscript actually left off. Without this it stays at the top of the sheet and every
         // section after the manuscript prints straight through it — which is what the first render
         // of this page did, and no test could see.
-        y = ContentTop + ((last - first) * lineHeight);
+        y = origin + ((last - first) * lineHeight);
         return last;
     }
 
@@ -486,10 +500,10 @@ internal sealed class PageWriter : IDisposable
     /// </summary>
     private void DrawNote(
         PlacedNote note, int line, IReadOnlyList<string> wraps, Mark mark,
-        float marginLeft, float noteWidth, SKFont font, float lineHeight, float proseSize)
+        float marginLeft, float noteWidth, SKFont font, float lineHeight, float proseSize, float origin)
     {
         var hue = MarkedManuscript.Hue(mark.Severity);
-        var top = ContentTop + (float)note.Top;
+        var top = origin + (float)note.Top;
 
         using (var bracket = new SKPaint
         {
@@ -514,7 +528,7 @@ internal sealed class PageWriter : IDisposable
 
         // Out of the text, down the gutter, and in to the note — an elbow rather than a diagonal,
         // because a diagonal across a column of prose reads as a mark on the prose.
-        var anchorY = ContentTop + (float)note.AnchorY + (proseSize / 2f) + 2f;
+        var anchorY = origin + (float)note.AnchorY + (proseSize / 2f) + 2f;
         var elbow = ContentLeft + (float)MarkupGeometry.TextWidth + 22f;
         using var leader = new SKPaint
         {
