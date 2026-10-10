@@ -679,3 +679,15 @@ Process (owner, D211): one screen per round; every decision, question and approv
   in lock task mode, relays progress, and brings Pulp back at Home, a long pause or the end. Browser
   or automated playback stays out (terms of use, DRM, Netflix has no Android web player). Needs a
   policy revisit of Flyleaf's lockdown and per-service device checks.
+- **D289 · Playlists reorder by Move, not drag** (Move up / down / to the top / to the bottom from the
+  grip), over mockup 04's "drag the grip" note — big targets, no fight with scrolling, as Plate does.
+- **D290 · Mood search tells the model when a child is watching** ("AUDIENCE: children" — no name, no
+  age), so it suggests fewer titles the filter would drop. The filter still decides.
+- **D291 · The dog-ear takes the colour of the most serious waiting notice**, not the newest (mockup
+  12) — a change to the shared kit, so every phone app's fold follows it. Row icons on the action card
+  and a Waiting-page subtitle stay drawing differences.
+- **D292 · "Hide watched" is remembered per playlist, on this phone only.**
+- **D293 · An unrated title on a child's Favorites row says "Unrated"**, not "Above band"; ticking it
+  still allow-lists it (D128, D255).
+- **D294 · A child's empty Watching and empty Playlists pages are voiced too**, age-moderated like the
+  child's empty Favorites — two seats added to the closed list.
