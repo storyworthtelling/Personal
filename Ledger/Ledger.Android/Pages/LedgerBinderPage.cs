@@ -284,6 +284,12 @@ public abstract class LedgerBinderPage : ContentPage
         {
             row.ColumnDefinitions.Add(new ColumnDefinition(
                 i == buttons.Length - 1 ? GridLength.Star : GridLength.Auto));
+            // A view has one parent. The page's primary button is set into the bar by its constructor and
+            // again on every appearance, so it is still in the previous row here; take it out first.
+            if (buttons[i].Parent is Layout previousRow)
+            {
+                previousRow.Children.Remove(buttons[i]);
+            }
             row.Children.Add(buttons[i]);
             Grid.SetColumn(buttons[i], i);
         }
