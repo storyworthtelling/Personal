@@ -123,6 +123,16 @@ public static class Discoveries
         return shaped;
     }
 
+    /// <summary>
+    /// The track from a search that sits on the album an album pick names, or null. Matched on
+    /// the album's own title and artist — the same identity <see cref="IsAlreadyHeld"/> uses for
+    /// an album — so a song that happens to share the album's title, on some other record, is
+    /// not mistaken for it.
+    /// </summary>
+    public static Track? FindAlbumTrack(IEnumerable<Track> found, string albumTitle, string albumArtist) =>
+        found.FirstOrDefault(track =>
+            TrackIdentity.SameSong(track.AlbumName, track.AlbumArtist, albumTitle, albumArtist));
+
     private static bool IsAlreadyHeld(
         Recommendation pick, IReadOnlyList<Track> owned, IReadOnlyList<string>? subscribedShows) => pick.Kind switch
     {
