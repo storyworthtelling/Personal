@@ -70,11 +70,15 @@ public interface IAnalysisPdfComposer
     /// <summary>
     /// <paramref name="manuscript"/> is the draft's own text, which the report marks up (Release G).
     /// Optional, so a report can still be composed for a draft whose source is not to hand.
+    /// <paramref name="chapters"/> says where each chapter sits in that text, which is what lets a
+    /// finding that cites only a chapter be written on the opening of it; without them such a finding
+    /// is printed among the whole-book notes instead.
     /// </summary>
     byte[] Compose(
         Folio.Domain.Analysis.BookAnalysisResult analysis,
         ReportCover cover,
         IReadOnlyList<SceneEvidence> scenes,
         DraftReview review,
-        string? manuscript = null);
+        string? manuscript = null,
+        IReadOnlyList<Folio.Domain.Markup.ChapterSpan>? chapters = null);
 }
