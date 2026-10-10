@@ -20,6 +20,7 @@ public sealed class HouseholdView
     private readonly IReadOnlyList<HouseholdPlaylist> playlists;
     private readonly IReadOnlyList<ViewerVeto> vetoes;
     private readonly IReadOnlyList<ChildStarEntry> stars;
+    private readonly IReadOnlyList<ContinueDismissedEntry> dismissals;
 
     private HouseholdView(HouseholdDocument document)
     {
@@ -37,6 +38,7 @@ public sealed class HouseholdView
         playlists = Gather(HouseholdMaps.Playlist);
         vetoes = Gather(HouseholdMaps.Veto);
         stars = Gather(HouseholdMaps.ChildStar);
+        dismissals = Gather(HouseholdMaps.ContinueDismissed);
         var picks = Gather(HouseholdMaps.ParentPick);
         var rules = Gather(HouseholdMaps.ChildRules);
         var viewers = Gather(HouseholdMaps.Viewer);
@@ -96,4 +98,8 @@ public sealed class HouseholdView
 
     public IReadOnlyList<ChildStar> StarsOf(ViewerId child) =>
         stars.Where(star => star.Child == child).Select(star => star.Star).ToList();
+
+    /// <summary>One viewer's own removals from Continue watching (D31, D97).</summary>
+    public IReadOnlyList<ContinueDismissal> DismissalsOf(ViewerId viewer) =>
+        dismissals.Where(entry => entry.Viewer == viewer).Select(entry => entry.Dismissal).ToList();
 }

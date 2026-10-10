@@ -146,19 +146,4 @@ public class TitleProgressTests
         Assert.Throws<ArgumentException>(() =>
             EpisodeMarks.For(CardActionKind.Watched, Show(), E(9, 1), new HashSet<EpisodeRef>(), Now));
     }
-
-    [Fact]
-    public void TheViewerIsTheHouseholdsFirstAdultAndNeverAChild()
-    {
-        var roster = new Pulp.Domain.People.HouseholdRoster(
-        [
-            new(new ViewerId("wren-example"), IsChild: true),
-            new(new ViewerId("ash-example"), IsChild: false),
-            new(new ViewerId("bay-example"), IsChild: false),
-        ]);
-
-        Assert.Equal(new ViewerId("ash-example"), TitleViewer.Of(roster));
-        Assert.Null(TitleViewer.Of(new Pulp.Domain.People.HouseholdRoster([new(new ViewerId("wren-example"), IsChild: true)])));
-        Assert.Null(TitleViewer.Of(null));
-    }
 }

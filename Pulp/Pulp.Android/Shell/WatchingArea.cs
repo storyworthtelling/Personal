@@ -7,6 +7,7 @@ using Pulp.App;
 using Pulp.Components;
 using Pulp.Domain.Core;
 using Pulp.Domain.Library;
+using Pulp.Domain.People;
 using Pulp.Domain.Shell;
 using Pulp.Domain.Voice;
 using Pulp.Domain.Watching;
@@ -22,9 +23,10 @@ namespace Pulp.Shell;
 /// (D152); each row a poster, title, what's next, where it plays and how, and the pencil mark (D150).
 /// A tap opens the title page (D151); a long press, the action card (mockup 10).
 ///
-/// <para>Whose list it is: the phone's viewer, as <see cref="ContinueWatchingViewer"/> answers it. With
-/// nobody to answer for — no roster yet, which is a fresh install before Release D's first run — the
-/// page is its empty state, never somebody else's rows (D97). Reading happens off the UI thread and
+/// <para>Whose list it is: the phone's viewer, as <see cref="ThisPhone"/> answers it. With no roster
+/// yet — a fresh install before Release D's first run — the page is its empty state; with a roster
+/// that does not settle whose phone this is, it says so in <see cref="ThisPhone.UnmatchedSentence"/>.
+/// Never somebody else's rows (D97). Reading happens off the UI thread and
 /// the page says so in a status sentence while it does, never a spinner.</para>
 ///
 /// <para>The voiced greeting sits under the header only once something has been composed (D118); the
@@ -46,6 +48,7 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
     private CancellationTokenSource? loading;
     private IReadOnlyList<WatchingRow>? rows;
     private ViewerId? viewer;
+    private ThisPhoneStatus phone = ThisPhoneStatus.NoRoster;
     private bool unreadable;
     private string? greeting;
     private VoiceLineAction emptyAction = VoiceLineAction.ShowNeutral;
@@ -75,6 +78,11 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
         if (rows is null)
         {
             return Column(PaperUi.Secondary(Host, ReadingStatus));
+        }
+
+        if (phone == ThisPhoneStatus.Unmatched)
+        {
+            return Column(PaperUi.Secondary(Host, ThisPhone.UnmatchedSentence));
         }
 
         var visible = rows.Where(row => !hidden.Contains(row.Row.Title)).ToList();
@@ -140,13 +148,12 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
         var cancel = new CancellationTokenSource();
         loading = cancel;
         var services = PulpServices.For(Host);
-        var posters = new PosterFiles(Host, (message, exception) => services.Diagnostics.Warn("watching", message, exception));
 
         _ = Task.Run(async () =>
         {
             try
             {
-                var (who, read) = await ReadAsync(services, posters, cancel.Token);
+                var (who, read) = await ReadAsync(services, cancel.Token);
                 Host.RunOnUiThread(() =>
                 {
                     if (cancel.IsCancellationRequested)
@@ -155,7 +162,8 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
                     }
 
                     unreadable = false;
-                    viewer = who;
+                    phone = who.Status;
+                    viewer = who.Viewer;
                     rows = read;
                     Invalidate();
                     _ = SpeakAsync(services, read, cancel.Token);
@@ -177,13 +185,14 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
         });
     }
 
-    private static async Task<(ViewerId? Viewer, IReadOnlyList<WatchingRow> Rows)> ReadAsync(
-        PulpServices services, PosterFiles posters, CancellationToken cancellationToken)
+    private static async Task<(ThisPhoneAnswer Who, IReadOnlyList<WatchingRow> Rows)> ReadAsync(
+        PulpServices services, CancellationToken cancellationToken)
     {
         var household = await services.HouseholdAsync(cancellationToken);
-        if (ContinueWatchingViewer.Resolve(household.Roster) is not { } who)
+        var phone = services.ThisPhoneOf(household);
+        if (phone.Viewer is not { } who)
         {
-            return (null, []);
+            return (phone, []);
         }
 
         var continueRows = await services.ContinueWatchingAsync(who, cancellationToken);
@@ -205,10 +214,10 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
                     service => services.Catalogue.ById(service)?.Name ?? service.Value),
                 home,
                 serviceName,
-                await posters.PathForAsync(title?.PosterUrl, cancellationToken)));
+                await services.Posters.PathForAsync(title?.PosterUrl, cancellationToken)));
         }
 
-        return (who, read);
+        return (phone, read);
     }
 
     /// <summary>

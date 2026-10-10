@@ -28,9 +28,6 @@ public static class TitlePageText
     /// <summary>Play with nobody on the household roster yet: the child gate has nobody to judge for.</summary>
     public const string NoHousehold = "Play waits until the household is set up in Settings.";
 
-    /// <summary>Play with no adult on the roster: a hand-off from this page is always an adult's.</summary>
-    public const string NoAdult = "Play waits until an adult is added to the household in Settings.";
-
     /// <summary>The household could not be read into a roster the child gate can judge by; the reason is in Diagnostics.</summary>
     public const string HouseholdUnreadable = "Play waits until the household's settings can be read. Diagnostics has the reason.";
 

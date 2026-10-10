@@ -12,6 +12,7 @@ using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
+using Pulp.Domain.People;
 using Pulp.Domain.Shell;
 using Pulp.Domain.Voice;
 using Pulp.Shell;
@@ -69,8 +70,8 @@ public class RecentlyWatchedActivity : Activity
         var watching = PulpAreas.All.ToList().FindIndex(spec => spec.Area == PulpArea.Watching);
         var rule = AreaPalette.For(PulpAreas.RuleHue(PulpArea.Watching)).Rule;
 
-        // Home is underneath this page, so any tab returns there; Watching is where it lands (§9).
-        var (spread, pageOverlay) = BinderFrame.WrapWithOverlay(this, PageTitle, rule, scroll, areas, watching, _ => Finish());
+        // Watching is the active tab (§9); any tab opens the shell on the area tapped.
+        var (spread, pageOverlay) = BinderFrame.WrapWithOverlay(this, PageTitle, rule, scroll, areas, watching, index => MainActivity.OpenOn(this, index));
         overlay = pageOverlay;
         SetContentView(spread);
 
@@ -115,7 +116,7 @@ public class RecentlyWatchedActivity : Activity
     }
 
     private sealed record Snapshot(
-        LibraryViewerStatus Status,
+        ThisPhoneStatus Status,
         ViewerId? Viewer,
         IReadOnlyList<RecentDay> Days,
         IReadOnlyList<WatchEvent> Sittings,
@@ -124,7 +125,7 @@ public class RecentlyWatchedActivity : Activity
     private async Task<Snapshot> LoadAsync(CancellationToken token)
     {
         var view = await services.HouseholdAsync(token);
-        var me = LibraryViewer.Me(view.Roster);
+        var me = services.ThisPhoneOf(view);
         if (me.Viewer is not { } viewer)
         {
             return new Snapshot(me.Status, null, [], [], new Dictionary<TitleId, CatalogueTitle>());
@@ -141,7 +142,7 @@ public class RecentlyWatchedActivity : Activity
             }
         }
 
-        return new Snapshot(LibraryViewerStatus.Known, viewer, days, view.SittingsOf(viewer), titles);
+        return new Snapshot(ThisPhoneStatus.Known, viewer, days, view.SittingsOf(viewer), titles);
     }
 
     private void ShowStatus(string sentence)
@@ -156,13 +157,13 @@ public class RecentlyWatchedActivity : Activity
 
         switch (snapshot.Status)
         {
-            case LibraryViewerStatus.NoRoster:
+            case ThisPhoneStatus.NoRoster:
                 ShowEmpty();
                 return;
-            case LibraryViewerStatus.Unmatched:
-                ShowStatus(LibraryViewer.UnmatchedStatus);
+            case ThisPhoneStatus.Unmatched:
+                ShowStatus(ThisPhone.UnmatchedSentence);
                 return;
-            case LibraryViewerStatus.Known:
+            case ThisPhoneStatus.Known:
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(snapshot), snapshot.Status, "A viewer status the page does not know.");

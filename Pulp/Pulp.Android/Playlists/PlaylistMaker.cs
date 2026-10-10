@@ -1,4 +1,3 @@
-using Codex.Ui.Voice;
 using Pulp.App;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Children;
@@ -23,22 +22,14 @@ internal sealed record MadeOutcome(HouseholdPlaylist? Saved, string? Status);
 /// shared when they chose so. "No idea" from the model, or nothing left once resolved, is one quiet
 /// status sentence and nothing is saved; neither is ever voiced (D99, G12). Runs off the UI thread.
 ///
-/// <para><b>A second catalogue client.</b> <see cref="PulpServices"/> does not expose a title search, and
-/// <c>App/</c> is outside this screen's brief, so the maker builds its own
-/// <see cref="StreamingAvailabilityClient"/> over the same keys and catalogue. It is given no lookup
-/// counter — a second <c>DiagnosticsLookupCounter</c> over the same tally file would overwrite the
-/// first's counts — so each make writes its search count to Diagnostics instead. The fix is a
-/// <c>PulpServices.SearchAsync</c>; reported, not made.</para>
+/// <para>Each suggested name is searched through <see cref="PulpServices.SearchAsync"/>, the one
+/// counted client, so a made playlist's searches are on the month's lookup count (D261).</para>
 /// </summary>
 internal sealed class PlaylistMaker(PulpServices services)
 {
     public const string NoIdea = "No playlist came of that, so nothing was saved.";
     public const string NothingOnOurServices = "None of the suggestions are on your services, so nothing was saved.";
     public const string Asking = "Asking for titles…";
-
-    private static readonly HttpClient Http = new(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromSeconds(30) };
-
-    private StreamingAvailabilityClient? search;
 
     public async Task<MadeOutcome> MakeAsync(
         PlaylistSeed seed,
@@ -66,20 +57,17 @@ internal sealed class PlaylistMaker(PulpServices services)
 
         var results = new List<CatalogueTitle>();
         var terms = MoodPlan.SearchTerms(answer);
-        search ??= new StreamingAvailabilityClient(Http, services.Keys, services.Catalogue, counter: null, new CredentialHealthStore());
         foreach (var term in terms)
         {
             try
             {
-                results.AddRange(await search.SearchByTitleAsync(term, kind: null, cancellationToken));
+                results.AddRange(await services.SearchAsync(term, cancellationToken));
             }
             catch (CatalogueLookupException exception)
             {
                 services.Diagnostics.Warn("playlists", $"A search for a suggested title failed ({exception.Failure}); that suggestion is dropped.", exception);
             }
         }
-
-        services.Diagnostics.Warn("lookups", $"A made playlist ran {terms.Count} title searches outside the monthly tally.");
 
         var made = PlaylistPlan.Resolve(query, answer, results, mood, _ => Array.Empty<FranchiseId>());
         if (made.Titles.Count == 0)

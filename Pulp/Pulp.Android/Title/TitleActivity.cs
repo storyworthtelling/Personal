@@ -18,6 +18,7 @@ using Pulp.Domain.Discover;
 using Pulp.Domain.HandOffs;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
+using Pulp.Domain.People;
 using Pulp.Domain.Ratings;
 using Pulp.Domain.Shell;
 using Pulp.Domain.Title;
@@ -199,11 +200,10 @@ public class TitleActivity : Activity
         var spread = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         spread.AddView(column, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent) { Weight = 1 });
 
-        // The gutter as drawn, Watching active. A tab goes back to the binder; the shell takes no
-        // area from an intent yet, so it lands on the area the page was opened from.
+        // The gutter as drawn, Watching active. A tab opens the shell on the area tapped.
         var binder = new BinderTabs(this);
         binder.SetAreas(PulpAreas.All.Select(Tab), 0);
-        binder.AreaSelected += _ => Finish();
+        binder.AreaSelected += index => MainActivity.OpenOn(this, index);
         spread.AddView(binder, new LinearLayout.LayoutParams(PaperTheme.Dp(this, BinderTabs.WidthDp), ViewGroup.LayoutParams.MatchParent));
         return spread;
     }
@@ -267,7 +267,7 @@ public class TitleActivity : Activity
     private async Task<HouseholdRead> ReadHouseholdAsync(CancellationToken token)
     {
         var view = await services.HouseholdAsync(token);
-        var viewer = TitleViewer.Of(view.Roster);
+        var viewer = services.ThisPhoneOf(view).Viewer;
         var sittings = viewer is { } who ? view.SittingsOf(who) : [];
 
         HandOffExecutor? executor;
@@ -275,7 +275,7 @@ public class TitleActivity : Activity
         try
         {
             executor = await services.HandOffsAsync(token);
-            blocked = executor is null ? TitlePageText.NoHousehold : viewer is null ? TitlePageText.NoAdult : null;
+            blocked = executor is null ? TitlePageText.NoHousehold : viewer is null ? ThisPhone.UnmatchedSentence : null;
         }
         catch (ArgumentException exception)
         {
@@ -357,7 +357,7 @@ public class TitleActivity : Activity
         try
         {
             var size = PaperTheme.Dp(this, PosterHeightDp);
-            var bitmap = await Task.Run(() => TitlePoster.LoadAsync(this, url, size, services.Diagnostics, token), token);
+            var bitmap = await Task.Run(() => services.Posters.LoadAsync(url, size, token), token);
             Post(() => poster.SetArtwork(bitmap));
         }
         catch (System.OperationCanceledException) when (token.IsCancellationRequested)
@@ -627,7 +627,7 @@ public class TitleActivity : Activity
         }
 
         // An adult's hand-off: the catalogue carries no franchises, and a franchise block is a child's
-        // rule, which the gate applies only to a child — none is on this request (TitleViewer).
+        // rule, which the gate applies only to a child — none is on this request (ThisPhone never answers a child).
         var request = new HandOffRequest([viewer], DiscoverFacts.For(title, _ => []), link, TitleHomes.SessionNames(title, episode));
         var at = DateTimeOffset.UtcNow;
         var outcome = executor.Start(this, request, at);

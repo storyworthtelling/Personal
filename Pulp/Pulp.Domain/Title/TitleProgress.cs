@@ -2,7 +2,6 @@ using Pulp.Domain.Actions;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
 using Pulp.Domain.Library;
-using Pulp.Domain.People;
 
 namespace Pulp.Domain.Title;
 
@@ -144,15 +143,4 @@ public static class EpisodeMarks
 
     private static WatchEvent Mark(TitleId show, EpisodeRef episode, WatchSource evidence, DateTimeOffset at) =>
         new(show, WatchedKind.Show, at, Service: null, episode, evidence);
-}
-
-/// <summary>
-/// Whose page this is. Pulp has no "who is holding the phone" yet (first run is Release D's), so the
-/// title page takes the roster's first adult — never a child, since a hand-off from this page is not
-/// put through a child's view, and never a guess when there is no adult at all.
-/// </summary>
-public static class TitleViewer
-{
-    public static ViewerId? Of(HouseholdRoster? roster) =>
-        roster?.Viewers.FirstOrDefault(viewer => !viewer.IsChild)?.Id;
 }

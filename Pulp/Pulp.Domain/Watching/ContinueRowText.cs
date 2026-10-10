@@ -2,7 +2,6 @@ using Pulp.Domain.Availability;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
 using Pulp.Domain.Library;
-using Pulp.Domain.People;
 
 namespace Pulp.Domain.Watching;
 
@@ -156,24 +155,4 @@ public static class ContinueRowText
         VideoQuality.Sd => "SD",
         _ => throw new ArgumentOutOfRangeException(nameof(quality), quality, "A picture quality with no name written for it."),
     };
-}
-
-/// <summary>
-/// Whose Continue watching this phone shows (D97: each viewer's is private). The household does not
-/// yet record which viewer a phone belongs to — Release D's first run does — so the one answer that
-/// cannot be wrong is taken: the roster's only adult. With no roster, two adults, or only children,
-/// there is nobody, and the page shows its empty state rather than another person's list.
-/// </summary>
-public static class ContinueWatchingViewer
-{
-    public static ViewerId? Resolve(HouseholdRoster? roster)
-    {
-        if (roster is null)
-        {
-            return null;
-        }
-
-        var adults = roster.Viewers.Where(viewer => !viewer.IsChild).ToList();
-        return adults.Count == 1 ? adults[0].Id : null;
-    }
 }

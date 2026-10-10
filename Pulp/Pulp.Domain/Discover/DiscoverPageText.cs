@@ -23,9 +23,6 @@ public static class DiscoverPageText
     /// <summary>No roster yet: the household is set up at first run (Release D).</summary>
     public const string NoHousehold = "The stack is dealt once the household is set up.";
 
-    /// <summary>A roster with two adults and nothing saying whose phone this is.</summary>
-    public const string WhosePhone = "The stack is dealt once this phone knows whose it is.";
-
     /// <summary>A week with nothing in it: no titles on the household's services came back to deal from.</summary>
     public const string NothingToDeal = "Nothing to deal this week yet.";
 
