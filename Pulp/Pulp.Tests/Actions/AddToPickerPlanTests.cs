@@ -134,13 +134,38 @@ public class AddToPickerPlanTests
         Assert.Equal(PickerChange.RemoveUndoFirst, AddToPickerPlan.Tap(robin));
     }
 
+    /// <summary>
+    /// D293: an unrated title is not above anybody's band — it has no band — so the row says
+    /// "Unrated" rather than "Above band". A child is still not shown it (D128), so ticking it is still
+    /// a parent's pick that allow-lists it (D255). The bug this reintroduces is the badge calling an
+    /// unrated title "Above band" — telling the parent something about its rating that is not true.
+    /// </summary>
     [Fact]
-    public void AnUnratedTitleReadsAsAboveBandBecauseAChildIsNotShownIt()
+    public void AnUnratedTitleSaysUnratedAndTickingStillAllowListsIt()
     {
         var unrated = new TitleFacts(Saltmarsh, TitleKind.Show, ContentRating.Unrated);
         var model = AddToPickerPlan.Build("Saltmarsh", Entry, unrated, [], [Child("Robin", BandAtLeastTeen())]);
 
-        Assert.Equal(ChildBadge.AboveBand, Assert.Single(model.Favorites).Badge);
+        var robin = Assert.Single(model.Favorites);
+        Assert.Equal("Unrated", AddToPickerPlan.BadgeLabel(robin.Badge));
+        Assert.True(robin.Enabled);
+        Assert.Equal(PickerChange.AddAndAllowList, AddToPickerPlan.Tap(robin));
+    }
+
+    [Fact]
+    public void AnUnratedParentsPickIsTickedAndStillSaysUnrated()
+    {
+        var rules = new ChildRules(new ViewerId("robin"), BandAtLeastTeen())
+        {
+            ParentPicks = [new ParentPick(Saltmarsh, new ViewerId("parent"), Now)],
+        };
+        var unrated = new TitleFacts(Saltmarsh, TitleKind.Show, ContentRating.Unrated);
+        var model = AddToPickerPlan.Build("Saltmarsh", Entry, unrated, [], [new PickerChild("Robin", rules)]);
+
+        var robin = Assert.Single(model.Favorites);
+        Assert.True(robin.Ticked);
+        Assert.Equal("Unrated", AddToPickerPlan.BadgeLabel(robin.Badge));
+        Assert.Equal(PickerChange.RemoveUndoFirst, AddToPickerPlan.Tap(robin));
     }
 
     [Fact]

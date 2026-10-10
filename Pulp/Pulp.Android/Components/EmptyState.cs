@@ -105,7 +105,10 @@ public sealed class EmptyState : LinearLayout
         neutral.Visibility = ViewStates.Gone;
     }
 
-    /// <summary>The neutral Serif italic line for each empty page (D264), from mockup 13's drawn copy.</summary>
+    /// <summary>
+    /// The neutral Serif italic line for each empty page (D264), from mockup 13's drawn copy. A child's
+    /// two later pages (D294) are written in the plain, short voice of the child's Favorites line.
+    /// </summary>
     public static string NeutralLine(VoiceSeat seat) => seat switch
     {
         VoiceSeat.EmptyContinueWatching => "Nothing started yet. Discover has this week's stack.",
@@ -113,6 +116,8 @@ public sealed class EmptyState : LinearLayout
         VoiceSeat.EmptyPlaylist => "Nothing on this playlist yet.",
         VoiceSeat.EmptyRecentlyWatched => "Nothing watched yet.",
         VoiceSeat.EmptyChildFavorites => "No favorites yet.",
+        VoiceSeat.EmptyChildWatching => "Nothing started yet.",
+        VoiceSeat.EmptyChildPlaylists => "No playlists yet.",
         VoiceSeat.EmptyCalendar => "Nothing in the next two weeks.",
         VoiceSeat.EmptySports => "No teams followed yet.",
         VoiceSeat.StackUsedUp => "That's the week. More on Friday.",

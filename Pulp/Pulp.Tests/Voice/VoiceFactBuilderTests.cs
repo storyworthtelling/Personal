@@ -110,6 +110,8 @@ public class VoiceFactBuilderTests
             ChildVoiceFacts.Greeting(PipRules, Evening, firstOpenOfDay: true),
             ChildVoiceFacts.Favorites(PipRules, [Named("t-otter", "Otter Island", "TV-Y")]),
             ChildVoiceFacts.EmptyFavorites(PipRules),
+            ChildVoiceFacts.EmptyWatching(PipRules),
+            ChildVoiceFacts.EmptyPlaylists(PipRules),
         };
 
         Assert.All(all, facts =>
@@ -139,6 +141,27 @@ public class VoiceFactBuilderTests
         Assert.DoesNotContain("Biscuit and the Map", text);
     }
 
+    /// <summary>
+    /// D294: a child's empty Watching and empty Playlists pages are voiced, each on its own seat and at
+    /// the child's reading level — a younger child's line is moderated for a younger band.
+    /// </summary>
+    [Fact]
+    public void AChildsEmptyWatchingAndPlaylistsPagesAreTheirOwnChildSeats()
+    {
+        var younger = new ChildRules(new ViewerId("wren"), AgeBand.UnderSeven);
+
+        var watching = ChildVoiceFacts.EmptyWatching(younger);
+        var lists = ChildVoiceFacts.EmptyPlaylists(younger);
+
+        Assert.Equal(VoiceSeat.EmptyChildWatching, watching.Seat);
+        Assert.Equal(VoiceSeat.EmptyChildPlaylists, lists.Seat);
+        Assert.Equal(AgeBand.UnderSeven, watching.ReadingLevel);
+        Assert.Equal(AgeBand.UnderSeven, lists.ReadingLevel);
+        Assert.True(watching.HasFacts);
+        Assert.True(lists.HasFacts);
+        Assert.DoesNotMatch("[0-9]", string.Join(" ", watching.Lines.Concat(lists.Lines)));
+    }
+
     [Fact]
     public void AChildsFavoritesLineWithNothingVisibleNamesNothing()
     {
@@ -161,7 +184,7 @@ public class VoiceFactBuilderTests
         };
 
         var methods = typeof(ChildVoiceFacts).GetMethods(BindingFlags.Public | BindingFlags.Static);
-        Assert.Equal(3, methods.Length);
+        Assert.Equal(5, methods.Length);
 
         foreach (var method in methods)
         {

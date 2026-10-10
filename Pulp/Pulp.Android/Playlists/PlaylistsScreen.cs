@@ -53,13 +53,13 @@ internal sealed class PlaylistsScreen
     private readonly PulpServices services;
     private readonly LibraryWrites writes;
     private readonly PlaylistMaker maker;
+    private readonly HideWatchedStore hideWatchedStore;
     private readonly Dictionary<TitleId, CatalogueTitle> titles = [];
 
     private Showing showing = Showing.List;
     private PlaylistId? open;
     private Data? data;
     private string? status = Loading;
-    private bool hideWatched;
     private bool naming;
     private string nameDraft = string.Empty;
     private string promptDraft = string.Empty;
@@ -77,6 +77,7 @@ internal sealed class PlaylistsScreen
         services = PulpServices.For(host);
         writes = new LibraryWrites(services, () => host.RunOnUiThread(Reload));
         maker = new PlaylistMaker(services);
+        hideWatchedStore = new HideWatchedStore(host);
     }
 
     private sealed record Data(ThisPhoneAnswer Me, IReadOnlyList<HouseholdPlaylist> Playlists, HouseholdView View);
@@ -360,7 +361,8 @@ internal sealed class PlaylistsScreen
             return;
         }
 
-        column.AddView(HideWatchedChip(), Spaced());
+        var hideWatched = hideWatchedStore.IsOn(playlist.Id);
+        column.AddView(HideWatchedChip(playlist.Id, hideWatched), Spaced());
 
         var view = data!.View;
         var sittings = view.SittingsOf(viewer);
@@ -382,8 +384,11 @@ internal sealed class PlaylistsScreen
     private CatalogueTitle? TitleOf(PlaylistEntry entry) =>
         entry.Kind is PlaylistEntryKind.Film or PlaylistEntryKind.Show ? titles.GetValueOrDefault(new TitleId(entry.Key)) : null;
 
-    /// <summary>"Hide watched" (D101): a chip on its own line, washed in the identity while it is on.</summary>
-    private View HideWatchedChip()
+    /// <summary>
+    /// "Hide watched" (D101): a chip on its own line, washed in the identity while it is on, and
+    /// remembered for this playlist on this phone (D292).
+    /// </summary>
+    private View HideWatchedChip(PlaylistId playlist, bool hideWatched)
     {
         var chip = PaperUi.Label(host, "Hide watched");
         chip.SetTextColor(hideWatched ? PaperTheme.Ink : PaperTheme.InkSoft);
@@ -398,7 +403,7 @@ internal sealed class PlaylistsScreen
         chip.Clickable = true;
         chip.Click += (_, _) =>
         {
-            hideWatched = !hideWatched;
+            hideWatchedStore.Set(playlist, !hideWatched);
             invalidate();
         };
 

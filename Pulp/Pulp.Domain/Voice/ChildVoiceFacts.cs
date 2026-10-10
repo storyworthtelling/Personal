@@ -58,4 +58,18 @@ public static class ChildVoiceFacts
         ArgumentNullException.ThrowIfNull(child);
         return new VoiceFacts(VoiceSeat.EmptyChildFavorites, ["There are no favorites yet."], child.Ceiling);
     }
+
+    /// <summary>A child's Watching page with nothing started (D294): the one fact the empty page holds.</summary>
+    public static VoiceFacts EmptyWatching(ChildRules child)
+    {
+        ArgumentNullException.ThrowIfNull(child);
+        return new VoiceFacts(VoiceSeat.EmptyChildWatching, ["Nothing has been started yet."], child.Ceiling);
+    }
+
+    /// <summary>A child's Playlists page with none on it (D294): the one fact the empty page holds.</summary>
+    public static VoiceFacts EmptyPlaylists(ChildRules child)
+    {
+        ArgumentNullException.ThrowIfNull(child);
+        return new VoiceFacts(VoiceSeat.EmptyChildPlaylists, ["There are no playlists yet."], child.Ceiling);
+    }
 }
