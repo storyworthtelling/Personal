@@ -12,7 +12,7 @@ namespace Pulp.Discover;
 /// A pile's front poster with the rest fanned behind it (D219, mockup 03's <c>.deck</c>): at most two
 /// plain paper cards, each turned a little further and set down-left of the last, a hairline-framed
 /// poster on top, and — when the card is vetoed — the poster dimmed with one ink-blue stroke across it
-/// (D220). The poster is fetched off the UI thread by <see cref="PosterLoader"/>; until it lands the
+/// (D220). The poster is fetched off the UI thread by <see cref="Pulp.Components.Posters"/>; until it lands the
 /// front card is the same plain paper as the ones behind.
 /// </summary>
 internal sealed class PosterDeck : FrameLayout

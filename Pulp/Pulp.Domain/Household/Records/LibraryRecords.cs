@@ -50,6 +50,14 @@ public sealed record HouseholdPlaylist(PlaylistId Id, ViewerId Owner, bool Share
 /// <summary>"Open there instead" (D216): this title's home from now on, for the household.</summary>
 public sealed record HomeChoice(TitleId Title, ServiceId Service);
 
+/// <summary>
+/// One viewer's "Remove from Continue watching" (D31). Private like the list it edits (D97), one record
+/// per viewer and title — removing it again restamps the one record — and undone by its tombstone.
+/// <see cref="ContinueWatching.Build(IEnumerable{WatchEvent}, IEnumerable{ShowSchedule}, IEnumerable{ContinueDismissal}, DateTimeOffset)"/>
+/// decides what it hides.
+/// </summary>
+public sealed record ContinueDismissedEntry(ViewerId Viewer, ContinueDismissal Dismissal);
+
 internal sealed class WatchedMap : RecordMap<WatchedSitting>
 {
     private static readonly FieldWords<WatchedKind> Kinds = new(new Dictionary<WatchedKind, string>
@@ -176,4 +184,21 @@ internal sealed class HomeOverrideMap : RecordMap<HomeChoice>
 
     public override HomeChoice Read(RecordReader record) =>
         new(new TitleId(record.Text("title")), new ServiceId(record.Text("service")));
+}
+
+internal sealed class ContinueDismissedMap : RecordMap<ContinueDismissedEntry>
+{
+    public override string Kind => HouseholdKinds.ContinueDismissed;
+
+    protected override string IdOf(ContinueDismissedEntry value) => RecordIds.Join(value.Viewer.Value, value.Dismissal.Title.Value);
+
+    public override IReadOnlyDictionary<string, string> FieldsOf(ContinueDismissedEntry value) =>
+        new FieldWriter()
+            .Text("viewer", value.Viewer.Value)
+            .Text("title", value.Dismissal.Title.Value)
+            .Instant("at", value.Dismissal.At)
+            .Fields;
+
+    public override ContinueDismissedEntry Read(RecordReader record) =>
+        new(new ViewerId(record.Text("viewer")), new ContinueDismissal(new TitleId(record.Text("title")), record.Instant("at")));
 }

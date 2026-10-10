@@ -184,33 +184,4 @@ public class ContinueRowTextTests
         Assert.Equal("Northlight+", ContinueRowText.CardSubtitle(null, "Northlight+"));
         Assert.Null(ContinueRowText.CardSubtitle(null, null));
     }
-
-    // ---- whose Continue watching this is (D97) ----
-
-    [Fact]
-    public void WithNoRosterThereIsNobodyToShow() =>
-        Assert.Null(ContinueWatchingViewer.Resolve(null));
-
-    [Fact]
-    public void TheOnlyAdultOnTheRosterIsThePhonesViewer()
-    {
-        var adult = new ViewerId("adult-example");
-        var roster = new HouseholdRoster([new HouseholdViewer(adult, false), new HouseholdViewer(new ViewerId("child-example"), true)]);
-        Assert.Equal(adult, ContinueWatchingViewer.Resolve(roster));
-    }
-
-    [Fact]
-    public void TwoAdultsAreNeverGuessedBetween()
-    {
-        // D97: Continue watching is private; showing the other adult's would be worse than showing none.
-        var roster = new HouseholdRoster([new HouseholdViewer(new ViewerId("one-example"), false), new HouseholdViewer(new ViewerId("two-example"), false)]);
-        Assert.Null(ContinueWatchingViewer.Resolve(roster));
-    }
-
-    [Fact]
-    public void AChildIsNeverThePhonesViewer()
-    {
-        var roster = new HouseholdRoster([new HouseholdViewer(new ViewerId("child-example"), true)]);
-        Assert.Null(ContinueWatchingViewer.Resolve(roster));
-    }
 }

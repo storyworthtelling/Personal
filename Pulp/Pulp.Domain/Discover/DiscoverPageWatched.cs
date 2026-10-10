@@ -6,25 +6,11 @@ using Pulp.Domain.People;
 namespace Pulp.Domain.Discover;
 
 /// <summary>
-/// Whose stack the phone shows (D23: the device owner's), and what that viewer has watched (D282) and
-/// learned from (D283). Nothing in the household yet says which adult holds this phone — first run is
-/// Release D's — so <see cref="Me"/> answers only when the roster leaves no doubt: exactly one adult.
-/// With two it answers nobody, and the page says so, rather than deal one adult's stack by the other's
-/// taste.
+/// What the stack's viewer has watched (D282) and what taste learns from (D283). Whose stack it is
+/// (D23: the device owner's) is <see cref="People.ThisPhone"/>'s one answer, not this page's.
 /// </summary>
-public static class DiscoverPageViewer
+public static class DiscoverPageWatched
 {
-    public static ViewerId? Me(HouseholdRoster? roster)
-    {
-        if (roster is null)
-        {
-            return null;
-        }
-
-        var adults = roster.Viewers.Where(viewer => !viewer.IsChild).ToList();
-        return adults.Count == 1 ? adults[0].Id : null;
-    }
-
     /// <summary>
     /// The titles the viewer has watched, by the one watched rule (<see cref="Sittings.Verdict"/>): a
     /// film whose own sittings say watched, a show with any episode watched — a show you have started

@@ -129,7 +129,7 @@ internal static class LibraryRows
     {
         try
         {
-            var bitmap = await Task.Run(() => LibraryPosters.LoadAsync(host, url, targetPx, cancellationToken), cancellationToken);
+            var bitmap = await Task.Run(() => PulpServices.For(host).Posters.LoadAsync(url, targetPx, cancellationToken), cancellationToken);
             if (bitmap is not null && !host.IsFinishing && !host.IsDestroyed)
             {
                 host.RunOnUiThread(() => window.SetArtwork(bitmap));

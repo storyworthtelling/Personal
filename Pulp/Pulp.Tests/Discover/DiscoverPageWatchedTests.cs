@@ -7,42 +7,15 @@ using Pulp.Domain.People;
 namespace Pulp.Tests.Discover;
 
 /// <summary>
-/// Whose stack the phone shows (D23: the device owner's) and what that viewer has watched (D282,
-/// D283). Nothing on the household yet says which adult holds this phone (first run is Release D), so
-/// the page answers only when the roster leaves no doubt — one adult — and otherwise shows a status
-/// sentence rather than guess and deal one adult's stack from the other's taste. Invented people only.
+/// What the stack's viewer has watched (D282) and what taste learns from (D283). Whose stack it is
+/// is <see cref="ThisPhone"/>'s answer, tested there. Invented people only.
 /// </summary>
-public class DiscoverPageViewerTests
+public class DiscoverPageWatchedTests
 {
     private static readonly ViewerId Sam = new("adult-example-a");
     private static readonly ViewerId Ash = new("adult-example-b");
     private static readonly ViewerId Wren = new("child-example-wren");
     private static readonly DateTimeOffset Evening = new(2026, 10, 12, 20, 0, 0, TimeSpan.Zero);
-
-    [Fact]
-    public void NoRosterIsNobody() => Assert.Null(DiscoverPageViewer.Me(null));
-
-    [Fact]
-    public void TheOneAdultOnTheRosterIsThePhonesViewer()
-    {
-        var roster = new HouseholdRoster([new HouseholdViewer(Sam, false), new HouseholdViewer(Wren, true)]);
-
-        Assert.Equal(Sam, DiscoverPageViewer.Me(roster));
-    }
-
-    [Fact]
-    public void TwoAdultsCannotBeToldApartSoNobodyIsGuessed()
-    {
-        var roster = new HouseholdRoster([new HouseholdViewer(Sam, false), new HouseholdViewer(Ash, false)]);
-
-        Assert.Null(DiscoverPageViewer.Me(roster));
-    }
-
-    [Fact]
-    public void AChildIsNeverThePhonesViewer()
-    {
-        Assert.Null(DiscoverPageViewer.Me(new HouseholdRoster([new HouseholdViewer(Wren, true)])));
-    }
 
     private static WatchEvent Film(string id, int minutesIn, bool ended, int dayOffset = 0, WatchSource source = WatchSource.Session) => new(
         new TitleId(id), WatchedKind.Film, Evening.AddDays(dayOffset), null, null, source,
@@ -55,7 +28,7 @@ public class DiscoverPageViewerTests
     [Fact]
     public void AFinishedFilmIsWatchedAndOneStoppedShortIsNot()
     {
-        var watched = DiscoverPageViewer.AlreadyWatched([Film("f-done", 100, true), Film("f-short", 10, false)]);
+        var watched = DiscoverPageWatched.AlreadyWatched([Film("f-done", 100, true), Film("f-short", 10, false)]);
 
         Assert.Contains(new TitleId("f-done"), watched);
         Assert.DoesNotContain(new TitleId("f-short"), watched);
@@ -64,7 +37,7 @@ public class DiscoverPageViewerTests
     [Fact]
     public void AShowWithAnyEpisodeWatchedIsNoLongerNew()
     {
-        var watched = DiscoverPageViewer.AlreadyWatched(
+        var watched = DiscoverPageWatched.AlreadyWatched(
             [Episode("s-seen", 1, 1, ended: true), Episode("s-seen", 1, 2, ended: false), Episode("s-sampled", 1, 1, ended: false)]);
 
         Assert.Contains(new TitleId("s-seen"), watched);
@@ -74,7 +47,7 @@ public class DiscoverPageViewerTests
     [Fact]
     public void MarkedUnwatchedAfterwardsCountsAsUnwatched()
     {
-        var watched = DiscoverPageViewer.AlreadyWatched(
+        var watched = DiscoverPageWatched.AlreadyWatched(
             [Film("f-again", 100, true), Film("f-again", 0, false, dayOffset: 1, source: WatchSource.MarkedUnwatched), Film("f-kept", 100, true)]);
 
         Assert.Equal([new TitleId("f-kept")], watched.ToArray());
@@ -90,7 +63,7 @@ public class DiscoverPageViewerTests
             [Ash] = [Film("f-short", 5, false)],
         };
 
-        var titles = DiscoverPageViewer.WatchedTitles(sittings, id => id.Value == "f-alone" ? ["noir"] : ["cartoon"]);
+        var titles = DiscoverPageWatched.WatchedTitles(sittings, id => id.Value == "f-alone" ? ["noir"] : ["cartoon"]);
         var roster = new HouseholdRoster([new HouseholdViewer(Sam, false), new HouseholdViewer(Ash, false), new HouseholdViewer(Wren, true)]);
         var taste = TasteLearner.Learn(Sam, roster, titles, VetoBook.For(Sam));
 

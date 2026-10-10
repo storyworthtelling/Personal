@@ -37,4 +37,10 @@ public static class HouseholdKinds
 
     /// <summary>A service the household has.</summary>
     public const string HouseholdService = "household-service";
+
+    /// <summary>
+    /// A viewer's "Remove from Continue watching" (<see cref="ContinueDismissedEntry"/>); undo is its
+    /// tombstone.
+    /// </summary>
+    public const string ContinueDismissed = "continue-dismissed";
 }

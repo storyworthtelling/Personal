@@ -11,6 +11,7 @@ using Pulp.Domain.Core;
 using Pulp.Domain.Discover;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
+using Pulp.Domain.People;
 using Pulp.Domain.Voice;
 using Pulp.Library;
 using Pulp.Title;
@@ -77,7 +78,7 @@ internal sealed class PlaylistsScreen
         maker = new PlaylistMaker(services);
     }
 
-    private sealed record Data(LibraryViewerAnswer Me, IReadOnlyList<HouseholdPlaylist> Playlists, HouseholdView View);
+    private sealed record Data(ThisPhoneAnswer Me, IReadOnlyList<HouseholdPlaylist> Playlists, HouseholdView View);
 
     /// <summary>The header: a playlist's own name on its page (mockup 04), else the area's or the flow's.</summary>
     public string? Title => showing switch
@@ -112,7 +113,7 @@ internal sealed class PlaylistsScreen
             try
             {
                 var view = await services.HouseholdAsync(CancellationToken.None);
-                var me = LibraryViewer.Me(view.Roster);
+                var me = services.ThisPhoneOf(view);
                 var playlists = me.Viewer is { } viewer ? view.PlaylistsFor(viewer) : [];
                 host.RunOnUiThread(() =>
                 {
@@ -207,13 +208,13 @@ internal sealed class PlaylistsScreen
 
         switch (data.Me.Status)
         {
-            case LibraryViewerStatus.NoRoster:
+            case ThisPhoneStatus.NoRoster:
                 column.AddView(Empty(VoiceSeat.EmptyPlaylists, primary: null));
                 return scroll;
-            case LibraryViewerStatus.Unmatched:
-                column.AddView(PaperUi.Secondary(host, LibraryViewer.UnmatchedStatus));
+            case ThisPhoneStatus.Unmatched:
+                column.AddView(PaperUi.Secondary(host, ThisPhone.UnmatchedSentence));
                 return scroll;
-            case LibraryViewerStatus.Known:
+            case ThisPhoneStatus.Known:
                 break;
             default:
                 throw new InvalidOperationException($"A viewer status the Playlists page does not know: {data.Me.Status}.");

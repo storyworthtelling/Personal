@@ -57,10 +57,13 @@ public static class HouseholdMaps
 
     public static RecordMap<HouseholdServiceEntry> HouseholdService { get; } = new HouseholdServiceMap();
 
+    public static RecordMap<ContinueDismissedEntry> ContinueDismissed { get; } = new ContinueDismissedMap();
+
     /// <summary>Every map's kind, for the guard that holds them frozen.</summary>
     public static IReadOnlyList<string> Kinds { get; } =
     [
         Watched.Kind, Playlist.Kind, Veto.Kind, ChildStar.Kind, ParentPick.Kind,
         HomeOverride.Kind, ChildRules.Kind, Viewer.Kind, AttestedService.Kind, HouseholdService.Kind,
+        ContinueDismissed.Kind,
     ];
 }

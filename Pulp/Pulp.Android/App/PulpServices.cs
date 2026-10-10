@@ -5,7 +5,9 @@ using Pulp.Domain.Core;
 using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
+using Pulp.Domain.People;
 using Pulp.Domain.Services;
+using Pulp.Components;
 using Pulp.HandOffs;
 using Pulp.Infrastructure.Catalogue;
 using Pulp.Infrastructure.Discover;
@@ -17,9 +19,11 @@ namespace Pulp.App;
 /// <summary>
 /// The composition root the areas get, so a screen never touches HTTP or a file itself. It builds the
 /// four data clients (Streaming Availability on the Direct route, D285), the mood client, the
-/// vault-backed keys, the lookup count (Diagnostics only, D261), the household store and the
-/// catalogue cache; and it answers the screens' reads — Continue Watching, a title, the playlists,
-/// Recently watched — cache-first, fetching only when <see cref="CatalogueFreshness"/> says so.
+/// vault-backed keys, the lookup count (Diagnostics only, D261), the household store, the catalogue
+/// cache and the one poster loader; and it answers the screens' reads — whose phone this is, Continue
+/// Watching, a title, the playlists, Recently watched, a title search, the changes feed — cache-first,
+/// fetching only when <see cref="CatalogueFreshness"/> says so. Every catalogue lookup goes through
+/// the one counted client here, so the Diagnostics count is the whole month's (D261).
 ///
 /// <para>One per process (<see cref="For"/>). Writes to the household go through
 /// <see cref="PutAsync"/> / <see cref="RemoveAsync"/>, which stamp with this install's hybrid
@@ -51,6 +55,7 @@ public sealed class PulpServices
         var counter = new DiagnosticsLookupCounter(files, Diagnostics);
         var health = new CredentialHealthStore();
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromSeconds(30) };
+        Posters = new Posters(http, cacheRoot, Diagnostics);
 
         Catalogue = ServiceCatalogue.Public;
         availability = new StreamingAvailabilityClient(http, Keys, Catalogue, counter, health, StreamingAvailabilityRoute.Direct);
@@ -85,6 +90,9 @@ public sealed class PulpServices
 
     /// <summary>Discover's mood search and the model-made playlist (D104, D171).</summary>
     public IMoodClient Mood { get; }
+
+    /// <summary>The one poster loader every screen paints from.</summary>
+    public Posters Posters { get; }
 
     /// <summary>Restores the keys and the shared Claude key from the vault. Call once at launch, off the UI thread.</summary>
     public async Task RefreshKeysAsync(CancellationToken cancellationToken)
@@ -142,6 +150,33 @@ public sealed class PulpServices
         }
     }
 
+    // ---- whose phone this is ----
+
+    /// <summary>Whose private lists this phone shows (D97), read from the household and this install's record.</summary>
+    public async Task<ThisPhoneAnswer> ThisPhoneAsync(CancellationToken cancellationToken) =>
+        ThisPhoneOf(await HouseholdAsync(cancellationToken));
+
+    /// <summary><see cref="ThisPhoneAsync"/> for a household already read. Reads the install's file; off the UI thread.</summary>
+    public ThisPhoneAnswer ThisPhoneOf(HouseholdView view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        return ThisPhone.Resolve(view.Roster, install.Load().Viewer);
+    }
+
+    /// <summary>
+    /// Records whose phone this is (Release D's first run), or clears it with null. Only an adult on the
+    /// roster can be recorded; anyone else is refused rather than kept as a record that resolves to nobody.
+    /// </summary>
+    public async Task SetThisPhoneAsync(ViewerId? viewer, CancellationToken cancellationToken)
+    {
+        if (viewer is { } who && !ThisPhone.CanBeRecorded((await HouseholdAsync(cancellationToken)).Roster, who))
+        {
+            throw new ArgumentException($"'{who}' is not an adult on the household roster, so this phone cannot be recorded as theirs.", nameof(viewer));
+        }
+
+        install.SaveViewer(viewer);
+    }
+
     /// <summary>
     /// The one door for hand-offs, built for the household as it stands; null until the roster names
     /// anyone (first run is Release D's), since a hand-off with no roster cannot be checked for a child.
@@ -192,10 +227,14 @@ public sealed class PulpServices
         return fetched;
     }
 
-    /// <summary>Continue Watching for one viewer (D96, D97), with each show's schedule from the catalogue.</summary>
+    /// <summary>
+    /// Continue Watching for one viewer (D96, D97), with each show's schedule from the catalogue and
+    /// the titles they removed by hand left out (D31).
+    /// </summary>
     public async Task<IReadOnlyList<ContinueRow>> ContinueWatchingAsync(ViewerId viewer, CancellationToken cancellationToken)
     {
-        var sittings = (await HouseholdAsync(cancellationToken)).SittingsOf(viewer);
+        var view = await HouseholdAsync(cancellationToken);
+        var sittings = view.SittingsOf(viewer);
         var schedules = new List<ShowSchedule>();
         foreach (var show in sittings.Where(sitting => sitting.Kind == WatchedKind.Show).Select(sitting => sitting.Title).Distinct())
         {
@@ -205,8 +244,21 @@ public sealed class PulpServices
             }
         }
 
-        return ContinueWatching.Build(sittings, schedules, DateTimeOffset.UtcNow);
+        return ContinueWatching.Build(sittings, schedules, view.DismissalsOf(viewer), DateTimeOffset.UtcNow);
     }
+
+    /// <summary>A title search (D209) over the one counted client. Throws <see cref="CatalogueLookupException"/> when the source fails.</summary>
+    public Task<IReadOnlyList<CatalogueTitle>> SearchAsync(string title, CancellationToken cancellationToken) =>
+        availability.SearchByTitleAsync(title, kind: null, cancellationToken);
+
+    /// <summary>One page of the changes feed on the given services, over the one counted client.</summary>
+    public Task<ChangesPage> ChangesAsync(
+        IEnumerable<StreamingService> services,
+        ChangeKind kind,
+        ChangeItem item,
+        string? cursor,
+        CancellationToken cancellationToken) =>
+        availability.GetChangesAsync(services, kind, item, cursor, cancellationToken);
 
     /// <summary>Recently watched for one viewer (D226–D228), each show's episode count from the cache.</summary>
     public async Task<IReadOnlyList<RecentDay>> RecentlyWatchedAsync(ViewerId viewer, TimeZoneInfo zone, CancellationToken cancellationToken)

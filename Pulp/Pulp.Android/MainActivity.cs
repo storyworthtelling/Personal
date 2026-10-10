@@ -6,6 +6,7 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Pulp.Domain;
+using Pulp.Domain.Shell;
 using Pulp.Shell;
 
 namespace Pulp;
@@ -20,6 +21,13 @@ namespace Pulp;
 /// registered explicitly from <see cref="PulpIdentity.MainActivityName"/>: the home-screen entry
 /// points at it, so a rename of this class or namespace cannot move it (guarded by
 /// <c>PulpInvariantsTests</c>). The launcher icon is named once, on <see cref="PulpApplication"/>.</para>
+///
+/// <para>A sub-page that draws the binder (the title page, Recently watched) opens the shell on the
+/// tab tapped through <see cref="OpenOn"/>: an intent naming the area (<see cref="AreaRequest"/>),
+/// sent ClearTop|SingleTop so the running shell under the sub-pages comes forward and reads it in
+/// <see cref="OnNewIntent"/>, or a fresh one reads it in <see cref="OnCreate"/>. Score and Post hand
+/// the area over in a static instead, because their sub-pages only ever finish back to the shell; a
+/// Pulp sub-page can sit on another (Recently watched opens a title), and ClearTop closes the lot.</para>
 ///
 /// <para>Laid out as drawn: the gutter runs the full height of the screen and the bottom bar sits
 /// under the page only, to the left of the gutter — Score and Post run their bar under both.</para>
@@ -65,7 +73,53 @@ public class MainActivity : Activity
             area.Changed += () => { if (Active == which) RenderContent(); };
         }
 
+        activeIndex = RequestedIndex(Intent) ?? 0;
         SetContentView(BuildLayout());
+        RenderContent();
+    }
+
+    /// <summary>Opens the shell on the area a sub-page's binder tab at <paramref name="tabIndex"/> stands for, closing the sub-pages above it.</summary>
+    public static void OpenOn(Activity from, int tabIndex)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        if (AreaRequest.ForTab(tabIndex) is not { } area)
+        {
+            return;
+        }
+
+        var intent = new Intent(from, typeof(MainActivity));
+        intent.PutExtra(AreaRequest.Extra, AreaRequest.Word(area));
+        intent.AddFlags(ActivityFlags.ClearTop | ActivityFlags.SingleTop);
+        from.StartActivity(intent);
+        from.Finish();
+    }
+
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        Intent = intent;
+        if (RequestedIndex(intent) is { } index)
+        {
+            SwitchTo(index);
+        }
+    }
+
+    private static int? RequestedIndex(Intent? intent) =>
+        AreaRequest.Read(intent?.GetStringExtra(AreaRequest.Extra)) is { } area ? AreaRequest.IndexOf(area) : null;
+
+    /// <summary>A tab's switch: tapping the area already showing returns it to its root, so this is not guarded on the index having changed.</summary>
+    private void SwitchTo(int index)
+    {
+        if (index == activeIndex)
+        {
+            while (Active.GoBack())
+            {
+            }
+        }
+
+        activeIndex = index;
+        binder.SetActive(index);
+        Active.Resume();
         RenderContent();
     }
 
@@ -115,22 +169,7 @@ public class MainActivity : Activity
 
         binder = new BinderTabs(this);
         binder.SetAreas(areas.Select(area => area.Tab), activeIndex);
-        binder.AreaSelected += index =>
-        {
-            // Tapping the tab you are already on returns that area to its root, so this is not
-            // guarded on the index having changed.
-            if (index == activeIndex)
-            {
-                while (Active.GoBack())
-                {
-                }
-            }
-
-            activeIndex = index;
-            binder.SetActive(index);
-            Active.Resume();
-            RenderContent();
-        };
+        binder.AreaSelected += SwitchTo;
         spread.AddView(binder, new LinearLayout.LayoutParams(
             PaperTheme.Dp(this, BinderTabs.WidthDp), ViewGroup.LayoutParams.MatchParent));
 

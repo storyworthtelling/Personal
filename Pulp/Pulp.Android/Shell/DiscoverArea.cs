@@ -34,8 +34,9 @@ namespace Pulp.Shell;
 ///
 /// <para>The page is built once and kept, so the field keeps its focus and keyboard while the content
 /// under it changes; every read and write runs off the UI thread and lands back on it. Whose stack it
-/// is comes from <see cref="DiscoverPageViewer.Me"/>: with no roster, or no way yet to tell which adult
-/// holds this phone, the page says so in a status sentence and deals nothing — never invented rows.</para>
+/// is comes from <see cref="ThisPhone"/>: with no roster, or no way yet to tell which adult holds this
+/// phone, the page says so in a status sentence and deals nothing — never invented rows. Every catalogue
+/// lookup goes through <see cref="PulpServices"/>' one counted client (D261).</para>
 /// </summary>
 public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Discover)
 {
@@ -65,7 +66,8 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
 
     private PulpServices Services => PulpServices.For(Host);
 
-    private DiscoverCatalogue Catalogue => DiscoverCatalogue.For(Host);
+    /// <summary>The changes feed is paged; two pages of new arrivals is a week's worth to deal from.</summary>
+    private const int ChangePages = 2;
 
     public override View BuildView()
     {
@@ -151,10 +153,10 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
     private async Task LoadAsync(bool deal, CancellationToken cancellationToken)
     {
         var view = await Services.HouseholdAsync(cancellationToken);
-        var viewer = DiscoverPageViewer.Me(view.Roster);
+        var viewer = Services.ThisPhoneOf(view).Viewer;
         if (view.Roster is not { } roster || viewer is not { } who)
         {
-            Publish(view, null, null, null, view.Roster is null ? DiscoverPageText.NoHousehold : DiscoverPageText.WhosePhone);
+            Publish(view, null, null, null, view.Roster is null ? DiscoverPageText.NoHousehold : ThisPhone.UnmatchedSentence);
             return;
         }
 
@@ -185,7 +187,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         IReadOnlyList<CatalogueTitle> pool;
         try
         {
-            pool = await Catalogue.NewOnServicesAsync(services, cancellationToken);
+            pool = await NewOnServicesAsync(services, cancellationToken);
         }
         catch (CatalogueLookupException exception)
         {
@@ -195,10 +197,10 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         }
 
         var sittings = roster.Viewers.ToDictionary(viewer => viewer.Id, viewer => view.SittingsOf(viewer.Id));
-        var watched = DiscoverPageViewer.WatchedTitles(sittings, id => Services.CachedCopy(id)?.Genres ?? []);
+        var watched = DiscoverPageWatched.WatchedTitles(sittings, id => Services.CachedCopy(id)?.Genres ?? []);
         var taste = TasteLearner.Learn(who, roster, watched, book);
         var dealt = DiscoverPageWeek.Deal(
-            who, roster, pool, taste, book, DiscoverPageViewer.AlreadyWatched(view.SittingsOf(who)),
+            who, roster, pool, taste, book, DiscoverPageWatched.AlreadyWatched(view.SittingsOf(who)),
             StackSizes.Default, now, TimeZoneInfo.Local, Plans(view), view.HomeOverrides);
         store.Save(dealt);
         Publish(view, who, book, dealt, DiscoverPageText.StackStatus);
@@ -399,12 +401,40 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
 
     private void WantPoster(PosterDeck deck, string url, int targetPx)
     {
-        var loader = new PosterLoader(Host.CacheDir!.AbsolutePath, Catalogue.Http, Services.Diagnostics);
+        var posters = Services.Posters;
         Run(async cancellationToken =>
         {
-            var bitmap = await loader.LoadAsync(url, targetPx, cancellationToken);
+            var bitmap = await posters.LoadAsync(url, targetPx, cancellationToken);
             Host.RunOnUiThread(() => deck.SetPoster(url, bitmap));
         }, null, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// What is new on the household's services, whole titles only: the pool the week is dealt from.
+    /// A title that turns up on several pages, or on several services, is one candidate.
+    /// </summary>
+    private async Task<IReadOnlyList<CatalogueTitle>> NewOnServicesAsync(
+        IReadOnlyList<StreamingService> services, CancellationToken cancellationToken)
+    {
+        var titles = new Dictionary<TitleId, CatalogueTitle>();
+        string? cursor = null;
+        for (var page = 0; page < ChangePages; page++)
+        {
+            var changes = await Services.ChangesAsync(services, ChangeKind.New, ChangeItem.Title, cursor, cancellationToken);
+            foreach (var (id, title) in changes.Titles)
+            {
+                titles.TryAdd(id, title);
+            }
+
+            if (!changes.HasMore)
+            {
+                break;
+            }
+
+            cursor = changes.NextCursor;
+        }
+
+        return titles.Values.ToList();
     }
 
     // ---- the search field ----
@@ -482,7 +512,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
             IReadOnlyList<CatalogueTitle> found;
             try
             {
-                found = await Catalogue.SearchAsync(text, null, cancellationToken);
+                found = await Services.SearchAsync(text, cancellationToken);
             }
             catch (CatalogueLookupException exception)
             {
@@ -500,7 +530,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
     {
         if (household?.Roster is not { } roster || me is not { } who)
         {
-            ShowStatus(me is null && household?.Roster is not null ? DiscoverPageText.WhosePhone : DiscoverPageText.NoHousehold);
+            ShowStatus(me is null && household?.Roster is not null ? ThisPhone.UnmatchedSentence : DiscoverPageText.NoHousehold);
             return;
         }
 
@@ -511,7 +541,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         {
             var services = view.Services.Select(Services.Catalogue.ById).OfType<StreamingService>().ToList();
             var sittings = roster.Viewers.ToDictionary(viewer => viewer.Id, viewer => view.SittingsOf(viewer.Id));
-            var taste = TasteLearner.Learn(who, roster, DiscoverPageViewer.WatchedTitles(sittings, id => Services.CachedCopy(id)?.Genres ?? []), book);
+            var taste = TasteLearner.Learn(who, roster, DiscoverPageWatched.WatchedTitles(sittings, id => Services.CachedCopy(id)?.Genres ?? []), book);
             var viewer = MoodViewer.Adult(who);
             var query = MoodQuery.For(mood, DiscoverContext.For(viewer, roster, services, taste));
 
@@ -529,7 +559,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
             {
                 try
                 {
-                    found.AddRange(await Catalogue.SearchAsync(term, null, cancellationToken));
+                    found.AddRange(await Services.SearchAsync(term, cancellationToken));
                 }
                 catch (CatalogueLookupException exception)
                 {

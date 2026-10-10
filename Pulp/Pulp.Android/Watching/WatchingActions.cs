@@ -19,6 +19,8 @@ namespace Pulp.Watching;
 /// What the Continue watching card's four entries do (mockup 10, D256): Play the next thing through
 /// the one hand-off door, mark it watched (undo-first, D160), Add to… (mockup 11), and remove it from
 /// Continue watching (undo-first). <see cref="ActionCardPlan"/> decides the entries; this wires them.
+/// A removal is the viewer's own household record (<see cref="ContinueDismissedEntry"/>), so it sticks
+/// across launches and phones until they sit down with the title again; undo writes its tombstone.
 /// </summary>
 public sealed class WatchingActions
 {
@@ -52,6 +54,7 @@ public sealed class WatchingActions
         };
 
         var marked = MarkSitting(row);
+        var removal = new ContinueDismissedEntry(viewer, new ContinueDismissal(row.Row.Title, DateTimeOffset.UtcNow));
         var handlers = new Dictionary<CardActionKind, CardHandler>
         {
             [CardActionKind.Play] = new(() => Play(row)),
@@ -60,8 +63,16 @@ public sealed class WatchingActions
                 () => Write(() => services.RemoveAsync(HouseholdMaps.Watched, marked, CancellationToken.None), "undo the mark")),
             [CardActionKind.AddTo] = new(() => AddTo(row)),
             [CardActionKind.RemoveFromContinueWatching] = new(
-                () => setHidden(row.Row.Title, true),
-                () => setHidden(row.Row.Title, false)),
+                () =>
+                {
+                    setHidden(row.Row.Title, true);
+                    Write(() => services.PutAsync(HouseholdMaps.ContinueDismissed, removal, CancellationToken.None), "remove from Continue watching");
+                },
+                () =>
+                {
+                    setHidden(row.Row.Title, false);
+                    Write(() => services.RemoveAsync(HouseholdMaps.ContinueDismissed, removal, CancellationToken.None), "put back on Continue watching");
+                }),
         };
 
         PulpActionCard.Show(host, overlay, item, handlers);
