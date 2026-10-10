@@ -51,11 +51,14 @@ public sealed class Posters
             return path;
         }
 
+        // Two screens can ask for one uncached poster at once. Each fetch writes its own temporary
+        // file and renames it into place whole (a rename in one folder is atomic), so a reader sees
+        // either no file or a finished one — never another fetch's half-written bytes.
+        var partial = $"{path}.{Guid.NewGuid():N}.part";
         try
         {
             Directory.CreateDirectory(directory);
             var bytes = await http.GetByteArrayAsync(new Uri(url), cancellationToken);
-            var partial = path + ".part";
             await File.WriteAllBytesAsync(partial, bytes, cancellationToken);
             File.Move(partial, path, overwrite: true);
             return path;
@@ -64,6 +67,14 @@ public sealed class Posters
         {
             diagnostics.Warn("posters", $"A poster could not be fetched ({new Uri(url).Host}); the bookplate stands in.", exception);
             return null;
+        }
+        finally
+        {
+            // Gone after a successful move; left behind only by a fetch that failed part-way.
+            if (File.Exists(partial))
+            {
+                File.Delete(partial);
+            }
         }
     }
 

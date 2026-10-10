@@ -77,6 +77,7 @@ public sealed class CatalogueCache
     }
 
     /// <summary>Marks a cached title stale (the changes feed touched it); keeps the copy to paint. Nothing cached, nothing to do.</summary>
+    /// <remarks>Nothing calls this yet: the daily changes pass (D204) that would is still to be wired.</remarks>
     public void Invalidate(TitleId id)
     {
         lock (gate)

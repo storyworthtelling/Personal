@@ -9,6 +9,7 @@ using Pulp.Domain.Actions;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
 using Pulp.Domain.Discover;
+using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
 using Pulp.Domain.People;
@@ -324,12 +325,12 @@ internal sealed class PlaylistsScreen
             return;
         }
 
-        var playlist = new HouseholdPlaylist(PlaylistMaker.NewId(), viewer, shareNew, Playlist.Named(name));
+        var playlist = new HouseholdPlaylist(HouseholdEdits.NewPlaylistId(), viewer, shareNew, Playlist.Named(name));
         naming = false;
         nameDraft = string.Empty;
         open = playlist.Id;
         showing = Showing.Playlist;
-        writes.Enqueue($"make the playlist {name}", token => services.PutAsync(HouseholdMaps.Playlist, playlist, token));
+        writes.Enqueue($"make the playlist {name}", token => services.CreatePlaylistAsync(playlist, token));
     }
 
     private void Open(PlaylistId id)
@@ -476,9 +477,10 @@ internal sealed class PlaylistsScreen
         var actions = moves
             .Select(move => new CardAction(PlaylistPageMoves.Label(move), () =>
             {
-                var moved = playlist with { List = PlaylistPageMoves.Apply(playlist.List, entry, move) };
-                Show(moved);
-                writes.Enqueue($"move {name} on {playlist.List.Name}", token => services.PutAsync(HouseholdMaps.Playlist, moved, token));
+                // Applied to the list as it stands when each lands — on screen and in the household — so
+                // a move never writes back a copy that predates an edit made since.
+                ShowEdit(playlist.Id, list => PlaylistEdits.Move(list, entry, move));
+                writes.Enqueue($"move {name} on {playlist.List.Name}", token => services.EditPlaylistAsync(playlist.Id, list => PlaylistEdits.Move(list, entry, move), token));
             }))
             .ToArray();
         ActionCard.Show(host, overlay(), name, playlist.List.Name, actions);
@@ -491,7 +493,11 @@ internal sealed class PlaylistsScreen
         var marks = PlaylistPageMarks.Watch(entry, TitleOf(entry), DateTimeOffset.UtcNow)
             .Select(mark => new WatchedSitting(viewer, mark))
             .ToList();
-        var without = playlist with { List = playlist.List.Remove(entry) };
+        // The removal and its undo, once for the page and once for the household: each is applied to
+        // its own list as it stands, so the undo puts the entry back where it stood and keeps a move
+        // made while the dog-ear was up, rather than writing back the list from before.
+        var shown = new EntryRemoval(entry);
+        var removal = new EntryRemoval(entry);
         var isTitle = entry.Kind is PlaylistEntryKind.Film or PlaylistEntryKind.Show;
 
         var handlers = new Dictionary<CardActionKind, CardHandler>
@@ -523,13 +529,13 @@ internal sealed class PlaylistsScreen
             [CardActionKind.RemoveFromPlaylist] = new(
                 () =>
                 {
-                    Show(without);
-                    writes.Enqueue($"remove {name} from {playlist.List.Name}", token => services.PutAsync(HouseholdMaps.Playlist, without, token));
+                    ShowEdit(playlist.Id, shown.Apply);
+                    writes.Enqueue($"remove {name} from {playlist.List.Name}", token => services.EditPlaylistAsync(playlist.Id, removal.Apply, token));
                 },
                 () =>
                 {
-                    Show(playlist);
-                    writes.Enqueue($"put {name} back on {playlist.List.Name}", token => services.PutAsync(HouseholdMaps.Playlist, playlist, token));
+                    ShowEdit(playlist.Id, shown.Undo);
+                    writes.Enqueue($"put {name} back on {playlist.List.Name}", token => services.EditPlaylistAsync(playlist.Id, removal.Undo, token));
                 }),
         };
 
@@ -548,36 +554,45 @@ internal sealed class PlaylistsScreen
 
         var actions = others.Select(target => new CardAction(target.List.Name, () =>
         {
-            var left = source with { List = source.List.Remove(entry) };
-            var arrived = target with { List = target.List.Add(entry) };
-            Show(left);
+            // Inverse edits, not snapshots: the undo takes the entry off the target only if this move
+            // put it there, and puts it back on the source where it stood, keeping anything since.
+            var shownLeft = new EntryRemoval(entry);
+            var shownArrived = new EntryAddition(entry);
+            var left = new EntryRemoval(entry);
+            var arrived = new EntryAddition(entry);
+            ShowEdit(target.Id, shownArrived.Apply);
+            ShowEdit(source.Id, shownLeft.Apply);
             writes.Enqueue($"move {name} to {target.List.Name}", async token =>
             {
-                await services.PutAsync(HouseholdMaps.Playlist, arrived, token);
-                await services.PutAsync(HouseholdMaps.Playlist, left, token);
+                await services.EditPlaylistAsync(target.Id, arrived.Apply, token);
+                await services.EditPlaylistAsync(source.Id, left.Apply, token);
             });
             DogEar.Show(host, overlay(), $"Undo moving {name} to {target.List.Name}.", () =>
             {
-                Show(source);
+                ShowEdit(target.Id, shownArrived.Undo);
+                ShowEdit(source.Id, shownLeft.Undo);
                 writes.Enqueue($"undo moving {name} to {target.List.Name}", async token =>
                 {
-                    await services.PutAsync(HouseholdMaps.Playlist, target, token);
-                    await services.PutAsync(HouseholdMaps.Playlist, source, token);
+                    await services.EditPlaylistAsync(target.Id, arrived.Undo, token);
+                    await services.EditPlaylistAsync(source.Id, left.Undo, token);
                 });
             });
         })).ToArray();
         ActionCard.Show(host, overlay(), "Move to another playlist", name, actions);
     }
 
-    /// <summary>Shows an edited playlist at once — the change itself is the success (§5) — while the write follows.</summary>
-    private void Show(HouseholdPlaylist edited)
+    /// <summary>
+    /// Shows an edit at once — the change itself is the success (§5) — applied to the playlist as the
+    /// page shows it now, while the write follows and the reload after it shows what was kept.
+    /// </summary>
+    private void ShowEdit(PlaylistId id, Func<Playlist, Playlist> change)
     {
         if (data is null)
         {
             return;
         }
 
-        data = data with { Playlists = data.Playlists.Select(playlist => playlist.Id == edited.Id ? edited : playlist).ToList() };
+        data = data with { Playlists = data.Playlists.Select(playlist => playlist.Id == id ? playlist with { List = change(playlist.List) } : playlist).ToList() };
         invalidate();
     }
 

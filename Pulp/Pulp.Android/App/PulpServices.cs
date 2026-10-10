@@ -26,7 +26,8 @@ namespace Pulp.App;
 /// the one counted client here, so the Diagnostics count is the whole month's (D261).
 ///
 /// <para>One per process (<see cref="For"/>). Writes to the household go through
-/// <see cref="PutAsync"/> / <see cref="RemoveAsync"/>, which stamp with this install's hybrid
+/// <see cref="PutAsync"/> / <see cref="RemoveAsync"/> and, for a playlist or a child's pick, the edits
+/// that read the record as it stands inside the same gate (<see cref="EditPlaylistAsync"/>), which stamp with this install's hybrid
 /// logical clock and keep it on disk. Today the household is the phone's own copy
 /// (<see cref="LocalHouseholdStore"/>); Release D swaps in the Drive store behind the same seam.</para>
 /// </summary>
@@ -129,6 +130,37 @@ public sealed class PulpServices
     public Task RemoveAsync<T>(RecordMap<T> map, T value, CancellationToken cancellationToken)
         where T : notnull =>
         EditAsync((document, stamp, writer) => HouseholdRecords.Remove(document, map, value, stamp, writer), cancellationToken);
+
+    // ---- playlist and pick edits: read-modify-write against the household as it stands ----
+
+    /// <summary>A brand-new playlist under a fresh id (<see cref="HouseholdEdits.NewPlaylistId"/>), which no other writer can have edited.</summary>
+    public Task CreatePlaylistAsync(HouseholdPlaylist playlist, CancellationToken cancellationToken) =>
+        PutAsync(HouseholdMaps.Playlist, playlist, cancellationToken);
+
+    /// <summary>
+    /// Changes one playlist as the household holds it when the write lands — never a copy a screen read
+    /// earlier, so a tick, a move or an undo made in between is kept. Throws when the playlist is gone.
+    /// </summary>
+    public Task EditPlaylistAsync(PlaylistId id, Func<Playlist, Playlist> change, CancellationToken cancellationToken) =>
+        EditAsync((document, stamp, writer) => HouseholdEdits.EditPlaylist(document, id, change, stamp, writer), cancellationToken);
+
+    /// <summary>A parent's pick for a child, which allow-lists its title for them (D255).</summary>
+    public Task AddParentPickAsync(ViewerId child, ParentPick pick, CancellationToken cancellationToken) =>
+        PutAsync(HouseholdMaps.ParentPick, new ParentPickEntry(child, pick), cancellationToken);
+
+    /// <summary>Takes a title off a child's Favorites by key, against the household as it stands.</summary>
+    public Task RemoveParentPickAsync(ParentPickRemoval removal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(removal);
+        return EditAsync(removal.Apply, cancellationToken);
+    }
+
+    /// <summary>The undo of <see cref="RemoveParentPickAsync"/>: the removed pick, or <paramref name="fallback"/> when it found none.</summary>
+    public Task PutBackParentPickAsync(ParentPickRemoval removal, ParentPick fallback, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(removal);
+        return EditAsync((document, stamp, writer) => removal.Undo(document, fallback, stamp, writer), cancellationToken);
+    }
 
     private async Task EditAsync(Func<HouseholdDocument, HlcTimestamp, string, HouseholdDocument> edit, CancellationToken cancellationToken)
     {

@@ -93,6 +93,21 @@ public class HouseholdDocumentCodecTests
     public void AFileThatIsNotAHouseholdIsRefused(string text) =>
         Assert.Throws<HouseholdFormatException>(() => HouseholdDocumentCodec.Deserialize(text));
 
+    /// <summary>
+    /// A schema or counter past <see cref="int.MaxValue"/> is damage, not a number to wrap: 2^32 + 1
+    /// cast to an int is 1, a perfectly valid schema, so an unchecked cast would read it as one.
+    /// </summary>
+    [Theory]
+    [InlineData("{\"format\":1,\"records\":[{\"kind\":\"viewer\",\"id\":\"x\",\"schema\":4294967297,\"wall\":1,\"counter\":0,\"writer\":\"w\",\"deleted\":false,\"fields\":{}}]}")]
+    [InlineData("{\"format\":1,\"records\":[{\"kind\":\"viewer\",\"id\":\"x\",\"schema\":1,\"wall\":1,\"counter\":4294967296,\"writer\":\"w\",\"deleted\":false,\"fields\":{}}]}")]
+    [InlineData("{\"format\":1,\"records\":[{\"kind\":\"viewer\",\"id\":\"x\",\"schema\":4294967297,\"wall\":1,\"counter\":0,\"writer\":\"w\",\"deleted\":true,\"fields\":{}}]}")]
+    public void ASchemaOrCounterTooLargeForAnIntIsRefusedNotWrapped(string text)
+    {
+        var refused = Assert.Throws<HouseholdFormatException>(() => HouseholdDocumentCodec.Deserialize(text));
+
+        Assert.Contains("viewer", refused.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AKeyTwiceInOneFileKeepsTheWinner()
     {

@@ -2,6 +2,7 @@ using System.Globalization;
 using Android.Content;
 using Pulp.App;
 using Pulp.Domain.Catalogue;
+using Pulp.Domain.Core;
 using Pulp.Infrastructure.Catalogue;
 using Pulp.Trailer;
 
@@ -12,7 +13,8 @@ namespace Pulp.Title;
 /// on this phone: a found id is kept for good, and "none found" for the day, because every search
 /// spends the key's daily quota. No trailer, no key, or a lookup that failed all hide the button —
 /// the failure goes to Diagnostics, never onto the page. Nothing here plays: the intent only opens the
-/// trailer screen, where the viewer presses play (D77).
+/// trailer screen, where the viewer presses play (D77). The title page and Discover's pile both ask
+/// through here, keyed on the title id, so a trailer is looked up once per title whichever screen asks.
 /// </summary>
 internal sealed class TrailerLookup
 {
@@ -33,10 +35,17 @@ internal sealed class TrailerLookup
     }
 
     /// <summary>The intent that opens this title's trailer, or null when there is none to open. Call off the UI thread.</summary>
-    public async Task<Intent?> FindAsync(Context context, CatalogueTitle title, CancellationToken cancellationToken)
+    public Task<Intent?> FindAsync(Context context, CatalogueTitle title, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(title);
-        var key = title.Id.Value;
+        return FindAsync(context, title.Id, title.Name, title.Year, cancellationToken);
+    }
+
+    /// <summary>The same, for a screen that has a title's id, name and year but not the whole title (Discover's pile).</summary>
+    public async Task<Intent?> FindAsync(Context context, TitleId id, string name, int? year, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var key = id.Value;
         var today = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var kept = preferences.GetString(key, null);
 
@@ -50,11 +59,11 @@ internal sealed class TrailerLookup
         {
             try
             {
-                videoId = await services.Trailers.FindTrailerAsync(title.Name, title.Year, cancellationToken);
+                videoId = await services.Trailers.FindTrailerAsync(name, year, cancellationToken);
             }
             catch (CatalogueLookupException exception)
             {
-                services.Diagnostics.Warn("trailer", $"No trailer lookup for {title.Id} ({exception.Failure}); the Trailer button stays hidden.", exception);
+                services.Diagnostics.Warn("trailer", $"No trailer lookup for {id} ({exception.Failure}); the Trailer button stays hidden.", exception);
                 return null;
             }
 
@@ -68,12 +77,12 @@ internal sealed class TrailerLookup
 
         try
         {
-            return TrailerActivity.For(context, videoId, title.Name);
+            return TrailerActivity.For(context, videoId, name);
         }
         catch (ArgumentException exception)
         {
             // The source answered with something that is not a video id; forget it so it is asked again.
-            services.Diagnostics.Warn("trailer", $"The trailer id kept for {title.Id} is not a video id; it is forgotten.", exception);
+            services.Diagnostics.Warn("trailer", $"The trailer id kept for {id} is not a video id; it is forgotten.", exception);
             preferences.Edit()!.Remove(key)!.Apply();
             return null;
         }

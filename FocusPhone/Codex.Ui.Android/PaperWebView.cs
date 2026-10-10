@@ -27,7 +27,11 @@ public static class PaperWebView
     /// Applies the shared hardening plus a posture. <paramref name="onLinkOut"/> is called
     /// with any URL the posture refuses to follow in place — for mail, that is every link.
     /// </summary>
-    public static void Harden(WebView view, WebPosture posture, Action<string> onLinkOut)
+    /// <param name="playerEmbed">
+    /// For the player only: the one embed its page places, which its client lets load into the
+    /// subframe (and nothing else). Null for every other posture.
+    /// </param>
+    public static void Harden(WebView view, WebPosture posture, Action<string> onLinkOut, Uri? playerEmbed = null)
     {
         var settings = view.Settings;
 
@@ -52,7 +56,7 @@ public static class PaperWebView
                 view.SetWebViewClient(new LinksAlwaysLeaveClient(onLinkOut));
                 break;
             case NavigationVerdict.Refuse:
-                view.SetWebViewClient(new NothingNavigatesClient());
+                view.SetWebViewClient(new NothingNavigatesClient(playerEmbed));
                 break;
             case NavigationVerdict.Follow:
                 // The caller's own client applies its containment (Flyleaf's browser).
@@ -72,10 +76,15 @@ public static class PaperWebView
     /// <returns>The player's chrome, so the host's Back can leave fullscreen before it leaves the screen.</returns>
     public static PlayerChrome LoadPlayer(WebView view, FrameLayout fullscreenHost, string videoId, string applicationId)
     {
-        var embed = PlayerEmbed.EmbedUrl(videoId);
+        var embed = PlayerEmbed.EmbedUrl(videoId, applicationId);
         var baseUrl = PlayerEmbed.BaseUrlFor(applicationId);
+        if (!PlayerEmbed.IsEmbedUrl(embed))
+        {
+            throw new InvalidOperationException(
+                $"The player was about to load {embed.Host}{embed.AbsolutePath}, which is not a YouTube embed of one video; nothing was loaded.");
+        }
 
-        Harden(view, WebPosture.Player, onLinkOut: _ => { });
+        Harden(view, WebPosture.Player, onLinkOut: _ => { }, playerEmbed: embed);
         // The IFrame player keeps its state in DOM storage; the player is the only posture that
         // turns it on, and only on its own view.
         view.Settings.DomStorageEnabled = true;
@@ -85,6 +94,13 @@ public static class PaperWebView
 
         // No "autoplay" in the iframe's allow list: the player waits for a tap inside it. No
         // picture-in-picture either: the trailer does not float out of Pulp.
+        //
+        // When the trailer ends, YouTube's end screen offers suggestions (same channel, with rel=0)
+        // that play inside the iframe by script — no navigation, so the client cannot refuse them.
+        // The page therefore re-cues the same video on the IFrame API's ENDED state: the thumbnail
+        // returns and nothing else is there to tap. That is the whole script: no JavaScript
+        // interface, nothing navigates. The video id is eleven characters of [A-Za-z0-9_-]
+        // (PlayerEmbed.EmbedUrl threw otherwise), so it is safe inside a quoted JS string.
         var source = embed.AbsoluteUri.Replace("&", "&amp;", StringComparison.Ordinal);
         var page = $$"""
             <!doctype html><html><head><meta charset="utf-8">
@@ -95,9 +111,20 @@ public static class PaperWebView
               .frame{position:relative;width:100%;padding-top:56.25%}
               iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
             </style></head><body><div class="frame">
-            <iframe src="{{source}}" allow="fullscreen"
+            <iframe id="trailer" src="{{source}}" allow="fullscreen"
               allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
-            </div></body></html>
+            </div>
+            <script>
+              function recue(e) {
+                if (e.data === YT.PlayerState.ENDED) { e.target.cueVideoById('{{videoId}}'); }
+              }
+              function onYouTubeIframeAPIReady() {
+                var events = { onStateChange: recue };
+                new YT.Player('trailer', { events: events });
+              }
+            </script>
+            <script src="https://www.youtube.com/iframe_api"></script>
+            </body></html>
             """;
 
         view.LoadDataWithBaseURL(baseUrl, page, "text/html", "utf-8", null);
@@ -156,10 +183,23 @@ public static class PaperWebView
     /// and "watch on YouTube" would otherwise turn a trailer into the site. Windows cannot open
     /// either: multiple windows are off in every posture, so a <c>target=_blank</c> or
     /// <c>window.open</c> has nowhere to go.
+    ///
+    /// <para>Android's documentation says this callback "may be called for subframes" (and is not
+    /// called for POST requests, or for loads the app started itself). So the one exception is the
+    /// embed the page placed, loading into its subframe (<see cref="PlayerEmbed.AllowsFrameLoad"/>);
+    /// refusing that would refuse the trailer itself. The main frame never moves.</para>
     /// </summary>
-    private sealed class NothingNavigatesClient : WebViewClient
+    private sealed class NothingNavigatesClient(Uri? embed) : WebViewClient
     {
-        public override bool ShouldOverrideUrlLoading(WebView? view, IWebResourceRequest? request) => true;
+        public override bool ShouldOverrideUrlLoading(WebView? view, IWebResourceRequest? request)
+        {
+            if (embed is null || request?.Url?.ToString() is not { } url || !Uri.TryCreate(url, UriKind.Absolute, out var requested))
+            {
+                return true;
+            }
+
+            return !PlayerEmbed.AllowsFrameLoad(requested, request.IsForMainFrame, embed);
+        }
     }
 
     /// <summary>

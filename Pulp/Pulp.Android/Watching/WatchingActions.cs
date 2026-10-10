@@ -11,6 +11,7 @@ using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
 using Pulp.Domain.Services;
 using Pulp.Domain.Watching;
+using Pulp.Library;
 using Pulp.Title;
 
 namespace Pulp.Watching;
@@ -30,6 +31,7 @@ public sealed class WatchingActions
     private readonly ViewerId viewer;
     private readonly Action reload;
     private readonly Action<TitleId, bool> setHidden;
+    private readonly LibraryWrites writes;
 
     /// <param name="setHidden">Hides a row (true) or brings it back (false) on this page.</param>
     public WatchingActions(Activity host, FrameLayout overlay, PulpServices services, ViewerId viewer, Action reload, Action<TitleId, bool> setHidden)
@@ -40,6 +42,10 @@ public sealed class WatchingActions
         this.viewer = viewer;
         this.reload = reload ?? throw new ArgumentNullException(nameof(reload));
         this.setHidden = setHidden ?? throw new ArgumentNullException(nameof(setHidden));
+
+        // One queue for every write this card makes, so an undo never lands ahead of its act (and so
+        // never takes the earlier clock stamp and loses to it).
+        writes = new LibraryWrites(services, () => host.RunOnUiThread(reload), "watching");
     }
 
     public void ShowCard(WatchingRow row)
@@ -59,19 +65,19 @@ public sealed class WatchingActions
         {
             [CardActionKind.Play] = new(() => Play(row)),
             [CardActionKind.MarkWatched] = new(
-                () => Write(() => services.PutAsync(HouseholdMaps.Watched, marked, CancellationToken.None), "mark watched"),
-                () => Write(() => services.RemoveAsync(HouseholdMaps.Watched, marked, CancellationToken.None), "undo the mark")),
+                () => writes.Enqueue("mark watched", token => services.PutAsync(HouseholdMaps.Watched, marked, token)),
+                () => writes.Enqueue("undo the mark", token => services.RemoveAsync(HouseholdMaps.Watched, marked, token))),
             [CardActionKind.AddTo] = new(() => AddTo(row)),
             [CardActionKind.RemoveFromContinueWatching] = new(
                 () =>
                 {
                     setHidden(row.Row.Title, true);
-                    Write(() => services.PutAsync(HouseholdMaps.ContinueDismissed, removal, CancellationToken.None), "remove from Continue watching");
+                    writes.Enqueue("remove from Continue watching", token => services.PutAsync(HouseholdMaps.ContinueDismissed, removal, token));
                 },
                 () =>
                 {
                     setHidden(row.Row.Title, false);
-                    Write(() => services.RemoveAsync(HouseholdMaps.ContinueDismissed, removal, CancellationToken.None), "put back on Continue watching");
+                    writes.Enqueue("put back on Continue watching", token => services.RemoveAsync(HouseholdMaps.ContinueDismissed, removal, token));
                 }),
         };
 
@@ -140,7 +146,7 @@ public sealed class WatchingActions
             pending.Service,
             row.Row.NextUp,
             WatchSource.HandOff));
-        Write(() => services.PutAsync(HouseholdMaps.Watched, sitting, CancellationToken.None), "record the hand-off");
+        writes.Enqueue("record the hand-off", token => services.PutAsync(HouseholdMaps.Watched, sitting, token));
     }
 
     /// <summary>The next episode's own link on the home when the catalogue has one, else the title's.</summary>
@@ -185,10 +191,11 @@ public sealed class WatchingActions
                 // Each child's Favorites is the picker's second group (D254), but the roster carries no
                 // child's name to head a row with, so the group stays empty until Release D names them.
                 var model = AddToPickerPlan.Build(row.Name, entry, row.Title is { } title ? DiscoverFacts.For(title, _ => []) : null, choices, []);
+                var picks = new PickerWrites(services, writes.Enqueue, viewer, row.Row.Title, entry);
                 host.RunOnUiThread(() => AddToPicker.Show(
                     host, overlay, model,
-                    (pickerRow, change) => OnPick(playlists, pickerRow, change, entry),
-                    name => NewPlaylist(name, entry)));
+                    picks.OnPick,
+                    name => picks.NewPlaylist(name)));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -196,58 +203,4 @@ public sealed class WatchingActions
             }
         });
     }
-
-    private Action? OnPick(IReadOnlyList<HouseholdPlaylist> playlists, PickerRow row, PickerChange change, PlaylistEntry entry)
-    {
-        if (row.Group != PickerGroup.Playlists || playlists.FirstOrDefault(playlist => playlist.Id.Value == row.Key) is not { } playlist)
-        {
-            return null;
-        }
-
-        var added = playlist with { List = playlist.List.Add(entry) };
-        var removed = playlist with { List = playlist.List.Remove(entry) };
-        switch (change)
-        {
-            case PickerChange.Add:
-            case PickerChange.AddAndAllowList:
-                Write(() => services.PutAsync(HouseholdMaps.Playlist, added, CancellationToken.None), "add to a playlist");
-                return null;
-            case PickerChange.RemoveUndoFirst:
-                Write(() => services.PutAsync(HouseholdMaps.Playlist, removed, CancellationToken.None), "take off a playlist");
-                return () => Write(() => services.PutAsync(HouseholdMaps.Playlist, added, CancellationToken.None), "put back on a playlist");
-            case PickerChange.Refused:
-                return null;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(change), change, "A picker change the home does not handle.");
-        }
-    }
-
-    /// <summary>A playlist named in place, personal by default (mockup 11), with this title already on it.</summary>
-    private void NewPlaylist(string name, PlaylistEntry entry)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return;
-        }
-
-        var playlist = new HouseholdPlaylist(
-            new PlaylistId("playlist-" + Guid.NewGuid().ToString("N")), viewer, Shared: false, Playlist.Named(name.Trim()).Add(entry));
-        Write(() => services.PutAsync(HouseholdMaps.Playlist, playlist, CancellationToken.None), "make a playlist");
-    }
-
-    /// <summary>A household write off the UI thread; the page reloads when it lands, so the list says what is true.</summary>
-    private void Write(Func<Task> write, string what) =>
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await write();
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                services.Diagnostics.Warn("watching", $"Could not {what}; the household is unchanged.", exception);
-            }
-
-            host.RunOnUiThread(reload);
-        });
 }
