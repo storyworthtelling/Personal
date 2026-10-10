@@ -79,3 +79,24 @@ public class LaunchFaultGuardTests
         Assert.True(clicked >= 0 && clear > clicked, "The report is cleared outside the Continue action.");
     }
 }
+
+/// <summary>
+/// The accounts page puts its one primary button in the bar both in its constructor and again in
+/// <c>OnAppearing</c>. A view can have only one parent, so <c>SetBar</c> must take each button out of the
+/// row it is still in first — otherwise the second call throws "a view having multiple parents" on every
+/// launch, which is the crash the owner saw.
+/// </summary>
+public class SetBarReparentingGuardTests
+{
+    [Fact]
+    public void SetBarDetachesEachButtonFromItsPreviousRowBeforeAddingIt()
+    {
+        var binder = File.ReadAllText(Path.Combine(DesignTestHelpers.LedgerRoot(), "Ledger.Android/Pages/LedgerBinderPage.cs"));
+
+        var setBar = NoDoubleLinkTests.ExtractMethod(binder, "protected void SetBar(params View[] buttons)");
+        var detach = setBar.IndexOf("buttons[i].Parent", StringComparison.Ordinal);
+        var add = setBar.IndexOf("row.Children.Add(buttons[i]);", StringComparison.Ordinal);
+
+        Assert.True(detach >= 0 && add > detach, "SetBar adds a button that may still belong to an earlier bar row.");
+    }
+}

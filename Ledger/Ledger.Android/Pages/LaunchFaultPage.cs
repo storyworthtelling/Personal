@@ -5,8 +5,8 @@ namespace Index.Android.Pages;
 /// <summary>
 /// A fault that stopped the app from opening, shown whole instead of as a crash. It is the first thing
 /// on screen after a crash on an earlier launch, and the page the app falls back to when it cannot build
-/// its first page. The report is an editor, so the owner can select and copy the exact text, and
-/// <see cref="Continue"/> is what clears it: until the owner has seen it, it stays on the next launch too.
+/// its first page. The report can be copied with its button or selected in the editor, and
+/// <see cref="continueTo"/> is what clears it: until the owner has seen it, it stays on the next launch too.
 /// </summary>
 public sealed class LaunchFaultPage : ContentPage
 {
@@ -24,16 +24,24 @@ public sealed class LaunchFaultPage : ContentPage
         };
         var copy = new Label
         {
-            Text = "The report below was kept on the phone. Press and hold to select it and copy it. "
-                   + "It stays here until you continue.",
+            Text = "The report below was kept on the phone. Copy it with the button, or press and hold "
+                   + "inside it to select. It stays here until you continue.",
             Style = PaperResources.Token<Style>("SecondaryLabel"),
         };
+
+        var copyStatus = new Label { Style = PaperResources.Token<Style>("SecondaryLabel") };
+        var copyButton = new Button
+        {
+            Text = "Copy report",
+            Style = PaperResources.Token<Style>("SecondaryButton"),
+        };
+        copyButton.Clicked += async (_, _) => await CopyAsync(report, copyStatus);
 
         var column = new VerticalStackLayout
         {
             Spacing = 14,
             Padding = new Thickness(24, 60, 24, 24),
-            Children = { heading, copy, ReportView(report) },
+            Children = { heading, copy, ReportView(report), copyButton, copyStatus },
         };
 
         if (continueTo is not null)
@@ -54,8 +62,8 @@ public sealed class LaunchFaultPage : ContentPage
         Content = new ScrollView { Content = column };
     }
 
-    /// <summary>The report as selectable monospace text. Used on this page and wherever a fault is shown
-    /// inline, so both read the same way.</summary>
+    /// <summary>The report as monospace text. Used on this page and wherever a fault is shown inline, so
+    /// both read the same way.</summary>
     public static View ReportView(string report) => new Editor
     {
         Text = report,
@@ -63,4 +71,19 @@ public sealed class LaunchFaultPage : ContentPage
         AutoSize = EditorAutoSizeOption.TextChanges,
         Style = PaperResources.Token<Style>("MonoEditor"),
     };
+
+    // A failure to copy is shown on this page, not recorded as a new fault: recording would overwrite the
+    // report the owner is trying to copy.
+    private static async Task CopyAsync(string report, Label status)
+    {
+        try
+        {
+            await Clipboard.Default.SetTextAsync(report);
+            status.Text = "Copied.";
+        }
+        catch (Exception ex)
+        {
+            status.Text = $"Could not copy: {ex.Message}";
+        }
+    }
 }
