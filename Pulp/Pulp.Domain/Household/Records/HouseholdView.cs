@@ -1,0 +1,99 @@
+using Pulp.Domain.Availability;
+using Pulp.Domain.Children;
+using Pulp.Domain.Core;
+using Pulp.Domain.Friday;
+using Pulp.Domain.Library;
+using Pulp.Domain.People;
+
+namespace Pulp.Domain.Household.Records;
+
+/// <summary>
+/// One household document read into the Domain's own inputs, once: the roster, each child's rules
+/// with the parents' picks on them, every viewer's sittings, vetoes and stars, the playlists, the
+/// home overrides and the services. Records that could not be read are gathered in
+/// <see cref="Unreadable"/> for Diagnostics — never dropped without a word, never allowed to blank
+/// the rest of the household.
+/// </summary>
+public sealed class HouseholdView
+{
+    private readonly IReadOnlyList<WatchedSitting> sittings;
+    private readonly IReadOnlyList<HouseholdPlaylist> playlists;
+    private readonly IReadOnlyList<ViewerVeto> vetoes;
+    private readonly IReadOnlyList<ChildStarEntry> stars;
+
+    private HouseholdView(HouseholdDocument document)
+    {
+        var unreadable = new List<UnreadableRecord>();
+
+        IReadOnlyList<T> Gather<T>(RecordMap<T> map)
+            where T : notnull
+        {
+            var set = HouseholdRecords.Read(document, map);
+            unreadable.AddRange(set.Unreadable);
+            return set.Items;
+        }
+
+        sittings = Gather(HouseholdMaps.Watched);
+        playlists = Gather(HouseholdMaps.Playlist);
+        vetoes = Gather(HouseholdMaps.Veto);
+        stars = Gather(HouseholdMaps.ChildStar);
+        var picks = Gather(HouseholdMaps.ParentPick);
+        var rules = Gather(HouseholdMaps.ChildRules);
+        var viewers = Gather(HouseholdMaps.Viewer);
+
+        HomeOverrides = Gather(HouseholdMaps.HomeOverride)
+            .Aggregate(Availability.HomeOverrides.None, (chosen, choice) => chosen.OpenThereInstead(choice.Title, choice.Service));
+        Attested = new AttestedServices(Gather(HouseholdMaps.AttestedService).Select(entry => entry.Service));
+        Services = Gather(HouseholdMaps.HouseholdService).Select(entry => entry.Service).ToList();
+
+        // Each record has one key per viewer, so the roster cannot be handed a viewer twice.
+        Roster = viewers.Count == 0 ? null : new HouseholdRoster(viewers);
+        ChildRules = rules
+            .Select(child => child with
+            {
+                ParentPicks = picks.Where(pick => pick.Child == child.Child).Select(pick => pick.Pick).ToList(),
+            })
+            .ToList();
+        Unreadable = unreadable;
+    }
+
+    public static HouseholdView Of(HouseholdDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return new HouseholdView(document);
+    }
+
+    /// <summary>The household's viewers; null until anyone is on the roster (first run is Release D's).</summary>
+    public HouseholdRoster? Roster { get; }
+
+    /// <summary>Each child's one filter, with the parents' picks read from their own records.</summary>
+    public IReadOnlyList<ChildRules> ChildRules { get; }
+
+    public HomeOverrides HomeOverrides { get; }
+
+    public AttestedServices Attested { get; }
+
+    public IReadOnlyList<ServiceId> Services { get; }
+
+    public IReadOnlyList<UnreadableRecord> Unreadable { get; }
+
+    /// <summary>One viewer's own sittings (D97): what Continue Watching and Recently watched are built from.</summary>
+    public IReadOnlyList<WatchEvent> SittingsOf(ViewerId viewer) =>
+        sittings.Where(sitting => sitting.Viewer == viewer).Select(sitting => sitting.Sitting).ToList();
+
+    /// <summary>The viewer's own playlists and the shared ones, by name.</summary>
+    public IReadOnlyList<HouseholdPlaylist> PlaylistsFor(ViewerId viewer) =>
+        playlists
+            .Where(playlist => playlist.IsVisibleTo(viewer))
+            .OrderBy(playlist => playlist.List.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(playlist => playlist.Id.Value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    public HouseholdPlaylist? Playlist(PlaylistId id) => playlists.FirstOrDefault(playlist => playlist.Id == id);
+
+    public VetoBook VetoesOf(ViewerId viewer) =>
+        VetoBook.From(viewer, vetoes.Where(veto => veto.Viewer == viewer).Select(veto => veto.Veto));
+
+    public IReadOnlyList<ChildStar> StarsOf(ViewerId child) =>
+        stars.Where(star => star.Child == child).Select(star => star.Star).ToList();
+}
