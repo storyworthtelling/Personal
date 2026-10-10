@@ -80,6 +80,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "off here); factualClaims = checkable real-world statements that may need fact-checking; " +
         "possibleInconsistencies = anything that may contradict earlier text (names, timeline, physical " +
         "details, world rules). " +
+        // The report writes each of these onto the manuscript page it is about, and by consolidation
+        // time only these notes survive — so a passage not quoted now can never be found again.
+        "For possibleInconsistencies, notableWeaknesses, thinSpots and offPageEvents, include a SHORT " +
+        "verbatim phrase from the excerpt (under fifteen words) in double quotes inside the note, " +
+        "pointing at the exact place it concerns. " +
         // The craft half of the read. It has to happen here, while the actual sentences are in front of
         // the model: by consolidation time only these notes survive, so a line edit not quoted now can
         // never be quoted at all.
@@ -120,9 +125,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         // Every finding has to be findable: an observation the author can't locate in the manuscript
         // costs them a re-read to act on. The chapter is already on the notes, so it only has to be
         // carried through rather than worked out.
-        "FINDING is an object {\"chapter\":string,\"detail\":string}: copy \"chapter\" from the note the " +
+        "FINDING is an object {\"chapter\":string,\"detail\":string,\"excerpt\":string}: copy \"chapter\" from the note the " +
         "observation came from (\"Chapter 7\", \"Chapters 7–8\"), naming the EARLIEST chapter involved " +
         "when an observation spans several, and use \"\" only when the notes carry no chapter at all. " +
+        // The excerpt is what lets the finding be written on the page it concerns.
+        "\"excerpt\": when the note you drew the finding from quotes a phrase, copy that phrase VERBATIM " +
+        "(a short one, under fifteen words) so the finding can be written on that line of the manuscript; " +
+        "use \"\" when the finding is about the book as a whole or no phrase was quoted. " +
         "Set \"chapter\" on each revisionPlan item the same way. " +
         "genre: infer the book's genre. wordCountRange: the word-count range publishers expect for that " +
         "genre (e.g. \"90,000–120,000\"). " +
@@ -210,12 +219,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "every suggestion is a POINTER the author acts on themselves — never drafted prose, never an example " +
         "scene, never sample lines. Respond with ONLY a JSON object: " +
         "{\"scenesToAdd\":[{\"kind\":string,\"location\":string,\"missing\":string,\"why\":string," +
-        "\"priority\":string}],\"showVsTell\":[{\"chapter\":string,\"excerpt\":string,\"direction\":string," +
+        "\"priority\":string,\"excerpt\":string}],\"showVsTell\":[{\"chapter\":string,\"excerpt\":string,\"direction\":string," +
         "\"suggestion\":string}],\"targetLow\":number,\"targetHigh\":number}. " +
         "scenesToAdd = the scenes/beats to ADD, ranked most-impactful first. kind is one of " +
         "\"MissingBeat\" (a turn that happens off-page), \"CharacterDeepening\", \"TensionStakes\", or " +
         "\"ThemeDeepening\". location says where it belongs (\"Chapter 4\", \"after Chapter 7\"). missing = " +
-        "what the reader never gets to see. why = the impact of adding it. priority is one of \"Must\", " +
+        "what the reader never gets to see. excerpt = a short phrase quoted VERBATIM from the notes at the " +
+        "passage the new scene belongs beside (\"\" if none). why = the impact of adding it. priority is one of \"Must\", " +
         "\"Should\", \"Consider\". showVsTell = show-vs-tell notes on BOTH ends: direction \"Dramatize\" for a " +
         "SUMMARIZED passage that could become a shown scene (the main lever for adding words) or \"Tighten\" " +
         "for an OVER-shown passage that runs long; quote the excerpt VERBATIM and give a pointer, not a " +
@@ -235,10 +245,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "each of the prior book's OPEN THREADS, judge whether this book ADDRESSES it (resolves or meaningfully " +
         "advances it), IGNORES it (never touches it), or CONTRADICTS it. You NUDGE, you never rewrite: point at " +
         "the problem, never draft the fix. Respond with ONLY a JSON object: " +
-        "{\"breaks\":[{\"chapter\":string,\"established\":string,\"contradiction\":string}]," +
+        "{\"breaks\":[{\"chapter\":string,\"established\":string,\"contradiction\":string,\"excerpt\":string}]," +
         "\"carriedThreads\":[{\"established\":string,\"status\":string}]}. breaks: chapter = where in THIS book " +
         "(\"Chapter 4\", \"\" if unknown); established = what the prior book set; contradiction = what this book " +
-        "says instead. carriedThreads: established = the prior open thread verbatim; status = one of " +
+        "says instead; excerpt = a short phrase from THIS book's notes, verbatim, where the clash is (\"\" if none). carriedThreads: established = the prior open thread verbatim; status = one of " +
         "\"Addressed\", \"Ignored\", \"Contradicted\". Give one carriedThreads entry per open thread provided. " +
         "Use [] when there are no breaks. No prose outside the JSON.";
 
@@ -550,7 +560,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             .Where(s => !string.IsNullOrWhiteSpace(s.Missing))
             .Select(s => new SceneAddition(
                 ParseAdditionKind(s.Kind), s.Location ?? string.Empty, s.Missing!, s.Why ?? string.Empty,
-                NormalizePriority(s.Priority)))
+                NormalizePriority(s.Priority))
+                { Excerpt = s.Excerpt ?? string.Empty })
             .ToList();
         var showTell = (dto.ShowVsTell ?? [])
             .Where(n => !string.IsNullOrWhiteSpace(n.Excerpt))
@@ -594,7 +605,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
         var breaks = (dto.Breaks ?? [])
             .Where(b => !string.IsNullOrWhiteSpace(b.Contradiction))
-            .Select(b => new SeriesBreak(b.Chapter ?? string.Empty, b.Established ?? string.Empty, b.Contradiction!))
+            .Select(b => new SeriesBreak(b.Chapter ?? string.Empty, b.Established ?? string.Empty, b.Contradiction!)
+            { Excerpt = b.Excerpt ?? string.Empty })
             .ToList();
         var carried = (dto.CarriedThreads ?? [])
             .Where(t => !string.IsNullOrWhiteSpace(t.Established))
@@ -647,7 +659,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private const string SectionFormat =
         "Reply with JSON only: {\"summary\": \"one or two sentences on what you found overall, or an "
         + "empty string if this book gives you nothing to say\", \"findings\": [{\"chapter\": \"Ch. 12-15\", "
-        + "\"detail\": \"what is wrong and why it matters\"}]}. Finding nothing is a legitimate answer: "
+        + "\"detail\": \"what is wrong and why it matters\", \"excerpt\": \"a short phrase (under fifteen "
+        + "words) copied verbatim from the manuscript where it happens, or an empty string when it is about "
+        + "the whole book\"}]}. Finding nothing is a legitimate answer: "
         + "return an empty findings list rather than inventing one.";
 
     private const string ReaderFormat =
@@ -696,7 +710,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             persona.Id,
             dto?.Summary ?? string.Empty,
             (dto?.Findings ?? []).Where(finding => !string.IsNullOrWhiteSpace(finding.Detail))
-                .Select(finding => new ReportFinding(finding.Chapter ?? string.Empty, finding.Detail!))
+                .Select(finding => new ReportFinding(finding.Chapter ?? string.Empty, finding.Detail!)
+                { Excerpt = finding.Excerpt ?? string.Empty })
                 .ToList());
     }
 
@@ -1043,6 +1058,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Missing { get; set; }
         public string? Why { get; set; }
         public string? Priority { get; set; }
+        public string? Excerpt { get; set; }
     }
 
     private sealed class ShowTellDto
@@ -1064,6 +1080,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Chapter { get; set; }
         public string? Established { get; set; }
         public string? Contradiction { get; set; }
+        public string? Excerpt { get; set; }
     }
 
     private sealed class CarriedThreadDto
@@ -1175,6 +1192,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     {
         public string? Chapter { get; set; }
         public string? Detail { get; set; }
+        public string? Excerpt { get; set; }
     }
 
     private sealed class SynthesisDto

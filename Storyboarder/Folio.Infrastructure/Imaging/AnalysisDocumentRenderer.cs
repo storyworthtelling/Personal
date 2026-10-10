@@ -31,8 +31,8 @@ public sealed class AnalysisDocumentRenderer
 
     public byte[] Render(
         BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes,
-        DraftReview? review = null, string? manuscript = null) =>
-        RenderReport(analysis, cover, scenes, review, manuscript).Pdf;
+        DraftReview? review = null, string? manuscript = null, IReadOnlyList<ChapterSpan>? chapters = null) =>
+        RenderReport(analysis, cover, scenes, review, manuscript, chapters).Pdf;
 
     /// <summary>
     /// Renders three times, and each pass buys something the next one needs.
@@ -53,7 +53,7 @@ public sealed class AnalysisDocumentRenderer
     /// </summary>
     public AnalysisRenderResult RenderReport(
         BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes,
-        DraftReview? review = null, string? manuscript = null)
+        DraftReview? review = null, string? manuscript = null, IReadOnlyList<ChapterSpan>? chapters = null)
     {
         var reportTitle = string.IsNullOrWhiteSpace(cover.Title) ? "Book Analysis" : cover.Title;
         var titled = cover with { Title = reportTitle };
@@ -63,7 +63,7 @@ public sealed class AnalysisDocumentRenderer
         IReadOnlyList<(string Title, int Page)> relative;
         using (var probe = new PageWriter(foot))
         {
-            RenderContent(analysis, titled, scenes, draft, probe, manuscript);
+            RenderContent(analysis, titled, draft, probe, manuscript, chapters);
             relative = probe.TocEntries.ToList();
             probe.Finish();
         }
@@ -83,13 +83,13 @@ public sealed class AnalysisDocumentRenderer
         covers.AnalysisCover(document, titled);
         covers.AnalysisToc(document, entries);
         document.NewPage();
-        RenderContent(analysis, titled, scenes, draft, document, manuscript);
+        RenderContent(analysis, titled, draft, document, manuscript, chapters);
         return new AnalysisRenderResult(document.Finish(), frontMatter, entries);
     }
 
     private static void RenderContent(
-        BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes,
-        DraftReview review, PageWriter writer, string? manuscript)
+        BookAnalysisResult analysis, ReportCover cover, DraftReview review, PageWriter writer,
+        string? manuscript, IReadOnlyList<ChapterSpan>? chapters)
     {
         using var body = ReportType.Body();
         using var bodyBold = ReportType.BodyBold();
@@ -131,7 +131,7 @@ public sealed class AnalysisDocumentRenderer
             writer.Heading($"Since draft {review.DraftNumber - 1}", h2, Ink, ruled: true);
             writer.Paragraph(
                 $"{review.Resolved.Count} resolved · {newCount} new · {regressedCount} regressed. " +
-                "New and regressed findings are marked in place below.",
+                "New and regressed findings are marked in the margin of the manuscript.",
                 bodyItalic, Muted);
             foreach (var resolved in review.Resolved)
                 writer.Bullet("Resolved — " + Join(resolved.Chapter, resolved.Detail), body, Muted);
@@ -164,138 +164,30 @@ public sealed class AnalysisDocumentRenderer
             }
         }
 
-        // Story integrity — the top analytical priority. On a later draft each finding is marked with its
-        // cross-draft status ([new]/[carried]/[regressed]).
-        Section(writer, "Plot holes", FindingCategory.PlotHole, analysis.PlotHoles, statusByFinding, body, h2);
-        Section(writer, "Inconsistencies", FindingCategory.Inconsistency, analysis.Inconsistencies, statusByFinding, body, h2);
-        Section(writer, "Inaccuracies", FindingCategory.Inaccuracy, analysis.Inaccuracies, statusByFinding, body, h2);
-
         Section(writer, "Themes", analysis.Themes, body, h2);
 
-        // The five whole-book sections with no other home in the report (Pacing, Voice consistency,
-        // and Series continuity fold into the sections below instead — see SectionFor).
-        RenderWholeBookNotes(writer, analysis.SectionReads, body, bodyItalic, h2, h3);
+        // Everything anchored to a place in the text is written on the text (P10, and now all of it):
+        // the findings, the line edits, the prose, dialogue and voice notes, the continuity breaks, the
+        // scenes to add. What is left is what is about the book as a whole — and whatever could not be
+        // tied to a place, which is printed here rather than lost. The marks are built first because
+        // the notes below must know what did not land.
+        var text = ManuscriptText.ForPrint(manuscript ?? string.Empty);
+        var marked = MarkSource.Build(
+            text, analysis, chapters,
+            (category, detail) => Tag(category, detail, statusByFinding));
 
-        // Pacing, with a tension-over-chapters chart when the model returned a curve of at least two
-        // points. A single chapter has nothing to trend between it and — a real manuscript proved
-        // this: the chart degenerated to one point floating above a bare rule, with nothing on the
-        // page saying what either mark was.
-        var pacingSection = SectionFor(analysis.SectionReads, "pacing");
-        if (analysis.PacingNotes is { Count: > 0 } || analysis.PacingCurve is { Count: > 0 } || pacingSection is { HasContent: true })
-        {
-            writer.Heading("Pacing", h2, Ink, ruled: true);
-            if (pacingSection is { HasContent: true } && !string.IsNullOrWhiteSpace(pacingSection.Summary))
-                writer.Paragraph(pacingSection.Summary, body, Ink);
-            if (analysis.PacingCurve is { Count: >= 2 })
-            {
-                writer.Paragraph("Tension across the chapters — a dip is a place to check the story is still pulling.", bodyItalic, Muted);
-                writer.PacingChart(analysis.PacingCurve, PlacedFindings(analysis));
-            }
-            foreach (var note in (analysis.PacingNotes ?? []).Concat(pacingSection?.Findings ?? []))
-                writer.Bullet(Join(note.Chapter, note.Detail) + Tag(FindingCategory.Pacing, note.Detail, statusByFinding), body, Ink);
-            writer.Gap(PageGeometry.SectionGap);
-        }
+        RenderWholeBookNotes(writer, analysis, marked.Unplaced, body, bodyBold, bodyItalic, h2, h3);
 
-        if (analysis.ProseNotes is { Count: > 0 })
-        {
-            writer.Heading("Prose style & voice", h2, Ink, ruled: true);
-            foreach (var note in analysis.ProseNotes)
-            {
-                writer.Bullet(Join(note.Chapter, note.Pattern, note.Evidence), body, Ink);
-                if (!string.IsNullOrWhiteSpace(note.Fix))
-                    writer.Paragraph(note.Fix, bodyItalic, Muted);
-            }
-            writer.Gap(PageGeometry.SectionGap);
-        }
-
-        if (analysis.DialogueNotes is { Count: > 0 })
-        {
-            writer.Heading("Dialogue", h2, Ink, ruled: true);
-            foreach (var note in analysis.DialogueNotes)
-            {
-                writer.Bullet(Join(note.Chapter, note.Speakers, note.Observation), body, Ink);
-                if (!string.IsNullOrWhiteSpace(note.Fix))
-                    writer.Paragraph(note.Fix, bodyItalic, Muted);
-            }
-            writer.Gap(PageGeometry.SectionGap);
-        }
-
-        if (analysis.LineEdits is { Count: > 0 })
-        {
-            writer.Heading("Line-level edits", h2, Ink, ruled: true);
-            writer.Paragraph("Sentences to cut, tighten, or rewrite. The excerpt is quoted as written; the words stay yours.", bodyItalic, Muted);
-            foreach (var edit in analysis.LineEdits)
-            {
-                writer.Bullet(Join(edit.Chapter, Quoted(edit.Excerpt)), bodyItalic, Ink);
-                if (!string.IsNullOrWhiteSpace(edit.Suggestion))
-                    writer.Paragraph(edit.Suggestion, body, Ink);
-                if (!string.IsNullOrWhiteSpace(edit.Reason))
-                    writer.Paragraph(edit.Reason, bodyItalic, Muted);
-                writer.Gap(PageGeometry.TightGap);
-            }
-        }
-
-        // Show vs tell, both ends of the pendulum: summaries that could become scenes (the additive lever)
-        // and over-shown passages to tighten.
-        RenderShowVsTell(writer, analysis.Expansion.ShowVsTell, body, bodyBold, bodyItalic, h2);
-
-        RenderVoiceConsistency(
-            writer, analysis.VoiceConsistency, SectionFor(analysis.SectionReads, "voice-consistency"),
-            body, bodyBold, bodyItalic, h2);
-
-        // Series continuity (Phase 5): on a sequel, where this book contradicts the prior book's canon and how it
-        // handles the prior book's open threads. Silent for a standalone book or a clean sequel.
-        RenderSeriesContinuity(
-            writer, analysis.SeriesContinuity, SectionFor(analysis.SectionReads, "series-continuity"),
-            body, bodyBold, bodyItalic, h2);
-
-        // The manuscript is the centre of the report (P10): everything anchored to a place in the
-        // text lives here, before the whole-book sections above give way to the six whole-book
-        // voices below. The scene-by-scene walk follows it — each scene's evidence image above its
-        // notes, the fidelity check — and only then do the readers speak.
-        RenderMarkedManuscript(writer, analysis, manuscript, bodyItalic, h2);
-        RenderScenes(writer, scenes, body, bodyItalic, h2);
+        RenderMarkedManuscript(writer, text, marked.Marks, bodyItalic, h2);
 
         RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3);
 
-        // What to do next: first the scenes to ADD (the additive engine — the owner writes short), then the
-        // revision plan, both grouped by impact tier.
-        RenderScenesToAdd(writer, analysis.Expansion.ScenesToAdd, body, bodyItalic, h2, h3);
+        // What to do next: the revision plan, grouped by impact tier.
         RenderRevisionPlan(writer, analysis.RevisionPlan, body, h2, h3);
 
         // The candid state of the draft, last.
         RenderVerdict(writer, analysis.Verdict, cover, body, bodyBold, bodyItalic, h2);
 
-    }
-
-    private static void RenderScenes(
-        PageWriter writer, IReadOnlyList<SceneEvidence> scenes, SKFont body, SKFont bodyItalic, SKFont h2)
-    {
-        if (scenes is not { Count: > 0 })
-            return;
-
-        writer.Heading("Scene by scene", h2, Ink, ruled: true);
-        writer.Paragraph(
-            "Each scene's wordless image is what a reader pictures from your words. Where it doesn't match " +
-            "your mind's eye, the prose is under-specifying the beat.",
-            bodyItalic, Muted);
-
-        foreach (var scene in scenes)
-        {
-            writer.KeepTogether(PageGeometry.SceneImageHeight + 80f);
-            writer.Paragraph(string.IsNullOrWhiteSpace(scene.Citation) ? "Scene" : scene.Citation, bodyItalic, Accent);
-            if (scene.ShowsPair)
-                writer.ScenePair(scene.PreviousImage!, scene.Image!);
-            else if (scene.Image is { Length: > 0 })
-                writer.Image(scene.Image);
-            else
-                writer.Paragraph("Image unavailable for this scene.", bodyItalic, Muted);
-            if (!string.IsNullOrWhiteSpace(scene.Purpose))
-                writer.Paragraph(scene.Purpose, body, Ink);
-            if (!string.IsNullOrWhiteSpace(scene.Verdict))
-                writer.Paragraph(scene.Verdict, bodyItalic, Muted);
-            writer.Gap(PageGeometry.SectionGap);
-        }
     }
 
     /// <summary>
@@ -305,18 +197,10 @@ public sealed class AnalysisDocumentRenderer
     /// the book, not a reading of it.
     /// </summary>
     private static void RenderMarkedManuscript(
-        PageWriter writer, BookAnalysisResult analysis, string? manuscript, SKFont bodyItalic, SKFont h2)
+        PageWriter writer, string manuscript, IReadOnlyList<Mark> marks, SKFont bodyItalic, SKFont h2)
     {
-        if (string.IsNullOrWhiteSpace(manuscript))
-            return;
-
-        // A real .docx paragraph opened with a literal Word tab has no glyph on the page — see
-        // ManuscriptText. Sanitized once, before marks are indexed, so the marks and the drawn
-        // lines agree on the same offsets throughout.
-        manuscript = ManuscriptText.ForPrint(manuscript);
-
-        var marks = MarkSource.From(manuscript, analysis);
-        if (marks.Count == 0)
+        // A hundred and forty pages of unmarked prose is a copy of the book, not a reading of it.
+        if (string.IsNullOrWhiteSpace(manuscript) || marks.Count == 0)
             return;
 
         writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
@@ -333,136 +217,180 @@ public sealed class AnalysisDocumentRenderer
         writer.NewPage();
     }
 
-    private static void RenderVoiceConsistency(
-        PageWriter writer, VoiceConsistency voice, SectionRead? section,
-        SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
-    {
-        if (string.IsNullOrWhiteSpace(voice.DominantVoice) && voice.Divergences is not { Count: > 0 }
-            && section is not { HasContent: true })
-            return;
-
-        writer.Heading("Authorial voice consistency", h2, Ink, ruled: true);
-        writer.Paragraph(
-            "Where the manuscript's own prose drifts from its dominant voice — a register slip, a tonal " +
-            "wobble. Deliberately distinct voices (a different POV, an embedded letter) are left out.",
-            bodyItalic, Muted);
-        if (section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary))
-            writer.Paragraph(section.Summary, body, Ink);
-        if (!string.IsNullOrWhiteSpace(voice.DominantVoice))
-        {
-            writer.Paragraph("The book's voice:", bodyBold, Ink);
-            writer.Paragraph(voice.DominantVoice, body, Ink);
-        }
-        if (voice.Divergences is { Count: > 0 })
-        {
-            writer.Paragraph("Passages that drift:", bodyBold, Ink);
-            foreach (var divergence in voice.Divergences)
-            {
-                writer.Bullet(Join(divergence.Chapter, Quoted(divergence.Excerpt)), bodyItalic, Ink);
-                if (!string.IsNullOrWhiteSpace(divergence.Divergence))
-                    writer.Paragraph(divergence.Divergence, body, Ink);
-                if (!string.IsNullOrWhiteSpace(divergence.Suggestion))
-                    writer.Paragraph(divergence.Suggestion, bodyItalic, Muted);
-                writer.Gap(PageGeometry.TightGap);
-            }
-        }
-        if (section?.Findings is { Count: > 0 })
-        {
-            writer.Paragraph("Also noted:", bodyBold, Ink);
-            foreach (var finding in section.Findings)
-                writer.Bullet(Join(finding.Chapter, finding.Detail), body, Ink);
-        }
-    }
-
-    // The cross-book continuity read (Phase 5): contradictions of the prior book's established canon, and the
-    // status of the prior book's carried-over open threads. Rendered only when there is something to say — a
-    // standalone book or a clean sequel is silent (quiet by default).
-    private static void RenderSeriesContinuity(
-        PageWriter writer, SeriesContinuity series, SectionRead? section,
-        SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
-    {
-        // Quiet by default: a standalone book's own section persona still runs and still has
-        // something to say ("no prior book was provided"), but that is not worth a page — the
-        // section's absence already says it. Only a book with real continuity content earns the page,
-        // and the persona's own summary is welcome once it does.
-        if (!series.HasContent)
-            return;
-
-        writer.Heading("Series continuity", h2, Ink, ruled: true);
-        var against = string.IsNullOrWhiteSpace(series.PriorBookTitle)
-            ? "the previous book"
-            : $"“{series.PriorBookTitle}”";
-        writer.Paragraph(
-            $"How this book holds together with {against} — where it clashes with what was established, and " +
-            "what it does with the threads the previous book left open.",
-            bodyItalic, Muted);
-        if (section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary))
-            writer.Paragraph(section.Summary, body, Ink);
-
-        if (series.Breaks is { Count: > 0 })
-        {
-            writer.Paragraph("Contradicts the previous book:", bodyBold, Ink);
-            foreach (var brk in series.Breaks)
-            {
-                writer.Bullet(Join(brk.Chapter, brk.Contradiction), body, Ink);
-                if (!string.IsNullOrWhiteSpace(brk.Established))
-                    writer.Paragraph($"Previously established: {brk.Established}", bodyItalic, Muted);
-                writer.Gap(PageGeometry.TightGap);
-            }
-        }
-
-        if (series.CarriedThreads is { Count: > 0 })
-        {
-            writer.Paragraph("Threads carried from the previous book:", bodyBold, Ink);
-            foreach (var thread in series.CarriedThreads)
-                writer.Bullet(Join(thread.Status, thread.Established), body, Ink);
-            writer.Gap(PageGeometry.BlockGap);
-        }
-
-        if (section?.Findings is { Count: > 0 })
-        {
-            writer.Paragraph("Also noted:", bodyBold, Ink);
-            foreach (var finding in section.Findings)
-                writer.Bullet(Join(finding.Chapter, finding.Detail), body, Ink);
-        }
-    }
-
     /// <summary>The section persona whose own read routes to a place other than "Whole-book notes".</summary>
     private static SectionRead? SectionFor(IReadOnlyList<SectionRead> sections, string personaId) =>
         sections.FirstOrDefault(section => section.PersonaId == personaId);
 
-    // The three section personas with an existing home elsewhere in the report — folded in by
-    // SectionFor at their own heading rather than printed again here.
-    private static readonly string[] HomedSectionIds = ["pacing", "voice-consistency", "series-continuity"];
-
     /// <summary>
-    /// Story integrity, Structure, Setup and payoff, Theme hierarchy, and Length: the five whole-book
-    /// sections that had no section of their own before this — their one-line summaries used to be
-    /// dumped into Themes, unlabeled, overwriting the model's actual answer to what the book is about.
-    /// Each now prints under its own persona name, findings and all.
+    /// What is true of the book as a whole, rather than of any one place in it.
+    ///
+    /// <para>The whole-book personas keep their own voices here: Story integrity, Structure, Setup and
+    /// payoff, Theme hierarchy and Length print their summary and findings as they always did, and
+    /// Pacing, Voice consistency and Series continuity contribute what is about the whole book — the
+    /// <b>tension chart</b>, the book's dominant voice, the status of the prior book's open threads —
+    /// while their chapter-cited findings are written on the manuscript. Last come the notes that had
+    /// no place to be written (<see cref="UnplacedNote"/>), so that removing the sections cannot make
+    /// a finding disappear.</para>
     /// </summary>
     private static void RenderWholeBookNotes(
-        PageWriter writer, IReadOnlyList<SectionRead> sectionReads, SKFont body, SKFont bodyItalic, SKFont h2, SKFont h3)
+        PageWriter writer, BookAnalysisResult analysis, IReadOnlyList<UnplacedNote> unplaced,
+        SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2, SKFont h3)
     {
-        var notes = sectionReads.Where(section => section.HasContent && !HomedSectionIds.Contains(section.PersonaId)).ToList();
-        if (notes.Count == 0)
+        var blocks = new List<Action>();
+
+        void Persona(SectionRead section)
+        {
+            blocks.Add(() =>
+            {
+                writer.Heading(PersonaName(section.PersonaId), h3, Ink);
+                if (!string.IsNullOrWhiteSpace(section.Summary))
+                    writer.Paragraph(section.Summary, body, Ink);
+                foreach (var finding in section.Findings ?? [])
+                    writer.Bullet(Join(finding.Chapter, finding.Detail), body, Ink);
+                writer.Gap(PageGeometry.BlockGap);
+            });
+        }
+
+        foreach (var persona in PersonaCatalogue.Sections)
+        {
+            var section = SectionFor(analysis.SectionReads, persona.Id);
+            switch (persona.Id)
+            {
+                case "pacing":
+                    AddPacing(blocks, writer, analysis, section, body, bodyItalic, h3);
+                    break;
+                case "voice-consistency":
+                    AddVoice(blocks, writer, analysis, section, body, bodyBold, h3);
+                    break;
+                case "series-continuity":
+                    AddSeries(blocks, writer, analysis, section, body, bodyBold, h3);
+                    break;
+                default:
+                    if (section is { HasContent: true })
+                        Persona(section);
+                    break;
+            }
+        }
+
+        // A read citing a persona the catalogue does not know prints as itself, so a wrong citation
+        // is visible rather than tidy.
+        foreach (var section in analysis.SectionReads.Where(read =>
+                     read.HasContent && PersonaCatalogue.Sections.All(persona => persona.Id != read.PersonaId)))
+            Persona(section);
+
+        if (unplaced.Count > 0)
+        {
+            blocks.Add(() =>
+            {
+                writer.Heading("Not tied to a place in the text", h3, Ink);
+                writer.Paragraph(
+                    "These notes are about the book rather than a passage, or named a place the "
+                    + "manuscript could not confirm — so they are listed here instead of on a page.",
+                    bodyItalic, Muted);
+                foreach (var group in unplaced.GroupBy(note => note.Source))
+                {
+                    writer.Paragraph(group.Key, bodyBold, Ink);
+                    foreach (var note in group)
+                        writer.Bullet(Join(note.Chapter, note.Text), body, Ink);
+                }
+                writer.Gap(PageGeometry.BlockGap);
+            });
+        }
+
+        if (blocks.Count == 0)
             return;
 
         writer.Heading("Whole-book notes", h2, Ink, ruled: true);
         writer.Paragraph(
-            "What each whole-book read found, beyond the findings above. Sellability, structure, and " +
-            "whether a stranger finishes it come later, from the six readers.",
+            "What the book is doing as a whole. Anything tied to a line — a plot hole, a line edit, a "
+            + "scene to add — is written on the manuscript itself, further on. Sellability, structure, "
+            + "and whether a stranger finishes it come later, from the readers.",
             bodyItalic, Muted);
 
-        foreach (var section in notes)
+        foreach (var block in blocks)
+            block();
+    }
+
+    /// <summary>
+    /// Pacing, with a tension-over-chapters chart when the model returned a curve of at least two
+    /// points. A single chapter has nothing to trend between — a real manuscript proved this: the
+    /// chart degenerated to one point floating above a bare rule, with nothing on the page saying
+    /// what either mark was. The chapter-cited pacing notes are marks on the manuscript.
+    /// </summary>
+    private static void AddPacing(
+        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section,
+        SKFont body, SKFont bodyItalic, SKFont h3)
+    {
+        var hasSummary = section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary);
+        var hasChart = analysis.PacingCurve is { Count: >= 2 };
+        if (!hasSummary && !hasChart)
+            return;
+
+        blocks.Add(() =>
         {
-            writer.Heading(PersonaName(section.PersonaId), h3, Ink);
-            if (!string.IsNullOrWhiteSpace(section.Summary))
-                writer.Paragraph(section.Summary, body, Ink);
-            foreach (var finding in section.Findings ?? [])
-                writer.Bullet(Join(finding.Chapter, finding.Detail), body, Ink);
+            writer.Heading("Pacing", h3, Ink);
+            if (hasSummary)
+                writer.Paragraph(section!.Summary, body, Ink);
+            if (hasChart)
+            {
+                writer.Paragraph("Tension across the chapters — a dip is a place to check the story is still pulling.", bodyItalic, Muted);
+                writer.PacingChart(analysis.PacingCurve, PlacedFindings(analysis));
+            }
             writer.Gap(PageGeometry.BlockGap);
-        }
+        });
+    }
+
+    private static void AddVoice(
+        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section,
+        SKFont body, SKFont bodyBold, SKFont h3)
+    {
+        var hasSummary = section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary);
+        var voice = analysis.VoiceConsistency.DominantVoice;
+        if (!hasSummary && string.IsNullOrWhiteSpace(voice))
+            return;
+
+        blocks.Add(() =>
+        {
+            writer.Heading("Voice consistency", h3, Ink);
+            if (hasSummary)
+                writer.Paragraph(section!.Summary, body, Ink);
+            if (!string.IsNullOrWhiteSpace(voice))
+            {
+                writer.Paragraph("The book's voice:", bodyBold, Ink);
+                writer.Paragraph(voice, body, Ink);
+            }
+            writer.Gap(PageGeometry.BlockGap);
+        });
+    }
+
+    // Quiet by default: a standalone book's own section persona still runs and still has something to
+    // say ("no prior book was provided"), but that is not worth a line — the section's absence already
+    // says it. Only a book with real continuity content earns it. The breaks are on the manuscript;
+    // what is left here is the status of the prior book's open threads, which is about the whole book.
+    private static void AddSeries(
+        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section,
+        SKFont body, SKFont bodyBold, SKFont h3)
+    {
+        var series = analysis.SeriesContinuity;
+        if (!series.HasContent)
+            return;
+
+        blocks.Add(() =>
+        {
+            var against = string.IsNullOrWhiteSpace(series.PriorBookTitle)
+                ? "the previous book"
+                : $"“{series.PriorBookTitle}”";
+            writer.Heading("Series continuity", h3, Ink);
+            if (section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary))
+                writer.Paragraph(section.Summary, body, Ink);
+            if (series.CarriedThreads is { Count: > 0 })
+            {
+                writer.Paragraph($"Threads carried from {against}:", bodyBold, Ink);
+                foreach (var thread in series.CarriedThreads)
+                    writer.Bullet(Join(thread.Status, thread.Established), body, Ink);
+            }
+            writer.Gap(PageGeometry.BlockGap);
+        });
     }
 
     /// <summary>
@@ -595,93 +523,8 @@ public sealed class AnalysisDocumentRenderer
         return PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId)?.Name ?? personaId;
     }
 
-    // The additive engine (Phase 3): scenes and beats to ADD, ranked by the same Must/Should/Consider impact
-    // tiers as the revision plan. Pointers only — the intro is explicit that these are the author's to write.
     // The impact tiers, in the order the plan and the additive engine both group by.
     private static readonly string[] Tiers = ["Must", "Should", "Consider"];
-
-    private static void RenderScenesToAdd(
-        PageWriter writer, IReadOnlyList<SceneAddition> additions, SKFont body, SKFont bodyItalic, SKFont h2, SKFont h3)
-    {
-        if (additions is not { Count: > 0 })
-            return;
-
-        writer.Heading("Scenes to add", h2, Ink, ruled: true);
-        writer.Paragraph(
-            "Where the book could grow — beats that happen off-page, scenes that would deepen a character or " +
-            "raise the stakes. These are pointers to write yourself, never drafted scenes.",
-            bodyItalic, Muted);
-
-        bool Matches(SceneAddition item, string tier) =>
-            string.Equals((item.Priority ?? string.Empty).Trim(), tier, StringComparison.OrdinalIgnoreCase);
-
-        void Render(SceneAddition addition)
-        {
-            writer.Bullet(Join(KindLabel(addition.Kind), addition.Location, addition.Missing), body, Ink);
-            if (!string.IsNullOrWhiteSpace(addition.Why))
-                writer.Paragraph(addition.Why, bodyItalic, Muted);
-        }
-
-        foreach (var tier in Tiers)
-        {
-            var items = additions.Where(a => Matches(a, tier)).ToList();
-            if (items.Count == 0)
-                continue;
-            writer.Heading(tier, h3, Accent);
-            foreach (var item in items)
-                Render(item);
-            writer.Gap(PageGeometry.BlockGap);
-        }
-
-        var other = additions.Where(a => !Tiers.Any(t => Matches(a, t))).ToList();
-        if (other.Count > 0)
-        {
-            writer.Heading("Consider", h3, Accent);
-            foreach (var item in other)
-                Render(item);
-        }
-        writer.Gap(PageGeometry.SectionGap);
-    }
-
-    private static string KindLabel(AdditionKind kind) => kind switch
-    {
-        AdditionKind.MissingBeat => "Missing beat",
-        AdditionKind.CharacterDeepening => "Character",
-        AdditionKind.TensionStakes => "Tension & stakes",
-        AdditionKind.ThemeDeepening => "Theme",
-        _ => "Add"
-    };
-
-    // Show vs tell, both ends of the pendulum: passages TOLD in summary that could become dramatized scenes
-    // (the main lever for adding words), and OVER-shown passages that run long. Diagnosis only — the excerpt
-    // is quoted so the author can find it, the suggestion is a pointer, not a rewrite.
-    private static void RenderShowVsTell(
-        PageWriter writer, IReadOnlyList<ShowTellNote> notes, SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
-    {
-        if (notes is not { Count: > 0 })
-            return;
-
-        writer.Heading("Show vs tell", h2, Ink, ruled: true);
-
-        void RenderGroup(string heading, ShowTellDirection direction)
-        {
-            var group = notes.Where(n => n.Direction == direction).ToList();
-            if (group.Count == 0)
-                return;
-            writer.Paragraph(heading, bodyBold, Ink);
-            foreach (var note in group)
-            {
-                writer.Bullet(Join(note.Chapter, Quoted(note.Excerpt)), bodyItalic, Ink);
-                if (!string.IsNullOrWhiteSpace(note.Suggestion))
-                    writer.Paragraph(note.Suggestion, body, Ink);
-            }
-            writer.Gap(PageGeometry.TightGap);
-        }
-
-        RenderGroup("Summarized — could become a scene:", ShowTellDirection.Dramatize);
-        RenderGroup("Over-shown — could be tightened:", ShowTellDirection.Tighten);
-        writer.Gap(PageGeometry.BlockGap);
-    }
 
     /// <summary>
     /// The revision plan: the only page in the report that is a <b>list of actions</b>.
@@ -847,20 +690,6 @@ public sealed class AnalysisDocumentRenderer
         writer.Heading(heading, h2, Ink, ruled: true);
         foreach (var item in items)
             writer.Bullet(item, body, Ink);
-        writer.Gap(PageGeometry.SectionGap);
-    }
-
-    // A section of findings. Each bullet leads with the chapter it was drawn from, which is the first
-    // thing the author needs in order to act on it, and (on a later draft) trails a cross-draft status tag.
-    private static void Section(
-        PageWriter writer, string heading, FindingCategory category, IReadOnlyList<ReportFinding>? items,
-        IReadOnlyDictionary<(FindingCategory, string), FindingStatus> statusByFinding, SKFont body, SKFont h2)
-    {
-        if (items is not { Count: > 0 })
-            return;
-        writer.Heading(heading, h2, Ink, ruled: true);
-        foreach (var item in items)
-            writer.Bullet(Join(item.Chapter, item.Detail) + Tag(category, item.Detail, statusByFinding), body, Ink);
         writer.Gap(PageGeometry.SectionGap);
     }
 

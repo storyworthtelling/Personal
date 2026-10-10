@@ -1134,8 +1134,15 @@ public sealed class ReviewProcessor : IPipelineStep
                     .Select(source => source.FullText)
                     .FirstOrDefaultAsync(cancellationToken);
 
+                var chapters = await db.Chapters
+                    .Where(chapter => chapter.NovelId == novel.Id)
+                    .OrderBy(chapter => chapter.Number)
+                    .Select(chapter => new Folio.Domain.Markup.ChapterSpan(
+                        chapter.Number, chapter.StartOffset, chapter.EndOffset))
+                    .ToListAsync(cancellationToken);
+
                 var pdf = analysisPdfComposer.Compose(
-                    folded, BuildCover(novel, wordCount), scenes, review, manuscript);
+                    folded, BuildCover(novel, wordCount), scenes, review, manuscript, chapters);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }

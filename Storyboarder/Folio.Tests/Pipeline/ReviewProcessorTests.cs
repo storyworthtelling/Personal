@@ -478,20 +478,46 @@ public class ReviewProcessorTests : IDisposable
     }
 
     /// <summary>
-    /// And the other half of the same claim: a draft nothing could be marked on prints no manuscript
-    /// at all. A hundred and forty pages of unmarked prose is a copy of the book, not a reading.
+    /// And the other half of the same claim: a draft with nothing to say prints no manuscript at all.
+    /// A hundred and forty pages of unmarked prose is a copy of the book, not a reading.
+    ///
+    /// <para>"Nothing locatable" used to be enough, because a finding that cited only a chapter could
+    /// not be marked. It is marked now — on the opening of the chapter, saying so — so the only draft
+    /// that prints no manuscript is one every read came back silent on.</para>
     /// </summary>
     [Fact]
-    public async Task ADraftWithNoLocatableFindingsPrintsNoManuscript()
+    public async Task ADraftEveryReadWasSilentOnPrintsNoManuscript()
     {
+        claude.Setup(c => c.ConsolidateAnalysis(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BookAnalysisResult.Empty);
         claude.Setup(c => c.ConsolidateCraft(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CraftReport([], [], [], []));
+        claude.Setup(c => c.ProposeExpansion(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(),
+                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ExpansionReport.Empty);
+        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, CancellationToken _) => Task.FromResult(SectionRead.Silent(persona.Id)));
 
         var id = SeedManuscript("The knight rode to the castle and knocked on the gate.");
         await DriveToCompletion(NewProcessor());
 
         Assert.DoesNotContain("knocked on the gate", TextOf(ReportOf(id)), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A finding that cites only a chapter is written on that chapter's opening, so the draft prints.
+    /// The default consolidation cites "Chapter 1" with no quotation.
+    /// </summary>
+    [Fact]
+    public async Task AFindingThatCitesOnlyAChapterStillPrintsTheManuscriptWithItMarked()
+    {
+        var id = SeedManuscript("The knight rode to the castle and knocked on the gate.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Contains("knocked on the gate", TextOf(ReportOf(id)), StringComparison.Ordinal);
     }
 
     private static string TextOf(byte[] pdf)
@@ -500,42 +526,12 @@ public class ReviewProcessorTests : IDisposable
         return string.Join(' ', document.GetPages().Select(page => page.Text));
     }
 
-    /// <summary>
-    /// F41 end to end: the changed scene's predecessor reaches the composed report, so the block
-    /// prints a before and an after.
-    ///
-    /// <para>This exists because the suite went green with the pair wired everywhere except the one
-    /// step that loads it — the record had the field, the renderer could draw two panels, and
-    /// nothing put an image in it. That is the same silent gap a stubbed call left in Release F, and
-    /// a rendered report is the only thing that can tell the difference.</para>
-    /// </summary>
-    [Fact]
-    public async Task AChangedScenesPredecessorReachesTheComposedReport()
-    {
-        const string first = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
-        const string second = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked loudly and waited in the cold.";
-        var firstId = SeedManuscript(first);
-        await DriveToCompletion(NewProcessor());
-        var secondId = SeedNextDraft(firstId, second);
-        await DriveToCompletion(NewProcessor());
-
-        Assert.True(Pictures(ReportOf(secondId)) > Pictures(ReportOf(firstId)),
-            "The second draft's report carries no more pictures than the first's, though one of its "
-            + "two scenes changed and should print its predecessor beside it.");
-    }
-
     private byte[] ReportOf(Guid novelId)
     {
         using var context = database.NewContext();
         var path = context.BookAnalyses.Single(a => a.NovelId == novelId).PdfPath;
         Assert.NotNull(path);
         return File.ReadAllBytes(path!);
-    }
-
-    private static int Pictures(byte[] pdf)
-    {
-        using var document = UglyToad.PdfPig.PdfDocument.Open(pdf);
-        return document.GetPages().Sum(page => page.GetImages().Count());
     }
 
     [Fact]

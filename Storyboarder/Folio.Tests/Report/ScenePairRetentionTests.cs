@@ -146,16 +146,20 @@ public class ScenePairRetentionTests : IDisposable
         Assert.Empty(SceneRetention.Freeable(only, null, [only]));
     }
 
-    /// <summary>The printed half: a paired scene draws two pictures, an unpaired one draws one.</summary>
+    /// <summary>
+    /// The printed half used to be that a paired scene drew two pictures. Scene by scene is no longer
+    /// a section — its verdicts are marks on the manuscript — so the report prints no scene pictures
+    /// at all, and this pins that rather than letting the section come back unannounced. The stored
+    /// images and their predecessors are kept above; only the page is gone.
+    /// </summary>
     [Fact]
-    public void APairedSceneBlockPrintsTwoPictures()
+    public void SceneByScenePrintsNeitherAHeadingNorPictures()
     {
-        var single = Pdf([new SceneEvidence("Ch. 1 · Scene 1", "Purpose", "Verdict", SampleImages.Png(), null)]);
         var paired = Pdf([new SceneEvidence("Ch. 1 · Scene 1", "Purpose", "Verdict", SampleImages.Png(), SampleImages.Png())]);
 
-        Assert.True(Pictures(paired) > Pictures(single),
-            "The paired scene block drew no more pictures than the unpaired one — the predecessor was "
-            + "carried all the way to the renderer and then not printed.");
+        Assert.Equal(0, Pictures(paired));
+        using var document = PdfDocument.Open(paired);
+        Assert.DoesNotContain("Scene by scene", string.Concat(document.GetPages().Select(page => page.Text)), StringComparison.Ordinal);
     }
 
     private static int Pictures(byte[] pdf)
