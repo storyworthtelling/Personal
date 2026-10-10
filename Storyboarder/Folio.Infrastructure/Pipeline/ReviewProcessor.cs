@@ -1629,7 +1629,7 @@ public sealed class ReviewProcessor : IPipelineStep
         var scenes = await db.Scenes
             .Where(s => s.NovelId == novelId)
             .OrderBy(s => s.Number)
-            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath, s.Changed, s.PreviousSceneId })
+            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath, s.Changed, s.PreviousSceneId, s.EndOffset })
             .ToListAsync(cancellationToken);
 
         // The before half of a changed scene's pair (F41). Only for changed scenes: an unchanged one
@@ -1666,7 +1666,11 @@ public sealed class ReviewProcessor : IPipelineStep
 
             evidence.Add(new SceneEvidence(
                 citation, beat?.Purpose ?? string.Empty, beat?.Verdict ?? string.Empty,
-                Read(scene.ImagePath), previous));
+                Read(scene.ImagePath), previous)
+            {
+                // Where the scene ends, so its block is inserted under its own last line.
+                EndOffset = scene.EndOffset,
+            });
         }
         return evidence;
     }
