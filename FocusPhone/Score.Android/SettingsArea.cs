@@ -1,3 +1,5 @@
+using System.Globalization;
+using Android.Text;
 using Android.Views;
 using Codex.Domain.Design;
 using Codex.Domain.Music;
@@ -170,31 +172,47 @@ public sealed class SettingsArea : ScoreArea
             : PaperUi.Secondary(Host, library.Status);
     }
 
+    // Two counts, typed in rather than picked from a ladder: the owner knows the number
+    // they want, and a list of rungs only ever offered a handful of them. Each is saved as
+    // it is typed, clamped on the way in, for the same reason the vault passphrase is —
+    // there is no Save on this screen, and leaving by a binder tab never blurs a field.
     private View StackSizeRow()
     {
-        // The ladder is built around whatever size is actually in force, so the picker
-        // always has a real row to open on. Deriving the rungs here instead — round
-        // numbers only — is what crashed this screen: the default is 14, which is not
-        // one of them, so the selected index came back missing on every fresh install.
-        var inForce = MusicSettingsStore.FridayStackSize;
-        var sizes = FridayStack.Ladder(inForce);
-
-        var picker = new AccordionPicker(
-            Host,
-            "Friday crate:",
-            sizes.Select(size => new PickerOption($"{size} records", Detail(size))),
-            FridayStack.IndexOn(inForce));
-        picker.Chosen += index => MusicSettingsStore.FridayStackSize = sizes[index];
-        return picker;
+        var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        column.AddView(CountRow("Songs and albums",
+            MusicSettingsStore.FridayMusicCount, count => MusicSettingsStore.FridayMusicCount = count));
+        column.AddView(CountRow("Podcast shows",
+            MusicSettingsStore.FridayPodcastCount, count => MusicSettingsStore.FridayPodcastCount = count));
+        column.AddView(PaperUi.Secondary(Host,
+            $"How many of each the Friday crate holds, from {FridayStack.Smallest} to {FridayStack.Largest}. Zero leaves that kind out."));
+        return column;
     }
 
-    private static string? Detail(int size) => size switch
+    private View CountRow(string label, int inForce, Action<int> save)
     {
-        FridayStack.Smallest => "A short run — a few things worth hearing.",
-        FridayStack.Default => "The default. A fortnight's records for a week, so there is room to skip some.",
-        FridayStack.Largest => "As many as the crate holds. Nothing carries over, so most of it goes unheard.",
-        _ => null,
-    };
+        var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
+        row.SetGravity(GravityFlags.CenterVertical);
+        row.SetMinimumHeight(PaperTheme.Dp(Host, DesignTokens.Shape.TouchTargetDp));
+        row.AddView(PaperUi.Body(Host, label),
+            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+
+        var field = PaperUi.Field(Host, "0");
+        field.InputType = InputTypes.ClassNumber;
+        field.Text = inForce.ToString(CultureInfo.InvariantCulture);
+        // A half-typed or cleared field is not a value: only a number that parses is saved,
+        // and anything outside the range is held to it rather than refused.
+        field.TextChanged += (_, _) =>
+        {
+            if (int.TryParse(field.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var count))
+            {
+                save(FridayStack.Clamp(count));
+            }
+        };
+        row.AddView(field, new LinearLayout.LayoutParams(PaperTheme.Dp(Host, CountFieldDp), ViewGroup.LayoutParams.WrapContent));
+        return row;
+    }
+
+    private const int CountFieldDp = 96;
 
     // The shape a working thing takes: what is true, and the way to change it.
     private View Settled(string state, string action, Action onAction)

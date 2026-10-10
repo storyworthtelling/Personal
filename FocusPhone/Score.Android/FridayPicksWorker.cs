@@ -68,8 +68,21 @@ public class FridayPicksWorker : Worker
         // The catalog goes in as evidence and as an exclusion list, and what comes
         // back is records the owner does NOT have. It used to go in as the source, so
         // the crate could only ever offer to add something already on the shelf.
+        var music = MusicSettingsStore.FridayMusicCount;
+        var podcasts = MusicSettingsStore.FridayPodcastCount;
+
+        // Both counts at zero is a crate the owner has switched off, not a failed run:
+        // it is saved empty so last week's records do not linger under a setting that
+        // asks for none. Only a run that asked for something and got nothing keeps the
+        // old shelf.
+        if (music + podcasts == 0)
+        {
+            store.Save([], DateTimeOffset.Now);
+            return Result.InvokeSuccess();
+        }
+
         var picks = taste.WeeklyDiscoveriesAsync(
-            catalog, MusicSettingsStore.FridayStackSize, gap, subscribedShows, CancellationToken.None)
+            catalog, music, podcasts, gap, subscribedShows, CancellationToken.None)
             .GetAwaiter().GetResult();
         if (picks.Count > 0)
         {
