@@ -5,6 +5,7 @@ using Codex.Domain.Design;
 using Codex.Ui;
 using Pulp.App;
 using Pulp.Components;
+using Pulp.Domain.ChildView;
 using Pulp.Domain.Core;
 using Pulp.Domain.Library;
 using Pulp.Domain.People;
@@ -33,7 +34,8 @@ namespace Pulp.Shell;
 /// empty page carries its own voiced invitation instead (D264), so the two never show together.</para>
 ///
 /// <para>The bottom bar is drawn as approved and never changes (D213, D263): the secondary switches
-/// to a child's view, the primary opens Recently watched.</para>
+/// to a child's view, the primary opens Recently watched. In a child's view the whole page is the
+/// <see cref="ChildWatchingPage"/>'s — "Back to me" and Favorites — and the adult page is not built.</para>
 /// </summary>
 public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Watching)
 {
@@ -53,23 +55,42 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
     private string? greeting;
     private VoiceLineAction emptyAction = VoiceLineAction.ShowNeutral;
     private string? emptyLine;
+    private ChildWatchingPage? childPage;
 
-    /// <summary>
-    /// "Watch as a child" was tapped (D213). Nothing handles it yet: the child's view ("Back to me",
-    /// Favorites as the primary) is Release D's.
-    /// </summary>
+    /// <summary>"Watch as a child" was tapped (D213); the shell asks which child and enters the child's view.</summary>
     public event Action? ChildViewRequested;
+
+    /// <summary>"Back to me" was tapped in a child's view (D213); the shell returns to the device owner.</summary>
+    public event Action? BackToMeRequested;
 
     /// <summary>"Recently watched" was tapped (D213); the page opens it itself, and raises this as well.</summary>
     public event Action? RecentlyWatchedRequested;
 
-    public override string? Greeting =>
+    public override string Title => childPage?.Title ?? base.Title;
+
+    public override string? Greeting => childPage is not null ? childPage.Greeting :
         viewer is not null && rows is not null && rows.Any(row => !hidden.Contains(row.Row.Title)) ? greeting : null;
 
     private WatchingVoice Voice => voice ??= new WatchingVoice(Host);
 
+    public override void ViewAs(ChildViewSession? session)
+    {
+        base.ViewAs(session);
+        childPage?.Pause();
+        childPage = session is null ? null : new ChildWatchingPage(Host, () => Overlay, session, Invalidate, () => BackToMeRequested?.Invoke());
+        if (session is not null)
+        {
+            Pause();
+        }
+    }
+
     public override View BuildView()
     {
+        if (childPage is not null)
+        {
+            return childPage.BuildView();
+        }
+
         if (unreadable)
         {
             return Column(PaperUi.Secondary(Host, UnreadableStatus));
@@ -109,7 +130,9 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
         return scroll;
     }
 
-    public override View? BuildBottomBar() =>
+    public override bool GoBack() => childPage?.GoBack() ?? false;
+
+    public override View? BuildBottomBar() => childPage is not null ? childPage.BottomBar() :
         PaperUi.BottomBar(
             Host,
             PaperUi.SecondaryButton(Host, "Watch as a child", () => ChildViewRequested?.Invoke()),
@@ -119,10 +142,20 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
                 RecentlyWatchedRequested?.Invoke();
             }));
 
-    public override void Resume() => Reload();
+    public override void Resume()
+    {
+        if (childPage is not null)
+        {
+            childPage.Reload();
+            return;
+        }
+
+        Reload();
+    }
 
     public override void Pause()
     {
+        childPage?.Pause();
         loading?.Cancel();
         loading = null;
     }

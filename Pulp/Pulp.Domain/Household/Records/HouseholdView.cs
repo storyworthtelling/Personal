@@ -21,6 +21,7 @@ public sealed class HouseholdView
     private readonly IReadOnlyList<ViewerVeto> vetoes;
     private readonly IReadOnlyList<ChildStarEntry> stars;
     private readonly IReadOnlyList<ContinueDismissedEntry> dismissals;
+    private readonly IReadOnlyList<ViewerNameEntry> names;
 
     private HouseholdView(HouseholdDocument document)
     {
@@ -39,6 +40,8 @@ public sealed class HouseholdView
         vetoes = Gather(HouseholdMaps.Veto);
         stars = Gather(HouseholdMaps.ChildStar);
         dismissals = Gather(HouseholdMaps.ContinueDismissed);
+        names = Gather(HouseholdMaps.ViewerName);
+        Plans = Gather(HouseholdMaps.ServicePlan);
         var picks = Gather(HouseholdMaps.ParentPick);
         var rules = Gather(HouseholdMaps.ChildRules);
         var viewers = Gather(HouseholdMaps.Viewer);
@@ -78,6 +81,23 @@ public sealed class HouseholdView
     public IReadOnlyList<ServiceId> Services { get; }
 
     public IReadOnlyList<UnreadableRecord> Unreadable { get; }
+
+    /// <summary>What Settings recorded about each service's plan (D29, D86, D8), had or not.</summary>
+    public IReadOnlyList<ServicePlanEntry> Plans { get; }
+
+    /// <summary>The recorded plan for one service; null when Settings has recorded nothing about it.</summary>
+    public ServicePlanEntry? PlanOf(ServiceId service) => Plans.FirstOrDefault(plan => plan.Service == service);
+
+    /// <summary>
+    /// The household's services as <see cref="BestHome"/> reads them (D28, D29): each with its recorded
+    /// tier. A service whose tier is not set is read as ad-free — what every screen assumed before the
+    /// tier was recorded — so setting nothing changes nothing, and only a recorded "with ads" plan says so.
+    /// </summary>
+    public IReadOnlyList<ServicePlan> ServicePlans =>
+        Services.Distinct().Select(service => new ServicePlan(service, AdFree: PlanOf(service)?.Tier != PlanTier.WithAds)).ToList();
+
+    /// <summary>The name a viewer goes by: their name record, or their id until one is written.</summary>
+    public string NameOf(ViewerId viewer) => names.FirstOrDefault(entry => entry.Viewer == viewer)?.Name ?? viewer.Value;
 
     /// <summary>One viewer's own sittings (D97): what Continue Watching and Recently watched are built from.</summary>
     public IReadOnlyList<WatchEvent> SittingsOf(ViewerId viewer) =>

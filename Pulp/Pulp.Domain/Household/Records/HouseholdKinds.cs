@@ -43,4 +43,10 @@ public static class HouseholdKinds
     /// tombstone.
     /// </summary>
     public const string ContinueDismissed = "continue-dismissed";
+
+    /// <summary>A service's plan as Settings records it: its tier, its picture and whether Flyleaf shows its app (<see cref="ServicePlanEntry"/>).</summary>
+    public const string ServicePlan = "service-plan";
+
+    /// <summary>The name a viewer goes by (<see cref="ViewerNameEntry"/>); the id stays, so a rename moves no record.</summary>
+    public const string ViewerName = "viewer-name";
 }

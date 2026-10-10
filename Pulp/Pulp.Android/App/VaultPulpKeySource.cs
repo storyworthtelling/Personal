@@ -1,4 +1,5 @@
 using Codex.Ui.Voice;
+using Pulp.Domain.Household;
 using Pulp.Infrastructure.Catalogue;
 using Storyworthtelling.Voice.Secrets;
 
@@ -16,6 +17,7 @@ public sealed class VaultPulpKeySource : IPulpKeySource
     private readonly VoiceGoogleAccount account;
     private readonly PulpDiagnostics diagnostics;
     private PulpSecrets keys = new();
+    private int householdRole = (int)HouseholdFileRole.Unknown;
 
     public VaultPulpKeySource(VoiceGoogleAccount account, PulpDiagnostics diagnostics)
     {
@@ -24,6 +26,15 @@ public sealed class VaultPulpKeySource : IPulpKeySource
     }
 
     public PulpSecrets Keys => Volatile.Read(ref keys);
+
+    /// <summary>
+    /// Whether this phone's account owns the household file or has it shared to it, read off the
+    /// vault's owner (<see cref="VaultOwnership"/>) on each refresh — the same "the owner is whoever
+    /// uses it first" rule the vault keeps, so the two never disagree about whose Drive holds the
+    /// household. <see cref="HouseholdFileRole.Unknown"/> until a refresh reads the vault, which
+    /// creates nothing.
+    /// </summary>
+    public HouseholdFileRole HouseholdRole => (HouseholdFileRole)Volatile.Read(ref householdRole);
 
     /// <summary>Reads the vault's Pulp section. Never throws: a phone that cannot reach the vault keeps whatever keys it has.</summary>
     public async Task RefreshAsync(CancellationToken cancellationToken)
@@ -45,6 +56,7 @@ public sealed class VaultPulpKeySource : IPulpKeySource
 
             SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
             Volatile.Write(ref keys, result.Vault.Pulp);
+            Volatile.Write(ref householdRole, (int)RoleOf(VaultOwnership.Decide(VoiceGoogleAccount.Email, result.Vault)));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -52,4 +64,13 @@ public sealed class VaultPulpKeySource : IPulpKeySource
             diagnostics.Warn("vault", "Pulp's keys could not be restored from the vault.", exception);
         }
     }
+
+    // A vault nobody has claimed yet is claimed by the first account to use it, so that account is
+    // the household's owner too; a phone with no account signed in has no Drive to own anything in.
+    private static HouseholdFileRole RoleOf(SharedVaultAccess access) => access switch
+    {
+        SharedVaultAccess.ReadWrite or SharedVaultAccess.Claimable => HouseholdFileRole.Owner,
+        SharedVaultAccess.ReadOnly => HouseholdFileRole.SharedWith,
+        _ => HouseholdFileRole.Unknown,
+    };
 }

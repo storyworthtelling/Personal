@@ -4,6 +4,7 @@ using Android.Graphics;
 using Android.Views;
 using Android.Widget;
 using Codex.Ui;
+using Pulp.Domain.ChildView;
 using Pulp.Domain.Shell;
 
 namespace Pulp.Shell;
@@ -64,6 +65,18 @@ public abstract class PulpAreaPage(Activity host, PulpArea area)
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
         return column;
     }
+
+    /// <summary>
+    /// The child's view this area reads as (D213), or null for the device owner. Set by the shell
+    /// through <see cref="ViewAs"/>; an area a child does not see (D231) is never shown while it is set.
+    /// </summary>
+    protected ChildViewSession? ChildView { get; private set; }
+
+    /// <summary>
+    /// The shell entered or left a child's view. An area that a child sees turns its page over to the
+    /// child's page here, so the adult page is never built while a child is watching.
+    /// </summary>
+    public virtual void ViewAs(ChildViewSession? session) => ChildView = session;
 
     /// <summary>The area's pinned bottom bar, or null when it has none.</summary>
     public virtual View? BuildBottomBar() => null;

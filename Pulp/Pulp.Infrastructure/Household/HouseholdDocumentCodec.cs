@@ -7,10 +7,14 @@ namespace Pulp.Infrastructure.Household;
 /// <summary>A household file this build cannot read: damaged, not a household, or from a newer format.</summary>
 public sealed class HouseholdFormatException : Exception
 {
-    public HouseholdFormatException(string message, Exception? inner = null)
+    public HouseholdFormatException(string message, Exception? inner = null, bool isNewerFormat = false)
         : base(message, inner)
     {
+        IsNewerFormat = isNewerFormat;
     }
+
+    /// <summary>The file is whole but states a format newer than this build reads — update Pulp, not the file.</summary>
+    public bool IsNewerFormat { get; }
 }
 
 /// <summary>
@@ -100,7 +104,8 @@ public static class HouseholdDocumentCodec
             if (version > HouseholdDocument.FormatVersion)
             {
                 throw new HouseholdFormatException(
-                    $"The household file is format {version}, written by a newer Pulp; this build reads format {HouseholdDocument.FormatVersion} and will not rewrite it in the older shape. Update Pulp on this device.");
+                    $"The household file is format {version}, written by a newer Pulp; this build reads format {HouseholdDocument.FormatVersion} and will not rewrite it in the older shape. Update Pulp on this device.",
+                    isNewerFormat: true);
             }
 
             if (version < 1)
