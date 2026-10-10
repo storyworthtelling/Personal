@@ -1,12 +1,13 @@
 using Android.Content;
 using Android.Webkit;
+using Android.Widget;
 using Codex.Domain.Web;
 
 namespace Codex.Ui;
 
 /// <summary>
-/// The suite's <b>one</b> hardened web view. Flyleaf's restricted browser and Post's mail
-/// reader are the same engine with different <see cref="WebPosture"/>s — a second WebView
+/// The suite's <b>one</b> hardened web view. Flyleaf's restricted browser, Post's mail
+/// reader and Pulp's trailer player are the same engine with different <see cref="WebPosture"/>s — a second WebView
 /// configured separately would be a second place to get wrong, and the one that gets
 /// forgotten is the one that gets exploited.
 ///
@@ -41,10 +42,66 @@ public static class PaperWebView
         settings.JavaScriptEnabled = posture.AllowsScript;
         settings.BlockNetworkImage = !posture.LoadsRemoteImages;
 
-        if (!posture.AllowsInPlaceNavigation)
+        // Never autoplay, in any posture (D77). True is also WebView's own default, so the two
+        // postures that predate this line behave exactly as before.
+        settings.MediaPlaybackRequiresUserGesture = !posture.PlaysMediaWithoutGesture;
+
+        switch (posture.OnNavigation())
         {
-            view.SetWebViewClient(new LinksAlwaysLeaveClient(onLinkOut));
+            case NavigationVerdict.HandOut:
+                view.SetWebViewClient(new LinksAlwaysLeaveClient(onLinkOut));
+                break;
+            case NavigationVerdict.Refuse:
+                view.SetWebViewClient(new NothingNavigatesClient());
+                break;
+            case NavigationVerdict.Follow:
+                // The caller's own client applies its containment (Flyleaf's browser).
+                break;
         }
+    }
+
+    /// <summary>
+    /// Plays one YouTube trailer — the <see cref="WebPosture.Player"/> posture, and the only
+    /// web player in the suite. The video id is validated before it can reach a URL
+    /// (<see cref="PlayerEmbed.EmbedUrl"/> throws otherwise), the IFrame sits in a page loaded at
+    /// the fixed https origin <see cref="PlayerEmbed.BaseUrlFor"/> names so the embed request
+    /// carries a Referer (YouTube's error 153 otherwise), and no JavaScript interface is ever
+    /// added. Fullscreen hands the engine's custom view to <paramref name="fullscreenHost"/>,
+    /// which the caller lays over its whole window.
+    /// </summary>
+    /// <returns>The player's chrome, so the host's Back can leave fullscreen before it leaves the screen.</returns>
+    public static PlayerChrome LoadPlayer(WebView view, FrameLayout fullscreenHost, string videoId, string applicationId)
+    {
+        var embed = PlayerEmbed.EmbedUrl(videoId);
+        var baseUrl = PlayerEmbed.BaseUrlFor(applicationId);
+
+        Harden(view, WebPosture.Player, onLinkOut: _ => { });
+        // The IFrame player keeps its state in DOM storage; the player is the only posture that
+        // turns it on, and only on its own view.
+        view.Settings.DomStorageEnabled = true;
+        var chrome = new PlayerChrome(fullscreenHost, WebPosture.Player.AllowsFullscreen);
+        view.SetWebChromeClient(chrome);
+        view.SetBackgroundColor(PaperTheme.Paper);
+
+        // No "autoplay" in the iframe's allow list: the player waits for a tap inside it. No
+        // picture-in-picture either: the trailer does not float out of Pulp.
+        var source = embed.AbsoluteUri.Replace("&", "&amp;", StringComparison.Ordinal);
+        var page = $$"""
+            <!doctype html><html><head><meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <meta name="referrer" content="strict-origin-when-cross-origin">
+            <style>
+              html,body{background:{{Hex(PaperTheme.Paper)}};margin:0;padding:0}
+              .frame{position:relative;width:100%;padding-top:56.25%}
+              iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+            </style></head><body><div class="frame">
+            <iframe src="{{source}}" allow="fullscreen"
+              allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+            </div></body></html>
+            """;
+
+        view.LoadDataWithBaseURL(baseUrl, page, "text/html", "utf-8", null);
+        return chrome;
     }
 
     /// <summary>
@@ -91,6 +148,72 @@ public static class PaperWebView
                 onLinkOut(url);
             }
             return true; // never followed here, whoever asked
+        }
+    }
+
+    /// <summary>
+    /// Nothing navigates and nothing is handed out. Used for the player, where the YouTube logo
+    /// and "watch on YouTube" would otherwise turn a trailer into the site. Windows cannot open
+    /// either: multiple windows are off in every posture, so a <c>target=_blank</c> or
+    /// <c>window.open</c> has nowhere to go.
+    /// </summary>
+    private sealed class NothingNavigatesClient : WebViewClient
+    {
+        public override bool ShouldOverrideUrlLoading(WebView? view, IWebResourceRequest? request) => true;
+    }
+
+    /// <summary>
+    /// The player's chrome: the engine's fullscreen, where the video's custom view is laid over
+    /// the caller's host while it lasts and handed back when the player, or the host's Back,
+    /// leaves fullscreen. A posture without fullscreen refuses the custom view outright.
+    /// </summary>
+    public sealed class PlayerChrome : WebChromeClient
+    {
+        private readonly FrameLayout host;
+        private readonly bool allowsFullscreen;
+        private ICustomViewCallback? callback;
+
+        internal PlayerChrome(FrameLayout host, bool allowsFullscreen)
+        {
+            this.host = host;
+            this.allowsFullscreen = allowsFullscreen;
+        }
+
+        public bool IsFullscreen => callback is not null;
+
+        public override void OnShowCustomView(Android.Views.View? view, ICustomViewCallback? customViewCallback)
+        {
+            if (view is null || !allowsFullscreen)
+            {
+                customViewCallback?.OnCustomViewHidden();
+                return;
+            }
+
+            callback = customViewCallback;
+            host.RemoveAllViews();
+            host.AddView(view, new FrameLayout.LayoutParams(
+                Android.Views.ViewGroup.LayoutParams.MatchParent, Android.Views.ViewGroup.LayoutParams.MatchParent));
+            host.Visibility = Android.Views.ViewStates.Visible;
+        }
+
+        public override void OnHideCustomView()
+        {
+            host.RemoveAllViews();
+            host.Visibility = Android.Views.ViewStates.Gone;
+            callback?.OnCustomViewHidden();
+            callback = null;
+        }
+
+        /// <summary>Leaves fullscreen if the player is in it; false when there was nothing to leave.</summary>
+        public bool LeaveFullscreen()
+        {
+            if (!IsFullscreen)
+            {
+                return false;
+            }
+
+            OnHideCustomView();
+            return true;
         }
     }
 }
