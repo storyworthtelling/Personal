@@ -27,15 +27,38 @@ public partial class App : Application
     /// Constructing a page inside the constructor asks the application for its resources while the
     /// application is still being built. <c>CreateWindow</c> runs after it is established, which is
     /// why MAUI deprecated the other route.</para>
+    ///
+    /// <para>A fault from an earlier launch is shown first, in full, before the owner reaches the
+    /// first page; the report stays until they continue. The first page itself is built under a guard
+    /// (see <see cref="FirstPage"/>) so a fault while building it is shown instead of ending the app.</para>
     /// </summary>
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        var page = IPlatformApplication.Current!.Services.GetRequiredService<Pages.MainPage>();
-        return new Window(new NavigationPage(page)
+        var pending = LaunchFaults.PendingReport();
+        return new Window(pending is null ? FirstPage() : new Pages.LaunchFaultPage(pending, FirstPage));
+    }
+
+    /// <summary>
+    /// The first real page, or the fault that stopped it being built. Building it is the step most
+    /// likely to fail at launch, and a failure here used to end the process before anything was on
+    /// screen. The fault is recorded (so the next launch shows it) and shown now.
+    /// </summary>
+    private Page FirstPage()
+    {
+        try
         {
-            BarBackgroundColor = Colour("Paper"),
-            BarTextColor = Colour("Ink"),
-        });
+            var page = IPlatformApplication.Current!.Services.GetRequiredService<Pages.MainPage>();
+            return new NavigationPage(page)
+            {
+                BarBackgroundColor = Colour("Paper"),
+                BarTextColor = Colour("Ink"),
+            };
+        }
+        catch (Exception ex)
+        {
+            var report = LaunchFaults.Record("Building the first page", ex);
+            return new Pages.LaunchFaultPage(report, continueTo: null);
+        }
     }
 
     /// <summary>
