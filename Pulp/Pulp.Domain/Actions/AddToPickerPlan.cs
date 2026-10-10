@@ -24,8 +24,14 @@ public enum ChildBadge
 {
     None,
 
-    /// <summary>Over the child's ceiling (or unrated): ticking it allow-lists it for them (D255).</summary>
+    /// <summary>Over the child's ceiling: ticking it allow-lists it for them (D255).</summary>
     AboveBand,
+
+    /// <summary>
+    /// No rating at all, so a child is not shown it (D128) — but it is not "above" a band it has none
+    /// of (D293). Ticking it still allow-lists it for them (D255).
+    /// </summary>
+    Unrated,
 
     /// <summary>On the child's block-list: greyed, cannot be ticked (D255, D258).</summary>
     Blocked,
@@ -70,6 +76,7 @@ public static class AddToPickerPlan
     public const string SharedTag = "shared";
     public const string YoursTag = "yours";
     public const string AboveBandBadge = "Above band";
+    public const string UnratedBadge = "Unrated";
     public const string BlockedBadge = "Blocked";
 
     /// <param name="title">
@@ -143,13 +150,14 @@ public static class AddToPickerPlan
             return PickerChange.RemoveUndoFirst;
         }
 
-        return row.Badge == ChildBadge.AboveBand ? PickerChange.AddAndAllowList : PickerChange.Add;
+        return row.Badge is ChildBadge.AboveBand or ChildBadge.Unrated ? PickerChange.AddAndAllowList : PickerChange.Add;
     }
 
     public static string? BadgeLabel(ChildBadge badge) => badge switch
     {
         ChildBadge.None => null,
         ChildBadge.AboveBand => AboveBandBadge,
+        ChildBadge.Unrated => UnratedBadge,
         ChildBadge.Blocked => BlockedBadge,
         _ => throw new ArgumentOutOfRangeException(nameof(badge), badge, "A picker badge with no label."),
     };
@@ -169,7 +177,8 @@ public static class AddToPickerPlan
         var badge = ChildFilter.Decide(withoutPick, title).Reason switch
         {
             FilterReason.Blocked => ChildBadge.Blocked,
-            FilterReason.AboveCeiling or FilterReason.Unrated => ChildBadge.AboveBand,
+            FilterReason.AboveCeiling => ChildBadge.AboveBand,
+            FilterReason.Unrated => ChildBadge.Unrated,
             _ => ChildBadge.None,
         };
 

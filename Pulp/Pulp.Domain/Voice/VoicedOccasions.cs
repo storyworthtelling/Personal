@@ -5,7 +5,7 @@ public sealed record VoicedOccasion(
     VoiceSeat Seat, string Purpose, VoiceAudience Audience, VoiceFallback Fallback, string Decisions);
 
 /// <summary>
-/// Pulp's voiced seats, each once (D38, D39, D112, D118, D232, D233, D264).
+/// Pulp's voiced seats, each once (D38, D39, D112, D118, D232, D233, D264, D294).
 ///
 /// <para><b>Errors are not among them, and that is the rule.</b> A voice is for the app's own
 /// remarks, not its bad news: a hand-off that did not land, a rejected key, a household file that
@@ -41,6 +41,12 @@ public static class VoicedOccasions
         new(VoiceSeat.EmptyChildFavorites,
             "a gentle line for a child whose favorites page has nothing on it yet",
             VoiceAudience.Child, VoiceFallback.NeutralLine, "D264, D233"),
+        new(VoiceSeat.EmptyChildWatching,
+            "a gentle line for a child whose watching page has nothing started yet",
+            VoiceAudience.Child, VoiceFallback.NeutralLine, "D294, D233"),
+        new(VoiceSeat.EmptyChildPlaylists,
+            "a gentle line for a child whose playlists page has none on it yet",
+            VoiceAudience.Child, VoiceFallback.NeutralLine, "D294, D233"),
         new(VoiceSeat.EmptyCalendar,
             "a line for a calendar with nothing coming up", VoiceAudience.Adult, VoiceFallback.NeutralLine, "D264"),
         new(VoiceSeat.EmptySports,

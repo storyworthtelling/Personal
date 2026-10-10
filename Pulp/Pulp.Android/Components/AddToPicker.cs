@@ -20,7 +20,7 @@ public delegate Action? PickerChangeHandler(PickerRow row, PickerChange change);
 /// <summary>
 /// Add to… (mockup 11, D259): the inline picker that grows up out of the page's bar, over the lower
 /// half — no dialog (§7). Two groups (D254): the viewer's playlists, last-used first, and each child's
-/// Favorites; each row carries the §7 checkbox (D257) and a child's row one neutral badge (D258).
+/// Favorites; each row carries the §7 checkbox (D257) and a child's row one neutral badge (D258) — "Above band", "Unrated" (D293) or "Blocked".
 /// <see cref="AddToPickerPlan"/> decides the rows; this draws and wires them.
 ///
 /// <para>Not the kit's <c>AccordionPicker</c>: that field is single-choice and closes on a pick, while

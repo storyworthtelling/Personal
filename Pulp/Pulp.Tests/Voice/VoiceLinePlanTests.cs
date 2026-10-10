@@ -71,7 +71,7 @@ public class VoiceLinePlanTests
             count++;
         }
 
-        Assert.Equal(13, count);
+        Assert.Equal(15, count);
     }
 
     [Fact]

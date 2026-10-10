@@ -28,6 +28,8 @@ public class VoicedOccasionTests
         [VoiceSeat.EmptyPlaylist] = "D264",
         [VoiceSeat.EmptyRecentlyWatched] = "D264",
         [VoiceSeat.EmptyChildFavorites] = "D264, D233",
+        [VoiceSeat.EmptyChildWatching] = "D294, D233",
+        [VoiceSeat.EmptyChildPlaylists] = "D294, D233",
         [VoiceSeat.EmptyCalendar] = "D264",
         [VoiceSeat.EmptySports] = "D264",
         [VoiceSeat.StackUsedUp] = "D112, D264",
@@ -66,6 +68,7 @@ public class VoicedOccasionTests
         foreach (var seat in Enum.GetValues<VoiceSeat>())
         {
             Assert.Equal(seat, VoicedOccasions.For(seat).Seat);
+            Assert.Equal(Approved[seat], VoicedOccasions.For(seat).Decisions);
         }
     }
 
@@ -100,7 +103,7 @@ public class VoicedOccasionTests
     public void EmptyPagesFallBackToANeutralLineAndEverythingElseHides()
     {
         var empties = VoicedOccasions.All.Where(o => o.Seat is VoiceSeat.StackUsedUp || o.Seat.ToString().StartsWith("Empty", StringComparison.Ordinal)).ToList();
-        Assert.Equal(8, empties.Count);
+        Assert.Equal(10, empties.Count);
         Assert.All(empties, o => Assert.Equal(VoiceFallback.NeutralLine, o.Fallback));
         Assert.All(VoicedOccasions.All.Except(empties), o => Assert.Equal(VoiceFallback.Hide, o.Fallback));
     }
@@ -110,7 +113,11 @@ public class VoicedOccasionTests
     {
         var childSeats = VoicedOccasions.All.Where(o => o.Audience == VoiceAudience.Child).Select(o => o.Seat).ToHashSet();
         Assert.Equal(
-            new HashSet<VoiceSeat> { VoiceSeat.ChildGreeting, VoiceSeat.ChildFavorites, VoiceSeat.EmptyChildFavorites },
+            new HashSet<VoiceSeat>
+            {
+                VoiceSeat.ChildGreeting, VoiceSeat.ChildFavorites, VoiceSeat.EmptyChildFavorites,
+                VoiceSeat.EmptyChildWatching, VoiceSeat.EmptyChildPlaylists,
+            },
             childSeats);
     }
 

@@ -42,6 +42,12 @@ public enum VoiceSeat
     /// <summary>A child's Favorites with nothing on it (D264), at the child's reading level (D233).</summary>
     EmptyChildFavorites,
 
+    /// <summary>A child's Watching page with nothing started (D294), at the child's reading level (D233).</summary>
+    EmptyChildWatching,
+
+    /// <summary>A child's Playlists page with none on it (D294), at the child's reading level (D233).</summary>
+    EmptyChildPlaylists,
+
     /// <summary>The Calendar with nothing in the next two weeks (D264).</summary>
     EmptyCalendar,
 
