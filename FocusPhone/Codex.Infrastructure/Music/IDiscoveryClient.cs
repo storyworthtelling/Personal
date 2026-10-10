@@ -40,6 +40,6 @@ public interface IDiscoveryClient
     /// already on the shelf is.
     /// </param>
     Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
-        TasteProfile profile, IReadOnlyList<Track> owned, int maxTracks,
+        TasteProfile profile, IReadOnlyList<Track> owned, int music, int podcasts,
         string? note, IReadOnlyList<string> subscribedShows, CancellationToken cancellationToken);
 }

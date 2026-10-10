@@ -141,6 +141,41 @@ public sealed class TidalCatalogClient(HttpClient httpClient)
         }
     }
 
+    /// <summary>
+    /// Every track on the album the given track belongs to, in the album's own order — the
+    /// whole record, not just the search hit. Empty if the track has no album, or on any
+    /// failure, the same never-throw rule as the other lookups here.
+    /// </summary>
+    public async Task<IReadOnlyList<Track>> GetAlbumTracksAsync(
+        string accessToken, string trackId, string countryCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var trackUrl = $"{BaseUrl}tracks/{Uri.EscapeDataString(trackId)}" +
+                $"?countryCode={Uri.EscapeDataString(countryCode)}&include=albums";
+            var trackReply = await Get<TrackResourceReply>(accessToken, trackUrl, cancellationToken);
+            var albumId = trackReply?.Data?.Relationships?.Albums?.Data?.FirstOrDefault()?.Id;
+            if (string.IsNullOrEmpty(albumId))
+            {
+                return [];
+            }
+
+            var itemsUrl = $"{BaseUrl}albums/{Uri.EscapeDataString(albumId)}/relationships/items" +
+                $"?countryCode={Uri.EscapeDataString(countryCode)}&include={Uri.EscapeDataString(Include)}";
+            var reply = await Get<AlbumItemsReply>(accessToken, itemsUrl, cancellationToken);
+            var included = reply?.Included ?? [];
+            return (reply?.Data ?? [])
+                .Select(reference => included.FirstOrDefault(r => r.Type == "tracks" && r.Id == reference.Id))
+                .Where(resource => resource?.Attributes is not null)
+                .Select(resource => BuildTrack(resource!, included))
+                .ToList();
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException)
+        {
+            return [];
+        }
+    }
+
     // The relationship list gives the order and which tracks belong to this result;
     // "included" is an unordered pool of every tracks/albums/artists resource the
     // include= asked for, matched back to it by (id, type) — JSON:API's normal shape.
@@ -216,6 +251,10 @@ public sealed class TidalCatalogClient(HttpClient httpClient)
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return JsonSerializer.Deserialize<T>(json, SerializerOptions);
     }
+
+    // An album's items relationship: the track references in album order, with the
+    // tracks themselves (and their artists and albums) in the include pool.
+    private sealed record AlbumItemsReply(List<ResourceRef>? Data = null, List<IncludedResource>? Included = null);
 
     private sealed record SearchIdReply(List<ResourceRef>? Data = null);
 
