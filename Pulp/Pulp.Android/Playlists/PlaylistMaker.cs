@@ -4,6 +4,7 @@ using Pulp.Domain.Children;
 using Pulp.Domain.Core;
 using Pulp.Domain.Discover;
 using Pulp.Domain.Friday;
+using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
 using Pulp.Domain.Services;
@@ -75,10 +76,8 @@ internal sealed class PlaylistMaker(PulpServices services)
             return new MadeOutcome(null, NothingOnOurServices);
         }
 
-        var playlist = new HouseholdPlaylist(NewId(), viewer, shared, made.ToPlaylist());
-        await services.PutAsync(HouseholdMaps.Playlist, playlist, cancellationToken);
+        var playlist = new HouseholdPlaylist(HouseholdEdits.NewPlaylistId(), viewer, shared, made.ToPlaylist());
+        await services.CreatePlaylistAsync(playlist, cancellationToken);
         return new MadeOutcome(playlist, null);
     }
-
-    public static PlaylistId NewId() => new("playlist-" + Guid.NewGuid().ToString("N"));
 }

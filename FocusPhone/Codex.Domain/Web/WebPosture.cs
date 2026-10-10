@@ -151,8 +151,17 @@ public static class PlayerEmbed
     /// <summary>
     /// The embed URL for a video id, with autoplay explicitly off (D77) and inline playback on.
     /// Throws for anything that is not a video id, so an invalid one can never become a URL.
+    ///
+    /// <para>The other parameters, from https://developers.google.com/youtube/player_parameters:
+    /// <c>rel=0</c> — since September 2018 related videos cannot be turned off, and 0 limits them to
+    /// the same channel as the trailer; <c>iv_load_policy=3</c> — annotations not shown;
+    /// <c>fs=1</c> — the fullscreen button (the default, stated so it is a decision);
+    /// <c>enablejsapi=1</c> — the IFrame API, which the player page uses to re-cue the trailer when it
+    /// ends, so the end screen's suggestions are never left on screen to tap. With
+    /// <paramref name="applicationId"/>, <c>origin</c> names the page's fixed origin
+    /// (<see cref="BaseUrlFor"/>), which YouTube asks for whenever the IFrame API is on.</para>
     /// </summary>
-    public static Uri EmbedUrl(string videoId)
+    public static Uri EmbedUrl(string videoId, string? applicationId = null)
     {
         if (!IsVideoId(videoId))
         {
@@ -161,7 +170,32 @@ public static class PlayerEmbed
                 nameof(videoId));
         }
 
-        return new Uri($"https://{EmbedHost}{EmbedPathPrefix}{videoId}?autoplay=0&playsinline=1");
+        var query = "autoplay=0&playsinline=1&rel=0&iv_load_policy=3&fs=1&enablejsapi=1";
+        if (applicationId is not null)
+        {
+            var origin = BaseUrlFor(applicationId).TrimEnd('/');
+            query += "&origin=" + Uri.EscapeDataString(origin);
+        }
+
+        return new Uri($"https://{EmbedHost}{EmbedPathPrefix}{videoId}?{query}");
+    }
+
+    /// <summary>
+    /// Whether the player's web view may load <paramref name="requested"/>: only the
+    /// <paramref name="embed"/> the page placed — same host, same video — and only into a subframe.
+    /// The query is not compared, so a browser re-escaping it cannot refuse the trailer itself. Android documents that
+    /// <c>shouldOverrideUrlLoading</c> "may be called for subframes", so refusing every request would
+    /// risk refusing the iframe's own load; anything else — the main frame leaving, the iframe moving
+    /// to another video or to the site — is refused.
+    /// </summary>
+    public static bool AllowsFrameLoad(Uri? requested, bool forMainFrame, Uri embed)
+    {
+        ArgumentNullException.ThrowIfNull(embed);
+        return requested is not null
+            && !forMainFrame
+            && IsEmbedUrl(requested)
+            && string.Equals(requested.Host, embed.Host, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(requested.AbsolutePath, embed.AbsolutePath, StringComparison.Ordinal);
     }
 
     /// <summary>

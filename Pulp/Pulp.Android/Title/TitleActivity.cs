@@ -742,69 +742,16 @@ public class TitleActivity : Activity
         var children = household.ChildRules.Select(rules => new PickerChild(rules.Child.Value, rules));
         var model = AddToPickerPlan.Build(title.Name, entry, DiscoverFacts.For(title, _ => []), playlists, children);
 
+        // Each tick is an edit of the household as it stands when it lands, not of the copy read when
+        // the picker opened, so a tick and an untick in one session both reach the file.
+        var picks = new PickerWrites(
+            services, (what, work) => Write(what, work), viewer, id, entry,
+            enqueueNewPlaylist: (what, work) => Write(what, work, reopenPicker: true));
         AddToPicker.Show(this, overlay, model,
-            (row, change) => OnPick(household, viewer, entry, row, change),
-            name => NewPlaylist(viewer, entry, name),
+            picks.OnPick,
+            name => picks.NewPlaylist(name),
             onFolded: () => addTo.Text = AddToPicker.ButtonLabel(open: false));
         addTo.Text = AddToPicker.ButtonLabel(open: true);
-    }
-
-    private Action? OnPick(HouseholdView household, ViewerId viewer, PlaylistEntry entry, PickerRow row, PickerChange change)
-    {
-        if (change == PickerChange.Refused)
-        {
-            return null;
-        }
-
-        if (row.Group == PickerGroup.Playlists)
-        {
-            var list = household.Playlist(new PlaylistId(row.Key))
-                ?? throw new InvalidOperationException($"The picker offered playlist '{row.Key}', which the household no longer holds.");
-            if (change == PickerChange.RemoveUndoFirst)
-            {
-                Write($"Removing {id} from a playlist", token => services.PutAsync(HouseholdMaps.Playlist, list with { List = list.List.Remove(entry) }, token));
-                return () => Write($"Putting {id} back on a playlist", token => services.PutAsync(HouseholdMaps.Playlist, list, token));
-            }
-
-            Write($"Adding {id} to a playlist", token => services.PutAsync(HouseholdMaps.Playlist, list with { List = list.List.Add(entry) }, token));
-            return null;
-        }
-
-        var child = new ViewerId(row.Key);
-        if (change == PickerChange.RemoveUndoFirst)
-        {
-            var picks = household.ChildRules.Where(rules => rules.Child == child)
-                .SelectMany(rules => rules.ParentPicks)
-                .Where(pick => pick.Title == id)
-                .Select(pick => new ParentPickEntry(child, pick))
-                .ToList();
-            Write($"Removing {id} from a child's Favorites", async token =>
-            {
-                foreach (var pick in picks)
-                {
-                    await services.RemoveAsync(HouseholdMaps.ParentPick, pick, token);
-                }
-            });
-            return () => Write($"Putting {id} back on a child's Favorites", async token =>
-            {
-                foreach (var pick in picks)
-                {
-                    await services.PutAsync(HouseholdMaps.ParentPick, pick, token);
-                }
-            });
-        }
-
-        // A parent's pick allow-lists its title for the child (D255), so Add and AddAndAllowList write the same record.
-        var added = new ParentPickEntry(child, new ParentPick(id, viewer, DateTimeOffset.UtcNow));
-        Write($"Adding {id} to a child's Favorites", token => services.PutAsync(HouseholdMaps.ParentPick, added, token));
-        return null;
-    }
-
-    private void NewPlaylist(ViewerId viewer, PlaylistEntry entry, string name)
-    {
-        // Personal by default (mockup 11); sharing is the playlist's own setting.
-        var list = new HouseholdPlaylist(new PlaylistId(Guid.NewGuid().ToString("N")), viewer, Shared: false, Playlist.Named(name).Add(entry));
-        Write($"A new playlist with {id}", token => services.PutAsync(HouseholdMaps.Playlist, list, token), reopenPicker: true);
     }
 
     // ---- writes ----

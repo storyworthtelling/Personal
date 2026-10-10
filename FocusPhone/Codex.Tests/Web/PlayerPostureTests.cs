@@ -147,4 +147,50 @@ public class PlayerPostureTests
     {
         Assert.Throws<ArgumentException>(() => PlayerEmbed.BaseUrlFor(applicationId));
     }
+    // Since September 2018 YouTube no longer lets an embed turn related videos off; rel=0 limits
+    // them to the same channel. Annotations off; the fullscreen button stated rather than assumed;
+    // the IFrame API enabled so the page can re-cue the trailer when it ends (see PaperWebView).
+    // https://developers.google.com/youtube/player_parameters
+    [Fact]
+    public void AnEmbedUrlLimitsWhatTheEndOffersAndCanBeReCued()
+    {
+        var query = PlayerEmbed.EmbedUrl("aBcDeFgHiJ0").Query;
+
+        Assert.Contains("rel=0", query, StringComparison.Ordinal);
+        Assert.Contains("iv_load_policy=3", query, StringComparison.Ordinal);
+        Assert.Contains("fs=1", query, StringComparison.Ordinal);
+        Assert.Contains("enablejsapi=1", query, StringComparison.Ordinal);
+        Assert.Contains("playsinline=1", query, StringComparison.Ordinal);
+    }
+
+    // With the IFrame API on, YouTube asks for the host page's origin as an extra check; it is the
+    // same fixed origin the page is loaded at, with no trailing slash.
+    [Fact]
+    public void AnEmbedUrlForAnAppNamesThePagesOrigin()
+    {
+        var url = PlayerEmbed.EmbedUrl("aBcDeFgHiJ0", "com.example.player");
+
+        Assert.Contains("origin=https%3A%2F%2Fcom.example.player", url.Query, StringComparison.Ordinal);
+        Assert.True(PlayerEmbed.IsEmbedUrl(url));
+        Assert.Throws<ArgumentException>(() => PlayerEmbed.EmbedUrl("aBcDeFgHiJ0", "com.example/evil"));
+    }
+
+    // Android documents that shouldOverrideUrlLoading "may be called for subframes". The player's
+    // client refuses everything except the one iframe load the page itself asked for: the exact
+    // embed (same host, same video), in a subframe. Anything in the main frame, or any other
+    // address, is refused.
+    [Fact]
+    public void OnlyTheEmbedItselfMayLoadAndOnlyInASubframe()
+    {
+        var embed = PlayerEmbed.EmbedUrl("aBcDeFgHiJ0", "com.example.player");
+
+        Assert.True(PlayerEmbed.AllowsFrameLoad(embed, forMainFrame: false, embed));
+        Assert.False(PlayerEmbed.AllowsFrameLoad(embed, forMainFrame: true, embed));
+        Assert.False(PlayerEmbed.AllowsFrameLoad(PlayerEmbed.EmbedUrl("zYxWvUtSrQ9", "com.example.player"), forMainFrame: false, embed));
+        // The same trailer with its query spelled differently is still the trailer.
+        Assert.True(PlayerEmbed.AllowsFrameLoad(PlayerEmbed.EmbedUrl("aBcDeFgHiJ0"), forMainFrame: false, embed));
+        Assert.False(PlayerEmbed.AllowsFrameLoad(new Uri("https://www.youtube.com/embed/aBcDeFgHiJ0"), forMainFrame: false, embed));
+        Assert.False(PlayerEmbed.AllowsFrameLoad(new Uri("https://www.youtube.com/watch?v=aBcDeFgHiJ0"), forMainFrame: false, embed));
+        Assert.False(PlayerEmbed.AllowsFrameLoad(null, forMainFrame: false, embed));
+    }
 }

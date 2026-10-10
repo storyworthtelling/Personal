@@ -21,6 +21,7 @@ using Pulp.Domain.Services;
 using Pulp.Domain.Shell;
 using Pulp.Domain.Voice;
 using Pulp.Infrastructure.Catalogue;
+using Pulp.Library;
 using Pulp.Title;
 
 namespace Pulp.Shell;
@@ -40,7 +41,15 @@ namespace Pulp.Shell;
 /// </summary>
 public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Discover)
 {
+    /// <summary>What a failed Add to… says above the stack; the stack itself stays.</summary>
+    private const string PlaylistsUnreadable = "Your playlists could not be read just now.";
+
     private readonly Handler handler = new(Looper.MainLooper!);
+
+    // One kept-week file, so one store: two would interleave their saves on one temporary file.
+    private readonly Lazy<DiscoverWeekStore> weekStore = new(() => new DiscoverWeekStore(host.FilesDir!.AbsolutePath, PulpServices.For(host).Diagnostics));
+    private readonly Lazy<TrailerLookup> trailers = new(() => new TrailerLookup(host, PulpServices.For(host)));
+    private LibraryWrites? writes;
     private LinearLayout? root;
     private FilterField? field;
     private ModeChips? chips;
@@ -65,6 +74,13 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
     private StackPileView? showPile;
 
     private PulpServices Services => PulpServices.For(Host);
+
+    /// <summary>
+    /// Every household write this page makes, one after another: an undo of a veto waits for the veto,
+    /// so it can never take the earlier clock stamp and lose to it. The page keeps its own state, so
+    /// nothing is re-read after a write.
+    /// </summary>
+    private LibraryWrites Writes => writes ??= new LibraryWrites(Services, () => { }, "discover");
 
     /// <summary>The changes feed is paged; two pages of new arrivals is a week's worth to deal from.</summary>
     private const int ChangePages = 2;
@@ -161,7 +177,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         }
 
         var book = view.VetoesOf(who);
-        var store = new DiscoverWeekStore(Host.FilesDir!.AbsolutePath, Services.Diagnostics);
+        var store = weekStore.Value;
         var kept = store.Load();
         var now = DateTimeOffset.UtcNow;
         if (kept is not null && kept.Viewer == who && !kept.IsDue(now))
@@ -202,7 +218,16 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         var dealt = DiscoverPageWeek.Deal(
             who, roster, pool, taste, book, DiscoverPageWatched.AlreadyWatched(view.SittingsOf(who)),
             StackSizes.Default, now, TimeZoneInfo.Local, Plans(view), view.HomeOverrides);
-        store.Save(dealt);
+        try
+        {
+            store.Save(dealt);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // The week was dealt; only keeping it failed. It is shown, and dealt again next time.
+            Services.Diagnostics.Warn("discover", "The dealt week could not be kept on this phone; it is shown, and dealt again next time.", exception);
+        }
+
         Publish(view, who, book, dealt, DiscoverPageText.StackStatus);
     }
 
@@ -290,7 +315,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         var veto = new ViewerVeto(who, new Veto(row.Id, row.Tags));
         vetoes = vetoes.Veto(row.Id, row.Tags);
         ShowStack();
-        Persist(() => Services.PutAsync(HouseholdMaps.Veto, veto, CancellationToken.None), $"The veto of {row.Id} was not saved.");
+        Writes.Enqueue($"veto {row.Id}", token => Services.PutAsync(HouseholdMaps.Veto, veto, token));
 
         // Undo-first (§13): the strike is made at once and the corner folds back to lift it.
         DogEar.Show(Host, Overlay, $"Undo not for me, {row.Name}.", () => BringBack(row));
@@ -306,25 +331,29 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         var veto = new ViewerVeto(who, new Veto(row.Id, row.Tags));
         vetoes = vetoes.BringBack(row.Id);
         ShowStack();
-        Persist(() => Services.RemoveAsync(HouseholdMaps.Veto, veto, CancellationToken.None), $"Bringing back {row.Id} was not saved.");
+        Writes.Enqueue($"bring back {row.Id}", token => Services.RemoveAsync(HouseholdMaps.Veto, veto, token));
     }
 
-    private void Trailer(DiscoverRow row) =>
-        Run(async cancellationToken =>
+    // The one trailer lookup (the title page's): a found id is kept, so the key's daily quota is spent
+    // once per title, and an answer that is not a video id is refused there rather than crashing here.
+    private void Trailer(DiscoverRow row)
+    {
+        var lookup = trailers.Value;
+        RunOnStack(async cancellationToken =>
         {
-            var video = await Services.Trailers.FindTrailerAsync(row.Name, row.Year, cancellationToken);
+            var intent = await lookup.FindAsync(Host, row.Id, row.Name, row.Year, cancellationToken);
             Host.RunOnUiThread(() =>
             {
-                if (video is null)
+                if (intent is null)
                 {
-                    note = DiscoverPageText.NoTrailer;
-                    ShowStack();
+                    Note(DiscoverPageText.NoTrailer);
                     return;
                 }
 
-                Host.StartActivity(Pulp.Trailer.TrailerActivity.For(Host, video, row.Name));
+                Host.StartActivity(intent);
             });
-        }, DiscoverPageText.NoTrailer, CancellationToken.None);
+        }, DiscoverPageText.NoTrailer);
+    }
 
     // D109: "Add to…" opens the inline playlist picker, last-used first. The picker's tick is the
     // success state (D257); the card stays on its pile, marked added.
@@ -336,7 +365,8 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         }
 
         var entry = PlaylistEntry.ForTitle(row.Id, row.Kind);
-        Run(async cancellationToken =>
+        var picks = new PickerWrites(Services, Writes.Enqueue, who, row.Id, entry);
+        RunOnStack(async cancellationToken =>
         {
             var lists = await Services.PlaylistsAsync(who, cancellationToken);
             var model = AddToPickerPlan.Build(
@@ -345,42 +375,27 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
                 []);
             Host.RunOnUiThread(() => AddToPicker.Show(
                 Host, Overlay, model,
-                (picked, change) => ChangePlaylist(lists, picked, change, entry, row),
-                name => NewPlaylist(who, name, entry, row)));
-        }, DiscoverPageText.StackStatus, CancellationToken.None);
-    }
+                (picked, change) =>
+                {
+                    var undo = picks.OnPick(picked, change);
+                    if (change is PickerChange.Add or PickerChange.AddAndAllowList)
+                    {
+                        MarkAdded(row);
+                    }
 
-    private Action? ChangePlaylist(
-        IReadOnlyList<HouseholdPlaylist> lists, PickerRow picked, PickerChange change, PlaylistEntry entry, DiscoverRow row)
-    {
-        var playlist = lists.First(list => list.Id.Value == picked.Key);
-        switch (change)
-        {
-            case PickerChange.Add:
-            case PickerChange.AddAndAllowList:
-                Persist(() => Services.PutAsync(HouseholdMaps.Playlist, playlist with { List = playlist.List.Add(entry) }, CancellationToken.None),
-                    $"Adding {row.Id} to playlist {playlist.Id} was not saved.");
-                MarkAdded(row);
-                return null;
-            case PickerChange.RemoveUndoFirst:
-                Persist(() => Services.PutAsync(HouseholdMaps.Playlist, playlist with { List = playlist.List.Remove(entry) }, CancellationToken.None),
-                    $"Removing {row.Id} from playlist {playlist.Id} was not saved.");
-                return () => Persist(
-                    () => Services.PutAsync(HouseholdMaps.Playlist, playlist with { List = playlist.List.Add(entry) }, CancellationToken.None),
-                    $"Putting {row.Id} back on playlist {playlist.Id} was not saved.");
-            case PickerChange.Refused:
-                return null;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(change), change, "A picker change the stack does not handle.");
-        }
-    }
+                    return undo;
+                },
+                name =>
+                {
+                    if (picks.NewPlaylist(name) is null)
+                    {
+                        return;
+                    }
 
-    private void NewPlaylist(ViewerId who, string name, PlaylistEntry entry, DiscoverRow row)
-    {
-        var playlist = new HouseholdPlaylist(new PlaylistId("playlist-" + Guid.NewGuid().ToString("N")), who, Shared: false, Playlist.Named(name).Add(entry));
-        Persist(() => Services.PutAsync(HouseholdMaps.Playlist, playlist, CancellationToken.None), $"The new playlist with {row.Id} was not saved.");
-        AddToPicker.Fold(Overlay);
-        MarkAdded(row);
+                    AddToPicker.Fold(Overlay);
+                    MarkAdded(row);
+                }));
+        }, PlaylistsUnreadable);
     }
 
     private void MarkAdded(DiscoverRow row)
@@ -392,11 +407,12 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
 
         week = week.Add(row.Id);
         var kept = week;
-        Persist(() =>
+        var store = weekStore.Value;
+        Writes.Enqueue("keep the week's added card", _ =>
         {
-            new DiscoverWeekStore(Host.FilesDir!.AbsolutePath, Services.Diagnostics).Save(kept);
+            store.Save(kept);
             return Task.CompletedTask;
-        }, "The week's added card was not kept.");
+        });
     }
 
     private void WantPoster(PosterDeck deck, string url, int targetPx)
@@ -652,16 +668,30 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
             }
         }, cancellationToken);
 
-    private void Persist(Func<Task> write, string failure) =>
+    /// <summary>
+    /// Work behind a pile button. A failure says so in the line above the stack and leaves the stack
+    /// where it is — a button that failed never takes the page away.
+    /// </summary>
+    private void RunOnStack(Func<CancellationToken, Task> work, string failureNote) =>
         _ = Task.Run(async () =>
         {
             try
             {
-                await write();
+                await work(CancellationToken.None);
             }
             catch (Exception exception) when (exception is not System.OperationCanceledException)
             {
-                Services.Diagnostics.Warn("discover", failure, exception);
+                Services.Diagnostics.Warn("discover", "A stack button's work failed: " + exception.Message, exception);
+                Host.RunOnUiThread(() => Note(failureNote));
             }
         });
+
+    private void Note(string text)
+    {
+        note = text;
+        if (field is not null && field.Query.Length == 0)
+        {
+            ShowStack();
+        }
+    }
 }

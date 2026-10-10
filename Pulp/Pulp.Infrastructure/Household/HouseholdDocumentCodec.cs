@@ -137,8 +137,8 @@ public static class HouseholdDocumentCodec
         {
             var key = new RecordKey(Text(element, "kind", where), Text(element, "id", where));
             where = $"record {key}";
-            var schema = (int)Number(element, "schema", where);
-            var stamp = new HlcTimestamp(Number(element, "wall", where), (int)Number(element, "counter", where));
+            var schema = WholeInt(element, "schema", where);
+            var stamp = new HlcTimestamp(Number(element, "wall", where), WholeInt(element, "counter", where));
             var writer = Text(element, "writer", where);
             var deleted = element.TryGetProperty("deleted", out var flag) && flag.ValueKind == JsonValueKind.True;
             if (deleted)
@@ -175,6 +175,12 @@ public static class HouseholdDocumentCodec
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()!
             : throw new HouseholdFormatException($"The household file's {where} has no '{name}'.");
+
+    /// <summary>A whole number that fits an int; one past it is damage, refused rather than wrapped by a cast.</summary>
+    private static int WholeInt(JsonElement element, string name, string where) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number)
+            ? number
+            : throw new HouseholdFormatException($"The household file's {where} has no '{name}' that is a whole number within the int range.");
 
     private static long Number(JsonElement element, string name, string where) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number)
