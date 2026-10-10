@@ -45,6 +45,24 @@ public sealed class SavedTidalTracksStore(Context context)
         Save([.. tracks, track]);
     }
 
+    /// <summary>
+    /// Adds a batch in one write, skipping any already saved (and any repeated within the
+    /// batch). Returns the ids actually added, so an undo removes only what this call put in
+    /// — a track the owner already had is never taken back out by someone else's undo.
+    /// </summary>
+    public IReadOnlyList<string> AddAll(IEnumerable<Track> tracks)
+    {
+        var current = Load();
+        var known = current.Select(track => track.Id).ToHashSet();
+        var added = tracks.Where(track => known.Add(track.Id)).ToList();
+        if (added.Count > 0)
+        {
+            Save([.. current, .. added]);
+        }
+
+        return [.. added.Select(track => track.Id)];
+    }
+
     public void Remove(string trackId) => Save([.. Load().Where(track => track.Id != trackId)]);
 
     /// <summary>Replaces a saved track's record in place (by id) — how

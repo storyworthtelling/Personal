@@ -122,6 +122,48 @@ public sealed class MusicLibrary(
     }
 
     /// <summary>
+    /// Saves a batch of TIDAL tracks — an album's worth, from Discover — as one inline state
+    /// change: one catalogue reload and one Changed, however many tracks. Returns the ids
+    /// actually added, which is exactly what <see cref="RemoveSavedTracks"/> should undo.
+    /// </summary>
+    public IReadOnlyList<string> SaveTracks(IReadOnlyList<Track> tracks)
+    {
+        var added = savedTidal.AddAll(tracks);
+        if (added.Count == 0)
+        {
+            return added;
+        }
+
+        LoadCatalog();
+        Changed?.Invoke();
+        var addedSet = added.ToHashSet();
+        _ = EnrichSavedTracksAsync(tracks.Where(track => addedSet.Contains(track.Id)).ToList());
+        return added;
+    }
+
+    /// <summary>The undo side of <see cref="SaveTracks"/>: removes the given ids in one reload.</summary>
+    public void RemoveSavedTracks(IReadOnlyList<string> trackIds)
+    {
+        foreach (var trackId in trackIds)
+        {
+            savedTidal.Remove(trackId);
+        }
+
+        LoadCatalog();
+        Changed?.Invoke();
+    }
+
+    // One track at a time, not in parallel: each is a couple of keyless or TIDAL calls, and a
+    // whole album's worth at once would be a burst the rate limits do not need.
+    private async Task EnrichSavedTracksAsync(IReadOnlyList<Track> tracks)
+    {
+        foreach (var track in tracks)
+        {
+            await EnrichSavedTrackAsync(track);
+        }
+    }
+
+    /// <summary>
     /// Fills in what TIDAL search results never carry — cover art (its own
     /// relationship, not a search result attribute; see
     /// <c>TidalCatalogClient.GetTrackArtworkUrlAsync</c>'s remarks) and tempo (TIDAL's
