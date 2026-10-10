@@ -6,15 +6,18 @@ namespace Codex.Domain.Apps;
 /// category shelves (spine-out, each with its bookend, in catalog order), and the leftover loose
 /// apps (spine-out, no bookend). Spine prominence comes from usage, ranked once across every spine
 /// so sizing is consistent down the whole tray. Empty sibling/loose/category shelves are dropped;
-/// the clock and home shelves always show. Pure — <see cref="BookshelfLayout"/> then places it.
+/// the clock and home shelves always show. An app featured on home is never also on a tray shelf:
+/// it is withdrawn from the tray here, and the moment it is replaced it is back on the shelf
+/// <see cref="AppTrayLayout"/> computed for it. Pure — <see cref="BookshelfLayout"/> then places it.
 /// </summary>
 public static class ShelfComposer
 {
     public static IReadOnlyList<ShelfSpec> Compose(
         HomeFeatureSet home,
-        TrayModel tray,
+        TrayModel trayAll,
         IReadOnlyDictionary<string, long> usageByPackage)
     {
+        var tray = WithoutFeatured(trayAll, home);
         var spinePackages = tray.Folders.SelectMany(f => f.Apps).Concat(tray.LooseApps)
             .Select(a => a.PackageName).ToList();
         var sizes = SpineSizing.Rank(usageByPackage, spinePackages);
@@ -51,6 +54,22 @@ public static class ShelfComposer
         }
 
         return shelves;
+    }
+
+    // The tray with every featured app taken out; folders that empty out are dropped with them.
+    private static TrayModel WithoutFeatured(TrayModel tray, HomeFeatureSet home)
+    {
+        var featured = home.Packages.ToHashSet();
+        bool Shown(TrayApp app) => !featured.Contains(app.PackageName);
+
+        var folders = tray.Folders
+            .Select(folder => folder with { Apps = folder.Apps.Where(Shown).ToList() })
+            .Where(folder => folder.Apps.Count > 0)
+            .ToList();
+        return new TrayModel(
+            tray.RepoApps.Where(Shown).ToList(),
+            folders,
+            tray.LooseApps.Where(Shown).ToList());
     }
 
     // Splits a list into fixed-size chunks (the last may be short), preserving order.
