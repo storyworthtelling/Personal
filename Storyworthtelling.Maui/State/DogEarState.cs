@@ -58,6 +58,23 @@ public sealed class DogEarState
     private readonly Dictionary<string, DogEarNotice> waiting = [];
     private readonly NoticeOrder order = new();
 
+    /// <summary>
+    /// Every hue, most serious first — the corner wears the most serious notice waiting, not the newest
+    /// (D291, mockup 12); ties go to the newest. Problem (broken), Caution (going stale), Action (a
+    /// decision waiting), Progress (waiting, not wrong), Reference (only worth knowing), Resolved
+    /// (settled). The native <c>Codex.Domain.Design.NoticeSeriousness</c> holds the same order, kept
+    /// identical by <c>DogEarSeriousnessTests</c>.
+    /// </summary>
+    public static IReadOnlyList<DogEarHue> MostSeriousFirst { get; } =
+    [
+        DogEarHue.Problem,
+        DogEarHue.Caution,
+        DogEarHue.Action,
+        DogEarHue.Progress,
+        DogEarHue.Reference,
+        DogEarHue.Resolved,
+    ];
+
     private DogEarNotice? undoHint;
     private Action? onUndo;
     private DateTimeOffset undoExpires;
@@ -144,7 +161,8 @@ public sealed class DogEarState
 
     /// <summary>
     /// What the corner shows at <paramref name="now"/>, or null for a flat corner. One fold, no
-    /// count (§13): it says something waits, not how much.
+    /// count (§13): it says something waits, not how much. An open undo outranks every notice; otherwise
+    /// the fold wears the most serious notice waiting (see <see cref="MostSeriousFirst"/>).
     /// </summary>
     public DogEarFold? Fold(DateTimeOffset now)
     {
@@ -158,8 +176,34 @@ public sealed class DogEarState
             return null;
         }
 
-        var newest = waiting[order.Keys[0]];
-        return new DogEarFold(newest.Headline, newest.Hue, ShowsBackArrow: false, Expires: null);
+        // The list stays newest first; the corner wears the most serious of it, the newest on a tie.
+        DogEarNotice? chosen = null;
+        var chosenRank = int.MaxValue;
+        foreach (var key in order.Keys)
+        {
+            var notice = waiting[key];
+            var rank = Rank(notice.Hue);
+            if (rank < chosenRank)
+            {
+                chosen = notice;
+                chosenRank = rank;
+            }
+        }
+
+        return new DogEarFold(chosen!.Headline, chosen.Hue, ShowsBackArrow: false, Expires: null);
+    }
+
+    private static int Rank(DogEarHue hue)
+    {
+        for (var index = 0; index < MostSeriousFirst.Count; index++)
+        {
+            if (MostSeriousFirst[index] == hue)
+            {
+                return index;
+            }
+        }
+
+        return MostSeriousFirst.Count;
     }
 
     private bool UndoIsOpen(DateTimeOffset now) => undoHint is not null && now < undoExpires;
