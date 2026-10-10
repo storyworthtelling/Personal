@@ -146,7 +146,11 @@ public class ScenePairRetentionTests : IDisposable
         Assert.Empty(SceneRetention.Freeable(only, null, [only]));
     }
 
-    /// <summary>The printed half: a paired scene draws two pictures, an unpaired one draws one.</summary>
+    /// <summary>
+    /// The printed half: a paired scene's block draws two pictures, an unpaired one draws one. (Here
+    /// with no manuscript to insert into, so the scenes print in order; the in-place case is
+    /// <c>SceneBlockTests</c>.)
+    /// </summary>
     [Fact]
     public void APairedSceneBlockPrintsTwoPictures()
     {
