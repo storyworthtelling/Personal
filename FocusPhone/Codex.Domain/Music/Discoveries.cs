@@ -85,6 +85,44 @@ public static class Discoveries
         return kept;
     }
 
+    /// <summary>
+    /// The picks the owner asked for, by kind: at most <paramref name="music"/> songs and
+    /// albums, and at most <paramref name="podcasts"/> shows, in the order they arrived.
+    /// Anything over a count is dropped; a short delivery is returned as it was.
+    /// </summary>
+    public static IReadOnlyList<Recommendation> Shape(IEnumerable<Recommendation> picks, int music, int podcasts)
+    {
+        var musicLeft = Math.Max(0, music);
+        var podcastsLeft = Math.Max(0, podcasts);
+        var shaped = new List<Recommendation>();
+
+        foreach (var pick in picks)
+        {
+            if (pick.Kind == DiscoveryKind.Podcast)
+            {
+                if (podcastsLeft == 0)
+                {
+                    continue;
+                }
+
+                podcastsLeft--;
+            }
+            else
+            {
+                if (musicLeft == 0)
+                {
+                    continue;
+                }
+
+                musicLeft--;
+            }
+
+            shaped.Add(pick);
+        }
+
+        return shaped;
+    }
+
     private static bool IsAlreadyHeld(
         Recommendation pick, IReadOnlyList<Track> owned, IReadOnlyList<string>? subscribedShows) => pick.Kind switch
     {
