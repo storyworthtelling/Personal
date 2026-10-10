@@ -1,4 +1,5 @@
 using Codex.Domain.Apps;
+using Codex.Domain.Policy;
 using Xunit;
 
 namespace Codex.Tests.Apps;
@@ -33,15 +34,41 @@ public class AppTrayLayoutTests
     }
 
     [Fact]
-    public void FocusPhoneApps_AreExcludedEntirely()
+    public void FocusPhoneHeads_LiveOnTheCodexShelf_WhenNotFeatured()
     {
+        // Post, Score and Plate are sibling apps too: they sit on the Codex shelf until the owner
+        // features one on home, and go back there the moment it's replaced.
         var model = Build(
             [App("com.storyworthtelling.focusphone.audio"), App("com.storyworthtelling.focusphone.communication"),
-             App("com.storyworthtelling.focusphone.launcher")]);
+             App(PolicyContext.PlatePackage)]);
+
+        Assert.Equal(
+            new[] { "com.storyworthtelling.focusphone.audio", "com.storyworthtelling.focusphone.communication",
+                PolicyContext.PlatePackage },
+            model.RepoApps.Select(a => a.PackageName));
+        Assert.Empty(model.Folders);
+        Assert.Empty(model.LooseApps);
+    }
+
+    [Fact]
+    public void Launcher_IsNeverOnAShelf()
+    {
+        var model = Build([App("com.storyworthtelling.focusphone.launcher")]);
 
         Assert.Empty(model.RepoApps);
         Assert.Empty(model.Folders);
         Assert.Empty(model.LooseApps);
+    }
+
+    [Fact]
+    public void OverrideOnFocusPhoneHead_IsIgnored_HeadStaysOnTheCodexShelf()
+    {
+        var overrides = new Dictionary<string, string> { ["com.storyworthtelling.focusphone.audio"] = CategoryCatalog.Finance };
+
+        var model = Build([App("com.storyworthtelling.focusphone.audio")], overrides);
+
+        Assert.Equal("com.storyworthtelling.focusphone.audio", Assert.Single(model.RepoApps).PackageName);
+        Assert.Empty(model.Folders);
     }
 
     [Fact]
