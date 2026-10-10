@@ -45,6 +45,20 @@ public sealed class HandOffExecutor
         this.catalogue = catalogue ?? throw new ArgumentNullException(nameof(catalogue));
     }
 
+    /// <summary>
+    /// The executor for a household as it stands: the planner is built here, inside the executor's
+    /// own construction, so nothing else in the head names <see cref="HandOffPlanner"/> (the one-door
+    /// guard). The planner refuses rules for anyone the roster does not name as a child.
+    /// </summary>
+    public HandOffExecutor(
+        Pulp.Domain.People.HouseholdRoster roster,
+        IEnumerable<Pulp.Domain.Children.ChildRules> childRules,
+        ServiceCatalogue catalogue,
+        Pulp.Domain.Children.AttestedServices attested)
+        : this(new HandOffPlanner(roster, childRules, catalogue, attested), catalogue)
+    {
+    }
+
     public HandOffOutcome Start(Activity host, HandOffRequest request, DateTimeOffset at)
     {
         ArgumentNullException.ThrowIfNull(host);
