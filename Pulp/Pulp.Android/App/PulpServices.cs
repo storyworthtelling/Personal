@@ -1,5 +1,8 @@
 using Android.Content;
 using Codex.Ui.Voice;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Drive.v3;
+using Google.Apis.Services;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
 using Pulp.Domain.Household;
@@ -28,8 +31,12 @@ namespace Pulp.App;
 /// <para>One per process (<see cref="For"/>). Writes to the household go through
 /// <see cref="PutAsync"/> / <see cref="RemoveAsync"/> and, for a playlist or a child's pick, the edits
 /// that read the record as it stands inside the same gate (<see cref="EditPlaylistAsync"/>), which stamp with this install's hybrid
-/// logical clock and keep it on disk. Today the household is the phone's own copy
-/// (<see cref="LocalHouseholdStore"/>); Release D swaps in the Drive store behind the same seam.</para>
+/// logical clock and keep it on disk. The phone's own copy (<see cref="LocalHouseholdStore"/>) is the
+/// working copy every read and edit uses; the shared file in Drive (<see cref="DriveHouseholdStore"/>,
+/// finding §2.7) is reached only by the sync passes — on open, after each edit once
+/// <see cref="HouseholdSyncSchedule.Debounce"/> has passed quietly, and on <see cref="SyncNowAsync"/> —
+/// so a phone without Drive keeps working and loses nothing. <see cref="SyncStatus"/> says where it
+/// stands.</para>
 /// </summary>
 public sealed class PulpServices
 {
@@ -37,6 +44,12 @@ public sealed class PulpServices
     private static PulpServices? instance;
 
     private readonly IHouseholdStore household;
+    private readonly DriveHouseholdStore sharedHousehold;
+    private readonly HouseholdSyncSchedule schedule = new();
+    private readonly object scheduleGate = new();
+    private readonly SemaphoreSlim passGate = new(1, 1);
+    private TaskCompletionSource wakeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private HouseholdSyncStatus syncStatus = HouseholdSyncStatus.LocalOnly("The household has not been compared with Drive yet.");
     private readonly LocalInstallStore install;
     private readonly CatalogueCache cache;
     private readonly StreamingAvailabilityClient availability;
@@ -70,7 +83,34 @@ public sealed class PulpServices
         household = new LocalHouseholdStore(files);
         install = new LocalInstallStore(files);
         cache = new CatalogueCache(Path.Combine(cacheRoot, "catalogue"));
+
+        sharedHousehold = new DriveHouseholdStore(
+            new DriveTextFile(DriveFactory(account), DriveHouseholdStore.FileName, SharedDriveFileIds.Store),
+            () => VaultPassphraseStore.Passphrase,
+            () => HouseholdSync.MayCreateFile(Keys.HouseholdRole));
+        lock (scheduleGate)
+        {
+            schedule.Opened(DateTimeOffset.UtcNow);
+        }
+
+        Task.Run(SyncLoopAsync);
     }
+
+    /// <summary>
+    /// The Drive service for the household file, over the same device-account token the vault reads
+    /// with (<see cref="VoiceGoogleAccount"/>, full <c>drive</c> scope — a file shared to this account
+    /// is found by name only with it).
+    /// </summary>
+    private static Func<CancellationToken, Task<DriveService>> DriveFactory(VoiceGoogleAccount account) => async _ =>
+    {
+        var token = await account.GetAccessToken();
+        return new DriveService(new BaseClientService.Initializer
+        {
+            HttpClientInitializer = GoogleCredential.FromAccessToken(token),
+            ApplicationName = "Pulp",
+            HttpClientFactory = new GoogleHttpClientFactory(),
+        });
+    };
 
     public static PulpServices For(Context context)
     {
@@ -99,6 +139,10 @@ public sealed class PulpServices
     public async Task RefreshKeysAsync(CancellationToken cancellationToken)
     {
         await Keys.RefreshAsync(cancellationToken);
+
+        // The vault says whose Drive holds the household, and a passphrase may just have been entered:
+        // either can turn a waiting or refused pass into one that lands, so ask for one now.
+        RequestSync();
         try
         {
             await voiceOptions.RefreshAsync(cancellationToken);
@@ -179,6 +223,201 @@ public sealed class PulpServices
         finally
         {
             householdGate.Release();
+        }
+
+        lock (scheduleGate)
+        {
+            schedule.Edited(DateTimeOffset.UtcNow);
+        }
+
+        Wake();
+    }
+
+    // ---- the shared household file ----
+
+    /// <summary>Where this phone's household stands against Drive: local only, synced at, offline, waiting for the share, or unreadable and why.</summary>
+    public HouseholdSyncStatus SyncStatus => Volatile.Read(ref syncStatus);
+
+    /// <summary>
+    /// Raised (off the UI thread) after every sync pass. A pass may have brought the other phone's
+    /// records home, so a screen showing the household re-reads it.
+    /// </summary>
+    public event EventHandler? SyncStatusChanged;
+
+    /// <summary>
+    /// Runs a pass now, whatever the schedule was holding — including after an unreadable file, which
+    /// otherwise stops passes until asked (a new passphrase is the usual reason to ask). Never throws
+    /// for Drive's sake; the outcome is in <see cref="SyncStatus"/>.
+    /// </summary>
+    public async Task<HouseholdSyncStatus> SyncNowAsync(CancellationToken cancellationToken)
+    {
+        lock (scheduleGate)
+        {
+            schedule.Asked(DateTimeOffset.UtcNow);
+        }
+
+        await RunPassAsync(cancellationToken);
+        return SyncStatus;
+    }
+
+    private void RequestSync()
+    {
+        lock (scheduleGate)
+        {
+            schedule.Asked(DateTimeOffset.UtcNow);
+        }
+
+        Wake();
+    }
+
+    private void Wake() =>
+        Interlocked.Exchange(ref wakeSignal, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+
+    /// <summary>The one background loop: sleeps until the schedule's next pass or a wake, then runs it if it is due.</summary>
+    private async Task SyncLoopAsync()
+    {
+        while (true)
+        {
+            var signal = Volatile.Read(ref wakeSignal).Task;
+            DateTimeOffset? due;
+            bool isDue;
+            lock (scheduleGate)
+            {
+                due = schedule.NextDue;
+                isDue = schedule.IsDue(DateTimeOffset.UtcNow);
+            }
+
+            if (isDue)
+            {
+                await RunPassAsync(CancellationToken.None);
+                continue;
+            }
+
+            var wait = due is { } at ? at - DateTimeOffset.UtcNow : Timeout.InfiniteTimeSpan;
+            if (wait != Timeout.InfiniteTimeSpan && wait < TimeSpan.Zero)
+            {
+                wait = TimeSpan.Zero;
+            }
+
+            await Task.WhenAny(signal, Task.Delay(wait));
+        }
+    }
+
+    /// <summary>
+    /// One pass (finding §2.7): the phone's file as it stands, published through the Drive store
+    /// (read → merge → write if needed → re-read, <see cref="HouseholdPublish"/>), and what that settles on
+    /// merged back into the phone's file as it stands <i>then</i> (<see cref="HouseholdSync.Adopt"/>), so an
+    /// edit made while the pass was on the network is kept. Every failure is caught here, logged with its
+    /// reason and turned into <see cref="SyncStatus"/>; the phone's own file is never the casualty.
+    /// </summary>
+    private async Task RunPassAsync(CancellationToken cancellationToken)
+    {
+        await passGate.WaitAsync(cancellationToken);
+        try
+        {
+            lock (scheduleGate)
+            {
+                schedule.Started(DateTimeOffset.UtcNow);
+            }
+
+            if (HouseholdSync.Readiness(VaultPassphraseStore.IsSet, VoiceGoogleAccount.IsSignedIn) is { } localOnly)
+            {
+                SetStatus(localOnly);
+                return;
+            }
+
+            var result = await sharedHousehold.PublishAsync(await household.LoadAsync(cancellationToken), cancellationToken);
+            await AdoptAsync(result.Held, cancellationToken);
+            var now = DateTimeOffset.UtcNow;
+            lock (scheduleGate)
+            {
+                switch (result.Outcome)
+                {
+                    case HouseholdPublishOutcome.AlreadyCurrent or HouseholdPublishOutcome.Written:
+                        schedule.Succeeded();
+                        break;
+                    default:
+                        schedule.Failed(now);
+                        break;
+                }
+            }
+
+            SetStatus(result.Outcome switch
+            {
+                HouseholdPublishOutcome.AlreadyCurrent or HouseholdPublishOutcome.Written => HouseholdSyncStatus.Synced(now),
+                HouseholdPublishOutcome.NotYetShared => HouseholdSyncStatus.WaitingForShare(
+                    SyncStatus.LastSynced,
+                    $"No household file is shared with this account yet. The owner shares '{DriveHouseholdStore.FileName}' from their Drive; until then this phone keeps its household to itself."),
+                _ => SyncStatus.WentOffline("The other phone was saving at the same moment; this phone's changes are kept and go up on the next pass."),
+            });
+        }
+        catch (HouseholdUnreadableException exception)
+        {
+            Diagnostics.Warn("household", exception.Message, exception);
+            Block(HouseholdSyncStatus.Unreadable(exception.Reason, exception.Message, SyncStatus.LastSynced));
+        }
+        catch (HouseholdFormatException exception)
+        {
+            // This phone's own file is damaged: nothing it holds can be merged up without guessing.
+            Diagnostics.Warn("household", "This phone's household file could not be read, so it was not synced: " + exception.Message, exception);
+            Block(HouseholdSyncStatus.Unreadable(HouseholdUnreadableReason.Damaged, exception.Message, SyncStatus.LastSynced));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Drive unreachable, a token refused, a timeout: the edits wait on the phone and the pass is retried.
+            Diagnostics.Warn("household", "Drive could not be reached for the household; this phone keeps working from its own copy and tries again later.", exception);
+            lock (scheduleGate)
+            {
+                schedule.Failed(DateTimeOffset.UtcNow);
+            }
+
+            SetStatus(SyncStatus.WentOffline(exception.Message));
+        }
+        finally
+        {
+            passGate.Release();
+        }
+    }
+
+    private async Task AdoptAsync(HouseholdDocument published, CancellationToken cancellationToken)
+    {
+        await householdGate.WaitAsync(cancellationToken);
+        try
+        {
+            var now = await household.LoadAsync(cancellationToken);
+            var kept = HouseholdSync.Adopt(now, published);
+            if (!kept.ContentEquals(now))
+            {
+                await household.SaveAsync(kept, cancellationToken);
+            }
+        }
+        finally
+        {
+            householdGate.Release();
+        }
+    }
+
+    private void Block(HouseholdSyncStatus status)
+    {
+        lock (scheduleGate)
+        {
+            schedule.Blocked();
+        }
+
+        SetStatus(status);
+    }
+
+    private void SetStatus(HouseholdSyncStatus status)
+    {
+        Volatile.Write(ref syncStatus, status);
+        try
+        {
+            SyncStatusChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception exception)
+        {
+            // A screen's handler failing must not stop the sync loop that raised it.
+            Diagnostics.Warn("household", "A screen's handler for the household sync status failed.", exception);
         }
     }
 

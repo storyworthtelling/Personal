@@ -11,6 +11,7 @@ using Pulp.Discover;
 using Pulp.Domain.Actions;
 using Pulp.Domain.Availability;
 using Pulp.Domain.Catalogue;
+using Pulp.Domain.ChildView;
 using Pulp.Domain.Core;
 using Pulp.Domain.Discover;
 using Pulp.Domain.Friday;
@@ -38,6 +39,9 @@ namespace Pulp.Shell;
 /// is comes from <see cref="ThisPhone"/>: with no roster, or no way yet to tell which adult holds this
 /// phone, the page says so in a status sentence and deals nothing — never invented rows. Every catalogue
 /// lookup goes through <see cref="PulpServices"/>' one counted client (D261).</para>
+///
+/// <para>In a child's view the page is the <see cref="ChildDiscoverPage"/>'s: no stack (D42), and a
+/// search shows only what every child watching may see. The adult page and its week are not built.</para>
 /// </summary>
 public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Discover)
 {
@@ -72,6 +76,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
     private string? note;
     private StackPileView? filmPile;
     private StackPileView? showPile;
+    private ChildDiscoverPage? childPage;
 
     private PulpServices Services => PulpServices.For(Host);
 
@@ -85,8 +90,21 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
     /// <summary>The changes feed is paged; two pages of new arrivals is a week's worth to deal from.</summary>
     private const int ChangePages = 2;
 
+    public override void ViewAs(ChildViewSession? session)
+    {
+        base.ViewAs(session);
+        childPage?.Pause();
+        childPage = session is null ? null : new ChildDiscoverPage(Host, () => Overlay, session);
+        CancelSearch();
+    }
+
     public override View BuildView()
     {
+        if (childPage is not null)
+        {
+            return childPage.Build();
+        }
+
         if (root is not null)
         {
             (root.Parent as ViewGroup)?.RemoveView(root);
@@ -127,6 +145,11 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
 
     public override void Resume()
     {
+        if (childPage is not null)
+        {
+            return;
+        }
+
         // Vetoes may have changed elsewhere; the kept week is re-read, and dealt again only when due.
         if (root is not null)
         {
@@ -134,7 +157,11 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         }
     }
 
-    public override void Pause() => CancelSearch();
+    public override void Pause()
+    {
+        childPage?.Pause();
+        CancelSearch();
+    }
 
     // ---- loading and dealing the week ----
 
@@ -245,9 +272,8 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
             }
         });
 
-    // Settings records plan tiers in Release D (D29); until then a household service counts as ad-free.
-    private static IReadOnlyList<ServicePlan> Plans(HouseholdView? view) =>
-        view?.Services.Select(service => new ServicePlan(service, AdFree: true)).ToList() ?? [];
+    // Each household service with the tier Settings recorded for it (D29); an unset tier reads as ad-free.
+    private static IReadOnlyList<ServicePlan> Plans(HouseholdView? view) => view?.ServicePlans ?? [];
 
     // ---- the stack ----
 

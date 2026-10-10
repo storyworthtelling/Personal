@@ -28,6 +28,8 @@ public class HouseholdKindsTests
         [nameof(HouseholdKinds.AttestedService)] = "attested-service",
         [nameof(HouseholdKinds.HouseholdService)] = "household-service",
         [nameof(HouseholdKinds.ContinueDismissed)] = "continue-dismissed",
+        [nameof(HouseholdKinds.ServicePlan)] = "service-plan",
+        [nameof(HouseholdKinds.ViewerName)] = "viewer-name",
     };
 
     private static IReadOnlyDictionary<string, string> Declared() =>
