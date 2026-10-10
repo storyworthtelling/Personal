@@ -344,7 +344,7 @@ public class HomeActivity : Activity
     {
         var label = art!.Label(package);
         var actions = new List<(string Label, Action OnClick)>();
-        if (!IsRepoApp(package))
+        if (!AppTrayLayout.IsRepoApp(package))
         {
             actions.Add(("Move to shelf…", () => ShowShelfPicker(package, label)));
         }
@@ -476,10 +476,6 @@ public class HomeActivity : Activity
         PolicyManager.ApplyCurrentPolicy(this);
         ReloadScene();
     }
-
-    private static bool IsRepoApp(string package) =>
-        package.StartsWith(Codex.Domain.Policy.PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal)
-        && !Codex.Domain.Policy.PolicyContext.FocusPhonePackages.Contains(package);
 
     // A Paper action sheet: a Serif title over left-aligned quiet buttons on a rounded paper card.
     private void ShowPaperMenu(string title, IReadOnlyList<(string Label, Action OnClick)> actions)
