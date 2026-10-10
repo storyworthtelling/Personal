@@ -168,52 +168,70 @@ public partial class MainPage : LedgerBinderPage
 
     protected override async void OnAppearing()
     {
-        base.OnAppearing();
-        isAppearing = true;
-        if (Window is not null)
+        try
         {
-            Window.Resumed -= OnWindowResumed;
-            Window.Resumed += OnWindowResumed;
-        }
+            base.OnAppearing();
+            isAppearing = true;
+            if (Window is not null)
+            {
+                Window.Resumed -= OnWindowResumed;
+                Window.Resumed += OnWindowResumed;
+            }
 
-        // Release I (D09/D29): her install never talks to Plaid or the local EF database at all — it
-        // renders read-only from the household snapshot the owner's install published. Every other
-        // install keeps the exact ReloadAsync() path below, untouched.
-        var household = await HouseholdPages.LoadAsync(roles, householdReader);
-        if (household.IsHers)
+            // Release I (D09/D29): her install never talks to Plaid or the local EF database at all — it
+            // renders read-only from the household snapshot the owner's install published. Every other
+            // install keeps the exact ReloadAsync() path below, untouched.
+            var household = await HouseholdPages.LoadAsync(roles, householdReader);
+            if (household.IsHers)
+            {
+                // Her Accounts has no primary action: the "Add an account" bar the constructor pinned
+                // opens the Plaid chooser, which her install must never reach.
+                SetBar();
+                firstRunShowing = household.Snapshot is null || household.Snapshot.Institutions.Count == 0;
+                if (household.Snapshot is not null)
+                {
+                    RenderFromHouseholdSnapshot(household.Snapshot);
+                }
+                else if (household.FileIsNewer)
+                {
+                    // A file this build cannot read is said so plainly, not shown as an empty phone.
+                    statusLabel.Text = string.Empty;
+                    bodyHost.Content = HouseholdPages.NewerFileNotice();
+                }
+                else
+                {
+                    // Her side, but the household file cannot be read right now (offline, or nothing
+                    // published yet): the same quiet empty state as an empty snapshot — never the owner's
+                    // path against her empty local database, which would offer to add an account.
+                    statusLabel.Text = string.Empty;
+                    bodyHost.Content = EmptyState(
+                        "Nothing connected yet.", "Nothing has come over from the other phone yet.");
+                }
+                _ = ShowVoiceAsync(isHers: true, household.Snapshot?.SnowballHistory);
+                return;
+            }
+
+            SetBar(primaryBarButton);
+            // The cached balances first: the page is never blank while Plaid is asked (D149).
+            await ReloadAsync();
+            StartRefreshOnOpen();
+            _ = ShowVoiceAsync(isHers: false, hersHistory: null);
+        }
+        catch (Exception ex)
         {
-            // Her Accounts has no primary action: the "Add an account" bar the constructor pinned
-            // opens the Plaid chooser, which her install must never reach.
-            SetBar();
-            firstRunShowing = household.Snapshot is null || household.Snapshot.Institutions.Count == 0;
-            if (household.Snapshot is not null)
-            {
-                RenderFromHouseholdSnapshot(household.Snapshot);
-            }
-            else if (household.FileIsNewer)
-            {
-                // A file this build cannot read is said so plainly, not shown as an empty phone.
-                statusLabel.Text = string.Empty;
-                bodyHost.Content = HouseholdPages.NewerFileNotice();
-            }
-            else
-            {
-                // Her side, but the household file cannot be read right now (offline, or nothing
-                // published yet): the same quiet empty state as an empty snapshot — never the owner's
-                // path against her empty local database, which would offer to add an account.
-                statusLabel.Text = string.Empty;
-                bodyHost.Content = EmptyState(
-                    "Nothing connected yet.", "Nothing has come over from the other phone yet.");
-            }
-            _ = ShowVoiceAsync(isHers: true, household.Snapshot?.SnowballHistory);
-            return;
+            ShowLaunchFault(ex);
         }
+    }
 
-        SetBar(primaryBarButton);
-        // The cached balances first: the page is never blank while Plaid is asked (D149).
-        await ReloadAsync();
-        StartRefreshOnOpen();
-        _ = ShowVoiceAsync(isHers: false, hersHistory: null);
+    // A fault while the accounts page opens is shown here, in full, instead of ending the app. It is
+    // recorded as well, so the next launch shows it before the first page. The page stays usable: the
+    // binder and the bar are untouched, and only the body is replaced with the report.
+    private void ShowLaunchFault(Exception ex)
+    {
+        var report = LaunchFaults.Record("Accounts page, OnAppearing", ex);
+        statusLabel.Text = "Accounts could not open. The full report is below.";
+        voiceLabel.IsVisible = false;
+        bodyHost.Content = LaunchFaultPage.ReportView(report);
     }
 
     protected override void OnDisappearing()
