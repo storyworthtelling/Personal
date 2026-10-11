@@ -15,9 +15,12 @@ public static class NearDuplicateCollapser
 {
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(3);
 
+    // Separators Fi puts between its wrapper ("Voicemail from …") and the transcript.
+    private static readonly char[] WrapperSeparators = [':', '—', '–', '-'];
+
     public static IReadOnlyList<TimelineItem> Collapse(IReadOnlyList<TimelineItem> items)
     {
-        var providerTexts = items.Where(IsProviderText).ToList();
+        var providerTexts = items.Where(item => IsProviderText(item) || IsFiVoicemail(item)).ToList();
         var voicemailNotifications = items
             .Where(item => item.Kind == TimelineItemKind.Voicemail && HasPrefix(item, "vm:"))
             .ToList();
@@ -31,6 +34,13 @@ public static class NearDuplicateCollapser
     private static bool IsProviderText(TimelineItem item) =>
         item.Kind == TimelineItemKind.Message && (HasPrefix(item, "sms:") || HasPrefix(item, "mms:"));
 
+    // A Fi voicemail is the transcript SMS, read as a voicemail (FiVoicemail.TryParse). It is
+    // the provider's record of that message, so it shadows the notification copy the same way
+    // a provider text does — but its snippet is only the transcript, not the wrapped body the
+    // notification shows, so the text must end with it rather than equal it.
+    private static bool IsFiVoicemail(TimelineItem item) =>
+        item.Kind == TimelineItemKind.Voicemail && HasPrefix(item, "fivm:");
+
     private static bool IsShadowedNotificationText(TimelineItem item, List<TimelineItem> providerTexts)
     {
         if (item.Kind != TimelineItemKind.Message || IsProviderText(item))
@@ -39,7 +49,7 @@ public static class NearDuplicateCollapser
         }
         return providerTexts.Any(provider =>
             provider.Incoming == item.Incoming
-            && SnippetsMatch(provider, item)
+            && (IsFiVoicemail(provider) ? IsWrappedTranscript(item.Snippet, provider.Snippet) : SnippetsMatch(provider, item))
             && WithinWindow(provider, item)
             && KeysCompatible(item, provider));
     }
@@ -59,6 +69,24 @@ public static class NearDuplicateCollapser
 
     private static bool SnippetsMatch(TimelineItem a, TimelineItem b) =>
         (a.Snippet ?? "").Trim() == (b.Snippet ?? "").Trim();
+
+    /// <summary>
+    /// True when <paramref name="notificationText"/> is the wrapped form of
+    /// <paramref name="transcript"/>: the transcript at its end, with a wrapper separator
+    /// directly before it. The separator is what stops a reply like "Oh, hi" from matching a
+    /// transcript of "hi" — a real text has no voicemail wrapper in front of it.
+    /// </summary>
+    private static bool IsWrappedTranscript(string? notificationText, string? transcript)
+    {
+        var text = (notificationText ?? "").Trim();
+        var words = (transcript ?? "").Trim();
+        if (words.Length == 0 || text.Length <= words.Length || !text.EndsWith(words, StringComparison.Ordinal))
+        {
+            return false;
+        }
+        var wrapper = text[..^words.Length].TrimEnd();
+        return wrapper.Length > 0 && WrapperSeparators.Contains(wrapper[^1]);
+    }
 
     private static bool WithinWindow(TimelineItem a, TimelineItem b) =>
         (a.TimestampUtc - b.TimestampUtc).Duration() <= Window;
