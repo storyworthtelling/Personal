@@ -91,9 +91,9 @@ public sealed class ChildPlay
                     host.RunOnUiThread(() => Start(executor, title));
                 }
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
-                services.Diagnostics.Warn("child", $"Play on '{id}' could not reach the hand-off door.", exception);
+                services.Diagnostics.Warn("child", "A child's Play could not reach the hand-off door.", exception);
             }
         });
     }

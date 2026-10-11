@@ -685,7 +685,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
             {
                 await work(cancellationToken);
             }
-            catch (Exception exception) when (exception is not System.OperationCanceledException)
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
             {
                 Services.Diagnostics.Warn("discover", "Discover's background work failed: " + exception.Message, exception);
                 if (failureStatus is not null)
@@ -706,7 +706,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
             {
                 await work(CancellationToken.None);
             }
-            catch (Exception exception) when (exception is not System.OperationCanceledException)
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
                 Services.Diagnostics.Warn("discover", "A stack button's work failed: " + exception.Message, exception);
                 Host.RunOnUiThread(() => Note(failureNote));

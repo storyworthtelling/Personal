@@ -63,7 +63,7 @@ internal sealed class TrailerLookup
             }
             catch (CatalogueLookupException exception)
             {
-                services.Diagnostics.Warn("trailer", $"No trailer lookup for {id} ({exception.Failure}); the Trailer button stays hidden.", exception);
+                services.Diagnostics.Warn("trailer", $"No trailer lookup ({exception.Failure}); the Trailer button stays hidden.", exception);
                 return null;
             }
 
@@ -82,7 +82,7 @@ internal sealed class TrailerLookup
         catch (ArgumentException exception)
         {
             // The source answered with something that is not a video id; forget it so it is asked again.
-            services.Diagnostics.Warn("trailer", $"The trailer id kept for {id} is not a video id; it is forgotten.", exception);
+            services.Diagnostics.Warn("trailer", "A kept trailer id is not a video id; it is forgotten.", exception);
             preferences.Edit()!.Remove(key)!.Apply();
             return null;
         }

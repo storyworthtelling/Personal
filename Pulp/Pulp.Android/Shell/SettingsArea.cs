@@ -235,7 +235,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
     private View DiagnosticsGroup(PulpServices services) =>
         Group(SettingsGroups.Diagnostics, SettingsGroups.DiagnosticsMeta, body =>
         {
-            body.AddView(PaperUi.Secondary(Host, diagnosticsStatus ?? "What went wrong quietly on this phone — ids, never what anyone watched."));
+            body.AddView(PaperUi.Secondary(Host, diagnosticsStatus ?? "What went wrong quietly on this phone — never what anyone watched."));
             body.AddView(PaperUi.SecondaryButton(Host, SettingsGroups.DiagnosticsMeta, () => ExportLog(services)),
                 SettingsViews.Spaced(Host, DesignTokens.Space.X2));
         });

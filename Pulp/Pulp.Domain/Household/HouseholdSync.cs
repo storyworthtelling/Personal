@@ -33,7 +33,10 @@ public enum HouseholdUnreadableReason
 /// <summary>Whether this phone's account owns the household file or has it shared to it (finding §2.7).</summary>
 public enum HouseholdFileRole
 {
-    /// <summary>Not known yet (the vault has not been read). Treated as not the owner: nothing is created.</summary>
+    /// <summary>
+    /// Not known yet: the vault has not been read and no earlier read is remembered for this account
+    /// (<see cref="HouseholdRoleMemory"/>). Nothing is created in Drive, but permissions are the owner's.
+    /// </summary>
     Unknown,
 
     /// <summary>The owner's account: the file lives in its Drive, so it may create it.</summary>
@@ -46,8 +49,11 @@ public enum HouseholdFileRole
 /// <summary>
 /// What a household screen may do on a phone, by whether it owns the file (D166). Both adults manage the
 /// children and the phone's own viewer; the services and adding or removing people stay the owner's. A
-/// role not known yet is not restricted: it is the owner's phone before the vault was read, or a phone
-/// with no vault at all, where there is nobody else to protect the household from.
+/// role nobody has known (<see cref="HouseholdFileRole.Unknown"/>) is not restricted: it is a phone with no
+/// vault at all, which must be able to set its own household up and has nobody else to protect it from.
+/// The window between a cold start and the vault's first read is closed elsewhere — the vault is read at
+/// launch and the last role is remembered per account (<see cref="HouseholdRoleMemory"/>) — so a phone
+/// the household was shared to does not pass through this arm.
 /// </summary>
 public sealed record HouseholdPermissions(
     bool CanEditServices, bool CanAddOrRemoveViewers, bool CanEditChildren, bool CanRenameOwnViewer, string? Note)
@@ -72,12 +78,13 @@ public static class SyncRefresh
 /// <summary>The quiet line a household screen carries about the sync. Plain, never voiced, never a raw error.</summary>
 public static class HouseholdSyncText
 {
-    public static string Line(HouseholdSyncStatus status, DateTimeOffset now)
+    /// <param name="zone">The viewer's zone, which decides what day an old sync falls on; the phone's own when omitted.</param>
+    public static string Line(HouseholdSyncStatus status, DateTimeOffset now, TimeZoneInfo? zone = null)
     {
         ArgumentNullException.ThrowIfNull(status);
         return status.State switch
         {
-            HouseholdSyncState.Synced when status.LastSynced is { } at => "Synced with Drive " + Ago(at, now) + ".",
+            HouseholdSyncState.Synced when status.LastSynced is { } at => "Synced with Drive " + Ago(at, now, zone ?? TimeZoneInfo.Local) + ".",
             HouseholdSyncState.Synced => "Synced with Drive.",
             HouseholdSyncState.Offline => "Drive couldn't be reached. Changes are kept on this phone and go up when it can.",
             HouseholdSyncState.WaitingForShare => "Waiting for the owner to share the household with this account.",
@@ -85,7 +92,9 @@ public static class HouseholdSyncText
         };
     }
 
-    private static string Ago(DateTimeOffset at, DateTimeOffset now)
+    // Minutes and hours are elapsed time; from a day on it is a day, named by the Domain's own day label
+    // in the viewer's zone (a UTC instant just after midnight is still the day before for most of the world).
+    private static string Ago(DateTimeOffset at, DateTimeOffset now, TimeZoneInfo zone)
     {
         var elapsed = now - at;
         if (elapsed < TimeSpan.FromMinutes(1))
@@ -98,9 +107,14 @@ public static class HouseholdSyncText
             return $"{(int)elapsed.TotalMinutes} min ago";
         }
 
-        return elapsed < TimeSpan.FromDays(1)
-            ? $"{(int)elapsed.TotalHours} h ago"
-            : "on " + at.ToString("MMM d", System.Globalization.CultureInfo.InvariantCulture);
+        if (elapsed < TimeSpan.FromDays(1))
+        {
+            return $"{(int)elapsed.TotalHours} h ago";
+        }
+
+        var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, zone).DateTime);
+        var label = Library.RecentDayLabel.For(day, at, now, zone);
+        return label == "Yesterday" ? "yesterday" : "on " + label;
     }
 }
 

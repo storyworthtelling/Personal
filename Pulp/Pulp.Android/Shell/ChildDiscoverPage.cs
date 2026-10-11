@@ -6,6 +6,7 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Pulp.App;
+using Pulp.Components;
 using Pulp.Discover;
 using Pulp.Title;
 using Pulp.Domain.Catalogue;
@@ -241,11 +242,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
             cells,
             cell => host.StartActivity(TitleActivity.For(host, cell.Id)),
             cell => play.ShowCard(cell.Id, cell.Name, cell.Where),
-            (window, url, width) => _ = Task.Run(async () =>
-            {
-                var bitmap = await posters.LoadAsync(url, width, CancellationToken.None);
-                host.RunOnUiThread(() => window.SetArtwork(bitmap));
-            })), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            PosterArt.Loader(host, posters)), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
     }
 
     private void Land(int asked, Action show) =>

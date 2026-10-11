@@ -1,4 +1,5 @@
 using Codex.Ui.Voice;
+using Pulp.Domain.Core;
 using Pulp.Domain.Household;
 using Pulp.Infrastructure.Catalogue;
 using Storyworthtelling.Voice.Secrets;
@@ -36,7 +37,7 @@ public sealed class VaultPulpKeySource : IPulpKeySource
     /// </summary>
     public HouseholdFileRole HouseholdRole => (HouseholdFileRole)Volatile.Read(ref householdRole);
 
-    /// <summary>Reads the vault's Pulp section. Never throws: a phone that cannot reach the vault keeps whatever keys it has.</summary>
+    /// <summary>Reads the vault's Pulp section. Never throws for the vault's sake (a timeout included): a phone that cannot reach the vault keeps whatever keys it has. Only the caller cancelling its own token propagates.</summary>
     public async Task RefreshAsync(CancellationToken cancellationToken)
     {
         if (!VaultPassphraseStore.IsSet || !VoiceGoogleAccount.IsSignedIn)
@@ -58,7 +59,7 @@ public sealed class VaultPulpKeySource : IPulpKeySource
             Volatile.Write(ref keys, result.Vault.Pulp);
             Volatile.Write(ref householdRole, (int)RoleOf(VaultOwnership.Decide(VoiceGoogleAccount.Email, result.Vault)));
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
             // Restore is a convenience; the clients' MissingKey path says what is missing.
             diagnostics.Warn("vault", "Pulp's keys could not be restored from the vault.", exception);

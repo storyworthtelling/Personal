@@ -1,6 +1,9 @@
+using Pulp.Domain.Children;
 using Pulp.Domain.Core;
+using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.People;
+using Pulp.Domain.Settings;
 
 namespace Pulp.Domain.FirstRun;
 
@@ -10,9 +13,49 @@ public sealed record DraftPerson(ViewerId Id, string Name, bool IsChild);
 /// <summary>An add or a remove on the draft: the draft afterwards, and the one sentence when the add was refused.</summary>
 public sealed record DraftEdit(HouseholdDraft Draft, string? Problem);
 
-/// <summary>What saving the draft writes: the viewers, a name record for each, and who was left out as already there.</summary>
+/// <summary>
+/// What saving the draft writes: the viewers, a name record for each, the rules record of each child
+/// (a child with none cannot be built for — the hand-off planner refuses the whole household), and who
+/// was left out as already there.
+/// </summary>
 public sealed record DraftCommit(
-    IReadOnlyList<HouseholdViewer> Viewers, IReadOnlyList<ViewerNameEntry> Names, IReadOnlyList<string> AlreadyThere);
+    IReadOnlyList<HouseholdViewer> Viewers, IReadOnlyList<ViewerNameEntry> Names, IReadOnlyList<ChildRules> ChildRules, IReadOnlyList<string> AlreadyThere);
+
+/// <summary>The household document after the draft is written, and what was written.</summary>
+public sealed record DraftWritten(HouseholdDocument Document, DraftCommit Commit);
+
+/// <summary>
+/// The pure half of writing the first-run people: read the roster as it stands in the document, commit
+/// the draft against it, and put every viewer, name and child's rules into the document in one go —
+/// the caller saves the result as a single edit, so no child is ever on the roster without rules.
+/// </summary>
+public static class HouseholdDraftWrite
+{
+    public static DraftWritten Apply(HouseholdDocument document, HouseholdDraft draft, HlcTimestamp stamp, string writer)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(draft);
+        var view = HouseholdView.Of(document);
+        var viewers = view.Roster?.Viewers ?? [];
+        var commit = draft.Commit(viewers.Select(viewer => viewer.Id), viewers.ToDictionary(viewer => viewer.Id, viewer => view.NameOf(viewer.Id)));
+        foreach (var viewer in commit.Viewers)
+        {
+            document = HouseholdRecords.Put(document, HouseholdMaps.Viewer, viewer, stamp, writer);
+        }
+
+        foreach (var name in commit.Names)
+        {
+            document = HouseholdRecords.Put(document, HouseholdMaps.ViewerName, name, stamp, writer);
+        }
+
+        foreach (var rules in commit.ChildRules)
+        {
+            document = HouseholdRecords.Put(document, HouseholdMaps.ChildRules, rules, stamp, writer);
+        }
+
+        return new DraftWritten(document, commit);
+    }
+}
 
 /// <summary>
 /// The household being set up at first run, before it is written (D142): people added by name with a
@@ -69,6 +112,7 @@ public sealed class HouseholdDraft
         var known = taken.Select(id => namesNow is not null && namesNow.TryGetValue(id, out var name) ? name : ViewerNaming.Display(id)).ToList();
         var viewers = new List<HouseholdViewer>();
         var names = new List<ViewerNameEntry>();
+        var rules = new List<ChildRules>();
         var already = new List<string>();
         foreach (var person in People)
         {
@@ -82,9 +126,13 @@ public sealed class HouseholdDraft
             taken.Add(id);
             viewers.Add(new HouseholdViewer(id, person.IsChild));
             names.Add(new ViewerNameEntry(id, person.Name));
+            if (person.IsChild)
+            {
+                rules.Add(ChildRuleEdits.NewChild(id));
+            }
         }
 
-        return new DraftCommit(viewers, names, already);
+        return new DraftCommit(viewers, names, rules, already);
     }
 }
 

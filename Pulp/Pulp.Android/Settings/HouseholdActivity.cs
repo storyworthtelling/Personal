@@ -39,6 +39,7 @@ public class HouseholdActivity : Activity
     private const string PageTitle = "Household";
     private const string Loading = "Reading the household…";
     private const int MostResults = 8;
+    private const string AddDraftKey = "add";
 
     private readonly CancellationTokenSource lifetime = new();
     private readonly Dictionary<ViewerId, ChildRules> rules = [];
@@ -53,7 +54,11 @@ public class HouseholdActivity : Activity
     private ThisPhoneAnswer phone = new(ThisPhoneStatus.NoRoster, null);
     private ViewerId? editing;
     private int pending;
+    private bool addAsChild;
     private SyncWatch syncWatch = null!;
+    private readonly PageDrafts drafts = new();
+    private bool fieldFocused;
+    private bool syncWaiting;
 
     public static Intent For(Context context)
     {
@@ -66,13 +71,13 @@ public class HouseholdActivity : Activity
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
         services = PulpServices.For(this);
-        syncWatch = new SyncWatch(this, services, Reload);
+        syncWatch = new SyncWatch(this, services, () => Reload(ReloadCause.Sync));
         writes = new LibraryWrites(services, () => RunOnUiThread(() =>
         {
             pending--;
             if (pending == 0)
             {
-                Reload();
+                Reload(ReloadCause.OwnWrites);
             }
         }), "household");
 
@@ -84,7 +89,7 @@ public class HouseholdActivity : Activity
         SetContentView(spread);
 
         ShowStatus(Loading);
-        Reload();
+        Reload(ReloadCause.Opened);
     }
 
     protected override void OnResume()
@@ -107,7 +112,7 @@ public class HouseholdActivity : Activity
 
     // ---- reading ----
 
-    private void Reload()
+    private void Reload(ReloadCause cause)
     {
         var token = lifetime.Token;
         _ = Task.Run(async () =>
@@ -123,6 +128,15 @@ public class HouseholdActivity : Activity
                     {
                         return;
                     }
+
+                    // A sync pass rebuilds nothing under someone who is typing; it runs once they leave the field.
+                    if (ReloadPolicy.ShouldWait(cause, fieldFocused, drafts.Any))
+                    {
+                        syncWaiting = true;
+                        return;
+                    }
+
+                    syncWaiting = false;
 
                     view = read;
                     phone = answer;
@@ -181,7 +195,7 @@ public class HouseholdActivity : Activity
 
         // D166, mockup 09: where the household stands against Drive, and what this phone may change of it.
         var rights = services.Rights;
-        column.AddView(PaperUi.Secondary(this, HouseholdSyncText.Line(services.SyncStatus, DateTimeOffset.UtcNow)), SettingsViews.Spaced(this, DesignTokens.Space.X2));
+        column.AddView(SyncLine.Build(this, services, lifetime.Token), SettingsViews.Spaced(this, DesignTokens.Space.X2));
         if (rights.Note is { } note)
         {
             column.AddView(PaperUi.Secondary(this, note), SettingsViews.Spaced(this, DesignTokens.Space.X1));
@@ -231,14 +245,15 @@ public class HouseholdActivity : Activity
         var editor = new LinearLayout(this) { Orientation = Orientation.Vertical };
         editor.SetPadding(PaperTheme.Dp(this, DesignTokens.Space.X4), 0, 0, PaperTheme.Dp(this, DesignTokens.Space.X3));
 
-        var field = PaperUi.Field(this, "Name");
-        field.Text = name;
+        var draftKey = $"rename:{viewer.Id}";
+        var field = DraftField(draftKey, "Name", name);
         editor.AddView(field);
         editor.AddView(PaperUi.SecondaryButton(this, "Rename", () =>
         {
             if (ViewerNaming.Clean(field.Text) is { } clean && clean != name)
             {
-                Enqueue($"rename {viewer.Id}", token => services.PutAsync(HouseholdMaps.ViewerName, new ViewerNameEntry(viewer.Id, clean), token));
+                drafts.Clear(draftKey);
+                Enqueue($"rename {viewer.Id}", token => RunSteps(PersonEdits.Rename(viewer.Id, clean), token));
             }
         }), SettingsViews.Spaced(this, DesignTokens.Space.X2));
 
@@ -256,10 +271,9 @@ public class HouseholdActivity : Activity
     {
         var form = new LinearLayout(this) { Orientation = Orientation.Vertical };
         form.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X3), 0, 0);
-        var field = PaperUi.Field(this, "Add someone: their name");
+        var field = DraftField(AddDraftKey, "Add someone: their name", string.Empty);
         form.AddView(field);
-        var child = false;
-        form.AddView(SettingsViews.CheckRow(this, "A child", child, picked => child = picked));
+        form.AddView(SettingsViews.CheckRow(this, "A child", addAsChild, picked => addAsChild = picked));
         var refusal = Muted(string.Empty);
         refusal.Visibility = ViewStates.Gone;
         form.AddView(refusal);
@@ -275,20 +289,19 @@ public class HouseholdActivity : Activity
                 return;
             }
 
-            var isChild = child;
+            var isChild = addAsChild;
             Enqueue($"add {name}", async token =>
             {
                 // Minted against the household as it stands when the write lands, not the copy this page read.
                 var now = await services.HouseholdAsync(token);
                 var id = ViewerNaming.Mint(name, now.Roster?.Viewers.Select(viewer => viewer.Id) ?? []);
-                await services.PutAsync(HouseholdMaps.Viewer, new HouseholdViewer(id, isChild), token);
-                await services.PutAsync(HouseholdMaps.ViewerName, new ViewerNameEntry(id, name), token);
-                if (isChild)
-                {
-                    await services.PutAsync(HouseholdMaps.ChildRules, ChildRuleEdits.NewChild(id), token);
-                }
+                await RunSteps(
+                    PersonEdits.Add(new HouseholdViewer(id, isChild), new ViewerNameEntry(id, name), isChild ? ChildRuleEdits.NewChild(id) : null),
+                    token);
             });
             field.Text = string.Empty;
+            drafts.Clear(AddDraftKey);
+            addAsChild = false;
         }));
         return form;
     }
@@ -300,33 +313,17 @@ public class HouseholdActivity : Activity
         {
             var fresh = before ?? ChildRuleEdits.NewChild(viewer.Id);
             rules[viewer.Id] = fresh;
-            Enqueue($"make {viewer.Id} a child", async token =>
-            {
-                await services.PutAsync(HouseholdMaps.Viewer, viewer with { IsChild = true }, token);
-                await services.PutAsync(HouseholdMaps.ChildRules, fresh, token);
-            });
+            Enqueue($"make {viewer.Id} a child", token => RunSteps(PersonEdits.MakeChild(viewer, fresh), token));
             return;
         }
 
         // An adult keeps no rules — a stray rules record would list them as a child in the picker — so
-        // taking the flag off drops the rules, and the dog-ear can put them back (§13).
+        // taking the flag off drops the rules, and the dog-ear can put them back (§13). PersonEdits
+        // decides the order the records are written in.
         rules.Remove(viewer.Id);
-        Enqueue($"make {viewer.Id} an adult", async token =>
-        {
-            await services.PutAsync(HouseholdMaps.Viewer, viewer with { IsChild = false }, token);
-            if (before is not null)
-            {
-                await services.RemoveAsync(HouseholdMaps.ChildRules, before, token);
-            }
-        });
+        Enqueue($"make {viewer.Id} an adult", token => RunSteps(PersonEdits.MakeAdult(viewer, before), token));
         DogEar.Show(this, overlay, HouseholdText.Undo("change", name), () =>
-        {
-            Enqueue($"make {viewer.Id} a child again", async token =>
-            {
-                await services.PutAsync(HouseholdMaps.Viewer, viewer with { IsChild = true }, token);
-                await services.PutAsync(HouseholdMaps.ChildRules, before ?? ChildRuleEdits.NewChild(viewer.Id), token);
-            });
-        });
+            Enqueue($"make {viewer.Id} a child again", token => RunSteps(PersonEdits.MakeChild(viewer, before ?? ChildRuleEdits.NewChild(viewer.Id)), token)));
     }
 
     /// <summary>Undo-first (§13): the person, their name and a child's rules go at once; the dog-ear puts all three back.</summary>
@@ -335,34 +332,17 @@ public class HouseholdActivity : Activity
         var named = view?.NameOf(viewer.Id) == viewer.Id.Value ? null : new ViewerNameEntry(viewer.Id, name);
         var childRules = rules.GetValueOrDefault(viewer.Id);
         editing = null;
-        Enqueue($"remove {viewer.Id}", async token =>
-        {
-            await services.RemoveAsync(HouseholdMaps.Viewer, viewer, token);
-            if (named is not null)
-            {
-                await services.RemoveAsync(HouseholdMaps.ViewerName, named, token);
-            }
-
-            if (childRules is not null)
-            {
-                await services.RemoveAsync(HouseholdMaps.ChildRules, childRules, token);
-            }
-        });
+        Enqueue($"remove {viewer.Id}", token => RunSteps(PersonEdits.Remove(viewer, named, childRules), token));
         DogEar.Show(this, overlay, HouseholdText.RemoveUndo(name), () =>
-            Enqueue($"put {viewer.Id} back", async token =>
-            {
-                await services.PutAsync(HouseholdMaps.Viewer, viewer, token);
-                if (named is not null)
-                {
-                    await services.PutAsync(HouseholdMaps.ViewerName, named, token);
-                }
-
-                if (childRules is not null)
-                {
-                    await services.PutAsync(HouseholdMaps.ChildRules, childRules, token);
-                }
-            }));
+            Enqueue($"put {viewer.Id} back", token => RunSteps(PersonEdits.Add(viewer, named ?? new ViewerNameEntry(viewer.Id, viewer.Id.Value), childRules ?? (viewer.IsChild ? ChildRuleEdits.NewChild(viewer.Id) : null)), token)));
     }
+
+    /// <summary>
+    /// Writes every record of a person's change in ONE household edit (<see cref="PersonEdits.ApplyAll"/>),
+    /// so a sync pass can never land between a child and their rules.
+    /// </summary>
+    private Task RunSteps(PersonEdit edit, CancellationToken token) =>
+        services.EditHouseholdAsync((document, stamp, writer) => PersonEdits.ApplyAll(document, edit, stamp, writer), token);
 
     private void SetThisPhone(ViewerId viewer)
     {
@@ -372,12 +352,12 @@ public class HouseholdActivity : Activity
             {
                 await services.SetThisPhoneAsync(viewer, lifetime.Token);
             }
-            catch (Exception exception) when (exception is not System.OperationCanceledException)
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, lifetime.Token))
             {
-                services.Diagnostics.Warn("household", $"This phone could not be recorded as {viewer}'s.", exception);
+                services.Diagnostics.Warn("household", "This phone could not be recorded as a viewer's.", exception);
             }
 
-            RunOnUiThread(Reload);
+            RunOnUiThread(() => Reload(ReloadCause.OwnWrites));
         });
     }
 
@@ -465,7 +445,7 @@ public class HouseholdActivity : Activity
     private View TitleSearch(ViewerId child, string name)
     {
         var box = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        var field = PaperUi.Field(this, $"Find a title to allow or block for {name}");
+        var field = DraftField($"search:{child}", $"Find a title to allow or block for {name}", string.Empty);
         box.AddView(field);
         box.AddView(PaperUi.SecondaryButton(this, "Find", () => Search(child, field.Text ?? string.Empty)), SettingsViews.Spaced(this, DesignTokens.Space.X2));
 
@@ -569,6 +549,26 @@ public class HouseholdActivity : Activity
         pending++;
         writes.Enqueue(what, write);
         Render();
+    }
+
+    /// <summary>
+    /// A text field whose text outlives the page's rebuilds: what is typed is kept under <paramref name="key"/>
+    /// and put back whenever the views are made again, and focus is tracked so a sync pass can wait.
+    /// </summary>
+    private EditText DraftField(string key, string hint, string fallback)
+    {
+        var field = PaperUi.Field(this, hint);
+        field.Text = drafts.Get(key, fallback);
+        field.TextChanged += (_, _) => drafts.Set(key, field.Text ?? string.Empty);
+        field.FocusChange += (_, args) =>
+        {
+            fieldFocused = args.HasFocus;
+            if (!args.HasFocus && syncWaiting)
+            {
+                Reload(ReloadCause.Opened);
+            }
+        };
+        return field;
     }
 
     private string TitleName(TitleId title) =>

@@ -176,7 +176,7 @@ internal sealed class PlaylistsScreen
                 }
                 catch (Exception exception)
                 {
-                    services.Diagnostics.Warn("playlists", $"Title {id} could not be looked up for its playlist row.", exception);
+                    services.Diagnostics.Warn("playlists", "A title could not be looked up for its playlist row.", exception);
                 }
             }
 
@@ -669,7 +669,7 @@ internal sealed class PlaylistsScreen
             }
             catch (ArgumentException exception)
             {
-                services.Diagnostics.Warn("playlists", $"'{seed.List.Name}' could not seed a playlist.", exception);
+                services.Diagnostics.Warn("playlists", "A playlist could not be seeded.", exception);
                 host.RunOnUiThread(() =>
                 {
                     making = false;

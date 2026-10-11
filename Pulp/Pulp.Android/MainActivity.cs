@@ -6,14 +6,17 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Pulp.App;
+using Pulp.Components;
 using Pulp.Domain;
 using Pulp.Domain.ChildView;
 using Pulp.Domain.Core;
+using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.People;
 using Pulp.Domain.Shell;
 using Pulp.FirstRun;
 using Pulp.Shell;
+using Pulp.Vault;
 
 namespace Pulp;
 
@@ -64,6 +67,9 @@ public class MainActivity : Activity
     private TextView viewerLine = null!;
     private SyncWatch syncWatch = null!;
     private HouseholdView? household;
+    private DateTimeOffset? lastResumeAsk;
+    private DateTimeOffset? syncNoticeSince;
+    private string? syncNoticeHeadline;
 
     private LinearLayout headerSlot = null!;
     private TextView greetingView = null!;
@@ -344,6 +350,7 @@ public class MainActivity : Activity
     /// <summary>The household moved under the screen (a sync pass brought records home, or its status changed): names and the showing area are read again.</summary>
     private void OnHouseholdMoved()
     {
+        ApplySyncNotice();
         ReadNames();
         Active.Resume();
     }
@@ -380,6 +387,33 @@ public class MainActivity : Activity
         }, token);
     }
 
+    /// <summary>
+    /// Lays the sync's notice on the dog-ear when Drive's household file cannot be opened (wrong
+    /// passphrase, damaged, from a newer Pulp), and withdraws it when the cause goes. Keyed by cause, so a
+    /// restated notice replaces itself; its time is when it first appeared, not when it was last restated.
+    /// </summary>
+    private void ApplySyncNotice()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var change = HouseholdSyncNotices.For(PulpServices.For(this).SyncStatus, syncNoticeSince ?? now);
+        if (change.Raise is not { } notice)
+        {
+            syncNoticeSince = null;
+            syncNoticeHeadline = null;
+            PulpNotices.Withdraw(this, Active.Overlay, change.Key);
+            return;
+        }
+
+        if (syncNoticeHeadline != notice.Headline)
+        {
+            syncNoticeSince = now;
+            syncNoticeHeadline = notice.Headline;
+            notice = HouseholdSyncNotices.For(PulpServices.For(this).SyncStatus, now).Raise ?? notice;
+        }
+
+        PulpNotices.Raise(this, Active.Overlay, notice, new PulpNotices.Buttons(OpenVault: () => StartActivity(VaultActivity.For(this))));
+    }
+
     private string NameFor(ViewerId id) => household?.NameOf(id) ?? ViewerNaming.Display(id);
 
     protected override void OnResume()
@@ -387,12 +421,22 @@ public class MainActivity : Activity
         base.OnResume();
         ReadNames();
         syncWatch.Resume();
+
+        // Coming back is a reason to compare with Drive, at most once a minute.
+        var now = DateTimeOffset.UtcNow;
+        if (SyncResumeGate.ShouldAsk(lastResumeAsk, now))
+        {
+            lastResumeAsk = now;
+            PulpServices.For(this).RequestSync();
+        }
+
         foreach (var area in areas)
         {
             area.Resume();
         }
 
         RenderContent();
+        ApplySyncNotice();
     }
 
     protected override void OnPause()

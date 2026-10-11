@@ -144,7 +144,7 @@ public class ServiceActivity : Activity
             }
             catch (Exception exception)
             {
-                services.Diagnostics.Warn("settings", $"The page for service {id} could not read the household.", exception);
+                services.Diagnostics.Warn("settings", "A service page could not read the household.", exception);
                 RunOnUiThread(() => ShowStatus("This service couldn't be read just now."));
             }
         }, token);

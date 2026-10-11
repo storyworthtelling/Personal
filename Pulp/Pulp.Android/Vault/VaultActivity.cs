@@ -11,6 +11,7 @@ using Pulp.Domain.Actions;
 using Pulp.Domain.FirstRun;
 using Pulp.Domain.Shell;
 using Pulp.App;
+using Pulp.Domain.Core;
 using Pulp.Components;
 using Pulp.Shell;
 using Storyworthtelling.Voice.Health;
@@ -201,9 +202,15 @@ public class VaultActivity : Activity
             Paint();
             await RestoreAsync();
         }
-        catch (Exception exception) when (exception is not System.OperationCanceledException)
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, lifetime.Token))
+        {
+            // The page closed mid-sign-in; there is no page left to tell.
+            return;
+        }
+        catch (Exception exception)
         {
             services.Diagnostics.Warn("vault", "Google sign-in did not complete.", exception);
+            ShowStatus(null);
             Raise(VaultOutcomes.SignInFailed(DateTimeOffset.UtcNow));
         }
     }
@@ -249,9 +256,14 @@ public class VaultActivity : Activity
 
             Paint();
         }
-        catch (Exception exception) when (exception is not System.OperationCanceledException)
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, lifetime.Token))
         {
-            // A cancellation is the page closing mid-save, with no page left to tell; anything else folds.
+            // The page closing mid-save leaves no page to tell.
+            return;
+        }
+        catch (Exception exception)
+        {
+            // Anything else — a timeout included — folds into the dog-ear and un-sticks the page.
             services.Diagnostics.Warn("vault", "Saving the Vault page failed.", exception);
             Settle(null, VaultOutcomes.Notice(VaultSaveOutcome.WriteFailed, DateTimeOffset.UtcNow));
         }

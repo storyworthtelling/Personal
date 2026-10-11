@@ -46,10 +46,9 @@ public sealed class PulpServices
 
     private readonly IHouseholdStore household;
     private readonly DriveHouseholdStore sharedHousehold;
-    private readonly HouseholdSyncSchedule schedule = new();
-    private readonly object scheduleGate = new();
+    private readonly HouseholdSyncLoop syncLoop;
     private readonly SemaphoreSlim passGate = new(1, 1);
-    private TaskCompletionSource wakeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private RememberedRole? rememberedRole;
     private HouseholdSyncStatus syncStatus = HouseholdSyncStatus.LocalOnly("The household has not been compared with Drive yet.");
     private readonly LocalInstallStore install;
     private readonly CatalogueCache cache;
@@ -88,13 +87,49 @@ public sealed class PulpServices
         sharedHousehold = new DriveHouseholdStore(
             new DriveTextFile(DriveFactory(account), DriveHouseholdStore.FileName, SharedDriveFileIds.Store),
             () => VaultPassphraseStore.Passphrase,
-            () => HouseholdSync.MayCreateFile(Keys.HouseholdRole));
-        lock (scheduleGate)
-        {
-            schedule.Opened(DateTimeOffset.UtcNow);
-        }
+            () => HouseholdSync.MayCreateFile(HouseholdFileRole));
+        rememberedRole = ReadRememberedRole();
 
-        Task.Run(SyncLoopAsync);
+        // The loop outlives any one pass: a failure is logged and backed off, never fatal (see HouseholdSyncLoop).
+        syncLoop = new HouseholdSyncLoop(
+            RunPassAsync,
+            exception => Diagnostics.Warn("household", "A sync pass failed unexpectedly; the loop carries on and tries again later.", exception),
+            () => DateTimeOffset.UtcNow);
+        syncLoop.Opened();
+        _ = Task.Run(() => syncLoop.RunAsync(CancellationToken.None));
+
+        // The keys and the household role come from the vault, which nothing else reads at a cold start.
+        _ = Task.Run(RefreshAtLaunchAsync);
+    }
+
+    // A damaged install file must not stop Pulp opening; it just means no role is remembered.
+    private RememberedRole? ReadRememberedRole()
+    {
+        try
+        {
+            return install.Load().Role;
+        }
+        catch (HouseholdFormatException exception)
+        {
+            Diagnostics.Warn("household", "The install file could not be read for the remembered household role.", exception);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads the vault once at launch (the role and the keys are empty until it is read), off the UI
+    /// thread. Never throws: a failure is logged and the phone works from what it remembers.
+    /// </summary>
+    private async Task RefreshAtLaunchAsync()
+    {
+        try
+        {
+            await RefreshKeysAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            Diagnostics.Warn("vault", "The vault could not be read at launch; keys and the household role stay as remembered.", exception);
+        }
     }
 
     /// <summary>
@@ -124,10 +159,13 @@ public sealed class PulpServices
     public PulpDiagnostics Diagnostics { get; }
 
     /// <summary>
-    /// Whether this phone's account owns the household file or has it shared to it (D166), as the vault
-    /// last said. Unknown until the vault has been read, which <see cref="HouseholdPermissions"/> does not restrict.
+    /// Whether this phone's account owns the household file or has it shared to it (D166): what the vault
+    /// says now, else the role remembered from its last read for this account
+    /// (<see cref="HouseholdRoleMemory.Effective"/>). Unknown only when neither exists, which
+    /// <see cref="HouseholdPermissions"/> does not restrict and which never creates the file.
     /// </summary>
-    public HouseholdFileRole HouseholdFileRole => Keys.HouseholdRole;
+    public HouseholdFileRole HouseholdFileRole =>
+        HouseholdRoleMemory.Effective(Keys.HouseholdRole, Volatile.Read(ref rememberedRole), VoiceGoogleAccount.Email);
 
     /// <summary>What this phone may change in the household (D166).</summary>
     public HouseholdPermissions Rights => HouseholdPermissions.For(HouseholdFileRole);
@@ -149,6 +187,7 @@ public sealed class PulpServices
     public async Task RefreshKeysAsync(CancellationToken cancellationToken)
     {
         await Keys.RefreshAsync(cancellationToken);
+        RememberRole();
 
         // The vault says whose Drive holds the household, and a passphrase may just have been entered:
         // either can turn a waiting or refused pass into one that lands, so ask for one now.
@@ -157,10 +196,31 @@ public sealed class PulpServices
         {
             await voiceOptions.RefreshAsync(cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
             Diagnostics.Warn("vault", "The shared Claude key could not be read; mood search answers 'no idea' until it can.", exception);
         }
+    }
+
+    // The role the vault just said is kept on this install, under the account it was read for, so the next
+    // cold start has it before the vault is read again.
+    private void RememberRole()
+    {
+        var role = Keys.HouseholdRole;
+        var account = VoiceGoogleAccount.Email;
+        if (role == HouseholdFileRole.Unknown || string.IsNullOrWhiteSpace(account))
+        {
+            return;
+        }
+
+        var remembered = new RememberedRole(role, account);
+        if (Volatile.Read(ref rememberedRole) == remembered)
+        {
+            return;
+        }
+
+        install.SaveRole(role, account);
+        Volatile.Write(ref rememberedRole, remembered);
     }
 
     // ---- the household ----
@@ -202,21 +262,11 @@ public sealed class PulpServices
         DraftCommit? made = null;
         await EditAsync((document, stamp, writer) =>
         {
-            var view = HouseholdView.Of(document);
-            var viewers = view.Roster?.Viewers ?? [];
-            var commit = draft.Commit(viewers.Select(viewer => viewer.Id), viewers.ToDictionary(viewer => viewer.Id, viewer => view.NameOf(viewer.Id)));
-            foreach (var viewer in commit.Viewers)
-            {
-                document = HouseholdRecords.Put(document, HouseholdMaps.Viewer, viewer, stamp, writer);
-            }
-
-            foreach (var name in commit.Names)
-            {
-                document = HouseholdRecords.Put(document, HouseholdMaps.ViewerName, name, stamp, writer);
-            }
-
-            made = commit;
-            return document;
+            // One edit writes the viewers, their names and each child's rules together: a child with no
+            // rules record would make the hand-off planner refuse the whole household.
+            var written = HouseholdDraftWrite.Apply(document, draft, stamp, writer);
+            made = written.Commit;
+            return written.Document;
         }, cancellationToken);
         return made ?? throw new InvalidOperationException("The household edit ran without producing the people it was to add.");
     }
@@ -252,6 +302,14 @@ public sealed class PulpServices
         return EditAsync((document, stamp, writer) => removal.Undo(document, fallback, stamp, writer), cancellationToken);
     }
 
+    /// <summary>
+    /// One edit of the household document as it stands when the write lands, applied whole — for a change
+    /// that touches several records and must never be seen half-done by a sync pass (a child and their
+    /// rules, D12).
+    /// </summary>
+    public Task EditHouseholdAsync(Func<HouseholdDocument, HlcTimestamp, string, HouseholdDocument> edit, CancellationToken cancellationToken) =>
+        EditAsync(edit, cancellationToken);
+
     private async Task EditAsync(Func<HouseholdDocument, HlcTimestamp, string, HouseholdDocument> edit, CancellationToken cancellationToken)
     {
         await householdGate.WaitAsync(cancellationToken);
@@ -271,12 +329,7 @@ public sealed class PulpServices
             householdGate.Release();
         }
 
-        lock (scheduleGate)
-        {
-            schedule.Edited(DateTimeOffset.UtcNow);
-        }
-
-        Wake();
+        syncLoop.Edited();
     }
 
     // ---- the shared household file ----
@@ -292,62 +345,30 @@ public sealed class PulpServices
 
     /// <summary>
     /// Runs a pass now, whatever the schedule was holding — including after an unreadable file, which
-    /// otherwise stops passes until asked (a new passphrase is the usual reason to ask). Never throws
-    /// for Drive's sake; the outcome is in <see cref="SyncStatus"/>.
+    /// otherwise stops passes until asked (a new passphrase is the usual reason to ask). Never throws:
+    /// the outcome is in <see cref="SyncStatus"/>, and a pass that fails for any reason is logged.
     /// </summary>
     public async Task<HouseholdSyncStatus> SyncNowAsync(CancellationToken cancellationToken)
     {
-        lock (scheduleGate)
+        syncLoop.Update(schedule => schedule.Asked(DateTimeOffset.UtcNow));
+        try
         {
-            schedule.Asked(DateTimeOffset.UtcNow);
+            await RunPassAsync(cancellationToken);
+        }
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, cancellationToken))
+        {
+            return SyncStatus;
+        }
+        catch (Exception exception)
+        {
+            Diagnostics.Warn("household", "Sync now failed unexpectedly; the phone keeps its own copy.", exception);
         }
 
-        await RunPassAsync(cancellationToken);
         return SyncStatus;
     }
 
-    private void RequestSync()
-    {
-        lock (scheduleGate)
-        {
-            schedule.Asked(DateTimeOffset.UtcNow);
-        }
-
-        Wake();
-    }
-
-    private void Wake() =>
-        Interlocked.Exchange(ref wakeSignal, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
-
-    /// <summary>The one background loop: sleeps until the schedule's next pass or a wake, then runs it if it is due.</summary>
-    private async Task SyncLoopAsync()
-    {
-        while (true)
-        {
-            var signal = Volatile.Read(ref wakeSignal).Task;
-            DateTimeOffset? due;
-            bool isDue;
-            lock (scheduleGate)
-            {
-                due = schedule.NextDue;
-                isDue = schedule.IsDue(DateTimeOffset.UtcNow);
-            }
-
-            if (isDue)
-            {
-                await RunPassAsync(CancellationToken.None);
-                continue;
-            }
-
-            var wait = due is { } at ? at - DateTimeOffset.UtcNow : Timeout.InfiniteTimeSpan;
-            if (wait != Timeout.InfiniteTimeSpan && wait < TimeSpan.Zero)
-            {
-                wait = TimeSpan.Zero;
-            }
-
-            await Task.WhenAny(signal, Task.Delay(wait));
-        }
-    }
+    /// <summary>Asks the background loop for a pass at once (coming back to the app, a vault just opened). Returns immediately.</summary>
+    public void RequestSync() => syncLoop.Ask();
 
     /// <summary>
     /// One pass (finding §2.7): the phone's file as it stands, published through the Drive store
@@ -361,10 +382,7 @@ public sealed class PulpServices
         await passGate.WaitAsync(cancellationToken);
         try
         {
-            lock (scheduleGate)
-            {
-                schedule.Started(DateTimeOffset.UtcNow);
-            }
+            syncLoop.Update(schedule => schedule.Started(DateTimeOffset.UtcNow));
 
             if (HouseholdSync.Readiness(VaultPassphraseStore.IsSet, VoiceGoogleAccount.IsSignedIn) is { } localOnly)
             {
@@ -375,7 +393,7 @@ public sealed class PulpServices
             var result = await sharedHousehold.PublishAsync(await household.LoadAsync(cancellationToken), cancellationToken);
             var brought = await AdoptAsync(result.Held, cancellationToken);
             var now = DateTimeOffset.UtcNow;
-            lock (scheduleGate)
+            syncLoop.Update(schedule =>
             {
                 switch (result.Outcome)
                 {
@@ -386,7 +404,7 @@ public sealed class PulpServices
                         schedule.Failed(now);
                         break;
                 }
-            }
+            });
 
             var settled = result.Outcome switch
             {
@@ -411,14 +429,11 @@ public sealed class PulpServices
             Diagnostics.Warn("household", "This phone's household file could not be read, so it was not synced: " + exception.Message, exception);
             Block(HouseholdSyncStatus.Unreadable(HouseholdUnreadableReason.Damaged, exception.Message, SyncStatus.LastSynced));
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
-            // Drive unreachable, a token refused, a timeout: the edits wait on the phone and the pass is retried.
+            // Drive unreachable, a token refused, a timeout (a TaskCanceledException is one): the edits wait on the phone and the pass is retried.
             Diagnostics.Warn("household", "Drive could not be reached for the household; this phone keeps working from its own copy and tries again later.", exception);
-            lock (scheduleGate)
-            {
-                schedule.Failed(DateTimeOffset.UtcNow);
-            }
+            syncLoop.Update(schedule => schedule.Failed(DateTimeOffset.UtcNow));
 
             SetStatus(SyncStatus.WentOffline(exception.Message));
         }
@@ -452,11 +467,7 @@ public sealed class PulpServices
 
     private void Block(HouseholdSyncStatus status)
     {
-        lock (scheduleGate)
-        {
-            schedule.Blocked();
-        }
-
+        syncLoop.Update(schedule => schedule.Blocked());
         SetStatus(status);
     }
 
@@ -536,7 +547,7 @@ public sealed class PulpServices
         }
         catch (CatalogueLookupException exception)
         {
-            Diagnostics.Warn("catalogue", $"Title {id} could not be refreshed ({exception.Failure}); the cached copy stands.", exception);
+            Diagnostics.Warn("catalogue", $"A title could not be refreshed ({exception.Failure}); the cached copy stands.", exception);
             return cached?.Title;
         }
 
@@ -609,7 +620,7 @@ public sealed class PulpServices
         var read = cache.Read(id);
         if (read.Status == CacheReadStatus.Unreadable)
         {
-            Diagnostics.Warn("catalogue", read.Problem ?? $"Cached title {id} could not be read.");
+            Diagnostics.Warn("catalogue", read.Problem ?? "A cached title could not be read.");
         }
 
         return read.Entry;
@@ -628,7 +639,7 @@ public sealed class PulpServices
         }
         catch (CatalogueLookupException exception)
         {
-            Diagnostics.Warn("catalogue", $"No rating for {title.Id} ({exception.Failure}); it stays unrated, which hides it from a child (D128).", exception);
+            Diagnostics.Warn("catalogue", $"A title has no rating ({exception.Failure}); it stays unrated, which hides it from a child (D128).", exception);
             return title;
         }
     }
@@ -647,7 +658,7 @@ public sealed class PulpServices
         }
         catch (CatalogueLookupException exception)
         {
-            Diagnostics.Warn("catalogue", $"No air dates for {title.Id} ({exception.Failure}).", exception);
+            Diagnostics.Warn("catalogue", $"A show has no air dates ({exception.Failure}).", exception);
             return title;
         }
     }

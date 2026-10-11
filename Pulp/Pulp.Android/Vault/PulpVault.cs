@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content;
 using Codex.Ui.Voice;
 using Pulp.App;
+using Pulp.Domain.Core;
 using Pulp.Domain.FirstRun;
 using Pulp.Infrastructure.Catalogue;
 using Storyworthtelling.Voice.Secrets;
@@ -56,7 +57,7 @@ internal sealed class PulpVault
         {
             result = await Access().Service.LoadAsync(cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
             services.Diagnostics.Warn("vault", "The vault could not be read from Drive.", exception);
             return VaultRestoreOutcome.Failed;
@@ -111,7 +112,7 @@ internal sealed class PulpVault
                     VaultKeys.Merge(vault.Pulp.YouTubeKey, Typed(PulpCredentialIds.YouTube))),
             }, cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
             // The publish's own read of the vault can throw before it reaches its write (no token, no network).
             services.Diagnostics.Warn("vault", "Pulp's keys could not be published to the vault.", exception);
