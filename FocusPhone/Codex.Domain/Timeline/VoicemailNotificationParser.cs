@@ -36,7 +36,7 @@ public static class VoicemailNotificationParser
             TimelineItemKind.Voicemail,
             contactKey,
             DateTimeOffset.FromUnixTimeMilliseconds(whenMillis),
-            string.IsNullOrWhiteSpace(text) ? "Voicemail" : text,
+            VoicemailTranscript.Extract(text) ?? "Voicemail",
             Incoming: true,
             SourceId: $"vm:{contactKey}:{whenMillis}");
     }
