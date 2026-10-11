@@ -9,6 +9,12 @@ public enum LookupSource
     TvMaze,
     Omdb,
     YouTube,
+
+    /// <summary>MLB's own Stats API (D208).</summary>
+    MlbStats,
+
+    /// <summary>ESPN's public JSON (D208).</summary>
+    Espn,
 }
 
 /// <summary>

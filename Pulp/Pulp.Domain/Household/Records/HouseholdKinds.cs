@@ -49,4 +49,10 @@ public static class HouseholdKinds
 
     /// <summary>The name a viewer goes by (<see cref="ViewerNameEntry"/>); the id stays, so a rename moves no record.</summary>
     public const string ViewerName = "viewer-name";
+
+    /// <summary>The id of the household's Pulp Google calendar (<see cref="PulpCalendarEntry"/>), written by the owner's install.</summary>
+    public const string PulpCalendar = "pulp-calendar";
+
+    /// <summary>One adult following one team (<see cref="Pulp.Domain.Sports.SportsFollow"/>, D60); unfollowing is its tombstone.</summary>
+    public const string SportsFollow = "sports-follow";
 }

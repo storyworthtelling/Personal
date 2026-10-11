@@ -4,6 +4,7 @@ using Pulp.Domain.Core;
 using Pulp.Domain.Friday;
 using Pulp.Domain.Library;
 using Pulp.Domain.People;
+using Pulp.Domain.Sports;
 
 namespace Pulp.Domain.Household.Records;
 
@@ -42,6 +43,8 @@ public sealed class HouseholdView
         dismissals = Gather(HouseholdMaps.ContinueDismissed);
         names = Gather(HouseholdMaps.ViewerName);
         Plans = Gather(HouseholdMaps.ServicePlan);
+        SportsFollows = Gather(HouseholdMaps.SportsFollow);
+        PulpCalendarId = Gather(HouseholdMaps.PulpCalendar).FirstOrDefault()?.CalendarId;
         var picks = Gather(HouseholdMaps.ParentPick);
         var rules = Gather(HouseholdMaps.ChildRules);
         var viewers = Gather(HouseholdMaps.Viewer);
@@ -74,6 +77,9 @@ public sealed class HouseholdView
     /// <summary>Each child's one filter, with the parents' picks read from their own records.</summary>
     public IReadOnlyList<ChildRules> ChildRules { get; }
 
+    /// <summary>The household's Pulp calendar id (D145); null until the owner's install has made it.</summary>
+    public string? PulpCalendarId { get; }
+
     public HomeOverrides HomeOverrides { get; }
 
     public AttestedServices Attested { get; }
@@ -81,6 +87,12 @@ public sealed class HouseholdView
     public IReadOnlyList<ServiceId> Services { get; }
 
     public IReadOnlyList<UnreadableRecord> Unreadable { get; }
+
+    /// <summary>Every adult's followed teams (D60).</summary>
+    public IReadOnlyList<SportsFollow> SportsFollows { get; }
+
+    /// <summary>The teams one adult follows.</summary>
+    public IReadOnlyList<SportsFollow> FollowsOf(ViewerId viewer) => SportsFollows.Where(follow => follow.Viewer == viewer).ToList();
 
     /// <summary>What Settings recorded about each service's plan (D29, D86, D8), had or not.</summary>
     public IReadOnlyList<ServicePlanEntry> Plans { get; }

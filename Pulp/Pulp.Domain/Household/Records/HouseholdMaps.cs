@@ -1,6 +1,7 @@
 using Pulp.Domain.Children;
 using Pulp.Domain.Core;
 using Pulp.Domain.People;
+using Pulp.Domain.Sports;
 
 namespace Pulp.Domain.Household.Records;
 
@@ -63,11 +64,15 @@ public static class HouseholdMaps
 
     public static RecordMap<ViewerNameEntry> ViewerName { get; } = new ViewerNameMap();
 
+    public static RecordMap<PulpCalendarEntry> PulpCalendar { get; } = new PulpCalendarMap();
+
+    public static RecordMap<SportsFollow> SportsFollow { get; } = new SportsFollowMap();
+
     /// <summary>Every map's kind, for the guard that holds them frozen.</summary>
     public static IReadOnlyList<string> Kinds { get; } =
     [
         Watched.Kind, Playlist.Kind, Veto.Kind, ChildStar.Kind, ParentPick.Kind,
         HomeOverride.Kind, ChildRules.Kind, Viewer.Kind, AttestedService.Kind, HouseholdService.Kind,
-        ContinueDismissed.Kind, ServicePlan.Kind, ViewerName.Kind,
+        ContinueDismissed.Kind, ServicePlan.Kind, ViewerName.Kind, SportsFollow.Kind, PulpCalendar.Kind,
     ];
 }
