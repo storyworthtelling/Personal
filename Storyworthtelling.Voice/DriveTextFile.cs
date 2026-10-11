@@ -1,5 +1,6 @@
 using Google;
 using Google.Apis.Drive.v3;
+using Microsoft.Extensions.Logging;
 using DriveData = Google.Apis.Drive.v3.Data;
 
 namespace Storyworthtelling.Voice;
@@ -23,14 +24,19 @@ public sealed class DriveTextFile : IDriveTextFile
     // can MOVE it in Drive without breaking the app. Null keeps the original name-only behaviour.
     private readonly IDriveFileIdStore? fileIdStore;
 
+    // Optional: told, by count and ownership only, when a name search was not clear-cut (DriveFileChooser).
+    private readonly ILogger? logger;
+
     public DriveTextFile(
         Func<CancellationToken, Task<DriveService>> serviceFactory,
         string fileName,
-        IDriveFileIdStore? fileIdStore = null)
+        IDriveFileIdStore? fileIdStore = null,
+        ILogger? logger = null)
     {
         this.serviceFactory = serviceFactory;
         this.fileName = fileName;
         this.fileIdStore = fileIdStore;
+        this.logger = logger;
     }
 
     public async Task<string?> ReadAsync(CancellationToken cancellationToken)
@@ -51,6 +57,9 @@ public sealed class DriveTextFile : IDriveTextFile
         using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
         var id = await FindId(service, cancellationToken);
 
+        // Created only when NO same-name file is visible at all: FindId settles on a shared copy when the
+        // account owns none, so a write never adds a second copy beside a file shared with this account. If
+        // that shared copy is read-only for this account the update below fails loudly rather than forking.
         if (id is null)
         {
             var create = service.Files.Create(new DriveData.File { Name = fileName }, stream, "application/json");
@@ -66,12 +75,7 @@ public sealed class DriveTextFile : IDriveTextFile
             var createdId = create.ResponseBody?.Id;
             if (createdId is null)
             {
-                var lookup = service.Files.List();
-                lookup.Q = $"name='{fileName}' and trashed=false";
-                lookup.Fields = "files(id)";
-                lookup.PageSize = 1;
-                var found = await lookup.ExecuteAsync(cancellationToken);
-                createdId = found.Files is { Count: > 0 } ? found.Files[0].Id : null;
+                createdId = (await SearchByName(service, cancellationToken)).Id;
             }
             if (createdId is not null)
                 fileIdStore?.Set(fileName, createdId);
@@ -92,18 +96,30 @@ public sealed class DriveTextFile : IDriveTextFile
         if (remembered is not null && await StillExists(service, remembered, cancellationToken))
             return remembered;
 
-        // 2) Fall back to the well-known-name search (the original behaviour).
-        var list = service.Files.List();
-        list.Q = $"name='{fileName}' and trashed=false";
-        list.Fields = "files(id)";
-        list.PageSize = 1;
-        var found = await list.ExecuteAsync(cancellationToken);
-        var id = found.Files is { Count: > 0 } ? found.Files[0].Id : null;
+        // 2) Fall back to the well-known-name search, choosing deterministically among same-name copies.
+        var id = (await SearchByName(service, cancellationToken)).Id;
 
         // 3) Capture / re-capture the id so the next resolution skips the search and survives a move.
         if (id is not null)
             fileIdStore?.Set(fileName, id);
         return id;
+    }
+
+    // Every same-name, non-trashed file this account can see, reduced to one by DriveFileChooser's rule
+    // (owned before shared, then most recently modified). The ambiguity is logged by count only.
+    private async Task<DriveFileChoice> SearchByName(DriveService service, CancellationToken cancellationToken)
+    {
+        var list = service.Files.List();
+        list.Q = DriveFileChooser.NameQuery(fileName);
+        list.Fields = DriveFileChooser.ListFields;
+        list.PageSize = DriveFileChooser.ListPageSize;
+        var found = await list.ExecuteAsync(cancellationToken);
+        var choice = DriveFileChooser.Choose(DriveFileChooser.FromDrive(found.Files));
+
+        var notice = DriveFileChooser.Notice(choice);
+        if (notice is not null)
+            logger?.LogWarning("{Notice}", notice);
+        return choice;
     }
 
     // A remembered id is only usable if the file still exists and isn't trashed; otherwise the caller
