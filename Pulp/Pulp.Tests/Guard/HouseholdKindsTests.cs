@@ -30,6 +30,8 @@ public class HouseholdKindsTests
         [nameof(HouseholdKinds.ContinueDismissed)] = "continue-dismissed",
         [nameof(HouseholdKinds.ServicePlan)] = "service-plan",
         [nameof(HouseholdKinds.ViewerName)] = "viewer-name",
+        [nameof(HouseholdKinds.SportsFollow)] = "sports-follow",
+        [nameof(HouseholdKinds.PulpCalendar)] = "pulp-calendar",
     };
 
     private static IReadOnlyDictionary<string, string> Declared() =>

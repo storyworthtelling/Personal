@@ -11,11 +11,13 @@ using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
 using Pulp.Domain.People;
 using Pulp.Domain.Services;
+using Pulp.Domain.Sports;
 using Pulp.Components;
 using Pulp.HandOffs;
 using Pulp.Infrastructure.Catalogue;
 using Pulp.Infrastructure.Discover;
 using Pulp.Infrastructure.Household;
+using Pulp.Infrastructure.Sports;
 using Storyworthtelling.Voice;
 
 namespace Pulp.App;
@@ -56,6 +58,9 @@ public sealed class PulpServices
     private readonly TvMazeClient episodes;
     private readonly OmdbClient ratings;
     private readonly DriveVoiceOptions voiceOptions;
+    private readonly SportsFeeds sportsFeeds;
+    private readonly SpoilerPeeks peeks = new();
+    private FoldMemory foldMemory = FoldMemory.Empty;
     private readonly SemaphoreSlim householdGate = new(1, 1);
 
     private PulpServices(Context context)
@@ -83,6 +88,15 @@ public sealed class PulpServices
         household = new LocalHouseholdStore(files);
         install = new LocalInstallStore(files);
         cache = new CatalogueCache(Path.Combine(cacheRoot, "catalogue"));
+
+        // Sport (D208): MLB's own feed and ESPN's JSON over the one client, counted into Diagnostics only (D261).
+        Sports = RoutedSportsSource.Shipped(http, counter);
+        sportsFeeds = new SportsFeeds(
+            Sports,
+            SportsSourceTable.Default,
+            new SportsCache(Path.Combine(cacheRoot, "sports")),
+            (message, exception) => Diagnostics.Warn("sports", message, exception),
+            () => DateTimeOffset.Now);
 
         sharedHousehold = new DriveHouseholdStore(
             new DriveTextFile(DriveFactory(account), DriveHouseholdStore.FileName, SharedDriveFileIds.Store),
@@ -176,6 +190,15 @@ public sealed class PulpServices
 
     /// <summary>Trailer ids for the title page's player.</summary>
     public YouTubeClient Trailers { get; }
+
+    /// <summary>
+    /// The sports feeds (D208), routed by <see cref="SportsSources"/>. Nothing a screen draws comes from here
+    /// directly: <see cref="SportsAsync"/> hands it held or open sheets, and the contract carries no result (G15).
+    /// </summary>
+    public ISportsSource Sports { get; }
+
+    /// <summary>Which source each league is read from (D208), for Settings → About to print (D140).</summary>
+    public SportsSourceTable SportsSources => SportsSourceTable.Default;
 
     /// <summary>Discover's mood search and the model-made playlist (D104, D171).</summary>
     public IMoodClient Mood { get; }
@@ -614,6 +637,77 @@ public sealed class PulpServices
     /// <summary>The viewer's own playlists and the shared ones (D97, D103).</summary>
     public async Task<IReadOnlyList<HouseholdPlaylist>> PlaylistsAsync(ViewerId viewer, CancellationToken cancellationToken) =>
         (await HouseholdAsync(cancellationToken)).PlaylistsFor(viewer);
+
+    // ---- sport ----
+
+    /// <summary>
+    /// The Sports tab for one viewer from the cache alone — no network — for an instant first paint
+    /// (<see cref="SportsAsync"/> follows). One held or open sheet per followed league, in league order,
+    /// and the fold it starts from; never a raw feed. Drawing a league spends its peek.
+    /// </summary>
+    public async Task<SportsPage> CachedSportsAsync(ViewerId viewer, CancellationToken cancellationToken) =>
+        await SportsPageAsync(viewer, refresh: false, cancellationToken);
+
+    /// <summary>
+    /// <see cref="CachedSportsAsync"/> after the cache has been brought up to date: a league is fetched only
+    /// when <see cref="SportsFreshness"/> says it is due, and one that fails keeps its cached copy (logged to
+    /// Diagnostics, never voiced). Which games are recordings still waiting comes from the viewer's own
+    /// sittings of kind Game (<see cref="RecordedGames"/>).
+    /// </summary>
+    public async Task<SportsPage> SportsAsync(ViewerId viewer, CancellationToken cancellationToken) =>
+        await SportsPageAsync(viewer, refresh: true, cancellationToken);
+
+    private async Task<SportsPage> SportsPageAsync(ViewerId viewer, bool refresh, CancellationToken cancellationToken)
+    {
+        var view = await HouseholdAsync(cancellationToken);
+        var follows = view.SportsFollows;
+        var feeds = await sportsFeeds.FollowedAsync(follows.Where(follow => follow.Viewer == viewer).ToList(), refresh, cancellationToken);
+        return SportsPage.Build(feeds, follows, viewer, view.SittingsOf(viewer), DateTimeOffset.Now, peeks, Volatile.Read(ref foldMemory));
+    }
+
+    /// <summary>The Spoilers tag was tapped on a league's line: the next draw of that league is a peek, once (D183, D242).</summary>
+    public void TapSpoilersTag(LeagueId league) => peeks.Tap(league);
+
+    /// <summary>What the viewer has opened or closed on the Sports tab (D241); the screen reads <see cref="FoldMemory.Choices"/> to keep it.</summary>
+    public FoldMemory SportsFold
+    {
+        get => Volatile.Read(ref foldMemory);
+        set => Volatile.Write(ref foldMemory, value ?? throw new ArgumentNullException(nameof(value)));
+    }
+
+    /// <summary>Every league with its teams, for the "add a team" picker (D67): the cache, else a one-day look. A league that cannot be reached is left out and logged.</summary>
+    public Task<IReadOnlyList<LeagueTeams>> BrowseLeaguesAsync(CancellationToken cancellationToken) =>
+        sportsFeeds.BrowseAsync(cancellationToken);
+
+    /// <summary>Follows a team for one adult; its whole league comes in with it (D60, D67). Following twice is one follow.</summary>
+    public Task FollowTeamAsync(ViewerId viewer, TeamId team, CancellationToken cancellationToken) =>
+        PutAsync(HouseholdMaps.SportsFollow, new SportsFollow(viewer, team), cancellationToken);
+
+    /// <summary>Stops following a team; the follow's tombstone, so the other phone drops it too.</summary>
+    public Task UnfollowTeamAsync(ViewerId viewer, TeamId team, CancellationToken cancellationToken) =>
+        RemoveAsync(HouseholdMaps.SportsFollow, new SportsFollow(viewer, team), cancellationToken);
+
+    /// <summary>
+    /// "Mark watched" / "Mark unwatched" on a game (D55, D278): a manual mark in the viewer's own sittings,
+    /// which is the evidence <see cref="RecordedGames"/> reads. Pulp learns of a game from nothing else yet.
+    /// </summary>
+    public Task MarkGameAsync(ViewerId viewer, GameId game, bool watched, CancellationToken cancellationToken) =>
+        PutAsync(
+            HouseholdMaps.Watched,
+            new WatchedSitting(viewer, new WatchEvent(
+                new TitleId(game.Value), WatchedKind.Game, DateTimeOffset.UtcNow, Service: null,
+                Evidence: watched ? WatchSource.MarkedWatched : WatchSource.MarkedUnwatched)),
+            cancellationToken);
+
+    /// <summary>
+    /// The Calendar's door to the feeds: the followed leagues' schedules for <paramref name="follows"/> (every
+    /// adult's, since the household calendar carries everyone's, D60), brought up to date when
+    /// <paramref name="refresh"/>. Internal on purpose — a fixture built from a feed carries a name, a time and a
+    /// channel, never a standing or a highlight, which is why only <c>SportsFollowing.Fixtures</c> should touch one;
+    /// no screen is handed a feed (<c>SportsScreenGetsOnlySheetsTests</c>).
+    /// </summary>
+    internal Task<IReadOnlyList<LeagueFeed>> FollowedFeedsAsync(IReadOnlyCollection<SportsFollow> follows, bool refresh, CancellationToken cancellationToken) =>
+        sportsFeeds.FollowedAsync(follows, refresh, cancellationToken);
 
     private CachedTitle? ReadCache(TitleId id)
     {
