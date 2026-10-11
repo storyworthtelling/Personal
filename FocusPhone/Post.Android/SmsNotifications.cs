@@ -29,6 +29,18 @@ internal static class SmsNotifications
 
         var address = message.Address;
         var contactKey = address is null ? null : Codex.Domain.Timeline.ContactKeyNormalizer.NormalizeAny(address);
+
+        // A text the owner judged spam is still written to the provider (the record is the
+        // phone's, not Post's to drop), but it must not buzz: the notification is the one
+        // place it would surface outside the Mailbox, which already hides it.
+        var arriving = new Codex.Domain.Timeline.TimelineItem(
+            Codex.Domain.Timeline.TimelineItemKind.Message, contactKey ?? string.Empty,
+            DateTimeOffset.UtcNow, message.Body, Incoming: true, SourceId: string.Empty);
+        if (SpamStore.Load(context).Matches(arriving))
+        {
+            return;
+        }
+
         var displayName = contactKey is null
             ? "Unknown"
             : ContactNameResolver.DisplayName(context, contactKey);

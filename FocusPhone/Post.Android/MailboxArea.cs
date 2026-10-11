@@ -430,7 +430,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             // undo window via the shared delete buffer), merge by resolved person identity,
             // then split off marketing mail into its own bucket, then stamp unread from the
             // per-thread read record.
-            var visible = deleteBuffer.Filter(database.Hidden.Filter(all));
+            var spam = SpamStore.Load(Host);
+            var visible = deleteBuffer.Filter(spam.Filter(database.Hidden.Filter(all))).ToList();
             var (ordinary, marketing) = MailboxSections.SplitMarketing(visible);
             var resolver = ContactAssociations.BuildResolver(Host, database.IdentityLinks);
             var readState = new ReadState(database.ReadState.LoadAll());
@@ -448,7 +449,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             Android.Util.Log.Warn("Post", $"Timeline stores unavailable: {e}");
             PostDiagnostics.LogWarning("Timeline", "Timeline stores unavailable; using plain merge", e);
             var (ordinary, marketing) = MailboxSections.SplitMarketing(
-                deleteBuffer.Filter(live.Concat(priorCache).Concat(page)));
+                deleteBuffer.Filter(SpamStore.Load(Host).Filter(live.Concat(priorCache).Concat(page))));
             merged = new TimelineMerger().Merge(ordinary);
             marketingThreads = new TimelineMerger().Merge(marketing);
         }
@@ -537,9 +538,170 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     private void ShowRowActions(ThreadRow row)
     {
-        ActionCard.Show(Host, Overlay, row.Title, row.Subtitle,
-            new CardAction("File this correspondence", () => FileCorrespondence(row), Lead: true),
-            new CardAction("Delete this correspondence", () => DeleteCorrespondence(row), Destructive: true));
+        var actions = new List<CardAction>();
+
+        // Someone the owner does not know is the only case that asks what to do with them:
+        // save them, or judge them spam. Someone in the book is simply filed or deleted.
+        var book = UnknownSenderBook(row);
+        if (book is not null)
+        {
+            actions.Add(new CardAction("Add to the Rolodex", () => ChooseRolodexEntry(row, book), Lead: true));
+        }
+        else
+        {
+            actions.Add(new CardAction("File this correspondence", () => FileCorrespondence(row), Lead: true));
+        }
+
+        if (book is not null)
+        {
+            actions.Add(new CardAction(
+                "Mark as spam", () => MarkSpam(row), Destructive: true,
+                Detail: "Deletes it, and anything worded like it from this sender."));
+        }
+        actions.Add(new CardAction("Delete this correspondence", () => DeleteCorrespondence(row), Destructive: true));
+
+        ActionCard.Show(Host, Overlay, row.Title, row.Subtitle, [.. actions]);
+    }
+
+    // The address book as it stands, when this correspondence is from someone not in it.
+    // Null means "do not offer the choice": the sender is known, it is a group (which has no
+    // single sender to save), or the book cannot be read, since then Post cannot tell and
+    // should not offer to act on a person it may already know.
+    private IReadOnlyList<ContactPicker.Person>? UnknownSenderBook(ThreadRow row)
+    {
+        if (row.Items.Any(item => item.IsGroup))
+        {
+            return null;
+        }
+
+        IReadOnlyList<ContactPicker.Person> people;
+        try
+        {
+            people = ContactPicker.People(Host);
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            return null;
+        }
+
+        var bookAddresses = people.SelectMany(person => person.Phones.Concat(person.Emails)).ToList();
+        return RolodexMembership.IsKnown(bookAddresses, row.Items.Select(item => item.ContactKey))
+            ? null
+            : people;
+    }
+
+    // Two ways to keep someone: a new contact, named here, or added to one already in the
+    // book. The sender is the correspondence's own key — the one number or address every
+    // item in it came from.
+    private void ChooseRolodexEntry(ThreadRow row, IReadOnlyList<ContactPicker.Person> book)
+    {
+        ActionCard.Show(Host, Overlay, row.Title, "Keep this sender in the Rolodex?",
+            new CardAction(
+                "A new contact", () => AskNewContactName(row), Lead: true,
+                Detail: "Save them under a name you enter."),
+            new CardAction(
+                "An existing contact", () => PickExistingContact(row, book),
+                Detail: "Add them to someone already in the Rolodex."));
+    }
+
+    private void AskNewContactName(ThreadRow row)
+    {
+        var input = PaperUi.Field(Host, "Their name");
+        new AlertDialog.Builder(Host)
+            .SetTitle("New contact")!
+            .SetView(input)!
+            .SetPositiveButton("Save", (_, _) =>
+            {
+                var name = (input.Text ?? string.Empty).Trim();
+                if (name.Length == 0)
+                {
+                    return;
+                }
+
+                try
+                {
+                    ContactPicker.CreateContact(Host, name, row.ContactKey);
+                }
+                catch (Exception e)
+                {
+                    RolodexWriteFailed(e, $"Could not save {name} to the Rolodex.");
+                    return;
+                }
+                ReloadThreads();
+            })!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    private void PickExistingContact(ThreadRow row, IReadOnlyList<ContactPicker.Person> book)
+    {
+        // Only real contacts can take an address; a typed-in entry (Id 0) has no contact behind it.
+        var contacts = book.Where(person => person.Id != 0).ToList();
+        if (contacts.Count == 0)
+        {
+            RolodexWriteFailed(null, "There is no contact to add them to yet. Save them as a new contact instead.");
+            return;
+        }
+
+        new AlertDialog.Builder(Host)
+            .SetTitle("Add to whom?")!
+            .SetItems(contacts.Select(person => person.Name).ToArray(), (_, args) =>
+            {
+                var chosen = contacts[args.Which];
+                try
+                {
+                    ContactPicker.AddAddress(Host, chosen.Id, row.ContactKey);
+                }
+                catch (Exception e)
+                {
+                    RolodexWriteFailed(e, $"Could not add them to {chosen.Name}.");
+                    return;
+                }
+                ReloadThreads();
+            })!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    // A failed save is not a confirmation the owner needs to dismiss: it folds into the
+    // corner and waits, and Diagnostics keeps the detail. The contact provider's exception
+    // text is never put on the page.
+    private void RolodexWriteFailed(Exception? cause, string reason)
+    {
+        var detail = cause switch
+        {
+            null => string.Empty,
+            Java.Lang.SecurityException => " Post does not have permission to write contacts yet.",
+            _ => " Diagnostics has the details.",
+        };
+        if (cause is not null)
+        {
+            PostDiagnostics.LogWarning("Rolodex", reason, cause);
+        }
+        DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
+            "The Rolodex did not change.",
+            reason + detail,
+            PaperTheme.ProblemMark));
+    }
+
+    // Spam is judged, not asked about: the owner has already decided by choosing it. It is
+    // undo-first like every destructive act here — the correspondence goes out of sight at
+    // once, the judgement is recorded at once (so the sender stays hidden if the window is
+    // left to close), and undo takes the judgement back along with the correspondence.
+    private void MarkSpam(ThreadRow row)
+    {
+        var spam = SpamStore.Load(Host);
+        spam.Mark(row.Items);
+        SpamStore.Save(Host, spam);
+
+        ScheduleBulkDelete(row.Items, $"Marked {row.Title} as spam.",
+            () =>
+            {
+                var withdrawn = SpamStore.Load(Host);
+                withdrawn.Unmark(row.Items);
+                SpamStore.Save(Host, withdrawn);
+            },
+            ReloadThreads);
     }
 
     // A correspondence is filed whole: every item in it goes to the archive and every
@@ -587,7 +749,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             return;
         }
 
-        ScheduleBulkDelete(row.Items, $"Deleted {row.Title}.", ReloadThreads);
+        ScheduleBulkDelete(row.Items, $"Deleted {row.Title}.", null, ReloadThreads);
     }
 
     // Brings the cache up to date with the mail account. Success is the refreshed list —
@@ -870,7 +1032,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 using var database = TimelineDatabase.Open(Host);
                 gathered.AddRange(database.Cache.LoadAll());
 
-                var visible = database.Hidden.Filter(gathered);
+                var visible = SpamStore.Load(Host).Filter(database.Hidden.Filter(gathered));
                 var resolver = ContactAssociations.BuildResolver(Host, database.IdentityLinks);
                 thread = new TimelineMerger().Merge(visible, resolver)
                     .FirstOrDefault(candidate => candidate.ContactKey == contactKey);
@@ -1054,7 +1216,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
 
         openSelection.Cancel();
-        ScheduleBulkDelete(items, CountMessage(items.Count, "deleted"), LoadOpenThread);
+        ScheduleBulkDelete(items, CountMessage(items.Count, "deleted"), null, LoadOpenThread);
     }
 
     private static string CountMessage(int count, string verb) => count == 1 ? $"1 {verb}." : $"{count} {verb}.";
@@ -1063,8 +1225,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // whichever view is watching at once via the shared deleteBuffer, and the fold
     // restores the whole batch together rather than one item at a time. Once the window
     // closes, each item is deleted at the source through the same per-kind routing
-    // (CommitDelete) a single-item delete already uses.
-    private void ScheduleBulkDelete(IReadOnlyList<TimelineItem> items, string message, params Action[] refresh)
+    // (CommitDelete) a single-item delete already uses. onUndo takes back anything else the
+    // delete was accompanied by (spam's judgement), before the views refresh.
+    private void ScheduleBulkDelete(
+        IReadOnlyList<TimelineItem> items, string message, Action? onUndo, params Action[] refresh)
     {
         var now = DateTimeOffset.Now;
         var window = TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
@@ -1083,6 +1247,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             {
                 deleteBuffer.Undo(item.Kind, item.SourceId);
             }
+            onUndo?.Invoke();
             foreach (var action in refresh)
             {
                 action();
@@ -1409,7 +1574,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     }
 
     private void DeleteWithUndo(TimelineItem item) =>
-        ScheduleBulkDelete([item], $"Deleted {ChannelWord(item)}.", LoadOpenThread);
+        ScheduleBulkDelete([item], $"Deleted {ChannelWord(item)}.", null, LoadOpenThread);
 
     // Performs the irreversible, channel-specific delete once the undo window closes.
     private void CommitDelete(TimelineItem item)
