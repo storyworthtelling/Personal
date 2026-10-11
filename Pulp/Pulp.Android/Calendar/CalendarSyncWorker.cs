@@ -1,5 +1,6 @@
 using Android.Content;
 using AndroidX.Work;
+using Pulp.App;
 using Pulp.Domain;
 using Pulp.Domain.Calendar;
 using Pulp.Infrastructure.Calendar;
@@ -37,6 +38,11 @@ public class CalendarSyncWorker : Worker
 
     public override Result DoWork()
     {
+        // WorkManager can start the process with no shell, so the hooks are still unset; composing the
+        // services is what sets them. Without this the worker would find them null and report success
+        // having written nothing.
+        PulpServices.For(ApplicationContext);
+
         var feed = CalendarSyncHooks.Feed;
         var calendar = CalendarSyncHooks.Calendar;
         if (feed is null || calendar is null)
