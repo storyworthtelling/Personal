@@ -16,7 +16,8 @@ public static class MusicSettingsStore
     private const string FolderKey = "musicFolderId";
     private const string LearningKey = "listeningGeniusEnabled";
     private const string LastRefreshKey = "tasteLastRefreshUtc";
-    private const string StackSizeKey = "fridayStackSize";
+    private const string FridayMusicKey = "fridayMusicCount";
+    private const string FridayPodcastKey = "fridayPodcastCount";
     private const string TempoGapKey = "tempoGap";
     private const string LastGreetingDateKey = "lastGreetingLocalDate";
 
@@ -44,14 +45,21 @@ public static class MusicSettingsStore
     }
 
     /// <summary>
-    /// How many records the Friday crate holds. Clamped on the way out as well as in,
-    /// so a value written by an older build (or a future one) can never hand the
-    /// worker a stack size the owner could not have chosen.
+    /// How many songs and albums the Friday crate holds. Clamped on the way out as well
+    /// as in, so a value written by a future build can never hand the worker a count
+    /// the owner could not have chosen.
     /// </summary>
-    public static int FridayStackSize
+    public static int FridayMusicCount
     {
-        get => FridayStack.Clamp(Preferences.GetInt(StackSizeKey, FridayStack.Default));
-        set => Preferences.Edit()!.PutInt(StackSizeKey, FridayStack.Clamp(value))!.Apply();
+        get => FridayStack.Clamp(Preferences.GetInt(FridayMusicKey, FridayStack.DefaultMusic));
+        set => Preferences.Edit()!.PutInt(FridayMusicKey, FridayStack.Clamp(value))!.Apply();
+    }
+
+    /// <summary>How many podcast shows the Friday crate holds. Zero is a real setting.</summary>
+    public static int FridayPodcastCount
+    {
+        get => FridayStack.Clamp(Preferences.GetInt(FridayPodcastKey, FridayStack.DefaultPodcasts));
+        set => Preferences.Edit()!.PutInt(FridayPodcastKey, FridayStack.Clamp(value))!.Apply();
     }
 
     /// <summary>

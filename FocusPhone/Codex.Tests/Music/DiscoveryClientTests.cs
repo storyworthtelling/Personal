@@ -10,7 +10,7 @@ namespace Codex.Tests.Music;
 
 public class DiscoveryClientTests
 {
-    private static readonly VoiceOptions Options = new() { ApiKey = "sk-test", Model = "claude-sonnet-4-6" };
+    private static readonly VoiceOptions Options = new() { ApiKey = "sk-test", Model = "claude-sonnet-5-5" };
 
     private static string MessageResponse(string text) =>
         JsonSerializer.Serialize(new { content = new[] { new { type = "text", text } }, stop_reason = "end_turn" });
@@ -40,7 +40,7 @@ public class DiscoveryClientTests
         Assert.Equal(["b", "a"], selection.TrackIds);
 
         var body = handler.RequestBodies.Single();
-        Assert.Contains("claude-sonnet-4-6", body);
+        Assert.Contains("claude-sonnet-5-5", body);
         Assert.Contains("something mellow", body); // the request seed reached the model
         Assert.Contains("Peace Piece", body);      // the catalog digest reached the model
         Assert.Equal("sk-test", handler.Requests.Single().Headers.GetValues("x-api-key").Single());
@@ -53,7 +53,7 @@ public class DiscoveryClientTests
             """Here you go: {"picks":[{"title":"Blue in Green","artist":"Bill Evans","why":"the quiet end of what you play"}]}"""));
 
         var picks = await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, 12, note: null, subscribedShows: [], CancellationToken.None);
+            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: [], CancellationToken.None);
 
         var pick = Assert.Single(picks);
         Assert.Equal("Blue in Green", pick.Title);
@@ -70,7 +70,7 @@ public class DiscoveryClientTests
             """{"picks":[{"title":"So What","artist":"Miles Davis","why":"you would like it"},{"title":"Blue in Green","artist":"Bill Evans","why":"adjacent"}]}"""));
 
         var picks = await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, 12, note: null, subscribedShows: [], CancellationToken.None);
+            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: [], CancellationToken.None);
 
         Assert.Equal("Blue in Green", Assert.Single(picks).Title);
     }
@@ -81,7 +81,7 @@ public class DiscoveryClientTests
         var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse("""{"picks":[]}"""));
 
         await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, 12, note: null, subscribedShows: ["Radiolab"], CancellationToken.None);
+            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: ["Radiolab"], CancellationToken.None);
 
         var body = handler.RequestBodies.Single();
         Assert.Contains("do NOT already have", body);
@@ -96,7 +96,7 @@ public class DiscoveryClientTests
         var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse("no json"));
 
         Assert.Empty(await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, 12, note: null, subscribedShows: [], CancellationToken.None));
+            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: [], CancellationToken.None));
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class DiscoveryClientTests
             """{"picks":[{"title":"Sketches of Spain","artist":"Miles Davis","why":"the whole record","kind":"album"},{"title":"Reply All","artist":"Gimlet","why":"you like tech stories","kind":"podcast"},{"title":"Blue in Green","artist":"Bill Evans","why":"adjacent","kind":"song"}]}"""));
 
         var picks = await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, 12, note: null, subscribedShows: [], CancellationToken.None);
+            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: [], CancellationToken.None);
 
         Assert.Equal(DiscoveryKind.Album, picks.Single(pick => pick.Title == "Sketches of Spain").Kind);
         Assert.Equal(DiscoveryKind.Podcast, picks.Single(pick => pick.Title == "Reply All").Kind);
@@ -122,7 +122,7 @@ public class DiscoveryClientTests
             """{"picks":[{"title":"Blue in Green","artist":"Bill Evans","why":"adjacent","kind":"vinyl"}]}"""));
 
         var pick = Assert.Single(await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, 12, note: null, subscribedShows: [], CancellationToken.None));
+            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: [], CancellationToken.None));
 
         Assert.Equal(DiscoveryKind.Song, pick.Kind);
     }
@@ -134,7 +134,7 @@ public class DiscoveryClientTests
             """{"picks":[{"title":"Radiolab","artist":"","why":"you like this","kind":"podcast"}]}"""));
 
         var picks = await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, 12, note: null, subscribedShows: ["Radiolab"], CancellationToken.None);
+            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: ["Radiolab"], CancellationToken.None);
 
         Assert.Empty(picks);
     }

@@ -76,6 +76,60 @@ public class ShelfComposerTests
     }
 
     [Fact]
+    public void FeaturedApps_AreNotShownOnAnyTrayShelf()
+    {
+        // Post is featured on home, Maps too; the tray still holds them as installed apps.
+        var tray = AppTrayLayout.Build(
+            [new TrayApp(HomeFeatureSet.CommunicationPackage, -1), new TrayApp(HomeFeatureSet.MapsPackage, -1),
+             new TrayApp("com.storyworthtelling.ledger", -1), new TrayApp("com.unknown.mystery", -1)],
+            new Dictionary<string, string>(),
+            CategoryCatalog.Seed());
+
+        var shelves = ShelfComposer.Compose(Home, tray, NoUsage);
+
+        var onTray = shelves.Skip(4).SelectMany(s => s.Entries).Select(e => e.Key).ToList();
+        Assert.DoesNotContain(HomeFeatureSet.CommunicationPackage, onTray);
+        Assert.DoesNotContain(HomeFeatureSet.MapsPackage, onTray);
+        Assert.Contains("com.storyworthtelling.ledger", onTray);
+        Assert.Contains("com.unknown.mystery", onTray);
+    }
+
+    [Fact]
+    public void ReplacingAFeaturedHeadApp_PutsItBackOnTheCodexShelf()
+    {
+        var installed = new[] { new TrayApp(HomeFeatureSet.CommunicationPackage, -1), new TrayApp("com.acme.newmail", -1) };
+        var overrides = new Dictionary<string, string>();
+        var catalog = CategoryCatalog.Seed();
+
+        var featuredAtStart = ShelfComposer.Compose(Home, AppTrayLayout.Build(installed, overrides, catalog), NoUsage);
+        var replaced = Home.Replace(HomeFeatureSet.CommunicationPackage, "com.acme.newmail");
+        var afterReplace = ShelfComposer.Compose(replaced, AppTrayLayout.Build(installed, overrides, catalog), NoUsage);
+
+        // Post is on home at the start, so it is absent from the Codex shelf…
+        Assert.DoesNotContain(HomeFeatureSet.CommunicationPackage,
+            featuredAtStart.Where(s => !s.Home).SelectMany(s => s.Entries).Select(e => e.Key));
+        // …and once replaced it returns to the Codex shelf, while the newcomer leaves it.
+        var codex = Assert.Single(afterReplace, s => !s.Home && s.Face == ShelfFace.CoverOut);
+        Assert.Equal(new[] { HomeFeatureSet.CommunicationPackage }, codex.Entries.Select(e => e.Key));
+        Assert.DoesNotContain("com.acme.newmail", afterReplace.Where(s => !s.Home).SelectMany(s => s.Entries).Select(e => e.Key));
+    }
+
+    [Fact]
+    public void ReplacingAFeaturedCategoryApp_PutsItBackOnItsOriginalShelf()
+    {
+        var installed = new[] { new TrayApp(HomeFeatureSet.MapsPackage, -1), new TrayApp("com.acme.newmail", -1) };
+        // The owner filed Maps on Travel; featuring it must not change that, only hide it from the shelf.
+        var overrides = new Dictionary<string, string> { [HomeFeatureSet.MapsPackage] = CategoryCatalog.Travel };
+        var catalog = CategoryCatalog.Seed();
+
+        var replaced = Home.Replace(HomeFeatureSet.MapsPackage, "com.acme.newmail");
+        var shelves = ShelfComposer.Compose(replaced, AppTrayLayout.Build(installed, overrides, catalog), NoUsage);
+
+        var travel = Assert.Single(shelves, s => s.BookendName == "Travel & Transit");
+        Assert.Equal(new[] { HomeFeatureSet.MapsPackage }, travel.Entries.Select(e => e.Key));
+    }
+
+    [Fact]
     public void SpineSizes_AreRankedAcrossTheWholeTray_ByUsage()
     {
         var usage = new Dictionary<string, long> { ["com.busy"] = 1000, ["com.quiet"] = 0 };

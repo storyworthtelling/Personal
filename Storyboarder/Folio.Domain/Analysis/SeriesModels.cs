@@ -25,7 +25,12 @@ public sealed record SeriesCanon(
 
 // One place THIS book contradicts the prior book's established canon: cited to a chapter of this book, what the
 // prior book established, and what this book says instead.
-public sealed record SeriesBreak(string Chapter, string Established, string Contradiction);
+public sealed record SeriesBreak(string Chapter, string Established, string Contradiction)
+{
+    // A verbatim line from THIS book where the clash is, so the contradiction is written on that line
+    // rather than listed. Empty when the model gave only a chapter.
+    public string Excerpt { get; init; } = string.Empty;
+}
 
 // A prior-book open thread carried forward, and how this book handles it — "Addressed", "Ignored", or
 // "Contradicted" — so a problem spanning books is tracked rather than silently forgotten.

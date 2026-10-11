@@ -70,14 +70,41 @@ public class FilterField : LinearLayout
                 has ? active : idle, DesignTokens.Shape.RadiusInput);
             QueryChanged?.Invoke(query);
         };
+
+        // Leaving the field (or pressing its keyboard action, which drops focus) is the
+        // moment a deferred filter takes effect. The keyboard action is handled here so a
+        // Done press commits the same way a tap elsewhere does.
+        input.FocusChange += (_, e) =>
+        {
+            if (!e.HasFocus)
+            {
+                Committed?.Invoke(Query);
+            }
+        };
+        input.EditorAction += (_, _) => input.ClearFocus();
     }
 
-    /// <summary>Fires on every keystroke — the filtering is live, not on submit.</summary>
+    /// <summary>Fires on every keystroke. Screens that filter live subscribe to this.</summary>
     public event Action<string>? QueryChanged;
+
+    /// <summary>
+    /// Fires when the owner has finished with the field: it lost focus, or its keyboard
+    /// action was pressed. Screens that would rather not re-render on every letter filter
+    /// on this instead, and take the text from <see cref="Query"/> when it fires.
+    /// </summary>
+    public event Action<string>? Committed;
 
     public string Query => input.Text?.Trim() ?? string.Empty;
 
-    public void Clear() => input.Text = string.Empty;
+    /// <summary>
+    /// Empties the field. Clearing is a decision, not an edit in progress, so it commits at
+    /// once rather than waiting for focus to leave.
+    /// </summary>
+    public void Clear()
+    {
+        input.Text = string.Empty;
+        Committed?.Invoke(Query);
+    }
 
     /// <summary>
     /// Restores a query the screen was already holding — after a rebuild the field

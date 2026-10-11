@@ -1134,8 +1134,15 @@ public sealed class ReviewProcessor : IPipelineStep
                     .Select(source => source.FullText)
                     .FirstOrDefaultAsync(cancellationToken);
 
+                var chapters = await db.Chapters
+                    .Where(chapter => chapter.NovelId == novel.Id)
+                    .OrderBy(chapter => chapter.Number)
+                    .Select(chapter => new Folio.Domain.Markup.ChapterSpan(
+                        chapter.Number, chapter.StartOffset, chapter.EndOffset))
+                    .ToListAsync(cancellationToken);
+
                 var pdf = analysisPdfComposer.Compose(
-                    folded, BuildCover(novel, wordCount), scenes, review, manuscript);
+                    folded, BuildCover(novel, wordCount), scenes, review, manuscript, chapters);
                 analysis.PdfPath = imageStore.Save($"{novel.Id}/analysis/book-analysis.pdf", pdf);
                 analysis.PdfStatus = WorkStatus.Completed;
             }
@@ -1622,7 +1629,7 @@ public sealed class ReviewProcessor : IPipelineStep
         var scenes = await db.Scenes
             .Where(s => s.NovelId == novelId)
             .OrderBy(s => s.Number)
-            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath, s.Changed, s.PreviousSceneId })
+            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath, s.Changed, s.PreviousSceneId, s.EndOffset })
             .ToListAsync(cancellationToken);
 
         // The before half of a changed scene's pair (F41). Only for changed scenes: an unchanged one
@@ -1659,7 +1666,11 @@ public sealed class ReviewProcessor : IPipelineStep
 
             evidence.Add(new SceneEvidence(
                 citation, beat?.Purpose ?? string.Empty, beat?.Verdict ?? string.Empty,
-                Read(scene.ImagePath), previous));
+                Read(scene.ImagePath), previous)
+            {
+                // Where the scene ends, so its block is inserted under its own last line.
+                EndOffset = scene.EndOffset,
+            });
         }
         return evidence;
     }

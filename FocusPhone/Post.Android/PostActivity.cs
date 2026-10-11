@@ -424,6 +424,8 @@ public class PostActivity : Activity
         var wanted = new[]
         {
             Manifest.Permission.ReadContacts,
+            // Saving a sender the owner does not know to the Rolodex (Add to the Rolodex).
+            Manifest.Permission.WriteContacts,
             Manifest.Permission.PostNotifications,
             // Placing calls from the Rolodex (ActionCall).
             Manifest.Permission.CallPhone,

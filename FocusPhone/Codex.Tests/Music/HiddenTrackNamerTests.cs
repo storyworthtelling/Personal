@@ -8,7 +8,7 @@ namespace Codex.Tests.Music;
 
 public class HiddenTrackNamerTests
 {
-    private static readonly VoiceOptions Options = new() { ApiKey = "sk-test", Model = "claude-sonnet-4-6" };
+    private static readonly VoiceOptions Options = new() { ApiKey = "sk-test", Model = "claude-sonnet-5-5" };
 
     private static string MessageResponse(string text) =>
         JsonSerializer.Serialize(new { content = new[] { new { type = "text", text } }, stop_reason = "end_turn" });
@@ -37,7 +37,7 @@ public class HiddenTrackNamerTests
         await Client(handler).NameAsync("Abbey Road", "The Beatles", "The End", CancellationToken.None);
 
         var body = handler.RequestBodies.Single();
-        Assert.Contains("claude-sonnet-4-6", body);
+        Assert.Contains("claude-sonnet-5-5", body);
         Assert.Contains("Abbey Road", body);
         Assert.Contains("The Beatles", body);
         Assert.Contains("The End", body);

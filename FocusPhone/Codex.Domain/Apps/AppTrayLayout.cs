@@ -19,7 +19,7 @@ public record TrayModel(
 
 /// <summary>
 /// Builds the tray layout from the allowed apps and the owner's category catalog: the owner's
-/// non-FocusPhone sibling apps stay loose at the root; every other app is placed by the owner's
+/// sibling apps (FocusPhone heads included) stay loose at the root; every other app is placed by the owner's
 /// override, else the curated seed, else Android's declared category — and lands loose when none
 /// of those name a category that still exists in the catalog. Apps in <paramref name="hidden"/> are
 /// left out entirely. Folders come back in the catalog's
@@ -46,14 +46,15 @@ public static class AppTrayLayout
                 continue;
             }
 
-            // The four FocusPhone apps live on the home shelf, never the tray.
-            if (PolicyContext.FocusPhonePackages.Contains(app.PackageName))
+            // The launcher is the shelf itself; it is never one of the books on it.
+            if (app.PackageName == PolicyContext.LauncherPackage)
             {
                 continue;
             }
 
-            // The owner's other apps (Canonizer, Index, Foreword, …) always sit loose at the
-            // root — never foldered — so an override can't move them.
+            // The owner's sibling apps (Post, Score, Plate, Index, Foreword, …) always sit loose
+            // at the root — never foldered — so an override can't move them. Featuring one on home
+            // takes it off this shelf (ShelfComposer), and removing it from home brings it back here.
             if (IsRepoApp(app.PackageName))
             {
                 repoApps.Add(app);
@@ -82,9 +83,13 @@ public static class AppTrayLayout
         return new TrayModel(repoApps, folders, looseApps);
     }
 
-    private static bool IsRepoApp(string packageName) =>
-        packageName.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal)
-        && !PolicyContext.FocusPhonePackages.Contains(packageName);
+    /// <summary>
+    /// True for the owner's own apps (every <c>com.storyworthtelling.*</c> package, FocusPhone heads
+    /// included), which the shelf keeps loose at the root rather than foldered. The launcher itself is
+    /// excluded before this is asked.
+    /// </summary>
+    public static bool IsRepoApp(string packageName) =>
+        packageName.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal);
 
     private static string? ResolveCategoryId(TrayApp app, IReadOnlyDictionary<string, string> overrides)
     {
