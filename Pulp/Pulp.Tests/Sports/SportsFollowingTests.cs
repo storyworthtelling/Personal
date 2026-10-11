@@ -33,6 +33,25 @@ public class SportsFollowingTests
     }
 
     [Fact]
+    public void ABareFeedIdStoredBeforeTeamIdsNamedTheirLeagueMatchesNothingRatherThanEveryLeague()
+    {
+        // D295: an old follow holds the feed's raw id, which several leagues share. It must not over-match.
+        var cfl = new Team(new TeamId("espn:cfl-invented:1"), "Harbor Gulls", string.Empty);
+        var srl = new Team(new TeamId("espn:srl-invented:1"), "Cove Otters", string.Empty);
+        var feeds = new[]
+        {
+            new LeagueFeed(CoastalLeague(), [cfl], [], [], [], null),
+            new LeagueFeed(new League(Southern, "Southern Rules League", "badge://srl", SeasonPhase.RegularSeason, new DateOnly(2026, 9, 1), null), [srl], [], [], [], null),
+        };
+
+        var legacy = new[] { new SportsFollow(Sam, new TeamId("1")) };
+        var current = new[] { new SportsFollow(Sam, cfl.Id) };
+
+        Assert.Empty(SportsFollowing.FollowedLeagues(feeds, legacy, Sam));
+        Assert.Equal([Coastal], SportsFollowing.FollowedLeagues(feeds, current, Sam));
+    }
+
+    [Fact]
     public void FixturesAreTheFollowedTeamsUpcomingGamesWithTheirFollowers()
     {
         var follows = new[] { new SportsFollow(Sam, Gulls.Id), new SportsFollow(Alex, Gulls.Id) };

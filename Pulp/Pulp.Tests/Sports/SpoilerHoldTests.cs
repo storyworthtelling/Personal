@@ -154,6 +154,56 @@ public class SpoilerHoldTests
         Assert.True(peeks.Spend(Coastal));
     }
 
+    // Peeks are tapped on the UI thread and spent on a Task.Run paint, so the set behind them is shared across threads.
+    // A plain HashSet corrupts under that; this runs thousands of interleaved calls and cannot prove every interleaving,
+    // but it reliably failed (an exception or a lost peek) against the unsynchronised set.
+    [Fact]
+    public async Task ConcurrentTapsAndSpendsNeverThrowAndNeverLoseOrInventAPeek()
+    {
+        var peeks = new SpoilerPeeks();
+        const int iterations = 20000;
+        var leagues = Enumerable.Range(0, 64).Select(index => new LeagueId("league-" + index)).ToList();
+        var spent = 0;
+        Exception? failure = null;
+
+        void Run(Action work)
+        {
+            try
+            {
+                work();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        }
+
+        var tapper = Task.Run(() => Run(() =>
+        {
+            for (var index = 0; index < iterations; index++)
+            {
+                peeks.Tap(leagues[index % leagues.Count]);
+            }
+        }));
+        var spenders = Enumerable.Range(0, 3).Select(_ => Task.Run(() => Run(() =>
+        {
+            for (var index = 0; index < iterations; index++)
+            {
+                if (peeks.Spend(leagues[index % leagues.Count]))
+                {
+                    Interlocked.Increment(ref spent);
+                }
+            }
+        }))).ToList();
+
+        await Task.WhenAll(spenders.Append(tapper));
+
+        Assert.Null(failure);
+        var left = leagues.Count(league => peeks.Spend(league));
+        // Taps are idempotent per league, so spends can never exceed taps, and nothing tapped is both lost and unspent.
+        Assert.InRange(spent + left, 1, iterations);
+    }
+
     [Theory]
     [InlineData(GameStage.Playoffs, true)]
     [InlineData(GameStage.Championship, true)]

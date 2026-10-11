@@ -199,6 +199,8 @@ public class HomeActivity : Activity
     protected override void OnResume()
     {
         base.OnResume();
+        // Home coming to the front while a locked hand-off runs is Home pressed: the way out (D288).
+        LockedSessionController.OnHome(this);
         ReloadScene();
         UpdateClock();
         UpdateSetDefaultLauncherButton();
@@ -440,10 +442,11 @@ public class HomeActivity : Activity
     {
         var store = new HomeFeatureStore(this);
         var home = store.Load();
+        var hidden = new HiddenAppsStore(this).Load();
         var actions = home.Packages
             .Select(featured => (art!.Label(featured), (Action)(() =>
             {
-                store.Save(home.Replace(featured, package));
+                store.Save(home.Replace(featured, package, hidden));
                 ReloadScene();
             })))
             .ToList();
