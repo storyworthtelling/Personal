@@ -440,10 +440,11 @@ public class HomeActivity : Activity
     {
         var store = new HomeFeatureStore(this);
         var home = store.Load();
+        var hidden = new HiddenAppsStore(this).Load();
         var actions = home.Packages
             .Select(featured => (art!.Label(featured), (Action)(() =>
             {
-                store.Save(home.Replace(featured, package));
+                store.Save(home.Replace(featured, package, hidden));
                 ReloadScene();
             })))
             .ToList();

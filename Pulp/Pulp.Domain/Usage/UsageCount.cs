@@ -108,10 +108,29 @@ public static class UsageHandOffs
     public static IReadOnlyList<UsageHandOff> From(IEnumerable<WatchedSitting> sittings)
     {
         ArgumentNullException.ThrowIfNull(sittings);
-        return sittings
+        var entries = sittings
             .Where(sitting => sitting.Sitting.Evidence == WatchSource.HandOff && sitting.Sitting.Service is not null)
             .Select(sitting => new UsageHandOff(sitting.Sitting.Service!.Value, sitting.Sitting.At))
             .Distinct()
+            .OrderBy(entry => entry.Service.Value, StringComparer.Ordinal)
+            .ThenBy(entry => entry.At)
             .ToList();
+
+        // Viewers sharing one hand-off are written a moment apart, not on the same tick: openings of one
+        // service within the tolerance are one opening, the earliest of them.
+        var opened = new List<UsageHandOff>();
+        foreach (var entry in entries)
+        {
+            if (opened.Count > 0
+                && opened[^1].Service.Equals(entry.Service)
+                && entry.At - opened[^1].At <= Pulp.Domain.Sessions.SessionRecording.HandOffTolerance)
+            {
+                continue;
+            }
+
+            opened.Add(entry);
+        }
+
+        return opened.OrderBy(entry => entry.At).ThenBy(entry => entry.Service.Value, StringComparer.Ordinal).ToList();
     }
 }

@@ -34,6 +34,13 @@ public sealed record HomeFeatureSet(IReadOnlyList<string> Packages)
     /// outgoing app must currently be featured; if the incoming app is already featured this is
     /// a no-op (a home shelf never holds the same app in two slots).
     /// </summary>
+    public HomeFeatureSet Replace(string existingPackage, string newPackage, HiddenApps hidden)
+    {
+        ArgumentNullException.ThrowIfNull(hidden);
+        // A hidden app is reachable only through Pulp: it never becomes a book on the home shelf.
+        return hidden.Contains(newPackage) ? this : Replace(existingPackage, newPackage);
+    }
+
     public HomeFeatureSet Replace(string existingPackage, string newPackage)
     {
         if (!Packages.Contains(existingPackage))

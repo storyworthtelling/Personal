@@ -17,7 +17,12 @@ namespace Pulp.Hidden;
 /// </summary>
 internal static class HiddenAppsCourier
 {
-    public static void Send(Context context, ServiceCatalogue catalogue, IEnumerable<ServiceId> ticked)
+    /// <summary>
+    /// True when a broadcast was handed to the system. False means none could be sent (the intent could not be
+    /// built or the call threw), so the caller may try again. A broadcast to a Flyleaf that is not installed
+    /// reports success all the same: <c>SendBroadcast</c> cannot say whether anyone received it.
+    /// </summary>
+    public static bool Send(Context context, ServiceCatalogue catalogue, IEnumerable<ServiceId> ticked)
     {
         try
         {
@@ -30,11 +35,13 @@ internal static class HiddenAppsCourier
             }
 
             context.SendBroadcast(intent, HiddenAppsHandOff.Permission);
+            return true;
         }
         catch (Exception e)
         {
             // Dropped on purpose: Flyleaf not being on this phone is the ordinary case on hers.
             Android.Util.Log.Info("Pulp", $"Hidden-apps hand-off to Flyleaf did not land: {e.Message}");
+            return false;
         }
     }
 }

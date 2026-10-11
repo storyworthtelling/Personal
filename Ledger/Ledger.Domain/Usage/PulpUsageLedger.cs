@@ -4,7 +4,7 @@ namespace Index.Domain.Usage;
 
 /// <summary>
 /// Every month Pulp has told Index about, one entry per service and month. Pulp sends a month's running
-/// total each time, so the latest receipt for a service and month replaces the earlier one. Immutable;
+/// total each time, so the latest receipt for a service and month replaces the earlier one; a receipt counting zero removes it. Immutable;
 /// <see cref="Apply"/> returns the next ledger.
 /// </summary>
 public sealed class PulpUsageLedger
@@ -18,7 +18,10 @@ public sealed class PulpUsageLedger
     public PulpUsageLedger Apply(PulpUsageReceipt receipt)
     {
         ArgumentNullException.ThrowIfNull(receipt);
-        var kept = Entries.Where(entry => !Same(entry, receipt)).Append(receipt)
+        // A count of zero is Pulp saying the month's last hand-off was undone: the entry goes rather than
+        // standing as a stale number (and a "never opened" month is no entry at all).
+        var others = Entries.Where(entry => !Same(entry, receipt));
+        var kept = (receipt.Count == 0 ? others : others.Append(receipt))
             .OrderBy(entry => entry.YearMonth, StringComparer.Ordinal)
             .ThenBy(entry => entry.Service, StringComparer.OrdinalIgnoreCase)
             .ToList();

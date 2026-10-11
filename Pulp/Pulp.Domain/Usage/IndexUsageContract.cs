@@ -51,13 +51,41 @@ public sealed record IndexUsagePayload
 
         return payloads;
     }
+
+    /// <summary>
+    /// Only the service-months a write touched, not all history. A touched month with no hand-offs left
+    /// (the only one of the month was undone) is sent as an explicit count of zero, which Index reads as
+    /// removal; <see cref="ForRows"/> drops zero rows and would leave Index showing the stale count.
+    /// Services the catalogue lacks are not sent.
+    /// </summary>
+    public static IReadOnlyList<IndexUsagePayload> ForTouched(
+        IEnumerable<ServiceMonthUsage> rows, IEnumerable<(ServiceId Service, UsageMonth Month)> touched, ServiceCatalogue catalogue)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(touched);
+        ArgumentNullException.ThrowIfNull(catalogue);
+        var known = rows.ToList();
+        var payloads = new List<IndexUsagePayload>();
+        foreach (var (service, month) in touched.Distinct())
+        {
+            if (catalogue.ById(service) is null)
+            {
+                continue;
+            }
+
+            var row = known.FirstOrDefault(candidate => candidate.Service.Equals(service) && candidate.Month == month && candidate.HandOffs > 0);
+            payloads.Add(row is null ? new IndexUsagePayload(service, month, 0, null) : From(row));
+        }
+
+        return payloads;
+    }
 }
 
 /// <summary>
 /// The Pulp to Index usage contract (G16), the Post to Index balance pattern again: an explicit
 /// broadcast naming Index's receiver, guarded by a signature permission Index declares. Index kept
 /// the Ledger package id, so the package below is the same one Post's <c>IndexHandoff</c> names. The
-/// count crosses as exact text. There is no outbox: Index absent is the ordinary case, and Pulp sends
+/// count crosses as exact text; a count of 0 tells Index to drop that month (the only hand-off of it was undone). There is no outbox: Index absent is the ordinary case, and Pulp sends
 /// the month's totals again on the next hand-off. Index's own receiver and manifest are checked
 /// against these literals by content, on both sides' tests.
 /// </summary>

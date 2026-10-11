@@ -27,6 +27,8 @@ internal sealed class PlaybackSessionWatcher
     private readonly Dictionary<string, SessionCallback> watching = new(StringComparer.Ordinal);
     private MediaSessionManager? manager;
     private SessionsChanged? changed;
+    private HiddenApps cachedNamed = HiddenApps.None;
+    private int cachedVersion = -1;
 
     public PlaybackSessionWatcher(Context context, ComponentName listener)
     {
@@ -73,12 +75,26 @@ internal sealed class PlaybackSessionWatcher
         }
 
         watching.Clear();
+        relay.ForgetAll();
         changed = null;
+    }
+
+    /// <summary>The stored set, parsed once and reloaded only when the receiver has written a new one.</summary>
+    private HiddenApps Named()
+    {
+        var current = HiddenAppsStore.Version;
+        if (current != cachedVersion)
+        {
+            cachedNamed = new HiddenAppsStore(context).Load();
+            cachedVersion = current;
+        }
+
+        return cachedNamed;
     }
 
     private void Refresh(IList<MediaController>? controllers)
     {
-        var named = new HiddenAppsStore(context).Load();
+        var named = Named();
         var live = new HashSet<string>(StringComparer.Ordinal);
         foreach (var controller in controllers ?? [])
         {
@@ -89,8 +105,13 @@ internal sealed class PlaybackSessionWatcher
             }
 
             live.Add(package);
-            if (!watching.ContainsKey(package))
+            watching.TryGetValue(package, out var existing);
+            var sameToken = existing is not null && Equals(existing.Token, controller.SessionToken);
+            var decision = PlaybackSessionWatch.Decide(existing is not null, true, sameToken);
+            if (decision != SessionWatch.Keep)
             {
+                // The app recreated its session: the old callback and controller are stale.
+                existing?.Detach();
                 var callback = new SessionCallback(this, controller, package);
                 controller.RegisterCallback(callback);
                 watching[package] = callback;
@@ -114,15 +135,11 @@ internal sealed class PlaybackSessionWatcher
             return;
         }
 
-        var named = new HiddenAppsStore(context).Load();
-        if (relay.Offer(reading, named) is { } toSend)
+        var named = Named();
+        var toSend = closed ? relay.Close(reading, named) : relay.Offer(reading, named);
+        if (toSend is not null)
         {
             Send(toSend);
-        }
-
-        if (closed)
-        {
-            relay.Forget(package);
         }
     }
 
@@ -194,6 +211,8 @@ internal sealed class PlaybackSessionWatcher
             this.package = package;
         }
 
+        public object? Token => controller.SessionToken;
+
         public override void OnPlaybackStateChanged(PlaybackState? state) => owner.Offer(controller, package);
 
         public override void OnMetadataChanged(MediaMetadata? metadata) => owner.Offer(controller, package);
@@ -201,7 +220,10 @@ internal sealed class PlaybackSessionWatcher
         public override void OnSessionDestroyed()
         {
             owner.Offer(controller, package, closed: true);
-            owner.watching.Remove(package);
+            if (owner.watching.TryGetValue(package, out var current) && ReferenceEquals(current, this))
+            {
+                owner.watching.Remove(package);
+            }
         }
 
         /// <summary>The session left the active list without being destroyed: say it stopped.</summary>

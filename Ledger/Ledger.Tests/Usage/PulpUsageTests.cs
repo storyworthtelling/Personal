@@ -91,6 +91,34 @@ public class PulpUsageTests
     }
 
     [Fact]
+    public void AReceiptCountingZeroRemovesThatServiceAndMonthSoAnUndoneHandOffLeavesNoStaleCount()
+    {
+        var ledger = PulpUsageLedger.Empty
+            .Apply(Receipt("streamly", "2026-09", 1, "2026-09-02", "Streamly"))
+            .Apply(Receipt("northstar", "2026-09", 4, "2026-09-05", "Northstar+"))
+            .Apply(Receipt("streamly", "2026-09", 0, null, "Streamly"));
+
+        var kept = Assert.Single(ledger.Entries);
+        Assert.Equal("northstar", kept.Service);
+        Assert.Null(PulpUsageLine.For(ledger, "Streamly", "2026-09", Today));
+    }
+
+    [Fact]
+    public void AZeroReceiptForAMonthNeverSeenIsHarmless()
+    {
+        var ledger = PulpUsageLedger.Empty.Apply(Receipt("streamly", "2026-09", 0, null, "Streamly"));
+
+        Assert.Empty(ledger.Entries);
+    }
+
+    [Fact]
+    public void AZeroCountParsesAsAReceiptNotARefusal()
+    {
+        Assert.True(PulpUsageReceipt.TryParse(key => Extras(count: "0", last: null).GetValueOrDefault(key), out var receipt));
+        Assert.Equal(0, receipt!.Count);
+    }
+
+    [Fact]
     public void TheLedgerRoundTripsThroughItsCodecAndGarbageReadsAsEmpty()
     {
         var ledger = PulpUsageLedger.Empty.Apply(Receipt("streamly", "2026-09", 14, "2026-09-18", "Streamly", "Streamly.com"));

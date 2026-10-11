@@ -184,4 +184,163 @@ public class SessionRecordingTests
     {
         Assert.Empty(SessionRecording.Resolve(Meaning(SessionEventKind.StoppedShort, "com.example.flix"), Catalogue, []));
     }
+
+    // ---- the review's scenarios: a hand-off is one sitting, not a standing claim on the service ----
+
+    private static readonly Dictionary<TitleId, string> Names = new()
+    {
+        [Lantern] = "Lantern Cove",
+        [Orchard] = "Orchard Row",
+    };
+
+    private static string? NameOf(TitleId id) => Names.GetValueOrDefault(id);
+
+    private static SessionMeaning Titled(string? title, SessionEventKind kind, bool ended, double minutes, DateTimeOffset at) =>
+        new(kind, "com.example.flix", title, new SessionObservation(at, TimeSpan.FromMinutes(minutes), TimeSpan.FromMinutes(100), ended));
+
+    [Fact]
+    public void AFilmWatchedToTheEndAfterAShowWasHandedOffIsNotTheShows()
+    {
+        // Lantern Cove (a show) was handed off; the household then opened a different film inside the app.
+        var sittings = new[] { HandOff(Sam, Lantern, Flix, HandedAt) };
+        var meaning = Titled("Orchard Row", SessionEventKind.Ended, ended: true, minutes: 96, at: Stopped);
+
+        Assert.Empty(SessionRecording.Resolve(meaning, Catalogue, sittings, NameOf));
+    }
+
+    [Fact]
+    public void TheRelayedTitleMatchesWhateverCaseOrDecorationTheAppAddsAround()
+    {
+        var sittings = new[] { HandOff(Sam, Lantern, Flix, HandedAt) };
+        var meaning = Titled("LANTERN COVE - S2:E3 \"The Tide\"", SessionEventKind.StoppedShort, ended: false, minutes: 30, at: Stopped);
+
+        Assert.Single(SessionRecording.Resolve(meaning, Catalogue, sittings, NameOf));
+    }
+
+    [Fact]
+    public void ABlankRelayedTitleFallsBackToTheWindowAlone()
+    {
+        var sittings = new[] { HandOff(Sam, Lantern, Flix, HandedAt) };
+        var meaning = Titled(null, SessionEventKind.StoppedShort, ended: false, minutes: 30, at: Stopped);
+
+        Assert.Single(SessionRecording.Resolve(meaning, Catalogue, sittings, NameOf));
+    }
+
+    [Fact]
+    public void AHandOffWhoseNameIsNotKnownFallsBackToTheWindowAlone()
+    {
+        var sittings = new[] { HandOff(Sam, Lantern, Flix, HandedAt) };
+        var meaning = Titled("Anything At All", SessionEventKind.StoppedShort, ended: false, minutes: 30, at: Stopped);
+
+        Assert.Single(SessionRecording.Resolve(meaning, Catalogue, sittings, titleName: id => null));
+    }
+
+    [Fact]
+    public void AHandOffIsSpentOnceTheAppHasMovedToAnotherTitle()
+    {
+        // The title changed 20 minutes after the hand-off; the later stop belongs to the new title.
+        var sittings = new[] { HandOff(Sam, Lantern, Flix, HandedAt) };
+        var changedAt = HandedAt.AddMinutes(20);
+
+        Assert.Empty(SessionRecording.Resolve(
+            Meaning(SessionEventKind.StoppedShort, "com.example.flix"), Catalogue, sittings, titleChangedAt: changedAt));
+    }
+
+    [Fact]
+    public void AHandOffMadeAfterTheTitleChangeIsNotSpent()
+    {
+        var sittings = new[] { HandOff(Sam, Orchard, Flix, HandedAt.AddMinutes(30)) };
+        var changedAt = HandedAt.AddMinutes(20);
+
+        Assert.Single(SessionRecording.Resolve(
+            Meaning(SessionEventKind.StoppedShort, "com.example.flix"), Catalogue, sittings, titleChangedAt: changedAt));
+    }
+
+    [Fact]
+    public void AnEpisodeThatAlreadyEndedSpendsTheHandOffSoTheAutoplayedNextOneIsNotItsTail()
+    {
+        var episode = new EpisodeRef(1, 1);
+        var ended = new WatchedSitting(Sam, new WatchEvent(
+            Lantern, WatchedKind.Show, HandedAt.AddMinutes(44), Flix.Id, episode, WatchSource.Session,
+            TimeSpan.FromMinutes(43), TimeSpan.FromMinutes(44), true));
+        var sittings = new[] { HandOff(Sam, Lantern, Flix, HandedAt, episode), ended };
+
+        // Episode two autoplayed under the same title and the household stopped it ten minutes in.
+        var meaning = Titled("Lantern Cove", SessionEventKind.StoppedShort, ended: false, minutes: 10, at: HandedAt.AddMinutes(60));
+
+        Assert.Empty(SessionRecording.Resolve(meaning, Catalogue, sittings, NameOf));
+    }
+
+    [Fact]
+    public void ASessionThatStoppedShortDoesNotSpendTheHandOffSoALaterStopStillCounts()
+    {
+        var episode = new EpisodeRef(1, 1);
+        var paused = new WatchedSitting(Sam, new WatchEvent(
+            Lantern, WatchedKind.Show, HandedAt.AddMinutes(20), Flix.Id, episode, WatchSource.Session,
+            TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(44), false));
+        var sittings = new[] { HandOff(Sam, Lantern, Flix, HandedAt, episode), paused };
+
+        Assert.Single(SessionRecording.Resolve(
+            Meaning(SessionEventKind.Ended, "com.example.flix", ended: true, minutes: 43, at: HandedAt.AddMinutes(60)), Catalogue, sittings));
+    }
+
+    [Fact]
+    public void TwoViewersHandedOffAMillisecondApartAreOneHandOff()
+    {
+        var sittings = new[]
+        {
+            HandOff(Wren, Orchard, Flix, HandedAt),
+            HandOff(Moss, Orchard, Flix, HandedAt.AddMilliseconds(1)),
+        };
+
+        var written = SessionRecording.Resolve(Meaning(SessionEventKind.StoppedShort, "com.example.flix"), Catalogue, sittings);
+
+        Assert.Equal(2, written.Count);
+    }
+
+    [Fact]
+    public void HandOffsFurtherApartThanTheToleranceAreTwoHandOffs()
+    {
+        var sittings = new[]
+        {
+            HandOff(Wren, Orchard, Flix, HandedAt),
+            HandOff(Moss, Orchard, Flix, HandedAt + SessionRecording.HandOffTolerance + TimeSpan.FromSeconds(1)),
+        };
+
+        var written = SessionRecording.Resolve(Meaning(SessionEventKind.StoppedShort, "com.example.flix"), Catalogue, sittings);
+
+        Assert.Equal(Moss, Assert.Single(written).Viewer);
+    }
+
+    [Fact]
+    public void AnAdultsLaterHandOffTakesNothingFromTheChildAndTheChildGetsNothingFromIt()
+    {
+        var sittings = new[]
+        {
+            HandOff(Wren, Orchard, Flix, HandedAt),
+            HandOff(Sam, Lantern, Flix, HandedAt.AddHours(1)),
+        };
+
+        var written = SessionRecording.Resolve(
+            Meaning(SessionEventKind.StoppedShort, "com.example.flix", at: HandedAt.AddHours(2)), Catalogue, sittings);
+
+        var only = Assert.Single(written);
+        Assert.Equal(Sam, only.Viewer);
+        Assert.Equal(Lantern, only.Sitting.Title);
+    }
+
+    [Fact]
+    public void TheMemoryOfTitleChangesKeepsTheLatestPerPackage()
+    {
+        var memory = new TitleChangeMemory();
+        Assert.Null(memory.LastSeen("com.example.flix"));
+
+        memory.Seen("com.example.flix", HandedAt);
+        memory.Seen("com.example.flix", HandedAt.AddMinutes(5));
+        memory.Seen("com.example.flix", HandedAt.AddMinutes(2));
+        memory.Seen("com.example.sample", HandedAt.AddMinutes(9));
+
+        Assert.Equal(HandedAt.AddMinutes(5), memory.LastSeen("com.example.flix"));
+        Assert.Equal(HandedAt.AddMinutes(9), memory.LastSeen("com.example.sample"));
+    }
 }

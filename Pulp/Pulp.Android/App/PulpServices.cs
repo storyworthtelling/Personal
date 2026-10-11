@@ -73,6 +73,7 @@ public sealed class PulpServices
     private readonly SemaphoreSlim householdGate = new(1, 1);
     private readonly Context appContext;
     private readonly HiddenAppsSendGate hiddenGate = new();
+    private readonly TitleChangeMemory titleChanges = new();
 
     private PulpServices(Context context)
     {
@@ -146,7 +147,8 @@ public sealed class PulpServices
         syncLoop.Opened();
         _ = Task.Run(() => syncLoop.RunAsync(CancellationToken.None));
 
-        // The hidden set goes to Flyleaf once at launch (G17); after that only a changed set is sent.
+        // The hidden set goes to Flyleaf on each cold start (G17) and then only when it changes. A fresh or
+        // unsynced install reads an empty set, which is never sent from a load: only a tick edit may empty it.
         _ = Task.Run(SendHiddenAtLaunchAsync);
 
         // The keys and the household role come from the vault, which nothing else reads at a cold start.
@@ -300,7 +302,7 @@ public sealed class PulpServices
             Diagnostics.Warn("household", record.Reason);
         }
 
-        SendHidden(view.Services);
+        SendHidden(view.Services, HiddenSendCause.Load);
         return view;
     }
 
@@ -333,11 +335,17 @@ public sealed class PulpServices
             if (value is WatchedSitting { Sitting.Evidence: Pulp.Domain.Library.WatchSource.HandOff })
             {
                 var view = HouseholdView.Of(await household.LoadAsync(CancellationToken.None));
-                IndexUsageCourier.Publish(appContext, UsageHandOffs.From(view.AllSittings), ServiceCatalogue.Public);
+                var touched = new List<(ServiceId Service, UsageMonth Month)>();
+                if (value is WatchedSitting { Sitting.Service: { } touchedService } handOff)
+                {
+                    touched.Add((touchedService, UsageMonth.Of(handOff.Sitting.At)));
+                }
+
+                IndexUsageCourier.Publish(appContext, UsageHandOffs.From(view.AllSittings), ServiceCatalogue.Public, touched);
             }
             else if (ReferenceEquals(map, HouseholdMaps.HouseholdService))
             {
-                SendHidden(HouseholdView.Of(await household.LoadAsync(CancellationToken.None)).Services);
+                SendHidden(HouseholdView.Of(await household.LoadAsync(CancellationToken.None)).Services, HiddenSendCause.Edit);
             }
         }
         catch (Exception exception)
@@ -350,7 +358,7 @@ public sealed class PulpServices
     {
         try
         {
-            SendHidden(HouseholdView.Of(await household.LoadAsync(CancellationToken.None)).Services);
+            SendHidden(HouseholdView.Of(await household.LoadAsync(CancellationToken.None)).Services, HiddenSendCause.Load);
         }
         catch (Exception exception)
         {
@@ -358,14 +366,19 @@ public sealed class PulpServices
         }
     }
 
-    /// <summary>Sends Flyleaf the ticked services' apps to hide when that set is not the one last sent in this process; the empty set too.</summary>
-    private void SendHidden(IReadOnlyList<ServiceId> ticked)
+    /// <summary>
+    /// Sends Flyleaf the ticked services' apps to hide when that set is not the one last sent in this process.
+    /// The empty set goes only from an edit (<see cref="HiddenSendCause.Edit"/>), never from a load. A send that
+    /// could not be made is forgotten so the next call tries again. A broadcast to a Flyleaf that is not on the
+    /// phone cannot be detected from here (SendBroadcast reports nothing), so that case is not retried.
+    /// </summary>
+    private void SendHidden(IReadOnlyList<ServiceId> ticked, HiddenSendCause cause)
     {
         try
         {
-            if (hiddenGate.ShouldSend(ticked))
+            if (hiddenGate.ShouldSend(ticked, cause) && !HiddenAppsCourier.Send(appContext, ServiceCatalogue.Public, ticked))
             {
-                HiddenAppsCourier.Send(appContext, ServiceCatalogue.Public, ticked);
+                hiddenGate.Forget();
             }
         }
         catch (Exception exception)
@@ -383,9 +396,9 @@ public sealed class PulpServices
     /// <summary>
     /// Matches a relayed session to the title the household last handed off and keeps it as that viewer's
     /// session evidence. It records an observation and never a verdict: <c>Watched.Decide</c> is the one
-    /// judge. Runs off the receiver's thread and never throws into it.
+    /// judge. The receiver awaits it (holding the broadcast open) off its own thread, and it never throws.
     /// </summary>
-    private void RecordSession(SessionMeaning meaning)
+    private async Task RecordSession(SessionMeaning meaning)
     {
         try
         {
@@ -396,21 +409,29 @@ public sealed class PulpServices
             Diagnostics.Warn("sessions", "A listener for the session kind failed.", exception);
         }
 
-        _ = Task.Run(async () =>
+        try
         {
-            try
+            if (meaning.Kind == SessionEventKind.TitleChanged)
             {
-                var view = HouseholdView.Of(await household.LoadAsync(CancellationToken.None));
-                foreach (var sitting in SessionRecording.Resolve(meaning, Catalogue, view.AllSittings))
-                {
-                    await PutAsync(HouseholdMaps.Watched, sitting, CancellationToken.None);
-                }
+                titleChanges.Seen(meaning.Package, meaning.Observation.At);
             }
-            catch (Exception exception)
+
+            var view = HouseholdView.Of(await household.LoadAsync(CancellationToken.None));
+            var resolved = SessionRecording.Resolve(
+                meaning,
+                Catalogue,
+                view.AllSittings,
+                titleName: id => ReadCache(id)?.Title.Name,
+                titleChangedAt: titleChanges.LastSeen(meaning.Package));
+            foreach (var sitting in resolved)
             {
-                Diagnostics.Warn("sessions", "A playback session could not be recorded as watch evidence.", exception);
+                await PutAsync(HouseholdMaps.Watched, sitting, CancellationToken.None);
             }
-        });
+        }
+        catch (Exception exception)
+        {
+            Diagnostics.Warn("sessions", "A playback session could not be recorded as watch evidence.", exception);
+        }
     }
 
     /// <summary>
