@@ -10,6 +10,7 @@ using Codex.Ui.Voice;
 using Pulp.App;
 using Pulp.Domain.Core;
 using Pulp.Domain.Friday;
+using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Services;
 using Pulp.Domain.Settings;
@@ -107,6 +108,13 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
             }
 
             body.AddView(SettingsViews.Rule(Host, PaperTheme.Hairline));
+            if (!services.Rights.CanEditServices)
+            {
+                // D166: on the phone the household is shared with, services are the owner's to change.
+                body.AddView(PaperUi.Secondary(Host, HouseholdPermissions.OwnerOnlyNote), SettingsViews.Spaced(Host, DesignTokens.Space.X2));
+                return;
+            }
+
             // As drawn: the one action in the group, in the sans semibold and the ink.
             var add = PaperUi.Body(Host, ServiceRowText.AddService);
             add.Typeface = PaperTheme.SansSemibold(Host);
@@ -137,6 +145,9 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
         var names = people.Select(viewer => household.NameOf(viewer.Id)).ToList();
         return Group(SettingsGroups.Household, SettingsGroups.HouseholdMeta(names), body =>
         {
+            // D166, mockup 09: where the household stands against Drive, as a quiet line.
+            body.AddView(PaperUi.Secondary(Host, HouseholdSyncText.Line(PulpServices.For(Host).SyncStatus, DateTimeOffset.UtcNow)),
+                SettingsViews.Spaced(Host, DesignTokens.Space.X1));
             foreach (var viewer in people)
             {
                 var ceiling = household.ChildRules.FirstOrDefault(rules => rules.Child == viewer.Id)?.Ceiling;

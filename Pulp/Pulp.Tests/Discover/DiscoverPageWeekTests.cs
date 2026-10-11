@@ -189,4 +189,39 @@ public class DiscoverPageWeekTests
         Assert.Null(read.Week);
         Assert.False(string.IsNullOrWhiteSpace(read.Problem));
     }
+
+    // ---- a size change waits for Friday (D112, D220) ----
+
+    [Fact]
+    public void AKeptWeekIsKeptMidweekWhateverSizeIsNowChosen()
+    {
+        var dealt = Deal(sizes: new StackSizes(3, 2));
+        var reread = DiscoverPageWeekCodec.Read(DiscoverPageWeekCodec.Write(dealt)).Week!;
+
+        Assert.True(reread.Keeps(Sam, Wednesday.AddDays(1)));
+        Assert.Equal(3, reread.Pile(TitleKind.Film, VetoBook.For(Sam)).Count);
+        Assert.Equal(2, reread.Pile(TitleKind.Show, VetoBook.For(Sam)).Count);
+    }
+
+    [Fact]
+    public void AKeptWeekIsDealtAgainOnlyAtTheNextFridayOrForAnotherViewer()
+    {
+        var dealt = Deal();
+
+        Assert.False(dealt.Keeps(Sam, dealt.Until));
+        Assert.False(dealt.Keeps(Ash, Wednesday));
+        Assert.True(dealt.Keeps(Sam, dealt.Until.AddTicks(-1)));
+    }
+
+    [Fact]
+    public void ABiggerSizeChosenLaterDealsMoreOnlyInTheNextWeek()
+    {
+        var small = Deal(sizes: new StackSizes(1, 1));
+        var next = DiscoverPageWeek.Deal(
+            Sam, Roster, Pool, TasteProfile.Empty, VetoBook.For(Sam), new HashSet<TitleId>(),
+            new StackSizes(3, 2), small.Until, Harbor, [], HomeOverrides.None);
+
+        Assert.Single(small.Pile(TitleKind.Film, VetoBook.For(Sam)));
+        Assert.Equal(3, next.Pile(TitleKind.Film, VetoBook.For(Sam)).Count);
+    }
 }

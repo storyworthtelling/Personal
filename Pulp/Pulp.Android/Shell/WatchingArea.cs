@@ -236,14 +236,14 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
             var title = row.Kind == TitleKind.Film
                 ? await services.TitleAsync(row.Title, tracked: true, opened: false, cancellationToken)
                 : services.CachedCopy(row.Title);
-            var home = ContinueRowText.Home(title, household.Services, household.HomeOverrides);
+            var home = ContinueRowText.Home(title, household.ServicePlans, household.HomeOverrides);
             var serviceName = home is null ? null : services.Catalogue.ById(home.Service)?.Name ?? home.Service.Value;
             read.Add(new WatchingRow(
                 row,
                 title?.Name ?? row.Title.Value,
                 title,
                 ContinueRowText.NextUp(row, title),
-                ContinueRowText.Where(title, household.Services, household.HomeOverrides,
+                ContinueRowText.Where(title, household.ServicePlans, household.HomeOverrides,
                     service => services.Catalogue.ById(service)?.Name ?? service.Value),
                 home,
                 serviceName,

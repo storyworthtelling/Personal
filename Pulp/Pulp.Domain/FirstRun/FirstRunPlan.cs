@@ -30,7 +30,8 @@ public sealed record FirstRunState(
     bool HasRoster,
     ThisPhoneStatus Phone,
     IReadOnlySet<FirstRunStep> Skipped,
-    bool Finished);
+    bool Finished,
+    bool MayAddPeople = true);
 
 /// <summary>
 /// Which step of first run comes next (D142: enter the passphrase; if the household file exists
@@ -51,7 +52,7 @@ public static class FirstRunPlan
             return FirstRunStep.Vault;
         }
 
-        if (!state.HasRoster && !state.Skipped.Contains(FirstRunStep.Household))
+        if (!state.HasRoster && state.MayAddPeople && !state.Skipped.Contains(FirstRunStep.Household))
         {
             return FirstRunStep.Household;
         }
@@ -63,6 +64,17 @@ public static class FirstRunPlan
         }
 
         return FirstRunStep.Done;
+    }
+
+    /// <summary>
+    /// Whether reaching <see cref="FirstRunStep.Done"/> may mark first run finished. The phone the household
+    /// is shared with (D166) adds nobody, so with no household yet it is not finished: the "This phone is"
+    /// step is still to come once the owner's household arrives.
+    /// </summary>
+    public static bool MayFinish(FirstRunState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return state.HasRoster || state.MayAddPeople;
     }
 
     /// <summary>

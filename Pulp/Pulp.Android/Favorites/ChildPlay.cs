@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Widget;
+using Codex.Ui;
 using Pulp.App;
 using Pulp.Components;
 using Pulp.Domain.Actions;
@@ -11,6 +12,7 @@ using Pulp.Domain.Discover;
 using Pulp.Domain.HandOffs;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
+using Pulp.Domain.Settings;
 using Pulp.Domain.Title;
 using Pulp.Library;
 
@@ -96,7 +98,11 @@ public sealed class ChildPlay
         });
     }
 
-    private void Start(Pulp.HandOffs.HandOffExecutor executor, CatalogueTitle title)
+    /// <summary>
+    /// Plays <paramref name="title"/> for the children watching, through the executor as them (G13):
+    /// the title page, which already holds the title, starts here.
+    /// </summary>
+    public void Start(Pulp.HandOffs.HandOffExecutor executor, CatalogueTitle title)
     {
         var facts = DiscoverFacts.For(title, _ => []);
         if (!audience.Shows(facts))
@@ -106,7 +112,7 @@ public sealed class ChildPlay
         }
 
         var at = DateTimeOffset.UtcNow;
-        var home = audience.HomeFor(TitleHomes.Choose(title, household.Services, household.HomeOverrides), facts, services.Catalogue, household.Attested);
+        var home = audience.HomeFor(TitleHomes.Choose(title, household.ServicePlans, household.HomeOverrides), facts, services.Catalogue, household.Attested);
         var sittings = household.SittingsOf(audience.Watching[0]);
         var episode = TitleProgress.ToPlay(title, sittings, at);
         if (home is null || TitleHomes.LinkFor(title, home.Service, episode) is not { } link)
@@ -132,6 +138,20 @@ public sealed class ChildPlay
             var sitting = new WatchedSitting(child, new WatchEvent(title.Id, kind, pending.Evidence.At, pending.Service, episode, WatchSource.HandOff));
             writes.Enqueue("record the child's hand-off", token => services.PutAsync(HouseholdMaps.Watched, sitting, token));
         }
+    }
+
+    /// <summary>The child's star on a title page: starred, it is taken away undo-first (§13); not starred, it is given.</summary>
+    public void ToggleStar(TitleId title, string name)
+    {
+        if (!IsStarred(title))
+        {
+            Star(title);
+            return;
+        }
+
+        var unstarred = ChildFavorites.ToUnstar(audience, household.StarsOf, title);
+        Write("take away the star", unstarred, put: false);
+        DogEar.Show(host, overlay(), HouseholdText.Undo("remove star", name), () => Write("put the star back", unstarred, put: true));
     }
 
     private void Star(TitleId title) =>

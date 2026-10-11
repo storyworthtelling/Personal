@@ -1,3 +1,4 @@
+using Pulp.Domain.People;
 using Pulp.Domain.FirstRun;
 
 namespace Pulp.Tests.FirstRun;

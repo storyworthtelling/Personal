@@ -27,7 +27,7 @@ public static class ChildPicker
             try
             {
                 var view = await services.HouseholdAsync(CancellationToken.None);
-                var choices = ChildPickChoices.For(ChildPickChoices.ChildrenOf(view.Roster), id => id.Value);
+                var choices = ChildPickChoices.For(ChildPickChoices.ChildrenOf(view.Roster), view.NameOf);
                 host.RunOnUiThread(() =>
                 {
                     if (choices.Count == 1)

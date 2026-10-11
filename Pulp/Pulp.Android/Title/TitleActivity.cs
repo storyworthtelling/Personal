@@ -12,9 +12,12 @@ using Pulp.App;
 using Pulp.Components;
 using Pulp.Domain.Actions;
 using Pulp.Domain.Availability;
+using Pulp.Domain.ChildView;
+using Pulp.Favorites;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
 using Pulp.Domain.Discover;
+using Pulp.Domain.Children;
 using Pulp.Domain.HandOffs;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
@@ -47,6 +50,13 @@ namespace Pulp.Title;
 /// intent itself. Success is the service's app opening, and the page repaints with the hand-off
 /// counted when it comes back — no toast. Everything that reads a file or the network runs off the
 /// UI thread, and while the title is being looked up the page says so in one sentence.</para>
+///
+/// <para><b>In a child's view the page is the children's</b> (mockup 06, D161, D23, G13): it reads the
+/// persisted child session (<see cref="ChildViewStore"/>) and never asks whose phone it is. What it
+/// offers is <see cref="TitleAffordances"/>'s — the rating chip, Play and the child's star; a title the
+/// children's filter hides is one quiet sentence, not the page. Play is <see cref="ChildPlay"/>'s: the
+/// hand-off names the children as its audience and one sitting is recorded per child, never the adult's.
+/// The binder draws the child's three areas.</para>
 /// </summary>
 [Activity(Exported = false, Theme = "@style/Theme.FocusPhone.Paper")]
 public class TitleActivity : Activity
@@ -68,6 +78,9 @@ public class TitleActivity : Activity
     private TextView voice = null!;
     private Button trailer = null!;
     private SeasonAccordion accordion = null!;
+    private SyncWatch syncWatch = null!;
+    private ChildViewSession? session;
+    private ChildPlay? childPlay;
 
     private PageState? state;
     private Task writes = Task.CompletedTask;
@@ -94,7 +107,9 @@ public class TitleActivity : Activity
         IReadOnlyList<WatchEvent> Sittings,
         HandOffExecutor? Executor,
         string? PlayBlocked,
-        bool Fresh);
+        bool Fresh,
+        ChildAudience? Audience = null,
+        bool ChildView = false);
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -111,6 +126,14 @@ public class TitleActivity : Activity
 
         id = new TitleId(raw);
         services = PulpServices.For(this);
+        session = new ChildViewStore(this).Load();
+        syncWatch = new SyncWatch(this, services, () =>
+        {
+            if (state is not null)
+            {
+                _ = RefreshHouseholdAsync();
+            }
+        });
         SetContentView(BuildLayout());
         ShowStatus(TitlePageText.Looking);
         _ = LoadAsync();
@@ -119,6 +142,7 @@ public class TitleActivity : Activity
     protected override void OnResume()
     {
         base.OnResume();
+        syncWatch.Resume();
 
         // Back from a service's app or another screen: the sittings may have moved (a hand-off counted,
         // a mark made elsewhere), so the ticks and the Play label are read again.
@@ -126,6 +150,12 @@ public class TitleActivity : Activity
         {
             _ = RefreshHouseholdAsync();
         }
+    }
+
+    protected override void OnPause()
+    {
+        base.OnPause();
+        syncWatch.Pause();
     }
 
     protected override void OnDestroy()
@@ -200,10 +230,12 @@ public class TitleActivity : Activity
         var spread = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         spread.AddView(column, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent) { Weight = 1 });
 
-        // The gutter as drawn, Watching active. A tab opens the shell on the area tapped.
+        // The gutter as drawn, Watching active: all six for an adult, the child's three in a child's view
+        // (D231). A tab opens the shell on the area tapped, and the shell routes it through the session.
         var binder = new BinderTabs(this);
-        binder.SetAreas(PulpAreas.All.Select(Tab), 0);
-        binder.AreaSelected += index => MainActivity.OpenOn(this, index);
+        var shown = ChildViewAreas.For(session);
+        binder.SetAreas(shown.Select(area => Tab(PulpAreas.For(area))), 0);
+        binder.AreaSelected += index => MainActivity.OpenOn(this, shown[index]);
         spread.AddView(binder, new LinearLayout.LayoutParams(PaperTheme.Dp(this, BinderTabs.WidthDp), ViewGroup.LayoutParams.MatchParent));
         return spread;
     }
@@ -262,35 +294,48 @@ public class TitleActivity : Activity
         }
     }
 
-    private sealed record HouseholdRead(HouseholdView? View, ViewerId? Viewer, IReadOnlyList<WatchEvent> Sittings, HandOffExecutor? Executor, string? PlayBlocked);
+    private sealed record HouseholdRead(
+        HouseholdView? View, ViewerId? Viewer, IReadOnlyList<WatchEvent> Sittings, HandOffExecutor? Executor, string? PlayBlocked,
+        ChildAudience? Audience = null, bool ChildView = false);
 
     private async Task<HouseholdRead> ReadHouseholdAsync(CancellationToken token)
     {
         var view = await services.HouseholdAsync(token);
+        var (executor, handOffProblem) = await BuildExecutorAsync(token);
+
+        if (session is { } watching)
+        {
+            // A child is watching: the children's filters are the page's, and nobody's taste or private
+            // lists are asked for. ThisPhone is never consulted (it never answers a child).
+            var resolved = watching.Resolve(view.Roster, view.ChildRules, view.NameOf);
+            var progress = resolved.Audience is { } audience ? view.SittingsOf(audience.Watching[0]) : [];
+            var problem = resolved.Problem ?? (executor is null ? handOffProblem ?? TitlePageText.NoHousehold : null);
+            return new HouseholdRead(view, null, progress, executor, problem, resolved.Audience, ChildView: true);
+        }
+
         var viewer = services.ThisPhoneOf(view).Viewer;
         var sittings = viewer is { } who ? view.SittingsOf(who) : [];
+        var blocked = executor is null ? handOffProblem ?? TitlePageText.NoHousehold : viewer is null ? ThisPhone.UnmatchedSentence : null;
+        return new HouseholdRead(view, viewer, sittings, executor, blocked);
+    }
 
-        HandOffExecutor? executor;
-        string? blocked;
+    private async Task<(HandOffExecutor? Executor, string? Problem)> BuildExecutorAsync(CancellationToken token)
+    {
         try
         {
-            executor = await services.HandOffsAsync(token);
-            blocked = executor is null ? TitlePageText.NoHousehold : viewer is null ? ThisPhone.UnmatchedSentence : null;
+            return (await services.HandOffsAsync(token), null);
         }
         catch (ArgumentException exception)
         {
             // The roster and the child rules disagree; the gate refuses to be built rather than judge a
             // child by nothing, so Play waits and Diagnostics says why.
             services.Diagnostics.Warn("title", "The hand-off gate could not be built from the household.", exception);
-            executor = null;
-            blocked = TitlePageText.HouseholdUnreadable;
+            return (null, TitlePageText.HouseholdUnreadable);
         }
-
-        return new HouseholdRead(view, viewer, sittings, executor, blocked);
     }
 
     private static PageState Compose(CatalogueTitle title, HouseholdRead household, bool fresh) =>
-        new(title, household.View, household.Viewer, household.Sittings, household.Executor, household.PlayBlocked, fresh);
+        new(title, household.View, household.Viewer, household.Sittings, household.Executor, household.PlayBlocked, fresh, household.Audience, household.ChildView);
 
     private async Task RefreshHouseholdAsync()
     {
@@ -325,6 +370,11 @@ public class TitleActivity : Activity
         }
 
         state = next;
+
+        // Rebuilt with every read: it holds the household it was made from, and the star it paints is read from it.
+        childPlay = next is { Audience: { } audience, Household: { } household }
+            ? new ChildPlay(this, () => overlay, services, audience, household, () => _ = RefreshHouseholdAsync())
+            : null;
         Paint();
         AskForExtras(next);
     }
@@ -332,6 +382,13 @@ public class TitleActivity : Activity
     /// <summary>The poster, the trailer and the why-this line: asked once the title is known, each off the UI thread.</summary>
     private void AskForExtras(PageState current)
     {
+        // A title the children cannot see loads nothing of itself: not its poster, not its trailer.
+        var offers = Offers(current);
+        if (!offers.Visible)
+        {
+            return;
+        }
+
         if (current.Title.PosterUrl != posterShown)
         {
             posterShown = current.Title.PosterUrl;
@@ -344,8 +401,12 @@ public class TitleActivity : Activity
         }
 
         extrasAsked = true;
-        _ = LoadTrailerAsync(current.Title);
-        if (current.Viewer is { } viewer)
+        if (offers.Trailer)
+        {
+            _ = LoadTrailerAsync(current.Title);
+        }
+
+        if (offers.WhyThis && current.Viewer is { } viewer)
         {
             _ = LoadVoiceAsync(current.Title, viewer, current.Sittings);
         }
@@ -422,6 +483,36 @@ public class TitleActivity : Activity
     private const int PosterWidthDp = DesignTokens.Space.X24;
     private const int PosterHeightDp = DesignTokens.Space.X24 + DesignTokens.Space.X12;
 
+    /// <summary>What this page offers the people watching: an adult's all of it, a child's the chip, Play and the star.</summary>
+    private TitleAffordances Offers(PageState current)
+    {
+        if (!current.ChildView)
+        {
+            return TitleAffordances.For(null, null);
+        }
+
+        // A child's view whose audience could not be resolved offers nothing, rather than the adult's page.
+        return current.Audience is { } audience
+            ? TitleAffordances.For(audience, DiscoverFacts.For(current.Title, _ => []))
+            : TitleAffordances.Unresolved;
+    }
+
+    /// <summary>
+    /// Where the title plays. For a child, the best home every child may start on, and no list of others
+    /// (they would be "open there instead", an adult's choice).
+    /// </summary>
+    private HomeChoice HomesFor(PageState current)
+    {
+        var homes = TitleHomes.Choose(current.Title, current.Household?.ServicePlans ?? [], current.Household?.HomeOverrides ?? HomeOverrides.None);
+        if (current.Audience is not { } audience || current.Household is not { } household)
+        {
+            return homes;
+        }
+
+        var facts = DiscoverFacts.For(current.Title, _ => []);
+        return new HomeChoice(audience.HomeFor(homes, facts, services.Catalogue, household.Attested), []);
+    }
+
     private void Paint()
     {
         if (state is not { } current)
@@ -430,14 +521,26 @@ public class TitleActivity : Activity
         }
 
         var title = current.Title;
+        var offers = Offers(current);
         pageStatus.Visibility = ViewStates.Gone;
 
         headerSlot.RemoveAllViews();
-        headerSlot.AddView(PaperUi.ScreenHeader(this, title.Name, AreaPalette.For(PulpAreas.RuleHue(PulpArea.Watching)).Rule));
-
         Detach(poster, voice, trailer, accordion);
         body.RemoveAllViews();
-        var homes = TitleHomes.Choose(title, current.Household?.Services ?? [], current.Household?.HomeOverrides ?? HomeOverrides.None);
+
+        if (!offers.Visible)
+        {
+            // One quiet sentence, not the page: not the title's name, poster or synopsis either.
+            headerSlot.AddView(PaperUi.ScreenHeader(this, ChildViewText.TitleNotHereHeader, AreaPalette.For(PulpAreas.RuleHue(PulpArea.Watching)).Rule));
+            body.AddView(PaperUi.Secondary(this, current.PlayBlocked ?? offers.HiddenSentence!));
+            barStatus.Visibility = ViewStates.Gone;
+            SetEnabled(play, false);
+            SetEnabled(addTo, false);
+            return;
+        }
+
+        headerSlot.AddView(PaperUi.ScreenHeader(this, title.Name, AreaPalette.For(PulpAreas.RuleHue(PulpArea.Watching)).Rule));
+        var homes = HomesFor(current);
 
         body.AddView(TopRow(current, homes));
 
@@ -467,6 +570,7 @@ public class TitleActivity : Activity
     private View TopRow(PageState current, HomeChoice homes)
     {
         var title = current.Title;
+        var offers = Offers(current);
         var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         row.AddView(poster, new LinearLayout.LayoutParams(PaperTheme.Dp(this, PosterWidthDp), PaperTheme.Dp(this, PosterHeightDp))
         {
@@ -496,7 +600,7 @@ public class TitleActivity : Activity
             where.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X2), 0, 0);
             facts.AddView(where);
 
-            foreach (var other in homes.Others)
+            foreach (var other in homes.Others.Where(_ => offers.OpenThereInstead))
             {
                 facts.AddView(AlsoLine(other));
             }
@@ -508,7 +612,10 @@ public class TitleActivity : Activity
             facts.AddView(none);
         }
 
-        facts.AddView(trailer, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
+        if (offers.Trailer)
+        {
+            facts.AddView(trailer, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
+        }
 
         row.AddView(facts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         return row;
@@ -548,7 +655,16 @@ public class TitleActivity : Activity
         }
 
         SetEnabled(play, blocked is null);
-        SetEnabled(addTo, current.Viewer is not null && current.Household is not null);
+        if (current.ChildView)
+        {
+            // The child's bar: their star where an adult has Add to… (mockup 06, D161).
+            addTo.Text = childPlay is { } star && star.IsStarred(title.Id) ? ChildViewText.UnstarLabel : ChildViewText.StarLabel;
+            SetEnabled(addTo, childPlay is not null);
+        }
+        else
+        {
+            SetEnabled(addTo, current.Viewer is not null && current.Household is not null);
+        }
 
         // The "none of your services" sentence already sits by the poster; the bar does not repeat it.
         var sentence = blocked == TitlePageText.NotOnOurServices ? null : blocked;
@@ -603,18 +719,42 @@ public class TitleActivity : Activity
     /// <summary>D216: the other home becomes this title's home from now on; the page repaints with it on top.</summary>
     private void OpenThereInstead(ServiceId service)
     {
+        if (state is { ChildView: true })
+        {
+            return;
+        }
+
         Write($"The home for {id}", token => services.PutAsync(HouseholdMaps.HomeOverride, new HomeOverride(id, service), token));
     }
 
     private void Play()
     {
-        if (state is not { Executor: { } executor, Viewer: { } viewer } current)
+        if (state is not { Executor: { } executor } current)
         {
             return;
         }
 
         var title = current.Title;
-        var homes = TitleHomes.Choose(title, current.Household?.Services ?? [], current.Household?.HomeOverrides ?? HomeOverrides.None);
+
+        // In a child's view Play is the children's: the hand-off names them as its audience and a sitting
+        // is recorded for each, never the phone's adult (G13, D23). A child's view that could not be
+        // resolved does nothing here rather than falling through to the adult's hand-off below.
+        if (current.ChildView)
+        {
+            if (current.Audience is not null)
+            {
+                childPlay?.Start(executor, title);
+            }
+
+            return;
+        }
+
+        if (current.Viewer is not { } viewer)
+        {
+            return;
+        }
+
+        var homes = TitleHomes.Choose(title, current.Household?.ServicePlans ?? [], current.Household?.HomeOverrides ?? HomeOverrides.None);
         if (homes.Best is not { } best)
         {
             return;
@@ -647,7 +787,7 @@ public class TitleActivity : Activity
     /// <summary>D160: a long-press on an episode opens the card; every mark is undo-first.</summary>
     private void MarkEpisode(CatalogueEpisode episode)
     {
-        if (state is not { Viewer: { } viewer } current)
+        if (state is not { Viewer: { } viewer, ChildView: false } current)
         {
             return;
         }
@@ -719,6 +859,13 @@ public class TitleActivity : Activity
 
     private void ToggleAddTo()
     {
+        // The same button is the child's star in a child's view; Add to… is an adult's playlists.
+        if (state is { ChildView: true, Title: var starred })
+        {
+            childPlay?.ToggleStar(starred.Id, starred.Name);
+            return;
+        }
+
         if (AddToPicker.IsOpen(overlay))
         {
             AddToPicker.Fold(overlay);
@@ -739,7 +886,7 @@ public class TitleActivity : Activity
         var title = current.Title;
         var entry = PlaylistEntry.ForTitle(title.Id, title.Kind);
         var playlists = household.PlaylistsFor(viewer).Select(list => new PickerPlaylist(list.Id.Value, list.List, list.Shared, LastUsed: null));
-        var children = household.ChildRules.Select(rules => new PickerChild(rules.Child.Value, rules));
+        var children = household.ChildRules.Select(rules => new PickerChild(household.NameOf(rules.Child), rules));
         var model = AddToPickerPlan.Build(title.Name, entry, DiscoverFacts.For(title, _ => []), playlists, children);
 
         // Each tick is an edit of the household as it stands when it lands, not of the copy read when

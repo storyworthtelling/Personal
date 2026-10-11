@@ -2,11 +2,12 @@ using System.Globalization;
 using System.Text;
 using Pulp.Domain.Core;
 
-namespace Pulp.Domain.FirstRun;
+namespace Pulp.Domain.People;
 
 /// <summary>
-/// The id a person added at first run is written under, derived from the name they were given. The
-/// viewer record holds the id and the child flag only, so the id is the name made into one word:
+/// A person's name and the id they are written under — the one place first run and the Household page
+/// both ask, so the two cannot disagree about an id. The viewer record holds the id and the child flag
+/// only (the name is its own record, <see cref="Household.Records.ViewerNameEntry"/>), so the id is the name made into one word:
 /// lowercased, each run of anything that is not a letter or digit become one hyphen. That makes it
 /// stable (the same name, the same id) and readable back as the name (<see cref="Display"/>). It is
 /// collision-safe within the roster: an id already taken is never handed out again.
@@ -19,6 +20,10 @@ public static class ViewerNaming
 
     public static string AlreadyThere(string name) =>
         $"{name.Trim()} is already in the household. Add an initial to tell them apart.";
+
+    /// <summary>The name as typed, trimmed with its inner runs of space made single; null when nothing is left.</summary>
+    public static string? Clean(string? typed) =>
+        string.IsNullOrWhiteSpace(typed) ? null : string.Join(' ', typed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     /// <summary>The problem with <paramref name="name"/>, in one plain sentence, or null when it will do.</summary>
     public static string? Check(string? name, IEnumerable<ViewerId> taken)
@@ -38,8 +43,8 @@ public static class ViewerNaming
         return taken.Contains(new ViewerId(slug)) ? AlreadyThere(Display(new ViewerId(slug))) : null;
     }
 
-    /// <summary>The id for <paramref name="name"/>, never one in <paramref name="taken"/>.</summary>
-    public static ViewerId IdFor(string name, IEnumerable<ViewerId> taken)
+    /// <summary>The id for <paramref name="name"/>, numbered past any id in <paramref name="taken"/>; refused when it has no letter or number.</summary>
+    public static ViewerId Mint(string name, IEnumerable<ViewerId> taken)
     {
         ArgumentNullException.ThrowIfNull(taken);
         var slug = Slug(name ?? string.Empty);

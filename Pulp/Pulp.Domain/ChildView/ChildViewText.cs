@@ -17,6 +17,10 @@ public static class ChildViewText
     public const string ReadingPlaylists = "Finding the playlists.";
     public const string Unreadable = "This page could not be read just now.";
     public const string DiscoverStatus = "Look for something by its name, or by how you feel.";
+    public const string TitleNotHere = "This one isn't on the shelf in this view.";
+    public const string TitleNotHereHeader = "Not here";
+    public const string StarLabel = "★ Favorite";
+    public const string UnstarLabel = "Remove from Favorites";
     public const string NothingFound = "Nothing here for this viewer.";
 
     /// <summary>"Watching as Robin", "Watching as Robin and Sam", "Watching as Robin, Sam and Ada" (D179).</summary>

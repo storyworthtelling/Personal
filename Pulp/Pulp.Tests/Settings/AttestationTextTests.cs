@@ -36,4 +36,11 @@ public class AttestationTextTests
 
     [Fact]
     public void ABlankNameIsRefused() => Assert.Throws<ArgumentException>(() => AttestationText.Statement(" "));
+
+    [Fact]
+    public void TheReadOnlySentenceSaysWhatTheOwnerAttested()
+    {
+        Assert.Equal("Adult profiles on Streamly are marked PIN-locked, so children can start titles there.", AttestationText.ReadOnly("Streamly", attested: true));
+        Assert.Equal("Adult profiles on Streamly are not marked PIN-locked, so nothing starts there while a child is watching.", AttestationText.ReadOnly("Streamly", attested: false));
+    }
 }

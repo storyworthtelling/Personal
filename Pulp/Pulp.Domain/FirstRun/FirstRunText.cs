@@ -45,4 +45,16 @@ public static class FirstRunText
     public static string Step(int number, int of) => $"Step {number} of {of}";
 
     public static string ThisPhoneIs(string name) => $"This phone is {name}'s";
+
+    /// <summary>Said when the household arrived from Drive while the owner typed, and some of those typed were already in it.</summary>
+    public static string AlreadyThere(IReadOnlyList<string> names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+        return names.Count switch
+        {
+            0 => throw new ArgumentException("Nobody to name.", nameof(names)),
+            1 => $"{names[0]} is already in the household.",
+            _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]} are already in the household.",
+        };
+    }
 }
