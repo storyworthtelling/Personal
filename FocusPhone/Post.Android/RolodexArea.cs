@@ -50,8 +50,14 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
 
         filter = new FilterField(Host, "Find a person", PaperTheme.PositiveMark);
         filter.SetQuery(query);
-        filter.QueryChanged += text =>
+        // Filter on commit (focus leaves the field), not per letter: each change rebuilds this
+        // view, which would otherwise tear the field down under the owner's fingers mid-word.
+        filter.Committed += text =>
         {
+            if (text == query)
+            {
+                return;
+            }
             query = text;
             Invalidate();
         };
