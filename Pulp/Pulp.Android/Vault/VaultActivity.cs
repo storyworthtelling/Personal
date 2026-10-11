@@ -42,6 +42,7 @@ public class VaultActivity : Activity
     private EditText passphrase = null!;
     private Button save = null!;
     private bool busy;
+    private string? calendarProblem;
 
     public static Intent For(Context context)
     {
@@ -117,7 +118,23 @@ public class VaultActivity : Activity
             : VaultPageText.NotSignedIn), Spaced(0, DesignTokens.Space.X2));
         body.AddView(PaperUi.SecondaryButton(this,
             VoiceGoogleAccount.IsSignedIn ? VaultPageText.SignInAgain : VaultPageText.SignIn,
-            () => _ = SignInAsync()), Spaced(0, DesignTokens.Space.X6));
+            () => _ = SignInAsync()), Spaced(0, DesignTokens.Space.X2));
+
+        // The calendar consent: the status is the state; the button exists only on the owner's phone until connected.
+        body.AddView(PaperUi.Secondary(this, services.CalendarConnection.Status(services.HouseholdFileRole)), Spaced(0, DesignTokens.Space.X2));
+        if (!string.IsNullOrEmpty(calendarProblem))
+        {
+            var problem = PaperUi.Secondary(this, calendarProblem);
+            problem.SetTextColor(PaperTheme.ProblemMark);
+            body.AddView(problem, Spaced(0, DesignTokens.Space.X2));
+        }
+
+        if (services.CalendarConnection.OffersConnect(services.HouseholdFileRole))
+        {
+            body.AddView(PaperUi.SecondaryButton(this, "Connect calendar", () => _ = ConnectCalendarAsync()), Spaced(0, DesignTokens.Space.X2));
+        }
+
+        body.AddView(new Space(this), Spaced(0, DesignTokens.Space.X4));
 
         // The passphrase, in the clear.
         body.AddView(PaperUi.Heading(this, VaultPageText.PassphraseHeading), Spaced(0, DesignTokens.Space.X2));
@@ -213,6 +230,27 @@ public class VaultActivity : Activity
             ShowStatus(null);
             Raise(VaultOutcomes.SignInFailed(DateTimeOffset.UtcNow));
         }
+    }
+
+    private async Task ConnectCalendarAsync()
+    {
+        try
+        {
+            await services.CalendarConnection.ConnectAsync(this);
+            calendarProblem = null;
+        }
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, lifetime.Token))
+        {
+            // The owner closed the chooser or the page: nothing to say.
+            return;
+        }
+        catch (Exception exception)
+        {
+            services.Diagnostics.Warn("vault", "Calendar consent did not complete.", exception);
+            calendarProblem = "The calendar could not be connected. Try again.";
+        }
+
+        Paint();
     }
 
     /// <summary>
