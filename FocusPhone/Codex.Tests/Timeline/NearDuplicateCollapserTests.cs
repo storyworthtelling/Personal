@@ -66,6 +66,36 @@ public class NearDuplicateCollapserTests
         Assert.Equal("fivm:5551234567:1", survivor.SourceId);
     }
 
+    // The notification carries Fi's own footer after the words, so the transcript is not at
+    // its end. The copy is still the same message.
+    [Fact]
+    public void Collapse_DropsNotificationCopyOfFiTranscriptWithListenFooter()
+    {
+        var voicemail = Item(TimelineItemKind.Voicemail, "5551234567", "fivm:5551234567:1",
+            snippet: "Hi, it's me.");
+        var notification = Item(TimelineItemKind.Message, "5551234567", "5551234567:1750000000000",
+            snippet: "New voicemail from (555) 010-2233 (0:04): Hi, it's me. To listen to this message, call +1 555-010-0100.",
+            secondsAfterT0: 30);
+
+        var survivor = Assert.Single(NearDuplicateCollapser.Collapse([voicemail, notification]));
+
+        Assert.Equal("fivm:5551234567:1", survivor.SourceId);
+    }
+
+    // A voicemail with no words is shown as "Voicemail"; its notification copy is identified by
+    // Fi's own "No transcript" wrapper, which a real text does not carry.
+    [Fact]
+    public void Collapse_DropsNotificationCopyOfFiVoicemailWithNoTranscript()
+    {
+        var voicemail = Item(TimelineItemKind.Voicemail, "5551234567", "fivm:5551234567:1",
+            snippet: "Voicemail");
+        var notification = Item(TimelineItemKind.Message, "5551234567", "5551234567:1750000000000",
+            snippet: "New voicemail from (555) 010-2233 (0:04): No transcript available. To listen to this message, call +1 555-010-0100.",
+            secondsAfterT0: 30);
+
+        Assert.Single(NearDuplicateCollapser.Collapse([voicemail, notification]));
+    }
+
     // A short reply that happens to end the way a transcript does is a real text, not the
     // same message: nothing before the transcript marks it as a voicemail wrapper.
     [Fact]

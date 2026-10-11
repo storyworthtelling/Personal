@@ -67,9 +67,7 @@ public static class FiVoicemail
 
     private static string Transcript(string body)
     {
-        var colon = body.IndexOf(Colon);
-        var cut = colon >= 0 ? colon + 1 : -1;
-
+        var cut = WrapperSeparator(body);
         if (cut < 0)
         {
             foreach (var dash in SpacedDashes)
@@ -90,7 +88,26 @@ public static class FiVoicemail
             return "Voicemail";
         }
 
-        var transcript = body[cut..].Trim();
-        return transcript.Length == 0 ? "Voicemail" : transcript;
+        return VoicemailTranscript.Extract(body[cut..]) ?? "Voicemail";
+    }
+
+    // The first colon that is not inside a time. Fi writes the length as "(0:04)", and that
+    // colon is not the wrapper's: cutting there leaves "04): …" as the transcript.
+    private static int WrapperSeparator(string body)
+    {
+        for (var i = 0; i < body.Length; i++)
+        {
+            if (body[i] != Colon)
+            {
+                continue;
+            }
+            var insideTime = i > 0 && char.IsAsciiDigit(body[i - 1])
+                && i + 1 < body.Length && char.IsAsciiDigit(body[i + 1]);
+            if (!insideTime)
+            {
+                return i + 1;
+            }
+        }
+        return -1;
     }
 }

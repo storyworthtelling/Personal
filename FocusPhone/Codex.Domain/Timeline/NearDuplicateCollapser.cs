@@ -71,20 +71,31 @@ public static class NearDuplicateCollapser
         (a.Snippet ?? "").Trim() == (b.Snippet ?? "").Trim();
 
     /// <summary>
-    /// True when <paramref name="notificationText"/> is the wrapped form of
-    /// <paramref name="transcript"/>: the transcript at its end, with a wrapper separator
-    /// directly before it. The separator is what stops a reply like "Oh, hi" from matching a
-    /// transcript of "hi" — a real text has no voicemail wrapper in front of it.
+    /// True when <paramref name="notificationText"/> is the wrapped form of the Fi voicemail
+    /// whose shown words are <paramref name="transcript"/>. With words, the transcript must sit
+    /// after a wrapper separator (Fi's own "(0:04):" or a colon); the separator is what stops a
+    /// reply like "Oh, hi" from matching a transcript of "hi". With no words the shown label is
+    /// "Voicemail", and only Fi's own footer identifies its notification copy.
     /// </summary>
     private static bool IsWrappedTranscript(string? notificationText, string? transcript)
     {
         var text = (notificationText ?? "").Trim();
         var words = (transcript ?? "").Trim();
-        if (words.Length == 0 || text.Length <= words.Length || !text.EndsWith(words, StringComparison.Ordinal))
+        if (words.Length == 0 || text.Length == 0)
         {
             return false;
         }
-        var wrapper = text[..^words.Length].TrimEnd();
+        if (words == "Voicemail")
+        {
+            return text.Contains(VoicemailTranscript.ListenFooter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var at = text.IndexOf(words, StringComparison.Ordinal);
+        if (at <= 0)
+        {
+            return false;
+        }
+        var wrapper = text[..at].TrimEnd();
         return wrapper.Length > 0 && WrapperSeparators.Contains(wrapper[^1]);
     }
 
