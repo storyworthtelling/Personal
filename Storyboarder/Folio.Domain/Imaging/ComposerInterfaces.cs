@@ -27,6 +27,13 @@ public sealed record SceneEvidence(
     /// this draft's.
     /// </summary>
     public bool ShowsPair => Image is not null && PreviousImage is not null;
+
+    /// <summary>
+    /// Where the scene ends in the stored manuscript. It is what lets the scene's block be inserted
+    /// into the marked manuscript under the scene's own last line. -1 when unknown, in which case the
+    /// block follows the end of the text rather than being lost.
+    /// </summary>
+    public int EndOffset { get; init; } = -1;
 }
 
 // One finding as it appears in the report, tagged with the cross-draft status the reconciliation gave it, so
@@ -70,11 +77,15 @@ public interface IAnalysisPdfComposer
     /// <summary>
     /// <paramref name="manuscript"/> is the draft's own text, which the report marks up (Release G).
     /// Optional, so a report can still be composed for a draft whose source is not to hand.
+    /// <paramref name="chapters"/> says where each chapter sits in that text, which is what lets a
+    /// finding that cites only a chapter be written on the opening of it; without them such a finding
+    /// is printed among the whole-book notes instead.
     /// </summary>
     byte[] Compose(
         Folio.Domain.Analysis.BookAnalysisResult analysis,
         ReportCover cover,
         IReadOnlyList<SceneEvidence> scenes,
         DraftReview review,
-        string? manuscript = null);
+        string? manuscript = null,
+        IReadOnlyList<Folio.Domain.Markup.ChapterSpan>? chapters = null);
 }

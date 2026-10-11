@@ -63,12 +63,21 @@ public sealed record ChapterNotes(
 public sealed record ReportFinding(string Chapter, string Detail)
 {
     public static ReportFinding Of(string detail) => new(string.Empty, detail);
+
+    /// <summary>
+    /// A short passage quoted verbatim from the manuscript, when the finding is about one. It is what
+    /// lets the finding be written on the page it concerns instead of listed in a section: with it,
+    /// the note lands on the sentence; without it, on the opening of the chapter cited. Empty for a
+    /// report stored before findings carried one, which is why it is init-only with an empty default.
+    /// </summary>
+    public string Excerpt { get; init; } = string.Empty;
 }
 
 public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
 {
     private const string ChapterProperty = "chapter";
     private const string DetailProperty = "detail";
+    private const string ExcerptProperty = "excerpt";
 
     public override ReportFinding Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -81,10 +90,11 @@ public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
 
         var chapter = string.Empty;
         var detail = string.Empty;
+        var excerpt = string.Empty;
         while (reader.Read())
         {
             if (reader.TokenType == JsonTokenType.EndObject)
-                return new ReportFinding(chapter, detail);
+                return new ReportFinding(chapter, detail) { Excerpt = excerpt };
             if (reader.TokenType != JsonTokenType.PropertyName)
                 continue;
 
@@ -97,6 +107,8 @@ public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
                 chapter = value;
             else if (string.Equals(name, DetailProperty, StringComparison.OrdinalIgnoreCase))
                 detail = value;
+            else if (string.Equals(name, ExcerptProperty, StringComparison.OrdinalIgnoreCase))
+                excerpt = value;
         }
 
         throw new JsonException("A report finding object was not terminated.");
@@ -107,6 +119,10 @@ public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
         writer.WriteStartObject();
         writer.WriteString(ChapterProperty, value.Chapter ?? string.Empty);
         writer.WriteString(DetailProperty, value.Detail ?? string.Empty);
+        // Written only when there is one, so a finding with no quote serialises exactly as it always
+        // did and nothing stored changes shape.
+        if (!string.IsNullOrWhiteSpace(value.Excerpt))
+            writer.WriteString(ExcerptProperty, value.Excerpt);
         writer.WriteEndObject();
     }
 }
@@ -379,7 +395,12 @@ public enum AdditionKind
 // One nudge to ADD a scene — a pointer, never drafted prose or an example scene (the nudge-never-write
 // principle). Location cites where it belongs ("Chapter 4", "after Ch. 7 · Scene 2"); Missing is what the
 // reader never gets to see; Why is the impact; Priority reuses the Must/Should/Consider impact tier.
-public sealed record SceneAddition(AdditionKind Kind, string Location, string Missing, string Why, string Priority);
+public sealed record SceneAddition(AdditionKind Kind, string Location, string Missing, string Why, string Priority)
+{
+    // A verbatim line from the passage the new scene belongs beside, so its caret can sit on the page.
+    // Empty when the model named only a chapter, which places the caret at the chapter's head or close.
+    public string Excerpt { get; init; } = string.Empty;
+}
 
 // Which end of the show-vs-tell pendulum a note is on: Dramatize a summarized passage that could become a
 // shown scene (the additive lever), or Tighten an over-shown passage.

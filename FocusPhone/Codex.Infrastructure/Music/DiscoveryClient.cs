@@ -19,6 +19,11 @@ public sealed class DiscoveryClient : IDiscoveryClient
     private const string AnthropicVersion = "2023-06-01";
     private const int MaxTokens = 1_200;
 
+    // The crate can ask for up to forty of each kind; a short reply is cheap, but a reply
+    // cut off mid-array would lose the whole crate to a JSON parse, so this is sized to the
+    // largest request rather than the usual one.
+    private const int WeeklyMaxTokens = 4_000;
+
     private const string PlaylistInstruction =
         "You are a music curator picking a playlist from ONE listener's own library. You are given their " +
         "TASTE PROFILE, a CATALOG (each track: id, title, artist, genre), and a REQUEST (a mood/genre/idea). " +
@@ -33,9 +38,10 @@ public sealed class DiscoveryClient : IDiscoveryClient
         "the albums they belong to), and the PODCASTS THEY ALREADY FOLLOW. Both lists are evidence of taste " +
         "and lists of what to AVOID recommending — never pick a track, another release of an album already " +
         "represented in the library, or a podcast already followed. Favour variety and things adjacent to " +
-        "their taste rather than the safest possible match, and honour what the profile says they avoid. Mix " +
-        "kinds rather than picking songs alone — a normal week's crate has some albums and, if the listener " +
-        "follows any podcasts at all, a show or two among the tracks. Give each pick a SHORT reason in one " +
+        "their taste rather than the safest possible match, and honour what the profile says they avoid. The " +
+        "two counts are exact and set separately: MUSIC PICKS is how many songs and albums to give (mix them " +
+        "rather than picking songs alone), and PODCAST PICKS is how many shows to give, where zero means no " +
+        "shows at all. Give each pick a SHORT reason in one " +
         "plain clause, said to the listener. kind is \"song\", \"album\", or \"podcast\". For a song or an " +
         "album, artist is who made it; for a podcast, artist is its network/publisher if you know one, else " +
         "an empty string — never invent one. Respond with ONLY a JSON object: " +
@@ -62,17 +68,17 @@ public sealed class DiscoveryClient : IDiscoveryClient
     }
 
     public async Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
-        TasteProfile profile, IReadOnlyList<Track> owned, int maxTracks,
+        TasteProfile profile, IReadOnlyList<Track> owned, int music, int podcasts,
         string? note, IReadOnlyList<string> subscribedShows, CancellationToken cancellationToken)
     {
         var userContent =
             $"TASTE PROFILE (JSON):\n{ProfileJson(profile)}\n\n" +
             $"LIBRARY THEY ALREADY HAVE (JSON):\n{CatalogJson(owned)}\n\n" +
             $"PODCASTS THEY ALREADY FOLLOW (JSON):\n{JsonSerializer.Serialize(subscribedShows)}\n\n" +
-            $"MAX PICKS: {maxTracks}" +
+            $"MUSIC PICKS: {music}\nPODCAST PICKS: {podcasts}" +
             (string.IsNullOrWhiteSpace(note) ? string.Empty : $"\n\nTHE SHELF IS SHORT OF: {note}");
 
-        var reply = await SendMessage(DiscoveriesInstruction, userContent, cancellationToken);
+        var reply = await SendMessage(DiscoveriesInstruction, userContent, WeeklyMaxTokens, cancellationToken);
         var json = ExtractObject(reply);
         if (json is null)
         {
@@ -86,8 +92,10 @@ public sealed class DiscoveryClient : IDiscoveryClient
 
             // Excluded here as well as asked for in the instruction. Asking is worth
             // doing and is not worth trusting: a recommender handed someone's
-            // favourite artists will happily name their favourite records back.
-            return Discoveries.Unowned(
+            // favourite artists will happily name their favourite records back. The counts
+            // are held the same way, and applied after the exclusion so a dropped
+            // duplicate does not use up one of the requested places.
+            var unowned = Discoveries.Unowned(
                 picks.Select(pick => new Recommendation(
                     pick.Title?.Trim() ?? string.Empty,
                     pick.Artist?.Trim() ?? string.Empty,
@@ -95,6 +103,7 @@ public sealed class DiscoveryClient : IDiscoveryClient
                     ParseKind(pick.Kind))),
                 owned,
                 subscribedShows);
+            return Discoveries.Shape(unowned, music, podcasts);
         }
         catch (JsonException)
         {
@@ -114,7 +123,7 @@ public sealed class DiscoveryClient : IDiscoveryClient
 
     private async Task<DiscoverySelection> Choose(string instruction, string userContent, CancellationToken cancellationToken)
     {
-        var reply = await SendMessage(instruction, userContent, cancellationToken);
+        var reply = await SendMessage(instruction, userContent, MaxTokens, cancellationToken);
         var json = ExtractObject(reply);
         if (json is null)
         {
@@ -161,12 +170,12 @@ public sealed class DiscoveryClient : IDiscoveryClient
             genre = track.DisplayGenre
         }));
 
-    private async Task<string> SendMessage(string instruction, string userText, CancellationToken cancellationToken)
+    private async Task<string> SendMessage(string instruction, string userText, int maxTokens, CancellationToken cancellationToken)
     {
         var payload = new
         {
             model = optionsAccessor.Value.Model,
-            max_tokens = MaxTokens,
+            max_tokens = maxTokens,
             system = instruction,
             messages = new[] { new { role = "user", content = userText } }
         };

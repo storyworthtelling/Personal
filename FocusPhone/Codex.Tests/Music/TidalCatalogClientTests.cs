@@ -303,3 +303,53 @@ public class TidalCatalogClientTests
         Assert.Null(url);
     }
 }
+
+public class TidalAlbumTracksTests
+{
+    private const string TrackUrl = "https://openapi.tidal.com/v2/tracks/120268?countryCode=US&include=albums";
+    private const string AlbumItemsUrl =
+        "https://openapi.tidal.com/v2/albums/120267/relationships/items?countryCode=US" +
+        "&include=tracks%2Ctracks.artists%2Ctracks.albums";
+
+    [Fact]
+    public async Task GetAlbumTracksAsync_ReturnsEveryTrackOnTheAlbumOfTheGivenTrack()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var client = new TidalCatalogClient(new HttpClient(handler));
+        handler.Respond(TrackUrl, """
+            {"data":{"id":"120268","type":"tracks","attributes":{"title":"Yellow"},
+              "relationships":{"albums":{"data":[{"id":"120267","type":"albums"}]}}}}
+            """);
+        handler.Respond(AlbumItemsUrl, """
+            {"data":[{"id":"120268","type":"tracks"},{"id":"120269","type":"tracks"}],
+             "included":[
+               {"id":"120268","type":"tracks","attributes":{"title":"Yellow","duration":"PT4M29S"},
+                "relationships":{"artists":{"data":[{"id":"8812","type":"artists"}]},
+                                 "albums":{"data":[{"id":"120267","type":"albums"}]}}},
+               {"id":"120269","type":"tracks","attributes":{"title":"Parachutes","duration":"PT0M59S"},
+                "relationships":{"artists":{"data":[{"id":"8812","type":"artists"}]},
+                                 "albums":{"data":[{"id":"120267","type":"albums"}]}}},
+               {"id":"120267","type":"albums","attributes":{"title":"Parachutes"}},
+               {"id":"8812","type":"artists","attributes":{"name":"Coldplay"}}
+             ]}
+            """);
+
+        var tracks = await client.GetAlbumTracksAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Equal(["tidal:120268", "tidal:120269"], tracks.Select(track => track.Id));
+        Assert.All(tracks, track => Assert.Equal("Parachutes", track.AlbumName));
+        Assert.Equal("Coldplay", tracks[0].ArtistName);
+    }
+
+    [Fact]
+    public async Task GetAlbumTracksAsync_ReturnsEmptyWhenTheTrackHasNoAlbum()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var client = new TidalCatalogClient(new HttpClient(handler));
+        handler.Respond(TrackUrl, """{"data":{"id":"120268","type":"tracks","attributes":{"title":"Single"}}}""");
+
+        var tracks = await client.GetAlbumTracksAsync("token", "120268", "US", CancellationToken.None);
+
+        Assert.Empty(tracks);
+    }
+}

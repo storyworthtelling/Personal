@@ -45,9 +45,9 @@ public class ShelfSceneBuilder(Context context)
     private bool IsAllowedInTray(ResolveInfo resolveInfo, HashSet<string> blocked, HashSet<string> browsers)
     {
         var package = resolveInfo.ActivityInfo!.PackageName!;
-        if (package == context.PackageName || PolicyContext.FocusPhonePackages.Contains(package))
+        if (package == context.PackageName)
         {
-            return false; // our own heads are featured on the home shelf, never the tray
+            return false; // the launcher is the shelf itself, never one of its books
         }
         if (blocked.Contains(package) || browsers.Contains(package))
         {

@@ -85,6 +85,54 @@ public static class Discoveries
         return kept;
     }
 
+    /// <summary>
+    /// The picks the owner asked for, by kind: at most <paramref name="music"/> songs and
+    /// albums, and at most <paramref name="podcasts"/> shows, in the order they arrived.
+    /// Anything over a count is dropped; a short delivery is returned as it was.
+    /// </summary>
+    public static IReadOnlyList<Recommendation> Shape(IEnumerable<Recommendation> picks, int music, int podcasts)
+    {
+        var musicLeft = Math.Max(0, music);
+        var podcastsLeft = Math.Max(0, podcasts);
+        var shaped = new List<Recommendation>();
+
+        foreach (var pick in picks)
+        {
+            if (pick.Kind == DiscoveryKind.Podcast)
+            {
+                if (podcastsLeft == 0)
+                {
+                    continue;
+                }
+
+                podcastsLeft--;
+            }
+            else
+            {
+                if (musicLeft == 0)
+                {
+                    continue;
+                }
+
+                musicLeft--;
+            }
+
+            shaped.Add(pick);
+        }
+
+        return shaped;
+    }
+
+    /// <summary>
+    /// The track from a search that sits on the album an album pick names, or null. Matched on
+    /// the album's own title and artist — the same identity <see cref="IsAlreadyHeld"/> uses for
+    /// an album — so a song that happens to share the album's title, on some other record, is
+    /// not mistaken for it.
+    /// </summary>
+    public static Track? FindAlbumTrack(IEnumerable<Track> found, string albumTitle, string albumArtist) =>
+        found.FirstOrDefault(track =>
+            TrackIdentity.SameSong(track.AlbumName, track.AlbumArtist, albumTitle, albumArtist));
+
     private static bool IsAlreadyHeld(
         Recommendation pick, IReadOnlyList<Track> owned, IReadOnlyList<string>? subscribedShows) => pick.Kind switch
     {

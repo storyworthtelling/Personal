@@ -68,7 +68,9 @@ public class SectionRoutingTests
         var pages = PagesOf(Render(analysis));
         var voicePage = pages.Single(page => page.Contains("Slips twice into a composed register.", StringComparison.Ordinal));
 
-        Assert.Contains("Authorial voice consistency", voicePage, StringComparison.Ordinal);
+        // Under the whole-book notes now, as "Voice consistency"; the old standalone section is gone.
+        Assert.Contains("Voice consistency", voicePage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Authorial voice consistency", voicePage, StringComparison.Ordinal);
     }
 
     /// <summary>Quiet by default: a standalone book's "no prior book" note isn't worth a page.</summary>

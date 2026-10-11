@@ -72,16 +72,9 @@ public static class ContactPicker
 
             // A contact can be backed by more than one raw contact — one per account it is
             // synced from. The first is a reasonable, simple choice with nothing else to go on.
-            long rawContactId;
-            using (var raw = resolver.Query(
-                ContactsContract.RawContacts.ContentUri!, ["_id"],
-                "contact_id = ?", [contactId.ToString()], null))
+            if (FirstRawContactId(resolver, contactId) is not { } rawContactId)
             {
-                if (raw is null || !raw.MoveToFirst())
-                {
-                    return false;
-                }
-                rawContactId = raw.GetLong(0);
+                return false;
             }
 
             var mimeType = ContactsContract.CommonDataKinds.Photo.ContentItemType;
@@ -115,6 +108,74 @@ public static class ContactPicker
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Saves a sender the owner does not know as a new contact with one address. The contact
+    /// is written to the phone (no account), so it is in the Rolodex here and in Post at
+    /// once; it does not sync to the owner's Google account.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The provider would not create the contact.</exception>
+    /// <exception cref="Java.Lang.SecurityException">WRITE_CONTACTS has not been granted.</exception>
+    public static void CreateContact(Context context, string name, string address)
+    {
+        var resolver = context.ContentResolver!;
+        var rawUri = resolver.Insert(ContactsContract.RawContacts.ContentUri!, new ContentValues())
+            ?? throw new InvalidOperationException($"The contacts provider would not create a contact for {name}.");
+        var rawContactId = ContentUris.ParseId(rawUri);
+
+        var nameValues = new ContentValues();
+        nameValues.Put("raw_contact_id", rawContactId);
+        nameValues.Put("mimetype", ContactsContract.CommonDataKinds.StructuredName.ContentItemType);
+        nameValues.Put(ContactsContract.CommonDataKinds.StructuredName.DisplayName, name);
+        resolver.Insert(ContactsContract.Data.ContentUri!, nameValues);
+
+        InsertAddress(resolver, rawContactId, address);
+    }
+
+    /// <summary>
+    /// Adds an address to an existing contact, on its first raw contact — the same choice
+    /// <see cref="SetPhoto"/> makes for the same reason.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The contact has no raw contact to attach it to.</exception>
+    /// <exception cref="Java.Lang.SecurityException">WRITE_CONTACTS has not been granted.</exception>
+    public static void AddAddress(Context context, long contactId, string address)
+    {
+        var resolver = context.ContentResolver!;
+        var rawContactId = FirstRawContactId(resolver, contactId)
+            ?? throw new InvalidOperationException(
+                $"Contact {contactId} has no raw contact to add {address} to.");
+        InsertAddress(resolver, rawContactId, address);
+    }
+
+    private static long? FirstRawContactId(Android.Content.ContentResolver resolver, long contactId)
+    {
+        using var raw = resolver.Query(
+            ContactsContract.RawContacts.ContentUri!, ["_id"],
+            "contact_id = ?", [contactId.ToString()], null);
+        return raw is not null && raw.MoveToFirst() ? raw.GetLong(0) : null;
+    }
+
+    // A phone number is a mobile number (the type the owner's own texts come from); an
+    // address with an @ is an email. Nothing else reaches here: the caller holds a sender
+    // Post has already read off a call, text or mail.
+    private static void InsertAddress(Android.Content.ContentResolver resolver, long rawContactId, string address)
+    {
+        var values = new ContentValues();
+        values.Put("raw_contact_id", rawContactId);
+        if (address.Contains('@'))
+        {
+            values.Put("mimetype", ContactsContract.CommonDataKinds.Email.ContentItemType);
+            values.Put(ContactsContract.CommonDataKinds.Email.Address, address);
+        }
+        else
+        {
+            values.Put("mimetype", ContactsContract.CommonDataKinds.Phone.ContentItemType);
+            values.Put(ContactsContract.CommonDataKinds.Phone.Number, address);
+            // "data2" is Phone.TYPE and 2 is Phone.TYPE_MOBILE; the bindings expose neither name.
+            values.Put("data2", 2);
+        }
+        resolver.Insert(ContactsContract.Data.ContentUri!, values);
     }
 
     /// <summary>

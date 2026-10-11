@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Microsoft.Maui.Hosting;
 using Index.Infrastructure.Persistence;
-using Index.Domain.Identity;
 
 // Declare permissions via assembly attributes so MAUI's manifest merger always includes them.
 [assembly: UsesPermission(global::Android.Manifest.Permission.Internet)]
@@ -35,14 +34,16 @@ public class MainApplication : MauiApplication
         var prevHandler = Java.Lang.Thread.DefaultUncaughtExceptionHandler;
         Java.Lang.Thread.DefaultUncaughtExceptionHandler = new CrashLogger(prevHandler);
 
+        // Every route a fault can take to the process lands in LaunchFaults.Record, so the next launch
+        // shows it whether it killed the app or was only logged.
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-            CrashLogger.Log(args.ExceptionObject?.ToString() ?? "(no details)");
+            LaunchFaults.Record("Unhandled exception", args.ExceptionObject?.ToString() ?? "(no details)");
 
         // A faulted Task nobody awaited (e.g. a fire-and-forget background refresh) otherwise vanishes;
         // capture it so a silent failure still lands in the crash log. Mark it observed so it can't escalate.
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
-            CrashLogger.Log($"Unobserved task exception:\n{args.Exception}");
+            LaunchFaults.Record("Unobserved task exception", args.Exception.ToString());
             args.SetObserved();
         };
 
@@ -68,13 +69,15 @@ public class MainApplication : MauiApplication
         catch (Exception ex)
         {
             SettingsStore.LastMigrationError = ex.Message;
-            CrashLogger.Log($"Database migration failed:\n{ex}");
+            LaunchFaults.Record("Database migration", ex);
         }
     }
 
+    // The Java-side handler: the uncaught exceptions the managed hook does not see on the Android
+    // thread. It records the fault, then hands it to the handler that was there before, so the process
+    // still dies the way it would have.
     private sealed class CrashLogger : Java.Lang.Object, Java.Lang.Thread.IUncaughtExceptionHandler
     {
-        private const string LogTag = IndexIdentity.DisplayName;
         private readonly Java.Lang.Thread.IUncaughtExceptionHandler? previous;
 
         public CrashLogger(Java.Lang.Thread.IUncaughtExceptionHandler? previous)
@@ -84,23 +87,8 @@ public class MainApplication : MauiApplication
 
         public void UncaughtException(Java.Lang.Thread? thread, Java.Lang.Throwable? ex)
         {
-            Log($"Uncaught exception on thread '{thread?.Name}':\n{ex}");
+            LaunchFaults.Record($"Uncaught exception on thread '{thread?.Name}'", ex?.ToString() ?? "(no details)");
             previous?.UncaughtException(thread, ex);
-        }
-
-        internal static void Log(string message)
-        {
-            global::Android.Util.Log.Error(LogTag, message);
-            try
-            {
-                var path = global::System.IO.Path.Combine(
-                    global::Android.App.Application.Context.FilesDir!.AbsolutePath,
-                    "crash.log");
-                global::System.IO.File.AppendAllText(
-                    path,
-                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}]\n{message}\n\n---\n\n");
-            }
-            catch { }
         }
     }
 }

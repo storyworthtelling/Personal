@@ -94,6 +94,36 @@ public class VoicemailNotificationParserTests
         Assert.Equal("Voicemail", item.Snippet);
     }
 
+    // The dialer's text carries the same Fi-style duration and footer as a Fi transcript, and
+    // the notification path must not show either as the words of the message.
+    [Fact]
+    public void TryParse_DurationAndNoTranscriptNotice_IsPlainVoicemail()
+    {
+        var item = VoicemailNotificationParser.TryParse(
+            VoicemailNotificationParser.DialerPackage,
+            channelId: "phone_voicemail_channel",
+            title: "(555) 123-4567",
+            text: "(0:04): No transcript available. To listen to this message, call +1 555-010-0100.",
+            WhenMillis);
+
+        Assert.NotNull(item);
+        Assert.Equal("Voicemail", item.Snippet);
+    }
+
+    [Fact]
+    public void TryParse_ListenFooterIsDroppedFromTheTranscript()
+    {
+        var item = VoicemailNotificationParser.TryParse(
+            VoicemailNotificationParser.DialerPackage,
+            channelId: "phone_voicemail_channel",
+            title: "(555) 123-4567",
+            text: "Hi, it's mom. To listen to this message, call +1 555-010-0100.",
+            WhenMillis);
+
+        Assert.NotNull(item);
+        Assert.Equal("Hi, it's mom.", item.Snippet);
+    }
+
     [Fact]
     public void TryParse_TitleIsJustVoicemail_FallsBackToVoicemailKey()
     {

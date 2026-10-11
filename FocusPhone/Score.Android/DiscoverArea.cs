@@ -494,13 +494,16 @@ public sealed class DiscoverArea : ScoreArea
         var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
 
         // Play is an audition for a song or an album (Score has no way to browse an unowned
-        // album, so this plays a track from it instead — see PerformActionAsync). A podcast
-        // pick names a show, not something to audition a clip of, so it offers Subscribe —
-        // the exact same action "Find a podcast" above already offers, reached through the
-        // podcast directory instead of a library lookup, since a crate pick is never something
-        // the library already has. Neither disturbs the assembled music queue.
-        var label = crate!.Current!.Kind == DiscoveryKind.Podcast ? "Subscribe" : "Play";
-        row.AddView(PaperUi.SecondaryButton(Host, label, () => _ = PerformActionAsync()));
+        // album, so this plays a track from it instead — see AuditionUnownedAsync). A podcast
+        // names a show, not a clip, so it has no Play. Add to library is the one way a pick
+        // joins the owner's shelf: a show subscribes, a song or album is saved. Neither
+        // disturbs the assembled music queue.
+        if (crate!.Current!.Kind != DiscoveryKind.Podcast)
+        {
+            row.AddView(PaperUi.SecondaryButton(Host, "Play", () => _ = AuditionUnownedAsync(crate.Current!)));
+        }
+
+        row.AddView(PaperUi.SecondaryButton(Host, "Add to library", () => _ = AddCurrentToLibraryAsync()));
         row.AddView(crate!.CurrentIsVetoed
             ? PaperUi.QuietButton(Host, "Bring it back", () => Strike(veto: false))
             : PaperUi.QuietButton(Host, "Not for me", () => Strike(veto: true)));
@@ -540,7 +543,9 @@ public sealed class DiscoverArea : ScoreArea
         Invalidate();
     }
 
-    private async Task PerformActionAsync()
+    // Add to library: a show subscribes exactly as a podcast search result does; a song asks
+    // whether the owner wants just the song or its whole album; an album pick adds the album.
+    private async Task AddCurrentToLibraryAsync()
     {
         var current = crate?.Current;
         if (current is null)
@@ -548,13 +553,132 @@ public sealed class DiscoverArea : ScoreArea
             return;
         }
 
-        if (current.Kind == DiscoveryKind.Podcast)
+        switch (current.Kind)
         {
-            await SubscribeToPickAsync(current);
+            case DiscoveryKind.Podcast:
+                await SubscribeToPickAsync(current);
+                break;
+            case DiscoveryKind.Album:
+                await AddAlbumPickAsync(current);
+                break;
+            default:
+                await AddSongPickAsync(current);
+                break;
+        }
+    }
+
+    // A TIDAL access token, or null with the reason already on screen. Every add path asks for
+    // one, so the signed-out and unreachable messages live in one place.
+    private async Task<string?> TidalTokenAsync()
+    {
+        if (new TidalAccountStore(Host).Load() is null)
+        {
+            actionStatus = "Sign in to TIDAL in Settings to add this.";
+            Invalidate();
+            return null;
+        }
+
+        var token = await new TidalAccessTokenProvider(Host).RefreshAsync(CancellationToken.None);
+        if (token.Status != TidalTokenPollStatus.Success || token.AccessToken is not { Length: > 0 } accessToken)
+        {
+            actionStatus = "Couldn't reach TIDAL. Try again in a moment.";
+            Invalidate();
+            return null;
+        }
+
+        return accessToken;
+    }
+
+    private async Task AddSongPickAsync(CratePick pick)
+    {
+        var accessToken = await TidalTokenAsync();
+        if (accessToken is null)
+        {
             return;
         }
 
-        await AuditionUnownedAsync(current);
+        var found = await new TidalCatalogClient(new HttpClient())
+            .SearchAsync(accessToken, $"{pick.Subtitle} {pick.Title}", MusicLibrary.TidalCountryCode, CancellationToken.None);
+        if (found.Count == 0)
+        {
+            actionStatus = $"Couldn't find “{pick.Title}” on TIDAL.";
+            Invalidate();
+            return;
+        }
+
+        var track = found[0];
+        actionStatus = null;
+
+        // A song with no album of its own has nothing to choose between.
+        if (string.IsNullOrWhiteSpace(track.AlbumName))
+        {
+            AddTracks([track], $"Saved {track.DisplayTitle}.");
+            return;
+        }
+
+        ActionCard.Show(Host, Overlay, track.DisplayTitle, track.DisplayArtist,
+            new CardAction("Just this song", () => AddTracks([track], $"Saved {track.DisplayTitle}."), Lead: true),
+            new CardAction($"The whole album: {track.AlbumName}", () => _ = AddWholeAlbumAsync(track.Id, track.AlbumName)));
+    }
+
+    private async Task AddAlbumPickAsync(CratePick pick)
+    {
+        var accessToken = await TidalTokenAsync();
+        if (accessToken is null)
+        {
+            return;
+        }
+
+        var found = await new TidalCatalogClient(new HttpClient())
+            .SearchAsync(accessToken, $"{pick.Subtitle} {pick.Title}", MusicLibrary.TidalCountryCode, CancellationToken.None);
+        var match = Discoveries.FindAlbumTrack(found, pick.Title, pick.Subtitle);
+        if (match is null)
+        {
+            actionStatus = $"Couldn't find “{pick.Title}” on TIDAL.";
+            Invalidate();
+            return;
+        }
+
+        await AddWholeAlbumAsync(match.Id, pick.Title);
+    }
+
+    // Every track on the album the given TIDAL track belongs to, saved as one change.
+    private async Task AddWholeAlbumAsync(string trackId, string albumTitle)
+    {
+        var accessToken = await TidalTokenAsync();
+        if (accessToken is null)
+        {
+            return;
+        }
+
+        var rawId = trackId.StartsWith("tidal:", StringComparison.Ordinal) ? trackId["tidal:".Length..] : trackId;
+        var tracks = await new TidalCatalogClient(new HttpClient())
+            .GetAlbumTracksAsync(accessToken, rawId, MusicLibrary.TidalCountryCode, CancellationToken.None);
+        if (tracks.Count == 0)
+        {
+            actionStatus = $"Couldn't load “{albumTitle}” from TIDAL.";
+            Invalidate();
+            return;
+        }
+
+        AddTracks(tracks, $"Saved the album {albumTitle}.");
+    }
+
+    // One inline state change for however many tracks: the undo removes exactly the ones this
+    // added, so a track the owner already had is never taken back out by someone else's undo.
+    private void AddTracks(IReadOnlyList<Track> tracks, string message)
+    {
+        var added = library.SaveTracks(tracks);
+        actionStatus = null;
+        if (added.Count == 0)
+        {
+            actionStatus = "Already in your library.";
+            Invalidate();
+            return;
+        }
+
+        DogEar.Show(Host, Overlay, message, onUndo: () => library.RemoveSavedTracks(added));
+        Invalidate();
     }
 
     // A crate pick is by definition not in the library (Discoveries.Unowned's whole job), so —
@@ -566,18 +690,9 @@ public sealed class DiscoverArea : ScoreArea
     // artist + album title and plays whatever TIDAL returns first for it.
     private async Task AuditionUnownedAsync(CratePick pick)
     {
-        if (new TidalAccountStore(Host).Load() is null)
+        var accessToken = await TidalTokenAsync();
+        if (accessToken is null)
         {
-            actionStatus = "Sign in to TIDAL in Settings to play this.";
-            Invalidate();
-            return;
-        }
-
-        var token = await new TidalAccessTokenProvider(Host).RefreshAsync(CancellationToken.None);
-        if (token.Status != TidalTokenPollStatus.Success || token.AccessToken is not { Length: > 0 } accessToken)
-        {
-            actionStatus = "Couldn't reach TIDAL. Try again in a moment.";
-            Invalidate();
             return;
         }
 
