@@ -36,7 +36,7 @@ public static class BestHome
         // One home per service: a service listing a title twice is one place to watch it, at its best.
         var homes = offers
             .Where(offer => plans.ContainsKey(offer.Service))
-            .Select(offer => new Home(offer.Service, offer.Quality, offer.AlwaysWithAds || !plans[offer.Service].AdFree))
+            .Select(offer => new Home(offer.Service, Capped(offer.Quality, plans[offer.Service]), offer.AlwaysWithAds || !plans[offer.Service].AdFree))
             .GroupBy(home => home.Service)
             .Select(group => group.OrderBy(home => home, Ranking).First())
             .OrderBy(home => home, Ranking)
@@ -51,6 +51,9 @@ public static class BestHome
         var best = homes.FirstOrDefault(home => pinned is not null && home.Service == pinned.Value) ?? homes[0];
         return new HomeChoice(best, homes.Where(home => home != best).ToList());
     }
+
+    private static VideoQuality Capped(VideoQuality listed, ServicePlan plan) =>
+        plan.Picture is { } streams && streams < listed ? streams : listed;
 
     /// <summary>Best first: higher quality, then no ads, then the service id so the answer never depends on arrival order.</summary>
     private static readonly IComparer<Home> Ranking = Comparer<Home>.Create((a, b) =>

@@ -5,6 +5,7 @@ using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
+using Pulp.Domain.FirstRun;
 using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
@@ -122,6 +123,15 @@ public sealed class PulpServices
 
     public PulpDiagnostics Diagnostics { get; }
 
+    /// <summary>
+    /// Whether this phone's account owns the household file or has it shared to it (D166), as the vault
+    /// last said. Unknown until the vault has been read, which <see cref="HouseholdPermissions"/> does not restrict.
+    /// </summary>
+    public HouseholdFileRole HouseholdFileRole => Keys.HouseholdRole;
+
+    /// <summary>What this phone may change in the household (D166).</summary>
+    public HouseholdPermissions Rights => HouseholdPermissions.For(HouseholdFileRole);
+
     public VaultPulpKeySource Keys { get; }
 
     public ServiceCatalogue Catalogue { get; }
@@ -174,6 +184,42 @@ public sealed class PulpServices
     public Task RemoveAsync<T>(RecordMap<T> map, T value, CancellationToken cancellationToken)
         where T : notnull =>
         EditAsync((document, stamp, writer) => HouseholdRecords.Remove(document, map, value, stamp, writer), cancellationToken);
+
+    /// <summary>
+    /// Writes the people typed at first run (D142), each with a name record. The roster is read and the
+    /// ids minted inside the same gate the sync's adoption takes, so a roster Drive brought in while the
+    /// owner typed is the one the ids are checked against — a draft id can never land on someone already
+    /// there (see <see cref="HouseholdDraft.Commit"/>). Only the owner's phone adds people (D166).
+    /// </summary>
+    public async Task<DraftCommit> AddPeopleAsync(HouseholdDraft draft, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        if (!Rights.CanAddOrRemoveViewers)
+        {
+            throw new InvalidOperationException("Adding people is the owner's, on their phone; this phone has the household shared to it.");
+        }
+
+        DraftCommit? made = null;
+        await EditAsync((document, stamp, writer) =>
+        {
+            var view = HouseholdView.Of(document);
+            var viewers = view.Roster?.Viewers ?? [];
+            var commit = draft.Commit(viewers.Select(viewer => viewer.Id), viewers.ToDictionary(viewer => viewer.Id, viewer => view.NameOf(viewer.Id)));
+            foreach (var viewer in commit.Viewers)
+            {
+                document = HouseholdRecords.Put(document, HouseholdMaps.Viewer, viewer, stamp, writer);
+            }
+
+            foreach (var name in commit.Names)
+            {
+                document = HouseholdRecords.Put(document, HouseholdMaps.ViewerName, name, stamp, writer);
+            }
+
+            made = commit;
+            return document;
+        }, cancellationToken);
+        return made ?? throw new InvalidOperationException("The household edit ran without producing the people it was to add.");
+    }
 
     // ---- playlist and pick edits: read-modify-write against the household as it stands ----
 
@@ -327,7 +373,7 @@ public sealed class PulpServices
             }
 
             var result = await sharedHousehold.PublishAsync(await household.LoadAsync(cancellationToken), cancellationToken);
-            await AdoptAsync(result.Held, cancellationToken);
+            var brought = await AdoptAsync(result.Held, cancellationToken);
             var now = DateTimeOffset.UtcNow;
             lock (scheduleGate)
             {
@@ -342,14 +388,17 @@ public sealed class PulpServices
                 }
             }
 
-            SetStatus(result.Outcome switch
+            var settled = result.Outcome switch
             {
                 HouseholdPublishOutcome.AlreadyCurrent or HouseholdPublishOutcome.Written => HouseholdSyncStatus.Synced(now),
                 HouseholdPublishOutcome.NotYetShared => HouseholdSyncStatus.WaitingForShare(
                     SyncStatus.LastSynced,
                     $"No household file is shared with this account yet. The owner shares '{DriveHouseholdStore.FileName}' from their Drive; until then this phone keeps its household to itself."),
                 _ => SyncStatus.WentOffline("The other phone was saving at the same moment; this phone's changes are kept and go up on the next pass."),
-            });
+            };
+
+            // A screen re-reads when records came home (SyncRefresh), so the pass says whether any did.
+            SetStatus(settled with { BroughtRecords = brought });
         }
         catch (HouseholdUnreadableException exception)
         {
@@ -379,17 +428,21 @@ public sealed class PulpServices
         }
     }
 
-    private async Task AdoptAsync(HouseholdDocument published, CancellationToken cancellationToken)
+    /// <summary>Merges what the pass settled on into the phone's file; true when that brought anything the phone lacked.</summary>
+    private async Task<bool> AdoptAsync(HouseholdDocument published, CancellationToken cancellationToken)
     {
         await householdGate.WaitAsync(cancellationToken);
         try
         {
             var now = await household.LoadAsync(cancellationToken);
             var kept = HouseholdSync.Adopt(now, published);
-            if (!kept.ContentEquals(now))
+            if (kept.ContentEquals(now))
             {
-                await household.SaveAsync(kept, cancellationToken);
+                return false;
             }
+
+            await household.SaveAsync(kept, cancellationToken);
+            return true;
         }
         finally
         {

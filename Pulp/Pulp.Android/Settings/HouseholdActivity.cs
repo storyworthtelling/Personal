@@ -9,6 +9,7 @@ using Pulp.App;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Children;
 using Pulp.Domain.Core;
+using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.People;
 using Pulp.Domain.Settings;
@@ -52,6 +53,7 @@ public class HouseholdActivity : Activity
     private ThisPhoneAnswer phone = new(ThisPhoneStatus.NoRoster, null);
     private ViewerId? editing;
     private int pending;
+    private SyncWatch syncWatch = null!;
 
     public static Intent For(Context context)
     {
@@ -64,6 +66,7 @@ public class HouseholdActivity : Activity
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
         services = PulpServices.For(this);
+        syncWatch = new SyncWatch(this, services, Reload);
         writes = new LibraryWrites(services, () => RunOnUiThread(() =>
         {
             pending--;
@@ -82,6 +85,18 @@ public class HouseholdActivity : Activity
 
         ShowStatus(Loading);
         Reload();
+    }
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+        syncWatch.Resume();
+    }
+
+    protected override void OnPause()
+    {
+        base.OnPause();
+        syncWatch.Pause();
     }
 
     protected override void OnDestroy()
@@ -164,6 +179,14 @@ public class HouseholdActivity : Activity
                 SettingsViews.Spaced(this, DesignTokens.Space.X2));
         }
 
+        // D166, mockup 09: where the household stands against Drive, and what this phone may change of it.
+        var rights = services.Rights;
+        column.AddView(PaperUi.Secondary(this, HouseholdSyncText.Line(services.SyncStatus, DateTimeOffset.UtcNow)), SettingsViews.Spaced(this, DesignTokens.Space.X2));
+        if (rights.Note is { } note)
+        {
+            column.AddView(PaperUi.Secondary(this, note), SettingsViews.Spaced(this, DesignTokens.Space.X1));
+        }
+
         // ---- the people (D88) ----
         column.AddView(SettingsViews.Subheading(this, "People"));
         foreach (var viewer in people)
@@ -171,20 +194,25 @@ public class HouseholdActivity : Activity
             var name = household.NameOf(viewer.Id);
             var ceiling = rules.TryGetValue(viewer.Id, out var childRules) ? childRules.Ceiling : (AgeBand?)null;
             column.AddView(SettingsViews.Rule(this, PaperTheme.Hairline));
-            column.AddView(SettingsViews.Row(this, name, HouseholdText.Person(viewer.IsChild, ceiling), onTap: () =>
+            // On the phone the household is shared with, only her own viewer can be opened, and only to rename (D166).
+            var editable = rights.CanAddOrRemoveViewers || (rights.CanRenameOwnViewer && phone.Viewer == viewer.Id);
+            column.AddView(SettingsViews.Row(this, name, HouseholdText.Person(viewer.IsChild, ceiling), onTap: editable ? () =>
             {
                 editing = editing == viewer.Id ? null : viewer.Id;
                 Render();
-            }));
+            } : null));
 
-            if (editing == viewer.Id)
+            if (editing == viewer.Id && editable)
             {
-                column.AddView(PersonEditor(viewer, name));
+                column.AddView(PersonEditor(viewer, name, rights.CanAddOrRemoveViewers));
             }
         }
 
         column.AddView(SettingsViews.Rule(this, PaperTheme.Hairline));
-        column.AddView(AddPerson(people));
+        if (rights.CanAddOrRemoveViewers)
+        {
+            column.AddView(AddPerson());
+        }
 
         // ---- each child's rules (D12, D127–D129) ----
         foreach (var child in people.Where(viewer => viewer.IsChild))
@@ -198,7 +226,7 @@ public class HouseholdActivity : Activity
 
     // ---- people ----
 
-    private View PersonEditor(HouseholdViewer viewer, string name)
+    private View PersonEditor(HouseholdViewer viewer, string name, bool mayChangeWho)
     {
         var editor = new LinearLayout(this) { Orientation = Orientation.Vertical };
         editor.SetPadding(PaperTheme.Dp(this, DesignTokens.Space.X4), 0, 0, PaperTheme.Dp(this, DesignTokens.Space.X3));
@@ -214,12 +242,17 @@ public class HouseholdActivity : Activity
             }
         }), SettingsViews.Spaced(this, DesignTokens.Space.X2));
 
+        if (!mayChangeWho)
+        {
+            return editor;
+        }
+
         editor.AddView(SettingsViews.CheckRow(this, "A child", viewer.IsChild, isChild => SetChild(viewer, name, isChild)));
         editor.AddView(PaperUi.QuietButton(this, $"Remove {name}", () => Remove(viewer, name)), SettingsViews.Spaced(this, DesignTokens.Space.X1));
         return editor;
     }
 
-    private View AddPerson(IReadOnlyList<HouseholdViewer> people)
+    private View AddPerson()
     {
         var form = new LinearLayout(this) { Orientation = Orientation.Vertical };
         form.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X3), 0, 0);
@@ -227,17 +260,27 @@ public class HouseholdActivity : Activity
         form.AddView(field);
         var child = false;
         form.AddView(SettingsViews.CheckRow(this, "A child", child, picked => child = picked));
+        var refusal = Muted(string.Empty);
+        refusal.Visibility = ViewStates.Gone;
+        form.AddView(refusal);
         form.AddView(PaperUi.SecondaryButton(this, "Add", () =>
         {
-            if (ViewerNaming.Clean(field.Text) is not { } name)
+            // Checked against the whole roster as it stands now, the one first run checks against.
+            var roster = view?.Roster?.Viewers.Select(viewer => viewer.Id) ?? [];
+            var problem = ViewerNaming.Check(field.Text, roster);
+            refusal.Text = problem ?? string.Empty;
+            refusal.Visibility = problem is null ? ViewStates.Gone : ViewStates.Visible;
+            if (problem is not null || ViewerNaming.Clean(field.Text) is not { } name)
             {
                 return;
             }
 
-            var id = ViewerNaming.Mint(name, people.Select(viewer => viewer.Id));
             var isChild = child;
-            Enqueue($"add {id}", async token =>
+            Enqueue($"add {name}", async token =>
             {
+                // Minted against the household as it stands when the write lands, not the copy this page read.
+                var now = await services.HouseholdAsync(token);
+                var id = ViewerNaming.Mint(name, now.Roster?.Viewers.Select(viewer => viewer.Id) ?? []);
                 await services.PutAsync(HouseholdMaps.Viewer, new HouseholdViewer(id, isChild), token);
                 await services.PutAsync(HouseholdMaps.ViewerName, new ViewerNameEntry(id, name), token);
                 if (isChild)

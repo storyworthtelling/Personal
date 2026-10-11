@@ -203,7 +203,7 @@ public sealed class ChildWatchingPage
     private async Task<Read> ReadAsync(PulpServices services, CancellationToken cancellationToken)
     {
         var household = await services.HouseholdAsync(cancellationToken);
-        var resolved = session.Resolve(household.Roster, household.ChildRules);
+        var resolved = session.Resolve(household.Roster, household.ChildRules, household.NameOf);
         if (resolved.Audience is not { } audience)
         {
             return new Read(resolved.Problem, null, null, null);
@@ -220,14 +220,14 @@ public sealed class ChildWatchingPage
         foreach (var row in continueRows.OrderByDescending(row => row.Since).DistinctBy(row => row.Title))
         {
             var title = await services.TitleAsync(row.Title, tracked: true, opened: false, cancellationToken);
-            var home = ContinueRowText.Home(title, household.Services, household.HomeOverrides);
+            var home = ContinueRowText.Home(title, household.ServicePlans, household.HomeOverrides);
             var serviceName = home is null ? null : services.Catalogue.ById(home.Service)?.Name ?? home.Service.Value;
             read.Add((new WatchingRow(
                 row,
                 title?.Name ?? row.Title.Value,
                 title,
                 ContinueRowText.NextUp(row, title),
-                ContinueRowText.Where(title, household.Services, household.HomeOverrides,
+                ContinueRowText.Where(title, household.ServicePlans, household.HomeOverrides,
                     service => services.Catalogue.ById(service)?.Name ?? service.Value),
                 home,
                 serviceName,

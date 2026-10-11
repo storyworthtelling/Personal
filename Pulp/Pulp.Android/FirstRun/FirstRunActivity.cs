@@ -47,6 +47,7 @@ public class FirstRunActivity : Activity
     private HouseholdDraft draft = HouseholdDraft.Empty;
     private bool addAsChild;
     private bool busy;
+    private SyncWatch syncWatch = null!;
     private int paint;
 
     public static Intent For(Context context)
@@ -61,15 +62,54 @@ public class FirstRunActivity : Activity
         base.OnCreate(savedInstanceState);
         services = PulpServices.For(this);
         vault = new PulpVault(services);
+        syncWatch = new SyncWatch(this, services, () => _ = AdvanceAsync());
         SetContentView(BuildLayout());
+        Restore(savedInstanceState);
+    }
+
+    private const string DraftKey = "household-draft";
+    private const string TypedKey = "typed-name";
+    private const string ChildKey = "typed-as-child";
+
+    /// <summary>
+    /// Android rebuilds this screen on a rotation or when the process was reclaimed while another app (the
+    /// account picker) was in front; what was typed — the people added, the name half-written and its
+    /// child flag — is put back, or the owner would start the household again. The vault passphrase is
+    /// kept by its own store as it is typed.
+    /// </summary>
+    protected override void OnSaveInstanceState(Bundle outState)
+    {
+        base.OnSaveInstanceState(outState);
+        outState.PutString(DraftKey, HouseholdDraftCodec.Encode(draft));
+        outState.PutString(TypedKey, name.Text ?? string.Empty);
+        outState.PutBoolean(ChildKey, addAsChild);
+    }
+
+    private void Restore(Bundle? saved)
+    {
+        if (saved is null)
+        {
+            return;
+        }
+
+        draft = HouseholdDraftCodec.Decode(saved.GetString(DraftKey));
+        name.Text = saved.GetString(TypedKey) ?? string.Empty;
+        addAsChild = saved.GetBoolean(ChildKey, false);
     }
 
     protected override void OnResume()
     {
         base.OnResume();
+        syncWatch.Resume();
 
         // Back from the Vault page or the account picker: what is in place may have moved.
         _ = AdvanceAsync();
+    }
+
+    protected override void OnPause()
+    {
+        base.OnPause();
+        syncWatch.Pause();
     }
 
     protected override void OnDestroy()
@@ -138,13 +178,20 @@ public class FirstRunActivity : Activity
             services.Diagnostics.Warn("first-run", "The household could not be read for first run.", exception);
             state = new FirstRunState(
                 VoiceGoogleAccount.IsSignedIn, VaultPassphraseStore.IsSet, vault.KeysPresent(), HasRoster: false,
-                ThisPhoneStatus.NoRoster, FirstRunProgress.Skipped, FirstRunProgress.Finished);
+                ThisPhoneStatus.NoRoster, FirstRunProgress.Skipped, FirstRunProgress.Finished,
+                MayAddPeople: services.Rights.CanAddOrRemoveViewers);
         }
 
         var step = FirstRunPlan.Next(state);
         if (step == FirstRunStep.Done)
         {
-            FirstRunProgress.Finish();
+            // The phone the household is shared with has no household yet to ask "This phone is" about;
+            // it closes without being marked finished, so the step still comes once the household does (D166).
+            if (FirstRunPlan.MayFinish(state))
+            {
+                FirstRunProgress.Finish();
+            }
+
             Finish();
             return;
         }
@@ -223,7 +270,7 @@ public class FirstRunActivity : Activity
         {
             var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             row.SetGravity(GravityFlags.CenterVertical);
-            var label = ViewerNaming.Display(person.Id) + (person.IsChild ? " · " + FirstRunText.ChildMark : string.Empty);
+            var label = person.Name + (person.IsChild ? " · " + FirstRunText.ChildMark : string.Empty);
             row.AddView(PaperUi.Body(this, label), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
             var id = person.Id;
             row.AddView(PaperUi.QuietButton(this, FirstRunText.TakeOff, () =>
@@ -250,10 +297,10 @@ public class FirstRunActivity : Activity
         Bar(FirstRunStep.ThisPhone);
         body.AddView(PaperUi.Body(this, FirstRunText.PhoneLead), Spaced(0, DesignTokens.Space.X6));
 
-        HouseholdRoster? roster;
+        HouseholdView household;
         try
         {
-            roster = (await services.HouseholdAsync(lifetime.Token)).Roster;
+            household = await services.HouseholdAsync(lifetime.Token);
         }
         catch (Exception exception) when (exception is not System.OperationCanceledException)
         {
@@ -267,7 +314,7 @@ public class FirstRunActivity : Activity
             return;
         }
 
-        foreach (var choice in PhoneChoices.For(roster))
+        foreach (var choice in PhoneChoices.For(household.Roster, household.NameOf))
         {
             var id = choice.Id;
             body.AddView(PaperUi.SecondaryButton(this, FirstRunText.ThisPhoneIs(choice.Name),
@@ -354,14 +401,12 @@ public class FirstRunActivity : Activity
         try
         {
             ShowStatus(FirstRunText.Saving);
-            foreach (var person in draft.People)
-            {
-                await services.PutAsync(HouseholdMaps.Viewer, person, lifetime.Token);
-            }
+            var written = await services.AddPeopleAsync(draft, lifetime.Token);
+            var already = written.AlreadyThere.Count == 0 ? null : FirstRunText.AlreadyThere(written.AlreadyThere);
 
             PulpNotices.Withdraw(this, overlay, FirstRunNotices.HouseholdKey);
             draft = HouseholdDraft.Empty;
-            ShowStatus(null);
+            ShowStatus(already);
             await AdvanceAsync();
         }
         catch (Exception exception) when (exception is not System.OperationCanceledException)

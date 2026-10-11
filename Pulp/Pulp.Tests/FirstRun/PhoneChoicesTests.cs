@@ -37,4 +37,15 @@ public class PhoneChoicesTests
         Assert.NotEmpty(choices);
         Assert.All(choices, choice => Assert.True(ThisPhone.CanBeRecorded(Roster, choice.Id)));
     }
+
+    /// <summary>The bug: "This phone is …" read the id back as a name, so a renamed person was offered as their old id.</summary>
+    [Fact]
+    public void EachChoiceReadsAsTheNameTheHouseholdHolds()
+    {
+        var names = new Dictionary<ViewerId, string> { [new ViewerId("rowan")] = "Ro Vale" };
+
+        var choices = PhoneChoices.For(Roster, id => names.GetValueOrDefault(id) ?? id.Value);
+
+        Assert.Equal(["Ro Vale", "juniper-vale"], choices.Select(choice => choice.Name));
+    }
 }

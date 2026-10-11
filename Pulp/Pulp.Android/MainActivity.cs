@@ -5,8 +5,12 @@ using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
+using Pulp.App;
 using Pulp.Domain;
 using Pulp.Domain.ChildView;
+using Pulp.Domain.Core;
+using Pulp.Domain.Household.Records;
+using Pulp.Domain.People;
 using Pulp.Domain.Shell;
 using Pulp.FirstRun;
 using Pulp.Shell;
@@ -58,6 +62,8 @@ public class MainActivity : Activity
     private ChildViewSession? childView;
     private ChildViewStore store = null!;
     private TextView viewerLine = null!;
+    private SyncWatch syncWatch = null!;
+    private HouseholdView? household;
 
     private LinearLayout headerSlot = null!;
     private TextView greetingView = null!;
@@ -93,6 +99,7 @@ public class MainActivity : Activity
         watching.BackToMeRequested += BackToMe;
 
         store = new ChildViewStore(this);
+        syncWatch = new SyncWatch(this, PulpServices.For(this), OnHouseholdMoved);
         childView = store.Load();
         foreach (var area in all)
         {
@@ -195,11 +202,16 @@ public class MainActivity : Activity
     public static void OpenOn(Activity from, int tabIndex)
     {
         ArgumentNullException.ThrowIfNull(from);
-        if (AreaRequest.ForTab(tabIndex) is not { } area)
+        if (AreaRequest.ForTab(tabIndex) is { } area)
         {
-            return;
+            OpenOn(from, area);
         }
+    }
 
+    /// <summary>The same, for a sub-page whose binder is not the full six (a child's three): it names the area, not a strip position.</summary>
+    public static void OpenOn(Activity from, PulpArea area)
+    {
+        ArgumentNullException.ThrowIfNull(from);
         var intent = new Intent(from, typeof(MainActivity));
         intent.PutExtra(AreaRequest.Extra, AreaRequest.Word(area));
         intent.AddFlags(ActivityFlags.ClearTop | ActivityFlags.SingleTop);
@@ -311,7 +323,7 @@ public class MainActivity : Activity
         headerSlot.RemoveAllViews();
         headerSlot.AddView(PaperUi.ScreenHeader(this, Active.Title, Active.Rule));
 
-        viewerLine.Text = childView?.Label(id => id.Value) ?? string.Empty;
+        viewerLine.Text = childView?.Label(NameFor) ?? string.Empty;
         viewerLine.Visibility = childView is null ? ViewStates.Gone : ViewStates.Visible;
 
         var greeting = Active.Greeting;
@@ -329,9 +341,52 @@ public class MainActivity : Activity
         }
     }
 
+    /// <summary>The household moved under the screen (a sync pass brought records home, or its status changed): names and the showing area are read again.</summary>
+    private void OnHouseholdMoved()
+    {
+        ReadNames();
+        Active.Resume();
+    }
+
+    /// <summary>
+    /// Reads the household once off the UI thread so the line under the header names the children by
+    /// the name the household holds (<see cref="HouseholdView.NameOf"/>), not by an id.
+    /// </summary>
+    private void ReadNames()
+    {
+        var token = lifetime.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var read = await PulpServices.For(this).HouseholdAsync(token);
+                RunOnUiThread(() =>
+                {
+                    household = read;
+                    if (childView is not null && !token.IsCancellationRequested)
+                    {
+                        RenderContent();
+                    }
+                });
+            }
+            catch (System.OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                // The shell went away; nothing is waiting for the names.
+            }
+            catch (Exception exception)
+            {
+                PulpServices.For(this).Diagnostics.Warn("shell", "The household could not be read for the names under the header.", exception);
+            }
+        }, token);
+    }
+
+    private string NameFor(ViewerId id) => household?.NameOf(id) ?? ViewerNaming.Display(id);
+
     protected override void OnResume()
     {
         base.OnResume();
+        ReadNames();
+        syncWatch.Resume();
         foreach (var area in areas)
         {
             area.Resume();
@@ -343,6 +398,7 @@ public class MainActivity : Activity
     protected override void OnPause()
     {
         base.OnPause();
+        syncWatch.Pause();
         foreach (var area in areas)
         {
             area.Pause();

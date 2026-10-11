@@ -7,6 +7,7 @@ using Codex.Domain.Design;
 using Codex.Ui;
 using Pulp.App;
 using Pulp.Discover;
+using Pulp.Title;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.ChildView;
 using Pulp.Domain.Discover;
@@ -142,7 +143,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
             try
             {
                 var view = await Services.HouseholdAsync(token);
-                var resolved = session.Resolve(view.Roster, view.ChildRules);
+                var resolved = session.Resolve(view.Roster, view.ChildRules, view.NameOf);
                 if (resolved.Audience is not { } audience)
                 {
                     Land(asked, () => ShowStatus(resolved.Problem ?? ChildViewText.Unreadable));
@@ -220,7 +221,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
 
     private PosterCell Cell(ChildAudience audience, HouseholdView view, CatalogueTitle title)
     {
-        var home = audience.HomeFor(TitleHomes.Choose(title, view.Services, view.HomeOverrides), DiscoverFacts.For(title, _ => []), Services.Catalogue, view.Attested);
+        var home = audience.HomeFor(TitleHomes.Choose(title, view.ServicePlans, view.HomeOverrides), DiscoverFacts.For(title, _ => []), Services.Catalogue, view.Attested);
         var where = home is null ? null : ChildFavorites.WhereLine(title, home, Services.Catalogue.ById(home.Service)?.Name ?? home.Service.Value);
         return new PosterCell(title.Id, title.Name, where, null, title.PosterUrl);
     }
@@ -238,7 +239,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
         body?.AddView(PosterGrid.Build(
             host,
             cells,
-            cell => play.Play(cell.Id),
+            cell => host.StartActivity(TitleActivity.For(host, cell.Id)),
             cell => play.ShowCard(cell.Id, cell.Name, cell.Where),
             (window, url, width) => _ = Task.Run(async () =>
             {

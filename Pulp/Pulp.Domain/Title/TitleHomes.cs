@@ -16,17 +16,25 @@ public static class TitleHomes
 {
     /// <summary>
     /// The best home among the household's services, and the others beneath it. <b>Ad tiers are not
-    /// recorded yet</b> (Settings' Services group is Release D's), so every service the household has
-    /// is taken as ad-free and only a free, ad-supported offer says "with ads" — the page under-states
-    /// ads until the tiers land, rather than inventing them.
+    /// known by service id alone</b>: every service is taken as ad-free and only a free, ad-supported offer
+    /// says "with ads". Screens that hold the household use the <see cref="ServicePlan"/> overload.
     /// </summary>
     public static HomeChoice Choose(CatalogueTitle title, IEnumerable<ServiceId> household, HomeOverrides overrides)
     {
-        ArgumentNullException.ThrowIfNull(title);
         ArgumentNullException.ThrowIfNull(household);
+        return Choose(title, household.Distinct().Select(service => new ServicePlan(service, AdFree: true)).ToList(), overrides);
+    }
+
+    /// <summary>
+    /// The same choice over the household's recorded plans (<c>HouseholdView.ServicePlans</c>): a with-ads
+    /// subscription says so and loses a tie (D29), and the plan's picture caps what is claimed (D28, D86).
+    /// </summary>
+    public static HomeChoice Choose(CatalogueTitle title, IEnumerable<ServicePlan> plans, HomeOverrides overrides)
+    {
+        ArgumentNullException.ThrowIfNull(title);
+        ArgumentNullException.ThrowIfNull(plans);
         ArgumentNullException.ThrowIfNull(overrides);
 
-        var plans = household.Distinct().Select(service => new ServicePlan(service, AdFree: true));
         return BestHome.Choose(title.Id, TitleOffers.Streams(title.Offers), plans, overrides);
     }
 

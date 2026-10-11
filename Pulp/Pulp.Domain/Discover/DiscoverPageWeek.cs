@@ -127,6 +127,14 @@ public sealed class DiscoverPageWeek
         return Pile(TitleKind.Film, vetoes).Concat(Pile(TitleKind.Show, vetoes)).All(card => card.State != CardState.Fresh);
     }
 
+    /// <summary>
+    /// Whether this kept week still stands for <paramref name="who"/> at <paramref name="now"/>: the same
+    /// viewer's, and not yet at its Friday. Deliberately not a question of sizes: a size chosen in Settings
+    /// is read only when a week is dealt, so a change can neither refill nor shrink the week in hand
+    /// (D112, D220); it takes effect at the next turnover.
+    /// </summary>
+    public bool Keeps(ViewerId who, DateTimeOffset now) => Viewer == who && !IsDue(now);
+
     /// <summary>True from the next Friday 6 am: the week is dealt again, whole (D110).</summary>
     public bool IsDue(DateTimeOffset now) => now >= Until;
 

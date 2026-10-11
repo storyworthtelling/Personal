@@ -8,6 +8,7 @@ using Codex.Ui;
 using Pulp.App;
 using Pulp.Domain.Availability;
 using Pulp.Domain.Core;
+using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Services;
 using Pulp.Domain.Settings;
@@ -47,6 +48,7 @@ public class ServiceActivity : Activity
     private bool attested;
     private bool loaded;
     private int pending;
+    private SyncWatch syncWatch = null!;
 
     public static Intent For(Context context, ServiceId service)
     {
@@ -80,6 +82,7 @@ public class ServiceActivity : Activity
             return;
         }
 
+        syncWatch = new SyncWatch(this, services, Reload);
         id = new ServiceId(raw);
         service = services.Catalogue.ById(id);
         plan = new ServicePlanEntry(id);
@@ -92,6 +95,18 @@ public class ServiceActivity : Activity
 
         ShowStatus(Loading);
         Reload();
+    }
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+        syncWatch?.Resume();
+    }
+
+    protected override void OnPause()
+    {
+        base.OnPause();
+        syncWatch?.Pause();
     }
 
     protected override void OnDestroy()
@@ -146,6 +161,12 @@ public class ServiceActivity : Activity
         }
 
         var name = service.Name;
+        if (!services.Rights.CanEditServices)
+        {
+            RenderReadOnly(name);
+            return;
+        }
+
         column.AddView(SettingsViews.CheckRow(this, $"The household has {name}", had, SetHad));
         if (!loaded || !had)
         {
@@ -186,6 +207,19 @@ public class ServiceActivity : Activity
         column.AddView(SettingsViews.Subheading(this, "Flyleaf"));
         column.AddView(SettingsViews.CheckRow(this, "Hide from Flyleaf", !plan.ShownInFlyleaf, hide => SetPlan(plan with { ShownInFlyleaf = !hide })));
         column.AddView(Muted($"Off Flyleaf's tray, {name} opens only through Pulp, on a title."));
+    }
+
+    /// <summary>D166: on the phone the household is shared with the service is read, not changed.</summary>
+    private void RenderReadOnly(string name)
+    {
+        column.AddView(PaperUi.Body(this, had ? $"The household has {name}." : $"The household doesn't have {name}."));
+        if (had)
+        {
+            column.AddView(Muted(ServiceRowText.Tier(plan)), SettingsViews.Spaced(this, DesignTokens.Space.X1));
+            column.AddView(Muted(service is { KidsOnly: true } ? AttestationText.KidsOnly(name) : AttestationText.ReadOnly(name, attested)));
+        }
+
+        column.AddView(Muted(HouseholdPermissions.OwnerOnlyNote), SettingsViews.Spaced(this, DesignTokens.Space.X3));
     }
 
     private void SetHad(bool has)

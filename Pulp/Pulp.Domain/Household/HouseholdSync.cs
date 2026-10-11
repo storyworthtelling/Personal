@@ -43,6 +43,67 @@ public enum HouseholdFileRole
     SharedWith,
 }
 
+/// <summary>
+/// What a household screen may do on a phone, by whether it owns the file (D166). Both adults manage the
+/// children and the phone's own viewer; the services and adding or removing people stay the owner's. A
+/// role not known yet is not restricted: it is the owner's phone before the vault was read, or a phone
+/// with no vault at all, where there is nobody else to protect the household from.
+/// </summary>
+public sealed record HouseholdPermissions(
+    bool CanEditServices, bool CanAddOrRemoveViewers, bool CanEditChildren, bool CanRenameOwnViewer, string? Note)
+{
+    public const string OwnerOnlyNote = "Services, and adding or removing people, are the owner's to change, on their phone.";
+
+    public static HouseholdPermissions For(HouseholdFileRole role) => role == HouseholdFileRole.SharedWith
+        ? new HouseholdPermissions(false, false, true, true, OwnerOnlyNote)
+        : new HouseholdPermissions(true, true, true, true, null);
+}
+
+/// <summary>When a screen showing the household reads it again: a pass brought records home, or the status moved.</summary>
+public static class SyncRefresh
+{
+    public static bool Needed(HouseholdSyncStatus? previous, HouseholdSyncStatus next)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        return previous is null || next.BroughtRecords || previous.State != next.State;
+    }
+}
+
+/// <summary>The quiet line a household screen carries about the sync. Plain, never voiced, never a raw error.</summary>
+public static class HouseholdSyncText
+{
+    public static string Line(HouseholdSyncStatus status, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(status);
+        return status.State switch
+        {
+            HouseholdSyncState.Synced when status.LastSynced is { } at => "Synced with Drive " + Ago(at, now) + ".",
+            HouseholdSyncState.Synced => "Synced with Drive.",
+            HouseholdSyncState.Offline => "Drive couldn't be reached. Changes are kept on this phone and go up when it can.",
+            HouseholdSyncState.WaitingForShare => "Waiting for the owner to share the household with this account.",
+            _ => status.Reason,
+        };
+    }
+
+    private static string Ago(DateTimeOffset at, DateTimeOffset now)
+    {
+        var elapsed = now - at;
+        if (elapsed < TimeSpan.FromMinutes(1))
+        {
+            return "just now";
+        }
+
+        if (elapsed < TimeSpan.FromHours(1))
+        {
+            return $"{(int)elapsed.TotalMinutes} min ago";
+        }
+
+        return elapsed < TimeSpan.FromDays(1)
+            ? $"{(int)elapsed.TotalHours} h ago"
+            : "on " + at.ToString("MMM d", System.Globalization.CultureInfo.InvariantCulture);
+    }
+}
+
 /// <summary>How one publish pass ended.</summary>
 public enum HouseholdPublishOutcome
 {
@@ -65,7 +126,7 @@ public enum HouseholdPublishOutcome
 /// is a fact the Settings page states, not a problem waiting behind the dog-ear.
 /// </summary>
 public sealed record HouseholdSyncStatus(
-    HouseholdSyncState State, DateTimeOffset? LastSynced, string Reason, HouseholdUnreadableReason? UnreadableReason = null)
+    HouseholdSyncState State, DateTimeOffset? LastSynced, string Reason, HouseholdUnreadableReason? UnreadableReason = null, bool BroughtRecords = false)
 {
     public static HouseholdSyncStatus LocalOnly(string reason) => new(HouseholdSyncState.LocalOnly, null, reason);
 

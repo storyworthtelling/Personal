@@ -12,11 +12,12 @@ public sealed record PhoneChoice(ViewerId Id, string Name);
 /// </summary>
 public static class PhoneChoices
 {
-    public static IReadOnlyList<PhoneChoice> For(HouseholdRoster? roster) =>
+    /// <param name="nameOf">How a person is written — the household's name record (<c>HouseholdView.NameOf</c>); the id read as a name when none is given.</param>
+    public static IReadOnlyList<PhoneChoice> For(HouseholdRoster? roster, Func<ViewerId, string>? nameOf = null) =>
         roster is null
             ? []
             : roster.Viewers
                 .Where(person => ThisPhone.CanBeRecorded(roster, person.Id))
-                .Select(person => new PhoneChoice(person.Id, ViewerNaming.Display(person.Id)))
+                .Select(person => new PhoneChoice(person.Id, (nameOf ?? ViewerNaming.Display)(person.Id)))
                 .ToList();
 }

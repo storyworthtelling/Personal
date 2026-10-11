@@ -94,7 +94,7 @@ public sealed class HouseholdView
     /// tier was recorded — so setting nothing changes nothing, and only a recorded "with ads" plan says so.
     /// </summary>
     public IReadOnlyList<ServicePlan> ServicePlans =>
-        Services.Distinct().Select(service => new ServicePlan(service, AdFree: PlanOf(service)?.Tier != PlanTier.WithAds)).ToList();
+        Services.Distinct().Select(service => new ServicePlan(service, AdFree: PlanOf(service)?.Tier != PlanTier.WithAds, Picture: PlanOf(service)?.Picture)).ToList();
 
     /// <summary>The name a viewer goes by: their name record, or their id until one is written.</summary>
     public string NameOf(ViewerId viewer) => names.FirstOrDefault(entry => entry.Viewer == viewer)?.Name ?? viewer.Value;

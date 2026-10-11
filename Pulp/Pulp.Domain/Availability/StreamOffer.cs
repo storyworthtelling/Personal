@@ -8,5 +8,9 @@ namespace Pulp.Domain.Availability;
 /// </summary>
 public sealed record StreamOffer(ServiceId Service, VideoQuality Quality, bool AlwaysWithAds = false);
 
-/// <summary>A service the household has, and whether its plan tier is ad-free (D29, recorded in Settings).</summary>
-public sealed record ServicePlan(ServiceId Service, bool AdFree);
+/// <summary>
+/// A service the household has, whether its plan tier is ad-free (D29) and, when Settings recorded it, the
+/// best picture the plan streams at (D86). That picture caps what a title can be claimed to play at on
+/// this service: an HD plan shows HD whatever the catalogue lists the title at (D28).
+/// </summary>
+public sealed record ServicePlan(ServiceId Service, bool AdFree, VideoQuality? Picture = null);

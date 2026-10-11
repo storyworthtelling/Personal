@@ -76,11 +76,13 @@ public sealed record ChildViewSession
     /// <summary>
     /// The children's own filters, read from the household as it stands. Every child picked must still
     /// be a child on the roster with rules of their own; otherwise there is no audience and the page
-    /// says why — a child judged by nothing would be shown everything.
+    /// says why — a child judged by nothing would be shown everything. The sentence names the child by
+    /// <paramref name="nameOf"/> (the household's name record), the id read as a name when none is given.
     /// </summary>
-    public ChildAudienceResult Resolve(HouseholdRoster? roster, IEnumerable<ChildRules> rules)
+    public ChildAudienceResult Resolve(HouseholdRoster? roster, IEnumerable<ChildRules> rules, Func<ViewerId, string>? nameOf = null)
     {
         ArgumentNullException.ThrowIfNull(rules);
+        nameOf ??= ViewerNaming.Display;
         if (roster is null)
         {
             return new ChildAudienceResult(null, ChildViewText.NoHousehold);
@@ -92,12 +94,12 @@ public sealed record ChildViewSession
         {
             if (!roster.Contains(child) || !roster.IsChild(child))
             {
-                return new ChildAudienceResult(null, ChildViewText.NotAChild(child.Value));
+                return new ChildAudienceResult(null, ChildViewText.NotAChild(nameOf(child)));
             }
 
             if (!known.TryGetValue(child, out var rule))
             {
-                return new ChildAudienceResult(null, ChildViewText.NoFilter(child.Value));
+                return new ChildAudienceResult(null, ChildViewText.NoFilter(nameOf(child)));
             }
 
             picked.Add(rule);

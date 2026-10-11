@@ -23,6 +23,7 @@ using Pulp.Domain.Shell;
 using Pulp.Domain.Voice;
 using Pulp.Infrastructure.Catalogue;
 using Pulp.Library;
+using Pulp.Settings;
 using Pulp.Title;
 
 namespace Pulp.Shell;
@@ -207,7 +208,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         var store = weekStore.Value;
         var kept = store.Load();
         var now = DateTimeOffset.UtcNow;
-        if (kept is not null && kept.Viewer == who && !kept.IsDue(now))
+        if (kept is not null && kept.Keeps(who, now))
         {
             Publish(view, who, book, kept, DiscoverPageText.StackStatus);
             return;
@@ -244,7 +245,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         var taste = TasteLearner.Learn(who, roster, watched, book);
         var dealt = DiscoverPageWeek.Deal(
             who, roster, pool, taste, book, DiscoverPageWatched.AlreadyWatched(view.SittingsOf(who)),
-            StackSizes.Default, now, TimeZoneInfo.Local, Plans(view), view.HomeOverrides);
+            new StackSizeStore(Host).Load(), now, TimeZoneInfo.Local, Plans(view), view.HomeOverrides);
         try
         {
             store.Save(dealt);

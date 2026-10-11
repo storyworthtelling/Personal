@@ -5,6 +5,7 @@ using Codex.Domain.Design;
 using Codex.Ui;
 using Pulp.App;
 using Pulp.Components;
+using Pulp.Title;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Children;
 using Pulp.Domain.ChildView;
@@ -86,7 +87,7 @@ public sealed class ChildPlaylistsPage(Activity host, Func<FrameLayout> overlay,
             return PosterGrid.Build(
                 host,
                 shown.Cells,
-                cell => actions.Play(cell.Id),
+                cell => host.StartActivity(TitleActivity.For(host, cell.Id)),
                 cell => actions.ShowCard(cell.Id, cell.Name, cell.Where),
                 (window, url, width) => _ = Task.Run(async () =>
                 {
@@ -156,7 +157,7 @@ public sealed class ChildPlaylistsPage(Activity host, Func<FrameLayout> overlay,
             try
             {
                 var household = await services.HouseholdAsync(cancel.Token);
-                var resolved = session.Resolve(household.Roster, household.ChildRules);
+                var resolved = session.Resolve(household.Roster, household.ChildRules, household.NameOf);
                 if (resolved.Audience is not { } audience)
                 {
                     Land(cancel, () => problem = resolved.Problem);
@@ -206,7 +207,7 @@ public sealed class ChildPlaylistsPage(Activity host, Func<FrameLayout> overlay,
 
     private static PosterCell Cell(PulpServices services, ChildAudience audience, HouseholdView household, CatalogueTitle title)
     {
-        var home = audience.HomeFor(TitleHomes.Choose(title, household.Services, household.HomeOverrides), DiscoverFacts.For(title, _ => []), services.Catalogue, household.Attested);
+        var home = audience.HomeFor(TitleHomes.Choose(title, household.ServicePlans, household.HomeOverrides), DiscoverFacts.For(title, _ => []), services.Catalogue, household.Attested);
         var where = home is null ? null : ChildFavorites.WhereLine(title, home, services.Catalogue.ById(home.Service)?.Name ?? home.Service.Value);
         return new PosterCell(title.Id, title.Name, where, null, title.PosterUrl);
     }

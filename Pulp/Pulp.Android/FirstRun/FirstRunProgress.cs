@@ -56,7 +56,8 @@ internal static class FirstRunProgress
             view.Roster is not null,
             phone.Status,
             Skipped,
-            Finished);
+            Finished,
+            MayAddPeople: services.Rights.CanAddOrRemoveViewers);
     }
 
     private static ISharedPreferences Prefs() =>

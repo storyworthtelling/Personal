@@ -22,8 +22,8 @@ public sealed record PlaylistRowLines(string? Name, string KindLine, string? Whe
 /// <item>A struck row adds "· watched" and drops the place (D101); a caught-up show reads "Caught up ·
 /// Season N out &lt;date&gt;" (D224); a film not out yet carries its date (D32). A dimmed row names no place.</item>
 /// </list>
-/// The household's plan tiers are not recorded yet, so a subscription is taken as ad-free and only a
-/// free service's offer says "with ads".
+/// Over bare service ids a subscription is taken as ad-free and only a free service's offer says "with
+/// ads"; over the household's plans a recorded with-ads tier says so too.
 /// </summary>
 public static class PlaylistPageRowText
 {
@@ -36,8 +36,23 @@ public static class PlaylistPageRowText
         HomeOverrides overrides,
         DateOnly today)
     {
-        ArgumentNullException.ThrowIfNull(row);
         ArgumentNullException.ThrowIfNull(householdServices);
+        return For(row, title, householdServices.Distinct().Select(service => new ServicePlan(service, AdFree: true)).ToList(), overrides, today);
+    }
+
+    /// <summary>
+    /// The row over the household's recorded plans (D29): a with-ads subscription says "On Streamly · HD,
+    /// with ads" and a plan's picture caps the 4K the row may claim.
+    /// </summary>
+    public static PlaylistRowLines For(
+        PlaylistRow row,
+        CatalogueTitle? title,
+        IReadOnlyList<ServicePlan> plans,
+        HomeOverrides overrides,
+        DateOnly today)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(plans);
         ArgumentNullException.ThrowIfNull(overrides);
 
         var kind = KindAndLength(row.Entry.Kind, title);
@@ -69,7 +84,7 @@ public static class PlaylistPageRowText
             return new PlaylistRowLines(name, kind, WhereLine: null, WhereEmphasis: false);
         }
 
-        var (where, emphasis) = Where(title, householdServices, overrides);
+        var (where, emphasis) = Where(title, plans, overrides);
         return new PlaylistRowLines(name, kind, where, emphasis);
     }
 
@@ -90,9 +105,8 @@ public static class PlaylistPageRowText
             ? $"{minutes}m"
             : string.Create(CultureInfo.InvariantCulture, $"{minutes / 60}h {minutes % 60:00}m");
 
-    private static (string? Line, bool Emphasis) Where(CatalogueTitle title, IReadOnlyList<ServiceId> householdServices, HomeOverrides overrides)
+    private static (string? Line, bool Emphasis) Where(CatalogueTitle title, IReadOnlyList<ServicePlan> plans, HomeOverrides overrides)
     {
-        var plans = householdServices.Select(service => new ServicePlan(service, AdFree: true));
         var choice = BestHome.Choose(title.Id, TitleOffers.Streams(title.Offers), plans, overrides);
 
         if (choice.Best is { } best)
@@ -119,6 +133,11 @@ public static class PlaylistPageRowText
             if (offer?.Kind == OfferKind.Free)
             {
                 line += Dot + "free, with ads";
+            }
+            else if (best.WithAds)
+            {
+                line += Dot + Quality(best.Quality) + ", with ads";
+                return (line, false);
             }
 
             if (best.Quality == VideoQuality.Uhd)

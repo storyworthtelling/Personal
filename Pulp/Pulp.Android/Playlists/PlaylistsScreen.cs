@@ -417,7 +417,7 @@ internal sealed class PlaylistsScreen
     private View BuildRow(HouseholdPlaylist playlist, PlaylistRow row, HouseholdView view, DateOnly today)
     {
         var title = TitleOf(row.Entry);
-        var text = PlaylistPageRowText.For(row, title, view.Services, view.HomeOverrides, today);
+        var text = PlaylistPageRowText.For(row, title, view.ServicePlans, view.HomeOverrides, today);
         var name = text.Name ?? (title is null && row.Entry.Kind is PlaylistEntryKind.Film or PlaylistEntryKind.Show
             ? "Looking it up…"
             : row.Entry.Key);

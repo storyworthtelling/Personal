@@ -100,45 +100,56 @@ public static class ContinueRowText
     /// service, which is what that home is (D29). Null when nothing is cached or the title is on none
     /// of the household's services; the row then leaves the line out rather than guess.
     ///
-    /// <para>Every subscription is read as ad-free: the household records no plan tier yet (D29's
-    /// Settings record is not built), so a "with ads" plan cannot be told from an ad-free one.</para>
+    /// <para>This overload knows services by id only, so every subscription is read as ad-free; the
+    /// <see cref="ServicePlan"/> overload reads the tier Settings recorded.</para>
     /// </summary>
     public static string? Where(CatalogueTitle? title, IEnumerable<ServiceId> household, HomeOverrides overrides, Func<ServiceId, string> nameOf)
     {
         ArgumentNullException.ThrowIfNull(household);
+        return Where(title, AdFreePlans(household), overrides, nameOf);
+    }
+
+    /// <summary>
+    /// <see cref="Where(CatalogueTitle?, IEnumerable{ServiceId}, HomeOverrides, Func{ServiceId, string})"/> over the
+    /// household's recorded plans (D29): a with-ads subscription reads "On Northstar+ · HD, with ads", a free
+    /// service still "free, with ads".
+    /// </summary>
+    public static string? Where(CatalogueTitle? title, IEnumerable<ServicePlan> plans, HomeOverrides overrides, Func<ServiceId, string> nameOf)
+    {
+        ArgumentNullException.ThrowIfNull(plans);
         ArgumentNullException.ThrowIfNull(overrides);
         ArgumentNullException.ThrowIfNull(nameOf);
-        if (title is null)
+        if (title is null || Home(title, plans, overrides) is not { } best)
         {
             return null;
         }
 
-        if (Home(title, household, overrides) is not { } best)
-        {
-            return null;
-        }
-
-        var how = best.WithAds ? "free, with ads" : Quality(best.Quality);
+        var free = title.Offers.Any(offer => offer.Service.Equals(best.Service) && offer.Kind == OfferKind.Free);
+        var how = free ? "free, with ads" : best.WithAds ? Quality(best.Quality) + ", with ads" : Quality(best.Quality);
         return $"On {nameOf(best.Service)}{Separator}{how}";
     }
 
     /// <summary>
     /// The home the where-line names and Play opens on (D28, D216): <see cref="BestHome"/> over the
-    /// household's services, every plan read as ad-free (see <see cref="Where"/>). Null when nothing is
+    /// household's services (plans as the overload used reads them). Null when nothing is
     /// cached or no household service carries the title.
     /// </summary>
     public static Home? Home(CatalogueTitle? title, IEnumerable<ServiceId> household, HomeOverrides overrides)
     {
         ArgumentNullException.ThrowIfNull(household);
-        ArgumentNullException.ThrowIfNull(overrides);
-        if (title is null)
-        {
-            return null;
-        }
-
-        var plans = household.Distinct().Select(service => new ServicePlan(service, AdFree: true)).ToList();
-        return BestHome.Choose(title.Id, TitleOffers.Streams(title.Offers), plans, overrides).Best;
+        return Home(title, AdFreePlans(household), overrides);
     }
+
+    /// <summary>The home over the household's recorded plans: a with-ads tier and a capped picture are read (D28, D29).</summary>
+    public static Home? Home(CatalogueTitle? title, IEnumerable<ServicePlan> plans, HomeOverrides overrides)
+    {
+        ArgumentNullException.ThrowIfNull(plans);
+        ArgumentNullException.ThrowIfNull(overrides);
+        return title is null ? null : BestHome.Choose(title.Id, TitleOffers.Streams(title.Offers), plans, overrides).Best;
+    }
+
+    private static List<ServicePlan> AdFreePlans(IEnumerable<ServiceId> household) =>
+        household.Distinct().Select(service => new ServicePlan(service, AdFree: true)).ToList();
 
     /// <summary>The action card's second line (mockup 10): what's next, then the service.</summary>
     public static string? CardSubtitle(string? nextUp, string? serviceName)
