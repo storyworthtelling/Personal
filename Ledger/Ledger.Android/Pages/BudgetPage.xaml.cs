@@ -4,6 +4,8 @@ using Index.Domain.Design;
 using Index.Domain.Household;
 using Index.Domain.Model;
 using Index.Domain.Time;
+using Index.Domain.Usage;
+using Index.Android.Platforms.Android;
 using Index.Infrastructure.Household;
 using Index.Infrastructure.Services;
 using Storyworthtelling.Maui;
@@ -432,10 +434,11 @@ public partial class BudgetPage : LedgerBinderPage
             TextColor = PaperResources.Colour("InkSoft"),
         });
 
+        var usage = PulpUsageStore.Load();
         var shown = NotePaging.Shown(transactions.Count, NotePaging.TransactionsInitial, NotePaging.TransactionsStep, noteTaps);
         foreach (var view in transactions.Take(shown))
         {
-            content.Children.Add(BuildTransactionRow(view, categoryId));
+            content.Children.Add(BuildTransactionRow(view, categoryId, usage, yearMonth));
         }
 
         var remaining = NotePaging.Remaining(transactions.Count, NotePaging.TransactionsInitial, NotePaging.TransactionsStep, noteTaps);
@@ -450,7 +453,7 @@ public partial class BudgetPage : LedgerBinderPage
         return PlanPostIt.Place(PostItView.BuildManual(bankPrimaryColorHex: null, content), PlanSpacing.CardGapDp);
     }
 
-    private View BuildTransactionRow(BudgetTransactionView view, Guid? categoryId)
+    private View BuildTransactionRow(BudgetTransactionView view, Guid? categoryId, PulpUsageLedger usage, string yearMonth)
     {
         var softInk = PaperResources.Colour("InkSoft");
         var transaction = view.Transaction;
@@ -469,6 +472,19 @@ public partial class BudgetPage : LedgerBinderPage
                 },
             },
         };
+
+        // Mockup 15 (Pulp D269/D270): one muted line under a charge Pulp knows — same ink as the line
+        // above it, no colour, no tap of its own. A charge Pulp does not know gets nothing.
+        var usageLine = PulpUsageLine.For(usage, transaction.MerchantName, yearMonth, CalendarDate.PhoneDay(DateTimeOffset.UtcNow));
+        if (usageLine is not null)
+        {
+            left.Children.Add(new Label
+            {
+                Text = usageLine,
+                Style = PaperResources.Token<Style>("SecondaryLabel"),
+                TextColor = softInk,
+            });
+        }
 
         var grid = new Grid
         {

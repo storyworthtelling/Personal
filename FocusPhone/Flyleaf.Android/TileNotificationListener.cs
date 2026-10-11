@@ -33,7 +33,18 @@ public class TileNotificationListener : NotificationListenerService
     {
         base.OnListenerConnected();
         BroadcastActivePackages();
+        sessions ??= new PlaybackSessionWatcher(this, new ComponentName(this, Class));
+        sessions.Start();
     }
+
+    public override void OnListenerDisconnected()
+    {
+        sessions?.Stop();
+        base.OnListenerDisconnected();
+    }
+
+    // Relays the playback sessions of the apps Pulp named (P12, finding 2.3); see PlaybackSessionWatcher.
+    private PlaybackSessionWatcher? sessions;
 
     // One per bound listener: a rebind starts with no memory of what was ringing, which at worst
     // opens a still-ringing call screen once more.

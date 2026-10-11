@@ -9,18 +9,24 @@ using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
 using Pulp.Domain.FirstRun;
 using Pulp.Domain.Household;
+using Pulp.Domain.Hidden;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
 using Pulp.Domain.People;
 using Pulp.Domain.Services;
+using Pulp.Domain.Sessions;
 using Pulp.Domain.Sports;
+using Pulp.Domain.Usage;
 using Pulp.Components;
 using Pulp.HandOffs;
+using Pulp.Hidden;
 using Pulp.Infrastructure.Calendar;
 using Pulp.Infrastructure.Catalogue;
 using Pulp.Infrastructure.Discover;
 using Pulp.Infrastructure.Household;
 using Pulp.Infrastructure.Sports;
+using Pulp.Sessions;
+using Pulp.Usage;
 using Storyworthtelling.Voice;
 
 namespace Pulp.App;
@@ -65,9 +71,12 @@ public sealed class PulpServices
     private readonly SpoilerPeeks peeks = new();
     private FoldMemory foldMemory = FoldMemory.Empty;
     private readonly SemaphoreSlim householdGate = new(1, 1);
+    private readonly Context appContext;
+    private readonly HiddenAppsSendGate hiddenGate = new();
 
     private PulpServices(Context context)
     {
+        appContext = context;
         var files = context.FilesDir?.AbsolutePath ?? throw new InvalidOperationException("Pulp has no files directory to keep its household in.");
         var cacheRoot = context.CacheDir?.AbsolutePath ?? files;
 
@@ -106,6 +115,10 @@ public sealed class PulpServices
         };
         CalendarSchedule.Schedule(context);
 
+        // Flyleaf's relayed playback sessions (G18). Set here like the calendar hooks, so the receiver, which
+        // Android can start with no shell, finds it once these services exist. The hook only records evidence.
+        SessionHooks.Record = RecordSession;
+
         household = new LocalHouseholdStore(files);
         install = new LocalInstallStore(files);
         cache = new CatalogueCache(Path.Combine(cacheRoot, "catalogue"));
@@ -132,6 +145,9 @@ public sealed class PulpServices
             () => DateTimeOffset.UtcNow);
         syncLoop.Opened();
         _ = Task.Run(() => syncLoop.RunAsync(CancellationToken.None));
+
+        // The hidden set goes to Flyleaf once at launch (G17); after that only a changed set is sent.
+        _ = Task.Run(SendHiddenAtLaunchAsync);
 
         // The keys and the household role come from the vault, which nothing else reads at a cold start.
         _ = Task.Run(RefreshAtLaunchAsync);
@@ -284,16 +300,118 @@ public sealed class PulpServices
             Diagnostics.Warn("household", record.Reason);
         }
 
+        SendHidden(view.Services);
         return view;
     }
 
-    public Task PutAsync<T>(RecordMap<T> map, T value, CancellationToken cancellationToken)
-        where T : notnull =>
-        EditAsync((document, stamp, writer) => HouseholdRecords.Put(document, map, value, stamp, writer), cancellationToken);
+    public async Task PutAsync<T>(RecordMap<T> map, T value, CancellationToken cancellationToken)
+        where T : notnull
+    {
+        await EditAsync((document, stamp, writer) => HouseholdRecords.Put(document, map, value, stamp, writer), cancellationToken);
+        await AfterWriteAsync(map, value);
+    }
 
-    public Task RemoveAsync<T>(RecordMap<T> map, T value, CancellationToken cancellationToken)
-        where T : notnull =>
-        EditAsync((document, stamp, writer) => HouseholdRecords.Remove(document, map, value, stamp, writer), cancellationToken);
+    public async Task RemoveAsync<T>(RecordMap<T> map, T value, CancellationToken cancellationToken)
+        where T : notnull
+    {
+        await EditAsync((document, stamp, writer) => HouseholdRecords.Remove(document, map, value, stamp, writer), cancellationToken);
+        await AfterWriteAsync(map, value);
+    }
+
+    // ---- what the household's writes tell the other apps (G16, G17) ----
+
+    /// <summary>
+    /// The cross-app sends that follow a write: a recorded hand-off republishes the month's usage to Index
+    /// (it replaces the month's total, so sending again is safe), and a tick change resends the hidden set to
+    /// Flyleaf. Neither can fail the write, which has already landed.
+    /// </summary>
+    private async Task AfterWriteAsync<T>(RecordMap<T> map, T value)
+        where T : notnull
+    {
+        try
+        {
+            if (value is WatchedSitting { Sitting.Evidence: Pulp.Domain.Library.WatchSource.HandOff })
+            {
+                var view = HouseholdView.Of(await household.LoadAsync(CancellationToken.None));
+                IndexUsageCourier.Publish(appContext, UsageHandOffs.From(view.AllSittings), ServiceCatalogue.Public);
+            }
+            else if (ReferenceEquals(map, HouseholdMaps.HouseholdService))
+            {
+                SendHidden(HouseholdView.Of(await household.LoadAsync(CancellationToken.None)).Services);
+            }
+        }
+        catch (Exception exception)
+        {
+            Diagnostics.Warn("handoff", "A cross-app send after a household write failed; the write itself stands.", exception);
+        }
+    }
+
+    private async Task SendHiddenAtLaunchAsync()
+    {
+        try
+        {
+            SendHidden(HouseholdView.Of(await household.LoadAsync(CancellationToken.None)).Services);
+        }
+        catch (Exception exception)
+        {
+            Diagnostics.Warn("hidden", "The household could not be read to tell Flyleaf which apps to hide.", exception);
+        }
+    }
+
+    /// <summary>Sends Flyleaf the ticked services' apps to hide when that set is not the one last sent in this process; the empty set too.</summary>
+    private void SendHidden(IReadOnlyList<ServiceId> ticked)
+    {
+        try
+        {
+            if (hiddenGate.ShouldSend(ticked))
+            {
+                HiddenAppsCourier.Send(appContext, ServiceCatalogue.Public, ticked);
+            }
+        }
+        catch (Exception exception)
+        {
+            hiddenGate.Forget();
+            Diagnostics.Warn("hidden", "Telling Flyleaf which apps to hide failed.", exception);
+        }
+    }
+
+    // ---- Flyleaf's playback sessions (G18) ----
+
+    /// <summary>The kind of each closed or changing session as it arrives, for Release G's return-to-Pulp; nothing else about it.</summary>
+    public event Action<SessionEventKind>? SessionKindSeen;
+
+    /// <summary>
+    /// Matches a relayed session to the title the household last handed off and keeps it as that viewer's
+    /// session evidence. It records an observation and never a verdict: <c>Watched.Decide</c> is the one
+    /// judge. Runs off the receiver's thread and never throws into it.
+    /// </summary>
+    private void RecordSession(SessionMeaning meaning)
+    {
+        try
+        {
+            SessionKindSeen?.Invoke(meaning.Kind);
+        }
+        catch (Exception exception)
+        {
+            Diagnostics.Warn("sessions", "A listener for the session kind failed.", exception);
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var view = HouseholdView.Of(await household.LoadAsync(CancellationToken.None));
+                foreach (var sitting in SessionRecording.Resolve(meaning, Catalogue, view.AllSittings))
+                {
+                    await PutAsync(HouseholdMaps.Watched, sitting, CancellationToken.None);
+                }
+            }
+            catch (Exception exception)
+            {
+                Diagnostics.Warn("sessions", "A playback session could not be recorded as watch evidence.", exception);
+            }
+        });
+    }
 
     /// <summary>
     /// Writes the people typed at first run (D142), each with a name record. The roster is read and the

@@ -111,6 +111,9 @@ public sealed class HouseholdView
     /// <summary>The name a viewer goes by: their name record, or their id until one is written.</summary>
     public string NameOf(ViewerId viewer) => names.FirstOrDefault(entry => entry.Viewer == viewer)?.Name ?? viewer.Value;
 
+    /// <summary>Everyone's sittings, for what is about the household and not one viewer: the usage count and which hand-off a session belongs to.</summary>
+    public IReadOnlyList<WatchedSitting> AllSittings => sittings;
+
     /// <summary>One viewer's own sittings (D97): what Continue Watching and Recently watched are built from.</summary>
     public IReadOnlyList<WatchEvent> SittingsOf(ViewerId viewer) =>
         sittings.Where(sitting => sitting.Viewer == viewer).Select(sitting => sitting.Sitting).ToList();

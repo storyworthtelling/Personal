@@ -21,7 +21,8 @@ public record TrayModel(
 /// Builds the tray layout from the allowed apps and the owner's category catalog: the owner's
 /// non-FocusPhone sibling apps stay loose at the root; every other app is placed by the owner's
 /// override, else the curated seed, else Android's declared category — and lands loose when none
-/// of those name a category that still exists in the catalog. Folders come back in the catalog's
+/// of those name a category that still exists in the catalog. Apps in <paramref name="hidden"/> are
+/// left out entirely. Folders come back in the catalog's
 /// (owner-chosen) order, and empty ones are omitted, so the caller never renders a bare shelf.
 /// </summary>
 public static class AppTrayLayout
@@ -29,7 +30,8 @@ public static class AppTrayLayout
     public static TrayModel Build(
         IEnumerable<TrayApp> apps,
         IReadOnlyDictionary<string, string> overrides,
-        CategoryCatalog catalog)
+        CategoryCatalog catalog,
+        HiddenApps? hidden = null)
     {
         var repoApps = new List<TrayApp>();
         var looseApps = new List<TrayApp>();
@@ -37,6 +39,13 @@ public static class AppTrayLayout
 
         foreach (var app in apps)
         {
+            // Pulp's ticked streaming services (D92): reachable only through Pulp, so not on the
+            // shelf at all, whatever the owner's override says.
+            if (hidden is not null && hidden.Contains(app.PackageName))
+            {
+                continue;
+            }
+
             // The four FocusPhone apps live on the home shelf, never the tray.
             if (PolicyContext.FocusPhonePackages.Contains(app.PackageName))
             {
