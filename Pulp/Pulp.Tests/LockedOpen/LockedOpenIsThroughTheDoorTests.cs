@@ -41,7 +41,7 @@ public class LockedOpenIsThroughTheDoorTests
 
         Assert.True(refused >= 0 && send > refused, "The locked send must come after the refusal return.");
         Assert.True(plain > send, "The plain hand-off is the fallback after the locked one.");
-        Assert.Contains("LockedOpenCourier.Send(host, plan.Intent.Package, plan.Intent.Data)", text, StringComparison.Ordinal);
+        Assert.Contains("LockedOpenCourier.Send(host, plan.Intent.Package, plan.Intent.Data,", text, StringComparison.Ordinal);
         Assert.Contains("LockedOpenChoice.Decide(", text, StringComparison.Ordinal);
     }
 
@@ -51,6 +51,21 @@ public class LockedOpenIsThroughTheDoorTests
         var text = Executor();
 
         Assert.Matches(@"HandOffRoute\.Locked\s*&&\s*LockedOpenCourier\.Send\(", text);
+    }
+
+    /// <summary>
+    /// Flyleaf's refusal reaches Pulp only as a result code after the executor has returned (D301), so the
+    /// plain hand-off is handed to the courier as the fallback, built from the plan's own intent.
+    /// </summary>
+    [Fact]
+    public void TheFallbackIsThePlainHandOffBuiltFromThePlansOwnIntent()
+    {
+        var text = Executor();
+        var send = text.IndexOf("LockedOpenCourier.Send(", StringComparison.Ordinal);
+        var fallbackCall = text.IndexOf("PlainHandOff(", send, StringComparison.Ordinal);
+
+        Assert.True(fallbackCall > send, "The courier must be given the plain hand-off to fall back to.");
+        Assert.Contains("HandOffOutcome PlainHandOff(", text, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -13,7 +13,7 @@ namespace Codex.Tests.Apps;
 public class LockedOpenGateTests
 {
     private const string Netflix = "com.netflix.mediaclient";
-    private static readonly Uri Link = new("https://www.example.com/title/harbor-lights");
+    private static readonly Uri Link = new("https://www.netflix.com/title/harbor-lights");
 
     private static readonly HiddenApps TickedNetflix = HiddenApps.Of([Netflix]);
 
@@ -21,9 +21,10 @@ public class LockedOpenGateTests
         string package,
         HiddenApps? hidden = null,
         IEnumerable<string>? blocked = null,
-        IEnumerable<string>? policySuspended = null) =>
+        IEnumerable<string>? policySuspended = null,
+        Uri? link = null) =>
         LockedOpenGate.Decide(
-            new LockedOpenRequest(package, Link),
+            new LockedOpenRequest(package, link ?? Link),
             hidden ?? TickedNetflix,
             new HashSet<string>(blocked ?? []),
             new HashSet<string>(policySuspended ?? []));
@@ -88,8 +89,34 @@ public class LockedOpenGateTests
         {
             Assert.DoesNotContain(package, HardBlock.CuratedPackages);
             Assert.False(package.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal), package);
-            Assert.Equal(LockedOpenRefusal.None, Decide(package, HiddenApps.Of([package])));
+            var host = LockedOpenCatalogue.LinkDomains[package].First();
+            Assert.Equal(LockedOpenRefusal.None, Decide(package, HiddenApps.Of([package]), link: new Uri($"https://www.{host}/watch/1")));
         }
+    }
+
+    [Fact]
+    public void EveryCataloguedPackageNamesAtLeastOneLinkDomainAndNothingElse()
+    {
+        Assert.Equal(
+            LockedOpenCatalogue.Packages.Order(StringComparer.Ordinal),
+            LockedOpenCatalogue.LinkDomains.Keys.Order(StringComparer.Ordinal));
+        Assert.All(LockedOpenCatalogue.LinkDomains.Values, domains => Assert.NotEmpty(domains));
+    }
+
+    [Theory]
+    [InlineData("https://www.netflix.com/title/1", true)]
+    [InlineData("https://netflix.com/title/1", true)]
+    [InlineData("https://help.netflix.com/title/1", true)]
+    [InlineData("https://NETFLIX.com/title/1", true)]
+    [InlineData("https://www.example.com/title/1", false)]
+    [InlineData("https://netflix.com.example.com/title/1", false)]
+    [InlineData("https://notnetflix.com/title/1", false)]
+    [InlineData("https://www.hulu.com/watch/1", false)]
+    public void TheLinkMustBeOnTheServicesOwnDomain(string link, bool allowed)
+    {
+        var verdict = Decide(Netflix, link: new Uri(link));
+
+        Assert.Equal(allowed ? LockedOpenRefusal.None : LockedOpenRefusal.LinkHostNotAllowed, verdict);
     }
 
     [Theory]

@@ -25,6 +25,7 @@ internal static class LockedSessionController
 {
     private const string Tag = "FlyleafLocked";
     private const int TickRequestCode = 2881;
+    private const int LaunchRequestCode = 2882;
 
     private static readonly object Gate = new();
 
@@ -62,10 +63,12 @@ internal static class LockedSessionController
                 context.PackageName!,
                 DateTimeOffset.UtcNow,
                 SystemClock.ElapsedRealtime(),
-                store.Load());
+                store.Load(),
+                BootCount(context));
             var plan = LockedSessionPlan.Start(facts);
             if (!plan.Allowed)
             {
+                Log.Warn(Tag, $"A locked open for {request.Package} was not started: the plan refused it (a session may already be running).");
                 return false;
             }
 
@@ -77,15 +80,24 @@ internal static class LockedSessionController
                 dpm.SetLockTaskFeatures(admin, (LockTaskFeatures)plan.LockTaskFeatures);
                 if (plan.UnsuspendPackage is { } unsuspend)
                 {
-                    dpm.SetPackagesSuspended(admin, [unsuspend], false);
+                    // The platform returns the packages it could not change. A service left suspended
+                    // would open locked onto nothing, so a failure here ends the attempt.
+                    var failedUnsuspend = dpm.SetPackagesSuspended(admin, [unsuspend], false);
+                    if (LockedSessionPlan.DidFail(failedUnsuspend, unsuspend))
+                    {
+                        throw new InvalidOperationException($"{unsuspend} could not be un-suspended for the session.");
+                    }
                 }
 
-                ArmTick(context);
+                // The early alarm doubles as the start check: a film that never shows a media session is let go.
+                ArmTick(context, LockedSessionRules.NextTick(plan.Record, SystemClock.ElapsedRealtime()));
                 OpenLocked(context, request);
                 return true;
             }
-            catch (Java.Lang.Exception exception)
+            catch (Exception exception)
             {
+                // Any failure, not only a Java one: the record is on disk, so it must be undone here or
+                // by the next start, never left half-applied with no clock armed.
                 Log.Warn(Tag, $"Starting the locked session failed, so it is being undone: {exception.Message}");
                 ReleaseCore(context, LockedReleaseReason.Stale);
                 return false;
@@ -99,7 +111,7 @@ internal static class LockedSessionController
         lock (Gate)
         {
             if (new LockedSessionStore(context).Load() is { } record
-                && LockedSessionRules.OnHome(record, DateTimeOffset.UtcNow) is { } reason)
+                && LockedSessionRules.OnHome(record, SystemClock.ElapsedRealtime()) is { } reason)
             {
                 ReleaseCore(context, reason);
             }
@@ -115,13 +127,14 @@ internal static class LockedSessionController
                 return;
             }
 
-            if (LockedSessionRules.OnTick(record, DateTimeOffset.UtcNow) is { } reason)
+            var elapsed = SystemClock.ElapsedRealtime();
+            if (LockedSessionRules.OnTick(record, elapsed) is { } reason)
             {
                 ReleaseCore(context, reason);
             }
             else
             {
-                ArmTick(context);
+                ArmTick(context, LockedSessionRules.NextTick(record, elapsed));
             }
         }
     }
@@ -141,7 +154,7 @@ internal static class LockedSessionController
                 return;
             }
 
-            var verdict = LockedSessionRules.OnReading(record, reading, DateTimeOffset.UtcNow);
+            var verdict = LockedSessionRules.OnReading(record, reading, SystemClock.ElapsedRealtime());
             if (verdict.Record != record)
             {
                 store.Save(verdict.Record);
@@ -169,13 +182,14 @@ internal static class LockedSessionController
                 return;
             }
 
-            if (LockedSessionRules.OnProcessStart(record, DateTimeOffset.UtcNow, SystemClock.ElapsedRealtime()) is { } reason)
+            var elapsed = SystemClock.ElapsedRealtime();
+            if (LockedSessionRules.OnProcessStart(record, DateTimeOffset.UtcNow, elapsed, BootCount(context)) is { } reason)
             {
                 ReleaseCore(context, reason);
             }
             else
             {
-                ArmTick(context);
+                ArmTick(context, LockedSessionRules.NextTick(record, elapsed));
             }
         }
     }
@@ -184,12 +198,13 @@ internal static class LockedSessionController
     private static void ReleaseCore(Context context, LockedReleaseReason reason)
     {
         var store = new LockedSessionStore(context);
-        var plan = LockedSessionPlan.Release(store.Load(), reason);
-        if (plan.IsNothing)
+        var record = store.Load();
+        if (record is null)
         {
             return;
         }
 
+        var plan = ReleasePlan(context, record, reason);
         try
         {
             if (PolicyManager.IsDeviceOwner(context))
@@ -203,14 +218,20 @@ internal static class LockedSessionController
                 dpm.SetLockTaskFeatures(admin, (LockTaskFeatures)plan.RestoreLockTaskFeatures);
                 if (plan.ResuspendPackage is { } resuspend)
                 {
-                    dpm.SetPackagesSuspended(admin, [resuspend], true);
+                    var failedResuspend = dpm.SetPackagesSuspended(admin, [resuspend], true);
+                    if (LockedSessionPlan.DidFail(failedResuspend, resuspend))
+                    {
+                        throw new InvalidOperationException($"{resuspend} could not be suspended again.");
+                    }
                 }
             }
         }
-        catch (Java.Lang.Exception exception)
+        catch (Exception exception)
         {
-            // The record stays, so the next Home press, tick or start tries again.
+            // The record stays, so the next Home press, tick or start tries again; the clock is re-armed
+            // so a retry does not wait on something that may never happen.
             Log.Warn(Tag, $"Releasing the locked session failed; it will be retried: {exception.Message}");
+            ArmTick(context, LockedSessionRules.TickInterval);
             return;
         }
 
@@ -222,13 +243,38 @@ internal static class LockedSessionController
         }
     }
 
+    // What the plan would suspend right now decides whether the service goes back (D301); a plan that
+    // cannot be built is read as "suspends nothing", never as a reason to suspend.
+    private static LockedReleasePlan ReleasePlan(Context context, LockedSessionRecord record, LockedReleaseReason reason)
+    {
+        IReadOnlySet<string> suspendedNow = new HashSet<string>(StringComparer.Ordinal);
+        if (record.Unsuspended)
+        {
+            try
+            {
+                suspendedNow = PolicyManager.PlannedSuspendedPackages(context);
+            }
+            catch (Exception exception)
+            {
+                Log.Warn(Tag, $"Could not read the policy plan to decide a re-suspend; leaving the service as it is: {exception.Message}");
+            }
+        }
+
+        return LockedSessionPlan.Release(record, reason, suspendedNow);
+    }
+
+    // A plain StartActivity from a manifest receiver is silently blocked on Android 14+ unless the sender
+    // opts in, so the launch is a PendingIntent sent with Flyleaf's device-owner opt-in, exactly as the
+    // call screen is (CallScreen.Open). The lock-task option rides the same options bundle.
     private static void OpenLocked(Context context, LockedOpenRequest request)
     {
         var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(request.Link.AbsoluteUri));
         intent.SetPackage(request.Package);
         intent.AddFlags(ActivityFlags.NewTask);
-        var options = ActivityOptions.MakeBasic()!.SetLockTaskEnabled(true)!;
-        context.StartActivity(intent, options.ToBundle());
+        var pending = PendingIntent.GetActivity(
+            context, LaunchRequestCode, intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable)!;
+        var options = CallScreen.OptInToBackgroundStart(ActivityOptions.MakeBasic()!.SetLockTaskEnabled(true)!);
+        pending.Send(context, 0, null, null, null, null, options.ToBundle());
     }
 
     private static void BringForward(Context context, string package)
@@ -244,7 +290,7 @@ internal static class LockedSessionController
             intent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ResetTaskIfNeeded);
             context.StartActivity(intent);
         }
-        catch (Java.Lang.Exception exception)
+        catch (Exception exception)
         {
             Log.Info(Tag, $"Could not bring {package} forward: {exception.Message}");
         }
@@ -279,13 +325,28 @@ internal static class LockedSessionController
         new Intent(context, typeof(LockedSessionTickReceiver)),
         PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable)!;
 
-    private static void ArmTick(Context context)
+    private static void ArmTick(Context context, TimeSpan delay)
     {
         var alarms = (AlarmManager?)context.GetSystemService(Context.AlarmService);
         alarms?.SetAndAllowWhileIdle(
             AlarmType.ElapsedRealtime,
-            SystemClock.ElapsedRealtime() + (long)LockedSessionRules.TickInterval.TotalMilliseconds,
+            SystemClock.ElapsedRealtime() + (long)delay.TotalMilliseconds,
             TickIntent(context));
+    }
+
+    // The boot count tells a restart that follows a reboot even when the session began seconds after
+    // boot, where comparing two elapsed-realtime readings cannot. -1 when the platform will not say.
+    private static int BootCount(Context context)
+    {
+        try
+        {
+            return Android.Provider.Settings.Global.GetInt(context.ContentResolver, "boot_count", -1);
+        }
+        catch (Exception exception)
+        {
+            Log.Info(Tag, $"Could not read the boot count: {exception.Message}");
+            return -1;
+        }
     }
 
     private static void CancelTick(Context context)

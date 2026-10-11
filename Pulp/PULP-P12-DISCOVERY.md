@@ -796,8 +796,8 @@ Read before any lock-task code was written: `PolicyManager.Apply`, `PolicyPlanBu
 - **D298 · The locked route is chosen only where it can land.** Pulp sends it when Flyleaf is installed and
   visible (a `<queries>` entry, new `Properties/AndroidManifest.xml`) and the planned package is one it told
   Flyleaf to hide; otherwise today's plain hand-off. A broadcast cannot report delivery, so a phone with
-  Flyleaf where the hidden set never arrived, or where Flyleaf refuses, shows up as the landing check's quiet
-  "may not have opened" (D286), not as a failure. A send that cannot be made falls back to the plain intent.
+  Flyleaf where the hidden set never arrived, or where Flyleaf refuses, used to show up only as the landing check's quiet
+  "may not have opened" (D286); the ask is now answered (D301) and a refusal falls back to the plain intent.
   There is no setting: the condition is the setting, and a switch can be added where `LockedOpenFacts` is built.
 - **D299 · The session turns on Home and the keyguard, and allowlists the phone app.** See the revisit: this
   is the minimum that keeps the way out, the lock screen and incoming calls.
@@ -809,9 +809,58 @@ Read before any lock-task code was written: `PolicyManager.Apply`, `PolicyPlanBu
 - **Evidence is unchanged.** Pulp records only through the existing relay and `SessionRecording`; the lock's
   end only sends a closing reading. Watched is still judged by `Watched.Decide`; nothing here marks anything.
 
+- **D300 · One locked session at a time; a second request is refused, not merged.** The review found that a
+  second start over a live one recorded the new package but kept the first service freed
+  (`Unsuspended = unsuspend is not null || Active.Unsuspended`) so the first stayed free while the second was
+  re-suspended at release, and restarted the six-hour clock. Chosen over a `FreedPackages` set because a
+  second request can only arise from a stale or racing sender (the film's room has one door, Home, and Home
+  ends the session), and refusing leaves the first record and its clock whole. With fix 1 the refused request
+  is visible to Pulp, which opens the title plainly. A repeat request for the running service is refused too.
+- **D301 · The review fixes to Release G.**
+  - **The refusal is heard.** Pulp sends the ask as an *ordered* broadcast; Flyleaf's `LockedOpenReceiver` sets
+    the result code (`LockedOpenHandoff.ResultStarted` = `RESULT_OK`, -1, only when the controller reports a
+    session started; `ResultRefused` = 0 otherwise, also the initial code so silence reads as refusal). The
+    controller runs synchronously inside `OnReceive`, so no `GoAsync` is needed. Pulp's pure `LockedOpenAnswer`
+    decides: fall back to the plain intent on anything but started, or on no answer in `AnswerTimeout` (10 s),
+    exactly once whichever of the two arrives second. The fallback is handed to the courier as a callback, so
+    `HandOffExecutor` stays the only sender (G8) and the signature permission is unchanged. Cost accepted: the
+    executor still returns `Started` for the locked route, since the answer arrives later; a fallback that then
+    finds the app not installed is logged, not shown, and the landing check (D286) remains the net.
+  - **Release puts back only what the plan wants.** The service is suspended again only if it was freed for the
+    session and `PlannedSuspendedPackages` names it *now*; a policy pass that freed it mid-session is not undone.
+    Since the plan frees every launchable non-hard-suspended app each pass, in practice the re-suspend is rare and
+    the next pass is what finally decides. `SetPackagesSuspended`'s failed list is honoured on both paths
+    (`LockedSessionPlan.DidFail`): a failed un-suspend ends the attempt before anything is launched; a failed
+    re-suspend keeps the record and re-arms the tick for a retry.
+  - **The launch is a `PendingIntent`**, sent with `CallScreen.OptInToBackgroundStart` (the call screen's
+    device-owner background-start opt-in, now shared) and the lock-task option on the same bundle; a plain
+    `StartActivity` from a manifest receiver is silently blocked on Android 14+.
+  - **A film that never opens is let go.** The record carries `Confirmed`, set by any reading from the target's
+    media session. `LockedSessionRules.OnTick` releases with `NeverStarted` (Pulp comes forward) once `StartTimeout`
+    (30 s, un-evidenced) passes unconfirmed; the start arms the existing tick alarm for that moment
+    (`NextTick`), then the five-minute interval. A record from before the field reads as confirmed.
+  - **The link must be on the service's own domain.** `LockedOpenCatalogue.LinkDomains` (package to domains; a
+    host matches the domain or a subdomain) and a new refusal `LinkHostNotAllowed`. Pulp's catalogue had no link
+    patterns (links come from the availability source), so `StreamingService` gained `LinkDomains`, filled in
+    `ServiceCatalogue.Public`, and guard G19 holds the two lists equal package for package. **The domains are
+    public knowledge, not checked against what the source returns**; a service whose links sit elsewhere refuses
+    at the gate and opens plainly.
+  - **A stale baseline no longer fires a false finish.** The record carries `Advanced`, set when the same title's
+    position moves forward after its baseline. A title change after the settle window releases as before, but
+    sends the synthetic `Stopped` close for the old title only if it had advanced; a re-baseline while settling
+    resets it.
+  - **Running rules read the monotonic clock.** `OnHome`, `OnTick` and `OnReading` take elapsed realtime (the
+    pause start is now `PausedSinceElapsedMs`; an older record's wall-clock pause is dropped). The wall clock is
+    read only at process start, where `OnProcessStart` compares wall time since the start with elapsed time since
+    the start: they agree across sleep and part across a reboot or a clock change, which also catches a start
+    seconds after boot, where "elapsed is smaller than the record's" is not true. The boot count
+    (`Settings.Global` `boot_count`) is recorded and compared as a second witness. Every failure after the record
+    is saved is caught as `Exception`, not only a Java one, so a record is never left with no clock armed.
+
 **Device-only, unverified:** that `ActivityOptions.setLockTaskEnabled` from a background broadcast starts the
 service's task locked (Flyleaf starting an activity from the background as device owner); that removing the
 package from the allowlist ends the lock; that Home reaches Flyleaf from a locked task; that the dialer
 allowlist lets a ringing call surface over a locked task and that answering returns to the film; that the
 status-bar disable survives; where each service's deep link lands and whether each publishes its position;
 and all four timing constants.
+Still device-only after D301: that an ordered broadcast's result code from a manifest receiver reaches Pulp's result receiver while Pulp is in the foreground; that the `PendingIntent` opt-in starts the task locked; that every service publishes a media session within 30 s of a cold start (a service that does not is released as `NeverStarted`, so the 30 s needs a real measurement); the link domains per service; and the boot count on the device.

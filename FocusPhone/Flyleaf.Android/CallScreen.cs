@@ -64,6 +64,24 @@ public static class CallScreen
     }
 
     /// <summary>
+    /// Opts a PendingIntent send into starting an activity from the background with Flyleaf's own
+    /// device-owner privilege (Android 14+; earlier versions need nothing). Shared with the locked
+    /// hand-off, which starts the service's app from a broadcast receiver and learned the same lesson.
+    /// </summary>
+    internal static ActivityOptions OptInToBackgroundStart(ActivityOptions options)
+    {
+        if (OperatingSystem.IsAndroidVersionAtLeast(34))
+        {
+            var mode = OperatingSystem.IsAndroidVersionAtLeast(36)
+                ? BackgroundActivityStartMode.AllowAlways
+                : BackgroundActivityStartMode.Allowed;
+            options.SetPendingIntentBackgroundActivityStartMode(mode);
+        }
+
+        return options;
+    }
+
+    /// <summary>
     /// Opens the call screen. Flyleaf is usually not in front when a call rings (the owner is in
     /// some other app), and since Android 14 a PendingIntent sent from the background starts an
     /// activity only if the sender opts in with its own privilege — which Flyleaf has, as the
@@ -75,11 +93,7 @@ public static class CallScreen
         {
             if (OperatingSystem.IsAndroidVersionAtLeast(34))
             {
-                var mode = OperatingSystem.IsAndroidVersionAtLeast(36)
-                    ? BackgroundActivityStartMode.AllowAlways
-                    : BackgroundActivityStartMode.Allowed;
-                var options = ActivityOptions.MakeBasic().SetPendingIntentBackgroundActivityStartMode(mode);
-                target.Send(options.ToBundle());
+                target.Send(OptInToBackgroundStart(ActivityOptions.MakeBasic()!).ToBundle());
             }
             else
             {
