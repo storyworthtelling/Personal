@@ -52,53 +52,64 @@ public sealed class SportsFeeds
             return [];
         }
 
+        // A cache-only read (a peek, the first paint) sends nothing, so it never waits behind a refresh holding the gate.
+        if (!refresh)
+        {
+            return await ReadFollowedAsync(follows, refresh: false, cancellationToken);
+        }
+
         await gate.WaitAsync(cancellationToken);
         try
         {
-            var held = new Dictionary<LeagueId, CachedLeague>();
-            foreach (var entry in table.Leagues)
-            {
-                if (ReadCached(entry.League) is { } cached)
-                {
-                    held[entry.League] = cached;
-                }
-            }
-
-            if (refresh && SportsPage.Unlocated(held.Values.Select(entry => entry.Feed), follows).Count > 0)
-            {
-                foreach (var entry in table.Leagues.Where(entry => !held.ContainsKey(entry.League)))
-                {
-                    if (await DiscoverAsync(entry.League, cancellationToken) is { } found)
-                    {
-                        held[entry.League] = found;
-                    }
-                }
-            }
-
-            var viewers = follows.Select(follow => follow.Viewer).Distinct().ToList();
-            var followed = viewers
-                .SelectMany(viewer => SportsFollowing.FollowedLeagues(held.Values.Select(entry => entry.Feed), follows, viewer))
-                .Distinct()
-                .ToList();
-
-            var feeds = new List<LeagueFeed>();
-            foreach (var league in followed)
-            {
-                var current = held[league];
-                if (refresh && SportsFreshness.NeedsFetch(current.FetchedAt, current.Feed.League.Phase, clock()))
-                {
-                    current = await RefreshAsync(league, current, cancellationToken);
-                }
-
-                feeds.Add(current.Feed);
-            }
-
-            return feeds;
+            return await ReadFollowedAsync(follows, refresh: true, cancellationToken);
         }
         finally
         {
             gate.Release();
         }
+    }
+
+    private async Task<IReadOnlyList<LeagueFeed>> ReadFollowedAsync(IReadOnlyCollection<SportsFollow> follows, bool refresh, CancellationToken cancellationToken)
+    {
+        var held = new Dictionary<LeagueId, CachedLeague>();
+        foreach (var entry in table.Leagues)
+        {
+            if (ReadCached(entry.League) is { } cached)
+            {
+                held[entry.League] = cached;
+            }
+        }
+
+        if (refresh && SportsPage.Unlocated(held.Values.Select(entry => entry.Feed), follows).Count > 0)
+        {
+            foreach (var entry in table.Leagues.Where(entry => !held.ContainsKey(entry.League)))
+            {
+                if (await DiscoverAsync(entry.League, cancellationToken) is { } found)
+                {
+                    held[entry.League] = found;
+                }
+            }
+        }
+
+        var viewers = follows.Select(follow => follow.Viewer).Distinct().ToList();
+        var followed = viewers
+            .SelectMany(viewer => SportsFollowing.FollowedLeagues(held.Values.Select(entry => entry.Feed), follows, viewer))
+            .Distinct()
+            .ToList();
+
+        var feeds = new List<LeagueFeed>();
+        foreach (var league in followed)
+        {
+            var current = held[league];
+            if (refresh && SportsFreshness.NeedsFetch(current.FetchedAt, current.Feed.League.Phase, clock()))
+            {
+                current = await RefreshAsync(league, current, cancellationToken);
+            }
+
+            feeds.Add(current.Feed);
+        }
+
+        return feeds;
     }
 
     /// <summary>Every league in the table with its teams, for the picker: the cache, else a one-day look at the league.</summary>
@@ -143,7 +154,7 @@ public sealed class SportsFeeds
         {
             var schedule = await source.GetScheduleAsync(league, new SportsWindow(Today(), 0, 0), cancellationToken);
             var feed = LeagueFeeds.Assemble(schedule, [], []);
-            cache.Store(feed, DateTimeOffset.UnixEpoch);
+            Store(feed, DateTimeOffset.UnixEpoch);
             return new CachedLeague(feed, DateTimeOffset.UnixEpoch);
         }
         catch (CatalogueLookupException exception)
@@ -179,8 +190,21 @@ public sealed class SportsFeeds
 
         var now = clock();
         var feed = LeagueFeeds.Assemble(schedule, order, current.Feed.Highlights);
-        cache.Store(feed, now);
+        Store(feed, now);
         return new CachedLeague(feed, now);
+    }
+
+    // A cache that cannot be written costs only the next first paint; the feed in hand is still good, so it is logged and returned.
+    private void Store(LeagueFeed feed, DateTimeOffset fetchedAt)
+    {
+        try
+        {
+            cache.Store(feed, fetchedAt);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Security.SecurityException or NotSupportedException)
+        {
+            warn($"League {feed.League.Id} could not be saved to the cache ({exception.Message}); it is used as fetched.", exception);
+        }
     }
 
     private DateOnly Today() => DateOnly.FromDateTime(clock().DateTime);

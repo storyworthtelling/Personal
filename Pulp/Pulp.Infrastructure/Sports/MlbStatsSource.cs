@@ -37,8 +37,10 @@ public sealed class MlbStatsSource : ISportsSource
 
     // mlbstatic.com serves the club and league marks the Stats API's own pages use; artwork in a
     // content slot (D238), loaded from the host that publishes it.
-    private const string TeamBadge = "https://www.mlbstatic.com/team-logos/{0}.svg";
-    private const string LeagueBadge = "https://www.mlbstatic.com/team-logos/league-on-dark/1.svg";
+    // The PNG form (verified live: image/png), because the device's poster decoder is a bitmap decoder and
+    // cannot draw the .svg these logos are published as; a badge that will not decode falls back to the monogram.
+    private const string TeamBadge = "https://midfield.mlbstatic.com/v1/team/{0}/spots/144";
+    private const string LeagueBadge = "https://midfield.mlbstatic.com/v1/league/1/spots/144";
 
     private readonly ProviderHttp http;
     private readonly LeagueId league;
@@ -70,7 +72,7 @@ public sealed class MlbStatsSource : ISportsSource
         using var document = http.Parse(response, what);
         var games = ReadGames(document.RootElement, byId, what);
 
-        var championship = await ReadChampionshipAsync(year, byId, cancellationToken);
+        var championship = await ReadChampionshipAsync(window.Today, year, byId, cancellationToken);
         var leagueRow = await LeagueOfAsync(season, window.Today, games, cancellationToken);
         return new LeagueSchedule(leagueRow, teams, games, championship);
     }
@@ -173,16 +175,20 @@ public sealed class MlbStatsSource : ISportsSource
         return teams.Items().Select(TeamOf).OfType<Team>().DistinctBy(team => team.Id).ToList();
     }
 
-    private static Team? TeamOf(JsonElement team)
+    // The Stats API's id is only unique inside baseball; the Domain's TeamId names the league too (D295).
+    private Team? TeamOf(JsonElement team)
     {
         var id = team.Number("id");
         var name = team.Text("name");
         return id is null || string.IsNullOrWhiteSpace(name)
             ? null
-            : new Team(new TeamId(id.Value.ToString(CultureInfo.InvariantCulture)), name, string.Format(CultureInfo.InvariantCulture, TeamBadge, id.Value));
+            : new Team(
+                new TeamId($"{league.Value.ToLowerInvariant()}:{id.Value.ToString(CultureInfo.InvariantCulture)}"),
+                name,
+                string.Format(CultureInfo.InvariantCulture, TeamBadge, id.Value));
     }
 
-    private static Team? Resolve(JsonElement side, Dictionary<TeamId, Team> known)
+    private Team? Resolve(JsonElement side, Dictionary<TeamId, Team> known)
     {
         var team = TeamOf(side.Child("team"));
         return team is null ? null : known.GetValueOrDefault(team.Id, team);
@@ -239,7 +245,7 @@ public sealed class MlbStatsSource : ISportsSource
     private static bool Instant(string? text, out DateTimeOffset at) =>
         DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out at);
 
-    private async Task<Championship?> ReadChampionshipAsync(int year, Dictionary<TeamId, Team> known, CancellationToken cancellationToken)
+    private async Task<Championship?> ReadChampionshipAsync(DateOnly today, int year, Dictionary<TeamId, Team> known, CancellationToken cancellationToken)
     {
         var what = "a championship request";
         var response = await http.GetAsync(
@@ -256,17 +262,24 @@ public sealed class MlbStatsSource : ISportsSource
             return null;
         }
 
-        var first = finals[0].Raw;
-        var id = first.Long("gamePk");
+        // The first final still to come; a finished series stands only when none is left.
+        var pick = finals.FirstOrDefault(entry => DateOnly.FromDateTime(entry.At.UtcDateTime) >= today);
+        if (pick.Raw.ValueKind != JsonValueKind.Object)
+        {
+            pick = finals[^1];
+        }
+
+        var id = pick.Raw.Long("gamePk");
         if (id is null)
         {
             return null;
         }
 
-        var teams = new[] { Resolve(first.Child("teams").Child("home"), known), Resolve(first.Child("teams").Child("away"), known) }
+        var teams = new[] { Resolve(pick.Raw.Child("teams").Child("home"), known), Resolve(pick.Raw.Child("teams").Child("away"), known) }
             .OfType<Team>().ToList();
-        var name = first.Text("seriesDescription") is { Length: > 0 } series ? series : "Championship";
-        return new Championship(new GameId(id.Value.ToString(CultureInfo.InvariantCulture)), name, finals[0].At, teams);
+
+        // The league's own name for its final, never the feed's seriesDescription: that text can carry a series score (G10/G15).
+        return new Championship(new GameId(id.Value.ToString(CultureInfo.InvariantCulture)), leagueName + " World Series", pick.At, teams);
     }
 
     /// <summary>Where the league is, from the season's own dates and today (D184, D235).</summary>

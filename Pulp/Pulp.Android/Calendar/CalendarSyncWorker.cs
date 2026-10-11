@@ -55,16 +55,24 @@ public class CalendarSyncWorker : Worker
             CalendarNightly.RunAsync(feed, calendar, DateOnly.FromDateTime(DateTime.Now), CancellationToken.None).GetAwaiter().GetResult();
             return Result.InvokeSuccess()!;
         }
-        catch (CalendarException exception) when (exception.Failure is CalendarFailure.Unavailable or CalendarFailure.Throttled)
+        catch (Exception exception)
         {
-            CalendarSyncHooks.Warn?.Invoke("The Pulp calendar could not be written tonight; WorkManager will try again.", exception);
-            return Result.InvokeRetry()!;
-        }
-        catch (CalendarException exception)
-        {
-            // Rejected or malformed will not mend by retrying tonight; the next scheduled night tries again.
-            CalendarSyncHooks.Warn?.Invoke("The Pulp calendar write was refused or unreadable.", exception);
-            return Result.InvokeFailure()!;
+            var advice = CalendarFailures.Advise(exception);
+            if (advice == CalendarAdvice.QuietRetry)
+            {
+                return Result.InvokeRetry()!;
+            }
+
+            // One constant sentence per verdict; each part goes alongside it, so the hook can read what Google said.
+            var message = advice == CalendarAdvice.Retry
+                ? "The Pulp calendar could not be written tonight; WorkManager will try again."
+                : "The Pulp calendar write failed and will not mend by retrying tonight.";
+            foreach (var part in CalendarFailures.Parts(exception))
+            {
+                CalendarSyncHooks.Warn?.Invoke(message, part);
+            }
+
+            return advice == CalendarAdvice.Retry ? Result.InvokeRetry()! : Result.InvokeFailure()!;
         }
     }
 }

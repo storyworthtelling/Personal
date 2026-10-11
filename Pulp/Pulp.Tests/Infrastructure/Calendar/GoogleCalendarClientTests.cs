@@ -26,7 +26,7 @@ public class GoogleCalendarClientTests
         new(key, "Rovers v Harriers (Sam)", null, new CalendarWhen(Day, new TimeOnly(19, 30)), TimeSpan.FromHours(3));
 
     [Fact]
-    public async Task TheScopesAreTheNarrowestThatCanCreateAndShare()
+    public async Task TheCalendarScopesAreTheNarrowestThatCanCreateAndShare()
     {
         Assert.Equal(
             ["https://www.googleapis.com/auth/calendar.app.created", "https://www.googleapis.com/auth/calendar.acls"],
@@ -200,6 +200,81 @@ public class GoogleCalendarClientTests
         Assert.Equal(expected, failure.Failure);
         Assert.Equal((int)status, failure.StatusCode);
         Assert.DoesNotContain("token-for-tests", failure.Message);
+    }
+
+    [Theory]
+    [InlineData("rateLimitExceeded")]
+    [InlineData("userRateLimitExceeded")]
+    [InlineData("quotaExceeded")]
+    public async Task AForbiddenRateLimitIsThrottledNotRejected(string reason)
+    {
+        // Bug kept out: every 403 was Rejected, which disconnected the calendar on a rate-limit blip.
+        var (client, handler) = Make();
+        handler.Enqueue(HttpStatusCode.Forbidden, $$$"""{"error":{"code":403,"message":"slow down","errors":[{"reason":"{{{reason}}}","domain":"usageLimits"}]}}""");
+
+        var failure = await Assert.ThrowsAsync<CalendarException>(() => client.CreateAsync("Pulp", Harbor, CancellationToken.None));
+
+        Assert.Equal(CalendarFailure.Throttled, failure.Failure);
+        Assert.Equal(403, failure.StatusCode);
+        Assert.Equal(reason, failure.Reason);
+        Assert.False(CalendarFailures.ConsentWithdrawn(failure));
+    }
+
+    [Theory]
+    [InlineData("insufficientPermissions", true)]
+    [InlineData("forbidden", true)]
+    [InlineData("accessNotConfigured", false)]
+    public async Task AForbiddenForAnotherReasonIsRejectedAndWithdrawsConsentOnlyForPermissions(string reason, bool withdraws)
+    {
+        var (client, handler) = Make();
+        handler.Enqueue(HttpStatusCode.Forbidden, $$$"""{"error":{"code":403,"message":"no","errors":[{"reason":"{{{reason}}}"}]}}""");
+
+        var failure = await Assert.ThrowsAsync<CalendarException>(() => client.CreateAsync("Pulp", Harbor, CancellationToken.None));
+
+        Assert.Equal(CalendarFailure.Rejected, failure.Failure);
+        Assert.Equal(withdraws, CalendarFailures.ConsentWithdrawn(failure));
+    }
+
+    [Fact]
+    public async Task AnUnreadableForbiddenBodyIsRejectedButDoesNotWithdrawConsent()
+    {
+        var (client, handler) = Make();
+        handler.Enqueue(HttpStatusCode.Forbidden, "<html>nope</html>");
+
+        var failure = await Assert.ThrowsAsync<CalendarException>(() => client.CreateAsync("Pulp", Harbor, CancellationToken.None));
+
+        Assert.Equal(CalendarFailure.Rejected, failure.Failure);
+        Assert.Null(failure.Reason);
+        Assert.False(CalendarFailures.ConsentWithdrawn(failure));
+    }
+
+    [Fact]
+    public async Task AnUnauthorizedAnswerAlwaysWithdrawsConsent()
+    {
+        var (client, handler) = Make();
+        handler.Enqueue(HttpStatusCode.Unauthorized, """{"error":{"code":401,"message":"expired"}}""");
+
+        var failure = await Assert.ThrowsAsync<CalendarException>(() => client.CreateAsync("Pulp", Harbor, CancellationToken.None));
+
+        Assert.True(CalendarFailures.ConsentWithdrawn(failure));
+    }
+
+    [Fact]
+    public async Task PatchingAnEventThatIsGoneCreatesItInstead()
+    {
+        // Bug kept out: a hand-deleted event made every nightly move fail with 404, forever.
+        var (client, handler) = Make();
+        handler.Enqueue(HttpStatusCode.NotFound, """{"error":{"code":404,"message":"Not Found"}}""");
+        handler.Enqueue(HttpStatusCode.OK);
+
+        await client.PatchAsync("cal-1", "e-gone", Timed("game:g1"), Harbor, CancellationToken.None);
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(HttpMethod.Patch, handler.Requests[0].Method);
+        Assert.Equal(HttpMethod.Post, handler.Requests[1].Method);
+        Assert.Equal("/calendar/v3/calendars/cal-1/events", handler.Requests[1].Uri.AbsolutePath);
+        Assert.Equal("none", handler.Requests[1].Query("sendUpdates"));
+        Assert.Equal("game:g1", handler.Requests[1].Json!["extendedProperties"]!["private"]![PulpEventKey.Property]!.GetValue<string>());
     }
 
     [Fact]

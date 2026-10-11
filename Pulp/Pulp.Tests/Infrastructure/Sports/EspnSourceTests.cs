@@ -76,7 +76,7 @@ public class EspnSourceTests
         Assert.All(handler.Requests, request => Assert.Equal("site.api.espn.com", request.Uri.Host));
         Assert.Contains(handler.Requests, request => request.Uri.AbsolutePath == SitePath + "/teams");
         var days = handler.Requests.Where(request => request.Uri.AbsolutePath == SitePath + "/scoreboard").ToList();
-        Assert.Equal(["20260119", "20260120", "20260121"], days.Select(request => request.Query("dates")));
+        Assert.Equal(["20260119", "20260120", "20260121"], days.Select(request => request.Query("dates")).Order());
         Assert.All(days, request => Assert.Equal("300", request.Query("limit")));
         Assert.Equal(4, tally.Count(LookupSource.Espn));
     }
@@ -90,7 +90,7 @@ public class EspnSourceTests
 
         var game = Assert.Single(schedule.Games);
         Assert.Equal(new GameId("e1"), game.Id);
-        Assert.Equal(new TeamId("11"), game.Home.Id);
+        Assert.Equal(new TeamId("espn:cfl-invented:11"), game.Home.Id);
         Assert.Equal("Harbor Gulls", game.Home.Name);
         Assert.Equal("https://example.com/gulls.png", game.Home.BadgeArt);
         Assert.Equal("Ridge Foxes", game.Away.Name);
@@ -144,10 +144,73 @@ public class EspnSourceTests
 
         Assert.NotNull(schedule.Championship);
         Assert.Equal(new GameId("e9"), schedule.Championship.Id);
-        Assert.Equal("The Coastal Bowl LX", schedule.Championship.Name);
+        Assert.Equal("Coastal Bowl", schedule.Championship.Name);
         Assert.Equal(["Harbor Gulls", "Ridge Foxes"], schedule.Championship.Teams.Select(team => team.Name));
         Assert.Equal(GameStage.Playoffs, schedule.Games.Single(game => game.Id == new GameId("e1")).Stage);
         Assert.Equal(GameStage.Championship, schedule.Games.Single(game => game.Id == new GameId("e9")).Stage);
+    }
+
+    private static readonly EspnLeague Hoops = new(new LeagueId("hoops-invented"), "Hoops League", "hoops", "bbl", ["Hoops Final"]);
+
+    [Fact]
+    public async Task ATeamIdNamesItsLeagueSoTwoLeaguesSharingARawIdAreTwoTeams()
+    {
+        handler.Route("/gridball/cfl/teams", Teams).Route("/hoops/bbl/teams", Teams)
+            .Route("/gridball/cfl/scoreboard", Board("2025-08-01", "2026-02-12", 2, Event("e1", "2026-01-20T18:00Z", 2)))
+            .Route("/hoops/bbl/scoreboard", Board("2025-08-01", "2026-02-12", 2, Event("e2", "2026-01-20T18:00Z", 2)));
+        var source = new EspnSource(new HttpClient(handler), [Definition, Hoops], tally);
+        var window = new SportsWindow(Today, 0, 0);
+
+        var football = await source.GetScheduleAsync(Gridball, window, CancellationToken.None);
+        var hoops = await source.GetScheduleAsync(Hoops.Id, window, CancellationToken.None);
+
+        // The feed's raw id "11" is the same in both; the Domain's id is not.
+        Assert.NotEqual(football.Teams[0].Id, hoops.Teams[0].Id);
+        Assert.Equal(new TeamId("espn:hoops-invented:11"), hoops.Games[0].Home.Id);
+
+        var feeds = new[] { LeagueFeeds.Assemble(football, [], []), LeagueFeeds.Assemble(hoops, [], []) };
+        var follows = new[] { new SportsFollow(new Pulp.Domain.Core.ViewerId("robin-example"), football.Teams[0].Id) };
+        Assert.Equal([Gridball], SportsFollowing.FollowedLeagues(feeds, follows, new Pulp.Domain.Core.ViewerId("robin-example")));
+        Assert.Contains(SportsFollowing.Fixtures(feeds, follows, new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)), fixture => fixture.League == Gridball);
+        Assert.DoesNotContain(SportsFollowing.Fixtures(feeds, follows, new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)), fixture => fixture.League == Hoops.Id);
+    }
+
+    [Fact]
+    public async Task TheChampionshipIsNamedByTheLeaguesMarkerNeverByTheFeedsHeadline()
+    {
+        Standard(Board("2025-08-01", "2026-02-12", 3,
+            Event("e9", "2026-01-21T23:30Z", 3, "Coastal Bowl LX - Game 6 (Harbor Gulls lead 3-2)")));
+
+        var schedule = await Source().GetScheduleAsync(Gridball, new SportsWindow(Today, 0, 2), CancellationToken.None);
+
+        Assert.Equal("Coastal Bowl", schedule.Championship!.Name);
+        Assert.DoesNotContain("lead", schedule.Championship.Name);
+        Assert.DoesNotContain("Gulls", schedule.Championship.Name);
+    }
+
+    [Fact]
+    public async Task TheChampionshipIsTheFirstFinalGameStillToCome()
+    {
+        Standard(Board("2025-08-01", "2026-02-12", 3,
+            Event("past", "2026-01-12T23:30Z", 3, "Coastal Bowl"),
+            Event("today", "2026-01-20T23:30Z", 3, "Coastal Bowl"),
+            Event("later", "2026-01-22T23:30Z", 3, "Coastal Bowl")));
+
+        var schedule = await Source().GetScheduleAsync(Gridball, new SportsWindow(Today, 8, 2), CancellationToken.None);
+
+        Assert.Equal(new GameId("today"), schedule.Championship!.Id);
+    }
+
+    [Fact]
+    public async Task WithEveryFinalGameBehindItTheLatestIsTheChampionship()
+    {
+        Standard(Board("2025-08-01", "2026-02-12", 3,
+            Event("first", "2026-01-10T23:30Z", 3, "Coastal Bowl"),
+            Event("last", "2026-01-12T23:30Z", 3, "Coastal Bowl")));
+
+        var schedule = await Source().GetScheduleAsync(Gridball, new SportsWindow(Today, 10, 0), CancellationToken.None);
+
+        Assert.Equal(new GameId("last"), schedule.Championship!.Id);
     }
 
     [Fact]
@@ -251,7 +314,7 @@ public class EspnSourceTests
 
         var order = await Source().GetStandingsOrderAsync(Gridball, CancellationToken.None);
 
-        Assert.Equal([new TeamId("11"), new TeamId("12"), new TeamId("13")], order.Select(team => team.Id));
+        Assert.Equal(["espn:cfl-invented:11", "espn:cfl-invented:12", "espn:cfl-invented:13"], order.Select(team => team.Id.Value));
         var request = Assert.Single(handler.Requests);
         Assert.Equal("/apis/v2/sports/gridball/cfl" + "/standings", request.Uri.AbsolutePath);
         Assert.DoesNotContain("9999", string.Join(" ", order));
@@ -270,7 +333,7 @@ public class EspnSourceTests
 
         var order = await Source().GetStandingsOrderAsync(Gridball, CancellationToken.None);
 
-        Assert.Equal(["11", "12", "13"], order.Select(team => team.Id.Value));
+        Assert.Equal(["espn:cfl-invented:11", "espn:cfl-invented:12", "espn:cfl-invented:13"], order.Select(team => team.Id.Value));
     }
 
     [Fact]

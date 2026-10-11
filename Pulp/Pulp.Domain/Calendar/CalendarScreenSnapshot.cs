@@ -46,6 +46,13 @@ public static class CalendarScreenSnapshot
     }
 }
 
+/// <summary>Whether the account picked for the calendar may be used.</summary>
+public enum CalendarAccountVerdict
+{
+    Accept,
+    Refuse,
+}
+
 /// <summary>What Settings and the Vault page say about the calendar, and whether they offer to connect it.</summary>
 public static class CalendarScreenConnection
 {
@@ -62,4 +69,17 @@ public static class CalendarScreenConnection
     /// <summary>Only the owner's phone writes, so only it needs the consent (D145).</summary>
     public static bool OffersConnect(HouseholdFileRole role, bool connected) =>
         role == HouseholdFileRole.Owner && !connected;
+
+    /// <summary>
+    /// The calendar's sign-in shares one stored Google account with Drive (the vault and the voice profile), so
+    /// a different pick would repoint all of them. The first pick, or the same account again, is accepted.
+    /// </summary>
+    public static CalendarAccountVerdict JudgeAccount(string storedAccount, string chosenAccount) =>
+        string.IsNullOrWhiteSpace(storedAccount) || string.Equals(storedAccount.Trim(), chosenAccount?.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? CalendarAccountVerdict.Accept
+            : CalendarAccountVerdict.Refuse;
+
+    /// <summary>The sentence for the Vault page when the picked account is not the one Pulp already uses.</summary>
+    public static string DifferentAccount(string storedAccount) =>
+        $"Pulp already uses {storedAccount} for Drive. Pick that account to connect the calendar.";
 }

@@ -25,7 +25,11 @@ public sealed class RoutedHandler : HttpMessageHandler
     {
         var headers = request.Headers.ToDictionary(
             header => header.Key, header => string.Join(",", header.Value), StringComparer.OrdinalIgnoreCase);
-        Requests.Add(new RecordedRequest(request.Method, request.RequestUri!, headers));
+        lock (Requests)
+        {
+            Requests.Add(new RecordedRequest(request.Method, request.RequestUri!, headers));
+        }
+
         var target = request.RequestUri!.PathAndQuery;
         var match = Enumerable.Reverse(routes)
             .Where(route => target.Contains(route.Contains, StringComparison.Ordinal))

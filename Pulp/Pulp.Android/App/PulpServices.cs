@@ -97,7 +97,7 @@ public sealed class PulpServices
         CalendarSyncHooks.Feed = new PulpCalendarFeed(this);
         CalendarSyncHooks.Warn = (message, exception) =>
         {
-            if (exception is CalendarException { Failure: CalendarFailure.Rejected })
+            if (exception is not null && CalendarFailures.ConsentWithdrawn(exception))
             {
                 CalendarConnection.Disconnected();
             }
@@ -725,8 +725,16 @@ public sealed class PulpServices
         sportsFeeds.BrowseAsync(cancellationToken);
 
     /// <summary>Follows a team for one adult; its whole league comes in with it (D60, D67). Following twice is one follow.</summary>
-    public Task FollowTeamAsync(ViewerId viewer, TeamId team, CancellationToken cancellationToken) =>
-        PutAsync(HouseholdMaps.SportsFollow, new SportsFollow(viewer, team), cancellationToken);
+    public async Task FollowTeamAsync(ViewerId viewer, TeamId team, CancellationToken cancellationToken)
+    {
+        // Following is an adult's act: a child's follow would reach the shared calendar and name the child.
+        if (CalendarFollows.RefusesFollow((await HouseholdAsync(cancellationToken)).Roster, viewer))
+        {
+            throw new InvalidOperationException($"'{viewer}' is a child on this household's roster, and only an adult follows a team.");
+        }
+
+        await PutAsync(HouseholdMaps.SportsFollow, new SportsFollow(viewer, team), cancellationToken);
+    }
 
     /// <summary>Stops following a team; the follow's tombstone, so the other phone drops it too.</summary>
     public Task UnfollowTeamAsync(ViewerId viewer, TeamId team, CancellationToken cancellationToken) =>

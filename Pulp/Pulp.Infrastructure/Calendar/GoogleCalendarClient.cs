@@ -28,12 +28,16 @@ public enum CalendarFailure
 /// <summary>A calendar call that failed. The message never carries the access token.</summary>
 public sealed class CalendarException : Exception
 {
-    public CalendarException(CalendarFailure failure, int? statusCode, string message, Exception? inner = null)
+    public CalendarException(CalendarFailure failure, int? statusCode, string message, Exception? inner = null, string? reason = null)
         : base(message, inner)
     {
         Failure = failure;
         StatusCode = statusCode;
+        Reason = reason;
     }
+
+    /// <summary>Google's own reason for the refusal (<c>rateLimitExceeded</c>, <c>insufficientPermissions</c>…), when the body gave one.</summary>
+    public string? Reason { get; }
 
     public CalendarFailure Failure { get; }
 
@@ -49,10 +53,12 @@ public sealed class CalendarException : Exception
 public sealed class GoogleCalendarClient : IPulpCalendar
 {
     /// <summary>
-    /// The narrowest pair that can do the whole job. <c>calendar.app.created</c> creates secondary
+    /// The narrowest Calendar pair that can do the whole job. <c>calendar.app.created</c> creates secondary
     /// calendars and manages events on the ones this app made; it cannot share, so
     /// <c>calendar.acls</c> (view and change sharing on calendars you own) covers the one other call.
-    /// The full <c>calendar</c> scope would also read every other calendar the owner has.
+    /// The full <c>calendar</c> scope would also read every other calendar the owner has. These are only the
+    /// Calendar scopes: the sign-in built from them (<c>VoiceGoogleAccount</c>) also carries Drive, because it
+    /// shares the stored Google account with the vault and the voice profile.
     /// </summary>
     public static readonly IReadOnlyList<string> Scopes =
     [
@@ -138,7 +144,12 @@ public sealed class GoogleCalendarClient : IPulpCalendar
 
     public async Task PatchAsync(string calendarId, string eventId, CalendarEventDraft draft, TimeZoneInfo zone, CancellationToken cancellationToken)
     {
-        using var response = await Send(HttpMethod.Patch, Silent(EventsUrl(calendarId) + "/" + Uri.EscapeDataString(eventId)), EventBody(draft, zone, false), "moving an event", cancellationToken);
+        using var response = await Send(HttpMethod.Patch, Silent(EventsUrl(calendarId) + "/" + Uri.EscapeDataString(eventId)), EventBody(draft, zone, false), "moving an event", cancellationToken, HttpStatusCode.NotFound);
+        if (response.Status == HttpStatusCode.NotFound)
+        {
+            // Someone deleted the event by hand: what the plan wanted is the event, so make it.
+            await InsertAsync(calendarId, draft, zone, cancellationToken);
+        }
     }
 
     public async Task DeleteAsync(string calendarId, string eventId, CancellationToken cancellationToken)
@@ -286,30 +297,65 @@ public sealed class GoogleCalendarClient : IPulpCalendar
         var code = (int)status;
         if (code is >= 200 and < 300 || answers.Contains(status))
         {
-            return Parse(text, what);
+            return Parse(text, what, status);
         }
 
+        var reason = ErrorReason(text);
         var failure = status switch
         {
+            HttpStatusCode.Forbidden when reason is "rateLimitExceeded" or "userRateLimitExceeded" or "quotaExceeded" or "dailyLimitExceeded" or "calendarUsageLimitsExceeded" => CalendarFailure.Throttled,
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => CalendarFailure.Rejected,
             HttpStatusCode.TooManyRequests => CalendarFailure.Throttled,
             _ => CalendarFailure.Unavailable,
         };
         var excerpt = text.Trim();
-        throw new CalendarException(failure, code, $"Google Calendar answered {what} with HTTP {code}: {(excerpt.Length <= 200 ? excerpt : excerpt[..200] + "…")}");
+        throw new CalendarException(failure, code, $"Google Calendar answered {what} with HTTP {code}: {(excerpt.Length <= 200 ? excerpt : excerpt[..200] + "…")}", null, reason);
     }
 
-    private static ParsedResponse Parse(string text, string what)
+    /// <summary>The first <c>error.errors[].reason</c> (or <c>error.details[].reason</c>) of an error body; null when there is none or it is not JSON.</summary>
+    private static string? ErrorReason(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
-            return new ParsedResponse(new JsonObject());
+            return null;
+        }
+
+        try
+        {
+            var error = (JsonNode.Parse(text) as JsonObject)?["error"];
+            foreach (var list in new[] { error?["errors"], error?["details"] })
+            {
+                if (list is JsonArray entries && entries.Select(entry => entry?["reason"]?.GetValue<string>()).FirstOrDefault(reason => !string.IsNullOrEmpty(reason)) is { } found)
+                {
+                    return found;
+                }
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException)
+        {
+            // An error body that is not the documented shape has no reason to give; the status stands alone.
+        }
+
+        return null;
+    }
+
+    private static ParsedResponse Parse(string text, string what, HttpStatusCode status)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return new ParsedResponse(new JsonObject(), status);
+        }
+
+        // A 404 the caller asked to be told about is not a document; its body is Google's error, not data.
+        if (status == HttpStatusCode.NotFound)
+        {
+            return new ParsedResponse(new JsonObject(), status);
         }
 
         try
         {
             return new ParsedResponse(JsonNode.Parse(text) as JsonObject
-                ?? throw new CalendarException(CalendarFailure.Malformed, null, $"Google Calendar answered {what} with something other than a JSON object."));
+                ?? throw new CalendarException(CalendarFailure.Malformed, null, $"Google Calendar answered {what} with something other than a JSON object."), status);
         }
         catch (JsonException exception)
         {
@@ -317,7 +363,7 @@ public sealed class GoogleCalendarClient : IPulpCalendar
         }
     }
 
-    private sealed record ParsedResponse(JsonObject Root) : IDisposable
+    private sealed record ParsedResponse(JsonObject Root, HttpStatusCode Status) : IDisposable
     {
         public void Dispose()
         {

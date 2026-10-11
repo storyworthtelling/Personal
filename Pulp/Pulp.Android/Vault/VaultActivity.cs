@@ -12,6 +12,7 @@ using Pulp.Domain.FirstRun;
 using Pulp.Domain.Shell;
 using Pulp.App;
 using Pulp.Domain.Core;
+using Pulp.Calendar;
 using Pulp.Components;
 using Pulp.Shell;
 using Storyworthtelling.Voice.Health;
@@ -243,6 +244,11 @@ public class VaultActivity : Activity
         {
             // The owner closed the chooser or the page: nothing to say.
             return;
+        }
+        catch (CalendarAccountRefusedException exception)
+        {
+            // The refusal is already a plain sentence for the owner; say it as it is.
+            calendarProblem = exception.Message;
         }
         catch (Exception exception)
         {

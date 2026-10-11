@@ -214,4 +214,54 @@ public class CalendarSyncPlanTests
         var moved = item with { When = new CalendarWhen(Today.AddDays(3), new TimeOnly(20, 0)) };
         Assert.Equal(CalendarDrafts.From(item, NameOf).Key, CalendarDrafts.From(moved, NameOf).Key);
     }
+
+    [Fact]
+    public void DeletesComeFirstThenMovesThenCreates()
+    {
+        // Bug kept out: creates ran first and a failing one stopped the write before the delete that takes a
+        // spoiler off the shared calendar.
+        var plan = CalendarSyncPlan.Compute(
+            [Draft("game:new", Today), Draft("game:moved", Today.AddDays(5)), Draft("game:same", Today)],
+            [Existing("e-moved", "game:moved", Today.AddDays(2)), Existing("e-same", "game:same", Today), Existing("e-gone", "game:gone", Today.AddDays(3))],
+            Today);
+
+        Assert.IsType<DeleteEvent>(plan[0]);
+        Assert.IsType<MoveEvent>(plan[1]);
+        Assert.IsType<CreateEvent>(plan[2]);
+        Assert.IsType<LeaveEvent>(plan[3]);
+    }
+
+    [Fact]
+    public void ADuplicateEventIsDeletedBeforeTheKeptOneMoves()
+    {
+        var plan = CalendarSyncPlan.Compute(
+            [Draft("game:1", Today.AddDays(5))],
+            [Existing("e1", "game:1", Today), Existing("e2", "game:1", Today)],
+            Today);
+
+        Assert.IsType<DeleteEvent>(plan[0]);
+        Assert.IsType<MoveEvent>(plan[1]);
+    }
+
+    [Fact]
+    public void ASubSecondDifferenceInATimeOfDayIsNotAMove()
+    {
+        // Bug kept out: a feed time with fractions of a second never equals the calendar's whole-second
+        // reading, so the event was patched every night.
+        var plan = CalendarSyncPlan.Compute(
+            [Draft("game:7", Today, new TimeOnly(19, 0, 0, 450))],
+            [Existing("e1", "game:7", Today, new TimeOnly(19, 0))],
+            Today);
+        Assert.IsType<LeaveEvent>(Assert.Single(plan));
+    }
+
+    [Fact]
+    public void ADifferenceOfAWholeSecondIsStillAMove()
+    {
+        var plan = CalendarSyncPlan.Compute(
+            [Draft("game:7", Today, new TimeOnly(19, 0, 1))],
+            [Existing("e1", "game:7", Today, new TimeOnly(19, 0))],
+            Today);
+        Assert.IsType<MoveEvent>(Assert.Single(plan));
+    }
 }

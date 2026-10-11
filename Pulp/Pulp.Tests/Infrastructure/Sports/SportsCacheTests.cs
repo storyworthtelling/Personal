@@ -84,6 +84,39 @@ public sealed class SportsCacheTests : IDisposable
         Assert.Equal(CacheReadStatus.Hit, cache.Read(Coastal).Status);
     }
 
+    [Theory]
+    [InlineData("\"name\":\"Coastal Football League\"", "\"name\":null")]
+    [InlineData("\"id\":\"cfl-invented\"", "\"id\":null")]
+    [InlineData("\"fetchedAt\":", "\"fetchedAt\":12,\"was\":")]
+    [InlineData("\"schedule\":[", "\"schedule\":{\"x\":1},\"was\":[")]
+    public void AnyDamagedFieldIsUnreadableAndNeverEscapesAsAnException(string original, string damaged)
+    {
+        var cache = new SportsCache(directory);
+        cache.Store(CoastalFeed(), Fetched);
+        var file = Directory.GetFiles(directory).Single();
+        var text = File.ReadAllText(file);
+        Assert.Contains(original, text);
+        File.WriteAllText(file, text.Replace(original, damaged));
+
+        var read = cache.Read(Coastal);
+
+        Assert.Equal(CacheReadStatus.Unreadable, read.Status);
+        Assert.Null(read.Entry);
+    }
+
+    [Fact]
+    public void AFileThatCannotBeOpenedIsUnreadableNotAnException()
+    {
+        var cache = new SportsCache(directory);
+        cache.Store(CoastalFeed(), Fetched);
+        var file = Directory.GetFiles(directory).Single();
+
+        // Held open without sharing, as another process or a failing disk would leave it.
+        using var held = new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        Assert.Equal(CacheReadStatus.Unreadable, cache.Read(Coastal).Status);
+    }
+
     [Fact]
     public void AnEntryFromANewerFormatIsUnreadableNotMisread()
     {

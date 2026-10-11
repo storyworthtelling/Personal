@@ -4,6 +4,16 @@ namespace Pulp.Domain.Calendar;
 
 public sealed record CalendarSyncResult(int Created, int Moved, int Deleted, int Left);
 
+/// <summary>
+/// One or more operations of a night's write failed after the rest had been tried. <see cref="Done"/> is what
+/// did get written; <see cref="AggregateException.InnerExceptions"/> is every failure, in plan order.
+/// </summary>
+public sealed class CalendarSyncException(IEnumerable<Exception> failures, CalendarSyncResult done)
+    : AggregateException($"{failures.Count()} calendar write(s) failed; {done.Created} created, {done.Moved} moved and {done.Deleted} deleted succeeded.", failures)
+{
+    public CalendarSyncResult Done { get; } = done;
+}
+
 /// <summary>Runs the nightly plan against the calendar: reads it, plans, and does exactly what the plan says.</summary>
 public sealed class CalendarWriter
 {
@@ -40,26 +50,43 @@ public sealed class CalendarWriter
         var moved = 0;
         var deleted = 0;
         var left = 0;
+        var failures = new List<Exception>();
         foreach (var operation in plan)
         {
-            switch (operation)
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Each operation stands alone: one that fails must not stop the ones behind it, above all a
+            // delete, which is what takes a spoiler off the shared calendar. The failures are thrown together.
+            try
             {
-                case CreateEvent create:
-                    await calendar.InsertAsync(calendarId, create.Draft, zone, cancellationToken);
-                    created++;
-                    break;
-                case MoveEvent move:
-                    await calendar.PatchAsync(calendarId, move.EventId, move.Draft, zone, cancellationToken);
-                    moved++;
-                    break;
-                case DeleteEvent delete:
-                    await calendar.DeleteAsync(calendarId, delete.EventId, cancellationToken);
-                    deleted++;
-                    break;
-                default:
-                    left++;
-                    break;
+                switch (operation)
+                {
+                    case CreateEvent create:
+                        await calendar.InsertAsync(calendarId, create.Draft, zone, cancellationToken);
+                        created++;
+                        break;
+                    case MoveEvent move:
+                        await calendar.PatchAsync(calendarId, move.EventId, move.Draft, zone, cancellationToken);
+                        moved++;
+                        break;
+                    case DeleteEvent delete:
+                        await calendar.DeleteAsync(calendarId, delete.EventId, cancellationToken);
+                        deleted++;
+                        break;
+                    default:
+                        left++;
+                        break;
+                }
             }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                failures.Add(exception);
+            }
+        }
+
+        if (failures.Count > 0)
+        {
+            throw new CalendarSyncException(failures, new CalendarSyncResult(created, moved, deleted, left));
         }
 
         return new CalendarSyncResult(created, moved, deleted, left);

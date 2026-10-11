@@ -47,8 +47,10 @@ public sealed class SportsCache
             {
                 return new SportsCacheRead(CacheReadStatus.Hit, Decode(File.ReadAllText(path)), null);
             }
-            catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or ArgumentException or CacheFormatException)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                // Anything that stops an entry being read (a locked or unreadable file, a null where text should be, a
+                // wrong-typed field) means "no cache" for this league: the caller logs the reason and fetches again.
                 return new SportsCacheRead(CacheReadStatus.Unreadable, null, $"Cached league {league} could not be read: {exception.Message}");
             }
         }
@@ -185,18 +187,18 @@ public sealed class SportsCache
 
         var l = root.GetProperty("league");
         var league = new League(
-            new LeagueId(l.GetProperty("id").GetString()!),
-            l.GetProperty("name").GetString()!,
-            l.GetProperty("badge").GetString()!,
-            (SeasonPhase)Word(Phases, l.GetProperty("phase").GetString()),
-            ParseDay(l.GetProperty("seasonEnds").GetString()!),
-            l.TryGetProperty("nextDate", out var next) ? ParseDay(next.GetString()!) : null);
+            new LeagueId(Text(l, "id")),
+            Text(l, "name"),
+            Text(l, "badge"),
+            (SeasonPhase)Word(Phases, Text(l, "phase")),
+            ParseDay(Text(l, "seasonEnds")),
+            l.TryGetProperty("nextDate", out _) ? ParseDay(Text(l, "nextDate")) : null);
 
         var championship = root.TryGetProperty("championship", out var c)
             ? new Championship(
-                new GameId(c.GetProperty("id").GetString()!),
-                c.GetProperty("name").GetString()!,
-                ParseInstant(c.GetProperty("startsAt").GetString()!),
+                new GameId(Text(c, "id")),
+                Text(c, "name"),
+                ParseInstant(Text(c, "startsAt")),
                 ReadTeams(c.GetProperty("teams")))
             : null;
 
@@ -204,23 +206,32 @@ public sealed class SportsCache
             league,
             ReadTeams(root.GetProperty("teams")),
             root.GetProperty("schedule").EnumerateArray().Select(game => new Game(
-                new GameId(game.GetProperty("id").GetString()!),
+                new GameId(Text(game, "id")),
                 ReadTeam(game.GetProperty("home")),
                 ReadTeam(game.GetProperty("away")),
-                ParseInstant(game.GetProperty("startsAt").GetString()!),
-                (GameStage)Word(Stages, game.GetProperty("stage").GetString()),
-                game.GetProperty("channel").GetString()!)).ToList(),
+                ParseInstant(Text(game, "startsAt")),
+                (GameStage)Word(Stages, Text(game, "stage")),
+                Text(game, "channel"))).ToList(),
             ReadTeams(root.GetProperty("order")),
             root.GetProperty("highlights").EnumerateArray()
-                .Select(highlight => new Highlight(highlight.GetProperty("videoId").GetString()!, highlight.GetProperty("title").GetString()!)).ToList(),
+                .Select(highlight => new Highlight(Text(highlight, "videoId"), Text(highlight, "title"))).ToList(),
             championship);
-        return new CachedLeague(feed, ParseInstant(root.GetProperty("fetchedAt").GetString()!));
+        return new CachedLeague(feed, ParseInstant(Text(root, "fetchedAt")));
     }
 
     private static List<Team> ReadTeams(JsonElement array) => array.EnumerateArray().Select(ReadTeam).ToList();
 
     private static Team ReadTeam(JsonElement team) =>
-        new(new TeamId(team.GetProperty("id").GetString()!), team.GetProperty("name").GetString()!, team.GetProperty("badge").GetString()!);
+        new(new TeamId(Text(team, "id")), Text(team, "name"), Text(team, "badge"));
+
+    // A null or wrong-typed value is a damaged entry, not a null that slips into a record and fails later.
+    private static string Text(JsonElement parent, string name)
+    {
+        var value = parent.GetProperty(name);
+        return value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? throw new CacheFormatException($"'{name}' has no text")
+            : throw new CacheFormatException($"'{name}' is {value.ValueKind}, not text");
+    }
 
     private static DateOnly ParseDay(string text) => DateOnly.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture);
 
