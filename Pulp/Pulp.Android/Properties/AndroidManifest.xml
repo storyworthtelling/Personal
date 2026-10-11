@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Package visibility (Android 11+): Pulp has to be able to see Flyleaf to know a locked hand-off can land (D298). -->
+  <queries>
+    <package android:name="com.storyworthtelling.focusphone.launcher" />
+  </queries>
+</manifest>

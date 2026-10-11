@@ -897,6 +897,26 @@ public class FrozenInvariantsTests
         return block.Contains($"HomeFeatureSet.{name}", StringComparison.Ordinal);
     }
 
+    // Release G (D288, D296, D297): the locked hand-off's receiver is addressed by name from another
+    // app, its record is persisted under a fixed preferences file, and the numbers that bound a lock
+    // are policy. A rename or a quiet "improvement" of any of them fails here, not on the phone.
+    [Fact]
+    public void TheLockedHandOffNamesAndBoundsAreFrozen()
+    {
+        Assert.Equal("com.storyworthtelling.focusphone.launcher.LockedOpenReceiver", LockedOpenHandoff.Receiver);
+        Assert.StartsWith(PolicyContext.LauncherPackage + ".", LockedOpenHandoff.Receiver, StringComparison.Ordinal);
+        Assert.Equal("lockedSession", LockedOpenHandoff.PreferencesName);
+        Assert.Equal(TimeSpan.FromHours(6), LockedSessionRules.MaxDuration);
+        Assert.Equal(LockTaskFeatureFlags.Home | LockTaskFeatureFlags.Keyguard, LockTaskFeatureFlags.Session);
+
+        // The catalogue never grows an owner package or a package the plan hard-blocks.
+        Assert.All(LockedOpenCatalogue.Packages, package =>
+        {
+            Assert.False(package.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal), package);
+            Assert.DoesNotContain(package, HardBlock.CuratedPackages);
+        });
+    }
+
     private static string ReadRequestMember(string action) => action switch
     {
         "com.storyworthtelling.plate.action.READ_CARD" => "ReadRequest.ReadCard",
