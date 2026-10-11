@@ -17,7 +17,8 @@ public sealed record StreamingService
         IReadOnlyList<string> packages,
         string sourceId,
         IReadOnlyList<string> merchantNames,
-        bool kidsOnly = false)
+        bool kidsOnly = false,
+        IReadOnlyList<string>? linkDomains = null)
     {
         ArgumentNullException.ThrowIfNull(packages);
         ArgumentNullException.ThrowIfNull(merchantNames);
@@ -39,6 +40,7 @@ public sealed record StreamingService
         SourceId = Require(sourceId, nameof(sourceId), id);
         MerchantNames = merchantNames.Select(merchant => merchant.Trim()).ToList();
         KidsOnly = kidsOnly;
+        LinkDomains = (linkDomains ?? []).Select(domain => domain.Trim().ToLowerInvariant()).ToList();
     }
 
     public ServiceId Id { get; }
@@ -62,6 +64,12 @@ public sealed record StreamingService
     /// catalogue's own entry and never from a record a caller hands it.
     /// </summary>
     public bool KidsOnly { get; }
+
+    /// <summary>
+    /// The domains this service's own title links live on (D301). Flyleaf refuses a locked open whose link
+    /// is off these, and keeps its own list equal to this one by a parity guard. A subdomain of one counts.
+    /// </summary>
+    public IReadOnlyList<string> LinkDomains { get; }
 
     /// <summary>The package a hand-off is aimed at.</summary>
     public string PrimaryPackage => Packages[0];

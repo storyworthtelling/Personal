@@ -22,7 +22,8 @@ public class LockedSessionPlanTests
         bool suspended = false,
         IEnumerable<string>? policySuspended = null,
         LockedSessionRecord? active = null,
-        string package = Netflix) =>
+        string package = Netflix,
+        int bootCount = -1) =>
         new(
             package,
             current ?? [],
@@ -33,7 +34,8 @@ public class LockedSessionPlanTests
             Flyleaf,
             At,
             1_000,
-            active);
+            active,
+            bootCount);
 
     [Fact]
     public void StartKeepsTheExistingAllowlistAndAddsTheServiceTheLauncherAndTheDialer()
@@ -118,21 +120,42 @@ public class LockedSessionPlanTests
     }
 
     [Fact]
-    public void AStartOverAnActiveSessionKeepsTheOriginalPriorsNotOurOwnAdditions()
+    public void ASecondStartWhileOneIsActiveIsRefusedAndChangesNothing()
     {
+        // D300: one session at a time. A second request used to take the new package while keeping the
+        // first one freed and restarting the six-hour clock; refusing it leaves the first record whole.
         var first = LockedSessionPlan.Start(Facts(current: ["com.example.kept"], features: 0, suspended: true));
-        // The device now reports what the first start set.
         var second = LockedSessionPlan.Start(Facts(
             current: first.LockTaskPackages,
             features: first.LockTaskFeatures,
-            suspended: false,
+            suspended: true,
             active: first.Record,
             package: "com.hulu.plus"));
 
-        Assert.Equal(["com.example.kept"], second.Record.PriorLockTaskPackages);
-        Assert.Equal(0, second.Record.PriorLockTaskFeatures);
-        Assert.Equal("com.hulu.plus", second.Record.Package);
+        Assert.False(second.Allowed);
+        Assert.Null(second.UnsuspendPackage);
+        Assert.Empty(second.LockTaskPackages);
         Assert.True(first.Record.Unsuspended);
+        Assert.Equal(Netflix, first.Record.Package);
+    }
+
+    [Fact]
+    public void ARepeatRequestForTheRunningServiceIsRefusedToo()
+    {
+        var first = LockedSessionPlan.Start(Facts());
+
+        Assert.False(LockedSessionPlan.Start(Facts(active: first.Record)).Allowed);
+    }
+
+    [Fact]
+    public void AStartRecordsTheBootCountAndStartsUnconfirmed()
+    {
+        var plan = LockedSessionPlan.Start(Facts(bootCount: 12));
+
+        Assert.Equal(12, plan.Record.BootCount);
+        Assert.False(plan.Record.Confirmed);
+        Assert.False(plan.Record.Advanced);
+        Assert.Null(plan.Record.PausedSinceElapsedMs);
     }
 
     [Fact]
@@ -140,7 +163,7 @@ public class LockedSessionPlanTests
     {
         var start = LockedSessionPlan.Start(Facts(current: ["com.example.kept"], features: 2, suspended: true));
 
-        var release = LockedSessionPlan.Release(start.Record, LockedReleaseReason.TitleEnded);
+        var release = LockedSessionPlan.Release(start.Record, LockedReleaseReason.TitleEnded, new HashSet<string> { Netflix });
 
         Assert.Equal(["com.example.kept"], release.RestoreLockTaskPackages);
         Assert.Equal(2, release.RestoreLockTaskFeatures);
@@ -150,11 +173,35 @@ public class LockedSessionPlanTests
     }
 
     [Fact]
+    public void ReleaseResuspendsOnlyWhatThePlanWouldSuspendNow()
+    {
+        // D301: the service was freed for the session. If a policy pass has legitimately freed it since
+        // (or never wanted it suspended), putting it back would undo that pass.
+        var start = LockedSessionPlan.Start(Facts(suspended: true));
+
+        Assert.Null(LockedSessionPlan.Release(start.Record, LockedReleaseReason.TitleEnded, new HashSet<string>()).ResuspendPackage);
+        Assert.Null(LockedSessionPlan.Release(start.Record, LockedReleaseReason.TitleEnded, new HashSet<string> { "com.hulu.plus" }).ResuspendPackage);
+        Assert.Equal(Netflix,
+            LockedSessionPlan.Release(start.Record, LockedReleaseReason.TitleEnded, new HashSet<string> { Netflix }).ResuspendPackage);
+        Assert.Null(LockedSessionPlan.Release(start.Record, LockedReleaseReason.TitleEnded).ResuspendPackage);
+    }
+
+    [Theory]
+    [InlineData(null, "com.netflix.mediaclient", false)]
+    [InlineData(new string[0], "com.netflix.mediaclient", false)]
+    [InlineData(new[] { "com.hulu.plus" }, "com.netflix.mediaclient", false)]
+    [InlineData(new[] { "com.netflix.mediaclient" }, "com.netflix.mediaclient", true)]
+    public void AFailedListNamingThePackageIsAFailureAndAnyOtherIsNot(string[]? failed, string package, bool failedExpected)
+    {
+        Assert.Equal(failedExpected, LockedSessionPlan.DidFail(failed, package));
+    }
+
+    [Fact]
     public void ReleaseDoesNotResuspendWhatItNeverReleased()
     {
         var start = LockedSessionPlan.Start(Facts(suspended: false));
 
-        Assert.Null(LockedSessionPlan.Release(start.Record, LockedReleaseReason.HomePressed).ResuspendPackage);
+        Assert.Null(LockedSessionPlan.Release(start.Record, LockedReleaseReason.HomePressed, new HashSet<string> { Netflix }).ResuspendPackage);
     }
 
     [Fact]
@@ -174,6 +221,7 @@ public class LockedSessionPlanTests
     [InlineData(LockedReleaseReason.TitleEnded, true)]
     [InlineData(LockedReleaseReason.TitleChanged, true)]
     [InlineData(LockedReleaseReason.MaxDuration, true)]
+    [InlineData(LockedReleaseReason.NeverStarted, true)]
     [InlineData(LockedReleaseReason.Stale, false)]
     public void OnlyACleanupOfAStaleLockLeavesPulpWhereItWas(LockedReleaseReason reason, bool bringsForward)
     {
@@ -186,7 +234,11 @@ public class LockedSessionPlanTests
     public void TheRecordSurvivesTheStoreAndAnUnreadableOneIsNoRecord()
     {
         var record = LockedSessionPlan.Start(Facts(current: ["com.example.kept"], features: 2, suspended: true)).Record
-            with { Title = "Harbor Lights", LastPositionMs = 61_000, LastDurationMs = 5_400_000, PausedSince = At.AddMinutes(3) };
+            with
+            {
+                Title = "Harbor Lights", LastPositionMs = 61_000, LastDurationMs = 5_400_000, PausedSinceElapsedMs = 181_000,
+                Confirmed = true, Advanced = true, BootCount = 9,
+            };
 
         Assert.True(LockedSessionCodec.TryDecode(LockedSessionCodec.Encode(record), out var back));
         Assert.Equal(record.Package, back.Package);
@@ -198,12 +250,32 @@ public class LockedSessionPlanTests
         Assert.Equal(record.Title, back.Title);
         Assert.Equal(record.LastPositionMs, back.LastPositionMs);
         Assert.Equal(record.LastDurationMs, back.LastDurationMs);
-        Assert.Equal(record.PausedSince, back.PausedSince);
+        Assert.Equal(record.PausedSinceElapsedMs, back.PausedSinceElapsedMs);
+        Assert.Equal(record.Confirmed, back.Confirmed);
+        Assert.Equal(record.Advanced, back.Advanced);
+        Assert.Equal(record.BootCount, back.BootCount);
 
         Assert.False(LockedSessionCodec.TryDecode(null, out _));
         Assert.False(LockedSessionCodec.TryDecode("", out _));
         Assert.False(LockedSessionCodec.TryDecode("{", out _));
         Assert.False(LockedSessionCodec.TryDecode("[]", out _));
         Assert.False(LockedSessionCodec.TryDecode("{\"package\":\"\"}", out _));
+    }
+
+    [Fact]
+    public void ARecordWrittenBeforeTheNewFieldsStillReadsWithSafeDefaults()
+    {
+        // An older record has none of Confirmed, Advanced, BootCount or the elapsed pause: absent reads
+        // as unknown boot, not advanced, and not paused. It also carries no freed-set to misread.
+        const string old = "{\"Package\":\"com.netflix.mediaclient\",\"StartedAt\":\"2026-03-04T20:00:00+00:00\","
+            + "\"StartedElapsedMs\":1000,\"PriorLockTaskPackages\":[\"a.b\"],\"PriorLockTaskFeatures\":0,"
+            + "\"Unsuspended\":true,\"Title\":null,\"LastPositionMs\":0,\"LastDurationMs\":0,\"PausedSince\":null}";
+
+        Assert.True(LockedSessionCodec.TryDecode(old, out var record));
+        Assert.Equal(-1, record.BootCount);
+        Assert.False(record.Advanced);
+        Assert.Null(record.PausedSinceElapsedMs);
+        Assert.True(record.Unsuspended);
+        Assert.True(record.Confirmed, "A record from before the start check must not be timed out as never started.");
     }
 }

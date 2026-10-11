@@ -35,7 +35,7 @@ public sealed record HandOffOutcome(HandOffResult Result, string? Notice, Pendin
 /// restricted browser (the locked phone's default web handler) never catches it. A refusal never
 /// reaches Android at all. On the locked phone (Flyleaf here, the package ticked: <see cref="LockedOpenChoice"/>)
 /// the same planned package and link go to Flyleaf as a locked open instead (D288, D298), falling back to the
-/// plain intent if that cannot be sent. Nothing else in the head builds a VIEW intent or calls
+/// plain intent if that cannot be sent, or if Flyleaf refuses or does not answer (D301). Nothing else in the head builds a VIEW intent or calls
 /// <c>HandOff.For</c>; <c>HandOffExecutorIsTheOneDoorTests</c> holds that.
 /// </summary>
 public sealed class HandOffExecutor
@@ -79,28 +79,37 @@ public sealed class HandOffExecutor
         }
 
         // Release G (D288): on the locked phone the same allowed intent is asked of Flyleaf, which starts it in
-        // lock task mode. Only the planner's own package and link cross; a send that cannot go falls back to the
-        // plain hand-off below, so the title still opens.
+        // lock task mode and says so in its answer (D301). Only the planner's own package and link cross. The
+        // plain hand-off below is the fallback in both senses: it runs at once if the ask cannot be sent, and
+        // later, once, if Flyleaf refuses or never answers, so the title still opens.
+        var pending = plan.Pending;
+        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(plan.Intent.Data.AbsoluteUri));
+        intent.SetPackage(plan.Intent.Package);
+
         if (LockedOpenChoice.Decide(locked, plan.Intent.Package) == HandOffRoute.Locked
-            && LockedOpenCourier.Send(host, plan.Intent.Package, plan.Intent.Data))
+            && LockedOpenCourier.Send(host, plan.Intent.Package, plan.Intent.Data, () => PlainHandOff(host, intent, serviceName, pending)))
         {
             return new HandOffOutcome(HandOffResult.Started, null, plan.Pending);
         }
 
-        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(plan.Intent.Data.AbsoluteUri));
-        intent.SetPackage(plan.Intent.Package);
+        return PlainHandOff(host, intent, serviceName, pending);
+    }
 
+    // An explicit package with nothing installed to answer it: the app is missing, which the owner can
+    // fix, so it is a notice rather than a failure to propagate. A late fallback (after the locked route
+    // answered no) has no outcome to return, so its failure is only logged.
+    private static HandOffOutcome PlainHandOff(Activity host, Intent intent, string serviceName, PendingHandOff pending)
+    {
         try
         {
             host.StartActivity(intent);
         }
         catch (ActivityNotFoundException)
         {
-            // An explicit package with nothing installed to answer it: the app is missing, which the
-            // owner can fix, so it is a notice rather than a failure to propagate.
+            Android.Util.Log.Info("Pulp", $"{serviceName} is not installed; the plain hand-off had nothing to open.");
             return new HandOffOutcome(HandOffResult.NotInstalled, HandOffNotice.NotInstalled(serviceName), null);
         }
 
-        return new HandOffOutcome(HandOffResult.Started, null, plan.Pending);
+        return new HandOffOutcome(HandOffResult.Started, null, pending);
     }
 }

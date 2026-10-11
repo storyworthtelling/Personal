@@ -29,6 +29,30 @@ public class LockedOpenContractTests
         Assert.Equal(PolicyContext.LauncherPackage, LockedOpenHandoff.Package);
     }
 
+    /// <summary>
+    /// The answer crosses as the ordered broadcast's result code (D301): Activity.RESULT_OK (-1) only
+    /// when a session started, 0 for anything else. Pulp reads the same two numbers from this file.
+    /// </summary>
+    [Fact]
+    public void TheResultCodesAreFrozenAndStartedIsAndroidsResultOk()
+    {
+        Assert.Equal(-1, LockedOpenHandoff.ResultStarted);
+        Assert.Equal(0, LockedOpenHandoff.ResultRefused);
+            }
+
+    [Fact]
+    public void TheReceiverAnswersAnOrderedBroadcastWithTheControllersOwnVerdict()
+    {
+        var source = Read("Flyleaf.Android", "LockedOpenReceiver.cs");
+
+        Assert.Contains("IsOrderedBroadcast", source, StringComparison.Ordinal);
+        Assert.Contains("ResultCode = ", source, StringComparison.Ordinal);
+        Assert.Contains("LockedOpenHandoff.ResultStarted", source, StringComparison.Ordinal);
+        Assert.Contains("LockedOpenHandoff.ResultRefused", source, StringComparison.Ordinal);
+        // The started/refused answer is the controller's return value, never an assumption.
+        Assert.Matches(@"var started = LockedSessionController\.Start\(", source);
+    }
+
     [Fact]
     public void TheReceiverIsRegisteredUnderTheContractsNames()
     {
@@ -125,6 +149,93 @@ public class LockedOpenContractTests
         Assert.Contains("plan.ResuspendPackage is { } resuspend", source, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A failed un-suspend must not open the film locked, and a failed re-suspend keeps the record for
+    /// a retry (D301): both read the list SetPackagesSuspended returns.
+    /// </summary>
+    [Fact]
+    public void TheControllerHonoursTheFailedListOfBothSuspendCalls()
+    {
+        var source = Read("Flyleaf.Android", "LockedSessionController.cs");
+
+        Assert.Matches(@"var \w+ = dpm\.SetPackagesSuspended\(admin, \[unsuspend\], false\);", source);
+        Assert.Matches(@"var \w+ = dpm\.SetPackagesSuspended\(admin, \[resuspend\], true\);", source);
+        Assert.Equal(2, Regex.Matches(source, @"LockedSessionPlan\.DidFail\(").Count);
+    }
+
+    /// <summary>
+    /// Everything that runs while a session is live reads the monotonic clock (D301): a wall-clock
+    /// change must not end or extend a lock. The wall clock appears only at start (to stamp the record)
+    /// and at process start (to notice it moved).
+    /// </summary>
+    [Fact]
+    public void TheRunningRulesAreGivenElapsedRealtimeNotTheWallClock()
+    {
+        var source = Read("Flyleaf.Android", "LockedSessionController.cs");
+
+        Assert.Contains("LockedSessionRules.OnHome(record, SystemClock.ElapsedRealtime())", source, StringComparison.Ordinal);
+        Assert.Contains("var elapsed = SystemClock.ElapsedRealtime();", source, StringComparison.Ordinal);
+        Assert.Contains("LockedSessionRules.OnTick(record, elapsed)", source, StringComparison.Ordinal);
+        Assert.Contains("LockedSessionRules.OnReading(record, reading, SystemClock.ElapsedRealtime())", source, StringComparison.Ordinal);
+        Assert.Equal(2, Regex.Matches(source, @"DateTimeOffset\.UtcNow").Count);
+    }
+
+    /// <summary>
+    /// Android 14 blocks a background activity start unless the sender opts in; the repo already learned
+    /// that for the call screen. The locked launch goes through a PendingIntent with the same opt-in (D301).
+    /// </summary>
+    [Fact]
+    public void TheLockedLaunchIsAPendingIntentWithTheBackgroundStartOptIn()
+    {
+        var source = Read("Flyleaf.Android", "LockedSessionController.cs");
+        var start = source.IndexOf("private static void OpenLocked(", StringComparison.Ordinal);
+        var body = source[start..source.IndexOf("private static void BringForward(", StringComparison.Ordinal)];
+
+        Assert.Contains("PendingIntent.GetActivity(", body, StringComparison.Ordinal);
+        Assert.Contains("SetLockTaskEnabled(true)", body, StringComparison.Ordinal);
+        Assert.Contains("CallScreen.OptInToBackgroundStart(", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("context.StartActivity(", body, StringComparison.Ordinal);
+        Assert.Contains("SetPendingIntentBackgroundActivityStartMode", Read("Flyleaf.Android", "CallScreen.cs"), StringComparison.Ordinal);
+    }
+
+    /// <summary>The start arms its own early alarm so a film that never opens is let go (D301).</summary>
+    [Fact]
+    public void TheStartArmsTheShortStartCheckAndTheTickFollowsTheRulesNextTick()
+    {
+        var source = Read("Flyleaf.Android", "LockedSessionController.cs");
+
+        Assert.Contains("LockedSessionRules.NextTick(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("catch (Java.Lang.Exception", source, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The link-domain allowlist beside the package catalogue equals the one Pulp's catalogue carries,
+    /// package for package (D301). Read from Pulp's source by content.
+    /// </summary>
+    [Fact]
+    public void TheLinkDomainsEqualPulpsServiceCatalogueDomainsPackageForPackage()
+    {
+        var path = Path.Combine(RepoRoot(), "Pulp", "Pulp.Domain", "Services", "ServiceCatalogue.cs");
+        var source = File.ReadAllText(path);
+        var start = source.IndexOf("Public { get; } = new(", StringComparison.Ordinal);
+        var block = source[start..source.IndexOf("]);", start, StringComparison.Ordinal)];
+        var ours = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (Match service in Regex.Matches(block, @"new\(new ServiceId\([^)]*\),\s*""[^""]*"",\s*\[([^\]]*)\],[^\n]*linkDomains:\s*\[([^\]]*)\]"))
+        {
+            var domains = string.Join(",", Regex.Matches(service.Groups[2].Value, @"""([^""]*)""").Select(m => m.Groups[1].Value).Order(StringComparer.Ordinal));
+            foreach (Match package in Regex.Matches(service.Groups[1].Value, @"""([^""]*)"""))
+            {
+                ours[package.Groups[1].Value] = domains;
+            }
+        }
+
+        var theirs = LockedOpenCatalogue.LinkDomains.ToDictionary(
+            pair => pair.Key, pair => string.Join(",", pair.Value.Order(StringComparer.Ordinal)), StringComparer.Ordinal);
+
+        Assert.NotEmpty(ours);
+        Assert.Equal(ours.OrderBy(pair => pair.Key, StringComparer.Ordinal), theirs.OrderBy(pair => pair.Key, StringComparer.Ordinal));
+    }
+
     [Fact]
     public void ReleaseRestoresThePolicyBeforeItClearsTheRecordAndNeverClearsAfterAFailure()
     {
@@ -133,7 +244,7 @@ public class LockedOpenContractTests
         var body = source[start..source.IndexOf("private static void OpenLocked(", StringComparison.Ordinal)];
 
         var restore = body.IndexOf("SetLockTaskPackages(", StringComparison.Ordinal);
-        var catchAt = body.IndexOf("catch (Java.Lang.Exception", StringComparison.Ordinal);
+        var catchAt = body.IndexOf("catch (Exception", StringComparison.Ordinal);
         var returnAt = body.IndexOf("return;", catchAt, StringComparison.Ordinal);
         var clear = body.IndexOf("store.Clear()", StringComparison.Ordinal);
         var forward = body.IndexOf("BringForward(", clear, StringComparison.Ordinal);

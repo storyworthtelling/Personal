@@ -30,6 +30,45 @@ public class LockedOpenContractTests
         Assert.Equal(FlyleafConstant(flyleafName), ours);
     }
 
+    [Theory]
+    [InlineData("ResultStarted", nameof(LockedOpenHandOff.ResultStarted))]
+    [InlineData("ResultRefused", nameof(LockedOpenHandOff.ResultRefused))]
+    public void TheResultCodesEqualFlyleafs(string flyleafName, string ourName)
+    {
+        var text = File.ReadAllText(Path.Combine(PulpSource.Root(), "..", FlyleafContract));
+        var match = Regex.Match(text, $@"public const int {Regex.Escape(flyleafName)}\s*=\s*(-?\d+)\s*;");
+        Assert.True(match.Success, $"Could not find LockedOpenHandoff.{flyleafName}.");
+
+        Assert.Equal(int.Parse(match.Groups[1].Value), (int)typeof(LockedOpenHandOff).GetField(ourName)!.GetValue(null)!);
+    }
+
+    /// <summary>Flyleaf refuses a link off the service's own domains (D301); Pulp must not send one it would refuse.</summary>
+    [Fact]
+    public void EveryServicesLinkDomainsEqualFlyleafsPackageForPackage()
+    {
+        var text = File.ReadAllText(Path.Combine(PulpSource.Root(), "..", FlyleafContract));
+        var start = text.IndexOf("LinkDomains { get; }", StringComparison.Ordinal);
+        Assert.True(start >= 0, "Could not find LockedOpenCatalogue.LinkDomains.");
+        var block = text[start..text.IndexOf("};", start, StringComparison.Ordinal)];
+        var flyleaf = Regex.Matches(block, @"\[""([^""]+)""\]\s*=\s*\[([^\]]*)\]").ToDictionary(
+            match => match.Groups[1].Value,
+            match => string.Join(",", Regex.Matches(match.Groups[2].Value, @"""([^""]*)""").Select(m => m.Groups[1].Value).Order(StringComparer.Ordinal)),
+            StringComparer.Ordinal);
+
+        var ours = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var service in ServiceCatalogue.Public.All)
+        {
+            Assert.NotEmpty(service.LinkDomains);
+            foreach (var package in service.Packages)
+            {
+                ours[package] = string.Join(",", service.LinkDomains.Order(StringComparer.Ordinal));
+            }
+        }
+
+        Assert.NotEmpty(flyleaf);
+        Assert.Equal(ours.OrderBy(pair => pair.Key, StringComparer.Ordinal), flyleaf.OrderBy(pair => pair.Key, StringComparer.Ordinal));
+    }
+
     [Fact]
     public void TheReceiverActionAndPermissionLiveUnderTheLaunchersPackage()
     {
@@ -67,7 +106,8 @@ public class LockedOpenContractTests
 
         Assert.Contains("new ComponentName(LockedOpenHandOff.Package, LockedOpenHandOff.Receiver)", courier, StringComparison.Ordinal);
         Assert.Contains("new Intent(LockedOpenHandOff.Action)", courier, StringComparison.Ordinal);
-        Assert.Contains("SendBroadcast(intent, LockedOpenHandOff.Permission)", courier, StringComparison.Ordinal);
+        Assert.Contains("SendOrderedBroadcast(", courier, StringComparison.Ordinal);
+        Assert.Contains("LockedOpenHandOff.Permission", courier, StringComparison.Ordinal);
         Assert.Contains("LockedOpenHandOff.Extras(", courier, StringComparison.Ordinal);
     }
 
@@ -76,8 +116,24 @@ public class LockedOpenContractTests
     {
         var courier = CourierSource();
 
-        Assert.DoesNotContain("SendBroadcast(intent)", courier, StringComparison.Ordinal);
+        Assert.DoesNotContain("SendBroadcast(", courier, StringComparison.Ordinal);
         Assert.DoesNotContain("SetPackage(", courier, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A plain broadcast cannot say whether Flyleaf started anything (D301). The courier asks with an
+    /// ordered one, reads the result code through the pure answer, and falls back exactly once.
+    /// </summary>
+    [Fact]
+    public void TheCourierAsksWithAnOrderedBroadcastAndFallsBackOnAnythingButStarted()
+    {
+        var courier = CourierSource();
+
+        Assert.Contains("SendOrderedBroadcast(", courier, StringComparison.Ordinal);
+        Assert.Contains("new LockedOpenAnswer()", courier, StringComparison.Ordinal);
+        Assert.Contains("ShouldFallBack(", courier, StringComparison.Ordinal);
+        Assert.Contains("LockedOpenHandOff.ResultRefused", courier, StringComparison.Ordinal);
+        Assert.Contains("LockedOpenHandOff.AnswerTimeout", courier, StringComparison.Ordinal);
     }
 
     [Fact]

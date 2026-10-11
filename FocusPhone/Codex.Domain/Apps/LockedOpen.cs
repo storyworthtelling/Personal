@@ -33,6 +33,15 @@ public static class LockedOpenHandoff
     /// <summary>The title's https deep link in that app.</summary>
     public const string LinkExtra = "link";
 
+    /// <summary>
+    /// The answer to the ask (D301). The request is an ordered broadcast and Flyleaf's receiver sets this
+    /// as the result code only when a locked session actually started: Activity.RESULT_OK.
+    /// </summary>
+    public const int ResultStarted = -1;
+
+    /// <summary>The result code for everything else: refused, or could not start. Also the initial code, so silence reads as this.</summary>
+    public const int ResultRefused = 0;
+
     /// <summary>The preferences file the locked-session record persists in; a storage key, kept stable.</summary>
     public const string PreferencesName = "lockedSession";
 
@@ -65,6 +74,9 @@ public enum LockedOpenRefusal
 
     /// <summary>The owner blocked it; a block outranks a request.</summary>
     OwnerBlocked,
+
+    /// <summary>The link's host is not one of the service's own domains (D301): a signed sender cannot aim a service's app at an arbitrary site.</summary>
+    LinkHostNotAllowed,
 }
 
 /// <summary>
@@ -86,6 +98,32 @@ public static class LockedOpenCatalogue
         "com.cbs.app",
         "com.peacocktv.peacockandroid",
     };
+
+    /// <summary>
+    /// The domains each service's own links live on (D301), kept equal to the <c>linkDomains</c> on Pulp's
+    /// <c>ServiceCatalogue.Public</c> by guard G19. A host matches a domain when it is that domain or a
+    /// subdomain of it. Public knowledge of where each service serves its title pages, not yet checked
+    /// against the links the availability source returns; the first device run confirms every one.
+    /// </summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> LinkDomains { get; } =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            ["com.netflix.mediaclient"] = ["netflix.com"],
+            ["com.disney.disneyplus"] = ["disneyplus.com"],
+            ["com.hulu.plus"] = ["hulu.com"],
+            ["com.wbd.stream"] = ["max.com", "hbomax.com"],
+            ["com.hbo.hbonow"] = ["max.com", "hbomax.com"],
+            ["com.amazon.avod.thirdpartyclient"] = ["primevideo.com", "amazon.com"],
+            ["com.cbs.app"] = ["paramountplus.com"],
+            ["com.peacocktv.peacockandroid"] = ["peacocktv.com"],
+        };
+
+    /// <summary>True when the host is, or is a subdomain of, one of the package's link domains.</summary>
+    public static bool HostAllowed(string package, string host) =>
+        LinkDomains.TryGetValue(package, out var domains)
+        && domains.Any(domain =>
+            host.Equals(domain, StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>Reads the two extras into a <see cref="LockedOpenRequest"/>, or says it cannot.</summary>
@@ -116,7 +154,7 @@ public static class LockedOpenCodec
 
 /// <summary>
 /// What a signed sender may ask Flyleaf to lock-task (D296). All of: a package-shaped id, outside the
-/// owner's namespace, in the streaming catalogue, ticked by the household (the stored hidden set),
+/// owner's namespace, in the streaming catalogue, on that service's own link domain, ticked by the household (the stored hidden set),
 /// not hard-suspended by the plan, and not blocked by the owner. Pure, so the receiver is a thin
 /// reader of the device's facts.
 /// </summary>
@@ -147,6 +185,11 @@ public static class LockedOpenGate
         if (!LockedOpenCatalogue.Packages.Contains(package))
         {
             return LockedOpenRefusal.NotStreamingService;
+        }
+
+        if (!LockedOpenCatalogue.HostAllowed(package, request.Link.Host))
+        {
+            return LockedOpenRefusal.LinkHostNotAllowed;
         }
 
         if (!hidden.Contains(package))
