@@ -15,6 +15,12 @@ public sealed class FakePulpCalendar : IPulpCalendar
 
     public List<string> Calls { get; } = [];
 
+    /// <summary>Calls that throw instead of succeeding, named as they appear in <see cref="Calls"/> ("insert:key").</summary>
+    public HashSet<string> Failing { get; } = [];
+
+    /// <summary>Runs after every event write is recorded, before it succeeds or throws.</summary>
+    public Action? OnCall { get; set; }
+
     public Action? OnCreate { get; set; }
 
     public Action? OnShare { get; set; }
@@ -41,19 +47,25 @@ public sealed class FakePulpCalendar : IPulpCalendar
 
     public Task InsertAsync(string calendarId, CalendarEventDraft draft, TimeZoneInfo zone, CancellationToken cancellationToken)
     {
-        Calls.Add("insert:" + draft.Key);
-        return Task.CompletedTask;
+        return Record("insert:" + draft.Key);
     }
 
     public Task PatchAsync(string calendarId, string eventId, CalendarEventDraft draft, TimeZoneInfo zone, CancellationToken cancellationToken)
     {
-        Calls.Add("patch:" + eventId);
-        return Task.CompletedTask;
+        return Record("patch:" + eventId);
     }
 
     public Task DeleteAsync(string calendarId, string eventId, CancellationToken cancellationToken)
     {
-        Calls.Add("delete:" + eventId);
-        return Task.CompletedTask;
+        return Record("delete:" + eventId);
+    }
+
+    private Task Record(string call)
+    {
+        Calls.Add(call);
+        OnCall?.Invoke();
+        return Failing.Contains(call)
+            ? throw new InvalidOperationException("The invented calendar refused " + call + ".")
+            : Task.CompletedTask;
     }
 }

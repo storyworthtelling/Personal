@@ -149,10 +149,24 @@ public static class SpoilerHold
 /// </summary>
 public sealed class SpoilerPeeks
 {
+    // Tapped on the UI thread and spent on a background paint, so every access takes the lock.
+    private readonly object gate = new();
     private readonly HashSet<LeagueId> granted = [];
 
-    public void Tap(LeagueId league) => granted.Add(league);
+    public void Tap(LeagueId league)
+    {
+        lock (gate)
+        {
+            granted.Add(league);
+        }
+    }
 
     /// <summary>True once per tap, then false until the tag is tapped again.</summary>
-    public bool Spend(LeagueId league) => granted.Remove(league);
+    public bool Spend(LeagueId league)
+    {
+        lock (gate)
+        {
+            return granted.Remove(league);
+        }
+    }
 }

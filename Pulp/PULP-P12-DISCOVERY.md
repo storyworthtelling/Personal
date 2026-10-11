@@ -691,3 +691,32 @@ Process (owner, D211): one screen per round; every decision, question and approv
   still allow-lists it (D128, D255).
 - **D294 · A child's empty Watching and empty Playlists pages are voiced too**, age-moderated like the
   child's empty Favorites — two seats added to the closed list.
+
+## Release E rulings (the calendar)
+
+- **Plans do not reach the calendar yet.** D68 (a plan to watch, on a date) and D146 (plans among the
+  calendar's contents) are **deferred**: the nightly writer's sources are new episodes of shows being
+  followed, releases of playlist titles and followed games, and nothing else. The Calendar page and the
+  household Google calendar agree on that, so nothing is promised that is not written.
+- **Deletes run first.** A night's write is ordered deletes, then moves, then creates; each operation is
+  tried on its own and the failures are thrown together at the end, so a failing create can never keep a
+  held game's delete (which takes a spoiler off the shared calendar) from running. A patch that finds its
+  event gone (404) creates it.
+- **Only adults' follows reach the shared calendar**, and following a team is refused for a child.
+- **A rate limit is not a withdrawn consent.** Only a 401, or a 403 whose reason is `insufficientPermissions`
+  or `forbidden`, clears the calendar's "connected" flag.
+- **The calendar's Google account is the Drive account.** Choosing a different one for the calendar is
+  refused in a plain sentence rather than repointing the vault and the voice profile.
+- **D295 · A team id names its league.** The sports adapters make `espn:<league>:<feed id>` and
+  `<league>:<feed id>` (e.g. `espn:nba:1`, `mlb:147`) because a feed's own team id is only unique inside its
+  sport, and one follow was pulling other leagues' teams into `FollowedLeagues`, fixtures, unwatched
+  recordings and the Find "Following" state. **A follow stored before this holds the bare feed id and
+  matches nothing** (ids compare by equality, so it cannot over-match); the household re-follows from Find.
+  Chosen over a tolerant "bare id matches any league's suffix" rule, which is exactly the bug, and over a
+  guessed read-time migration, since a bare `1` does not say which league it meant. Game ids are not
+  namespaced: event ids are not observed to collide, and recordings are keyed by them.
+- **The championship's name is the league's own, never the feed's text.** ESPN names it with the matched
+  marker from the shipped table ("NBA Finals"), MLB as "<league name> World Series"; the headline and
+  `seriesDescription` can read "Game 6 (X leads 3-2)" and are only matched against. The championship is the
+  first final game not yet played, else the latest. MLB badges use the PNG form (`midfield.mlbstatic.com`),
+  since the poster decoder is a bitmap decoder and cannot draw the SVG.

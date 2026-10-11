@@ -38,12 +38,30 @@ public sealed class CalendarConnection(VoiceGoogleAccount account)
     public async Task ConnectAsync(Activity activity)
     {
         ArgumentNullException.ThrowIfNull(activity);
-        await account.SignIn(activity);
+        var stored = VoiceGoogleAccount.Email;
+        var chosen = await account.SignIn(activity);
+
+        // The sign-in keeps its pick in the one stored Google account Drive reads (the vault, the voice
+        // profile), so a different pick would repoint them all. Put the stored one back and say so.
+        if (CalendarScreenConnection.JudgeAccount(stored, chosen) == CalendarAccountVerdict.Refuse)
+        {
+            RestoreDriveAccount(stored);
+            throw new CalendarAccountRefusedException(CalendarScreenConnection.DifferentAccount(stored));
+        }
+
         Set(true);
     }
 
     /// <summary>Google refused the token: the consent was withdrawn or never reached this account.</summary>
     public void Disconnected() => Set(false);
+
+    // The account's own preference, which Codex.Ui.Android keeps private; named here rather than edited there.
+    private static void RestoreDriveAccount(string email)
+    {
+        var editor = Application.Context.GetSharedPreferences("voice", FileCreationMode.Private)!.Edit()!;
+        editor.PutString("googleAccountEmail", email);
+        editor.Apply();
+    }
 
     private static ISharedPreferences Prefs() =>
         Application.Context.GetSharedPreferences(PrefsName, FileCreationMode.Private)!;
@@ -53,5 +71,13 @@ public sealed class CalendarConnection(VoiceGoogleAccount account)
         var editor = Prefs().Edit()!;
         editor.PutBoolean(ConnectedKey, connected);
         editor.Apply();
+    }
+}
+
+/// <summary>The chosen Google account is not the one Drive already uses; the message is a sentence for the owner.</summary>
+public sealed class CalendarAccountRefusedException : InvalidOperationException
+{
+    public CalendarAccountRefusedException(string message) : base(message)
+    {
     }
 }

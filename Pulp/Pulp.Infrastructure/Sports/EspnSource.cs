@@ -68,36 +68,84 @@ public sealed class EspnSource : ISportsSource
         var teams = await ReadTeamsAsync(league, cancellationToken);
         var known = teams.ToDictionary(team => team.Id);
 
+        // One request per day (a range is refused), at most MaxConcurrentDays at once; results are merged in day order.
+        using var slots = new SemaphoreSlim(MaxConcurrentDays);
+        var days = window.Days().ToList();
+        var boards = await Task.WhenAll(days.Select(async day =>
+        {
+            await slots.WaitAsync(cancellationToken);
+            try
+            {
+                return await ReadDayAsync(league, day, known, cancellationToken);
+            }
+            finally
+            {
+                slots.Release();
+            }
+        }));
+
         var games = new List<(Game Game, IReadOnlyList<string> Notes)>();
         ScoreboardSeason? season = null;
         var badge = string.Empty;
-        foreach (var day in window.Days())
+        for (var index = 0; index < days.Count; index++)
         {
-            var what = "a scoreboard request";
-            var response = await http.GetAsync(
-                new Uri($"{SiteHost}/{league.Sport}/{league.Slug}/scoreboard?dates={day.ToString("yyyyMMdd", CultureInfo.InvariantCulture)}&limit=300"),
-                NoHeaders, what, cancellationToken);
-            using var document = http.Parse(response, what);
-            var root = document.RootElement;
-            var block = root.Child("leagues").Items().FirstOrDefault();
-            if (block.ValueKind != JsonValueKind.Object)
+            var board = boards[index];
+            if (season is null || days[index] == window.Today)
             {
-                throw http.Malformed(what, "no leagues block");
+                if (board.Season is null)
+                {
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(board.SeasonProblem!).Throw();
+                }
+
+                season = board.Season;
+                badge = board.Badge ?? badge;
             }
 
-            if (season is null || day == window.Today)
-            {
-                season = ReadSeason(block.Child("season"), what);
-                badge = block.Child("logos").Items().Select(logo => logo.Text("href")).FirstOrDefault(href => !string.IsNullOrWhiteSpace(href)) ?? badge;
-            }
-
-            games.AddRange(ReadEvents(root.Child("events"), known, league));
+            games.AddRange(board.Games);
         }
 
         var ordered = games.DistinctBy(entry => entry.Game.Id).OrderBy(entry => entry.Game.StartsAt).ToList();
         var distinct = ordered.Select(entry => entry.Game).ToList();
-        var championship = ordered.Where(entry => entry.Game.Stage == GameStage.Championship).Select(entry => ChampionshipOf(entry.Game, entry.Notes, league)).FirstOrDefault();
+        var finals = ordered.Where(entry => entry.Game.Stage == GameStage.Championship).ToList();
+
+        // The first final still to come (a series' later games come after it); a finished one stands only when none is left.
+        var chosen = finals.FirstOrDefault(entry => DateOnly.FromDateTime(entry.Game.StartsAt.UtcDateTime) >= window.Today);
+        chosen = chosen.Game is null ? finals.LastOrDefault() : chosen;
+        var championship = chosen.Game is null ? null : ChampionshipOf(chosen.Game, chosen.Notes, league);
         return new LeagueSchedule(LeagueOf(league, season!, badge, window.Today, distinct), teams, distinct, championship);
+    }
+
+    private const int MaxConcurrentDays = 4;
+
+    private async Task<(ScoreboardSeason? Season, CatalogueLookupException? SeasonProblem, string? Badge, List<(Game Game, IReadOnlyList<string> Notes)> Games)> ReadDayAsync(EspnLeague league, DateOnly day, Dictionary<TeamId, Team> known, CancellationToken cancellationToken)
+    {
+        var what = "a scoreboard request";
+        var response = await http.GetAsync(
+            new Uri($"{SiteHost}/{league.Sport}/{league.Slug}/scoreboard?dates={day.ToString("yyyyMMdd", CultureInfo.InvariantCulture)}&limit=300"),
+            NoHeaders, what, cancellationToken);
+        using var document = http.Parse(response, what);
+        var root = document.RootElement;
+        var block = root.Child("leagues").Items().FirstOrDefault();
+        if (block.ValueKind != JsonValueKind.Object)
+        {
+            throw http.Malformed(what, "no leagues block");
+        }
+
+        var badge = block.Child("logos").Items().Select(logo => logo.Text("href")).FirstOrDefault(href => !string.IsNullOrWhiteSpace(href));
+
+        // Only the first day's or today's season is used, so another day's unusable season is carried, not thrown.
+        ScoreboardSeason? season = null;
+        CatalogueLookupException? problem = null;
+        try
+        {
+            season = ReadSeason(block.Child("season"), what);
+        }
+        catch (CatalogueLookupException exception)
+        {
+            problem = exception;
+        }
+
+        return (season, problem, badge, ReadEvents(root.Child("events"), known, league));
     }
 
     public async Task<IReadOnlyList<Team>> GetStandingsOrderAsync(LeagueId requested, CancellationToken cancellationToken)
@@ -114,7 +162,7 @@ public sealed class EspnSource : ISportsSource
             var index = 0;
             foreach (var entry in group.Child("standings").Child("entries").Items())
             {
-                var team = TeamOf(entry.Child("team"));
+                var team = TeamOf(league, entry.Child("team"));
                 if (team is not null)
                 {
                     ranked.Add((RankOf(entry.Child("stats")), groups, index++, team));
@@ -183,10 +231,15 @@ public sealed class EspnSource : ISportsSource
             throw http.Malformed(what, "no teams array");
         }
 
-        return teams.Items().Select(entry => TeamOf(entry.Child("team"))).OfType<Team>().DistinctBy(team => team.Id).ToList();
+        return teams.Items().Select(entry => TeamOf(league, entry.Child("team"))).OfType<Team>().DistinctBy(team => team.Id).ToList();
     }
 
-    private static Team? TeamOf(JsonElement team)
+    // The feed's team id is only unique inside its sport ("1" is a team in the NBA, the NFL and the NHL), so the
+    // Domain's TeamId names the league too (D295). Every TeamId this source makes goes through here.
+    private static TeamId NamespacedId(EspnLeague league, string rawId) =>
+        new($"espn:{league.Id.Value.ToLowerInvariant()}:{rawId}");
+
+    private static Team? TeamOf(EspnLeague league, JsonElement team)
     {
         var id = team.Text("id");
         var name = team.Text("displayName");
@@ -196,7 +249,7 @@ public sealed class EspnSource : ISportsSource
         }
 
         var art = team.Text("logo") ?? team.Child("logos").Items().Select(logo => logo.Text("href")).FirstOrDefault(href => !string.IsNullOrWhiteSpace(href)) ?? string.Empty;
-        return new Team(new TeamId(id), name, art);
+        return new Team(NamespacedId(league, id), name, art);
     }
 
     private sealed record ScoreboardSeason(DateOnly Start, DateOnly End, int Type);
@@ -222,8 +275,8 @@ public sealed class EspnSource : ISportsSource
             var home = competitors.FirstOrDefault(competitor => competitor.Text("homeAway") == "home");
             var away = competitors.FirstOrDefault(competitor => competitor.Text("homeAway") == "away");
             var id = raw.Text("id");
-            var homeTeam = TeamOf(home.Child("team"));
-            var awayTeam = TeamOf(away.Child("team"));
+            var homeTeam = TeamOf(league, home.Child("team"));
+            var awayTeam = TeamOf(league, away.Child("team"));
             if (string.IsNullOrWhiteSpace(id) || homeTeam is null || awayTeam is null
                 || !DateTimeOffset.TryParse(raw.Text("date"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var startsAt))
             {
@@ -256,8 +309,9 @@ public sealed class EspnSource : ISportsSource
 
     private static Championship ChampionshipOf(Game game, IReadOnlyList<string> notes, EspnLeague league)
     {
-        var name = notes
-            .FirstOrDefault(note => league.ChampionshipMarkers.Any(marker => note.Contains(marker, StringComparison.OrdinalIgnoreCase))) ?? league.Name + " championship";
+        // The name is the league's own marker, never the feed's headline: a headline can read "Game 6 (X leads 3-2)" (G10/G15).
+        var name = league.ChampionshipMarkers
+            .FirstOrDefault(marker => notes.Any(note => note.Contains(marker, StringComparison.OrdinalIgnoreCase))) ?? league.Name + " championship";
         return new Championship(game.Id, name, game.StartsAt, [game.Home, game.Away]);
     }
 

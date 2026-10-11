@@ -101,7 +101,7 @@ public class MlbStatsSourceTests
 
         var game = Assert.Single(schedule.Games);
         Assert.Equal(new GameId("5551"), game.Id);
-        Assert.Equal(new TeamId("9001"), game.Home.Id);
+        Assert.Equal(new TeamId("diamond-invented:9001"), game.Home.Id);
         Assert.Equal("Marsh Herons", game.Home.Name);
         Assert.Equal("Pine Lake Otters", game.Away.Name);
         Assert.Equal(new DateTimeOffset(2026, 7, 20, 23, 5, 0, TimeSpan.Zero), game.StartsAt);
@@ -188,7 +188,7 @@ public class MlbStatsSourceTests
     }
 
     [Fact]
-    public async Task TheChampionshipIsTheEarliestFinalGameWithItsTeamsAndTheSeriesName()
+    public async Task TheChampionshipIsTheEarliestFinalGameStillToComeWithItsTeamsAndTheLeaguesOwnName()
     {
         Standard(NoGames);
         handler.Route("gameType=W", Day("2026-10-24",
@@ -199,9 +199,53 @@ public class MlbStatsSourceTests
 
         Assert.NotNull(championship);
         Assert.Equal(new GameId("8001"), championship.Id);
-        Assert.Equal("Invented Series", championship.Name);
+        Assert.Equal("Invented Baseball World Series", championship.Name);
         Assert.Equal(new DateTimeOffset(2026, 10, 25, 0, 8, 0, TimeSpan.Zero), championship.StartsAt);
         Assert.Equal(["Marsh Herons", "Pine Lake Otters"], championship.Teams.Select(team => team.Name));
+    }
+
+    [Fact]
+    public async Task TheChampionshipNameNeverCarriesTheFeedsSeriesText()
+    {
+        Standard(NoGames);
+        handler.Route("gameType=W", Day("2026-10-24",
+            Game(8001, "2026-10-25T00:08:00Z", "W", "9001", "9002")).Replace("\"seriesDescription\": \"Regular Season\"", "\"seriesDescription\": \"World Series Game 6 - Marsh Herons lead 3-2\""));
+
+        var championship = (await Source().GetScheduleAsync(Diamond, Window, CancellationToken.None)).Championship;
+
+        Assert.Equal("Invented Baseball World Series", championship!.Name);
+    }
+
+    [Fact]
+    public async Task TheChampionshipIsTheFirstFinalGameNotYetPlayedElseTheLatest()
+    {
+        Standard(NoGames);
+        handler.Route("gameType=W", Day("2026-10-24",
+            Game(8001, "2026-07-10T00:08:00Z", "W", "9001", "9002"),
+            Game(8002, "2026-07-20T23:08:00Z", "W", "9001", "9002"),
+            Game(8003, "2026-07-22T00:08:00Z", "W", "9001", "9002")));
+
+        var upcoming = (await Source().GetScheduleAsync(Diamond, Window, CancellationToken.None)).Championship;
+        Assert.Equal(new GameId("8002"), upcoming!.Id);
+
+        handler.Route("gameType=W", Day("2026-10-24",
+            Game(8001, "2026-07-10T00:08:00Z", "W", "9001", "9002"),
+            Game(8003, "2026-07-12T00:08:00Z", "W", "9001", "9002")));
+        var latest = (await Source().GetScheduleAsync(Diamond, Window, CancellationToken.None)).Championship;
+        Assert.Equal(new GameId("8003"), latest!.Id);
+    }
+
+    [Fact]
+    public async Task BadgesAreThePngFormTheDeviceCanDecodeNotSvg()
+    {
+        Standard(Day("2026-07-20", Game(1, "2026-07-20T23:05:00Z", "R", "9001", "9002")));
+
+        var schedule = await Source().GetScheduleAsync(Diamond, Window, CancellationToken.None);
+
+        Assert.All(schedule.Teams, team => Assert.EndsWith("/v1/team/" + team.Id.Value.Split(':')[1] + "/spots/144", team.BadgeArt));
+        Assert.StartsWith("https://midfield.mlbstatic.com/", schedule.Teams[0].BadgeArt);
+        Assert.DoesNotContain(".svg", schedule.League.BadgeArt);
+        Assert.DoesNotContain(".svg", schedule.Teams[0].BadgeArt);
     }
 
     [Fact]
@@ -225,7 +269,7 @@ public class MlbStatsSourceTests
 
         var order = await Source().GetStandingsOrderAsync(Diamond, CancellationToken.None);
 
-        Assert.Equal([new TeamId("9001"), new TeamId("9002")], order.Select(team => team.Id));
+        Assert.Equal(["diamond-invented:9001", "diamond-invented:9002"], order.Select(team => team.Id.Value));
         var request = Assert.Single(handler.Requests);
         Assert.Equal("/api/v1/standings", request.Uri.AbsolutePath);
         Assert.Equal("103,104", request.Query("leagueId"));

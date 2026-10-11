@@ -57,17 +57,31 @@ public static class CalendarSyncPlan
             .GroupBy(item => item.Key!, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.OrderBy(item => item.EventId, StringComparer.Ordinal).ToList(), StringComparer.Ordinal);
 
-        var operations = new List<CalendarOperation>();
+        // Deleting comes first: a delete is what takes a spoiler off the shared calendar, so no failing
+        // move or create may stand in front of it. Moves come before creates for the same reason (a create
+        // announces itself; a move was already there). Leaves are bookkeeping and go last.
+        var deletes = new List<CalendarOperation>();
+        var moves = new List<CalendarOperation>();
+        var creates = new List<CalendarOperation>();
+        var leaves = new List<CalendarOperation>();
         foreach (var draft in desired)
         {
             if (!madeByPulp.TryGetValue(draft.Key, out var held))
             {
-                operations.Add(new CreateEvent(draft));
+                creates.Add(new CreateEvent(draft));
                 continue;
             }
 
-            operations.Add(Same(draft, held[0]) ? new LeaveEvent(held[0].EventId, draft.Key) : new MoveEvent(held[0].EventId, draft));
-            operations.AddRange(held.Skip(1).Select(extra => new DeleteEvent(extra.EventId, draft.Key)));
+            if (Same(draft, held[0]))
+            {
+                leaves.Add(new LeaveEvent(held[0].EventId, draft.Key));
+            }
+            else
+            {
+                moves.Add(new MoveEvent(held[0].EventId, draft));
+            }
+
+            deletes.AddRange(held.Skip(1).Select(extra => new DeleteEvent(extra.EventId, draft.Key)));
         }
 
         var wanted = desired.Select(draft => draft.Key).ToHashSet(StringComparer.Ordinal);
@@ -76,15 +90,34 @@ public static class CalendarSyncPlan
             foreach (var item in held)
             {
                 // A day already gone is history, not a title that left the plan.
-                operations.Add(item.When.Date >= today ? new DeleteEvent(item.EventId, key) : new LeaveEvent(item.EventId, key));
+                if (item.When.Date >= today)
+                {
+                    deletes.Add(new DeleteEvent(item.EventId, key));
+                }
+                else
+                {
+                    leaves.Add(new LeaveEvent(item.EventId, key));
+                }
             }
         }
 
+        var operations = new List<CalendarOperation>(deletes.Count + moves.Count + creates.Count + leaves.Count);
+        operations.AddRange(deletes);
+        operations.AddRange(moves);
+        operations.AddRange(creates);
+        operations.AddRange(leaves);
         return operations;
     }
 
     private static bool Same(CalendarEventDraft draft, ExistingEvent held) =>
-        draft.When == held.When
+        SameWhen(draft.When, held.When)
         && string.Equals(draft.Title, held.Title, StringComparison.Ordinal)
         && string.Equals(draft.Description ?? string.Empty, held.Description ?? string.Empty, StringComparison.Ordinal);
+
+    /// <summary>The calendar reads back whole seconds, so a feed time is compared at that precision.</summary>
+    private static bool SameWhen(CalendarWhen wanted, CalendarWhen held) =>
+        wanted.Date == held.Date && Seconds(wanted.Time) == Seconds(held.Time);
+
+    private static TimeOnly? Seconds(TimeOnly? time) =>
+        time is { } value ? new TimeOnly(value.Hour, value.Minute, value.Second) : null;
 }

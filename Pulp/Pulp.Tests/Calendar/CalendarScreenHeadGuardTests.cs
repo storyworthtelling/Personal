@@ -69,6 +69,64 @@ public class CalendarScreenHeadGuardTests
         Assert.Contains("CalendarScreenSnapshot.Build(", feed, StringComparison.Ordinal);
         Assert.Contains("CalendarScreenHolds.ByAdult(", reads, StringComparison.Ordinal);
         Assert.Contains("CalendarScreenSources.Build(", reads, StringComparison.Ordinal);
+
+        // The behaviour is CalendarFollowsTests; this keeps the read going through it. A follow by a child,
+        // a removed viewer or a null roster made ForHousehold throw, or put a child's name on the calendar.
+        Assert.Contains("CalendarFollows.OfAdults(household.SportsFollows, roster)", reads, StringComparison.Ordinal);
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(reads, @"household\.SportsFollows").Count);
+    }
+
+    [Fact]
+    public void FollowingATeamIsRefusedForAChild()
+    {
+        var text = Head("Pulp.Android/App/PulpServices.cs");
+        var start = text.IndexOf("public async Task FollowTeamAsync(", StringComparison.Ordinal);
+        Assert.True(start >= 0, "FollowTeamAsync is missing or no longer async, so it cannot read the roster.");
+        var body = text[start..Math.Min(text.Length, start + 900)];
+
+        Assert.Contains("CalendarFollows.RefusesFollow(", body, StringComparison.Ordinal);
+        Assert.Contains("HouseholdMaps.SportsFollow", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheWorkerCarriesTheFrozenNameAndAnswersEveryFailureNotOnlyTheCalendarsOwn()
+    {
+        // Bugs kept out: a renamed worker class (WorkManager cannot instantiate a persisted row), and an
+        // uncaught non-calendar exception (a sign-in or programming error) crashing the worker unreported.
+        var text = Head("Pulp.Android/Calendar/CalendarSyncWorker.cs");
+
+        Assert.Contains("[global::Android.Runtime.Register(PulpIdentity.DailyChangesWorkerName)]", text, StringComparison.Ordinal);
+        Assert.Contains("class CalendarSyncWorker : Worker", text, StringComparison.Ordinal);
+        Assert.Contains("catch (Exception exception)", text, StringComparison.Ordinal);
+        Assert.Contains("CalendarFailures.Advise(", text, StringComparison.Ordinal);
+        Assert.Contains("Result.InvokeRetry()", text, StringComparison.Ordinal);
+        Assert.Contains("Result.InvokeFailure()", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARejectedTokenDisconnectsTheCalendarOnlyWhenConsentWasWithdrawn()
+    {
+        // Bug kept out: every 403 cleared the connected flag, so a rate-limit blip disconnected the calendar.
+        var text = Head("Pulp.Android/App/PulpServices.cs");
+
+        Assert.Contains("CalendarFailures.ConsentWithdrawn(exception)", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("CalendarFailure.Rejected }", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheCalendarSignInNeverRepointsTheDriveAccount()
+    {
+        var text = Head("Pulp.Android/Calendar/CalendarConnection.cs");
+        Assert.Contains("CalendarScreenConnection.JudgeAccount(", text, StringComparison.Ordinal);
+        Assert.Contains("CalendarScreenConnection.DifferentAccount(", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheScopeCommentAdmitsTheSignInAlsoCarriesDrive()
+    {
+        var text = Head("Pulp.Infrastructure/Calendar/GoogleCalendarClient.cs");
+        Assert.DoesNotContain("narrowest pair", text, StringComparison.Ordinal);
+        Assert.Contains("also carries Drive", text, StringComparison.Ordinal);
     }
 
     [Fact]

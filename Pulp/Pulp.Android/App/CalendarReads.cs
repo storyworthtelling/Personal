@@ -60,7 +60,7 @@ internal sealed class CalendarReads(PulpServices services)
             }
         }
 
-        var follows = household.SportsFollows;
+        var follows = CalendarFollows.OfAdults(household.SportsFollows, roster);
         IReadOnlyList<LeagueFeed> feeds = follows.Count == 0
             ? []
             : await services.FollowedFeedsAsync(follows, refresh: true, cancellationToken);

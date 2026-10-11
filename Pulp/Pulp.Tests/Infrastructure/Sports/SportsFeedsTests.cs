@@ -51,11 +51,21 @@ public sealed class SportsFeedsTests : IDisposable
 
         public bool FailStandings { get; set; }
 
+        public TaskCompletionSource? Gate { get; set; }
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public IReadOnlyList<LeagueId> Leagues { get; } = [Coastal, Southern];
 
-        public Task<LeagueSchedule> GetScheduleAsync(LeagueId league, SportsWindow window, CancellationToken cancellationToken)
+        public async Task<LeagueSchedule> GetScheduleAsync(LeagueId league, SportsWindow window, CancellationToken cancellationToken)
         {
             Calls.Add("schedule:" + league);
+            Started.TrySetResult();
+            if (Gate is { } gate)
+            {
+                await gate.Task;
+            }
+
             Windows.Add(window);
             cancellationToken.ThrowIfCancellationRequested();
             if (FailSchedule)
@@ -68,7 +78,7 @@ public sealed class SportsFeedsTests : IDisposable
                 : new LeagueFeed(
                     new League(Southern, "Southern Rules League", "badge://srl", SeasonPhase.RegularSeason, new DateOnly(2026, 9, 1), null),
                     [Otters], [], [], [], null);
-            return Task.FromResult(new LeagueSchedule(feed.League, feed.Teams, feed.Schedule, feed.Championship));
+            return new LeagueSchedule(feed.League, feed.Teams, feed.Schedule, feed.Championship);
         }
 
         public Task<IReadOnlyList<Team>> GetStandingsOrderAsync(LeagueId league, CancellationToken cancellationToken)
@@ -118,6 +128,68 @@ public sealed class SportsFeedsTests : IDisposable
 
         Assert.Empty(source.Calls);
         Assert.Equal([Coastal], feeds.Select(feed => feed.League.Id));
+    }
+
+    [Fact]
+    public async Task ACacheOnlyReadDoesNotWaitBehindARefreshInFlight()
+    {
+        Cache().Store(CoastalFeed(), clock.AddDays(-9));
+        source.Gate = new TaskCompletionSource();
+        var feeds = Feeds();
+
+        var refreshing = feeds.FollowedAsync([Follows(Gulls.Id)], refresh: true, CancellationToken.None);
+        await source.Started.Task;
+
+        var painted = feeds.FollowedAsync([Follows(Gulls.Id)], refresh: false, CancellationToken.None);
+        var finished = await Task.WhenAny(painted, Task.Delay(TimeSpan.FromSeconds(5)));
+
+        Assert.Same(painted, finished);
+        Assert.Equal([Coastal], (await painted).Select(feed => feed.League.Id));
+        source.Gate.SetResult();
+        await refreshing;
+    }
+
+    [Fact]
+    public async Task AnUnreadableCacheEntryMeansNoCacheAndTheLeagueIsFetchedAgain()
+    {
+        Cache().Store(CoastalFeed(), clock);
+        File.WriteAllText(Directory.GetFiles(directory).Single(), "{ \"format\": 1, \"league\": { \"id\": null } }");
+
+        var feeds = await Feeds().FollowedAsync([Follows(Gulls.Id)], refresh: true, CancellationToken.None);
+
+        Assert.Equal([Coastal], feeds.Select(feed => feed.League.Id));
+        Assert.Contains(warnings, message => message.Contains("could not be read"));
+        Assert.Contains("schedule:cfl-invented", source.Calls);
+    }
+
+    [Fact]
+    public async Task AFailedStoreIsLoggedAndTheFreshFeedStillComesBack()
+    {
+        // The cache directory's parent is a file, so no store can succeed.
+        var blocker = Path.Combine(Path.GetTempPath(), "pulp-blocker-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(blocker, "not a directory");
+        try
+        {
+            var feeds = new SportsFeeds(
+                source,
+                new SportsSourceTable(
+                    [new SportsSourceInfo("one", "One", "t")],
+                    [new SportsLeagueEntry(Coastal, "Coastal", "one"), new SportsLeagueEntry(Southern, "Southern", "one")]),
+                new SportsCache(Path.Combine(blocker, "inside")),
+                (message, exception) => warnings.Add(message),
+                () => clock);
+
+            var found = await feeds.FollowedAsync([Follows(Gulls.Id)], refresh: true, CancellationToken.None);
+            var browsed = await feeds.BrowseAsync(CancellationToken.None);
+
+            Assert.Equal([Coastal], found.Select(feed => feed.League.Id));
+            Assert.NotEmpty(browsed);
+            Assert.Contains(warnings, message => message.Contains("could not be saved"));
+        }
+        finally
+        {
+            File.Delete(blocker);
+        }
     }
 
     [Fact]
