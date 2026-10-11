@@ -243,6 +243,8 @@ web player, and Playwright does not run on the phone).
 - **[L3]** Release: Home, a long pause, the title ending or a title change (from the session relay,
   Release F) ends lock task and brings Pulp forward; Pulp records progress or marks it watched.
 - **[L3]** Children: only attested or kids-only services (G13 unchanged); lock task keeps them in.
+- **Built (D296-D299, see DISCOVERY "Release G policy revisit"):** the request contract and gate, the
+  persisted record and rules, Flyleaf's controller, Pulp's courier and route choice. **G19.**
 - **Device-only:** each app's behaviour under lock task, incoming calls, where each deep link lands,
   and whether each app publishes its position. Nothing here is provable off the phone.
 
@@ -268,6 +270,7 @@ web player, and Playwright does not run on the phone).
 | G14 | the store writes over an undecryptable file | `Pulp.Tests/Household` |
 | G15 | a sports adapter returns a score | `Pulp.Tests/Sports` |
 | G16–G18 | a cross-app action, permission or payload drifts | both sides' contract tests |
+| G19 | the locked-open action, permission, payload or streaming catalogue drifts, or a request reaches lock task by any door but `HandOffExecutor` | both sides' contract tests, `Pulp.Tests/LockedOpen` |
 
 Each guard's first commit records its red run and names the bug it reintroduced. **A guard that
 passes against an empty input is a vacuous guard** — each asserts it found something to check.

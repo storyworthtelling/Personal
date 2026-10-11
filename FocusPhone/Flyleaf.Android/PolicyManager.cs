@@ -38,22 +38,34 @@ public static class PolicyManager
             return;
         }
 
+        var policyContext = BuildPolicyContext(context);
+
+        Apply(context, PolicyPlanBuilder.Build(policyContext));
+    }
+
+    private static PolicyContext BuildPolicyContext(Context context)
+    {
         var store = new BlocklistStore(context);
         // Recomputed live from persisted timestamps (UnlockStateMachine.Touch), same as every other
         // observer of admin state — never cached, so a session that expired since the last policy
         // pass is read as expired here too.
         var adminModeActive = new UnlockStore(context).LoadMachine(new SystemClockAdapter()).CurrentState
             == UnlockState.AdminActive;
-        var policyContext = new PolicyContext(
+        return new PolicyContext(
             OwnPackages: PolicyContext.FocusPhonePackages,
             BrowserPackages: QueryBrowserPackages(context),
             OtherHomePackages: QueryOtherHomePackages(context),
             DebuggingLockedDown: store.DebuggingLockedDown,
             NeverVisiblePackages: QueryNeverVisiblePackages(context),
             AdminModeActive: adminModeActive);
-
-        Apply(context, PolicyPlanBuilder.Build(policyContext));
     }
+
+    /// <summary>
+    /// The packages the plan hard-suspends right now, from the same facts a policy pass reads. A locked
+    /// hand-off consults it so that a request can never free what the lockdown suspends (D296).
+    /// </summary>
+    internal static IReadOnlySet<string> PlannedSuspendedPackages(Context context) =>
+        PolicyPlanBuilder.Build(BuildPolicyContext(context)).SuspendedPackages;
 
     private static void Apply(Context context, PolicyPlan plan)
     {

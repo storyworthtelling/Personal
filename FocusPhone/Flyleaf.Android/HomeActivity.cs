@@ -199,6 +199,8 @@ public class HomeActivity : Activity
     protected override void OnResume()
     {
         base.OnResume();
+        // Home coming to the front while a locked hand-off runs is Home pressed: the way out (D288).
+        LockedSessionController.OnHome(this);
         ReloadScene();
         UpdateClock();
         UpdateSetDefaultLauncherButton();

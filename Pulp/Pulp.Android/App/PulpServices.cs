@@ -10,6 +10,7 @@ using Pulp.Domain.Core;
 using Pulp.Domain.FirstRun;
 using Pulp.Domain.Household;
 using Pulp.Domain.Hidden;
+using Pulp.Domain.LockedOpen;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
 using Pulp.Domain.People;
@@ -20,6 +21,7 @@ using Pulp.Domain.Usage;
 using Pulp.Components;
 using Pulp.HandOffs;
 using Pulp.Hidden;
+using Pulp.LockedOpen;
 using Pulp.Infrastructure.Calendar;
 using Pulp.Infrastructure.Catalogue;
 using Pulp.Infrastructure.Discover;
@@ -708,7 +710,15 @@ public sealed class PulpServices
     public async Task<HandOffExecutor?> HandOffsAsync(CancellationToken cancellationToken)
     {
         var view = await HouseholdAsync(cancellationToken);
-        return view.Roster is null ? null : new HandOffExecutor(view.Roster, view.ChildRules, Catalogue, view.Attested);
+        if (view.Roster is null)
+        {
+            return null;
+        }
+
+        // D298: the locked route is offered only where Flyleaf is on this phone, and only for the services
+        // the household ticked (the set Flyleaf was told to hide). The plain hand-off stands everywhere else.
+        var locked = LockedOpenFacts.For(LockedOpenCourier.FlyleafPresent(appContext), Catalogue, view.Services);
+        return new HandOffExecutor(view.Roster, view.ChildRules, Catalogue, view.Attested, locked);
     }
 
     // ---- the screens' reads ----

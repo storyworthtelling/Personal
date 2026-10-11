@@ -135,6 +135,9 @@ internal sealed class PlaybackSessionWatcher
             return;
         }
 
+        // A locked hand-off (D288) watches every reading of its own app, before the relay's change filter.
+        LockedSessionController.OnReading(context, reading, Send);
+
         var named = Named();
         var toSend = closed ? relay.Close(reading, named) : relay.Offer(reading, named);
         if (toSend is not null)

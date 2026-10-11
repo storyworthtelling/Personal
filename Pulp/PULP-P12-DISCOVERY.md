@@ -720,3 +720,98 @@ Process (owner, D211): one screen per round; every decision, question and approv
   `seriesDescription` can read "Game 6 (X leads 3-2)" and are only matched against. The championship is the
   first final game not yet played, else the latest. MLB badges use the PNG form (`midfield.mlbstatic.com`),
   since the poster decoder is a bitmap decoder and cannot draw the SVG.
+
+## Release G rulings (the locked hand-off)
+
+### Release G policy revisit (read from the code, not from a device)
+
+Read before any lock-task code was written: `PolicyManager.Apply`, `PolicyPlanBuilder`, `PolicyContext`,
+`PolicyReconciler`, `CallScreen`, `TileNotificationListener`, `HomeActivity`. Nothing here has met a phone.
+
+- **What the lockdown does today.** User restrictions (safe boot, factory reset, date and time), private
+  DNS, **the status bar disabled** (`SetStatusBarDisabled`), the never-visible categories, other browsers and
+  other homes **hard-suspended**, `PinHomeActivity` and `PinRestrictedBrowser`. **There is no kiosk, no lock
+  task and no keyguard call anywhere in the head**: `SetLockTaskPackages`, `SetLockTaskFeatures`,
+  `StartLockTask` and `SetKeyguardDisabled` do not appear in the repository before Release G. Lock task is
+  new ground, so its defaults are the platform's, not ours.
+- **Can the streaming app run?** Yes, with no change. Visibility is runnability: every launchable app the plan
+  does not suspend is actively un-suspended each pass. The streaming apps are not browsers, not homes and not
+  in `HardBlock`'s categories or curated list, so they are released. The hidden-apps set (D92) only keeps them
+  off the tray; it suspends nothing. The owner's manual block is likewise shelf-only. So the un-suspend the
+  brief allows is, in the normal case, **a no-op**: `LockedSessionPlan` un-suspends the chosen package only
+  when it is suspended at that moment and the plan does not hard-suspend it, and records that it did so release
+  can put it back. A package the plan hard-suspends is refused, not released. One caveat: the next ordinary
+  policy pass releases whatever it finds suspended, so the re-suspend on release is real only until then.
+- **Calls.** An incoming call is surfaced by Flyleaf itself: the listener reads the call notification and
+  sends the dialer's full-screen `PendingIntent` with the device-owner background-start opt-in
+  (`CallScreen.Open`). Lock task changes one thing about that: **a task in lock task mode refuses an activity
+  start from a package that is not on the lock task allowlist** (the platform's lock-task violation check; the
+  only built-in exception is emergency calling over a locked keyguard). The dialer is not the service, so
+  without an entry the ringing call would be swallowed in exactly the way the status-bar disable once swallowed
+  it. So a locked session allowlists the default and system dialer packages (`TelecomManager`) alongside the
+  service and Flyleaf. That widens the *lock-task* allowlist only; it frees no suspended app and adds no
+  capability the dialer does not already have. **I judged it not a weakening** (see D299) and built it; it is
+  the one extension beyond "the service's package" and is flagged for the owner. Notifications stay off
+  (`LOCK_TASK_FEATURE_NOTIFICATIONS` unset), which matches the lockdown's existing alert suppression; the call
+  path does not use them. The home shelf's "Return to the call" bar needs no change: Home is the way out, and
+  Home ends the session.
+- **Back, Home, recents.** Features set to `HOME | KEYGUARD` and nothing else. Home is the way out (Flyleaf is
+  the persistent preferred Home). Recents/overview, the power menu, system info and notifications stay off, so
+  nothing but Home leaves the app. Back is the app's own: backing out of its root ends its task and with it the
+  lock. **`KEYGUARD` is on on purpose**: without it the platform shows no lock screen while a task is locked,
+  and a screen that times out mid-film would wake onto the app, a real weakening that setting only `HOME`
+  would have introduced. Set it and the screen locks as it does today.
+- **Does the status-bar disable survive?** Lock task drives the status bar through its own disable token; the
+  device-owner `SetStatusBarDisabled` is a separate token and the flags are OR-ed, so the disable should hold
+  through and after a session. **Device-only to confirm.**
+- **How a session ends.** Flyleaf cannot call `stopLockTask` on another app's task. The release removes the
+  service from the lock task allowlist (restoring exactly the list it found), which the platform answers by
+  taking the task out of lock task; Flyleaf then comes forward and starts Pulp. **Device-only to confirm,
+  both that removal ends the lock and that Home reaches Flyleaf while the task is locked.**
+- **Verdict.** Nothing needed to build this weakens the lockdown beyond what the brief allowed, so nothing
+  was refused on policy grounds. Everything lock-task is **reversible by the record** (below) and confined to
+  one file, `LockedSessionController`, which a guard pins as the only place that touches the allowlist,
+  features or a request's un-suspend.
+
+- **D296 · A signed sender cannot lock-task an arbitrary app.** Every suite app shares one keystore, and the
+  hidden set (D92) is writable by any of them, so a request is honoured only if the package is **all** of:
+  outside the owner's namespace; in a curated streaming catalogue (`LockedOpenCatalogue`, Flyleaf's own list,
+  kept equal to Pulp's `ServiceCatalogue.Public` by guard G19); in the stored hidden set (Pulp named it); not
+  hard-suspended by the plan; not blocked by the owner. The link must be an https URL of bounded length with no
+  credentials. The hidden-set test alone was rejected: it would let a signed app hide Chrome and then lock it.
+- **D297 · A locked session is a persisted record with rules, not a flag.** The record (the package, when it
+  started, the lock-task allowlist and features it replaced, whether it un-suspended, the title and place, any
+  pause start) is **committed before anything is changed** and cleared **after** everything is put back, so a
+  Flyleaf that dies in between is undone by the next start (`EndStaleAtStart`, run from the application's
+  `OnCreate`); a restore that fails keeps the record and retries. Release is idempotent (no record, nothing to
+  do). One session at a time; a second start over a live one keeps the original priors rather than mistaking
+  its own additions for them. It ends on: **Home** (a resume of Flyleaf's home more than three seconds after the
+  start); a **long pause** (30 minutes paused, checked by an inexact five-minute alarm as well as by readings);
+  the **title ending** (the app closes its session); a **title change** (a different title, which also sends
+  Pulp a closing reading for the old one at its last place, ahead of the reading that replaced it, so autoplay
+  does not lose the finished episode); a **six-hour cap**; and a **stale record at process start** (a reboot,
+  a cap overrun or a clock jump back). For the first 20 seconds after the start an old title or a close is the
+  app replacing the session it had and only sets the baseline. **All of 3 s, 20 s, 30 min and 5 min are
+  un-evidenced**; the six hours is the brief's.
+- **D298 · The locked route is chosen only where it can land.** Pulp sends it when Flyleaf is installed and
+  visible (a `<queries>` entry, new `Properties/AndroidManifest.xml`) and the planned package is one it told
+  Flyleaf to hide; otherwise today's plain hand-off. A broadcast cannot report delivery, so a phone with
+  Flyleaf where the hidden set never arrived, or where Flyleaf refuses, shows up as the landing check's quiet
+  "may not have opened" (D286), not as a failure. A send that cannot be made falls back to the plain intent.
+  There is no setting: the condition is the setting, and a switch can be added where `LockedOpenFacts` is built.
+- **D299 · The session turns on Home and the keyguard, and allowlists the phone app.** See the revisit: this
+  is the minimum that keeps the way out, the lock screen and incoming calls.
+- **Children are unchanged (G13).** The request is built only inside `HandOffExecutor`, from the planner's
+  own package and link, after the plan allowed it: a child's request that the gate refused never reaches the
+  courier, and the courier builds no view intent and names no service. `LockedOpenIsThroughTheDoorTests` holds
+  that. Lock task keeps a child in the service's app; the catalogue and the attested-service rule decide which
+  services a child can reach, exactly as before.
+- **Evidence is unchanged.** Pulp records only through the existing relay and `SessionRecording`; the lock's
+  end only sends a closing reading. Watched is still judged by `Watched.Decide`; nothing here marks anything.
+
+**Device-only, unverified:** that `ActivityOptions.setLockTaskEnabled` from a background broadcast starts the
+service's task locked (Flyleaf starting an activity from the background as device owner); that removing the
+package from the allowlist ends the lock; that Home reaches Flyleaf from a locked task; that the dialer
+allowlist lets a ringing call surface over a locked task and that answering returns to the film; that the
+status-bar disable survives; where each service's deep link lands and whether each publishes its position;
+and all four timing constants.

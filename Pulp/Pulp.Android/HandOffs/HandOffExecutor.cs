@@ -1,7 +1,9 @@
 using Android.App;
 using Android.Content;
 using Pulp.Domain.HandOffs;
+using Pulp.Domain.LockedOpen;
 using Pulp.Domain.Services;
+using Pulp.LockedOpen;
 
 namespace Pulp.HandOffs;
 
@@ -31,18 +33,22 @@ public sealed record HandOffOutcome(HandOffResult Result, string? Notice, Pendin
 /// child gate — and turns only the plan's own intent into an Android <c>Intent</c>: <c>ACTION_VIEW</c>,
 /// the service's https deep link, and <c>SetPackage</c> with the service's package, so Flyleaf's
 /// restricted browser (the locked phone's default web handler) never catches it. A refusal never
-/// reaches Android at all. Nothing else in the head builds a VIEW intent or calls
+/// reaches Android at all. On the locked phone (Flyleaf here, the package ticked: <see cref="LockedOpenChoice"/>)
+/// the same planned package and link go to Flyleaf as a locked open instead (D288, D298), falling back to the
+/// plain intent if that cannot be sent. Nothing else in the head builds a VIEW intent or calls
 /// <c>HandOff.For</c>; <c>HandOffExecutorIsTheOneDoorTests</c> holds that.
 /// </summary>
 public sealed class HandOffExecutor
 {
     private readonly HandOffPlanner planner;
     private readonly ServiceCatalogue catalogue;
+    private readonly LockedOpenFacts? locked;
 
-    public HandOffExecutor(HandOffPlanner planner, ServiceCatalogue catalogue)
+    public HandOffExecutor(HandOffPlanner planner, ServiceCatalogue catalogue, LockedOpenFacts? locked = null)
     {
         this.planner = planner ?? throw new ArgumentNullException(nameof(planner));
         this.catalogue = catalogue ?? throw new ArgumentNullException(nameof(catalogue));
+        this.locked = locked;
     }
 
     /// <summary>
@@ -54,8 +60,9 @@ public sealed class HandOffExecutor
         Pulp.Domain.People.HouseholdRoster roster,
         IEnumerable<Pulp.Domain.Children.ChildRules> childRules,
         ServiceCatalogue catalogue,
-        Pulp.Domain.Children.AttestedServices attested)
-        : this(new HandOffPlanner(roster, childRules, catalogue, attested), catalogue)
+        Pulp.Domain.Children.AttestedServices attested,
+        LockedOpenFacts? locked = null)
+        : this(new HandOffPlanner(roster, childRules, catalogue, attested), catalogue, locked)
     {
     }
 
@@ -69,6 +76,15 @@ public sealed class HandOffExecutor
         if (plan.Intent is null || plan.Pending is null)
         {
             return new HandOffOutcome(HandOffResult.Refused, HandOffNotice.ForRefusal(plan.Verdict.Refusal, serviceName), null);
+        }
+
+        // Release G (D288): on the locked phone the same allowed intent is asked of Flyleaf, which starts it in
+        // lock task mode. Only the planner's own package and link cross; a send that cannot go falls back to the
+        // plain hand-off below, so the title still opens.
+        if (LockedOpenChoice.Decide(locked, plan.Intent.Package) == HandOffRoute.Locked
+            && LockedOpenCourier.Send(host, plan.Intent.Package, plan.Intent.Data))
+        {
+            return new HandOffOutcome(HandOffResult.Started, null, plan.Pending);
         }
 
         var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(plan.Intent.Data.AbsoluteUri));
