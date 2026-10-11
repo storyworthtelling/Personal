@@ -74,11 +74,7 @@ public sealed class FavoritesPage(Activity host, Func<FrameLayout> overlay, Chil
             cells,
             cell => host.StartActivity(TitleActivity.For(host, cell.Id)),
             cell => actions.ShowCard(cell.Id, cell.Name, cell.Where),
-            (window, url, width) => _ = Task.Run(async () =>
-            {
-                var bitmap = await posters.LoadAsync(url, width, CancellationToken.None);
-                host.RunOnUiThread(() => window.SetArtwork(bitmap));
-            }));
+            PosterArt.Loader(host, posters));
     }
 
     public void Pause()

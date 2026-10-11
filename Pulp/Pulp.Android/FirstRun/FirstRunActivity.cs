@@ -75,7 +75,9 @@ public class FirstRunActivity : Activity
     /// Android rebuilds this screen on a rotation or when the process was reclaimed while another app (the
     /// account picker) was in front; what was typed — the people added, the name half-written and its
     /// child flag — is put back, or the owner would start the household again. The vault passphrase is
-    /// kept by its own store as it is typed.
+    /// kept as it is typed (<c>passphrase.TextChanged</c> in <see cref="BuildLayout"/> writes it to its
+    /// install-local store), so there is nothing of it to save here and the field is read back from the
+    /// store when the screen is rebuilt.
     /// </summary>
     protected override void OnSaveInstanceState(Bundle outState)
     {
@@ -148,6 +150,7 @@ public class FirstRunActivity : Activity
         // Built once so what was typed survives a repaint.
         passphrase = PaperUi.MonoField(this, VaultPageText.PassphraseHint);
         passphrase.Text = VaultPassphraseStore.Passphrase;
+        passphrase.TextChanged += (_, _) => VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
         name = PaperUi.Field(this, FirstRunText.NameHint);
 
         var scroll = new ScrollView(this) { FillViewport = true };
@@ -171,9 +174,14 @@ public class FirstRunActivity : Activity
         {
             state = await Task.Run(() => FirstRunProgress.ReadAsync(services, lifetime.Token), lifetime.Token);
         }
-        catch (Exception exception) when (exception is not System.OperationCanceledException)
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, lifetime.Token))
         {
-            // The household file would not open. The sync raises its own notice; first run carries on
+            // The screen was closed while the state was being read.
+            return;
+        }
+        catch (Exception exception)
+        {
+            // The household file would not open (a timeout included). The sync raises its own notice; first run carries on
             // as though there were no household yet, which is what this phone can see.
             services.Diagnostics.Warn("first-run", "The household could not be read for first run.", exception);
             state = new FirstRunState(
@@ -302,7 +310,7 @@ public class FirstRunActivity : Activity
         {
             household = await services.HouseholdAsync(lifetime.Token);
         }
-        catch (Exception exception) when (exception is not System.OperationCanceledException)
+        catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, lifetime.Token))
         {
             // Skip stays in the bar; the household's own notice says the file would not open.
             services.Diagnostics.Warn("first-run", "The roster could not be read for 'This phone is'.", exception);
@@ -332,7 +340,11 @@ public class FirstRunActivity : Activity
             PulpNotices.Withdraw(this, overlay, VaultOutcomes.SignInKey);
             await AdvanceAsync();
         }
-        catch (Exception exception) when (exception is not System.OperationCanceledException)
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, lifetime.Token))
+        {
+            return;
+        }
+        catch (Exception exception)
         {
             services.Diagnostics.Warn("first-run", "Google sign-in did not complete.", exception);
             PulpNotices.Raise(this, overlay, VaultOutcomes.SignInFailed(DateTimeOffset.UtcNow), NoticeButtons());
@@ -363,6 +375,19 @@ public class FirstRunActivity : Activity
 
             ShowStatus(VaultOutcomes.Sentence(outcome, vault.KeysPresent()));
             await AdvanceAsync();
+        }
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, lifetime.Token))
+        {
+            // The screen was closed while the vault opened.
+            return;
+        }
+        catch (Exception exception)
+        {
+            // A timeout or a token refused: the page must not stay on "Opening the vault…" with nothing said.
+            services.Diagnostics.Warn("first-run", "The vault could not be opened.", exception);
+            ShowStatus(null);
+            PulpNotices.Raise(this, overlay, VaultOutcomes.Notice(VaultRestoreOutcome.Failed, DateTimeOffset.UtcNow)
+                ?? throw new InvalidOperationException("A failed vault open has no notice to raise."), NoticeButtons());
         }
         finally
         {
@@ -409,7 +434,11 @@ public class FirstRunActivity : Activity
             ShowStatus(already);
             await AdvanceAsync();
         }
-        catch (Exception exception) when (exception is not System.OperationCanceledException)
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, lifetime.Token))
+        {
+            return;
+        }
+        catch (Exception exception)
         {
             services.Diagnostics.Warn("first-run", "The household could not be saved.", exception);
             ShowStatus(null);
@@ -434,9 +463,13 @@ public class FirstRunActivity : Activity
             PulpNotices.Withdraw(this, overlay, FirstRunNotices.PhoneKey);
             await AdvanceAsync();
         }
-        catch (Exception exception) when (exception is not System.OperationCanceledException)
+        catch (Exception exception) when (CancellationVerdict.IsUserCancel(exception, lifetime.Token))
         {
-            services.Diagnostics.Warn("first-run", $"This phone could not be recorded as {viewer}'s.", exception);
+            return;
+        }
+        catch (Exception exception)
+        {
+            services.Diagnostics.Warn("first-run", "This phone could not be recorded as a person's.", exception);
             PulpNotices.Raise(this, overlay, FirstRunNotices.PhoneNotSaved(DateTimeOffset.UtcNow), NoticeButtons());
         }
         finally

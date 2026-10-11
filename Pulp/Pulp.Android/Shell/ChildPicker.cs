@@ -3,6 +3,7 @@ using Android.Widget;
 using Codex.Ui;
 using Pulp.App;
 using Pulp.Domain.ChildView;
+using Pulp.Domain.Core;
 using Pulp.Domain.Shell;
 
 namespace Pulp.Shell;
@@ -42,7 +43,7 @@ public static class ChildPicker
                     ActionCard.Show(host, overlay, ChildViewText.WhoIsWatching, choices.Count == 0 ? ChildViewText.NoChildren : null, actions);
                 });
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
                 services.Diagnostics.Warn("child", "The household's children could not be read for Watch as a child.", exception);
             }

@@ -8,7 +8,7 @@ namespace Pulp.Infrastructure.Household;
 /// This install's writer id, the hybrid logical clock's last stamp, and — once Release D's first run
 /// records it — whose phone this is (<see cref="Pulp.Domain.People.ThisPhone"/> decides whether it still holds).
 /// </summary>
-public sealed record InstallState(string InstallId, HlcTimestamp LastStamp, ViewerId? Viewer = null);
+public sealed record InstallState(string InstallId, HlcTimestamp LastStamp, ViewerId? Viewer = null, RememberedRole? Role = null);
 
 /// <summary>
 /// What belongs to this install rather than the household, as one small file beside the household:
@@ -22,6 +22,11 @@ public sealed record InstallState(string InstallId, HlcTimestamp LastStamp, View
 /// lesson): "whose phone is this" is a fact about the install, and a copy in the shared household
 /// file would be restored onto the other adult's phone, which would then show them the first adult's
 /// private lists. Optional — a file written before it existed reads as matched to nobody.</para>
+///
+/// <para>So is the last household role the vault said (<see cref="RememberedRole"/>), with the account it
+/// was read under: it keeps a phone the household is shared to from acting as the owner's during the
+/// moments after a cold start before the vault has been read. Install-local for the same reason as the
+/// viewer; optional, and an unreadable value reads as no memory rather than a damaged install.</para>
 /// </summary>
 public sealed class LocalInstallStore
 {
@@ -78,6 +83,20 @@ public sealed class LocalInstallStore
         }
     }
 
+    /// <summary>Remembers the role the vault said for this account. Unknown and anonymous roles are refused, not stored.</summary>
+    public void SaveRole(HouseholdFileRole role, string account)
+    {
+        var remembered = new RememberedRole(role, account);
+        lock (gate)
+        {
+            var state = Read() ?? new InstallState("install-" + Guid.NewGuid().ToString("N"), HlcTimestamp.Zero);
+            if (state.Role != remembered)
+            {
+                Write(state with { Role = remembered });
+            }
+        }
+    }
+
     private InstallState? Read()
     {
         if (!File.Exists(path))
@@ -99,13 +118,28 @@ public sealed class LocalInstallStore
                 && !string.IsNullOrWhiteSpace(recorded.GetString())
                     ? new ViewerId(recorded.GetString()!)
                     : null;
-            return new InstallState(id, new HlcTimestamp(root.GetProperty("wall").GetInt64(), root.GetProperty("counter").GetInt32()), viewer);
+            return new InstallState(id, new HlcTimestamp(root.GetProperty("wall").GetInt64(), root.GetProperty("counter").GetInt32()), viewer, ReadRole(root));
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or ArgumentException)
         {
             // Never silently replaced: a new id here would make this phone a second writer.
             throw new HouseholdFormatException($"{FileName} is damaged and this install's writer id cannot be read: {exception.Message}", exception);
         }
+    }
+
+    private static RememberedRole? ReadRole(JsonElement root)
+    {
+        if (!root.TryGetProperty("role", out var role) || role.ValueKind != JsonValueKind.String
+            || !root.TryGetProperty("roleAccount", out var account) || account.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(account.GetString())
+            || !Enum.TryParse<HouseholdFileRole>(role.GetString(), out var parsed)
+            || !Enum.IsDefined(parsed)
+            || parsed == HouseholdFileRole.Unknown)
+        {
+            return null;
+        }
+
+        return new RememberedRole(parsed, account.GetString()!);
     }
 
     private void Write(InstallState state)
@@ -120,6 +154,12 @@ public sealed class LocalInstallStore
             if (state.Viewer is { } viewer)
             {
                 writer.WriteString("viewer", viewer.Value);
+            }
+
+            if (state.Role is { } remembered)
+            {
+                writer.WriteString("role", remembered.Role.ToString());
+                writer.WriteString("roleAccount", remembered.Account);
             }
 
             writer.WriteEndObject();

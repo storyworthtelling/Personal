@@ -283,7 +283,7 @@ public class TitleActivity : Activity
         }
         catch (Exception exception)
         {
-            services.Diagnostics.Warn("title", $"Title {id} could not be loaded.", exception);
+            services.Diagnostics.Warn("title", "The title page could not load its title.", exception);
             Post(() =>
             {
                 if (state is null)
@@ -357,7 +357,7 @@ public class TitleActivity : Activity
         }
         catch (Exception exception)
         {
-            services.Diagnostics.Warn("title", $"The household could not be read again for title {id}.", exception);
+            services.Diagnostics.Warn("title", "The household could not be read again for the title page.", exception);
         }
     }
 
@@ -446,7 +446,7 @@ public class TitleActivity : Activity
         }
         catch (Exception exception)
         {
-            services.Diagnostics.Warn("trailer", $"The trailer for {title.Id} could not be looked up; the button stays hidden.", exception);
+            services.Diagnostics.Warn("trailer", "The trailer could not be looked up; the button stays hidden.", exception);
         }
     }
 
@@ -474,7 +474,7 @@ public class TitleActivity : Activity
         catch (Exception exception)
         {
             // Never voiced and never on the page (§14): the seat simply stays hidden.
-            services.Diagnostics.Warn("voice", $"The why-this line for {title.Id} could not be composed.", exception);
+            services.Diagnostics.Warn("voice", "The why-this line could not be composed.", exception);
         }
     }
 
@@ -923,7 +923,7 @@ public class TitleActivity : Activity
             }
             catch (Exception exception)
             {
-                services.Diagnostics.Warn("household", $"{what} could not be saved.", exception);
+                services.Diagnostics.Warn("household", "A household change from the title page could not be saved.", exception);
             }
 
             await RefreshHouseholdAsync();

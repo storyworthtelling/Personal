@@ -121,9 +121,9 @@ public sealed class WatchingActions
                     ?? throw new InvalidOperationException("The household has no roster, so no hand-off can be checked.");
                 host.RunOnUiThread(() => Start(executor, request, row, title, serviceName, buttons));
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
-                services.Diagnostics.Warn("watching", $"Play on '{title.Name}' could not reach the hand-off door.", exception);
+                services.Diagnostics.Warn("watching", "Play could not reach the hand-off door.", exception);
             }
         });
     }
@@ -197,9 +197,9 @@ public sealed class WatchingActions
                     picks.OnPick,
                     name => picks.NewPlaylist(name)));
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
-                services.Diagnostics.Warn("watching", $"The playlists for '{row.Name}' could not be read.", exception);
+                services.Diagnostics.Warn("watching", "The playlists for a row could not be read.", exception);
             }
         });
     }
