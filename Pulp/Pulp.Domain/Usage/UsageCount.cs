@@ -1,5 +1,7 @@
 using Pulp.Domain.Core;
 using Pulp.Domain.HandOffs;
+using Pulp.Domain.Household.Records;
+using Pulp.Domain.Library;
 
 namespace Pulp.Domain.Usage;
 
@@ -93,5 +95,23 @@ public static class UsageCount
             DateOnly? last = inMonth.Count == 0 ? null : DateOnly.FromDateTime(inMonth.Max(entry => entry.At).DateTime);
             return new ServiceMonthUsage(key.Service, key.Month, inMonth.Count, total, last);
         }).ToList();
+    }
+}
+
+/// <summary>
+/// The usage entries for every hand-off the household has recorded. A hand-off is kept as each watching
+/// viewer's own sitting, so one for two children is two sittings with the same service and instant and
+/// is still one opening of the service.
+/// </summary>
+public static class UsageHandOffs
+{
+    public static IReadOnlyList<UsageHandOff> From(IEnumerable<WatchedSitting> sittings)
+    {
+        ArgumentNullException.ThrowIfNull(sittings);
+        return sittings
+            .Where(sitting => sitting.Sitting.Evidence == WatchSource.HandOff && sitting.Sitting.Service is not null)
+            .Select(sitting => new UsageHandOff(sitting.Sitting.Service!.Value, sitting.Sitting.At))
+            .Distinct()
+            .ToList();
     }
 }
