@@ -178,6 +178,35 @@ public class PulpInvariantsTests
         Assert.DoesNotContain("HouseholdAsync", source, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// What the viewer opened or folded on the Sports tab is remembered on this phone (D241). The
+    /// preferences file and the key prefix are where an upgraded phone finds it; rename either and every
+    /// league and team goes back to the starting rule.
+    /// </summary>
+    [Fact]
+    public void SportsFoldPreferencesAreFrozen()
+    {
+        var preference = typeof(PulpIdentity).Assembly.GetType("Pulp.Domain.Sports.SportsFoldPreference");
+        Assert.True(preference is not null, "Pulp.Domain.Sports.SportsFoldPreference was not found.");
+        Assert.Equal("pulp-sports-fold", ConstantOf(preference!, "FileName"));
+        Assert.Equal("fold:", ConstantOf(preference!, "KeyPrefix"));
+    }
+
+    /// <summary>The fold store opens the frozen file, keys by the frozen prefix, and stays on this phone only.</summary>
+    [Fact]
+    public void TheSportsFoldStoreUsesTheFrozenNamesAndStaysOnThisPhone()
+    {
+        var store = PulpSource.Files(".cs")
+            .SingleOrDefault(file => PulpSource.Relative(file) == "Pulp.Android/Sports/SportsFoldStore.cs");
+        Assert.True(store is not null, "Pulp.Android/Sports/SportsFoldStore.cs was not found.");
+
+        var source = File.ReadAllText(store!);
+        Assert.Contains("GetSharedPreferences(SportsFoldPreference.FileName", source, StringComparison.Ordinal);
+        Assert.Contains("SportsFoldPreference.KeyPrefix", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("PulpServices", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("HouseholdAsync", source, StringComparison.Ordinal);
+    }
+
     // ---- helpers ----
 
     private static string ConstantOf(Type type, string name)

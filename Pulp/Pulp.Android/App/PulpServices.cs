@@ -3,6 +3,8 @@ using Codex.Ui.Voice;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
+using Pulp.Calendar;
+using Pulp.Domain.Calendar;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
 using Pulp.Domain.FirstRun;
@@ -14,6 +16,7 @@ using Pulp.Domain.Services;
 using Pulp.Domain.Sports;
 using Pulp.Components;
 using Pulp.HandOffs;
+using Pulp.Infrastructure.Calendar;
 using Pulp.Infrastructure.Catalogue;
 using Pulp.Infrastructure.Discover;
 using Pulp.Infrastructure.Household;
@@ -84,6 +87,24 @@ public sealed class PulpServices
 
         voiceOptions = VoiceOptionsAccess.ForHead(account.GetAccessToken, "Pulp");
         Mood = new MoodClient(http, voiceOptions, health);
+
+        // The nightly calendar writer (D145, D149). Its Google account asks for only the two scopes the client
+        // names; the consent lives on the Vault page (CalendarConnection). The hooks are set here so the worker,
+        // which WorkManager can start with no shell, finds them once it asks for these services.
+        var calendarAccount = new VoiceGoogleAccount(GoogleCalendarClient.Scopes.ToArray());
+        CalendarConnection = new CalendarConnection(calendarAccount);
+        CalendarSyncHooks.Calendar = new GoogleCalendarClient(http, calendarAccount.GetAccessToken);
+        CalendarSyncHooks.Feed = new PulpCalendarFeed(this);
+        CalendarSyncHooks.Warn = (message, exception) =>
+        {
+            if (exception is CalendarException { Failure: CalendarFailure.Rejected })
+            {
+                CalendarConnection.Disconnected();
+            }
+
+            Diagnostics.Warn("calendar", message, exception);
+        };
+        CalendarSchedule.Schedule(context);
 
         household = new LocalHouseholdStore(files);
         install = new LocalInstallStore(files);
@@ -185,6 +206,12 @@ public sealed class PulpServices
     public HouseholdPermissions Rights => HouseholdPermissions.For(HouseholdFileRole);
 
     public VaultPulpKeySource Keys { get; }
+
+    /// <summary>
+    /// Where the owner's calendar consent stands, for the Settings and Vault pages: <see cref="CalendarConnection.Status"/>
+    /// is the sentence ("Calendar not connected yet") and <see cref="CalendarConnection.ConnectAsync"/> is the consent button's action.
+    /// </summary>
+    public CalendarConnection CalendarConnection { get; }
 
     public ServiceCatalogue Catalogue { get; }
 
@@ -637,6 +664,24 @@ public sealed class PulpServices
     /// <summary>The viewer's own playlists and the shared ones (D97, D103).</summary>
     public async Task<IReadOnlyList<HouseholdPlaylist>> PlaylistsAsync(ViewerId viewer, CancellationToken cancellationToken) =>
         (await HouseholdAsync(cancellationToken)).PlaylistsFor(viewer);
+
+    // ---- the calendar ----
+
+    /// <summary>
+    /// The Calendar page for one viewer (mockup 8): the next two weeks of their own and shared items only
+    /// (D244, D245), a held league's revealing games absent (D242), grouped by day. Reads off the same
+    /// sources the nightly writer uses, so the page and the household calendar agree.
+    /// </summary>
+    public async Task<CalendarScreenPage> CalendarPageAsync(ViewerId viewer, CancellationToken cancellationToken)
+    {
+        var read = await new CalendarReads(this).ReadAsync(cancellationToken);
+        var now = DateTimeOffset.Now;
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, read.Zone).DateTime);
+        IReadOnlySet<LeagueId> held = read.HeldByAdult.TryGetValue(viewer, out var mine) ? mine : new HashSet<LeagueId>();
+        var items = CalendarItems.ForViewer(read.Sources, viewer, today, read.Zone, held);
+        var context = new CalendarScreenContext(viewer, read.Household.NameOf, service => Catalogue.ById(service)?.Name, read.KindOf);
+        return CalendarScreen.Build(items, context, now, read.Zone);
+    }
 
     // ---- sport ----
 
