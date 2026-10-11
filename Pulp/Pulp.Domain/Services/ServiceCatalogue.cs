@@ -49,7 +49,7 @@ public sealed class ServiceCatalogue
         new(new ServiceId("netflix"), "Netflix", ["com.netflix.mediaclient"], "netflix", ["Netflix", "Netflix.com"]),
         new(new ServiceId("disney-plus"), "Disney+", ["com.disney.disneyplus"], "disney", ["Disney+", "Disney Plus", "DisneyPlus"]),
         new(new ServiceId("hulu"), "Hulu", ["com.hulu.plus"], "hulu", ["Hulu", "Hulu.com"]),
-        new(new ServiceId("hbo-max"), "HBO Max", ["com.wbd.stream", "com.hbo.hbonow"], "hbo", ["HBO Max", "Max", "Max.com", "HBOMax.com"]),
+        new(new ServiceId("hbo-max"), "HBO Max", ["com.wbd.stream", "com.hbo.hbonow"], "hbo", ["HBO Max", "Max.com", "HBOMax.com"]),
         new(new ServiceId("prime-video"), "Prime Video", ["com.amazon.avod.thirdpartyclient"], "prime", ["Prime Video", "Amazon Prime Video"]),
         new(new ServiceId("paramount-plus"), "Paramount+", ["com.cbs.app"], "paramount", ["Paramount+", "Paramount Plus"]),
         new(new ServiceId("peacock"), "Peacock", ["com.peacocktv.peacockandroid"], "peacock", ["Peacock", "PeacockTV"]),

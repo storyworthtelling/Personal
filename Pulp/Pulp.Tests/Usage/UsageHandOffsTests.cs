@@ -66,4 +66,20 @@ public class UsageHandOffsTests
         Assert.Contains(one, all);
         Assert.Contains(two, all);
     }
+
+    [Fact]
+    public void TwoViewersAMillisecondApartAreStillOneOpening()
+    {
+        var entries = UsageHandOffs.From([Sitting("child-wren", First, Flix), Sitting("child-moss", First.AddMilliseconds(1), Flix)]);
+
+        Assert.Single(entries);
+    }
+
+    [Fact]
+    public void OpeningsMinutesApartAreTwoOpenings()
+    {
+        var entries = UsageHandOffs.From([Sitting("adult-a", First, Flix), Sitting("adult-a", First.AddMinutes(3), Flix)]);
+
+        Assert.Equal(2, entries.Count);
+    }
 }

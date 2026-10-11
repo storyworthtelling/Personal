@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
+using Pulp.App;
 using Pulp.Domain.Sessions;
 
 // Flyleaf's playback-session relay (SessionHandOff). Flyleaf holds this permission to send; declaring
@@ -14,12 +15,14 @@ namespace Pulp.Sessions;
 /// <summary>
 /// What the composition hands the receiver (set once at launch, in <c>PulpServices</c>): where a read
 /// session goes to be matched with the title the household started and recorded as watch evidence.
-/// Null until composed, in which case a session is read and dropped. The hook receives the meaning
+/// Null until composed — which a cold-started receiver cannot assume, since the services are built lazily: the receiver
+/// composes them itself before it reads this. The task completes when the evidence is written, so the receiver can
+/// hold the broadcast open (<c>GoAsync</c>) until then. If still null, a session is read and dropped. The hook receives the meaning
 /// only; the <see cref="Pulp.Domain.Watching.Watched"/> rule, not this layer, judges it.
 /// </summary>
 public static class SessionHooks
 {
-    public static Action<SessionMeaning>? Record { get; set; }
+    public static Func<SessionMeaning, Task>? Record { get; set; }
 }
 
 /// <summary>
@@ -64,13 +67,29 @@ public class SessionReceiver : BroadcastReceiver
             Previous[message.Package] = message;
         }
 
-        try
+        // A cold-started receiver has no activity to have composed the services, and the hook is set only by
+        // their constructor: compose them first. GoAsync keeps the process alive until the evidence is written,
+        // which a bare background task would not outlive the broadcast for.
+        var pending = GoAsync();
+        _ = Task.Run(async () =>
         {
-            SessionHooks.Record?.Invoke(meaning);
-        }
-        catch (Exception e)
-        {
-            Android.Util.Log.Warn("Pulp", $"Recording a session failed: {e}");
-        }
+            try
+            {
+                PulpServices.For(context);
+                var record = SessionHooks.Record;
+                if (record is not null)
+                {
+                    await record(meaning);
+                }
+            }
+            catch (Exception e)
+            {
+                Android.Util.Log.Warn("Pulp", $"Recording a session failed: {e}");
+            }
+            finally
+            {
+                pending?.Finish();
+            }
+        });
     }
 }

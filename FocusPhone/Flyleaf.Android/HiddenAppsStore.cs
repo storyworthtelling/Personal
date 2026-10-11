@@ -13,6 +13,8 @@ public class HiddenAppsStore
 {
     private const string SetKey = "packages"; // JSON array of package ids
 
+    private static int version;
+
     private readonly ISharedPreferences preferences;
 
     public HiddenAppsStore(Context context)
@@ -20,8 +22,14 @@ public class HiddenAppsStore
         preferences = context.GetSharedPreferences(HiddenAppsHandoff.PreferencesName, FileCreationMode.Private)!;
     }
 
+    /// <summary>Bumped on every <see cref="Save"/> in this process, so a reader can cache the set and reload only when it changed.</summary>
+    public static int Version => Volatile.Read(ref version);
+
     public HiddenApps Load() => HiddenAppsCodec.Decode(preferences.GetString(SetKey, null));
 
-    public void Save(HiddenApps hidden) =>
+    public void Save(HiddenApps hidden)
+    {
         preferences.Edit()!.PutString(SetKey, HiddenAppsCodec.Encode(hidden))!.Commit();
+        Interlocked.Increment(ref version);
+    }
 }

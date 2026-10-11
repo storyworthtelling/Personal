@@ -233,9 +233,82 @@ public sealed class PlaybackSessionRelay
     /// <summary>Drops a package's memory so its next session is sent from the start.</summary>
     public void Forget(string package) => lastSent.Remove(package);
 
+    /// <summary>Drops every package's memory (the watcher stopped), so a still-playing session is re-sent on reconnect.</summary>
+    public void ForgetAll() => lastSent.Clear();
+
+    /// <summary>
+    /// The reading to send when a session closes, or null. A session whose stop was already sent
+    /// says nothing more (a second, zero-position "stopped" would overwrite the real position). A
+    /// closing reading with no position, title or duration of its own (the platform no longer
+    /// publishes a state once a session is destroyed) carries the last ones sent. Forgets the package.
+    /// </summary>
+    public PlaybackSessionReading? Close(PlaybackSessionReading reading, HiddenApps named)
+    {
+        ArgumentNullException.ThrowIfNull(reading);
+        ArgumentNullException.ThrowIfNull(named);
+        var hadPrevious = lastSent.TryGetValue(reading.Package, out var previous);
+        if (hadPrevious && previous!.State == PlaybackSessionState.Stopped)
+        {
+            lastSent.Remove(reading.Package);
+            return null;
+        }
+
+        var closing = reading with { State = PlaybackSessionState.Stopped };
+        if (hadPrevious)
+        {
+            closing = closing with
+            {
+                PositionMs = closing.PositionMs > 0 ? closing.PositionMs : previous!.PositionMs,
+                DurationMs = closing.DurationMs > 0 ? closing.DurationMs : previous!.DurationMs,
+                Title = string.IsNullOrWhiteSpace(closing.Title) ? previous!.Title : closing.Title,
+            };
+        }
+
+        // Offer applies the named-set and title rules; the Differs check always passes here because
+        // the state changes (a playing or paused previous, or none).
+        var sent = Offer(closing, named);
+        lastSent.Remove(reading.Package);
+        return sent;
+    }
+
     private static bool Differs(PlaybackSessionReading previous, PlaybackSessionReading next) =>
         previous.State != next.State
         || previous.DurationMs != next.DurationMs
         || !string.Equals(previous.Title, next.Title, StringComparison.Ordinal)
         || Math.Abs(next.PositionMs - previous.PositionMs) >= PlaybackSessionHandoff.ProgressStepMs;
+}
+
+/// <summary>What the watcher does with a package's media session on a refresh.</summary>
+public enum SessionWatch
+{
+    /// <summary>Nothing to do: the same session is already watched, or there is none and none was.</summary>
+    Keep,
+
+    /// <summary>A session appeared: register a callback.</summary>
+    Register,
+
+    /// <summary>The app recreated its session: unregister the old callback and register on the new one.</summary>
+    Replace,
+
+    /// <summary>The watched session left the active list: say it stopped.</summary>
+    Close,
+}
+
+/// <summary>Decides the <see cref="SessionWatch"/> from whether a package is watched, live, and (when both) on the same session token.</summary>
+public static class PlaybackSessionWatch
+{
+    public static SessionWatch Decide(bool isWatched, bool isLive, bool sameToken)
+    {
+        if (!isLive)
+        {
+            return isWatched ? SessionWatch.Close : SessionWatch.Keep;
+        }
+
+        if (!isWatched)
+        {
+            return SessionWatch.Register;
+        }
+
+        return sameToken ? SessionWatch.Keep : SessionWatch.Replace;
+    }
 }

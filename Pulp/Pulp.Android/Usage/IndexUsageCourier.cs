@@ -13,11 +13,16 @@ namespace Pulp.Usage;
 /// </summary>
 internal static class IndexUsageCourier
 {
-    /// <summary>Tallies the recorded hand-offs and sends one broadcast per service-month. Wiring: call after a hand-off is recorded.</summary>
-    public static void Publish(Context context, IEnumerable<UsageHandOff> handOffs, ServiceCatalogue catalogue)
+    /// <summary>
+    /// Tallies the recorded hand-offs and sends one broadcast for each touched service-month, not all history.
+    /// A touched month left with no hand-offs goes as an explicit zero so Index clears it. Wiring: call after a
+    /// hand-off is recorded or removed.
+    /// </summary>
+    public static void Publish(
+        Context context, IEnumerable<UsageHandOff> handOffs, ServiceCatalogue catalogue, IEnumerable<(ServiceId Service, UsageMonth Month)> touched)
     {
         var rows = UsageCount.Tally(handOffs, []);
-        foreach (var payload in IndexUsagePayload.ForRows(rows, catalogue))
+        foreach (var payload in IndexUsagePayload.ForTouched(rows, touched, catalogue))
         {
             Send(context, payload, catalogue);
         }

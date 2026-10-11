@@ -17,47 +17,85 @@ public class HiddenAppsSendGateTests
     {
         var gate = new HiddenAppsSendGate();
 
-        Assert.True(gate.ShouldSend([]));
+        Assert.True(gate.ShouldSend([], HiddenSendCause.Edit));
     }
 
     [Fact]
     public void TheSameSetAgainIsNotSentWhateverTheOrderOrRepeats()
     {
         var gate = new HiddenAppsSendGate();
-        Assert.True(gate.ShouldSend([Flix, Sample]));
+        Assert.True(gate.ShouldSend([Flix, Sample], HiddenSendCause.Edit));
 
-        Assert.False(gate.ShouldSend([Sample, Flix, Sample]));
+        Assert.False(gate.ShouldSend([Sample, Flix, Sample], HiddenSendCause.Edit));
     }
 
     [Fact]
     public void AChangedSetIsSentAndUntickingEverythingIsSentToo()
     {
         var gate = new HiddenAppsSendGate();
-        gate.ShouldSend([Flix, Sample]);
+        gate.ShouldSend([Flix, Sample], HiddenSendCause.Edit);
 
-        Assert.True(gate.ShouldSend([Flix]));
-        Assert.True(gate.ShouldSend([]));
-        Assert.False(gate.ShouldSend([]));
+        Assert.True(gate.ShouldSend([Flix], HiddenSendCause.Edit));
+        Assert.True(gate.ShouldSend([], HiddenSendCause.Edit));
+        Assert.False(gate.ShouldSend([], HiddenSendCause.Edit));
     }
 
     [Fact]
     public void ASetBeingSentAgainAfterChangingBackIsSent()
     {
         var gate = new HiddenAppsSendGate();
-        gate.ShouldSend([Flix]);
-        gate.ShouldSend([]);
+        gate.ShouldSend([Flix], HiddenSendCause.Edit);
+        gate.ShouldSend([], HiddenSendCause.Edit);
 
-        Assert.True(gate.ShouldSend([Flix]));
+        Assert.True(gate.ShouldSend([Flix], HiddenSendCause.Edit));
     }
 
     [Fact]
     public void ASendThatDidNotGoOutCanBeForgottenSoTheNextCallTriesAgain()
     {
         var gate = new HiddenAppsSendGate();
-        gate.ShouldSend([Flix]);
+        gate.ShouldSend([Flix], HiddenSendCause.Edit);
 
         gate.Forget();
 
-        Assert.True(gate.ShouldSend([Flix]));
+        Assert.True(gate.ShouldSend([Flix], HiddenSendCause.Edit));
+    }
+
+    [Fact]
+    public void AnEmptySetSeenOnLoadIsNeverSentBecauseAFreshInstallHasNotSyncedYet()
+    {
+        var gate = new HiddenAppsSendGate();
+
+        Assert.False(gate.ShouldSend([], HiddenSendCause.Load));
+        Assert.False(gate.ShouldSend([], HiddenSendCause.Load));
+    }
+
+    [Fact]
+    public void AnEmptySetOnLoadDoesNotUseUpTheLaterRealSend()
+    {
+        var gate = new HiddenAppsSendGate();
+        gate.ShouldSend([], HiddenSendCause.Load);
+
+        Assert.True(gate.ShouldSend([Flix], HiddenSendCause.Load));
+    }
+
+    [Fact]
+    public void AnEditThatEmptiesTheSetIsSentBecauseThatIsHowUntickingUnHides()
+    {
+        var gate = new HiddenAppsSendGate();
+        gate.ShouldSend([Flix], HiddenSendCause.Load);
+
+        Assert.True(gate.ShouldSend([], HiddenSendCause.Edit));
+        Assert.False(gate.ShouldSend([], HiddenSendCause.Edit));
+    }
+
+    [Fact]
+    public void AnEmptyLoadAfterAnEmptyingEditIsStillNotSent()
+    {
+        var gate = new HiddenAppsSendGate();
+        gate.ShouldSend([Flix], HiddenSendCause.Load);
+        gate.ShouldSend([], HiddenSendCause.Edit);
+
+        Assert.False(gate.ShouldSend([], HiddenSendCause.Load));
     }
 }

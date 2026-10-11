@@ -195,4 +195,48 @@ public class IndexUsageContractTests
         Assert.True(match.Success, $"IndexHandoff.{name} not found in MoneyMail.cs.");
         return match.Groups[1].Value;
     }
+
+    [Fact]
+    public void OnlyTheTouchedServiceMonthIsSentNotAllHistory()
+    {
+        var rows = new[]
+        {
+            Row("netflix", 2026, 8, 2, null, new DateOnly(2026, 8, 4)),
+            Row("netflix", 2026, 9, 6, null, new DateOnly(2026, 9, 4)),
+            Row("hulu", 2026, 9, 3, null, new DateOnly(2026, 9, 2)),
+        };
+
+        var payloads = IndexUsagePayload.ForTouched(rows, [(new ServiceId("netflix"), new UsageMonth(2026, 9))], Catalogue);
+
+        var only = Assert.Single(payloads);
+        Assert.Equal(6, only.HandOffs);
+        Assert.Equal(new UsageMonth(2026, 9), only.Month);
+    }
+
+    [Fact]
+    public void ATouchedMonthThatDroppedToZeroIsSentAsAnExplicitZeroSoIndexClearsIt()
+    {
+        var payloads = IndexUsagePayload.ForTouched([], [(new ServiceId("netflix"), new UsageMonth(2026, 9))], Catalogue);
+
+        var zero = Assert.Single(payloads);
+        Assert.Equal(0, zero.HandOffs);
+        Assert.Null(zero.LastOpened);
+        var extras = IndexUsageContract.Extras(zero, Catalogue);
+        Assert.Equal("0", extras[IndexUsageContract.CountExtra]);
+        Assert.False(extras.ContainsKey(IndexUsageContract.LastOpenedExtra));
+        Assert.Equal("Netflix|Netflix.com", extras[IndexUsageContract.MerchantsExtra]);
+    }
+
+    [Fact]
+    public void ATouchedServiceNotInTheCatalogueIsNotSentAndDuplicatesCollapse()
+    {
+        var touched = new[]
+        {
+            (new ServiceId("not-in-the-table"), new UsageMonth(2026, 9)),
+            (new ServiceId("hulu"), new UsageMonth(2026, 9)),
+            (new ServiceId("hulu"), new UsageMonth(2026, 9)),
+        };
+
+        Assert.Single(IndexUsagePayload.ForTouched([], touched, Catalogue));
+    }
 }

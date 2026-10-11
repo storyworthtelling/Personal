@@ -190,4 +190,76 @@ public class PlaybackSessionTests
 
         Assert.Null(relay.Offer(Reading(package: "com.storyworthtelling.focusphone.communication"), owner));
     }
+
+    [Fact]
+    public void ClosingAfterAStopWasAlreadySentSendsNothingMore()
+    {
+        var relay = new PlaybackSessionRelay();
+        relay.Offer(Reading(positionMs: 900000, state: PlaybackSessionState.Stopped), Named);
+
+        Assert.Null(relay.Close(Reading(positionMs: 0, state: PlaybackSessionState.Stopped), Named));
+    }
+
+    [Fact]
+    public void ClosingWithNoStateCarriesTheLastPositionTitleAndDuration()
+    {
+        var relay = new PlaybackSessionRelay();
+        relay.Offer(Reading(positionMs: 900000, state: PlaybackSessionState.Playing), Named);
+
+        var closing = relay.Close(Reading(title: null, positionMs: 0, durationMs: 0, state: PlaybackSessionState.Stopped), Named);
+
+        Assert.NotNull(closing);
+        Assert.Equal(PlaybackSessionState.Stopped, closing!.State);
+        Assert.Equal(900000, closing.PositionMs);
+        Assert.Equal("Harbor Lights", closing.Title);
+        Assert.Equal(2640000, closing.DurationMs);
+    }
+
+    [Fact]
+    public void ClosingKeepsItsOwnPositionWhenItHasOne()
+    {
+        var relay = new PlaybackSessionRelay();
+        relay.Offer(Reading(positionMs: 900000), Named);
+
+        var closing = relay.Close(Reading(positionMs: 950000, state: PlaybackSessionState.Stopped), Named);
+
+        Assert.Equal(950000, closing!.PositionMs);
+    }
+
+    [Fact]
+    public void ClosingForgetsThePackageSoTheNextSessionIsSent()
+    {
+        var relay = new PlaybackSessionRelay();
+        relay.Offer(Reading(), Named);
+        relay.Close(Reading(state: PlaybackSessionState.Stopped), Named);
+
+        Assert.NotNull(relay.Offer(Reading(), Named));
+    }
+
+    [Fact]
+    public void ClosingAnUnnamedPackageSendsNothing()
+    {
+        Assert.Null(new PlaybackSessionRelay().Close(Reading(package: Other, state: PlaybackSessionState.Stopped), Named));
+    }
+
+    [Fact]
+    public void ForgettingEverythingLetsAStillPlayingSessionBeSentAgain()
+    {
+        var relay = new PlaybackSessionRelay();
+        relay.Offer(Reading(), Named);
+        relay.ForgetAll();
+
+        Assert.NotNull(relay.Offer(Reading(), Named));
+    }
+
+    [Theory]
+    [InlineData(false, true, false, SessionWatch.Register)]
+    [InlineData(true, true, true, SessionWatch.Keep)]
+    [InlineData(true, true, false, SessionWatch.Replace)]
+    [InlineData(true, false, false, SessionWatch.Close)]
+    [InlineData(false, false, false, SessionWatch.Keep)]
+    public void TheWatcherDecidesFromTheSessionTokenNotThePackage(bool watched, bool live, bool sameToken, SessionWatch expected)
+    {
+        Assert.Equal(expected, PlaybackSessionWatch.Decide(watched, live, sameToken));
+    }
 }
