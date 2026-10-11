@@ -170,6 +170,21 @@ report what can't be built as drawn". A subagent never pushes, never opens a PR,
 
 ### Release C — the phone, core screens
 
+**Wave 1 (foundations, before any screen):** the data clients, the shell, the voice list and the
+hand-off executor, in disjoint folders. *Added at Release C:* the plan had no step for the four
+data clients the screens read, so they land here.
+
+- **[L3]** `Pulp.Infrastructure` clients — Streaming Availability (titles, offers, deep links,
+  expiry, posters, `/changes`), TVmaze (air dates), OMDb (the rating code only), YouTube Data
+  (trailer ids) — each over `HttpClient`, keys read live from the vault section, faked in tests,
+  reporting credential health; mapped into a `Pulp.Domain/Catalogue` model. **No TMDB** (G7).
+- **[L2]** The shell: `PulpActivity` over `BinderFrame` with the six areas of mockup 01 (Watching,
+  Playlists, Discover, Sports, Calendar, Settings), area hues per DESIGN.md §9 with an area-hue
+  guard, and the pinned bottom bar.
+
+**Wave 2:** the screens below, each from its mockup.
+
+
 All UI **[L2]**, each with its mockup embedded; components from `Codex.Ui.Android` (BinderFrame,
 ArtworkWindow, ActionCard, AccordionPicker, Checkbox, DogEar, FilterField, WaitingActivity).
 
@@ -206,14 +221,32 @@ ArtworkWindow, ActionCard, AccordionPicker, Checkbox, DogEar, FilterField, Waiti
 
 ### Release F — the three cross-app contracts
 
-- **[L3]** Pulp → Index usage (D90, D269–D271): `com.storyworthtelling.index.UsageReceiver`,
-  signature permission `…index.RECEIVE_USAGE`, Index's line under a matching charge (mockup 15).
+- **[L3]** Pulp → Index usage (D90, D269–D271): `com.storyworthtelling.ledger.UsageReceiver` (Index kept the
+  Ledger package id so it upgrades in place — `IndexHandoff.Package`), signature permission
+  `…ledger.RECEIVE_USAGE`, Index's line under a matching charge (mockup 15).
   Contract tests on both sides (`IndexHandoffContractTests` pattern). **G16.**
 - **[L3]** Pulp → Flyleaf hidden apps (D8, D92, D93): Flyleaf's receiver persists the set and its
   tray excludes it; `PolicyContext.PulpPackage`; Pulp's cover-out book on the sibling shelf (D91).
   **G17.**
 - **[L3]** Flyleaf → Pulp playback sessions (finding §2.3): Flyleaf's existing listener forwards
   sessions for the packages Pulp named, signature permission `…pulp.RECEIVE_SESSIONS`. **G18.**
+
+### Release G — the locked hand-off (D288)
+
+Added after Release C wave 1, from the watch-journey feasibility study (browser or automated
+playback ruled out: every surveyed service's terms ban automated access, Netflix has no Android
+web player, and Playwright does not run on the phone).
+
+- **[L3]** Pulp → Flyleaf "open locked" request over a signature-guarded broadcast; Flyleaf adds the
+  service's package to the lock task allowlist and starts the deep link in lock task mode, with Home
+  kept as the way out (Flyleaf is Home). **POLICY ENFORCEMENT REVISIT** of the lockdown first.
+- **[L3]** Release: Home, a long pause, the title ending or a title change (from the session relay,
+  Release F) ends lock task and brings Pulp forward; Pulp records progress or marks it watched.
+- **[L3]** Children: only attested or kids-only services (G13 unchanged); lock task keeps them in.
+- **Built (D296-D299, see DISCOVERY "Release G policy revisit"):** the request contract and gate, the
+  persisted record and rules, Flyleaf's controller, Pulp's courier and route choice. **G19.**
+- **Device-only:** each app's behaviour under lock task, incoming calls, where each deep link lands,
+  and whether each app publishes its position. Nothing here is provable off the phone.
 
 ---
 
@@ -237,6 +270,7 @@ ArtworkWindow, ActionCard, AccordionPicker, Checkbox, DogEar, FilterField, Waiti
 | G14 | the store writes over an undecryptable file | `Pulp.Tests/Household` |
 | G15 | a sports adapter returns a score | `Pulp.Tests/Sports` |
 | G16–G18 | a cross-app action, permission or payload drifts | both sides' contract tests |
+| G19 | the locked-open action, permission, payload or streaming catalogue drifts, or a request reaches lock task by any door but `HandOffExecutor` | both sides' contract tests, `Pulp.Tests/LockedOpen` |
 
 Each guard's first commit records its red run and names the bug it reintroduced. **A guard that
 passes against an empty input is a vacuous guard** — each asserts it found something to check.

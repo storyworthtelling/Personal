@@ -20,6 +20,8 @@ public class FocusApplication : Application
         CrashReporter.Install(this, "FocusPhone");
         packageWatcher = new PackageWatcher(this);
         packageWatcher.Start();
+        // A lock-task session a dead process left behind is undone before anything else runs (D297).
+        LockedSessionController.EndStaleAtStart(this);
         UpdateService.Schedule(this);
     }
 }

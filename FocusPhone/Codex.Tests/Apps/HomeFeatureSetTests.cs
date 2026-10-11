@@ -49,4 +49,22 @@ public class HomeFeatureSetTests
 
         Assert.Equal(HomeFeatureSet.Default.Packages, featured.Packages);
     }
+
+    [Fact]
+    public void AHiddenAppIsNotSwappedOntoTheHomeShelf()
+    {
+        var set = HomeFeatureSet.Default;
+        var hidden = HiddenApps.Of(["com.example.streamer"]);
+
+        Assert.Same(set, set.Replace(HomeFeatureSet.MapsPackage, "com.example.streamer", hidden));
+    }
+
+    [Fact]
+    public void AnAppThatIsNotHiddenStillSwapsWhenHiddenAppsAreGiven()
+    {
+        var swapped = HomeFeatureSet.Default.Replace(
+            HomeFeatureSet.MapsPackage, "com.example.other", HiddenApps.Of(["com.example.streamer"]));
+
+        Assert.Contains("com.example.other", swapped.Packages);
+    }
 }

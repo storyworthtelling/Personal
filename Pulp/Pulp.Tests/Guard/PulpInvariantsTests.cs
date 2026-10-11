@@ -145,7 +145,76 @@ public class PulpInvariantsTests
             "A preference key is derived from an identifier; make it a string literal:\n" + string.Join("\n", offenders));
     }
 
+    /// <summary>
+    /// "Hide watched" is remembered per playlist on this phone (D292). The preferences file and the key
+    /// prefix are where an upgraded phone finds what the owner set; rename either and every playlist
+    /// quietly forgets its setting.
+    /// </summary>
+    [Fact]
+    public void HideWatchedPreferencesAreFrozen()
+    {
+        var preference = typeof(PulpIdentity).Assembly.GetType("Pulp.Domain.Library.HideWatchedPreference");
+        Assert.True(preference is not null, "Pulp.Domain.Library.HideWatchedPreference was not found.");
+        Assert.Equal("pulp-playlist-hide-watched", ConstantOf(preference!, "FileName"));
+        Assert.Equal("hide-watched:", ConstantOf(preference!, "KeyPrefix"));
+    }
+
+    /// <summary>
+    /// The store opens the frozen file and keys by the frozen key, and keeps the setting on this phone
+    /// only — never in the shared household file, which the other install reads (D292).
+    /// </summary>
+    [Fact]
+    public void TheHideWatchedStoreUsesTheFrozenNamesAndStaysOnThisPhone()
+    {
+        var store = PulpSource.Files(".cs")
+            .SingleOrDefault(file => PulpSource.Relative(file) == "Pulp.Android/Playlists/HideWatchedStore.cs");
+        Assert.True(store is not null, "Pulp.Android/Playlists/HideWatchedStore.cs was not found.");
+
+        var source = File.ReadAllText(store!);
+        Assert.Contains("GetSharedPreferences(HideWatchedPreference.FileName", source, StringComparison.Ordinal);
+        Assert.Contains("HideWatchedPreference.Key(", source, StringComparison.Ordinal);
+        // The household file is reached only through PulpServices; the store must not hold one.
+        Assert.DoesNotContain("PulpServices", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("HouseholdAsync", source, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// What the viewer opened or folded on the Sports tab is remembered on this phone (D241). The
+    /// preferences file and the key prefix are where an upgraded phone finds it; rename either and every
+    /// league and team goes back to the starting rule.
+    /// </summary>
+    [Fact]
+    public void SportsFoldPreferencesAreFrozen()
+    {
+        var preference = typeof(PulpIdentity).Assembly.GetType("Pulp.Domain.Sports.SportsFoldPreference");
+        Assert.True(preference is not null, "Pulp.Domain.Sports.SportsFoldPreference was not found.");
+        Assert.Equal("pulp-sports-fold", ConstantOf(preference!, "FileName"));
+        Assert.Equal("fold:", ConstantOf(preference!, "KeyPrefix"));
+    }
+
+    /// <summary>The fold store opens the frozen file, keys by the frozen prefix, and stays on this phone only.</summary>
+    [Fact]
+    public void TheSportsFoldStoreUsesTheFrozenNamesAndStaysOnThisPhone()
+    {
+        var store = PulpSource.Files(".cs")
+            .SingleOrDefault(file => PulpSource.Relative(file) == "Pulp.Android/Sports/SportsFoldStore.cs");
+        Assert.True(store is not null, "Pulp.Android/Sports/SportsFoldStore.cs was not found.");
+
+        var source = File.ReadAllText(store!);
+        Assert.Contains("GetSharedPreferences(SportsFoldPreference.FileName", source, StringComparison.Ordinal);
+        Assert.Contains("SportsFoldPreference.KeyPrefix", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("PulpServices", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("HouseholdAsync", source, StringComparison.Ordinal);
+    }
+
     // ---- helpers ----
+
+    private static string ConstantOf(Type type, string name)
+    {
+        var field = type.GetField(name);
+        Assert.True(field is not null && field.IsLiteral, $"{type.Name}.{name} is not a const.");
+        return (string)field!.GetRawConstantValue()!;
+    }
 
     private static string ConstantValue(string name)
     {

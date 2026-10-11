@@ -37,7 +37,7 @@ public class ShelfSceneBuilder(Context context)
             trayApps.Add(new TrayApp(package, category));
         }
 
-        var tray = AppTrayLayout.Build(trayApps, new AppFolderStore(context).Load(), catalog);
+        var tray = AppTrayLayout.Build(trayApps, new AppFolderStore(context).Load(), catalog, new HiddenAppsStore(context).Load());
         var usage = UsageStatsReader.ForegroundTime(context);
         return ShelfComposer.Compose(home, tray, usage);
     }

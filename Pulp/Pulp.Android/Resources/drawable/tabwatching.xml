@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Watching: a screen with a play mark, on its stand. Drawn from mockup 01's SVG on its 26-unit grid; the stroke colour is a
+     placeholder the binder replaces with SetColorFilter (ink on cloth, the area's hue when active). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp" android:height="26dp"
+    android:viewportWidth="26" android:viewportHeight="26">
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="round"
+      android:pathData="M5,5H21A2,2 0 0,1 23,7V16A2,2 0 0,1 21,18H5A2,2 0 0,1 3,16V7A2,2 0 0,1 5,5Z"/>
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="round"
+      android:pathData="M11,9V14L15,11.5Z"/>
+  <path android:strokeColor="@android:color/black" android:strokeWidth="1.8"
+      android:strokeLineCap="round" android:strokeLineJoin="round"
+      android:pathData="M9,22H17"/>
+</vector>

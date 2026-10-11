@@ -57,6 +57,34 @@ public static class DogEar
         public static Color Resolved => PaperTheme.ResolvedMark;
         public static Color Reference => PaperTheme.ReferenceMark;
         public static Color Progress => PaperTheme.ProgressMark;
+
+        /// <summary>
+        /// Reads a notice's colour back to its role, so the fold can wear the most serious one
+        /// (<see cref="NoticeSeriousness"/>, D291). Null for a colour that is no role — an app's
+        /// identity hue — which ranks below every role.
+        /// </summary>
+        public static FoldRole? RoleOf(Color hue)
+        {
+            (FoldRole Role, Color Hue)[] roles =
+            [
+                (FoldRole.Problem, Problem),
+                (FoldRole.Caution, Caution),
+                (FoldRole.Action, Action),
+                (FoldRole.Resolved, Resolved),
+                (FoldRole.Reference, Reference),
+                (FoldRole.Progress, Progress),
+            ];
+
+            foreach (var (role, colour) in roles)
+            {
+                if (colour.ToArgb() == hue.ToArgb())
+                {
+                    return role;
+                }
+            }
+
+            return null;
+        }
     }
 
     // What is waiting, per host. Held off to the side rather than on the view because the
@@ -160,9 +188,11 @@ public static class DogEar
             return;
         }
 
-        // One fold, no count (§13): the corner says something waits, not how much.
+        // One fold, no count (§13): the corner says something waits, not how much. It wears the most
+        // serious notice waiting, the newest on a tie (D291); the Waiting page still lists newest first.
+        var shown = notices[NoticeSeriousness.MostSerious(notices, notice => Hues.RoleOf(notice.Hue))];
         var size = PaperTheme.Dp(context, DogEarGeometry.SizeDp);
-        var fold = new FoldView(context, notices[0].Headline, timer: null, showsBackArrow: false, hue: notices[0].Hue)
+        var fold = new FoldView(context, shown.Headline, timer: null, showsBackArrow: false, hue: shown.Hue)
         {
             Tag = NoticeTag,
         };

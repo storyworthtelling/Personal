@@ -16,6 +16,10 @@
        fabricated balance. Guard G2 (IndexHandoffContractTests) checks this line's name against
        IndexHandoff.Permission byte-for-byte. -->
   <permission android:name="com.storyworthtelling.ledger.RECEIVE_BALANCE" android:protectionLevel="signature" />
+  <!-- Pulp's usage count (Pulp D90, D269-D271): the same shape as the balance hand-off above, signature
+       level so only the owner's own signed apps can send it. Guard G16 (PulpUsageContractTests) checks
+       this line's name against Pulp's IndexUsageContract.Permission byte-for-byte. -->
+  <permission android:name="com.storyworthtelling.ledger.RECEIVE_USAGE" android:protectionLevel="signature" />
   <!-- Package visibility (Android 11+). The connect page asks whether Chrome is suspended, which is
        how it tells that the FocusPhone's Admin mode is open (the default browser stays Flyleaf's
        restricted viewer either way, so it cannot). Without the <package> entry Android hides Chrome
