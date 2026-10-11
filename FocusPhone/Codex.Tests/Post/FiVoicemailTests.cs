@@ -88,4 +88,41 @@ public class FiVoicemailTests
         Assert.NotNull(item);
         Assert.False(string.IsNullOrWhiteSpace(item!.Snippet));
     }
+
+    // The duration in the wrapper, "(0:04)", has a colon of its own. The wrapper separator is
+    // the first colon that is not between two digits, or the transcript starts with "04):".
+    [Fact]
+    public void TheDurationColonIsNotTheWrapperSeparator()
+    {
+        var item = FiVoicemail.TryParse(
+            "+15550102233", "New voicemail from (555) 010-2233 (0:04): Hi, it's me, call me back.", When);
+
+        Assert.Equal("Hi, it's me, call me back.", item!.Snippet);
+    }
+
+    // Fi appends its own "To listen" line to every voicemail. It is wrapper, not transcript.
+    [Fact]
+    public void FisListenFooterIsNotTheTranscript()
+    {
+        var item = FiVoicemail.TryParse(
+            "+15550102233",
+            "New voicemail from (555) 010-2233 (0:04): Hi, it's me. To listen to this message, call +1 555-010-0100.",
+            When);
+
+        Assert.Equal("Hi, it's me.", item!.Snippet);
+    }
+
+    // Fi's own statement that there is no transcript is not a transcript: it reads as a plain
+    // voicemail, the same as one with nothing at all.
+    [Fact]
+    public void FisNoTranscriptNoticeReadsAsAPlainVoicemail()
+    {
+        var item = FiVoicemail.TryParse(
+            "+15550102233",
+            "New voicemail from (555) 010-2233 (0:04): No transcript available. To listen to this message, call +1 555-010-0100.",
+            When);
+
+        Assert.Equal(TimelineItemKind.Voicemail, item!.Kind);
+        Assert.Equal("Voicemail", item.Snippet);
+    }
 }

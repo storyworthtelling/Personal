@@ -50,6 +50,64 @@ public class NearDuplicateCollapserTests
         Assert.Equal("sms:1", survivor.SourceId);
     }
 
+    // Google Fi's "Voicemails by text" turns the transcript SMS into a voicemail (fivm:), so
+    // it is no longer a provider text. Google Messages still notifies the same message with
+    // its full body, wrapper included, and that copy must not survive as a second row.
+    [Fact]
+    public void Collapse_DropsNotificationCopyOfFiVoicemailTranscript()
+    {
+        var voicemail = Item(TimelineItemKind.Voicemail, "5551234567", "fivm:5551234567:1",
+            snippet: "Hi, it's me, call me back.");
+        var notification = Item(TimelineItemKind.Message, "5551234567", "5551234567:1750000000000",
+            snippet: "Voicemail from (555) 010-2233: Hi, it's me, call me back.", secondsAfterT0: 30);
+
+        var survivor = Assert.Single(NearDuplicateCollapser.Collapse([voicemail, notification]));
+
+        Assert.Equal("fivm:5551234567:1", survivor.SourceId);
+    }
+
+    // The notification carries Fi's own footer after the words, so the transcript is not at
+    // its end. The copy is still the same message.
+    [Fact]
+    public void Collapse_DropsNotificationCopyOfFiTranscriptWithListenFooter()
+    {
+        var voicemail = Item(TimelineItemKind.Voicemail, "5551234567", "fivm:5551234567:1",
+            snippet: "Hi, it's me.");
+        var notification = Item(TimelineItemKind.Message, "5551234567", "5551234567:1750000000000",
+            snippet: "New voicemail from (555) 010-2233 (0:04): Hi, it's me. To listen to this message, call +1 555-010-0100.",
+            secondsAfterT0: 30);
+
+        var survivor = Assert.Single(NearDuplicateCollapser.Collapse([voicemail, notification]));
+
+        Assert.Equal("fivm:5551234567:1", survivor.SourceId);
+    }
+
+    // A voicemail with no words is shown as "Voicemail"; its notification copy is identified by
+    // Fi's own "No transcript" wrapper, which a real text does not carry.
+    [Fact]
+    public void Collapse_DropsNotificationCopyOfFiVoicemailWithNoTranscript()
+    {
+        var voicemail = Item(TimelineItemKind.Voicemail, "5551234567", "fivm:5551234567:1",
+            snippet: "Voicemail");
+        var notification = Item(TimelineItemKind.Message, "5551234567", "5551234567:1750000000000",
+            snippet: "New voicemail from (555) 010-2233 (0:04): No transcript available. To listen to this message, call +1 555-010-0100.",
+            secondsAfterT0: 30);
+
+        Assert.Single(NearDuplicateCollapser.Collapse([voicemail, notification]));
+    }
+
+    // A short reply that happens to end the way a transcript does is a real text, not the
+    // same message: nothing before the transcript marks it as a voicemail wrapper.
+    [Fact]
+    public void Collapse_KeepsUnrelatedTextThatEndsLikeAFiTranscript()
+    {
+        var voicemail = Item(TimelineItemKind.Voicemail, "5551234567", "fivm:5551234567:1", snippet: "hi");
+        var reply = Item(TimelineItemKind.Message, "5551234567", "5551234567:1750000000000",
+            snippet: "Oh, hi", secondsAfterT0: 30);
+
+        Assert.Equal(2, NearDuplicateCollapser.Collapse([voicemail, reply]).Count);
+    }
+
     [Fact]
     public void Collapse_KeepsBothWhenSnippetsDiffer()
     {
