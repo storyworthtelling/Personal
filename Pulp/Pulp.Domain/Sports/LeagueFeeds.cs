@@ -57,19 +57,33 @@ public static class SportsFreshness
 public static class RecordedGames
 {
     public static IReadOnlyList<GameId> Unwatched(
-        LeagueFeed feed, IReadOnlyCollection<TeamId> followed, IEnumerable<WatchEvent> sittings, DateTimeOffset now)
+        LeagueFeed feed, IReadOnlyCollection<TeamId> followed, IEnumerable<WatchEvent> sittings, DateTimeOffset now) =>
+        Started(feed, followed, sittings, now, watched: false);
+
+    /// <summary>
+    /// The mirror: games in the same window that the watch evidence says were watched. Only the open league's
+    /// "Earlier" fold reads it (<see cref="EarlierGames"/>).
+    /// </summary>
+    public static IReadOnlyList<GameId> Watched(
+        LeagueFeed feed, IReadOnlyCollection<TeamId> followed, IEnumerable<WatchEvent> sittings, DateTimeOffset now) =>
+        Started(feed, followed, sittings, now, watched: true);
+
+    private static List<GameId> Started(
+        LeagueFeed feed, IReadOnlyCollection<TeamId> followed, IEnumerable<WatchEvent> sittings, DateTimeOffset now, bool watched)
     {
         ArgumentNullException.ThrowIfNull(feed);
         ArgumentNullException.ThrowIfNull(followed);
         ArgumentNullException.ThrowIfNull(sittings);
         var byGame = sittings
             .Where(sitting => sitting.Kind == WatchedKind.Game)
+            // A hand-off to a game opens the service, not the recording: it is usage evidence only (D312).
+            .Where(sitting => sitting.Evidence != WatchSource.HandOff)
             .ToLookup(sitting => sitting.Title.Value, StringComparer.OrdinalIgnoreCase);
         var oldest = now.AddDays(-SportsWindow.RecordingDays);
 
         return feed.Schedule
             .Where(game => game.StartsAt <= now && game.StartsAt >= oldest && followed.Any(game.Involves))
-            .Where(game => !Sittings.Verdict(byGame[game.Id.Value]).IsWatched)
+            .Where(game => Sittings.Verdict(byGame[game.Id.Value]).IsWatched == watched)
             .OrderBy(game => game.StartsAt)
             .Select(game => game.Id)
             .ToList();

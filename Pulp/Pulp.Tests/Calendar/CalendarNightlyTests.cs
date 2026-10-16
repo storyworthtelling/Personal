@@ -18,6 +18,10 @@ public class CalendarNightlyTests
 
         public List<string> Saved { get; } = [];
 
+        public void NoteShareFailures(IReadOnlyList<CalendarShareFailure> failures)
+        {
+        }
+
         public Task<CalendarFeedSnapshot> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(Snapshot);
 
         public Task SaveCalendarIdAsync(string calendarId, CancellationToken cancellationToken)

@@ -26,10 +26,20 @@ public interface ICalendarFeed
 
     /// <summary>Writes the new calendar's id into the household file (the owner's install only).</summary>
     Task SaveCalendarIdAsync(string calendarId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Tells the install which addresses the calendar could not be shared with tonight (an empty list when
+    /// all went well, which clears an earlier problem), so the Vault page can say so (D359).
+    /// </summary>
+    void NoteShareFailures(IReadOnlyList<CalendarShareFailure> failures);
 }
 
 /// <summary><paramref name="Result"/> is null when this install wrote nothing (it is not the owner's).</summary>
-public sealed record CalendarNightlyOutcome(string? CalendarId, CalendarSyncResult? Result);
+public sealed record CalendarNightlyOutcome(string? CalendarId, CalendarSyncResult? Result)
+{
+    /// <summary>The addresses the calendar could not be shared with tonight; the events were still written.</summary>
+    public IReadOnlyList<CalendarShareFailure> ShareFailures { get; init; } = [];
+}
 
 /// <summary>The daily pass's calendar step: find or make the calendar, then bring it in line (D145, D149).</summary>
 public static class CalendarNightly
@@ -41,6 +51,7 @@ public static class CalendarNightly
         ArgumentNullException.ThrowIfNull(calendar);
 
         var snapshot = await feed.ReadAsync(cancellationToken);
+        var shareFailures = new List<CalendarShareFailure>();
         var id = await CalendarHousehold.EnsureAsync(
             calendar,
             snapshot.Role,
@@ -49,15 +60,20 @@ public static class CalendarNightly
             snapshot.AdultAccounts,
             created => feed.SaveCalendarIdAsync(created, cancellationToken),
             snapshot.Zone,
-            cancellationToken);
+            cancellationToken,
+            shareFailures);
+        if (id is not null)
+        {
+            feed.NoteShareFailures(shareFailures);
+        }
 
         if (id is null || PulpCalendarAccess.Decide(snapshot.Role, id) != CalendarStand.Write)
         {
-            return new CalendarNightlyOutcome(id, null);
+            return new CalendarNightlyOutcome(id, null) { ShareFailures = shareFailures };
         }
 
         var items = CalendarItems.ForHousehold(snapshot.Sources, today, snapshot.Zone, snapshot.HeldByAdult);
         var result = await new CalendarWriter(calendar).SyncAsync(id, items, snapshot.NameOf, today, snapshot.Zone, cancellationToken);
-        return new CalendarNightlyOutcome(id, result);
+        return new CalendarNightlyOutcome(id, result) { ShareFailures = shareFailures };
     }
 }

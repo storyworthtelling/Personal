@@ -19,6 +19,8 @@ public sealed record LeagueLine(LeagueId Id, string Name, string BadgeArt, Seaso
 /// <summary>
 /// One game row. <paramref name="Recorded"/> marks an unwatched recording, which plays from the
 /// start on the named channel (D55, D57); otherwise it is the team's next game (D236).
+/// <paramref name="Over"/> is set only on an open league's lines, from the clock alone
+/// (<see cref="GameOver"/>); a held league's lines never carry it.
 /// </summary>
 public sealed record GameLine(
     GameId Id,
@@ -27,7 +29,8 @@ public sealed record GameLine(
     DateTimeOffset StartsAt,
     GameStage Stage,
     string Channel,
-    bool Recorded);
+    bool Recorded,
+    bool Over = false);
 
 /// <summary>A followed team inside its league, and the games it shows (D236).</summary>
 public sealed record TeamGames(Team Team, IReadOnlyList<GameLine> Games);
@@ -56,4 +59,14 @@ public sealed record OpenLeague(
     ChampionshipLine? Championship,
     IReadOnlyList<Team> Standings,
     IReadOnlyList<Highlight> Highlights,
-    bool IsPeek) : LeagueSheet;
+    bool IsPeek) : LeagueSheet
+{
+    /// <summary>
+    /// Finished games the viewer has watched, per followed team, newest first (D330). Empty for a peek; a
+    /// held league is a different type and has nowhere to put it.
+    /// </summary>
+    public IReadOnlyList<TeamEarlier> Earlier { get; init; } = [];
+}
+
+/// <summary>One followed team's watched, finished games (D330).</summary>
+public sealed record TeamEarlier(TeamId Team, IReadOnlyList<GameLine> Games);

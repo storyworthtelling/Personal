@@ -45,7 +45,7 @@ public enum ServiceBadge
 /// just appears on a child's page:
 /// <list type="number">
 /// <item>a block — title, franchise, or every service the title is on — hides, whatever else (D12, D129);</item>
-/// <item>an allow-list entry or a parent's favorite shows (D12, D255);</item>
+/// <item>an allow-list entry, a parent's favorite or a game in a league a parent allowed shows (D12, D255, D326);</item>
 /// <item>an unrated title hides (D128);</item>
 /// <item>the ceiling decides (D127).</item>
 /// </list>
@@ -65,6 +65,12 @@ public static class ChildFilter
         }
 
         if (child.Allowed.Contains(title.Id))
+        {
+            return new FilterVerdict(true, FilterReason.AllowListed);
+        }
+
+        // A parent's league allowance is an explicit allow for every game in it (D317, D326): no rating is invented.
+        if (title.League is { } league && child.AllowedLeagues.Contains(league))
         {
             return new FilterVerdict(true, FilterReason.AllowListed);
         }

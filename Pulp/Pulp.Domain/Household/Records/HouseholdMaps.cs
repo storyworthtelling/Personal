@@ -68,11 +68,17 @@ public static class HouseholdMaps
 
     public static RecordMap<SportsFollow> SportsFollow { get; } = new SportsFollowMap();
 
+    public static RecordMap<HouseholdPlan> Plan { get; } = new PlanMap();
+
+    public static RecordMap<AdultAccountEntry> AdultAccount { get; } = new AdultAccountMap();
+
+    public static RecordMap<ChildLeagueAllowance> ChildLeague { get; } = new ChildLeagueMap();
+
     /// <summary>Every map's kind, for the guard that holds them frozen.</summary>
     public static IReadOnlyList<string> Kinds { get; } =
     [
         Watched.Kind, Playlist.Kind, Veto.Kind, ChildStar.Kind, ParentPick.Kind,
         HomeOverride.Kind, ChildRules.Kind, Viewer.Kind, AttestedService.Kind, HouseholdService.Kind,
-        ContinueDismissed.Kind, ServicePlan.Kind, ViewerName.Kind, SportsFollow.Kind, PulpCalendar.Kind,
+        ContinueDismissed.Kind, ServicePlan.Kind, ViewerName.Kind, SportsFollow.Kind, PulpCalendar.Kind, Plan.Kind, AdultAccount.Kind, ChildLeague.Kind,
     ];
 }

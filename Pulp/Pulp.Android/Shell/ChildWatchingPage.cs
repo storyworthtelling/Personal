@@ -43,6 +43,8 @@ public sealed class ChildWatchingPage
     private string? problem;
     private ChildPlay? play;
     private IReadOnlyList<WatchingRow>? rows;
+    private ChildSportSection? sport;
+    private ChildSportSectionView? sportView;
     private string? greeting;
     private VoiceLineAction emptyAction = VoiceLineAction.Compose;
     private string? emptyLine;
@@ -84,7 +86,7 @@ public sealed class ChildWatchingPage
             return Status(ChildViewText.ReadingWatching);
         }
 
-        if (rows.Count == 0)
+        if (rows.Count == 0 && sport is null)
         {
             var empty = new EmptyState(host, VoiceSeat.EmptyChildWatching);
             empty.Present(emptyAction, emptyLine);
@@ -100,6 +102,12 @@ public sealed class ChildWatchingPage
                 row,
                 () => actions.Play(row.Row.Title),
                 () => actions.ShowCard(row.Row.Title, row.Name, ContinueRowText.CardSubtitle(row.NextUp, row.ServiceName))));
+        }
+
+        // Sport sits quietly below the shows (D325): present only when a parent allowed a league, absent otherwise, never an empty card.
+        if (sport is not null && sportView is not null)
+        {
+            list.AddView(sportView.Build(sport));
         }
 
         var scroll = new ScrollView(host) { FillViewport = true };
@@ -175,6 +183,8 @@ public sealed class ChildWatchingPage
                     problem = read.Problem;
                     play = read.Play;
                     rows = read.Rows;
+                    sport = read.Sport;
+                    sportView = read.Sport is null ? null : new ChildSportSectionView(host, overlay, services, read.Audience!, Reload);
                     invalidate();
                     if (read.Facts is { } facts)
                     {
@@ -198,7 +208,9 @@ public sealed class ChildWatchingPage
         });
     }
 
-    private sealed record Read(string? Problem, ChildPlay? Play, IReadOnlyList<WatchingRow>? Rows, VoiceFacts? Facts);
+    private sealed record Read(
+        string? Problem, ChildPlay? Play, IReadOnlyList<WatchingRow>? Rows, VoiceFacts? Facts,
+        ChildSportSection? Sport = null, ChildAudience? Audience = null);
 
     private async Task<Read> ReadAsync(PulpServices services, CancellationToken cancellationToken)
     {
@@ -241,7 +253,22 @@ public sealed class ChildWatchingPage
         var facts = shown.Count > 0
             ? ChildVoiceFacts.Greeting(reader, DateTimeOffset.Now, firstOpenOfDay: false)
             : ChildVoiceFacts.EmptyWatching(reader);
-        return new Read(null, new ChildPlay(host, overlay, services, audience, household, Reload), shown, facts);
+        return new Read(null, new ChildPlay(host, overlay, services, audience, household, Reload), shown, facts, await SportAsync(services, audience, household, cancellationToken), audience);
+    }
+
+    /// <summary>The Sport section (D325). Sport never costs the shows their page: a feed that fails is logged and the section is simply absent.</summary>
+    private static async Task<ChildSportSection?> SportAsync(
+        PulpServices services, ChildAudience audience, Pulp.Domain.Household.Records.HouseholdView household, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await services.ChildSportAsync(audience, household, cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            services.Diagnostics.Warn("child", "A child's sport could not be read.", exception);
+            return null;
+        }
     }
 
     private void Present(VoiceLineAction action, string? line)

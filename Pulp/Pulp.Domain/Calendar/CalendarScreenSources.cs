@@ -17,7 +17,9 @@ public sealed record CalendarScreenReads(
     IReadOnlyList<HouseholdPlaylist> Playlists,
     IReadOnlyDictionary<TitleId, CatalogueTitle> Titles,
     Func<CatalogueTitle, ServiceId?> HomeOf,
-    TimeZoneInfo Zone);
+    TimeZoneInfo Zone,
+    IReadOnlyList<FilmReleaseDate>? FilmDates = null,
+    IReadOnlyList<HouseholdPlan>? Plans = null);
 
 /// <summary>
 /// The calendar's sources (<see cref="CalendarSources"/>) built from those reads, shared by the Calendar page
@@ -38,7 +40,8 @@ public static class CalendarScreenSources
         ArgumentNullException.ThrowIfNull(games);
 
         var episodes = Episodes(reads);
-        return new CalendarSources(episodes, Releases(reads, episodes), games, []);
+        var plans = CalendarPlans.ToSources(reads.Plans ?? [], reads.ShowsByAdult.Keys.ToHashSet());
+        return new CalendarSources(episodes, Releases(reads, episodes), games, plans);
     }
 
     private static List<EpisodeRelease> Episodes(CalendarScreenReads reads)
@@ -80,7 +83,7 @@ public static class CalendarScreenSources
 
     /// <summary>
     /// A show on a playlist releases when a season opens: its first episode. A film has no release date in
-    /// the catalogue, so none is made up for it. A premiere of a show the shelf's owners watch is already
+    /// the catalogue, so it releases only on a day the availability source announced (D302); none is made up. A premiere of a show the shelf's owners watch is already
     /// their new episode, and is not said twice.
     /// </summary>
     private static List<TitleRelease> Releases(CalendarScreenReads reads, IReadOnlyList<EpisodeRelease> episodes)
@@ -115,6 +118,23 @@ public static class CalendarScreenSources
 
                 releases.Add(new TitleRelease(title.Id, title.Name, TitleKind.Show, premiere.Date, null, service, shelves));
             }
+        }
+
+        foreach (var film in reads.Playlists
+            .SelectMany(playlist => playlist.List.Entries
+                .Where(entry => entry.Kind == PlaylistEntryKind.Film)
+                .Select(entry => (Title: new TitleId(entry.Key), Shelf: playlist.Shelf)))
+            .GroupBy(pair => pair.Title))
+        {
+            var known = (reads.FilmDates ?? []).Where(date => date.Title == film.Key).OrderBy(date => date.Date).FirstOrDefault();
+            if (known is null || !reads.Titles.TryGetValue(film.Key, out var title) || title.Kind != TitleKind.Film)
+            {
+                continue;
+            }
+
+            releases.Add(new TitleRelease(
+                title.Id, title.Name, TitleKind.Film, known.Date, null, known.Service,
+                film.Select(pair => pair.Shelf).Distinct().ToList()));
         }
 
         return releases;

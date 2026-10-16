@@ -8,23 +8,31 @@ public sealed record GameRow(
     string? ChannelLine,
     string? Chip,
     bool Recorded,
-    DateTimeOffset StartsAt)
+    DateTimeOffset StartsAt,
+    string? Channel = null,
+    bool HighlightsOffered = false,
+    string? HighlightsLabel = null)
 {
     /// <summary>
     /// A row from the sheet's own <see cref="GameLine"/>. This is the only way to make one, so a row can
     /// only show what a held or open sheet chose to carry.
     /// </summary>
-    public static GameRow From(GameLine game, DateTimeOffset now, TimeZoneInfo zone)
+    public static GameRow From(GameLine game, DateTimeOffset now, TimeZoneInfo zone, bool highlights = false)
     {
         ArgumentNullException.ThrowIfNull(game);
+        var title = game.Away.Name + " at " + game.Home.Name;
+        var offered = highlights && HighlightsOffer.IsOver(game.StartsAt, now);
         return new GameRow(
             game.Id,
-            game.Away.Name + " at " + game.Home.Name,
+            title,
             SportsScreenText.GameDetail(game, now, zone),
             SportsScreenText.ChannelLine(game.Channel),
             SportsScreenText.StageChip(game.Stage),
             game.Recorded,
-            game.StartsAt);
+            game.StartsAt,
+            string.IsNullOrWhiteSpace(game.Channel) ? null : game.Channel.Trim(),
+            offered,
+            offered ? HighlightsOffer.Label(title, game.StartsAt, zone) : null);
     }
 }
 
@@ -36,7 +44,16 @@ public sealed record TeamPlan(
     bool Open,
     bool HasRecording,
     IReadOnlyList<GameRow> Games,
-    string? EmptyLine);
+    string? EmptyLine)
+{
+    /// <summary>The quiet fold line over watched, finished games (D330); null when the team has none or the league is held.</summary>
+    public string? EarlierLine { get; init; }
+
+    /// <summary>Whether the viewer has opened the Earlier fold; it starts folded.</summary>
+    public bool EarlierOpen { get; init; }
+
+    public IReadOnlyList<GameRow> Earlier { get; init; } = [];
+}
 
 /// <summary>
 /// A championship at league level, outside any team (D239, D240). <paramref name="TeamsLine"/> is absent
@@ -79,6 +96,8 @@ public static class SportsScreenPlan
 {
     public const string NothingScheduled = "Nothing scheduled.";
 
+    public const string EarlierLabel = "Earlier";
+
     public static IReadOnlyList<LeaguePlan> For(SportsPage page, FoldMemory overlay, DateTimeOffset now, TimeZoneInfo zone)
     {
         ArgumentNullException.ThrowIfNull(page);
@@ -98,8 +117,10 @@ public static class SportsScreenPlan
         };
 
         var open = overlay.Remembered(FoldMemory.LeagueKey(line.Id)) ?? fold.IsLeagueOpen(line.Id);
+        var highlights = sheet is OpenLeague offering && HighlightsOffer.Allowed(offering);
         var tagged = sheet is HeldLeague || sheet is OpenLeague { IsPeek: true };
-        var teamPlans = SportsScreenOrder.Teams(teams).Select(team => TeamOf(line.Id, team, fold, overlay, now, zone)).ToList();
+        var earlier = sheet is OpenLeague { IsPeek: false } plain ? plain.Earlier : [];
+        var teamPlans = SportsScreenOrder.Teams(teams).Select(team => TeamOf(line.Id, team, fold, overlay, now, zone, highlights, earlier)).ToList();
 
         var championship = sheet switch
         {
@@ -132,14 +153,24 @@ public static class SportsScreenPlan
             SportsScreenText.StageChip(GameStage.Championship)!,
             champ.Teams.Count == 0 ? null : string.Join(champ.Teams.Count == 2 ? " vs " : " · ", champ.Teams.Select(team => team.Name)));
 
-    private static TeamPlan TeamOf(LeagueId league, TeamGames team, LeagueFold fold, FoldMemory overlay, DateTimeOffset now, TimeZoneInfo zone)
+    private static TeamPlan TeamOf(LeagueId league, TeamGames team, LeagueFold fold, FoldMemory overlay, DateTimeOffset now, TimeZoneInfo zone, bool highlights, IReadOnlyList<TeamEarlier> earlier)
     {
         var hasRecording = team.Games.Any(game => game.Recorded);
         var open = overlay.Remembered(FoldMemory.TeamKey(league, team.Team.Id)) ?? fold.IsTeamOpen(league, team.Team.Id, hasRecording);
-        var games = SportsScreenOrder.Games(team.Games).Select(game => GameRow.From(game, now, zone)).ToList();
+        var games = SportsScreenOrder.Games(team.Games).Select(game => GameRow.From(game, now, zone, highlights)).ToList();
+        var earlierRows = earlier
+            .Where(entry => entry.Team == team.Team.Id)
+            .SelectMany(entry => entry.Games)
+            .Select(game => GameRow.From(game, now, zone, highlights))
+            .ToList();
         return new TeamPlan(
             team.Team.Id, team.Team.Name, team.Team.BadgeArt, open, hasRecording, games,
-            games.Count == 0 ? NothingScheduled : null);
+            games.Count == 0 && earlierRows.Count == 0 ? NothingScheduled : null)
+        {
+            Earlier = earlierRows,
+            EarlierLine = earlierRows.Count == 0 ? null : EarlierLabel,
+            EarlierOpen = earlierRows.Count > 0 && (overlay.Remembered(FoldMemory.EarlierKey(league, team.Team.Id)) ?? false),
+        };
     }
 
     private static IReadOnlyList<LeagueLink> LinksOf(OpenLeague league)

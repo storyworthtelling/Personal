@@ -49,6 +49,8 @@ public sealed class SportsFeedsTests : IDisposable
 
         public bool FailSchedule { get; set; }
 
+        public Dictionary<LeagueId, Exception> Breaks { get; } = [];
+
         public bool FailStandings { get; set; }
 
         public TaskCompletionSource? Gate { get; set; }
@@ -68,6 +70,11 @@ public sealed class SportsFeedsTests : IDisposable
 
             Windows.Add(window);
             cancellationToken.ThrowIfCancellationRequested();
+            if (Breaks.TryGetValue(league, out var broken))
+            {
+                throw broken;
+            }
+
             if (FailSchedule)
             {
                 throw new CatalogueLookupException(LookupSource.Espn, LookupFailure.Unavailable, 500, "the invented source is down");
@@ -248,6 +255,48 @@ public sealed class SportsFeedsTests : IDisposable
         Assert.Equal([Coastal], feeds.Select(feed => feed.League.Id));
         Assert.Equal(clock.AddDays(-2), Cache().Read(Coastal).Entry!.FetchedAt);
         Assert.Contains(warnings, message => message.Contains("cfl-invented") && message.Contains("Unavailable"));
+    }
+
+    [Fact]
+    public async Task OnlyTheLeaguesAskedForAreReadAndAnUnaskedOneIsNeverTouched()
+    {
+        // A fresh install following the Otters, who play in both leagues; only Coastal is allowed (a child's allowance).
+        var feeds = await Feeds().FollowedAsync([Follows(Otters.Id)], refresh: true, CancellationToken.None, onlyLeagues: new HashSet<LeagueId> { Coastal });
+
+        Assert.Equal([Coastal], feeds.Select(feed => feed.League.Id));
+        Assert.DoesNotContain(source.Calls, call => call.Contains("srl-invented", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AnEmptyAskReadsNothingAtAll()
+    {
+        var feeds = await Feeds().FollowedAsync([Follows(Otters.Id)], refresh: true, CancellationToken.None, onlyLeagues: new HashSet<LeagueId>());
+
+        Assert.Empty(feeds);
+        Assert.Empty(source.Calls);
+    }
+
+    [Fact]
+    public async Task OneLeaguesUnexpectedFailureCostsOnlyThatLeagueAndNotTheOthers()
+    {
+        source.Breaks[Southern] = new InvalidOperationException("an invented parse fault");
+
+        var feeds = await Feeds().FollowedAsync([Follows(Otters.Id)], refresh: true, CancellationToken.None);
+
+        Assert.Equal([Coastal], feeds.Select(feed => feed.League.Id));
+        Assert.Contains(warnings, message => message.Contains("srl-invented"));
+    }
+
+    [Fact]
+    public async Task ATimeoutOfOneLeagueIsNotTheCallersCancellation()
+    {
+        Cache().Store(CoastalFeed(), clock.AddDays(-2));
+        source.Breaks[Coastal] = new TaskCanceledException("an invented request timeout");
+
+        var feeds = await Feeds().FollowedAsync([Follows(Gulls.Id)], refresh: true, CancellationToken.None);
+
+        Assert.Equal([Coastal], feeds.Select(feed => feed.League.Id));
+        Assert.Equal(clock.AddDays(-2), Cache().Read(Coastal).Entry!.FetchedAt);
     }
 
     [Fact]

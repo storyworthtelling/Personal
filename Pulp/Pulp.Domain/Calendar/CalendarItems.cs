@@ -63,7 +63,15 @@ public static class CalendarItems
         }
 
         var held = heldByAdult.Values.SelectMany(leagues => leagues).ToHashSet();
-        return Build(sources, null, today, zone, held);
+
+        // D360: the calendar is shared with her, so a plan that is not for every adult ("Just me") stays on its
+        // maker's own Pulp page and is never written to it.
+        var adults = heldByAdult.Keys.ToList();
+        var shared = sources with
+        {
+            Plans = sources.Plans.Where(plan => adults.All(plan.Viewers.Contains)).ToList(),
+        };
+        return Build(shared, null, today, zone, held);
     }
 
     /// <summary>Groups items under their day: all-day items first, then by time.</summary>
@@ -176,7 +184,7 @@ public static class CalendarItems
         CalendarItemKind.Plan,
         new CalendarWhen(plan.Date, plan.Time),
         plan.Name,
-        null,
+        plan.Place,
         null,
         plan.Title,
         null,

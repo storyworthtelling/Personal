@@ -29,6 +29,23 @@ public class ServiceCatalogueTests
         });
     }
 
+    // D351: the phone app is first (it is the one handed to); the Android TV app is listed too so a TV-only install still resolves.
+    [Fact]
+    public void AppleTvIsInThePublicCatalogueWithBothItsPackagesAndSpecificMerchantNames()
+    {
+        var apple = ServiceCatalogue.Public.ById(new ServiceId("apple-tv"))!;
+
+        Assert.Equal("Apple TV", apple.Name);
+        Assert.Equal(["com.apple.atve.android.appletv", "com.apple.atve.androidtv.appletv"], apple.Packages);
+        Assert.Equal("com.apple.atve.android.appletv", apple.PrimaryPackage);
+        Assert.Equal("apple", apple.SourceId);
+        Assert.Equal(["Apple TV+", "Apple TV"], apple.MerchantNames);
+        Assert.Equal(["tv.apple.com", "apple.com"], apple.LinkDomains);
+        Assert.False(apple.KidsOnly);
+        Assert.Same(apple, ServiceCatalogue.Public.ByMerchant("apple tv+"));
+        Assert.Null(ServiceCatalogue.Public.ByMerchant("APPLE.COM/BILL"));
+    }
+
     [Fact]
     public void ThePublicCatalogueIsOneToOneOnEveryKey()
     {

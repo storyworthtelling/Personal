@@ -21,7 +21,8 @@ public static class CalendarScreenSnapshot
         bool connected,
         string? calendarId,
         string? signedInAccount,
-        TimeZoneInfo zone)
+        TimeZoneInfo zone,
+        IReadOnlyList<string>? otherAdultAccounts = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         ArgumentNullException.ThrowIfNull(heldByAdult);
@@ -32,8 +33,8 @@ public static class CalendarScreenSnapshot
         var writes = role == HouseholdFileRole.Owner && connected && account is not null;
         var effective = role == HouseholdFileRole.Owner && !writes ? HouseholdFileRole.Unknown : role;
 
-        // The other adult's own account is not recorded anywhere in the household yet, so the calendar is
-        // shared with nobody but its owner until a record names it.
+        // The other adult's address comes from the household file (D304); the owner is first, and only a phone
+        // that writes shares anything. CalendarSharing.Missing drops the owner's own address and duplicates.
         return new CalendarFeedSnapshot(
             sources,
             heldByAdult,
@@ -41,9 +42,12 @@ public static class CalendarScreenSnapshot
             effective,
             calendarId,
             writes ? account! : string.Empty,
-            writes ? [account!] : [],
+            writes ? Shared(account!, otherAdultAccounts) : [],
             zone);
     }
+
+    private static List<string> Shared(string owner, IReadOnlyList<string>? others) =>
+        CalendarSharing.Missing(owner, others ?? [], []).Prepend(owner).ToList();
 }
 
 /// <summary>Whether the account picked for the calendar may be used.</summary>
@@ -58,13 +62,22 @@ public static class CalendarScreenConnection
 {
     public const string NotConnected = "Calendar not connected yet";
 
-    public static string Sentence(HouseholdFileRole role, bool connected) => role switch
+    public static string Sentence(HouseholdFileRole role, bool connected, IReadOnlyList<string>? unshared = null) => role switch
     {
         HouseholdFileRole.Owner when !connected => NotConnected,
+        HouseholdFileRole.Owner when unshared is { Count: > 0 } =>
+            "Calendar connected. Pulp writes the household calendar each night. " + ShareProblem(unshared),
         HouseholdFileRole.Owner => "Calendar connected. Pulp writes the household calendar each night.",
         HouseholdFileRole.SharedWith => "The household calendar is written from the owner's phone.",
         _ => "The calendar waits until this phone knows whose it is.",
     };
+
+    /// <summary>D359: the plain sentence for addresses Google refused to share the calendar with.</summary>
+    public static string ShareProblem(IReadOnlyList<string> accounts)
+    {
+        ArgumentNullException.ThrowIfNull(accounts);
+        return "Couldn't share with " + string.Join(" or ", accounts) + ".";
+    }
 
     /// <summary>Only the owner's phone writes, so only it needs the consent (D145).</summary>
     public static bool OffersConnect(HouseholdFileRole role, bool connected) =>

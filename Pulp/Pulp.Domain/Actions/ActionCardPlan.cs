@@ -59,6 +59,9 @@ public sealed record CardItem(string Title, CardPlace Place)
 
     /// <summary>For an episode: it is already watched, so the mark that changes it is Unwatched.</summary>
     public bool EpisodeWatched { get; init; }
+
+    /// <summary>For a game: it is already watched (listed under Earlier), so the mark that changes it is Mark unwatched (D330).</summary>
+    public bool GameWatched { get; init; }
 }
 
 /// <summary>
@@ -146,7 +149,9 @@ public static class ActionCardPlan
         CardPlace.SportsGame =>
         [
             new(CardActionKind.Play, PlayLabel(item), false),
-            new(CardActionKind.MarkWatched, MarkLabel(item), true),
+            item.GameWatched
+                ? new(CardActionKind.MarkUnwatched, "Mark unwatched", true)
+                : new(CardActionKind.MarkWatched, MarkLabel(item), true),
             new(CardActionKind.AddTo, AddToLabel, false),
         ],
         _ => throw new ArgumentOutOfRangeException(nameof(item), item.Place, "No action card is drawn for this place."),

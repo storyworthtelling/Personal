@@ -6,13 +6,19 @@ using Codex.Ui;
 using Pulp.App;
 using Pulp.Components;
 using Pulp.Domain.Actions;
+using Pulp.Infrastructure.Catalogue;
 using Pulp.Domain.Core;
+using Pulp.Domain.HandOffs;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
 using Pulp.Domain.People;
+using Pulp.Domain.Services;
 using Pulp.Domain.Sports;
 using Pulp.Domain.Voice;
+using Pulp.HandOffs;
+using Pulp.Infrastructure.Sports;
 using Pulp.Library;
+using Pulp.Trailer;
 
 namespace Pulp.Sports;
 
@@ -23,10 +29,16 @@ namespace Pulp.Sports;
 /// schedule (no mockup, D272). Pages are read through <see cref="PulpServices"/> as sheets only, and every
 /// word on a row comes from <see cref="SportsScreenPlan"/>.
 ///
-/// <para><b>Play.</b> A game carries a channel name and nothing a hand-off can use (no service, no link),
-/// so Play names the channel and says Pulp cannot open it yet; it never reaches the hand-off door and
-/// never records evidence — a hand-off's evidence reads as watched and would lift the hold. Only "Mark
-/// watched" says a game was watched.</para>
+/// <para><b>Play (D311, D312).</b> A game carries a channel name and no link, so Play resolves the channel to a
+/// service the household ticked (<see cref="GamePlay"/> over <see cref="BroadcasterTable"/>) and opens that
+/// service's home through <see cref="HandOffExecutor"/>, the one door (G8). The hand-off is kept as the viewer's
+/// usage evidence only, through <see cref="GamePlay.UsageSitting"/>; it never says the game was watched
+/// (<see cref="RecordedGames"/> ignores it), so only "Mark watched" or a session that ended can lift a hold. An
+/// unknown or unticked broadcaster keeps the honest card and names what to tick.</para>
+///
+/// <para><b>Highlights (D313, D314).</b> A quiet line on the row of an over game in an open league with an official
+/// channel; tapping it looks the video up, once, and plays it in the shared player. The line and the player's
+/// header are the generic label with the teams and the date, never the video's own title.</para>
 /// </summary>
 internal sealed class SportsScreen
 {
@@ -288,8 +300,22 @@ internal sealed class SportsScreen
 
         foreach (var game in team.Games)
         {
-            block.AddView(SportsRows.GameRow(host, game, () => Play(game), () => ShowGameCard(game, viewer)));
+            block.AddView(SportsRows.GameRow(host, game, () => Play(game), () => ShowGameCard(game, viewer, watched: false), () => PlayHighlights(game)));
             block.AddView(LibraryRows.Hairline(host));
+        }
+
+        // D330: watched, finished games stay reachable behind a quiet line; it starts folded.
+        if (team.EarlierLine is { } earlierLine)
+        {
+            block.AddView(SportsRows.EarlierLine(host, earlierLine, team.EarlierOpen, () => ToggleEarlier(league.Id, team)));
+            if (team.EarlierOpen)
+            {
+                foreach (var game in team.Earlier)
+                {
+                    block.AddView(SportsRows.GameRow(host, game, () => Play(game), () => ShowGameCard(game, viewer, watched: true), () => PlayHighlights(game)));
+                    block.AddView(LibraryRows.Hairline(host));
+                }
+            }
         }
 
         if (team.EmptyLine is { } empty)
@@ -316,6 +342,15 @@ internal sealed class SportsScreen
         var open = !team.Open;
         overlayFold = overlayFold.WithTeam(league, team.Id, open);
         services.SportsFold = services.SportsFold.WithTeam(league, team.Id, open);
+        foldStore.Save(services.SportsFold);
+        invalidate();
+    }
+
+    private void ToggleEarlier(LeagueId league, TeamPlan team)
+    {
+        var open = !team.EarlierOpen;
+        overlayFold = overlayFold.WithEarlier(league, team.Id, open);
+        services.SportsFold = services.SportsFold.WithEarlier(league, team.Id, open);
         foldStore.Save(services.SportsFold);
         invalidate();
     }
@@ -404,7 +439,7 @@ internal sealed class SportsScreen
         var viewer = me!.Viewer!.Value;
         foreach (var game in games)
         {
-            column.AddView(SportsRows.GameRow(host, game, () => Play(game), () => ShowGameCard(game, viewer)));
+            column.AddView(SportsRows.GameRow(host, game, () => Play(game), () => ShowGameCard(game, viewer, watched: false), () => PlayHighlights(game)));
             column.AddView(LibraryRows.Hairline(host));
         }
     }
@@ -430,19 +465,119 @@ internal sealed class SportsScreen
 
     // ---- a game: Play, the card, marks ----
 
-    /// <summary>Play: the channel, named; no hand-off is made and no evidence recorded (see the class note).</summary>
-    private void Play(GameRow game) =>
-        ActionCard.Show(host, overlay(), game.Title, SportsScreenText.PlayNote(game.ChannelLine));
-
-    private void ShowGameCard(GameRow game, ViewerId viewer)
+    /// <summary>Play: the ticked service's home through the one door, else the card (see the class note).</summary>
+    private void Play(GameRow game)
     {
-        var item = new CardItem(game.Title, CardPlace.SportsGame) { Subtitle = game.Detail };
+        // Until the household has loaded nothing is known of what is ticked, so "Tick Peacock in Settings" would be a guess.
+        if (household is null)
+        {
+            ActionCard.Show(host, overlay(), game.Title, SportsScreenText.ServicesLoading);
+            return;
+        }
+
+        var decision = GamePlay.Decide(game.Channel, household.Services, BroadcasterTable.Public, ServiceCatalogue.Public);
+        if (!decision.Opens || me?.Viewer is not { } viewer)
+        {
+            ActionCard.Show(host, overlay(), game.Title, decision.Note ?? SportsScreenText.PlayNote(game.ChannelLine));
+            return;
+        }
+
+        var service = ServiceCatalogue.Public.ById(decision.Service!.Value)!;
+        var request = GamePlay.Request(viewer, game.Id, service, decision.Home!, game.Title);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var executor = await services.HandOffsAsync(CancellationToken.None)
+                    ?? throw new InvalidOperationException("The household has no roster, so no hand-off can be checked.");
+                host.RunOnUiThread(() => StartGame(executor, request, viewer, game, service.Name));
+            }
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
+            {
+                services.Diagnostics.Warn("sports", "Play could not reach the hand-off door.", exception);
+            }
+        });
+    }
+
+    private void StartGame(HandOffExecutor executor, HandOffRequest request, ViewerId viewer, GameRow game, string serviceName)
+    {
+        var at = DateTimeOffset.UtcNow;
+        var outcome = executor.Start(host, request, at);
+        PulpNotices.AfterHandOff(host, overlay(), outcome, request, serviceName, game.Title, at, new PulpNotices.Buttons());
+        if (outcome.Recorded is not { } pending)
+        {
+            return;
+        }
+
+        // Usage only: the sitting counts the service's openings and never marks the game watched (D312).
+        var sitting = GamePlay.UsageSitting(viewer, game.Id, pending);
+        writes.Enqueue("record a game's hand-off", token => services.PutAsync(HouseholdMaps.Watched, sitting, token));
+    }
+
+    private readonly HighlightVideoCache highlightVideos = new();
+
+    /// <summary>The one-tap peek at a game's highlights: asked again of the gate, looked up until found, played in the shared player.</summary>
+    private void PlayHighlights(GameRow game)
+    {
+        var found = page?.Sheets.OfType<OpenLeague>()
+            .SelectMany(league => league.Teams.SelectMany(team => team.Games)
+                .Concat(league.Earlier.SelectMany(entry => entry.Games))
+                .Select(line => (League: league, Line: line)))
+            .FirstOrDefault(entry => entry.Line.Id == game.Id);
+        if (found is not { } entry
+            || !HighlightsOffer.For(entry.League, entry.Line, DateTimeOffset.Now)
+            || HighlightChannels.Default.ChannelOf(entry.League.Line.Id) is not { } channel)
+        {
+            return;
+        }
+
+        var label = game.HighlightsLabel ?? "Highlights";
+        var request = new HighlightsRequest(entry.League.Line.Id, channel, entry.Line.Home.Name, entry.Line.Away.Name, entry.Line.StartsAt);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (!highlightVideos.TryGet(game.Id, out var video))
+                {
+                    video = await new YouTubeHighlightsSource(services.Trailers).FindVideoIdAsync(request, CancellationToken.None);
+                    highlightVideos.Remember(game.Id, video);
+                }
+
+                host.RunOnUiThread(() =>
+                {
+                    if (video is null)
+                    {
+                        ActionCard.Show(host, overlay(), game.Title, "No highlights found for this game yet.");
+                        return;
+                    }
+
+                    host.StartActivity(TrailerActivity.ForHighlights(host, video, label));
+                });
+            }
+            catch (CatalogueLookupException exception)
+            {
+                services.Diagnostics.Warn("sports", $"No highlights lookup ({exception.Failure}).", exception);
+                host.RunOnUiThread(() => ActionCard.Show(host, overlay(), game.Title, "Highlights couldn't be looked up just now."));
+            }
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
+            {
+                services.Diagnostics.Warn("sports", "A game's highlights could not be looked up.", exception);
+            }
+        });
+    }
+
+    private void ShowGameCard(GameRow game, ViewerId viewer, bool watched)
+    {
+        var item = new CardItem(game.Title, CardPlace.SportsGame) { Subtitle = game.Detail, GameWatched = watched };
         var handlers = new Dictionary<CardActionKind, CardHandler>
         {
             [CardActionKind.Play] = new(() => Play(game)),
             [CardActionKind.MarkWatched] = new(
                 () => writes.Enqueue("mark a game watched", token => services.MarkGameAsync(viewer, game.Id, true, token)),
                 () => writes.Enqueue("undo marking a game watched", token => services.MarkGameAsync(viewer, game.Id, false, token))),
+            [CardActionKind.MarkUnwatched] = new(
+                () => writes.Enqueue("mark a game unwatched", token => services.MarkGameAsync(viewer, game.Id, false, token)),
+                () => writes.Enqueue("undo marking a game unwatched", token => services.MarkGameAsync(viewer, game.Id, true, token))),
             [CardActionKind.AddTo] = new(() => AddTo(game, viewer)),
         };
         PulpActionCard.Show(host, overlay(), item, handlers);

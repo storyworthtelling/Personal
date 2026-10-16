@@ -27,6 +27,7 @@ using Pulp.Infrastructure.Catalogue;
 using Pulp.Infrastructure.Discover;
 using Pulp.Infrastructure.Household;
 using Pulp.Infrastructure.Sports;
+using Pulp.Infrastructure.Usage;
 using Pulp.Sessions;
 using Pulp.Usage;
 using Storyworthtelling.Voice;
@@ -59,6 +60,7 @@ public sealed class PulpServices
 
     private readonly IHouseholdStore household;
     private readonly DriveHouseholdStore sharedHousehold;
+    private readonly IndexUsageFilePublisher usageFile;
     private readonly HouseholdSyncLoop syncLoop;
     private readonly SemaphoreSlim passGate = new(1, 1);
     private RememberedRole? rememberedRole;
@@ -96,6 +98,11 @@ public sealed class PulpServices
         episodes = new TvMazeClient(http, counter);
         ratings = new OmdbClient(http, Keys, counter, health);
         Trailers = new YouTubeClient(http, Keys, counter, health);
+        FilmReleaseSource = new CachedFilmReleaseSource(
+            new HouseholdFilmDates(this),
+            () => DateTimeOffset.UtcNow,
+            FilmDatesLifetime,
+            async token => string.Join(",", (await HouseholdAsync(token)).Services.Select(service => service.Value.ToLowerInvariant()).Distinct().Order(StringComparer.Ordinal)));
 
         voiceOptions = VoiceOptionsAccess.ForHead(account.GetAccessToken, "Pulp");
         Mood = new MoodClient(http, voiceOptions, health);
@@ -139,6 +146,13 @@ public sealed class PulpServices
             new DriveTextFile(DriveFactory(account), DriveHouseholdStore.FileName, SharedDriveFileIds.Store),
             () => VaultPassphraseStore.Passphrase,
             () => HouseholdSync.MayCreateFile(HouseholdFileRole));
+        usageFile = new IndexUsageFilePublisher(
+            new DriveIndexUsageStore(
+                new DriveTextFile(DriveFactory(account), IndexUsageFile.FileName, SharedDriveFileIds.Store),
+                () => VaultPassphraseStore.Passphrase,
+                ServiceCatalogue.Public,
+                () => HouseholdSync.MayCreateFile(HouseholdFileRole)),
+            (message, exception) => Diagnostics.Warn("handoff", message, exception));
         rememberedRole = ReadRememberedRole();
 
         // The loop outlives any one pass: a failure is logged and backed off, never fatal (see HouseholdSyncLoop).
@@ -234,6 +248,26 @@ public sealed class PulpServices
     public CalendarConnection CalendarConnection { get; }
 
     public ServiceCatalogue Catalogue { get; }
+
+    /// <summary>Twelve hours: the changes feed is counted against the source's monthly budget (D204), and a film's date moves rarely.</summary>
+    private static readonly TimeSpan FilmDatesLifetime = TimeSpan.FromHours(12);
+
+    /// <summary>The days films arrive on the household's services (D302), from the availability source's upcoming changes and nowhere else.</summary>
+    public IFilmReleaseSource FilmReleaseSource { get; }
+
+    private sealed class HouseholdFilmDates(PulpServices owner) : IFilmReleaseSource
+    {
+        // Two pages at most: the cap is the budget, not a loop to the end of the feed.
+        private const int MostPages = 2;
+
+        public async Task<IReadOnlyList<FilmReleaseDate>> UpcomingAsync(CancellationToken cancellationToken)
+        {
+            var household = await owner.HouseholdAsync(cancellationToken);
+            var services = household.Services.Distinct().Select(owner.Catalogue.ById).OfType<StreamingService>().ToList();
+            return await new ChangesFilmReleaseSource(services, owner.ChangesAsync, TimeZoneInfo.Local, MostPages)
+                .UpcomingAsync(cancellationToken);
+        }
+    }
 
     /// <summary>Trailer ids for the title page's player.</summary>
     public YouTubeClient Trailers { get; }
@@ -344,6 +378,8 @@ public sealed class PulpServices
                 }
 
                 IndexUsageCourier.Publish(appContext, UsageHandOffs.From(view.AllSittings), ServiceCatalogue.Public, touched);
+                usageFile.Queue(IndexUsagePayload.ForTouched(
+                    UsageCount.Tally(UsageHandOffs.From(view.AllSittings), []), touched, ServiceCatalogue.Public));
             }
             else if (ReferenceEquals(map, HouseholdMaps.HouseholdService))
             {
@@ -857,6 +893,28 @@ public sealed class PulpServices
         var follows = view.SportsFollows;
         var feeds = await sportsFeeds.FollowedAsync(follows.Where(follow => follow.Viewer == viewer).ToList(), refresh, cancellationToken);
         return SportsPage.Build(feeds, follows, viewer, view.SittingsOf(viewer), DateTimeOffset.Now, peeks, Volatile.Read(ref foldMemory));
+    }
+
+    /// <summary>
+    /// The "Sport" section of a child's Watching tab (D325), or null: nothing allowed for every child watching reads
+    /// no feed at all. The teams are the adults' follows (a child has none, D60); the section carries no standing,
+    /// highlight or score, and a held league stays held with no peek. A feed that cannot be read is left to the caller to log.
+    /// </summary>
+    public async Task<Pulp.Domain.Children.ChildSportSection?> ChildSportAsync(
+        Pulp.Domain.ChildView.ChildAudience audience, HouseholdView household, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(audience);
+        ArgumentNullException.ThrowIfNull(household);
+        var allowed = Pulp.Domain.Children.ChildSports.AllowedForAll(household.ChildLeagueAllowances, audience.Watching);
+        var follows = household.SportsFollows.Where(follow => !CalendarFollows.RefusesFollow(household.Roster, follow.Viewer)).ToList();
+        if (allowed.Count == 0 || follows.Count == 0)
+        {
+            return null;
+        }
+
+        var feeds = await sportsFeeds.FollowedAsync(follows, refresh: true, cancellationToken, onlyLeagues: allowed);
+        var context = new Pulp.Domain.Children.ChildSportContext(audience.Children, household.Services, household.Attested, TimeZoneInfo.Local);
+        return Pulp.Domain.Children.ChildSportSection.Build(feeds, allowed, follows, household.SittingsOf, context, DateTimeOffset.Now);
     }
 
     /// <summary>The Spoilers tag was tapped on a league's line: the next draw of that league is a peek, once (D183, D242).</summary>
