@@ -36,8 +36,8 @@ public class ServiceCatalogueTests
         var apple = ServiceCatalogue.Public.ById(new ServiceId("apple-tv"))!;
 
         Assert.Equal("Apple TV", apple.Name);
-        Assert.Equal(["com.apple.atve.android.appletv", "com.apple.atve.androidtv.appletv"], apple.Packages);
-        Assert.Equal("com.apple.atve.android.appletv", apple.PrimaryPackage);
+        Assert.Equal(["com.apple.atve.androidtv.appletv"], apple.Packages);
+        Assert.Equal("com.apple.atve.androidtv.appletv", apple.PrimaryPackage);
         Assert.Equal("apple", apple.SourceId);
         Assert.Equal(["Apple TV+", "Apple TV"], apple.MerchantNames);
         Assert.Equal(["tv.apple.com", "apple.com"], apple.LinkDomains);
