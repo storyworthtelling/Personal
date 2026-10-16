@@ -195,4 +195,45 @@ public class NearDuplicateCollapserTests
 
         Assert.Equal(3, NearDuplicateCollapser.Collapse([call, providerText, email]).Count);
     }
+
+    // An RCS group message that another phone gave up on arrives a second time as a plain
+    // SMS from just its sender. Google Messages' notification still knows it was the group's,
+    // so that copy is the one kept: the provider row stays in the phone's record, it only
+    // stops filing the group's message under one member.
+    [Fact]
+    public void Collapse_GroupNotificationOutranksOneToOneFallbackText()
+    {
+        var fallback = Item(TimelineItemKind.Message, "5550100001", "sms:9", snippet: "Thursday?",
+            secondsAfterT0: 90);
+        var group = Item(TimelineItemKind.Message, "5550100001", "5550100001:1750000000000",
+            snippet: "Thursday?") with { GroupId = "rcs:conv-42" };
+
+        var result = NearDuplicateCollapser.Collapse([fallback, group]);
+
+        var survivor = Assert.Single(result);
+        Assert.Equal("rcs:conv-42", survivor.GroupId);
+    }
+
+    [Fact]
+    public void Collapse_GroupNotificationStillYieldsToTheProvidersOwnGroupCopy()
+    {
+        var providerGroup = Item(TimelineItemKind.Message, "5550100001", "mms:9", snippet: "Thursday?")
+            with { GroupId = "mms:17" };
+        var group = Item(TimelineItemKind.Message, "5550100001", "5550100001:1750000000000",
+            snippet: "Thursday?", secondsAfterT0: 20) with { GroupId = "rcs:conv-42" };
+
+        var result = NearDuplicateCollapser.Collapse([providerGroup, group]);
+
+        Assert.Equal("mms:9", Assert.Single(result).SourceId);
+    }
+
+    [Fact]
+    public void Collapse_GroupNotificationLeavesAnotherSendersTextAlone()
+    {
+        var other = Item(TimelineItemKind.Message, "5550100002", "sms:9", snippet: "Thursday?");
+        var group = Item(TimelineItemKind.Message, "5550100001", "5550100001:1750000000000",
+            snippet: "Thursday?") with { GroupId = "rcs:conv-42" };
+
+        Assert.Equal(2, NearDuplicateCollapser.Collapse([other, group]).Count);
+    }
 }

@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Content.PM;
 using Android.Runtime;
 using Codex.Domain.Diagnostics;
+using Codex.Domain.Post;
 
 namespace Post;
 
@@ -24,7 +25,14 @@ public static class PostDiagnostics
 {
     private const string Label = "Post";
 
+    // The texts trail: a line per text that reaches Post, by whichever route, so a late or
+    // missing text can be traced afterwards. Its own file and cap, because a line per text
+    // in the failure log would roll the failure history out within a day.
+    private const string TextsFileName = "texts.log";
+    private const long TextsMaxBytes = 96 * 1024;
+
     private static DiagnosticLog? log;
+    private static DiagnosticLog? texts;
     private static CrashLogStore? crashStore;
 
     public static void Install(Application app)
@@ -35,6 +43,7 @@ public static class PostDiagnostics
             return;
         }
         log = new DiagnosticLog(directory);
+        texts = new DiagnosticLog(directory, TextsMaxBytes, TextsFileName);
         crashStore = new CrashLogStore(directory);
 
         // Append each crash to the rolling history as well — the shared
@@ -64,6 +73,27 @@ public static class PostDiagnostics
         catch
         {
             // Diagnostics must never throw and mask the caller's own flow.
+        }
+    }
+
+    /// <summary>
+    /// Adds a line to the texts trail. The line is built by <see cref="TextTrail"/>, which
+    /// keeps message content and whole numbers out of it — the trail is meant to be shared.
+    /// </summary>
+    public static void LogText(string source, string line)
+    {
+        if (texts is null)
+        {
+            return;
+        }
+        try
+        {
+            texts.Append(new DiagnosticEntry(DateTimeOffset.Now, DiagnosticLevel.Info, source, line));
+        }
+        catch
+        {
+            // Diagnostics must never throw and mask the caller's own flow — least of all
+            // from inside a broadcast receiver holding an incoming text.
         }
     }
 
@@ -104,7 +134,24 @@ public static class PostDiagnostics
         // grows, how many contacts have no face, and whether date detection finds anything
         // worth proposing.
         var report = DiagnosticsReport.Build(reportContext, ReadAll(), crashStore?.ReadLatest());
-        return $"{report}\n\n{FieldNotesStore.Load(context).Render()}";
+        return $"{report}\n\n{FieldNotesStore.Load(context).Render()}\n\n{TextsSection(context)}";
+    }
+
+    // Which routes a text has into Post right now, then the trail of what actually arrived.
+    private static string TextsSection(Context context)
+    {
+        string status;
+        try
+        {
+            status = TextsStatusReader.Read(context).Render();
+        }
+        catch (Exception e)
+        {
+            status = $"Could not read the texts status: {e.Message}";
+        }
+        var trail = texts?.ReadAll().TrimEnd() ?? string.Empty;
+        return "=== Texts ===\n" + status + "\n\n--- Texts trail (oldest first) ---\n"
+            + (trail.Length == 0 ? "Nothing recorded yet." : trail);
     }
 
     private static void RecordCrash(Exception? exception)

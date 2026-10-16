@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Service.Notification;
+using Codex.Domain.Post;
 using Codex.Domain.Timeline;
 
 namespace Post;
@@ -41,6 +42,21 @@ public class MessagesNotificationListener : NotificationListenerService
         }
     }
 
+    public override void OnListenerConnected()
+    {
+        base.OnListenerConnected();
+        PostDiagnostics.LogText("Notifications", "Notification capture connected");
+    }
+
+    // Android unbinds a listener under memory pressure or after a crash, and everything
+    // Google Messages notifies until it rebinds never reaches Post — worth a line, since
+    // it is one of the ways an RCS message goes missing.
+    public override void OnListenerDisconnected()
+    {
+        base.OnListenerDisconnected();
+        PostDiagnostics.LogText("Notifications", "Notification capture disconnected");
+    }
+
     private void CaptureMessages(StatusBarNotification sbn)
     {
         var style = AndroidX.Core.App.NotificationCompat.MessagingStyle
@@ -50,24 +66,32 @@ public class MessagesNotificationListener : NotificationListenerService
             return;
         }
 
-        var items = new List<TimelineItem>();
-        foreach (var message in style.Messages)
+        // The shortcut id is Messages' own id for the conversation; a group threads on it.
+        var notice = new MessagingNotice(
+            sbn.Notification!.ShortcutId,
+            style.ConversationTitle?.ToString(),
+            style.IsGroupConversation,
+            style.Messages
+                .Select(message => new NoticeMessage(
+                    message.Person?.Name?.ToString(), message.Timestamp, message.Text?.ToString()))
+                .ToList());
+        PostDiagnostics.LogText("Notifications", TextTrail.Notice(notice, DateTimeOffset.UtcNow));
+
+        var items = MessagingNoticeMapper.Map(notice, ContactKey);
+        Cache(items.ToList());
+
+        var groupId = items.FirstOrDefault(item => item.IsGroup)?.GroupId;
+        if (groupId is not null)
         {
-            var sender = message.Person?.Name?.ToString() ?? style.ConversationTitle?.ToString() ?? "";
-            if (string.IsNullOrEmpty(sender))
+            try
             {
-                continue;
+                GroupNameStore.Learn(this, GroupNames.KeyFor(groupId), MessagingNoticeMapper.GroupTitle(notice));
             }
-            var contactKey = ContactKey(sender);
-            items.Add(new TimelineItem(
-                TimelineItemKind.Message,
-                contactKey,
-                DateTimeOffset.FromUnixTimeMilliseconds(message.Timestamp),
-                message.Text?.ToString(),
-                Incoming: true,
-                SourceId: $"{contactKey}:{message.Timestamp}"));
+            catch (Exception e)
+            {
+                PostDiagnostics.LogWarning("Notifications", "Could not record a group's name", e);
+            }
         }
-        Cache(items);
     }
 
     private void Cache(List<TimelineItem> items)

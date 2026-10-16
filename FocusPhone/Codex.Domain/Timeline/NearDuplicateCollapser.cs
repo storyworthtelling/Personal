@@ -25,8 +25,11 @@ public static class NearDuplicateCollapser
             .Where(item => item.Kind == TimelineItemKind.Voicemail && HasPrefix(item, "vm:"))
             .ToList();
 
+        var groupNotifications = items.Where(IsGroupNotificationText).ToList();
+
         return items
             .Where(item => !IsShadowedNotificationText(item, providerTexts))
+            .Where(item => !IsOneToOneFallbackOfGroupText(item, groupNotifications))
             .Where(item => !IsShadowedCallLogVoicemail(item, voicemailNotifications))
             .ToList();
     }
@@ -48,11 +51,32 @@ public static class NearDuplicateCollapser
             return false;
         }
         return providerTexts.Any(provider =>
-            provider.Incoming == item.Incoming
+            // A group's notification copy yields only to the provider's own group copy;
+            // against a one-to-one fallback it is the one that knows where the message belongs.
+            (!item.IsGroup || provider.IsGroup)
+            && provider.Incoming == item.Incoming
             && (IsFiVoicemail(provider) ? IsWrappedTranscript(item.Snippet, provider.Snippet) : SnippetsMatch(provider, item))
             && WithinWindow(provider, item)
             && KeysCompatible(item, provider));
     }
+
+    private static bool IsGroupNotificationText(TimelineItem item) =>
+        item.Kind == TimelineItemKind.Message && item.IsGroup && !IsProviderText(item);
+
+    /// <summary>
+    /// An RCS group message another phone gave up on comes in a second time as a plain SMS
+    /// from just its sender. When Google Messages' notification still has it as the group's,
+    /// the one-to-one provider copy steps aside, so the message reads in its group rather than
+    /// under one member. The provider row itself is untouched — only the merge view changes.
+    /// </summary>
+    private static bool IsOneToOneFallbackOfGroupText(TimelineItem item, List<TimelineItem> groupNotifications) =>
+        IsProviderText(item)
+        && !item.IsGroup
+        && groupNotifications.Any(notification =>
+            notification.Incoming == item.Incoming
+            && SnippetsMatch(notification, item)
+            && WithinWindow(notification, item)
+            && KeysCompatible(notification, item));
 
     private static bool IsShadowedCallLogVoicemail(TimelineItem item, List<TimelineItem> notifications)
     {

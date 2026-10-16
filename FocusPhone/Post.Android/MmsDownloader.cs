@@ -91,6 +91,7 @@ public class MmsDownloadReceiver : BroadcastReceiver
         if (ResultCode != Result.Ok)
         {
             PostDiagnostics.LogWarning("Mms", $"MMS download did not complete (result {ResultCode}).");
+            PostDiagnostics.LogText("Mms", $"MMS download did not complete (result {ResultCode})");
             return;
         }
 
@@ -102,6 +103,7 @@ public class MmsDownloadReceiver : BroadcastReceiver
                 return;
             }
 
+            PostDiagnostics.LogText("Mms", TextTrail.MmsDownloaded(SmsLogReader.ReadMmsAllAddresses(context, id).Count));
             var address = SmsLogReader.ReadMmsAddress(context, id, SmsLogReader.MmsBoxInbox);
             var body = SmsLogReader.ReadMmsText(context, id)
                 ?? AttachmentSummary.Describe(SmsLogReader.ReadMmsAttachments(context, id));
