@@ -50,6 +50,9 @@ public static class PostSync
             }
         }
 
+        // Before the mail: a text with no mail account is still owed its retry.
+        MmsStubSweep.Run(context);
+
         var account = new AccountStore(context);
         var route = MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured);
         if (route == MailTransport.None)

@@ -454,20 +454,27 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             marketingThreads = new TimelineMerger().Merge(marketing);
         }
 
+        var groupNames = GroupNameStore.Load(Host);
         var rows = InboxOrdering.UnreadFirstThenRecent(merged)
-            .Select(thread => BuildRow(thread, titleSeed))
+            .Select(thread => BuildRow(thread, titleSeed, groupNames))
             .ToList();
         var marketingRows = InboxOrdering.UnreadFirstThenRecent(marketingThreads)
-            .Select(thread => BuildRow(thread, titleSeed))
+            .Select(thread => BuildRow(thread, titleSeed, groupNames))
             .ToList();
         return (page, rows, marketingRows);
     }
 
-    private ThreadRow BuildRow(ContactThread thread, Dictionary<string, string> titleSeed)
+    private ThreadRow BuildRow(ContactThread thread, Dictionary<string, string> titleSeed, GroupNames groupNames)
     {
+        // A group's title is worked out fresh rather than taken from the seed, which exists
+        // to spare contact lookups and would otherwise hold the old title after a rename.
+        if (thread.IsGroup)
+        {
+            titleSeed.Remove(thread.ContactKey);
+        }
         if (!titleSeed.TryGetValue(thread.ContactKey, out var title))
         {
-            title = ThreadTitle(thread);
+            title = ThreadTitle(thread, groupNames);
             titleSeed[thread.ContactKey] = title;
         }
         var latest = thread.Items[^1];
@@ -476,10 +483,14 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         return new ThreadRow(thread.ContactKey, title, subtitle, thread.HasUnread, thread.Items);
     }
 
-    private string ThreadTitle(ContactThread thread)
+    private string ThreadTitle(ContactThread thread, GroupNames groupNames)
     {
         if (thread.IsGroup)
         {
+            if (groupNames.TitleFor(thread.ContactKey) is { } named)
+            {
+                return named;
+            }
             var names = thread.Participants.Take(3)
                 .Select(key => ContactNameResolver.DisplayName(Host, key));
             var joined = string.Join(", ", names);
@@ -558,6 +569,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 "Mark as spam", () => MarkSpam(row), Destructive: true,
                 Detail: "Deletes it, and anything worded like it from this sender."));
         }
+        if (row.Items.Any(item => item.IsGroup))
+        {
+            actions.Add(new CardAction("Name this group", () => AskGroupName(row.ContactKey, row.Title)));
+        }
         actions.Add(new CardAction("Delete this correspondence", () => DeleteCorrespondence(row), Destructive: true));
 
         ActionCard.Show(Host, Overlay, row.Title, row.Subtitle, [.. actions]);
@@ -602,6 +617,30 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             new CardAction(
                 "An existing contact", () => PickExistingContact(row, book),
                 Detail: "Add them to someone already in the Rolodex."));
+    }
+
+    // A group's own name, in place of its member list. The field starts with the owner's
+    // name when there is one; saving it empty takes the name away again, back to whatever
+    // Google Messages calls the group, else its members.
+    private void AskGroupName(string groupKey, string currentTitle)
+    {
+        var input = PaperUi.Field(Host, "Group name");
+        input.Text = GroupNameStore.Load(Host).OwnersNameFor(groupKey) ?? string.Empty;
+        new AlertDialog.Builder(Host)
+            .SetTitle("Name this group")!
+            .SetMessage(currentTitle)!
+            .SetView(input)!
+            .SetPositiveButton("Save", (_, _) =>
+            {
+                GroupNameStore.Name(Host, groupKey, input.Text);
+                if (openGroupKey == groupKey)
+                {
+                    LoadOpenThread();
+                }
+                ReloadThreads();
+            })!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
     }
 
     private void AskNewContactName(ThreadRow row)
@@ -843,6 +882,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private IReadOnlyList<string> openMemberKeys = [];
     private IReadOnlyList<string> openParticipants = [];
     private IReadOnlyList<string> openParticipantAddresses = [];
+    private string? openGroupKey;
+    private bool openGroupMembershipKnown;
     private bool openIsGroup;
     private string? openBridgeConversationId;
 
@@ -885,6 +926,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         openItems = [];
         openMemberKeys = [];
         openIsGroup = false;
+        openGroupKey = null;
         openBridgeConversationId = null;
         openSelection.Cancel();
         Invalidate();
@@ -911,6 +953,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         openItems = [];
         openMemberKeys = [];
         openIsGroup = false;
+        openGroupKey = null;
         openBridgeConversationId = null;
         openSelection.Cancel();
         DogEar.SetNotice(Host, Overlay, NoticeKeys.ProposedDate, null);
@@ -1074,6 +1117,11 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         openParticipants = thread?.Participants ?? [];
         openParticipantAddresses = thread?.ParticipantAddresses ?? [];
         openIsGroup = thread?.IsGroup ?? false;
+        openGroupKey = openIsGroup ? thread!.ContactKey : null;
+        // A group seen only in Google Messages' notifications lists just who has spoken,
+        // so it is not offered a group MMS reply that would leave the others out.
+        openGroupMembershipKnown = thread?.Items.Where(item => item.IsGroup)
+            .All(item => GroupMembership.IsKnown(item.GroupId)) ?? false;
         openTitle = OpenThreadTitle(thread);
 
         // Hide anything the owner just deleted (still inside its undo window, single or
@@ -1275,6 +1323,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         if (thread.IsGroup)
         {
+            if (GroupNameStore.Load(Host).TitleFor(thread.ContactKey) is { } named)
+            {
+                return named;
+            }
             var names = thread.Participants.Take(3).Select(key => ContactNameResolver.DisplayName(Host, key));
             var joined = string.Join(", ", names);
             return joined.Length == 0 ? "Group" : joined;
@@ -1301,7 +1353,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             // each number; Participants is the normalized fallback for an older cached
             // thread that predates the raw-address column.
             var groupRecipients = openParticipantAddresses.Count > 0 ? openParticipantAddresses : openParticipants;
-            if (groupRecipients.Count > 0)
+            if (groupRecipients.Count > 0 && openGroupMembershipKnown)
             {
                 AddAction("Text", () => ShowGroupCompose(groupRecipients));
             }
@@ -1346,7 +1398,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             actions.Add(new CardAction("Call back", () => PlaceCall(phone)));
             actions.Add(new CardAction("Text back", () => SendText(phone), Lead: true));
         }
-        else if (openIsGroup && openParticipants.Count > 0)
+        else if (openIsGroup && openParticipants.Count > 0 && openGroupMembershipKnown)
         {
             var groupRecipients = openParticipantAddresses.Count > 0 ? openParticipantAddresses : openParticipants;
             actions.Add(new CardAction("Text back", () => ShowGroupCompose(groupRecipients), Lead: true));
@@ -1383,6 +1435,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         if (phone is not null && !openIsGroup)
         {
             actions.Add(new CardAction("Block this number", () => Block(phone), Destructive: true));
+        }
+        if (openGroupKey is { } groupKey)
+        {
+            actions.Add(new CardAction("Name this group", () => AskGroupName(groupKey, openTitle)));
         }
 
         ActionCard.Show(Host, Overlay, openTitle, TimelineItemFormatter.Describe(item), actions.ToArray());

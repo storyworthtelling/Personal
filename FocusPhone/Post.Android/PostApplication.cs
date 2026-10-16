@@ -29,6 +29,11 @@ public class PostApplication : Application
         // Bring the Messages-for-Web bridge online if a Google account is already
         // paired, so incoming texts stream into the cache. No-op (stub) when the
         // gmbridge binding isn't built in.
+        // A picture or group text whose download failed is asked for again while the
+        // carrier still holds it. Off the main thread: it reads the provider.
+        var app = this;
+        Task.Run(() => MmsStubSweep.Run(app));
+
         try
         {
             GmBridgeClient.Shared(this).ConnectIfPaired();
