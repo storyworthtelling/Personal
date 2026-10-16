@@ -40,11 +40,10 @@ public static class SmsRecordMapper
     /// address list, since Android already canonicalizes "who is this conversation with"
     /// consistently across messages.
     ///
-    /// Participants can end up including the device's own number: an incoming group MMS's
-    /// own address list often lists every recipient, yourself included, and there is no
-    /// reliable way from the provider alone to tell which one that is. Left as-is rather than
-    /// guessed at — an extra name in a group header is a smaller error than a wrongly
-    /// dropped one.
+    /// An incoming group MMS's address list usually includes this phone too. When the phone
+    /// can say its own number (<paramref name="ownNumbers"/>) it is left out; when it cannot,
+    /// it stays — an extra name in a group header is a smaller error than a wrongly dropped
+    /// one.
     ///
     /// Each address in <paramref name="allAddresses"/> is normalized once to decide group
     /// membership and build <see cref="TimelineItem.Participants"/>, and the first raw
@@ -56,7 +55,7 @@ public static class SmsRecordMapper
     public static TimelineItem? MapMms(
         string id, long dateSeconds, int messageBox, string? address, string? text,
         long threadId = 0, IReadOnlyList<string>? allAddresses = null,
-        IReadOnlyList<AttachmentRef>? attachments = null)
+        IReadOnlyList<AttachmentRef>? attachments = null, IReadOnlyCollection<string>? ownNumbers = null)
     {
         if (string.IsNullOrEmpty(address) || messageBox is not (MmsInbox or MmsSent))
         {
@@ -67,6 +66,8 @@ public static class SmsRecordMapper
         // ParticipantAddresses and Participants describe the same people in the same
         // order — the normalized list for matching/display, the raw one for anything
         // that has to actually reach the number, country code included.
+        var own = (ownNumbers ?? []).Select(ContactKeyNormalizer.NormalizePhone).ToHashSet(StringComparer.Ordinal);
+        var ownListed = false;
         var byNormalizedKey = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var raw in allAddresses ?? [])
         {
@@ -75,11 +76,18 @@ public static class SmsRecordMapper
                 continue;
             }
             var key = ContactKeyNormalizer.NormalizePhone(raw);
+            if (own.Contains(key))
+            {
+                ownListed = true;
+                continue;
+            }
             byNormalizedKey.TryAdd(key, raw);
         }
         var participants = byNormalizedKey.Keys.ToList();
         var participantAddresses = byNormalizedKey.Values.ToList();
-        var isGroup = participants.Count > 2;
+        // Sender-plus-this-phone is a conversation of two; once this phone has been taken out
+        // of the list, any second person makes it a group.
+        var isGroup = participants.Count > (ownListed ? 1 : 2);
         var attachmentList = attachments ?? [];
 
         return new TimelineItem(

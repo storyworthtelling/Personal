@@ -27,6 +27,8 @@ internal static class MmsSender
 {
     private const string OutboxFolder = "mms-outbox";
 
+    internal const string ExtraFile = "com.storyworthtelling.focusphone.communication.extra.MMS_SENT_FILE";
+
     public static void Send(
         Context context, IReadOnlyList<string> recipients, string? text, IReadOnlyList<MmsOutboundPart> media)
     {
@@ -50,7 +52,11 @@ internal static class MmsSender
         // to, so it needs its own grant (mirrors MmsDownloader's write-side grant).
         MmsAccess.GrantToPlatform(context, uri, ActivityFlags.GrantReadUriPermission);
 
-        var completed = new Intent(context, typeof(MmsSendReceiver)).SetData(uri);
+        // The file's own path rides along: the Uri is Post's FileProvider address for the
+        // platform, and its Path is "/mms-outbox/…", not somewhere on disk.
+        var completed = new Intent(context, typeof(MmsSendReceiver))
+            .SetData(uri)
+            .PutExtra(ExtraFile, file.AbsolutePath);
         var pending = PendingIntent.GetBroadcast(
             context, transactionId.GetHashCode(), completed,
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
@@ -79,7 +85,7 @@ public class MmsSendReceiver : BroadcastReceiver
             return;
         }
 
-        var uri = intent?.Data;
+        var path = intent?.GetStringExtra(MmsSender.ExtraFile);
         try
         {
             if (ResultCode != Result.Ok)
@@ -89,11 +95,12 @@ public class MmsSendReceiver : BroadcastReceiver
                 return;
             }
 
-            if (uri?.Path is null)
+            if (path is null || !System.IO.File.Exists(path))
             {
+                PostDiagnostics.LogWarning("Mms", "A sent MMS's file was gone before it could be recorded.");
                 return;
             }
-            var pdu = System.IO.File.ReadAllBytes(uri.Path);
+            var pdu = System.IO.File.ReadAllBytes(path);
             var info = MmsSendRequestParser.Parse(pdu);
             if (info is null)
             {
@@ -113,9 +120,9 @@ public class MmsSendReceiver : BroadcastReceiver
         }
         finally
         {
-            if (uri?.Path is not null)
+            if (path is not null)
             {
-                System.IO.File.Delete(uri.Path);
+                System.IO.File.Delete(path);
             }
         }
     }
@@ -149,47 +156,22 @@ public class MmsSendReceiver : BroadcastReceiver
             return;
         }
 
-        foreach (var recipient in info.Recipients)
-        {
-            var addrValues = new ContentValues();
-            addrValues.Put("address", recipient);
-            addrValues.Put("type", MmsAddrTo);
-            addrValues.Put("charset", 106); // UTF-8, matching MmsComposer's own EncodedStringValue charset.
-            context.ContentResolver?.Insert(Android.Net.Uri.Parse($"content://mms/{id}/addr")!, addrValues);
-        }
-
+        // Parts before addresses, as for a received message: a reload mid-write then sees a
+        // message with nobody on it, which the reader skips, not one with half its content.
         foreach (var part in info.Parts)
         {
-            InsertPart(context, id, part);
+            var isText = part.MimeType == "text/plain";
+            MmsProviderWriter.InsertPart(context, id, new MmsPartRow(
+                part.MimeType, 106, part.FileName, part.FileName, null,
+                isText ? System.Text.Encoding.UTF8.GetString(part.Data) : null,
+                isText ? null : part.Data));
+        }
+        foreach (var recipient in info.Recipients)
+        {
+            MmsProviderWriter.InsertAddress(context, id, recipient, MmsInboxRecord.AddressTo);
         }
     }
 
-    private static void InsertPart(Context context, string messageId, MmsOutboundPart part)
-    {
-        var values = new ContentValues();
-        values.Put("mid", messageId);
-        values.Put("ct", part.MimeType);
-        values.Put("fn", part.FileName);
-        if (part.MimeType == "text/plain")
-        {
-            // A short text part can live directly in the row's own "text" column — the same
-            // column SmsLogReader.ReadMmsText already reads, no stream write needed.
-            values.Put("text", System.Text.Encoding.UTF8.GetString(part.Data));
-            context.ContentResolver?.Insert(Android.Net.Uri.Parse("content://mms/part")!, values);
-            return;
-        }
-
-        var partUri = context.ContentResolver?.Insert(Android.Net.Uri.Parse("content://mms/part")!, values);
-        if (partUri is null)
-        {
-            return;
-        }
-        using var stream = context.ContentResolver?.OpenOutputStream(partUri);
-        stream?.Write(part.Data, 0, part.Data.Length);
-    }
-
-    // Telephony.Mms.Addr type value for "to" — the same constant SmsLogReader keys off.
-    private const string MmsAddrTo = "151";
     private const int MmsBoxSent = 2;
 
     private static long GetOrCreateThreadId(Context context, IReadOnlyList<string> recipients) =>

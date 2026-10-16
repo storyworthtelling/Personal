@@ -58,6 +58,9 @@ public static class SmsLogReader
 
     private static void ReadMms(Context context, List<TimelineItem> items)
     {
+        // This phone's number is left out of a group's members, so it neither heads the
+        // group nor receives its own reply.
+        var ownNumbers = OwnNumbers.Read(context);
         using var cursor = context.ContentResolver!.Query(
             Telephony.Mms.ContentUri!,
             ["_id", "date", "msg_box", "thread_id"],
@@ -79,7 +82,8 @@ public static class SmsLogReader
                 ReadMmsText(context, id),
                 threadId,
                 ReadMmsAllAddresses(context, id),
-                ReadMmsAttachments(context, id));
+                ReadMmsAttachments(context, id),
+                ownNumbers);
             if (item is not null)
             {
                 items.Add(item);

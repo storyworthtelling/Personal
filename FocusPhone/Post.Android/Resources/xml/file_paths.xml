@@ -3,8 +3,11 @@
      subfolder only: an attachment is fetched on demand, opened, and left for the system to
      reclaim. Widening this to files-path would expose timeline.db and the ghost archive to
      any app handed a URI. "mms-outbox" is the composed-but-not-yet-sent PDU MmsSender hands
-     the platform's MMS transport to read; also cache-only, cleared the same way. -->
+     the platform's MMS transport to read; also cache-only, cleared the same way. "mms-inbox" is where the
+     platform writes a downloaded MMS for MmsDownloadReceiver to read and store; each file is
+     deleted once read. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
   <cache-path name="attachments" path="attachments/" />
   <cache-path name="mms-outbox" path="mms-outbox/" />
+  <cache-path name="mms-inbox" path="mms-inbox/" />
 </paths>
