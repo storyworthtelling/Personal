@@ -68,6 +68,30 @@ public static class MmsComposer
     // above — WSP reuses small integers per context).
     private const int PartName = 0x85;
 
+    private const int MessageTypeNotifyRespInd = 0x83;
+    private const int FieldStatus = 0x95;
+    private const int StatusRetrieved = 0x81;
+
+    /// <summary>
+    /// The M-NotifyResp.ind that tells the carrier a downloaded MMS arrived, as AOSP's
+    /// PduComposer writes it: message type, the notification's transaction id, MMS version,
+    /// and Status = Retrieved. Without it some carriers announce the same message again, and
+    /// the owner gets it twice.
+    /// </summary>
+    public static byte[] ComposeNotifyResponse(string transactionId)
+    {
+        var writer = new PduWriter();
+        writer.AppendOctet(FieldMessageType);
+        writer.AppendOctet(MessageTypeNotifyRespInd);
+        writer.AppendOctet(FieldTransactionId);
+        writer.AppendTextString(transactionId);
+        writer.AppendOctet(FieldMmsVersion);
+        writer.AppendShortInteger(CurrentMmsVersion);
+        writer.AppendOctet(FieldStatus);
+        writer.AppendOctet(StatusRetrieved);
+        return writer.ToArray();
+    }
+
     /// <summary>
     /// <paramref name="recipients"/> must be non-empty; each is written as a phone-number
     /// address (<c>/TYPE=PLMN</c>, per WSP's address-type suffix convention) since that is

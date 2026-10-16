@@ -192,4 +192,27 @@ public class SmsRecordMapperTests
         Assert.Single(item.Attachments);
         Assert.Equal("photo.jpg", item.Attachments[0].FileName);
     }
+
+    // With this phone's own number known it is left out of a group's members: it is not
+    // someone to show in the header, and a group reply sent to it would come straight back.
+    [Fact]
+    public void MapMms_LeavesThisPhoneOutOfTheMembers()
+    {
+        var item = SmsRecordMapper.MapMms("31", T0Seconds, messageBox: 1, "5551234567", "hi",
+            threadId: 12, allAddresses: ["5551234567", "+15550100009", "5559999999"],
+            ownNumbers: ["(555) 010-0009"])!;
+
+        Assert.True(item.IsGroup);
+        Assert.Equal(["5551234567", "5559999999"], item.Participants);
+        Assert.Equal(["5551234567", "5559999999"], item.ParticipantAddresses);
+    }
+
+    [Fact]
+    public void MapMms_OneToOneWithThisPhoneListed_IsNotAGroup()
+    {
+        var item = SmsRecordMapper.MapMms("32", T0Seconds, messageBox: 1, "5551234567", "hi",
+            threadId: 13, allAddresses: ["5551234567", "5550100009"], ownNumbers: ["5550100009"])!;
+
+        Assert.False(item.IsGroup);
+    }
 }
