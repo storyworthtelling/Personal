@@ -171,7 +171,11 @@ public sealed class ReviewProcessor : IPipelineStep
 
         if (!await db.Chunks.AnyAsync(c => c.NovelId == novel.Id, cancellationToken))
         {
-            foreach (var span in chunker.Chunk(source.FullText))
+            // Chunks never span a chapter start, so each analysis unit is one chapter (or a piece of a long
+            // one). Detection is deterministic, so the chapter rows written by EnsureChaptersLabelled below
+            // are exactly these spans.
+            var chapterStarts = chapterDetector.Detect(source.FullText).Select(s => s.StartOffset).ToList();
+            foreach (var span in chunker.Chunk(source.FullText, chapterStarts))
                 db.Chunks.Add(new Chunk
                 {
                     NovelId = novel.Id,

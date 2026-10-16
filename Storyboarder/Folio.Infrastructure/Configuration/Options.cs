@@ -30,8 +30,9 @@ public sealed class ClaudeOptions
     // The per-chunk analysis "map" call. Its notes now cover craft as well as story (line-edit
     // candidates, prose/voice patterns, dialogue, a scene list) for a chunk of up to ~48K characters,
     // which is more than the small default MaxTokens comfortably holds — and a reply that runs out of
-    // budget is thrown away wholesale (ResponseTruncatedException), not merely trimmed.
-    public int ChapterNotesMaxTokens { get; set; } = 12_000;
+    // budget is thrown away wholesale (ResponseTruncatedException), not merely trimmed. 12K was cut off on
+    // real chunks (8 of 9 failed on one book), so this matches the extraction budget.
+    public int ChapterNotesMaxTokens { get; set; } = 16_000;
 
     // The consolidated revision report is long (many sections + several reviews), so its "reduce"
     // call gets a larger output budget than the per-chunk/per-panel calls. This covers the STORY half
