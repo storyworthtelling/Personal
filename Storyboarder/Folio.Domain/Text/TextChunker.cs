@@ -26,12 +26,17 @@ public sealed class TextChunker
         this.maxChars = maxChars;
     }
 
-    public IReadOnlyList<ChunkSpan> Chunk(string text)
+    // chapterStarts are offsets where a chapter begins. A chunk never runs across one of them, so each
+    // chunk lies within a single chapter: the analysis reads a chunk as one unit and cites it by chapter,
+    // and packing several short chapters into one call overflows the reply budget and blurs the citation.
+    // A paragraph that straddles a chapter start is not split here; chapters open on their own line.
+    public IReadOnlyList<ChunkSpan> Chunk(string text, IReadOnlyList<int>? chapterStarts = null)
     {
         var chunks = new List<ChunkSpan>();
         if (string.IsNullOrWhiteSpace(text))
             return chunks;
 
+        var breaks = chapterStarts?.Where(s => s > 0).Distinct().ToArray() ?? [];
         int chunkStart = -1;
         int chunkEnd = -1;
 
@@ -50,6 +55,9 @@ public sealed class TextChunker
 
         foreach (var (start, end) in SplitParagraphs(text))
         {
+            if (chunkStart >= 0 && breaks.Any(b => b > chunkStart && b <= start))
+                Flush();
+
             if (end - start > maxChars)
             {
                 Flush();
