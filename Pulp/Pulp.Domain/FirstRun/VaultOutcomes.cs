@@ -91,6 +91,16 @@ public static class VaultOutcomes
         SignInKey, "Google sign-in did not finish", "Without it Pulp cannot reach the vault in Drive. Try signing in again.",
         NoticeRole.Problem, WaitingNotices.OpenVaultLabel, NoticeAction.OpenVault, at);
 
+    /// <summary>
+    /// Google does not know this build yet. Retrying cannot help, so the notice names the one thing to
+    /// register: the package and the suite's signing SHA-1, as an Android OAuth client.
+    /// </summary>
+    public static WaitingNotice SignInNotRegistered(DateTimeOffset at) => new(
+        SignInKey, "Google does not recognise this build yet",
+        $"Register the package {PulpIdentity.ApplicationId} with the suite's signing SHA-1 as an Android OAuth client "
+            + "in the Google Cloud project, wait a few minutes, then sign in again.",
+        NoticeRole.Problem, WaitingNotices.OpenVaultLabel, NoticeAction.OpenVault, at);
+
     private static WaitingNotice Problem(string headline, string detail, DateTimeOffset at) =>
         new(NoticeKey, headline, detail, NoticeRole.Problem, WaitingNotices.OpenVaultLabel, NoticeAction.OpenVault, at);
 }
