@@ -228,6 +228,14 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
                 line.SetTextColor(PaperTheme.InkSoft);
                 body.AddView(line, SettingsViews.Spaced(Host, DesignTokens.Space.X1));
             }
+
+            // The league to source table (D140, D208) and the broadcaster to service table (D310), as printed.
+            foreach (var table in SettingsGroups.SportsTables())
+            {
+                var line = PaperUi.Secondary(Host, table);
+                line.SetTextColor(PaperTheme.InkSoft);
+                body.AddView(line, SettingsViews.Spaced(Host, DesignTokens.Space.X1));
+            }
         });
 
     // ---- Diagnostics (D125) ----

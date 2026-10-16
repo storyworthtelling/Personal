@@ -40,6 +40,24 @@ public class CalendarScreenSnapshotTests
     }
 
     [Fact]
+    public void AConnectedOwnerSharesTheCalendarWithTheOtherAdultOnceAndOnlyWhenItWrites()
+    {
+        var shared = CalendarScreenSnapshot.Build(
+            Nothing, NoHolds, viewer => viewer.Value, HouseholdFileRole.Owner, true, "cal-1", "sam@example.com", Zone,
+            ["avery@example.com", "SAM@example.com", "avery@example.com"]);
+        var notConnected = CalendarScreenSnapshot.Build(
+            Nothing, NoHolds, viewer => viewer.Value, HouseholdFileRole.Owner, false, "cal-1", "sam@example.com", Zone,
+            ["avery@example.com"]);
+        var herPhone = CalendarScreenSnapshot.Build(
+            Nothing, NoHolds, viewer => viewer.Value, HouseholdFileRole.SharedWith, false, "cal-1", "avery@example.com", Zone,
+            ["avery@example.com"]);
+
+        Assert.Equal(["sam@example.com", "avery@example.com"], shared.AdultAccounts);
+        Assert.Empty(notConnected.AdultAccounts);
+        Assert.Empty(herPhone.AdultAccounts);
+    }
+
+    [Fact]
     public void TheOtherAdultsPhoneKeepsItsRoleAndNeedsNoConsent()
     {
         var snapshot = Snapshot(HouseholdFileRole.SharedWith, connected: false, calendarId: "cal-1");

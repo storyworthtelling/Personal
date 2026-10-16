@@ -50,4 +50,17 @@ public class TrailerActivityTests
             @"MediaPlaybackRequiresUserGesture|AddJavascriptInterface|JavaScriptEnabled|SetWebViewClient|AllowFileAccess|autoplay=1"),
             source);
     }
+
+    // D315: the one player serves trailers and highlights; the kind changes the words only.
+    [Fact]
+    public void TheOnePlayerServesBothKindsWithTheirOwnWords()
+    {
+        var source = Source();
+
+        Assert.Contains("ForHighlights(", source, StringComparison.Ordinal);
+        Assert.Contains("PlayerCopy.Parse(", source, StringComparison.Ordinal);
+        Assert.Contains("PlayerCopy.Status(kind)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Tap play to start the trailer", source, StringComparison.Ordinal);
+        Assert.Equal(1, Regex.Matches(source, @"PaperWebView\.LoadPlayer").Count);
+    }
 }

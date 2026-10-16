@@ -32,6 +32,9 @@ public class HouseholdKindsTests
         [nameof(HouseholdKinds.ViewerName)] = "viewer-name",
         [nameof(HouseholdKinds.SportsFollow)] = "sports-follow",
         [nameof(HouseholdKinds.PulpCalendar)] = "pulp-calendar",
+        [nameof(HouseholdKinds.Plan)] = "plan",
+        [nameof(HouseholdKinds.AdultAccount)] = "adult-account",
+        [nameof(HouseholdKinds.ChildLeague)] = "child-league",
     };
 
     private static IReadOnlyDictionary<string, string> Declared() =>

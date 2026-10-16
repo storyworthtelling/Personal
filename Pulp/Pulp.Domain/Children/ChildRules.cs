@@ -57,6 +57,12 @@ public sealed record ChildRules(ViewerId Child, AgeBand Ceiling)
     public IReadOnlySet<FranchiseId> BlockedFranchises { get; init; } = new HashSet<FranchiseId>();
 
     public IReadOnlySet<ServiceId> BlockedServices { get; init; } = new HashSet<ServiceId>();
+
+    /// <summary>
+    /// The leagues a parent allowed this child (D317), which allow-list every game in them (D326). Derived from the
+    /// allowance records by <c>HouseholdView</c>, never stored on this record, so there is one place a league is allowed.
+    /// </summary>
+    public IReadOnlySet<Sports.LeagueId> AllowedLeagues { get; init; } = new HashSet<Sports.LeagueId>();
 }
 
 /// <summary>What the filter needs to know about a title: its rating, franchises and homes.</summary>
@@ -66,6 +72,9 @@ public sealed record TitleFacts(TitleId Id, TitleKind Kind, ContentRating Rating
 
     /// <summary>The services the title can be watched on; empty when not yet known.</summary>
     public IReadOnlyCollection<ServiceId> Homes { get; init; } = [];
+
+    /// <summary>The league a game belongs to, so a parent's league allowance can allow it (D326); null for anything that is not a game.</summary>
+    public Sports.LeagueId? League { get; init; }
 }
 
 /// <summary>

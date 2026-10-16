@@ -5,6 +5,7 @@ using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.People;
 using Pulp.Domain.Services;
+using Pulp.Domain.Sports;
 using Pulp.Domain.Settings;
 using static Pulp.Tests.Household.Records.RecordsFixtures;
 
@@ -164,6 +165,84 @@ public class PersonEditsTests
         Assert.True(PlannerBuilds(whole));
         Assert.Empty(HouseholdView.Of(whole).ChildRules);
         Assert.False(HouseholdView.Of(whole).Roster!.IsChild(Pip));
+    }
+
+    private static readonly ChildLeagueAllowance PipHarbor = new(Pip, new LeagueId("harbor-league"), Avery, DateTimeOffset.UnixEpoch);
+    private static readonly ChildLeagueAllowance PipRiver = new(Pip, new LeagueId("river-league"), Avery, DateTimeOffset.UnixEpoch);
+
+    private static HouseholdDocument StartWithLeagues()
+    {
+        var document = Start((AveryAdult, null), (PipChild, PipRules));
+        document = HouseholdRecords.Put(document, HouseholdMaps.ChildLeague, PipHarbor, Next(), PhoneA);
+        return HouseholdRecords.Put(document, HouseholdMaps.ChildLeague, PipRiver, Next(), PhoneA);
+    }
+
+    [Fact]
+    public void ARemovedChildsLeaguesDoNotReturnToANewChildWithTheSameId()
+    {
+        var removed = PersonEdits.ApplyAll(
+            StartWithLeagues(), PersonEdits.Remove(PipChild, new ViewerNameEntry(Pip, "Pip"), PipRules, [PipHarbor, PipRiver]), Next(), PhoneA);
+        var readded = PersonEdits.ApplyAll(
+            removed, PersonEdits.Add(PipChild, new ViewerNameEntry(Pip, "Pip"), ChildRuleEdits.NewChild(Pip)), Next(), PhoneA);
+
+        var view = HouseholdView.Of(readded);
+
+        Assert.Empty(view.ChildLeagueAllowances);
+        Assert.Empty(Assert.Single(view.ChildRules).AllowedLeagues);
+    }
+
+    [Fact]
+    public void AChildMadeAdultAndThenChildAgainDoesNotKeepTheLeagues()
+    {
+        var adult = PersonEdits.ApplyAll(StartWithLeagues(), PersonEdits.MakeAdult(PipChild, PipRules, [PipHarbor, PipRiver]), Next(), PhoneA);
+        var again = PersonEdits.ApplyAll(adult, PersonEdits.MakeChild(new HouseholdViewer(Pip, false), ChildRuleEdits.NewChild(Pip)), Next(), PhoneA);
+
+        Assert.Empty(HouseholdView.Of(adult).ChildLeagueAllowances);
+        Assert.Empty(HouseholdView.Of(again).ChildLeagueAllowances);
+        Assert.True(PlannerBuilds(adult));
+        Assert.True(PlannerBuilds(again));
+    }
+
+    [Fact]
+    public void UndoingARemovalOrAnAdultChangePutsTheLeaguesBackWithThePerson()
+    {
+        var start = StartWithLeagues();
+        var removed = PersonEdits.ApplyAll(start, PersonEdits.Remove(PipChild, new ViewerNameEntry(Pip, "Pip"), PipRules, [PipHarbor, PipRiver]), Next(), PhoneA);
+        var undone = PersonEdits.ApplyAll(removed, PersonEdits.Add(PipChild, new ViewerNameEntry(Pip, "Pip"), PipRules, [PipHarbor, PipRiver]), Next(), PhoneA);
+        var adult = PersonEdits.ApplyAll(start, PersonEdits.MakeAdult(PipChild, PipRules, [PipHarbor, PipRiver]), Next(), PhoneA);
+        var back = PersonEdits.ApplyAll(adult, PersonEdits.MakeChild(PipChild, PipRules, [PipHarbor, PipRiver]), Next(), PhoneA);
+
+        foreach (var restored in new[] { undone, back })
+        {
+            var leagues = HouseholdView.Of(restored).LeaguesAllowedFor(Pip);
+            Assert.Equal(2, leagues.Count);
+            Assert.Contains(PipHarbor.League, leagues);
+            Assert.True(PlannerBuilds(restored));
+        }
+    }
+
+    [Fact]
+    public void ALeagueRecordOfSomeoneNotCurrentlyAChildIsNotReadAsAllowed()
+    {
+        // A record left by an older build: the child is gone but the allowance was never tombstoned.
+        var document = StartWithLeagues();
+        document = PersonEdits.ApplyAll(document, PersonEdits.Remove(PipChild, new ViewerNameEntry(Pip, "Pip"), PipRules), Next(), PhoneA);
+        document = PersonEdits.ApplyAll(document, PersonEdits.Add(PipChild, new ViewerNameEntry(Pip, "Pip"), ChildRuleEdits.NewChild(Pip)), Next(), PhoneA);
+        var viewerOnly = HouseholdRecords.Put(
+            HouseholdRecords.Put(HouseholdDocument.Empty, HouseholdMaps.Viewer, AveryAdult, Next(), PhoneA),
+            HouseholdMaps.ChildLeague, new ChildLeagueAllowance(Avery, new LeagueId("harbor-league"), Avery, DateTimeOffset.UnixEpoch), Next(), PhoneA);
+
+        Assert.Empty(HouseholdView.Of(viewerOnly).ChildLeagueAllowances);
+        Assert.Empty(HouseholdView.Of(viewerOnly).LeaguesAllowedFor(Avery));
+    }
+
+    [Fact]
+    public void AnAdultsGoogleAddressIsReadOnlyWhileTheyAreCurrentlyAnAdult()
+    {
+        var document = HouseholdRecords.Put(Start((AveryAdult, null), (PipChild, PipRules)), HouseholdMaps.AdultAccount, new AdultAccountEntry(Pip, "pip@example.com"), Next(), PhoneA);
+        document = HouseholdRecords.Put(document, HouseholdMaps.AdultAccount, new AdultAccountEntry(Avery, "avery@example.com"), Next(), PhoneA);
+
+        Assert.Equal(["avery@example.com"], HouseholdView.Of(document).AdultGoogleAccounts);
     }
 
     [Fact]

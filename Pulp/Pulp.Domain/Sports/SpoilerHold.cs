@@ -41,7 +41,8 @@ public static class SpoilerHold
         IReadOnlyCollection<TeamId> followed,
         IReadOnlyCollection<GameId> unwatchedRecordings,
         DateTimeOffset now,
-        bool peeking)
+        bool peeking,
+        IReadOnlyCollection<GameId>? watchedGames = null)
     {
         ArgumentNullException.ThrowIfNull(feed);
         var league = feed.League;
@@ -66,7 +67,14 @@ public static class SpoilerHold
         var championship = feed.Championship is null
             ? null
             : new ChampionshipLine(feed.Championship.Name, feed.Championship.StartsAt, feed.Championship.Teams);
-        return new OpenLeague(line, openTeams, championship, feed.Standings, feed.Highlights, IsPeek: held);
+        // D330: the Earlier fold belongs to a league with nothing held. A peek is a held league and gets none.
+        var earlier = held || watchedGames is null
+            ? []
+            : teams
+                .Select(team => new TeamEarlier(team.Id, EarlierGames.For(feed, team.Id, watchedGames, now)))
+                .Where(entry => entry.Games.Count > 0)
+                .ToList();
+        return new OpenLeague(line, openTeams, championship, feed.Standings, feed.Highlights, IsPeek: held) { Earlier = earlier };
     }
 
     /// <summary>The followed teams that play in this league, by name.</summary>
@@ -95,12 +103,16 @@ public static class SpoilerHold
             .OrderBy(game => game.StartsAt)
             .FirstOrDefault();
 
-    /// <summary>D236: the unwatched recordings, oldest first, then the next game.</summary>
+    /// <summary>
+    /// D236: the unwatched recordings, then the next game. A recording whose game is over by the clock is
+    /// marked so (the finished list, see the ordering in <see cref="SportsScreenOrder"/>); a watched game is
+    /// not an unwatched recording and so never reaches the list.
+    /// </summary>
     private static List<GameLine> OpenGames(
         LeagueFeed feed, TeamId team, IReadOnlyCollection<GameId> unwatchedRecordings, DateTimeOffset now)
     {
         var lines = UnwatchedRecordings(feed, team, unwatchedRecordings, now)
-            .Select(game => Line(game, recorded: true))
+            .Select(game => Line(game, recorded: true, over: GameOver.IsOver(feed.League.Id, game.StartsAt, now)))
             .ToList();
         var next = NextGame(feed, team, now);
         if (next is not null)
@@ -138,8 +150,9 @@ public static class SpoilerHold
         return lines;
     }
 
-    private static GameLine Line(Game game, bool recorded) =>
-        new(game.Id, game.Home, game.Away, game.StartsAt, game.Stage, game.Channel, recorded);
+    // A held league's lines are built without `over`: a held sheet never says a game is over.
+    private static GameLine Line(Game game, bool recorded, bool over = false) =>
+        new(game.Id, game.Home, game.Away, game.StartsAt, game.Stage, game.Channel, recorded, over);
 }
 
 /// <summary>

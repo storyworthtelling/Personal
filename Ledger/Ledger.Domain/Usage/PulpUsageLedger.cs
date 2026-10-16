@@ -28,6 +28,23 @@ public sealed class PulpUsageLedger
         return new PulpUsageLedger(kept);
     }
 
+    /// <summary>
+    /// This ledger filled out from the one Pulp left in Drive (Pulp D320): the local receiver wins for any service
+    /// and month it has an entry for, and the shared file supplies the rest. Both carry household-wide totals, so
+    /// the receiver is never behind in a way that matters; the file is for the phone the receiver never ran on.
+    /// </summary>
+    public PulpUsageLedger WithSharedFrom(PulpUsageLedger shared)
+    {
+        ArgumentNullException.ThrowIfNull(shared);
+        var filled = shared.Entries
+            .Where(entry => entry.Count > 0 && !Entries.Any(own => Same(own, entry)));
+        return new PulpUsageLedger(
+            Entries.Concat(filled)
+                .OrderBy(entry => entry.YearMonth, StringComparer.Ordinal)
+                .ThenBy(entry => entry.Service, StringComparer.OrdinalIgnoreCase)
+                .ToList());
+    }
+
     private static bool Same(PulpUsageReceipt left, PulpUsageReceipt right) =>
         string.Equals(left.Service, right.Service, StringComparison.OrdinalIgnoreCase) && left.YearMonth == right.YearMonth;
 }

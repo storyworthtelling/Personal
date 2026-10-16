@@ -2,7 +2,8 @@ namespace Pulp.Domain.Sports;
 
 /// <summary>
 /// The order within a league (D236): the teams with a recording waiting first, then by name; a team's
-/// games as unwatched recordings oldest first, then its next game. Stable, so two draws of the same
+/// games as recordings still running oldest first, then the finished games (over by the clock, not yet
+/// watched) newest first, then its next game. Stable, so two draws of the same
 /// page put the same row in the same place.
 /// </summary>
 public static class SportsScreenOrder
@@ -20,10 +21,14 @@ public static class SportsScreenOrder
     public static IReadOnlyList<GameLine> Games(IEnumerable<GameLine> games)
     {
         ArgumentNullException.ThrowIfNull(games);
-        return games
-            .OrderBy(game => game.Recorded ? 0 : 1)
-            .ThenBy(game => game.StartsAt)
-            .ThenBy(game => game.Id.Value, StringComparer.OrdinalIgnoreCase)
+        var all = games.ToList();
+        var running = all.Where(game => !game.Over && game.Recorded)
+            .OrderBy(game => game.StartsAt).ThenBy(game => game.Id.Value, StringComparer.OrdinalIgnoreCase);
+        var finished = all.Where(game => game.Over)
+            .OrderByDescending(game => game.StartsAt).ThenBy(game => game.Id.Value, StringComparer.OrdinalIgnoreCase);
+        var next = all.Where(game => !game.Over && !game.Recorded)
+            .OrderBy(game => game.StartsAt).ThenBy(game => game.Id.Value, StringComparer.OrdinalIgnoreCase);
+        return running.Concat(finished).Concat(next)
             .ToList();
     }
 }

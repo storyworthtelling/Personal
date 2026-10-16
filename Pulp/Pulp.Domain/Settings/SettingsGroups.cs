@@ -62,4 +62,15 @@ public static class SettingsGroups
         "Ratings: OMDb, the Open Movie Database.",
         "Trailers: YouTube.",
     ];
+
+    /// <summary>
+    /// The sports tables as About prints them (D140): each league and the feed it is read from (D208), then the
+    /// broadcasters a game's Play opens in the household's own services (D310).
+    /// </summary>
+    public static IReadOnlyList<string> SportsTables() =>
+    [
+        .. Pulp.Domain.Sports.SportsSourceTable.Default.AboutLines(),
+        "Play opens a game in your own service when its channel is one of these:",
+        .. Pulp.Domain.Services.BroadcasterTable.Public.AboutLines(),
+    ];
 }

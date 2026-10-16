@@ -53,6 +53,7 @@ public sealed class ServiceCatalogue
         new(new ServiceId("prime-video"), "Prime Video", ["com.amazon.avod.thirdpartyclient"], "prime", ["Prime Video", "Amazon Prime Video"], linkDomains: ["primevideo.com", "amazon.com"]),
         new(new ServiceId("paramount-plus"), "Paramount+", ["com.cbs.app"], "paramount", ["Paramount+", "Paramount Plus"], linkDomains: ["paramountplus.com"]),
         new(new ServiceId("peacock"), "Peacock", ["com.peacocktv.peacockandroid"], "peacock", ["Peacock", "PeacockTV"], linkDomains: ["peacocktv.com"]),
+        new(new ServiceId("apple-tv"), "Apple TV", ["com.apple.atve.androidtv.appletv"], "apple", ["Apple TV+", "Apple TV"], linkDomains: ["tv.apple.com", "apple.com"]),
     ]);
 
     public IReadOnlyList<StreamingService> All { get; }

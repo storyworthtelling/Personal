@@ -10,6 +10,7 @@ using Pulp.App;
 using Pulp.Components;
 using Pulp.Domain.Calendar;
 using Pulp.Domain.Core;
+using Pulp.Domain.Household.Records;
 using Pulp.Domain.People;
 using Pulp.Domain.Shell;
 using Pulp.Domain.Voice;
@@ -21,7 +22,8 @@ namespace Pulp.Shell;
 /// Calendar, one tab of Pulp's binder (mockup 8, D66, D244-D247): the next two weeks of the viewer's own and
 /// shared items, grouped by day under relative headings, each line a mono time or "All day", a title, a quiet
 /// kind-and-service line with whose it is at the end. A tap opens the title's page, or the league on Sports.
-/// There is no bottom bar (D246): plans are made from a title's page. Reading happens off the UI thread and
+/// There is no bottom bar (D246); a plan is added from a quiet "Add a plan" line under the status (D305) and
+/// removed from a long-press on its row, undo-first on the dog-ear. Reading happens off the UI thread and
 /// the page says so in a status sentence while it does, never a spinner. The words are the Domain's
 /// (<see cref="CalendarScreen"/>); the page is not shown in a child's view (<c>ChildViewAreas</c>).
 /// </summary>
@@ -30,10 +32,25 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
     /// <summary>The mono time column's width, as drawn.</summary>
     private const int TimeColumnDp = 56;
 
+    private const string AddPlanLabel = "Add a plan";
+
     private CancellationTokenSource? loading;
     private CalendarScreenPage? page;
     private ThisPhoneStatus phone = ThisPhoneStatus.NoRoster;
     private bool unreadable;
+    private ViewerId? me;
+    private IReadOnlyList<ViewerId> adults = [];
+    private IReadOnlyList<HouseholdPlan> plans = [];
+
+    // The form's draft, kept across the rebuilds a date or time pick causes.
+    private bool adding;
+    private string planText = string.Empty;
+    private string planPlace = string.Empty;
+    private DateOnly planDate = DateOnly.FromDateTime(DateTime.Today);
+    private TimeOnly? planTime;
+    private bool planShared;
+    private string? planProblem;
+    private string? planSaved;
 
     public override View BuildView()
     {
@@ -52,7 +69,7 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
             return Column(PaperUi.Secondary(Host, ThisPhone.UnmatchedSentence));
         }
 
-        if (page.IsEmpty)
+        if (page.IsEmpty && !adding && me is null)
         {
             var empty = new EmptyState(Host, VoiceSeat.EmptyCalendar);
             empty.Present(VoiceLineAction.ShowNeutral, null);
@@ -60,7 +77,33 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
         }
 
         var list = new LinearLayout(Host) { Orientation = Orientation.Vertical };
-        list.AddView(PaperUi.Secondary(Host, CalendarScreen.StatusLine));
+        if (page.IsEmpty)
+        {
+            var empty = new EmptyState(Host, VoiceSeat.EmptyCalendar);
+            empty.Present(VoiceLineAction.ShowNeutral, null);
+            list.AddView(empty);
+        }
+        else
+        {
+            list.AddView(PaperUi.Secondary(Host, CalendarScreen.StatusLine));
+        }
+
+        if (me is not null)
+        {
+            if (!adding && planSaved is not null)
+            {
+                list.AddView(PaperUi.Secondary(Host, planSaved));
+            }
+
+            list.AddView(adding ? PlanForm() : PaperUi.QuietButton(Host, AddPlanLabel, () =>
+            {
+                adding = true;
+                planProblem = null;
+                planSaved = null;
+                Invalidate();
+            }));
+        }
+
         foreach (var day in page.Days)
         {
             var heading = PaperUi.Heading(Host, day.Label);
@@ -92,6 +135,11 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
         var vertical = PaperTheme.Dp(Host, DesignTokens.Space.X2);
         line.SetPadding(0, vertical, 0, vertical);
         line.Click += (_, _) => Open(row);
+        if (CalendarPlans.IdOfKey(row.Key) is { } planId)
+        {
+            line.LongClickable = true;
+            line.LongClick += (_, _) => PlanActions(planId, row);
+        }
 
         var time = PaperUi.Mono(Host, row.TimeText);
         time.SetTextColor(PaperTheme.InkSoft);
@@ -160,6 +208,8 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
             {
                 var household = await services.HouseholdAsync(cancel.Token);
                 var who = services.ThisPhoneOf(household);
+                var roster = household.Roster;
+                var adultIds = roster?.Viewers.Where(viewer => !roster.IsChild(viewer.Id)).Select(viewer => viewer.Id).ToList() ?? [];
                 var read = who.Viewer is { } viewer ? await services.CalendarPageAsync(viewer, cancel.Token) : null;
                 Host.RunOnUiThread(() =>
                 {
@@ -170,6 +220,9 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
 
                     unreadable = false;
                     phone = who.Status;
+                    adults = adultIds;
+                    plans = household.CalendarPlans;
+                    me = who.Viewer is { } mine && adultIds.Contains(mine) ? mine : null;
                     page = read ?? new CalendarScreenPage([]);
                     Invalidate();
                 });
@@ -188,6 +241,147 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
                     Invalidate();
                 });
             }
+        });
+    }
+
+    // ---- plans (D68, D146, D305) ----
+
+    /// <summary>
+    /// The "Add a plan" form, built from Paper's own components: a line of words, a day and optionally a time
+    /// from the system pickers, a place, and who it is for. It is checked by <see cref="CalendarPlans.Check"/>
+    /// before anything is written, and what is written is a household record, so the other phone sees it too.
+    /// </summary>
+    private View PlanForm()
+    {
+        var form = PaperUi.HairlineCard(Host);
+        var gap = PaperTheme.Dp(Host, DesignTokens.Space.X2);
+        form.AddView(PaperUi.Heading(Host, AddPlanLabel));
+
+        var text = PaperUi.Field(Host, "What is the plan?");
+        text.Text = planText;
+        text.TextChanged += (_, _) => planText = text.Text ?? string.Empty;
+        form.AddView(text);
+
+        form.AddView(PaperUi.SecondaryButton(Host, planDate.ToString("ddd, MMM d", System.Globalization.CultureInfo.CurrentCulture), () =>
+        {
+            var dialog = new DatePickerDialog(
+                Host,
+                (_, picked) =>
+                {
+                    planDate = DateOnly.FromDateTime(picked.Date);
+                    Invalidate();
+                },
+                planDate.Year, planDate.Month - 1, planDate.Day);
+            dialog.Show();
+        }), Spaced(gap));
+
+        var time = planTime is { } at ? CalendarScreen.TimeText(new CalendarWhen(planDate, at)) : CalendarScreen.AllDayText;
+        form.AddView(PaperUi.SecondaryButton(Host, time, () =>
+        {
+            var start = planTime ?? new TimeOnly(19, 0);
+            var dialog = new TimePickerDialog(
+                Host,
+                (_, picked) =>
+                {
+                    planTime = new TimeOnly(picked.HourOfDay, picked.Minute);
+                    Invalidate();
+                },
+                start.Hour, start.Minute, false);
+            dialog.Show();
+        }), Spaced(gap));
+        if (planTime is not null)
+        {
+            form.AddView(PaperUi.QuietButton(Host, "All day instead", () =>
+            {
+                planTime = null;
+                Invalidate();
+            }));
+        }
+
+        var place = PaperUi.Field(Host, "Where? (optional)");
+        place.Text = planPlace;
+        place.TextChanged += (_, _) => planPlace = place.Text ?? string.Empty;
+        form.AddView(place, Spaced(gap));
+
+        form.AddView(PaperUi.Segmented(Host, ["Just me", "Everyone"], index => planShared = index == 1, planShared ? 1 : 0), Spaced(gap));
+
+        if (planProblem is not null)
+        {
+            form.AddView(PaperUi.Secondary(Host, planProblem), Spaced(gap));
+        }
+
+        form.AddView(PaperUi.PrimaryButton(Host, "Add", SavePlan), Spaced(gap));
+        form.AddView(PaperUi.QuietButton(Host, "Cancel", () =>
+        {
+            adding = false;
+            Invalidate();
+        }));
+        return form;
+    }
+
+    private LinearLayout.LayoutParams Spaced(int top) =>
+        new(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = top };
+
+    private void SavePlan()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        planProblem = CalendarPlans.Check(planText, planDate, today);
+        if (planProblem is not null || me is not { } maker)
+        {
+            Invalidate();
+            return;
+        }
+
+        var plan = new HouseholdPlan(
+            CalendarPlans.NewId(),
+            maker,
+            CalendarPlans.Clean(planText)!,
+            null,
+            planDate,
+            planTime,
+            CalendarPlans.Clean(planPlace),
+            CalendarPlans.Who(maker, planShared, adults));
+        adding = false;
+        planSaved = CalendarPlans.SavedNote(planDate, today);
+        planText = string.Empty;
+        planPlace = string.Empty;
+        planTime = null;
+        Write("add the plan", token => PulpServices.For(Host).PutAsync(HouseholdMaps.Plan, plan, token));
+    }
+
+    /// <summary>A long-press on a plan row: one entry, taken at once, with the way back on the dog-ear (§13).</summary>
+    private void PlanActions(string planId, CalendarScreenRow row)
+    {
+        var plan = plans.FirstOrDefault(found => string.Equals(found.Id, planId, StringComparison.OrdinalIgnoreCase));
+        if (plan is null)
+        {
+            return;
+        }
+
+        ActionCard.Show(Host, Overlay, row.Title, row.TimeText, new CardAction("Remove plan", () =>
+        {
+            var services = PulpServices.For(Host);
+            Write("remove the plan", token => services.RemoveAsync(HouseholdMaps.Plan, plan, token));
+            DogEar.Show(Host, Overlay, "Undo remove plan, " + plan.Text + ".", () =>
+                Write("put the plan back", token => services.PutAsync(HouseholdMaps.Plan, plan, token)));
+        }));
+    }
+
+    private void Write(string what, Func<CancellationToken, Task> write)
+    {
+        var services = PulpServices.For(Host);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await write(CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                services.Diagnostics.Warn("calendar", "The calendar could not " + what + ".", exception);
+            }
+
+            Host.RunOnUiThread(Reload);
         });
     }
 

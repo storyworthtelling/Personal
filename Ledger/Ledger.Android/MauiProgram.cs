@@ -19,6 +19,7 @@ using Index.Infrastructure.Pipeline;
 using Index.Infrastructure.Services;
 using Index.Infrastructure.Snowball;
 using Index.Infrastructure.Time;
+using Index.Infrastructure.Usage;
 using Index.Infrastructure.Voice;
 using Index.Infrastructure.Worksheet;
 using Index.Android.Google;
@@ -173,6 +174,16 @@ public static class MauiProgram
                 () => SettingsStore.VaultPassphrase,
                 () => sp.GetRequiredService<InstallRoleService>().Current,
                 sp.GetRequiredService<ISnowballHistoryImportMemory>()));
+
+        // Pulp's usage file (Pulp D320): the household's own passphrase-protected file, read by BOTH installs so the
+        // line under a charge does not depend on Pulp living on the same phone. Its IDriveTextFile is built here for
+        // its OWN file name and handed straight to the source, like the snowball history's, never resolved bare.
+        builder.Services.AddSingleton(sp =>
+            new DrivePulpUsageSource(
+                new DriveTextFile(
+                    DriveFactory(sp), DrivePulpUsageSource.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>()),
+                sp.GetService<ILogger<DrivePulpUsageSource>>()));
+        builder.Services.AddSingleton<PulpUsageSync>();
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
         // the owner's passphrase (SettingsStore.VaultPassphrase). Ledger publishes its Plaid credentials and

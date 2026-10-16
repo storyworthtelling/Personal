@@ -381,6 +381,90 @@ public class EspnSourceTests
             () => new EspnSource(patient, [Definition], tally).GetStandingsOrderAsync(Gridball, cancellation.Token));
     }
 
+    // ESPN's soccer feeds number a season's parts with opaque ids (13846, 14024), not 1/2/3: the stage is in the slug (D340).
+    private static readonly EspnLeague Club = new(new LeagueId("fcl-invented"), "Futbol Club League", "soccer", "fcl.1", ["Club Cup"], ["club-cup"]);
+
+    private static string SoccerEvent(string id, string date, int opaqueType, string? slug, string headline = "")
+    {
+        var slugPart = slug is null ? string.Empty : $$""", "slug": "{{slug}}" """;
+        return Event(id, date, 2, headline).Replace("\"season\": { \"year\": 2025, \"type\": 2 }", $$"""
+        "season": { "year": 2026, "type": {{opaqueType}}{{slugPart}} }
+        """.Trim());
+    }
+
+    private async Task<LeagueSchedule> ClubSchedule(string board, SportsWindow? window = null)
+    {
+        handler.Route("/soccer/fcl.1/teams", Teams).Route("/soccer/fcl.1/scoreboard", board);
+        return await new EspnSource(new HttpClient(handler), [Club], tally).GetScheduleAsync(Club.Id, window ?? new SportsWindow(Today, 0, 0), CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData("regular-season", GameStage.RegularSeason)]
+    [InlineData("preseason", GameStage.Preseason)]
+    [InlineData("club-cup", GameStage.Championship)]
+    [InlineData("CLUB-CUP", GameStage.Championship)]
+    [InlineData("eastern-conference-playoffs---round-one", GameStage.Playoffs)]
+    [InlineData("something-this-build-has-never-seen", GameStage.Playoffs)]
+    public async Task ASoccerSeasonPartWithAnOpaqueIdIsStagedBySlugAndAnUnknownSlugIsHeldAsARevealingPlayoff(string slug, GameStage expected)
+    {
+        var board = Board("2026-01-01", "2026-12-31", 13846, SoccerEvent("e1", "2026-01-20T18:00Z", 13846, slug));
+
+        var game = Assert.Single((await ClubSchedule(board)).Games);
+
+        Assert.Equal(expected, game.Stage);
+    }
+
+    [Fact]
+    public async Task AnOpaqueSeasonPartWithNoSlugIsAlsoHeldAsARevealingPlayoff()
+    {
+        var board = Board("2026-01-01", "2026-12-31", 13846, SoccerEvent("e1", "2026-01-20T18:00Z", 13846, null));
+
+        Assert.Equal(GameStage.Playoffs, Assert.Single((await ClubSchedule(board)).Games).Stage);
+    }
+
+    [Fact]
+    public async Task TheSlugNeverOverridesAKnownNumericSeasonType()
+    {
+        var board = Board("2026-01-01", "2026-12-31", 2, SoccerEvent("e1", "2026-01-20T18:00Z", 3, "regular-season"));
+
+        Assert.Equal(GameStage.Playoffs, Assert.Single((await ClubSchedule(board)).Games).Stage);
+    }
+
+    [Fact]
+    public async Task ASoccerChampionshipIsNamedByTheLeaguesOwnMarkerWhenNoNoteNamesIt()
+    {
+        var board = Board("2026-01-01", "2026-12-31", 13846,
+            SoccerEvent("cup", "2026-01-20T23:30Z", 13119, "club-cup", "Club side win series 2-0"));
+
+        var schedule = await ClubSchedule(board);
+
+        Assert.Equal(new GameId("cup"), schedule.Championship!.Id);
+        Assert.Equal("Club Cup", schedule.Championship.Name);
+        Assert.DoesNotContain("win", schedule.Championship.Name);
+    }
+
+    [Fact]
+    public async Task AYearLongSeasonWithNoGameInTheWindowAndAnOpaqueTypeIsOffSeasonNotRegularSeason()
+    {
+        var league = (await ClubSchedule(Board("2026-01-01", "2026-12-31", 13846), Window)).League;
+
+        Assert.Equal(SeasonPhase.OffSeason, league.Phase);
+    }
+
+    [Fact]
+    public void TheShippedSoccerLeaguesAreStagedBySlugWithTheirOwnChampionshipSlug()
+    {
+        var mls = EspnLeagues.Default.Single(league => league.Id == new LeagueId("mls"));
+        var nwsl = EspnLeagues.Default.Single(league => league.Id == new LeagueId("nwsl"));
+
+        Assert.Equal(("soccer", "usa.1"), (mls.Sport, mls.Slug));
+        Assert.Equal(("soccer", "usa.nwsl"), (nwsl.Sport, nwsl.Slug));
+        Assert.Equal(["mls-cup"], mls.ChampionshipSlugs);
+        Assert.Equal(["playoffs---championship"], nwsl.ChampionshipSlugs);
+        Assert.Contains("MLS Cup", mls.ChampionshipMarkers);
+        Assert.Contains("NWSL Championship", nwsl.ChampionshipMarkers);
+    }
+
     [Fact]
     public void TheShippedLeaguesAreExactlyTheTablesEspnLeagues()
     {
