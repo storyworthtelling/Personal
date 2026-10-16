@@ -114,7 +114,7 @@ public static class SmsLogReader
     /// by type: a group's other members show up as "to" rows the same as the one recipient
     /// an ordinary message has, and the count is the whole signal.
     /// </summary>
-    private static List<string> ReadMmsAllAddresses(Context context, string id)
+    internal static List<string> ReadMmsAllAddresses(Context context, string id)
     {
         var addresses = new List<string>();
         using var cursor = context.ContentResolver!.Query(

@@ -72,7 +72,8 @@ public class DiagnosticsActivity : Activity
 
         contentColumn.AddView(PaperUi.Body(this, hasEntries
             ? "Recent problems captured on this device, oldest first. Use Share to send this to whoever is "
-              + "helping fix the app."
+              + "helping fix the app; the shared copy also carries the texts trail — when each text arrived, "
+              + "by which route, never what it said."
             : "No problems have been captured. Anything that goes wrong — including quietly, in the background "
               + "— will be recorded here."),
             Spaced(0, DesignTokens.Space.X4));

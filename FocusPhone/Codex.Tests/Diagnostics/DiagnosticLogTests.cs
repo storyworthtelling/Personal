@@ -158,4 +158,19 @@ public class DiagnosticLogTests : IDisposable
         Assert.True(log.HasEntries);
         Assert.Contains("a failure worth undoing", log.ReadAll());
     }
+
+    // The texts trail is a second log beside the failure log, not inside it: a line per
+    // arriving text would roll the failure history out within a day.
+    [Fact]
+    public void NamedLog_KeepsItsOwnFile()
+    {
+        var failures = new DiagnosticLog(directory);
+        var texts = new DiagnosticLog(directory, 64 * 1024, "texts.log");
+
+        texts.Append(Entry("SMS arrived"));
+
+        Assert.False(failures.HasEntries);
+        Assert.Contains("SMS arrived", texts.ReadAll());
+        Assert.True(File.Exists(Path.Combine(directory, "texts.log")));
+    }
 }

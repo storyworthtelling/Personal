@@ -65,6 +65,8 @@ public class SmsDeliverReceiver : BroadcastReceiver
             var incoming = SmsProviderWriter.PersistIncoming(context, intent);
             if (incoming is not null)
             {
+                PostDiagnostics.LogText("Sms", TextTrail.Sms(
+                    incoming.Address, incoming.SentAt ?? DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, incoming.Parts));
                 SmsNotifications.NotifyIncoming(context, incoming);
             }
         }
@@ -108,6 +110,7 @@ public class MmsDeliverReceiver : BroadcastReceiver
                 return;
             }
 
+            PostDiagnostics.LogText("Mms", TextTrail.MmsAnnounced());
             MmsDownloader.RequestDownload(context, notification);
         }
         catch (Exception e)

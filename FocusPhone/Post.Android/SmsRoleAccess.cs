@@ -20,7 +20,7 @@ public static class SmsRoleAccess
     /// <summary>Arbitrary, distinct from the voice sign-in's code so results do not cross.</summary>
     public const int RequestCode = 4801;
 
-    public static SmsRoleStatus Status(Activity host)
+    public static SmsRoleStatus Status(Context host)
     {
         var roles = (RoleManager?)host.GetSystemService(Context.RoleService);
         if (roles is null || !roles.IsRoleAvailable(RoleManager.RoleSms!))
