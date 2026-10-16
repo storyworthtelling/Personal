@@ -347,7 +347,11 @@ public class FirstRunActivity : Activity
         catch (Exception exception)
         {
             services.Diagnostics.Warn("first-run", "Google sign-in did not complete.", exception);
-            PulpNotices.Raise(this, overlay, VaultOutcomes.SignInFailed(DateTimeOffset.UtcNow), NoticeButtons());
+            var at = DateTimeOffset.UtcNow;
+            var notice = GoogleSignInFailure.IsUnregistered(exception.ToString())
+                ? VaultOutcomes.SignInNotRegistered(at)
+                : VaultOutcomes.SignInFailed(at);
+            PulpNotices.Raise(this, overlay, notice, NoticeButtons());
         }
     }
 
