@@ -63,12 +63,26 @@ public static class SportsScreenText
     public static string? ChannelLine(string? channel) =>
         string.IsNullOrWhiteSpace(channel) ? null : "On " + channel.Trim();
 
+    /// <summary>Play's sentence while the household has not loaded: what is ticked is unknown, so nothing is said about ticking.</summary>
+    public const string ServicesLoading = "Loading your services…";
+
     /// <summary>
     /// What Play says while no feed hands Pulp a link to a game (D57): the channel it is on, and that
     /// Pulp cannot open it yet. A hand-off needs a service and a link; the sheet carries only a channel.
     /// </summary>
     public static string PlayNote(string? channelLine) =>
         (channelLine is null ? string.Empty : channelLine + ". ") + "Pulp can't open this game for you yet.";
+
+    /// <summary>
+    /// What Play says when the channel is a known broadcaster but its service is not ticked (D311): the channel,
+    /// the service that carries it, and where to tick it.
+    /// </summary>
+    public static string TickNote(string? channelLine, string serviceName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
+        return (channelLine is null ? string.Empty : channelLine + ". ")
+            + $"{serviceName.Trim()} carries it. Tick {serviceName.Trim()} in Settings, under Services, and Play will open it.";
+    }
 
     /// <summary>The chip on a game: only what is not ordinary. A championship game is "Final" as mockup 07 draws it.</summary>
     public static string? StageChip(GameStage stage) => stage switch

@@ -1,5 +1,6 @@
 using Pulp.Domain.Calendar;
 using Pulp.Domain.Catalogue;
+using Codex.Ui;
 using Pulp.Domain.Core;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.Library;
@@ -44,15 +45,25 @@ internal sealed class CalendarReads(PulpServices services)
                 .ToList());
         var playlists = adults.SelectMany(household.PlaylistsFor).DistinctBy(playlist => playlist.Id).ToList();
 
+        // A film's date is the availability source's alone (D302). It is asked only when a playlist holds a film,
+        // and a source that fails costs the film rows, never the calendar. It is read before the titles because
+        // a film is looked up only when it has a day (D358); otherwise the film loop would find no title to build from.
+        IReadOnlyList<FilmReleaseDate> filmDates = [];
+        if (playlists.Any(playlist => playlist.List.Entries.Any(entry => entry.Kind == PlaylistEntryKind.Film)))
+        {
+            try
+            {
+                filmDates = await services.FilmReleaseSource.UpcomingAsync(cancellationToken);
+            }
+            catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
+            {
+                services.Diagnostics.Warn("calendar", "Film release dates could not be read; films are left off the calendar.", exception);
+            }
+        }
+
         var tracked = showsByAdult.Values.SelectMany(shows => shows).ToHashSet();
-        var wanted = tracked
-            .Concat(playlists.SelectMany(playlist => playlist.List.Entries)
-                .Where(entry => entry.Kind == PlaylistEntryKind.Show)
-                .Select(entry => new TitleId(entry.Key)))
-            .Distinct()
-            .ToList();
         var titles = new Dictionary<TitleId, CatalogueTitle>();
-        foreach (var id in wanted)
+        foreach (var id in CalendarTitleWants.Of(tracked, playlists, filmDates))
         {
             if (await services.TitleAsync(id, tracked.Contains(id), opened: false, cancellationToken) is { } title)
             {
@@ -72,7 +83,9 @@ internal sealed class CalendarReads(PulpServices services)
             playlists,
             titles,
             title => ContinueRowText.Home(title, household.ServicePlans, household.HomeOverrides)?.Service,
-            zone);
+            zone,
+            FilmDates: filmDates,
+            Plans: household.CalendarPlans);
         return new CalendarRead(
             CalendarScreenSources.Build(reads, games),
             household,

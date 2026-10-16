@@ -21,7 +21,7 @@ public sealed record CalendarScreenRow(
 /// <summary>One day's group, under its relative heading.</summary>
 public sealed record CalendarScreenDay(string Label, IReadOnlyList<CalendarScreenRow> Rows);
 
-/// <summary>The page, ready to draw. It carries no action beyond opening a row: plans are made from a title's page (D246).</summary>
+/// <summary>The page, ready to draw. It carries no action beyond opening a row (D246); the area adds its own "Add a plan" line (D305).</summary>
 public sealed record CalendarScreenPage(IReadOnlyList<CalendarScreenDay> Days)
 {
     public bool IsEmpty => Days.Count == 0;
@@ -111,7 +111,8 @@ public static class CalendarScreen
                 _ => "Release",
             }, service),
             CalendarItemKind.Game => Join("Game", item.Detail),
-            _ => Join(kind switch { TitleKind.Film => "Film", TitleKind.Show => "Show", _ => null }, service) is { Length: > 0 } line
+            _ when item.Title is null => Join("Plan", item.Detail),
+            _ => Join(kind switch { TitleKind.Film => "Film", TitleKind.Show => "Show", _ => null }, service, item.Detail) is { Length: > 0 } line
                 ? line
                 : "Plan to watch",
         };

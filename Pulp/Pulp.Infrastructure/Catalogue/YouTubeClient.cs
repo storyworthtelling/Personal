@@ -46,4 +46,31 @@ public sealed class YouTubeClient
             .Select(item => item.Child("id").Text("videoId"))
             .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
     }
+
+    /// <summary>
+    /// The video id of one embeddable video inside a channel, published in a window (a game's highlights, D313).
+    /// The title and thumbnail in the response are never read: the caller wants an id to play, and the text is feed
+    /// text that can say how a game went.
+    /// </summary>
+    public async Task<string?> FindInChannelAsync(string channelId, string phrase, DateTimeOffset publishedAfter, DateTimeOffset publishedBefore, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(channelId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(phrase);
+        var key = http.RequireKey(keys.Keys.YouTubeKey, "YouTube");
+        var what = "a highlights search";
+        var response = await http.GetAsync(
+            new Uri("https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&videoEmbeddable=true"
+                + "&channelId=" + Uri.EscapeDataString(channelId)
+                + "&publishedAfter=" + Uri.EscapeDataString(Stamp(publishedAfter))
+                + "&publishedBefore=" + Uri.EscapeDataString(Stamp(publishedBefore))
+                + "&q=" + Uri.EscapeDataString(phrase) + "&key=" + Uri.EscapeDataString(key)),
+            NoHeaders, what, cancellationToken);
+
+        using var document = http.Parse(response, what);
+        return document.RootElement.Child("items").Items()
+            .Select(item => item.Child("id").Text("videoId"))
+            .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
+    }
+
+    private static string Stamp(DateTimeOffset at) => at.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
 }

@@ -864,3 +864,490 @@ allowlist lets a ringing call surface over a locked task and that answering retu
 status-bar disable survives; where each service's deep link lands and whether each publishes its position;
 and all four timing constants.
 Still device-only after D301: that an ordered broadcast's result code from a manifest receiver reaches Pulp's result receiver while Pulp is in the foreground; that the `PendingIntent` opt-in starts the task locked; that every service publishes a media session within 30 s of a cold start (a service that does not is released as `NeverStarted`, so the 30 s needs a real measurement); the link domains per service; and the boot count on the device.
+
+## Follow-up rulings
+
+### Calendar follow-up (film releases, plans, her account)
+
+- **D302 · A film is on the calendar only on a day the availability source announced.** The catalogue holds a
+  film's release *year*, so the date comes from the Streaming Availability changes feed already integrated
+  (D204): `Upcoming` changes of a whole title, film, on a service the household pays for (subscription, free
+  or add-on), with an announced day (`FilmReleaseDates.FromChanges`). Undated changes, rentals and purchases
+  are not "the film's release" and are skipped; a film on two services takes the earliest day. A playlist film
+  with such a day becomes a "Film release" row (`CalendarScreenSources`), naming its playlists as a show's
+  premiere does. **What the day means:** it is when the film *arrives on that service*, which is the
+  household's real "can watch it now" date; it is not the theatrical date, and no theatrical date is
+  available without a new source. No TMDB (G7), no new key, no invented date. The source is `IFilmReleaseSource`
+  (`ChangesFilmReleaseSource`, two pages at most, behind a 12-hour `CachedFilmReleaseSource`) and is asked
+  only when some playlist holds a film; a failure leaves the film rows off and the rest of the calendar intact.
+  Cost: up to two extra requests per twelve hours on the 1,000/month budget, only while a playlist holds a film.
+- **D303 · Plans are a household record, `plan`.** Frozen kind `plan` (`HouseholdPlan`: id, owner, text,
+  optional title, day, optional time, optional place, who), guarded in `HouseholdKindsTests` and
+  `PlanAndAccountRecordTests`; per-field merge like every record, delete is a tombstone, an unreadable day or
+  time is reported, not dropped. `CalendarPlans.ToSources` keeps adults only (a child in `Who` is dropped, a
+  plan only children are on is not read), the page shows a plan to those in it (D244) and the household calendar
+  to all. A plan's place is its detail line; free text is allowed (a title link is optional, so `PlannedViewing.Title`
+  became nullable and gained `Place`). "Plan · The Majestic" in the mockup is the title line, unchanged.
+- **D304 · Her Google account is its own record, `adult-account`.** Not a field on the roster's `viewer`
+  record: a separate kind keyed by viewer (`AdultAccountEntry`) means editing it never touches a roster record,
+  an older build's roster read is unaffected, and nothing needs a schema bump. The shape is checked by
+  `GoogleAddress.Check` (one @, dotted domain, no spaces, at most 254) both when typed and again when read, so a
+  hand-edited record never reaches Google. It is edited on **Settings, Household**, in an adult's person editor
+  (owner only, as the other roster edits are), blank clears it undo-first, and removing the person removes it.
+  `HouseholdView.AdultGoogleAccounts` (roster adults only, never a child) feeds `PulpCalendarFeed` and so
+  `CalendarScreenSnapshot`'s `AdultAccounts`: on the owner's connected phone the next nightly write shares the
+  Pulp calendar with her as a reader (`CalendarHousehold.EnsureAsync`, already built; the owner's own address and
+  duplicates are dropped). It lives only in the encrypted household file; tests use `example.com` addresses.
+- **D305 · Add a plan is a quiet line on the Calendar page, not a bottom bar.** D246 stands (no bottom bar), so
+  the entry is an "Add a plan" quiet button under the status line that opens an inline Paper card: words, a
+  day (system date picker), an optional time (system time picker; none is all-day, D148), a place, and "Just me"
+  / "Everyone". It is checked by `CalendarPlans.Check` (words, at most 80 letters, not a past day) before
+  anything is written. **Deviation from the brief:** the kit's `ActionCard` cannot hold input fields, so this
+  is a card-styled inline form rather than a `PulpActionCard`. A long-press on a plan row offers "Remove plan",
+  taken at once with the way back on the dog-ear (§13). The page is not shown in a child's view, and a viewer
+  who is not an adult on the roster is offered no entry. D244/D246's "plans are made from a title's page" is
+  widened, not withdrawn; a title-page entry is still unbuilt.
+
+**Owner actions.** (1) On Settings, Household, open her person and enter her Google address, then let the
+nightly write run (the calendar must already be connected on the owner's phone): she then finds the Pulp
+calendar in her Google Calendar as a reader. (2) Nothing to enable for film dates: it uses the Streaming
+Availability key already in the vault; films show only once the source has announced an arrival day.
+
+**Device-only, unverified.** The date and time pickers and the form's rebuild-on-pick behaviour; the long-press
+and dog-ear on a plan row; that the changes feed's `upcoming` + `show` response carries film titles and
+timestamps for the household's services (the mapping follows the v4 schema but this query has not met the live
+API); that the `reader` share reaches her account on a real nightly run; the Household editor's email keyboard.
+
+## Follow-up rulings
+
+Decided after Release G, for the two Sports items left unbuilt (Play, and D71's highlights). Numbered from D310 so they
+cannot collide with rulings other work adds after D301.
+
+- **D310 · The broadcaster table** — a game carries only a channel string, so `BroadcasterTable` (Domain, beside
+  `ServiceCatalogue`) maps public broadcaster and streaming names, matched whole and without case, to the catalogue
+  service whose own app streams them: Peacock and NBC; Prime Video; Netflix; Paramount+ and CBS; ESPN+ and Disney+; HBO Max,
+  Max, TNT, TBS, truTV and TNT Sports; Hulu. A linear network is listed only where the service carries it live in its own
+  app. A channel text naming several (ESPN's "NBC · Peacock") is read in order and the first *ticked* service wins; if none is
+  ticked, the first known one is named. The table is checked on construction (a name claimed twice, or a service the
+  catalogue lacks, throws) and printed in Settings → About beside the league to source table (`SettingsGroups.SportsTables`,
+  D140). The streaming rights behind it are un-evidenced and change; a name the app does not find is the first thing to
+  check on a device.
+- **D311 · Play for a game** — Play resolves the channel (`GamePlay.Decide`). Ticked: it opens the service's **home** through
+  `HandOffPlanner`/`HandOffExecutor` (G8), as an https link on the service's own first link domain
+  (`BroadcasterTable.HomeLink`), so `HandOffRequest` needed no change and Flyleaf's own-domain gate (D301) passes. Known but
+  unticked: the card keeps the channel and says which service to tick, and where. Unknown or no channel: the earlier card,
+  unchanged. Children are unchanged: Sports stays out of their view (D59), and the request's facts are unrated, so a child
+  anywhere on the sofa is refused at the gate. A mis-open or missing app uses the existing dog-ear notices.
+- **D312 · A played game is usage, not watching** — the hand-off is kept as the viewer's sitting for the game
+  (`GamePlay.UsageSitting`, `WatchedKind.Game`), so it counts toward the service's month in Index (D269); `RecordedGames` now
+  ignores a hand-off sitting for a game, because opening a service says nothing about whether the recording was seen.
+  Only "Mark watched" or a session that ended lifts a recording and its hold. The earlier guard's ban on the hand-off's
+  evidence in the Sports files is narrowed to what it was for: the head may call the executor and keep the usage sitting
+  through `UsageSitting`, but never names a watch source itself. Known edge: a session that ends within the hand-off window
+  (12 h) is attributed to the last hand-off for that service, so a different programme ending in the same app could mark the
+  game watched; the existing session rules own that, and a game has no title name to compare.
+- **D313 · Highlights: source, scope and offer** — highlights are offered only for **open** leagues (a held league's
+  one-tap peek counts as held), only for a league with an official YouTube channel on record (`HighlightChannels`; a league
+  not in it fails closed), and only for a game that is **over** (four hours after its start, un-evidenced). The source sits
+  behind `IHighlightsSource`, whose only return is a video id, so a title or thumbnail has nowhere to travel. The adapter
+  (`YouTubeHighlightsSource`) reuses the trailers' `YouTubeClient`, key and health reporting: one search inside the channel,
+  for "away home highlights", embeddable, from the game's day to three days after. Nothing is looked up until the viewer taps
+  the row's quiet "Highlights" line, once per game per session (a search costs 100 quota units). The channel ids are public
+  and unconfirmed against the live API; a wrong one finds nothing. Practical reach: the sheet carries only unwatched
+  recordings and the next game, so an over game in an open league appears where the Schedule page lists it; widening the
+  sheet to show finished games is a separate decision.
+- **D314 · Why highlights are drawn as a generic label** — a highlight's title or thumbnail is feed text written to
+  describe how a game went, so a title that "looks like a result" is the ordinary case, not the exception, and no filter on
+  titles can be trusted. So no part of the video's own text is ever read or drawn: the row says "Highlights", the player's
+  header is "Highlights · Away at Home · Sat Jan 17", and a guard fails if a Sports head file names the league-wide
+  `Highlight` record, its list, a snippet or a thumbnail. The league-wide list the feed carries (D71) stays undrawn. The
+  embed itself shows YouTube's own poster frame until the viewer taps play; that frame is the one residual risk, and is why
+  the offer is limited to leagues with nothing held.
+- **D315 · One player, two kinds** — `TrailerActivity` keeps its name, file and manifest entry and gains a kind
+  (`PlayerKind`: Trailer or Highlights, words in `PlayerCopy`). Only the header fallback and the status sentence differ; the
+  posture, the id check and the single `LoadPlayer` call are unchanged, so the G6 guard (one class reaches the player) stands
+  and now describes a YouTube video, not only a trailer.
+- **D316 · A held league's channel** — checked against D242 and kept: a held league still shows a recording's channel
+  (the viewer already knows the game exists and needs the channel to find it) and the first revealing recording, but never a
+  later revealing fixture, which `SpoilerHold` leaves out of a held sheet together with its channel. A channel names where
+  a game is shown, not how it went. A test pins that a held plan carries no later playoff fixture and offers no highlights.
+
+**Device-only, unverified:** that the service's home link opens its live tab (or at least its app) and not a store or a
+browser page, per service; that a Flyleaf locked open accepts the `www.` home links; the broadcaster names ESPN and MLB
+actually return, and the rights behind each mapping; the four channel ids; that a channel search finds the game's
+highlights inside the three-day window; and the embed's poster frame for a highlight.
+
+- **D317 · A child's sport is a per-league allowance, and the phone still shows no Sports tab.** D59/D72 say a child sees
+  sport only for leagues a parent allowed; D231 keeps Sports out of the child's phone view (it waits for the TV phase). The
+  record those two needed did not exist; it does now: frozen household kind `child-league`, one record per child and
+  league (`ChildLeagueAllowance`: child, league, the adult who ticked it, when), un-allowing is its tombstone, two parents'
+  ticks merge. `ChildSports` (Domain) holds the rules: nothing allowed means nothing shown; a group of children sees the
+  intersection of each child's leagues (no children, no leagues); a held league stays held exactly as for an adult, with
+  **no peek** for a child; and a child's open league carries **no highlights** (a highlight's own title can read as a
+  result, D314, and D61 asks for full games only) — standings stay, as D72's "full league view". Scores do not exist in
+  the types (G10, G15). Settings → Household → a child's rules gained a **Leagues** group of ticks, every league unticked
+  to begin with, writable by the adult whose phone this is (it asks to be told whose phone it is first). D231 stands: the
+  child's `Route` is unchanged and a test still holds Sports out, so ticking a league changes nothing on the phone until the
+  TV phase draws from `ChildSports`. Not built because no ruling asks for it: a child's own team follows (follows are per
+  adult, D60), so `Present` takes whatever followed teams the caller supplies.
+
+- **D321 · The Sports page lists finished games in open leagues, and "over" is the clock.** The owner's
+  decision: highlights must be reachable, so an open league lists the *finished* games of followed teams from
+  the schedule window (the 14 days already fetched), newest first, as the generic row (title, day, channel,
+  Mark watched, Play, and the one-tap Highlights line, D313). **Over is time only** (`GameOver`, Domain): the
+  game's start plus a typical length by league (nfl and mlb 4 h, nba and nhl 3 h; a league the table lacks takes
+  the longest, so an unknown game is called over late, never early; un-evidenced). Its signature is a league and two
+  moments; the feed's score, winner, record and status flags are still never read (G15), the adapters are
+  unchanged, and `GameOverTests` pins that neither the rule nor `GameLine`/`GameRow`/`Game` has a result-named member.
+  `GameLine` gained `Over` (default false), set only by an open sheet. Order within a team: recordings still
+  running, then finished games newest first, then the next game. **Held leagues are untouched (D242):** a held
+  sheet never sets `Over`, never lists a finished game beyond the viewer's own unwatched recordings (D316), shows
+  no highlights and no finished row; a peek (the Spoilers tag) behaves as before and the hold returns after it.
+  A watched game drops off, as a recording does. Highlights timing stays D313's flat four hours; the sport table
+  can mark a game over up to an hour sooner (nba, nhl), and that gap simply has no Highlights line yet.
+  **Finding to confirm:** by D55 every started, unwatched game of a followed team is a recording, and any such
+  recording *holds* its league (D70). So a league is open only when every finished game of the viewer's teams is
+  already watched, and "unwatched and finished" is empty there; the finished list is therefore visible only
+  during a peek, where those games were already listed as recordings. This build adds the over mark, the
+  newest-first order and the guards, but not a new reach. If the owner wants a finished game to stay reachable
+  for highlights *after* it is marked watched, that is a different rule (watched games listed in an open league,
+  under a quiet "Earlier" fold) and a new ruling; it was not built because the brief says watched games drop off.
+
+## Follow-up rulings: usage through Drive
+
+- **D320 · Usage reaches an Index install through a small encrypted Drive file, as well as the broadcast.** D90's
+  broadcast only lands on a phone where Pulp and Index both live, but the install that shows a charge is the one
+  with Plaid, which need not be the phone Pulp ran on. So after the broadcast, Pulp also writes the same month
+  totals to `storyworthtelling-pulp-usage.json` (`IndexUsageFile.FileName`, frozen), sealed with `VaultEnvelope`
+  under the household passphrase, the way the household file and the snowball history already are.
+  **Why not the household snapshot:** that file is the owner's Index install's single-writer publication of its
+  own figures, and Pulp writing into it would make two writers of one file. **Why not the Pulp household file:**
+  Index would have to learn its record format, and it is a Pulp-internal merge document. A separate file is the
+  lightest correct design: one reader, one writer kind, no coupling to either app's other formats.
+  **Contents:** `{version: 1, entries: [{service, month, count, lastOpened?, merchants[]}]}` — exactly the
+  `IndexUsagePayload` fields and the merchant names the broadcast already carries (public catalogue data, so Index
+  keeps no second table). No title, viewer or minutes has a field, and the usage shape guard still holds because
+  `IndexUsageEntry` is typed (`ServiceId`, `UsageMonth`, count, day); merchant names are written from the catalogue
+  and are not held in memory. **Writing:** Pulp merges a touched service-month over what the file holds (a later
+  total replaces an earlier one; a count of zero removes it, as in D90), skips the write when nothing changed,
+  debounces by 30 seconds (`IndexUsageFileQueue`, `IndexUsageFilePublisher`) and is best effort; a failed write is
+  put back and goes again with the next hand-off. **G14:** a file that exists and will not open (wrong passphrase,
+  damaged, a newer version, no passphrase on the phone) is never written over (`IndexUsageUnreadableException`).
+  Only the owner's account creates the file (`HouseholdSync.MayCreateFile`, the household file's rule): one made in
+  her Drive would be a second file the owner's install never sees. Until the owner's Pulp has written once, hers
+  waits. A service the catalogue lacks is not written, and is dropped from the file if this build rewrites it.
+  **Reading:** Index, on both installs, reads it through `DrivePulpUsageSource` (its own `IDriveTextFile`, the
+  vault passphrase only, no Plaid and no section of the owner's vault; a guard fails if the source names either),
+  throttled to once per 30 minutes when the Budget page appears. Only a file that opened and decoded replaces the
+  kept copy (`PulpUsageStore.SaveShared`); wrong passphrase, garbled, newer, absent or offline leave it exactly as it
+  was. The line is drawn from the local receiver's ledger filled out from that copy (`PulpUsageLedger.WithSharedFrom`):
+  the receiver wins for any service and month it has, since both carry household-wide totals, and the file supplies
+  the rest. Receipts still apply only to the receiver's own ledger, so the Drive copy never leaks into it.
+  **Guard G16, the file's half:** `PulpUsageFileGuardTests` holds the file name, version and field names equal across
+  the two codecs by content. **Her install:** it reads and keeps the file like the owner's, but the line is drawn
+  only where a charge is, and the Budget page on her install shows the household's categories, not transactions; the
+  line therefore appears on the install that has Plaid charges. Not widened beyond that here.
+
+**Device-only, unverified (D320).** That the owner's account sees a file Pulp wrote from another phone (it follows
+the household file's share path, which has been exercised only by tests); the first creation of the file on the
+owner's phone and that her Pulp then updates it; that a 30-second debounce survives the process being reclaimed
+(a pending write is lost, and the next hand-off sends the month again); and the line itself under a real charge
+on a phone Pulp is not installed on.
+
+- **D321 · The four highlight channel ids are confirmed** — fetched each public `youtube.com/channel/<id>` page without a key: the NFL, MLB, NBA and NHL ids in `HighlightChannels` each resolve to a channel titled for the league with vanity URL `@NFL`/`@MLB`/`@NBA`/`@NHL` and a self-canonical URL, so none changed; a test pins four distinct, well-formed ids. This closes the "four channel ids" item in the unverified list above, except that a channel search finding the game inside the window remains device-only.
+
+## Follow-up rulings: a child's sport inside Watching
+
+- **D325 · A child gets no Sports tab, and the sport a parent allowed is a quiet "Sport" section at the foot of their Watching
+  tab.** Amends D231 and D317. The tab set stays three (Watching, Playlists, Discover; a request for Sports still lands on
+  Watching); only the content of Watching grows. `ChildSportSection.Build` (Domain, `Pulp.Domain/Children`) composes it from
+  `ChildSports.Present` over the allowed leagues, and `ChildWatchingPage` draws it (`Shell/ChildSportSectionView`) under the
+  shows, with the same Paper rows as the Sports screen (rule, heading, body and secondary lines) and none of its machinery.
+  **Rules:** default-deny, so nothing allowed for every child watching (`ChildSports.AllowedForAll`, D255's intersection for a
+  group) means no section and no feed is even read; no empty card for a league with no game or a section with no league.
+  A held league stays held, with no peek and no Spoilers tag to tap, and shows no revealing fixture; no standing, highlight,
+  score or record has a field in the section's types (a test walks them). A row is title, day, time and channel only; a
+  championship is its name and date. **Which teams (G10, D60):** a child has no follows (follows are per adult), so the
+  section shows the adults' followed teams within the allowed leagues. **Held:** a league is held if any adult's followed
+  team there has an unwatched recording of theirs, the strictest reading. **Play:** a row offers Play only when the channel
+  resolves to a service the household ticked and `ChildFilter.CanStart` answers yes for every child on the very facts
+  `GamePlay.Request` hands the planner (so a blocked service, or one not attested or kids-only, offers nothing, G13); the
+  tap goes through the one hand-off door as the children watching, and the sitting is each child's own, usage only (D312,
+  D23). Otherwise the tap opens a card with the game and its channel. **Consequence worth the owner's eye:** a game's facts
+  are unrated, so under D128 the gate refuses it for a child unless a parent has allow-listed that game, which nothing in
+  the editor does; today Play therefore appears for a child only in that case, and rows are otherwise look-only. Changing
+  that is a rating decision for games, not a drawing one, and is not made here. A feed that fails is logged and the section
+  is absent; it never costs the shows their page.
+
+**Device-only, unverified (D325).** That the section reads well under the shows on a real phone (spacing, a long list),
+that a held league's recordings read sensibly to a child, and a real Play from a row (see the consequence above).
+
+
+- **D330 · An open league's "Earlier" fold keeps watched, finished games reachable (resolves D321's finding).** D321 found
+  that in an open league "finished and unwatched" is empty by design (an unwatched started game is a recording and holds
+  the league, D55/D70), so the owner's request, every finished game of the leagues they watch listed so Highlights stay
+  reachable, was not met. Decided: all finished games are listed. Each followed team in an **open** league gets a quiet
+  **Earlier** line (secondary ink, chevron, starts folded) over the games that are **watched**, **over by the clock**
+  (`GameOver`) and inside the schedule window already fetched (`SportsWindow.RecordingDays`, 14 days), newest first. No new
+  fetch. Built by the pure `EarlierGames.For`, fed by `RecordedGames.Watched` (the mirror of `Unwatched`, same evidence
+  and verdict rule); `SpoilerHold.Present` takes the watched ids and fills `OpenLeague.Earlier` (per-team
+  `TeamEarlier`), and `SportsScreenPlan` turns it into `TeamPlan.Earlier`/`EarlierLine`/`EarlierOpen`. Rows are the generic
+  finished row (title, day, channel, Highlights when D313 allows, Play). **Held leagues are unchanged (D242):** `HeldLeague`
+  and `TeamGames` have no Earlier member, so a held league can show no Earlier fold and never says a game is over; a test
+  builds a held page with watched finished games and asserts none. **A peek is unchanged (D183):** it carries no Earlier
+  list. **Fold key:** `FoldMemory.EarlierKey` (`earlier:<league>:<team>`) is its own choice, so folding a team never moves
+  it; it rides the existing frozen `pulp-sports-fold` file and `fold:` prefix, so **no new preference file or prefix**
+  exists and the frozen-names guard is unchanged (a test pins the round trip). **Card:** Mark watched is undo-capable,
+  so an Earlier row's long-press card (`CardItem.GameWatched`) offers Play, **Mark unwatched** (undo-first; it makes the
+  game a recording again and so re-holds the league, the owner's own act) and Add to. The Schedule page is unchanged and
+  still lists every game the sheet carries. A league with no channel on record lists Earlier rows without a Highlights line.
+  **Device-only, unverified:** the fold's look in the team block, and a real Mark unwatched re-holding the league on the
+  next draw.
+
+## Follow-up rulings: the owner's leagues (MLS, NWSL, PWHL, PWBL, Olympics)
+
+Numbered from D340 so they cannot collide with D330 (the Earlier fold) or the rulings before it. Checked live through the agent proxy,
+shapes only; nothing from a response is stored in the repository and every fixture is invented.
+
+- **D340 · The table lists the owner's eight first, and a league may have no source.** The owner follows MLB, NFL, NHL, MLS,
+  NWSL, PWHL, PWBL and the Olympics; NBA stays in the table, with WNBA and AFL, but is not followed. `SportsSourceTable.Default` is
+  now in that order (the order the picker, the child allowance rows and About use). A league with no public, key-free, score-free
+  schedule source is in the table with a null source and a sentence saying why (`SportsLeagueEntry.NoSourceNote`); About
+  prints "League — no schedule source yet: why" for it. `Leagues` stays the sourced leagues only (everything that asks a source,
+  browses or lets a child be allowed a league iterates it and so never meets an unsourced one), `Unsourced` and `All` are new. A
+  source with no note, or a note beside a source, is refused when the table is built. League ids are frozen record keys
+  (`mlb nfl nhl mls nwsl pwhl pwbl olympics nba wnba afl`, lowercase), pinned by `SportsLeagueIdsFrozenTests`: follows are
+  namespaced team ids (D295), so a renamed league orphans them silently. **Not touched:** the Find field still sorts its
+  matches alphabetically by league name (`SportsScreenFind`, another change's file); if the watched eight should lead the
+  search results as well, that is one ordering change there.
+- **D341 · MLS and NWSL: ESPN's public JSON, no new adapter.** `soccer/usa.1` and `soccer/usa.nwsl` answer the same
+  scoreboard, teams and standings shapes `EspnSource` already reads (30 and 16 teams; a `rank` stat per standings entry; MLS
+  standings in two conference groups). **One difference mattered:** the soccer feeds do not number a season's parts 1/2/3. An
+  event's `season.type` is an opaque id (13846 for the 2026 MLS regular season, 14024 for NWSL), so the existing rule — any number
+  it does not know is a revealing playoff — would have held every ordinary MLS and NWSL game as a playoff. The part is in
+  `season.slug` instead (measured: `regular-season`, `mls-cup`, `eastern-conference-playoffs---round-one` and `---final`,
+  `playoffs---quarterfinals`, `---semifinals`, `---championship`). `StageOf` reads the slug only when the type is not 1, 2 or 3
+  (a known number is never overridden by a slug): `regular-season` is the regular season, `preseason` the preseason, a slug in the
+  league's `ChampionshipSlugs` (`mls-cup`; `playoffs---championship`) the championship, **everything else, and a missing
+  slug, a revealing playoff** (the standing default, kept). `slug` joins the allowed wire reads in G15's guard; it names a part
+  of the season, not a result. The championship's name is the league's marker (`MLS Cup`, `NWSL Championship`) when no note
+  names it, never the feed's text. One more consequence: a year-long season (MLS's runs 1 Jan to 31 Dec) with no game in the
+  window and an opaque part id is now **off-season** rather than the fall-through regular season; numbers 1–3 keep their meaning.
+  ESPN's notes on soccer playoff games read like "PHI win series 2-0"; as before they are only matched against the
+  championship markers, never kept or drawn.
+- **D342 · PWHL is unsourced.** ESPN has no PWHL league (its hockey leagues are the NHL, the Olympic and world-cup
+  tournaments and college hockey). The league's own feed is HockeyTech's (`lscluster.hockeytech.com`, client `pwhl`), which
+  answers "Invalid key." without an access key, so it is not key-free, and the PWHL terms of use (item xi) forbid "automated
+  scripts to collect information from or otherwise interact with the PWHL Digital Properties". Taking the key out of the
+  site's own script would be both. No source, and no invented one.
+- **D343 · PWBL is unsourced.** ESPN has no such league (its basketball leagues are the NBA and its development and summer
+  leagues, the WNBA, NBL, FIBA and college). No league feed could be reached or found through the agent proxy (pwbl.com is an
+  unrelated wiffle-ball site; the league's own hosts were refused). Unsourced until the owner or a later check finds one
+  with terms that allow it.
+- **D344 · The Olympics are unsourced, and the reason is the shape.** ESPN has no Olympics league; it carries four separate
+  per-sport tournaments (men's and women's ice hockey, men's and women's basketball), country-as-team, only while those are
+  played. Following "the Olympics" through two sports would say less than it seems to, and the medal-event schedule (sports and
+  disciplines by day) is not a team schedule at all: the model has no followable unit for it and olympics.com's schedule could
+  not be read without a key or a browser from here. So the entry says "no schedule source yet: ESPN lists only a few Olympic team
+  tournaments, not the Games' event schedule". If the owner wants those tournaments, they are four more ESPN entries and a
+  country-team follow; if they want events, it is a different model (a discipline-day), neither built. The next Games are in 2028.
+- **D345 · Game length.** `GameOver`: MLS and NWSL 2.5 h (150 minutes), PWHL and PWBL 3 h, and WNBA 3 h (it was missing and fell
+  to the 4 h longest). The unknown-league fallback is still the longest, 4 h. The three unsourced leagues have lengths so a source
+  needs no second change. Highlights timing stays D313's flat four hours.
+- **D346 · Broadcasters: nothing added, on purpose.** The feed's channel names for these leagues are Apple TV (MLS in 2026),
+  FOX and FOX Deportes, and, for NWSL, CBS, Paramount+, ABC, ESPN+, Disney+, ION, NWSL+ and others. The catalogue holds
+  seven services (Netflix, Disney+, Hulu, HBO Max, Prime Video, Paramount+, Peacock). CBS and Paramount+ (NWSL), NBC and
+  Peacock (the Olympics, if sourced), Prime Video and ESPN+ already map. Apple TV, FOX, ION, NWSL+, ABC and Victory+ have no
+  catalogue service, and adding a service is the household's catalogue decision (availability ids, merchant names, packages),
+  not a broadcaster-table line, so they stay unmapped and Play shows the honest card with the channel. `BroadcasterTableTests`
+  pins both halves. **Open question for the owner:** adding Apple TV (MLS) and a sports service for NWSL's ION/Victory+ is the
+  step that makes Play useful for MLS.
+- **D347 · Highlights channels.** The official channels for MLS (`UCSZbXT5TLLW_i-5W8FZpFsg`) and NWSL
+  (`UCL4xu08EDu0ZFZsBJUB0chw`) are on record. Verified as before: each public `youtube.com/channel/<id>` page resolves to a channel
+  titled "Major League Soccer" with vanity `@mls`, and "National Women's Soccer League" with vanity `@NWSLsoccer`, each with a
+  self-canonical URL. PWHL, PWBL and the Olympics have none (no schedule, so nothing to offer highlights for); WNBA and AFL are
+  unchanged. A channel search finding the game inside the window remains device-only.
+- **D348 · Stage markers and the Championship line.** Revealing stages are unchanged: playoffs and championship reveal, regular
+  season and preseason do not (`SpoilerHold.Reveals`). MLS has a Championship line (MLS Cup, a single game, slug `mls-cup`);
+  NWSL has one (the Championship, slug `playoffs---championship`). PWHL's Walter Cup is the stage marker the owner named but
+  with no source there is no line to draw; when a source exists its marker is the first thing to add.
+
+**Device-only, unverified (D340–D349).** MLS and NWSL in the real app: the first fetch for each (30 and 16 teams, standings
+interleaved across MLS's two groups), the Championship line in the weeks it exists, a playoff round held as revealing, and what
+the Preseason slug is called (none was seen in either feed's schedule, so a preseason game would be held as a playoff until its
+slug is known); the feed's broadcast names for 2027; and the About lines on a phone.
+
+- **D349 · The highlights search reaches 14 days after a game, not 3 (amends D313).** D313's window ("the game's day to three
+  days after") fitted a game that was just played. The Earlier fold (D330) keeps watched games reachable for the schedule
+  window's 14 days, and a game 10 days old whose highlights were posted on day 0 fell outside a three-day search and found
+  nothing. `YouTubeHighlightsSource` now searches from the game's day to 14 days after, matching the oldest row Earlier can
+  show. Cost unchanged (one 100-unit search, once per game per session, on a tap); the wider window can in principle match a
+  later game between the same two clubs, since the query is "away home highlights" inside the league's channel and results are
+  not ordered by closeness to the game. The video is still reduced to an id (D314), so a wrong match shows a wrong clip, never text.
+  Device-only: that the channel search ranks the right clip first across a fortnight.
+
+## Follow-up rulings: children can play the sport
+
+- **D350 · A parent's league allowance is the allow for every game in it, so a child's sport row can offer Play (resolves the
+  "consequence worth the owner's eye" in D325; the owner decided children should be able to play the sports).** A game has no age
+  rating and none is invented. Instead the allowance a parent already gave (D317) is read as what it is, an explicit allow:
+  `TitleFacts.League` (new, set by `GamePlay.Request` for a game) names the game's league, `ChildRules.AllowedLeagues` (new,
+  **derived** by `HouseholdView` from the child's `ChildLeagueAllowance` records and deliberately not a field of the stored
+  `child-rules` record, so there is still one place a league is allowed) lists the child's leagues, and `ChildFilter.Decide` returns
+  `AllowListed` for an unrated game whose league the child has. **Order unchanged and still the rule:** block (title, franchise,
+  or every home of the title blocked) > allow (title, **league**) > parent favourite > unrated hidden > ceiling; `CanStart` then
+  still requires the service to be one of the title's homes, unblocked for every child, and attested or kids-only (D210, G13), so
+  an allowed league on an unattested or blocked service offers nothing. **A group** is judged by the strictest child (D175): every
+  child must have the league (`AllowedForAll`'s intersection at the section, and per child inside `DecideTogether`/the planner).
+  **One door (G8):** the section's `PlayFor` and `ChildSportSectionView` both build the request with `GamePlay.Request(..., league)`
+  and the view hands it to `HandOffExecutor`, whose `HandOffPlanner` re-judges it against the household's own rules, so Play is
+  offered exactly when the planner will allow it and the planner would still refuse a forged request (no league, or a league the
+  child lacks). In `PlayFor` the section's `allowed` set is unioned into each child's `AllowedLeagues` (it is already their
+  intersection, so this can only agree with the household). **Held leagues** are untouched: a revealing fixture is still absent from
+  the section and so has no Play. **Evidence stays usage-only (D312, D23):** a played game is recorded as `WatchedKind.Game` /
+  `WatchSource.HandOff` per child and is never "watched". The championship row (no channel) still has no Play. Earlier tests that
+  said Play was look-only for an unrated game (`NoPlayForAnUnratedGameEvenOnAnAttestedService...`) were replaced deliberately by
+  `ChildLeagueAllowTests` and the section tests for allowed, unattested, group, held and blocked cases.
+  Device-only: a real Play from a child's row on an attested service (the locked route under Flyleaf, D298), and that the
+  service's home opens on the live section rather than a generic landing.
+
+- **D351 · Apple TV joins the catalogue (amends D346, which left it unmapped for want of a service).** `ServiceCatalogue.Public` now
+  holds eight services. Apple TV: id `apple-tv`, name "Apple TV", availability source id `apple`, packages
+  `com.apple.atve.android.appletv` (the phone app, first, so it is the one handed to) and `com.apple.atve.androidtv.appletv` (the
+  Android TV app, listed so a TV-only install still resolves), link domains `tv.apple.com` and `apple.com`, not kids-only and so
+  not attested until the household attests it like any other. Merchant names are the specific ones only, "Apple TV+" and "Apple
+  TV"; the generic "APPLE.COM/BILL" is deliberately absent, since it also carries iCloud, App Store and Music charges and would
+  count them as a streaming subscription (D90). `BroadcasterTable` maps "Apple TV" and "Apple TV+" to it; **"MLS Season Pass"
+  stays unmapped** (D346's pin kept; it is a product name and was not seen as a feed channel). Flyleaf's `LockedOpenCatalogue`
+  carries both packages and their domains, equal to Pulp's by the existing content-read parity guards on both sides (G19), which
+  went red the moment Pulp's list changed and green again once Flyleaf's did. Picker order is catalogue order, so Apple TV is last.
+  **One code change rode along:** `BroadcasterTable.HomeLink` put `www.` before the first domain unconditionally, which for
+  `tv.apple.com` would have made `www.tv.apple.com`, a host that does not exist; it now adds `www.` only to a bare two-label domain.
+  The broad `apple.com` domain is accepted as the task asked: it lets a locked open reach any apple.com page, but only inside Apple
+  TV's own app. **Device-only, unverified:** that the two package ids are right and which one is installed (public knowledge, not
+  read off a phone; a wrong one breaks the hand-off and the hiding for Apple TV alone, so check both on the phone first), that the
+  availability source's id is `apple` and its links are on `tv.apple.com`, the merchant names as Plaid reports them, and the feed's
+  actual spelling of the broadcaster for MLS games.
+
+## Follow-up rulings: scraping the owner's three unsourced leagues from their official sites
+
+The owner asked whether PWHL, PWBL and the Olympics can be read from their official websites. Checked 16 Oct 2026 through the agent
+proxy: read-only, an honest User-Agent, one or two requests per page, robots.txt and terms read before anything else. Shapes only; no
+scraped content or real schedule is stored in the repository and every fixture is invented. The standing rule held throughout: no
+automated reader for a site whose terms or robots.txt forbid one, and no workaround for a block.
+
+- **D354 · PWHL: read from the one calendar file its own site offers for syncing, and nothing else of the site.** URLs checked:
+  `thepwhl.com/robots.txt` (200; `User-agent: *` / `Allow: /`, nothing disallowed), `thepwhl.com/en/terms-of-use` (200; item (xi)
+  of the prohibited uses reads "use automated scripts to collect information from or otherwise interact with the PWHL Digital
+  Properties" — unchanged since D342), `thepwhl.com/en/schedule` (200, read once for its links), `pwhl.com/robots.txt` (a
+  Shopify merchandise store, unrelated), `assets.contentstack.io/robots.txt` (404, the CDN publishes none). The schedule page
+  carries, beside its fixtures, **"Sync to Your Calendar" links for the preseason and the regular season** (and a per-game "Add to
+  Calendar" link into HockeyTech's `ical_add_games.php`, which is HockeyTech's own host and was not requested). The regular-season link is a
+  static iCalendar file, `Content-Type: text/calendar`, `Cache-Control: public, max-age=31536000`, `Access-Control-Allow-Origin: *`,
+  `Content-Disposition` naming it `FULL_Regular_Season_26-27.ics`, no key and no cookie: 180 events (30 games for each of 12 clubs), 5 Dec 2026
+  to 18 Apr 2027, in the shape `UID`, `TZID:UTC` (as a property), `DTSTART:…Z`, `DTEND`, `DESCRIPTION` (the same fixed sentence on
+  every entry), `LOCATION` ("Arena | City"), `SUMMARY` ("Away @ Home"), `STATUS:CONFIRMED`. **The honest reading of the terms:** (xi) forbids
+  scripts on the PWHL Digital Properties, and the file is hosted on a third-party content CDN, not on `thepwhl.com`; it exists to be
+  subscribed to by a calendar app, which is itself automated, and the league's own page invites exactly that. Pulp reads it the way a
+  calendar app does (one GET, at most every ten minutes, an identifying User-Agent, and the app's own 6-24 hour refresh above that) and touches no other PWHL
+  address: not the HTML pages, not HockeyTech's stats feed (key needed), not the per-game links. **That is a judgement, not a permission
+  anyone gave in writing; it is the owner's to confirm, and the source can be removed by flipping one table entry** (the entry
+  returns to a no-source note). Built: `PwhlCalendarSource` (source id `pwhl-calendar`, `LookupSource.PwhlCalendar`, listed in About as "the PWHL's own
+  calendar file"), behind `ISportsSource`, routed from the table. It reads `UID`, `DTSTART` and `SUMMARY` and nothing else
+  (`DESCRIPTION`, `LOCATION`, `STATUS`, `DTEND` are never named, so a score in any of them cannot be read; the venue is dropped because `Game` has no
+  place for it). **The G15 rule for a SUMMARY:** a calendar can put "Team A 3-2 Team B" there, so a SUMMARY is accepted only as exactly
+  two club names split on " @ ", each of letters, spaces, a dot or an apostrophe; any digit, bracket, colon, dash, "vs" or other separator
+  refuses the entry (it is dropped, not trimmed), and a calendar in which no entry survives is `Malformed`, not an empty season. A start with
+  parameters (a time zone) or without the `Z` is refused rather than guessed at. **Known limit, stated:** a result *word* with no digit
+  ("Harbor Gulls @ Bay Herons FINAL") would pass as part of a club name, because a calendar carries no roster to compare against; the real file's
+  180 summaries were checked in place and all are plain "Away @ Home", so this guards a future change, not today's file. Team ids are
+  `pwhl:<slug of the name>` (diacritics stripped); game ids are the calendar's UIDs (opaque; a new season's file may issue new ones, which
+  only orphans a finished season's follow-ups, not follows, since follows are team ids). **Stage:** every game is `RegularSeason`, because that is
+  the file and the count (180) is a whole regular season; there is no Walter Cup line and no playoff file was found, so the day one appears
+  its entries need a stage marker or they will be mislabelled as regular season and drawn without the spoiler hold: **that is the
+  first thing to check when the playoffs arrive** (on-device item below). Season phase is by the calendar's own first and last day (off-season with the first game as the
+  return date before 5 Dec, regular season between, off-season after). Standings are empty (a calendar has no order, and one would reveal results); highlights
+  stay unoffered (no verified channel, D347). Game length was already set (D345). **Operational limit:** the file is a per-season asset whose
+  link is replaced each season, so `PwhlCalendarSource.CalendarUrl` is a one-line yearly update; until then the league shows its cached
+  copy and a warning in Diagnostics. The preseason file (a handful of games in Nov 2026, same shape) is not read: its stage would be
+  preseason and the owner did not ask for it; it is the same adapter with a second constant if wanted.
+- **D355 · PWBL: still unsourced; the host could not be reached.** `www.thepwbl.com`, `thepwbl.com` and `www.pwbl.pro` were refused by the
+  proxy's gateway (HTTP 502 on CONNECT, a policy denial or an upstream failure, logged in the proxy status) and `www.pwbl.com` presented a
+  self-signed certificate (an unrelated site, as D343 found). A fetch tool resolved no address for `www.thepwbl.com`. A web search returned no
+  official schedule page or feed for the league (it surfaced Project B, a different new women's basketball league, and a women's pro baseball
+  league, neither of which is the PWBL). With no robots.txt or terms readable, nothing may be built. **The entry stays unsourced; its note is
+  unchanged.** What the owner can do: subscribe to the league's calendar in Google Calendar herself if the league offers one on its site (look for
+  "Add to calendar" or a webcal link), or add the games as plans on the Calendar (D303). Checking the host from a normal network is the next step if she wants
+  this reconsidered.
+- **D356 · The Olympics: still unsourced, and now for two reasons.** `olympics.com/robots.txt` (200) allows everything except athlete-library,
+  search and a few internal paths, so it does not forbid reading; `olympics.com/en/terms-of-use` returned 404 (the terms page is elsewhere and
+  was not found); the schedule pages (`/en/paris-2024/schedule`, `/en/milano-cortina-2026/schedule`) answered **HTTP 403 "Access Denied"**
+  from the site's CDN to an honest read-only client, which is the site declining automated readers, and getting around it (a browser
+  disguise, a different route) is not done. No ICS, RSS, documented JSON or schema.org event data was found on any page that could be
+  read, and a search found only fan-made calendars from past Games, no official one. The shape reason in D344 is unchanged: the Games' schedule is sport and
+  discipline by day, with no team the model can follow. **Left unsourced; the note is amended** to say the site refuses automated reading
+  (below). What the owner can do: add the events she cares about as plans on the Calendar (D303), or subscribe to a broadcaster's or the
+  organisers' calendar in Google Calendar if one is published closer to LA 2028. Nothing was mapped onto the team model.
+- **D357 · The About text for the two that remain.** PWBL: "no public schedule feed could be reached or found". Olympics: "the Games' schedule is
+  by sport and day, not by team, and the official site refuses automated reading". PWHL's note is gone with its source.
+
+**Device-only, unverified (D354–D357).** The PWHL file in the real app: that the 5 Dec 2026 first game shows as the return date, that
+the Earlier fold and the "away at home" names read right with real club names (including the two with accents), that the regular-season
+link still answers after the season rolls over, and whether the playoffs arrive as a new file, as appended entries in this one, or not at all.
+The owner's confirmation of D354's reading of the terms.
+
+## Follow-up rulings: review fixes on the calendar follow-ups
+
+- **D358 · A film on a playlist is looked up when the availability source gave it a day (amends D302).** The calendar read built the list of
+  titles to fetch from watched shows and playlist *shows* only, so a film was never fetched and the film loop skipped it: the changes
+  feed was read and its budget spent for nothing. `CalendarTitleWants.Of` now names the watched shows, the playlist shows, and a playlist
+  film only when it appears in the film dates (an undated film is not looked up, so it costs no request). The film dates are read first.
+- **D359 · A refused share does not stop the night's events.** Sharing the calendar with the other adult is attempted per address; a
+  Google refusal is collected (`CalendarShareFailure`), written to Diagnostics (one constant sentence plus the exception), and the events
+  are still written. The next night asks again, since who is still missing comes from who the calendar is actually shared with. The
+  Vault page's calendar status ends with "Couldn't share with <address>." until a night passes with no refusal. A cancelled run still cancels.
+- **D360 · A "Just me" plan stays off the household calendar.** The Google calendar is shared with her, so writing a plan that is not
+  for every adult would show it to her under a label that promised otherwise. The household write now carries only plans every adult is on;
+  a "Just me" plan stays on its maker's Pulp Calendar page. In a household with one adult, their own plan is for everyone.
+- **D361 · A plan beyond the two weeks is kept and says so.** Add-a-plan still accepts any day that has not gone. After saving a plan
+  fourteen or more days out, the page says "Saved for <day>. It will show once it is within two weeks." (the day named as the page's own
+  headings name a far day: "Oct 26"). `CalendarPlans.SavedNote`.
+
+**Device-only, unverified (D358-D361).** A real film date reaching the Calendar page and the Google calendar; Google's actual refusal of a
+malformed address (the code path is exercised only with a fake that throws); the status sentence on the Vault page after a refusal.
+
+- **D362 · A child's league ticks go and come back with the child.** Removing a child, or making them an adult, now tombstones every
+  `child-league` allowance for them in the same atomic edit as the viewer, name and rules; the undo puts them back in that same kind of edit
+  (`PersonEdits.Remove`/`MakeAdult`/`Add`/`MakeChild` take the allowances; `PersonRecord.LeagueAllowance`). A later child given the same id
+  therefore starts with no league. As a second line, `HouseholdView` reads an allowance only for a child who is on the roster as a child now
+  and holds live rules (`ChildLeagueAllowances`, `LeaguesAllowedFor`, `ChildRules.AllowedLeagues` all go through that), so a stale record from
+  an older build is ignored rather than inherited. `AdultGoogleAccounts` already walked only the roster's current adults; a test now pins it.
+- **D363 · "None yet" for a game's highlights is not remembered.** `HighlightVideoCache` (Domain, a `ConcurrentDictionary`) keeps only a found
+  video id; a miss is asked again on the next tap, and the lookup task and the UI thread no longer share a plain `Dictionary`.
+- **D364 · The usage-file publisher separates a debounce cancel from a failed write, and never writes twice at once.**
+  `IndexUsageFileFlusher` (Domain, pure) holds the decision: a cancel while waiting out the debounce leaves the queue alone (a newer hand-off
+  will flush it); once drained, any failure, including the `TaskCanceledException` a Drive HTTP timeout raises, puts the payloads back and warns.
+  A `SemaphoreSlim` serialises flushes so a second read-merge-write cannot lose a service-month or create the file twice.
+- **D365 · The PWHL adapter polls like a subscriber and refuses what is not a schedule.** `Reuse` is six hours (a calendar subscription
+  client polls every few hours; ten minutes was a browser's rate against a host that never asked for it). The whole file is `Malformed` when
+  more than 16 distinct clubs appear (a league has far fewer), and a SUMMARY side containing a result word as a whole word (won, wins, beat,
+  beats, def, final, lost, lose, ot, so, shootout, draw, tied; any case) is a refused entry even with no digit in it. A longer word that
+  merely contains one ("Sotheby") is not refused. The cost is that a real club called, say, "So Cal" would be refused; none is.
+- **D366 · Index logs why Pulp's usage file could not be read, and retries a failed read in two minutes.** `DrivePulpUsageSource` takes an
+  optional logger and warns with the exception before returning `Unreadable`. `PulpUsageThrottle` waits 30 minutes only after a read that
+  worked (a loaded file or no file at all) and 2 minutes after any other, instead of setting the 30-minute gap before the read started.
+- **D367 · A child's Sport section reads only the leagues the parents allowed, and a league's failure is that league's alone.**
+  `SportsFeeds.FollowedAsync` takes an optional `onlyLeagues`; the child path passes the intersection of the children's allowances, so a
+  disallowed league is never looked up, discovered or fetched. Any failure of one league other than the caller's own cancellation (a request
+  timeout is a `TaskCanceledException` too) is logged and leaves that league on its cached copy, or out, rather than failing the section.
+- **D368 · Play before the household loads says so.** "Loading your services…" (`SportsScreenText.ServicesLoading`) instead of the
+  "Tick ... in Settings" sentence, which would have been a guess.
+- **D369 · The film-release cache shares one fetch and is keyed by the ticked services.** `CachedFilmReleaseSource` is locked: callers
+  arriving during a fetch share it, one caller's cancellation does not cancel it for the rest, a failed fetch is not kept, and the held
+  answer is per ticked-service set, so ticking or unticking a service asks again within the lifetime.
+
+**Device-only, unverified (D362-D369).** The household editor's remove/make-adult/undo against a real two-phone sync (the tombstones and the
+put-back are proven in the document, not across a merge with a stale phone); the usage file publish over a real Drive timeout; the PWHL file's
+real club count and wording against the new filter; Play's loading sentence in the brief window before the household reads.
+
+- **D370 · Package ids checked against Google Play (corrects D351).** Every package in `ServiceCatalogue.Public` was fetched from its public Play listing on 16 Oct 2026. Nine of the ten resolved to the expected app (Netflix, Disney+, Hulu, HBO Max `com.wbd.stream`, Prime Video, Paramount+, Peacock, and Apple TV). Two did not: `com.apple.atve.android.appletv`, which D351 took from memory, does not exist (404) — Apple TV's phone and TV app is the single listing `com.apple.atve.androidtv.appletv` ("Apple TV: Shows, Movies & More"), so Apple TV now carries that one package in Pulp and in Flyleaf's `LockedOpenCatalogue`; and `com.hbo.hbonow` (the old HBO Now app) is also gone from Play, kept only so a phone that still has it installed resolves, which is harmless. Whether each installed app is the same package id on the owner's phone remains a device check.

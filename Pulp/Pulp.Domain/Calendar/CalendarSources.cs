@@ -34,11 +34,12 @@ public sealed record TitleRelease(
 /// <summary>A "plan to watch" on a date (D68), for the viewers it names (D73).</summary>
 public sealed record PlannedViewing(
     string PlanId,
-    TitleId Title,
+    TitleId? Title,
     string Name,
     DateOnly Date,
     TimeOnly? Time,
-    IReadOnlyList<ViewerId> Viewers);
+    IReadOnlyList<ViewerId> Viewers,
+    string? Place = null);
 
 /// <summary>
 /// Everything the calendar is built from. There is deliberately no leaving-soon source: D146 keeps

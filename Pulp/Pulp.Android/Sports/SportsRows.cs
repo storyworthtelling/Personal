@@ -116,7 +116,7 @@ internal static class SportsRows
         return line;
     }
 
-    public static View GameRow(Activity host, GameRow game, Action onPlay, Action onHold)
+    public static View GameRow(Activity host, GameRow game, Action onPlay, Action onHold, Action onHighlights)
     {
         var row = new LinearLayout(host) { Orientation = Orientation.Horizontal, Clickable = true };
         var pad = Dp(host, DesignTokens.Space.X2);
@@ -131,6 +131,18 @@ internal static class SportsRows
         if (game.ChannelLine is { } channel)
         {
             lines.AddView(PaperUi.Secondary(host, channel));
+        }
+
+        if (game.HighlightsOffered)
+        {
+            // A quiet line, drawn from the generic label only (D313): nothing of a video is fetched until it is tapped.
+            var peek = PaperUi.Secondary(host, "Highlights");
+            peek.SetTextColor(PaperTheme.InkBlue);
+            peek.SetMinimumHeight(Dp(host, DesignTokens.Shape.TouchTargetDp));
+            peek.Gravity = GravityFlags.CenterVertical;
+            peek.Clickable = true;
+            peek.Click += (_, _) => onHighlights();
+            lines.AddView(peek);
         }
 
         row.AddView(lines, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
@@ -149,6 +161,18 @@ internal static class SportsRows
             onHold();
         };
         return row;
+    }
+
+    /// <summary>The quiet "Earlier" line over a team's watched, finished games (D330): secondary ink, a chevron, a full touch target.</summary>
+    public static View EarlierLine(Activity host, string label, bool open, Action onToggle)
+    {
+        var line = new LinearLayout(host) { Orientation = Orientation.Horizontal, Clickable = true };
+        line.SetGravity(GravityFlags.CenterVertical);
+        line.SetMinimumHeight(Dp(host, DesignTokens.Shape.TouchTargetDp));
+        line.AddView(PaperUi.Secondary(host, label), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
+        line.AddView(new SportsChevronView(host, open));
+        line.Click += (_, _) => onToggle();
+        return line;
     }
 
     /// <summary>The championship at league level (D239): its name in Serif, its date, the chip, the finalists once known.</summary>

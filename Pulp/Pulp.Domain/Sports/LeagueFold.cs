@@ -26,6 +26,14 @@ public sealed class FoldMemory
 
     public static string TeamKey(LeagueId league, TeamId team) => "team:" + league.Value + ":" + team.Value;
 
+    /// <summary>
+    /// A team's "Earlier" fold (D330). Its own key, so folding the team never opens or closes it. It rides the
+    /// same frozen preferences file and <c>fold:</c> prefix as every other choice, so no new stored name exists.
+    /// </summary>
+    public static string EarlierKey(LeagueId league, TeamId team) => "earlier:" + league.Value + ":" + team.Value;
+
+    public FoldMemory WithEarlier(LeagueId league, TeamId team, bool open) => With(EarlierKey(league, team), open);
+
     public FoldMemory WithLeague(LeagueId league, bool open) => With(LeagueKey(league), open);
 
     public FoldMemory WithTeam(LeagueId league, TeamId team, bool open) => With(TeamKey(league, team), open);

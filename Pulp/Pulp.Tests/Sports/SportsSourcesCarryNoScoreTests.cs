@@ -44,7 +44,7 @@ public class SportsSourcesCarryNoScoreTests
         [
             "sports", "leagues", "teams", "team", "id", "displayName", "logo", "logos", "href", "season", "startDate", "endDate",
             "type", "events", "date", "competitions", "competitors", "homeAway", "notes", "headline", "broadcasts", "market",
-            "names", "children", "standings", "entries", "stats", "name", "value",
+            "names", "children", "standings", "entries", "stats", "name", "value", "slug",
         ],
     };
 
@@ -281,5 +281,65 @@ public class SportsSourcesCarryNoScoreTests
         Assert.DoesNotContain("\"value\"", outside);
         Assert.DoesNotContain("TryGetDouble", outside);
         Assert.Contains("\"rank\", \"playoffSeed\"", espn[start..end]);
+    }
+
+    // ---- the calendar adapter (D354) ----
+
+    // A calendar file is not JSON, so the allowlist is of property names. A SUMMARY can hold a score and is read only to be
+    // refused when it has one; DESCRIPTION, STATUS, COMMENT and the rest are never named in the adapter at all.
+    private static readonly string[] CalendarFiles = ["PwhlCalendarSource.cs"];
+
+    private static readonly HashSet<string> AllowedCalendarTokens = new(StringComparer.Ordinal)
+    {
+        "BEGIN", "END", "VCALENDAR", "VEVENT", "UID", "DTSTART", "SUMMARY",
+
+        // Not a field: the league's own name, which the adapter prints on the league it returns.
+        "PWHL",
+    };
+
+    [Fact]
+    public void EveryAdapterInTheSportsFolderIsGuardedByOneOfTheTwoLists()
+    {
+        var unguarded = Directory.EnumerateFiles(Path.Combine(PulpSource.Root(), "Pulp.Infrastructure", "Sports"), "*.cs")
+            .Select(Path.GetFileName)
+            .Where(name => name!.EndsWith("Source.cs", StringComparison.Ordinal))
+            .Except(["RoutedSportsSource.cs", "YouTubeHighlightsSource.cs"])
+            .Where(name => !AllowedReads.ContainsKey(name!) && !CalendarFiles.Contains(name!))
+            .ToList();
+
+        Assert.True(unguarded.Count == 0, $"{string.Join(", ", unguarded)} reads a source the score guard does not look at.");
+    }
+
+    [Fact]
+    public void ACalendarAdapterNamesOnlyTheThreeSchedulePropertiesAndNothingThatCouldHoldAResult()
+    {
+        foreach (var file in CalendarFiles)
+        {
+            var path = Path.Combine(PulpSource.Root(), "Pulp.Infrastructure", "Sports", file);
+            Assert.True(File.Exists(path), $"{file} is not where the guard expects it.");
+            var literals = new List<string>();
+            var code = Literal.Replace(File.ReadAllText(path), match =>
+            {
+                literals.Add(match.Value.Trim('"'));
+                return "\"\"";
+            });
+            code = Regex.Replace(code, "//.*$", string.Empty, RegexOptions.Multiline);
+
+            var tokens = literals.Where(text => Regex.IsMatch(text, "^[A-Z][A-Z-]*$")).Distinct().ToList();
+            Assert.Contains("SUMMARY", tokens);
+            Assert.Contains("DTSTART", tokens);
+            var stray = tokens.Except(AllowedCalendarTokens).ToList();
+            Assert.True(stray.Count == 0, $"{file} names the calendar field(s) {string.Join(", ", stray)}, which the allowed list does not.");
+
+            var offences = Regex.Matches(code, "[A-Za-z_][A-Za-z0-9_]*").Select(match => match.Value).Distinct()
+                .Where(name => name != "record" && Names(name).Any(ResultWords.Contains)).ToList();
+            Assert.True(offences.Count == 0, $"{file} uses the identifier(s) {string.Join(", ", offences)}, named like a result.");
+            Assert.DoesNotMatch(@"JsonSerializer|Deserialize|JsonPropertyName|JsonConverter", code);
+            foreach (Match declared in Regex.Matches(code, @"\b(?:record|class|struct)\s+(\w+)"))
+            {
+                // Its own class and the parsed calendar it holds between requests (Domain games and teams, no wire shape).
+                Assert.Contains(declared.Groups[1].Value, new[] { file[..^3], "ParsedCalendar" });
+            }
+        }
     }
 }

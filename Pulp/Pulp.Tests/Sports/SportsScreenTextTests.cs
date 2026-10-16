@@ -131,4 +131,11 @@ public class SportsScreenTextTests
             SportsScreenText.PlayNote("On Gridline TV · channel 7"));
         Assert.Equal("Pulp can't open this game for you yet.", SportsScreenText.PlayNote(null));
     }
+
+    [Fact]
+    public void PlayWhileTheHouseholdHasNotLoadedSaysSoAndNeverTellsAnyoneToTickAService()
+    {
+        Assert.Equal("Loading your services…", SportsScreenText.ServicesLoading);
+        Assert.DoesNotContain("Tick", SportsScreenText.ServicesLoading, StringComparison.Ordinal);
+    }
 }

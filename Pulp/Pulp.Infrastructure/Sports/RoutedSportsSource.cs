@@ -25,13 +25,14 @@ public sealed class RoutedSportsSource : ISportsSource
         this.sources = sources;
     }
 
-    /// <summary>The shipped composition: MLB's own feed and ESPN's JSON over the one client.</summary>
+    /// <summary>The shipped composition: MLB's own feed, ESPN's JSON and the PWHL's calendar file over the one client.</summary>
     public static RoutedSportsSource Shipped(HttpClient httpClient, ILookupCounter? counter) => new(
         SportsSourceTable.Default,
         new Dictionary<string, ISportsSource>(StringComparer.OrdinalIgnoreCase)
         {
             [SportsSourceIds.MlbStats] = new MlbStatsSource(httpClient, counter),
             [SportsSourceIds.Espn] = new EspnSource(httpClient, EspnLeagues.Default, counter),
+            [SportsSourceIds.PwhlCalendar] = new PwhlCalendarSource(httpClient, counter),
         });
 
     public IReadOnlyList<LeagueId> Leagues => table.Leagues.Select(entry => entry.League).ToList();

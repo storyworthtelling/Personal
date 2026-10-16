@@ -30,6 +30,8 @@ public partial class BudgetPage : LedgerBinderPage
     private readonly HouseholdSnapshotReader householdReader;
     // The remembered role: no page re-derives it from Drive (Phase 1.1).
     private readonly InstallRoleService roles;
+    // Pulp's usage through Drive (Pulp D320), asked for on both installs and read back when a charge's note opens.
+    private readonly PulpUsageSync pulpUsage;
 
     private readonly DogEarState dogEarState = new();
     private readonly DogEar dogEar;
@@ -52,12 +54,13 @@ public partial class BudgetPage : LedgerBinderPage
     // lengthens in place by NotePaging's step per tap; opening a different card starts it over.
     private int noteTaps;
 
-    public BudgetPage(BudgetService budget, HouseholdSnapshotReader householdReader, InstallRoleService roles)
+    public BudgetPage(BudgetService budget, HouseholdSnapshotReader householdReader, InstallRoleService roles, PulpUsageSync pulpUsage)
     {
         InitializeComponent();
         this.budget = budget;
         this.householdReader = householdReader;
         this.roles = roles;
+        this.pulpUsage = pulpUsage;
 
         dogEar = new DogEar(dogEarState);
         dogEar.NoticesOpened += OnNoticesOpened;
@@ -76,6 +79,8 @@ public partial class BudgetPage : LedgerBinderPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        _ = pulpUsage.RefreshAsync(); // quiet and best effort; never awaited, never fails the page
 
         // Release I (D09/D29): her install reads this month's categories from the household snapshot,
         // never Plaid/EF. Every other install keeps the exact ReloadAsync() path below, untouched.

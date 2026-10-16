@@ -42,12 +42,15 @@ public sealed class SportsFeeds
     /// <summary>
     /// The feeds of every league a team in <paramref name="follows"/> plays in — every adult's, since the
     /// Calendar is built for the household. With <paramref name="refresh"/> false nothing is sent: what the
-    /// cache holds is what comes back, for an instant first paint.
+    /// cache holds is what comes back, for an instant first paint. With <paramref name="onlyLeagues"/> given, no
+    /// other league is looked up, discovered or returned (a child's section reads only what a parent allowed, D317).
+    /// A league that fails for any reason other than the caller's cancellation costs that league alone.
     /// </summary>
-    public async Task<IReadOnlyList<LeagueFeed>> FollowedAsync(IReadOnlyCollection<SportsFollow> follows, bool refresh, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<LeagueFeed>> FollowedAsync(
+        IReadOnlyCollection<SportsFollow> follows, bool refresh, CancellationToken cancellationToken, IReadOnlySet<LeagueId>? onlyLeagues = null)
     {
         ArgumentNullException.ThrowIfNull(follows);
-        if (follows.Count == 0)
+        if (follows.Count == 0 || onlyLeagues is { Count: 0 })
         {
             return [];
         }
@@ -55,13 +58,13 @@ public sealed class SportsFeeds
         // A cache-only read (a peek, the first paint) sends nothing, so it never waits behind a refresh holding the gate.
         if (!refresh)
         {
-            return await ReadFollowedAsync(follows, refresh: false, cancellationToken);
+            return await ReadFollowedAsync(follows, refresh: false, cancellationToken, onlyLeagues);
         }
 
         await gate.WaitAsync(cancellationToken);
         try
         {
-            return await ReadFollowedAsync(follows, refresh: true, cancellationToken);
+            return await ReadFollowedAsync(follows, refresh: true, cancellationToken, onlyLeagues);
         }
         finally
         {
@@ -69,10 +72,12 @@ public sealed class SportsFeeds
         }
     }
 
-    private async Task<IReadOnlyList<LeagueFeed>> ReadFollowedAsync(IReadOnlyCollection<SportsFollow> follows, bool refresh, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<LeagueFeed>> ReadFollowedAsync(
+        IReadOnlyCollection<SportsFollow> follows, bool refresh, CancellationToken cancellationToken, IReadOnlySet<LeagueId>? onlyLeagues)
     {
         var held = new Dictionary<LeagueId, CachedLeague>();
-        foreach (var entry in table.Leagues)
+        var asked = table.Leagues.Where(entry => onlyLeagues is null || onlyLeagues.Contains(entry.League)).ToList();
+        foreach (var entry in asked)
         {
             if (ReadCached(entry.League) is { } cached)
             {
@@ -82,7 +87,7 @@ public sealed class SportsFeeds
 
         if (refresh && SportsPage.Unlocated(held.Values.Select(entry => entry.Feed), follows).Count > 0)
         {
-            foreach (var entry in table.Leagues.Where(entry => !held.ContainsKey(entry.League)))
+            foreach (var entry in asked.Where(entry => !held.ContainsKey(entry.League)))
             {
                 if (await DiscoverAsync(entry.League, cancellationToken) is { } found)
                 {
@@ -103,7 +108,14 @@ public sealed class SportsFeeds
             var current = held[league];
             if (refresh && SportsFreshness.NeedsFetch(current.FetchedAt, current.Feed.League.Phase, clock()))
             {
-                current = await RefreshAsync(league, current, cancellationToken);
+                try
+                {
+                    current = await RefreshAsync(league, current, cancellationToken);
+                }
+                catch (Exception exception) when (IsThisLeaguesFault(exception, cancellationToken))
+                {
+                    warn($"League {league} could not be refreshed ({exception.GetType().Name}); the cached copy stands.", exception);
+                }
             }
 
             feeds.Add(current.Feed);
@@ -162,7 +174,16 @@ public sealed class SportsFeeds
             warn($"League {league} could not be looked at ({exception.Failure}); its teams are unknown until it can be.", exception);
             return null;
         }
+        catch (Exception exception) when (IsThisLeaguesFault(exception, cancellationToken))
+        {
+            warn($"League {league} could not be looked at ({exception.GetType().Name}); its teams are unknown until it can be.", exception);
+            return null;
+        }
     }
+
+    // Anything but the caller's own cancellation (a request timeout is a TaskCanceledException too) belongs to one league.
+    private static bool IsThisLeaguesFault(Exception exception, CancellationToken cancellationToken) =>
+        !(exception is OperationCanceledException && cancellationToken.IsCancellationRequested);
 
     private async Task<CachedLeague> RefreshAsync(LeagueId league, CachedLeague current, CancellationToken cancellationToken)
     {
