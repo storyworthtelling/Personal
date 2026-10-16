@@ -1,4 +1,5 @@
 using Android.Media;
+using Android.Runtime;
 using Java.Nio;
 
 namespace Score;
@@ -9,9 +10,27 @@ namespace Score;
 /// Drive-backed stream <see cref="MusicTagReader"/> already opens — no local download
 /// step just to look for silence.
 /// </summary>
-internal sealed class StreamMediaDataSource(System.IO.Stream stream) : MediaDataSource
+internal sealed class StreamMediaDataSource : MediaDataSource
 {
-    public override long Size => stream.CanSeek ? stream.Length : -1;
+    private readonly System.IO.Stream? stream;
+
+    public StreamMediaDataSource(System.IO.Stream stream)
+    {
+        this.stream = stream;
+    }
+
+    // MediaExtractor releases its data source on its own schedule, so the platform can call
+    // close() back into this object after the managed side has already disposed it. .NET
+    // then rebuilds the managed peer from the native handle, and it can only do that through
+    // this constructor. Without it the callback throws NotSupportedException ("Unable to
+    // activate instance of type … from native handle") on the Java thread and crashes the app
+    // mid-playback. The rebuilt peer has no stream, so it reports end of stream and does
+    // nothing on close.
+    protected StreamMediaDataSource(nint handle, JniHandleOwnership transfer) : base(handle, transfer)
+    {
+    }
+
+    public override long Size => stream is { CanSeek: true } seekable ? seekable.Length : -1;
 
     // ReadAt is invoked by MediaExtractor across the JNI boundary. A .NET exception
     // escaping an overridden Java method there does not unwind back through our own
@@ -23,7 +42,7 @@ internal sealed class StreamMediaDataSource(System.IO.Stream stream) : MediaData
     // end of stream.
     public override int ReadAt(long position, byte[]? buffer, int offset, int size)
     {
-        if (buffer is null)
+        if (buffer is null || stream is null)
         {
             return -1;
         }
