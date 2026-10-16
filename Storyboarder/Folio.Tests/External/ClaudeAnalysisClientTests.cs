@@ -719,6 +719,33 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task AnalyzeChapter_UsesChapterNotesMaxTokens_NotDefault()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", FastModel = "test-fast-model",
+            MaxTokens = 256, ChapterNotesMaxTokens = 16000
+        });
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
+        handler.EnqueueOk(Reply("{}"));
+
+        await client.AnalyzeChapter("excerpt", "Chapter 1", Array.Empty<string>(), "", CancellationToken.None);
+
+        // A chunk's notes cover story and craft for up to ~48K characters; at the small default budget
+        // a full reply is cut off, thrown away wholesale, and the chunk fails after its retries.
+        Assert.Contains("\"max_tokens\":16000", handler.RequestBodies[0]);
+    }
+
+    [Fact]
+    public void ChapterNotesMaxTokens_DefaultHoldsAFullChunkOfNotes()
+    {
+        // The 12,000 default was cut off on real chunks (stop_reason=max_tokens), failing 8 of 9 chunks in
+        // one book. The default must stay above that budget with room for a whole chunk's craft notes.
+        Assert.True(new ClaudeOptions().ChapterNotesMaxTokens >= 16_000);
+    }
+
+    [Fact]
     public async Task MaxTokensStopReason_ThrowsTruncatedResponse_NotSilentPartialBody()
     {
         var (client, handler) = Create();
