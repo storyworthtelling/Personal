@@ -78,4 +78,46 @@ public class TextChunkerTests
         Assert.True(chunks.Count >= 4);
         Assert.All(chunks, c => Assert.True(c.Text.Length <= 250));
     }
+
+    [Fact]
+    public void ChapterStart_ForcesABoundary_EvenWhenBothChaptersFitTogether()
+    {
+        // Two short chapters would pack into one chunk by size alone. A chapter is the unit the analysis
+        // reads and cites, so a chunk must never run from one chapter into the next.
+        const string text = "Chapter 1\n\nA short opening.\n\nChapter 2\n\nA short second.";
+        int secondStart = text.IndexOf("Chapter 2", StringComparison.Ordinal);
+
+        var chunks = new TextChunker().Chunk(text, [secondStart]);
+
+        Assert.Equal(2, chunks.Count);
+        Assert.Equal(0, chunks[0].StartOffset);
+        Assert.Equal(secondStart, chunks[1].StartOffset);
+        Assert.StartsWith("Chapter 1", chunks[0].Text, StringComparison.Ordinal);
+        Assert.StartsWith("Chapter 2", chunks[1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ChapterStarts_OneChunkPerChapter_WhenEachChapterIsShort()
+    {
+        var text = string.Join("\n\n", Enumerable.Range(1, 40).Select(n => $"Chapter {n}\n\nA line of prose for chapter {n}."));
+        var starts = Enumerable.Range(1, 40)
+            .Select(n => text.IndexOf($"Chapter {n}\n", StringComparison.Ordinal))
+            .ToArray();
+
+        var chunks = new TextChunker().Chunk(text, starts);
+
+        Assert.Equal(40, chunks.Count);
+        Assert.Equal(starts, chunks.Select(c => c.StartOffset).ToArray());
+    }
+
+    [Fact]
+    public void ChapterStartAtTheVeryStart_DoesNotProduceAnEmptyChunk()
+    {
+        const string text = "Chapter 1\n\nProse.";
+
+        var chunks = new TextChunker().Chunk(text, [0]);
+
+        var chunk = Assert.Single(chunks);
+        Assert.Equal(text, chunk.Text);
+    }
 }
