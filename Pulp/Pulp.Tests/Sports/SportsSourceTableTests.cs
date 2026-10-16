@@ -62,6 +62,39 @@ public class SportsSourceTableTests
         Assert.NotEmpty(table.Leagues);
         Assert.Contains(table.Leagues, entry => entry.SourceId == SportsSourceIds.MlbStats);
         Assert.Contains(table.Leagues, entry => entry.SourceId == SportsSourceIds.Espn);
-        Assert.Equal(table.Leagues.Count, table.AboutLines().Count);
+        Assert.Equal(table.All.Count, table.AboutLines().Count);
+    }
+
+    [Fact]
+    public void AnUnsourcedLeagueIsInTheTableAndAboutSaysThereIsNoSourceYet()
+    {
+        var table = new SportsSourceTable(
+            [new SportsSourceInfo("alpha-feed", "Alpha Feed", "individual use")],
+            [
+                new SportsLeagueEntry(new LeagueId("cfl-invented"), "Coastal", "alpha-feed"),
+                new SportsLeagueEntry(new LeagueId("srl-invented"), "Southern Rink League", null, "its feed needs a key"),
+            ]);
+
+        Assert.Equal(["cfl-invented"], table.Leagues.Select(entry => entry.League.Value));
+        Assert.Equal(["srl-invented"], table.Unsourced.Select(entry => entry.League.Value));
+        Assert.Equal(["cfl-invented", "srl-invented"], table.All.Select(entry => entry.League.Value));
+        Assert.Null(table.SourceOf(new LeagueId("srl-invented")));
+        Assert.Equal("Southern Rink League — no schedule source yet: its feed needs a key", table.AboutLines()[1]);
+    }
+
+    [Fact]
+    public void AnUnsourcedLeagueWithoutAReasonIsRefused()
+    {
+        Assert.Throws<ArgumentException>(() => new SportsSourceTable(
+            [new SportsSourceInfo("alpha-feed", "Alpha Feed", "terms")],
+            [new SportsLeagueEntry(new LeagueId("srl-invented"), "Southern", null)]));
+    }
+
+    [Fact]
+    public void ASourcedLeagueCarryingANoSourceNoteIsRefused()
+    {
+        Assert.Throws<ArgumentException>(() => new SportsSourceTable(
+            [new SportsSourceInfo("alpha-feed", "Alpha Feed", "terms")],
+            [new SportsLeagueEntry(new LeagueId("cfl-invented"), "Coastal", "alpha-feed", "stray note")]));
     }
 }

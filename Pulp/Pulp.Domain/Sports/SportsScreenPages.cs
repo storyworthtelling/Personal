@@ -27,7 +27,7 @@ public static class SportsScreenPages
     {
         ArgumentNullException.ThrowIfNull(league);
         var champion = league.Championship is { } champ ? SportsScreenPlan.ChampionshipOf(champ, zone) : null;
-        var games = PlayoffGames(league).Select(game => GameRow.From(game, now, zone)).ToList();
+        var games = PlayoffGames(league).Select(game => GameRow.From(game, now, zone, HighlightsOffer.Allowed(league))).ToList();
         return new BracketPlan(champion, games);
     }
 
@@ -35,7 +35,7 @@ public static class SportsScreenPages
     public static IReadOnlyList<GameRow> Schedule(OpenLeague league, DateTimeOffset now, TimeZoneInfo zone)
     {
         ArgumentNullException.ThrowIfNull(league);
-        return AllGames(league).Select(game => GameRow.From(game, now, zone)).ToList();
+        return AllGames(league).Select(game => GameRow.From(game, now, zone, HighlightsOffer.Allowed(league))).ToList();
     }
 
     /// <summary>The playoff and championship games among those the sheet carries.</summary>

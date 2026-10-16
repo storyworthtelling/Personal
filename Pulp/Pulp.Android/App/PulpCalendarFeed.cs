@@ -38,7 +38,19 @@ internal sealed class PulpCalendarFeed(PulpServices services) : ICalendarFeed
 
         var read = await new CalendarReads(services).ReadAsync(cancellationToken);
         return CalendarScreenSnapshot.Build(
-            read.Sources, read.HeldByAdult, read.Household.NameOf, role, connected, read.Household.PulpCalendarId, account, read.Zone);
+            read.Sources, read.HeldByAdult, read.Household.NameOf, role, connected, read.Household.PulpCalendarId, account, read.Zone,
+            read.Household.AdultGoogleAccounts);
+    }
+
+    public void NoteShareFailures(IReadOnlyList<CalendarShareFailure> failures)
+    {
+        // One constant sentence; the address is in the status on the Vault page and the exception rides alongside.
+        foreach (var failure in failures)
+        {
+            services.Diagnostics.Warn("calendar", "The Pulp calendar could not be shared with an address.", failure.Failure);
+        }
+
+        services.CalendarConnection.NoteUnshared(failures.Select(failure => failure.Account).ToList());
     }
 
     public Task SaveCalendarIdAsync(string calendarId, CancellationToken cancellationToken) =>

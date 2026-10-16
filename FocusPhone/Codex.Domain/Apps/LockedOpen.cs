@@ -97,6 +97,8 @@ public static class LockedOpenCatalogue
         "com.amazon.avod.thirdpartyclient",
         "com.cbs.app",
         "com.peacocktv.peacockandroid",
+        "com.apple.atve.android.appletv",
+        "com.apple.atve.androidtv.appletv",
     };
 
     /// <summary>
@@ -116,6 +118,8 @@ public static class LockedOpenCatalogue
             ["com.amazon.avod.thirdpartyclient"] = ["primevideo.com", "amazon.com"],
             ["com.cbs.app"] = ["paramountplus.com"],
             ["com.peacocktv.peacockandroid"] = ["peacocktv.com"],
+            ["com.apple.atve.android.appletv"] = ["tv.apple.com", "apple.com"],
+            ["com.apple.atve.androidtv.appletv"] = ["tv.apple.com", "apple.com"],
         };
 
     /// <summary>True when the host is, or is a subdomain of, one of the package's link domains.</summary>

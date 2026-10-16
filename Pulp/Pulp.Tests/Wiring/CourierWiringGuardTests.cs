@@ -19,6 +19,20 @@ public class CourierWiringGuardTests
     }
 
     [Fact]
+    public void TheSameHandOffAlsoQueuesTheUsageFileForDrive()
+    {
+        var text = Services();
+
+        Assert.Contains("usageFile.Queue(", text, StringComparison.Ordinal);
+        var publisher = File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Android/Usage/IndexUsageFilePublisher.cs"));
+        Assert.Contains("DriveIndexUsageStore", publisher, StringComparison.Ordinal);
+        Assert.Contains("IndexUsageFileQueue", publisher, StringComparison.Ordinal);
+        Assert.Contains("IndexUsageFileFlusher", publisher, StringComparison.Ordinal);
+        var flusher = File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Domain/Usage/IndexUsageFileFlusher.cs"));
+        Assert.Contains("catch (Exception", flusher, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheHiddenSetGoesToFlyleafThroughTheGateFromTheHouseholdsServices()
     {
         var text = Services();

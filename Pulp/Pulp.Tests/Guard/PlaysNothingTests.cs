@@ -8,7 +8,8 @@ namespace Pulp.Tests.Guard;
 /// or a protected-media grant (<c>RESOURCE_PROTECTED_MEDIA_ID</c>, whose wire value is <c>android.webkit.resource.PROTECTED_MEDIA_ID</c>) arriving here would be the first step down a road that cannot end in
 /// a working app, and nothing about it would fail until a device refused to decode a frame.
 ///
-/// <para>The one exception is a YouTube trailer (D34, plan P2), played through the shared web
+/// <para>The one exception is a YouTube video (a trailer, D34, plan P2, or a game's highlights, D71 and D313,
+/// which share the one screen, D315), played through the shared web
 /// view's <c>Player</c> posture — script on, nothing navigates, never autoplays. It is loaded from
 /// exactly one class, <c>Pulp.Android/Trailer/TrailerActivity.cs</c>; a second place reaching the
 /// player is a second player, and that is what the second test refuses.</para>

@@ -58,6 +58,9 @@ public static class CalendarSharing
     }
 }
 
+/// <summary>One address Google would not share the calendar with, and why; the night's writing carries on without it (D359).</summary>
+public sealed record CalendarShareFailure(string Account, Exception Failure);
+
 /// <summary>
 /// The Pulp calendar's access, in order: create (owner only), save the id to the household at once
 /// (before sharing, so a failure there cannot orphan a second calendar on the next try), then share.
@@ -74,7 +77,8 @@ public static class CalendarHousehold
         IReadOnlyList<string> adultAccounts,
         Func<string, Task> saveId,
         TimeZoneInfo zone,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ICollection<CalendarShareFailure>? shareFailures = null)
     {
         ArgumentNullException.ThrowIfNull(calendar);
         ArgumentNullException.ThrowIfNull(saveId);
@@ -98,7 +102,16 @@ public static class CalendarHousehold
         var shared = await calendar.SharedWithAsync(id!, cancellationToken);
         foreach (var account in CalendarSharing.Missing(ownerAccount, adultAccounts, shared))
         {
-            await calendar.ShareAsReaderAsync(id!, account, cancellationToken);
+            try
+            {
+                await calendar.ShareAsReaderAsync(id!, account, cancellationToken);
+            }
+            catch (Exception exception) when (shareFailures is not null && !cancellationToken.IsCancellationRequested && exception is not OperationCanceledException)
+            {
+                // One bad address (a typo in the household file) must not stop the night's events (D359); the
+                // next night asks again, since Missing() is computed from who the calendar is actually shared with.
+                shareFailures.Add(new CalendarShareFailure(account, exception));
+            }
         }
 
         return id;

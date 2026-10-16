@@ -21,11 +21,24 @@ public sealed class CalendarConnection(VoiceGoogleAccount account)
 {
     private const string PrefsName = "pulp-calendar";
     private const string ConnectedKey = "connected";
+    private const string UnsharedKey = "unshared";
 
     public bool Connected => Prefs().GetBoolean(ConnectedKey, false);
 
     /// <summary>"Calendar not connected yet" until the owner has consented; the other phone's and unknown roles say their own.</summary>
-    public string Status(HouseholdFileRole role) => CalendarScreenConnection.Sentence(role, Connected);
+    public string Status(HouseholdFileRole role) => CalendarScreenConnection.Sentence(role, Connected, Unshared());
+
+    /// <summary>Keeps tonight's refused addresses for the status sentence (D359); an empty list clears an old problem.</summary>
+    public void NoteUnshared(IReadOnlyList<string> accounts)
+    {
+        var editor = Prefs().Edit()!;
+        editor.PutString(UnsharedKey, string.Join('\n', accounts));
+        editor.Apply();
+    }
+
+    private static IReadOnlyList<string> Unshared() =>
+        (Prefs().GetString(UnsharedKey, string.Empty) ?? string.Empty)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
     /// <summary>Whether to draw the consent button: the owner's phone, not yet connected.</summary>
     public bool OffersConnect(HouseholdFileRole role) => CalendarScreenConnection.OffersConnect(role, Connected);

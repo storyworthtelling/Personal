@@ -40,7 +40,7 @@ public sealed record SportsPage(IReadOnlyList<LeagueSheet> Sheets, LeagueFold Fo
         var ordered = LeagueOrder.Order(mine.Values.Select(feed => feed.League));
         var sheets = ordered
             .Select(league => mine[league.Id])
-            .Select(feed => SpoilerHold.Present(feed, teams, RecordedGames.Unwatched(feed, teams, evidence, now), now, peeks.Spend(feed.League.Id)))
+            .Select(feed => SpoilerHold.Present(feed, teams, RecordedGames.Unwatched(feed, teams, evidence, now), now, peeks.Spend(feed.League.Id), RecordedGames.Watched(feed, teams, evidence, now)))
             .ToList();
         return new SportsPage(sheets, LeagueFold.Starting(ordered, memory));
     }

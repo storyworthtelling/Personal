@@ -6,8 +6,12 @@ using Pulp.Infrastructure.Catalogue;
 
 namespace Pulp.Infrastructure.Sports;
 
-/// <summary>One league ESPN's public JSON serves: its path (<c>/sports/{Sport}/{Slug}</c>) and the words that name its championship game.</summary>
-public sealed record EspnLeague(LeagueId Id, string Name, string Sport, string Slug, IReadOnlyList<string> ChampionshipMarkers);
+/// <summary>
+/// One league ESPN's public JSON serves: its path (<c>/sports/{Sport}/{Slug}</c>), the words that name its championship
+/// game in a note, and, for the soccer feeds whose season parts carry opaque ids rather than 1/2/3, the season-part
+/// slugs that are the championship (D340).
+/// </summary>
+public sealed record EspnLeague(LeagueId Id, string Name, string Sport, string Slug, IReadOnlyList<string> ChampionshipMarkers, IReadOnlyList<string>? ChampionshipSlugs = null);
 
 /// <summary>The leagues the shipped table (<see cref="SportsSourceTable.Default"/>) reads from ESPN.</summary>
 public static class EspnLeagues
@@ -18,7 +22,8 @@ public static class EspnLeagues
         new(new LeagueId("nhl"), "NHL", "hockey", "nhl", ["Stanley Cup Final"]),
         new(new LeagueId("nba"), "NBA", "basketball", "nba", ["NBA Finals"]),
         new(new LeagueId("wnba"), "WNBA", "basketball", "wnba", ["WNBA Finals"]),
-        new(new LeagueId("nwsl"), "NWSL", "soccer", "usa.nwsl", ["NWSL Championship"]),
+        new(new LeagueId("mls"), "MLS", "soccer", "usa.1", ["MLS Cup"], ["mls-cup"]),
+        new(new LeagueId("nwsl"), "NWSL", "soccer", "usa.nwsl", ["NWSL Championship"], ["playoffs---championship"]),
         new(new LeagueId("afl"), "AFL", "australian-football", "afl", ["Grand Final"]),
     ];
 }
@@ -32,6 +37,8 @@ public static class EspnLeagues
 /// <item><c>/apis/site/v2/sports/{sport}/{slug}/scoreboard?dates=yyyyMMdd</c> — <c>leagues[0].season</c>
 /// (<c>startDate</c>, <c>endDate</c>, <c>type.type</c>: 1 pre, 2 regular, 3 post) and <c>events[]</c> with <c>id</c>,
 /// <c>date</c>, <c>season.type</c>, <c>competitions[0].competitors[]</c> (<c>homeAway</c>, <c>team</c>),
+/// <c>season.slug</c> (read only when <c>season.type</c> is not 1, 2 or 3, which is how the soccer feeds number a
+/// season's parts: <c>regular-season</c>, <c>preseason</c>, a playoff round, <c>mls-cup</c>),
 /// <c>competitions[0].notes[].headline</c> and <c>competitions[0].broadcasts[]</c> (<c>market</c>, <c>names[]</c>).
 /// A date <i>range</i> was refused with HTTP 400 when measured, so each day is asked for singly.</item>
 /// <item><c>.../teams</c> — <c>sports[0].leagues[0].teams[].team</c>.</item>
@@ -285,7 +292,7 @@ public sealed class EspnSource : ISportsSource
             }
 
             var notes = Headlines(raw, competition);
-            var stage = StageOf(raw.Child("season").Number("type"), notes, league);
+            var stage = StageOf(raw.Child("season").Number("type"), raw.Child("season").Text("slug"), notes, league);
             games.Add((new Game(
                 new GameId(id), known.GetValueOrDefault(homeTeam.Id, homeTeam), known.GetValueOrDefault(awayTeam.Id, awayTeam),
                 startsAt, stage, ChannelOf(competition.Child("broadcasts"))), notes));
@@ -299,19 +306,43 @@ public sealed class EspnSource : ISportsSource
             .Select(note => note.Text("headline")).OfType<string>().Where(text => text.Length > 0).ToList();
 
     // Anything this build does not know is held as a revealing playoff: wrongly held is a fold, wrongly shown is a spoiler.
-    private static GameStage StageOf(int? seasonType, IReadOnlyList<string> notes, EspnLeague league) => seasonType switch
+    // 1, 2 and 3 are the American feeds' pre, regular and post; any other number is an opaque id (soccer) and the slug says which part.
+    private static GameStage StageOf(int? seasonType, string? partSlug, IReadOnlyList<string> notes, EspnLeague league)
     {
-        1 => GameStage.Preseason,
-        2 => GameStage.RegularSeason,
-        3 when notes.Any(note => league.ChampionshipMarkers.Any(marker => note.Contains(marker, StringComparison.OrdinalIgnoreCase))) => GameStage.Championship,
-        _ => GameStage.Playoffs,
-    };
+        var named = notes.Any(note => league.ChampionshipMarkers.Any(marker => note.Contains(marker, StringComparison.OrdinalIgnoreCase)));
+        return seasonType switch
+        {
+            1 => GameStage.Preseason,
+            2 => GameStage.RegularSeason,
+            3 when named => GameStage.Championship,
+            3 => GameStage.Playoffs,
+            _ => StageOfSlug(partSlug, league),
+        };
+    }
+
+    private static GameStage StageOfSlug(string? partSlug, EspnLeague league)
+    {
+        if (string.Equals(partSlug, "regular-season", StringComparison.OrdinalIgnoreCase))
+        {
+            return GameStage.RegularSeason;
+        }
+
+        if (string.Equals(partSlug, "preseason", StringComparison.OrdinalIgnoreCase) || string.Equals(partSlug, "pre-season", StringComparison.OrdinalIgnoreCase))
+        {
+            return GameStage.Preseason;
+        }
+
+        var isChampionship = partSlug is not null
+            && (league.ChampionshipSlugs ?? []).Any(known => string.Equals(known, partSlug, StringComparison.OrdinalIgnoreCase));
+        return isChampionship ? GameStage.Championship : GameStage.Playoffs;
+    }
 
     private static Championship ChampionshipOf(Game game, IReadOnlyList<string> notes, EspnLeague league)
     {
         // The name is the league's own marker, never the feed's headline: a headline can read "Game 6 (X leads 3-2)" (G10/G15).
         var name = league.ChampionshipMarkers
-            .FirstOrDefault(marker => notes.Any(note => note.Contains(marker, StringComparison.OrdinalIgnoreCase))) ?? league.Name + " championship";
+            .FirstOrDefault(marker => notes.Any(note => note.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+            ?? (league.ChampionshipSlugs is { Count: > 0 } ? league.ChampionshipMarkers[0] : league.Name + " championship");
         return new Championship(game.Id, name, game.StartsAt, [game.Home, game.Away]);
     }
 
@@ -361,7 +392,9 @@ public sealed class EspnSource : ISportsSource
             {
                 1 => SeasonPhase.Preseason,
                 3 => SeasonPhase.Postseason,
-                4 => SeasonPhase.OffSeason,
+                // 4 is the American feeds' off-season; a larger number is an opaque soccer part id, and a year-long
+                // season with no game in the window is between seasons.
+                >= 4 => SeasonPhase.OffSeason,
                 _ => SeasonPhase.RegularSeason,
             };
         return new League(league.Id, league.Name, badge, phase, season.End, phase == SeasonPhase.Preseason ? NextGameDate() : null);

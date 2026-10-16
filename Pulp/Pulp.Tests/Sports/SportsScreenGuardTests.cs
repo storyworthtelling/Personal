@@ -89,14 +89,48 @@ public class SportsScreenGuardTests
     [Fact]
     public void APlayedGameIsNeverRecordedAsWatchedByTheHandOff()
     {
-        // A hand-off's evidence reads as WATCHED (Watched.Decide), so a game opened to look at would
-        // vanish from the recordings and lift the hold. Only "Mark watched" says a game was watched.
+        // A hand-off's evidence reads as WATCHED for a title (Watched.Decide), so a game opened to look at would
+        // vanish from the recordings and lift the hold. Play may call the one door (D311) and keep usage evidence,
+        // but only through GamePlay.UsageSitting, which RecordedGames ignores (D312); the head never names the
+        // evidence kind itself, and only "Mark watched" (or a session that ended) says a game was watched.
         var head = Head();
         Assert.NotEmpty(head);
 
-        var offenders = head.Where(file => Regex.IsMatch(file.Text, @"WatchSource\.HandOff\b")).Select(file => file.Path).ToList();
+        var offenders = head.Where(file => Regex.IsMatch(file.Text, @"WatchSource\.\w+")).Select(file => file.Path).ToList();
+        Assert.True(offenders.Count == 0, "The Sports screen names a watch source itself:\n" + string.Join("\n", offenders));
 
-        Assert.True(offenders.Count == 0, "The Sports screen records a hand-off as evidence:\n" + string.Join("\n", offenders));
         Assert.Contains(head, file => file.Text.Contains("MarkGameAsync(", StringComparison.Ordinal));
+        var play = head.Single(file => file.Path == "Pulp.Android/Sports/SportsScreen.cs").Text;
+        Assert.Contains("executor.Start(", play, StringComparison.Ordinal);
+        Assert.Contains("GamePlay.UsageSitting(", play, StringComparison.Ordinal);
+
+        // Every write to the watched records is one of the two allowed: the viewer's own mark, or the usage sitting.
+        foreach (var file in head)
+        {
+            foreach (Match write in Regex.Matches(file.Text, @"HouseholdMaps\.Watched[^;]*;"))
+            {
+                Assert.Contains("sitting", write.Value, StringComparison.Ordinal);
+            }
+        }
+
+        Assert.DoesNotMatch(new Regex(@"HandOffExecutor\s*\(|new\s+HandOffPlanner|HandOff\.For\s*\(|ActionView"), play);
+    }
+
+    [Fact]
+    public void HighlightsAreDrawnFromTheGenericLabelAndNeverAVideosOwnWords()
+    {
+        // D314: a highlight's title or thumbnail is feed text and can say how a game went. The head never names the
+        // league-wide Highlight record or its list, and never reads a title off the lookup (which returns an id only).
+        var head = Head();
+        Assert.NotEmpty(head);
+
+        var offenders = head
+            .Where(file => Regex.IsMatch(file.Text, @"\bHighlight\b|\.Highlights\b|\bsnippet\b|[Tt]humbnail"))
+            .Select(file => file.Path)
+            .ToList();
+
+        Assert.True(offenders.Count == 0, "The Sports screen reads a video's own words:\n" + string.Join("\n", offenders));
+        Assert.Contains(head, file => file.Text.Contains("HighlightsOffer.For(", StringComparison.Ordinal));
+        Assert.Contains(head, file => file.Text.Contains("game.HighlightsLabel", StringComparison.Ordinal));
     }
 }

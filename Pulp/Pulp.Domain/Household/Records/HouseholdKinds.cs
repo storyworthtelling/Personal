@@ -55,4 +55,13 @@ public static class HouseholdKinds
 
     /// <summary>One adult following one team (<see cref="Pulp.Domain.Sports.SportsFollow"/>, D60); unfollowing is its tombstone.</summary>
     public const string SportsFollow = "sports-follow";
+
+    /// <summary>A plan to go and see something, on a day (<see cref="HouseholdPlan"/>, D68); deleting it is its tombstone.</summary>
+    public const string Plan = "plan";
+
+    /// <summary>An adult's Google address, for sharing the Pulp calendar (<see cref="AdultAccountEntry"/>).</summary>
+    public const string AdultAccount = "adult-account";
+
+    /// <summary>A parent allowing one child one league's sport (<see cref="ChildLeagueAllowance"/>, D72); un-allowing is its tombstone.</summary>
+    public const string ChildLeague = "child-league";
 }

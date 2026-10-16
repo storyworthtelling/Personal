@@ -15,6 +15,9 @@ public enum LookupSource
 
     /// <summary>ESPN's public JSON (D208).</summary>
     Espn,
+
+    /// <summary>The calendar file the PWHL's own site offers for syncing to a calendar (D354).</summary>
+    PwhlCalendar,
 }
 
 /// <summary>

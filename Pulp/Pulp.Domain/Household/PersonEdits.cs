@@ -10,6 +10,9 @@ public enum PersonRecord
     Viewer,
     Name,
     Rules,
+
+    /// <summary>One league a parent ticked for a child (D317): it goes and comes back with the child.</summary>
+    LeagueAllowance,
 }
 
 public enum PersonWriteKind
@@ -24,7 +27,8 @@ public sealed record PersonStep(
     PersonRecord Record,
     HouseholdViewer? Viewer,
     ViewerNameEntry? Name,
-    ChildRules? Rules);
+    ChildRules? Rules,
+    ChildLeagueAllowance? Allowance = null);
 
 /// <summary>The writes that make one change to a person, in the order they are to land.</summary>
 public sealed record PersonEdit(IReadOnlyList<PersonStep> Steps);
@@ -46,7 +50,8 @@ public sealed record PersonEdit(IReadOnlyList<PersonStep> Steps);
 /// </summary>
 public static class PersonEdits
 {
-    public static PersonEdit Add(HouseholdViewer viewer, ViewerNameEntry name, ChildRules? rules)
+    /// <summary>A child's <paramref name="allowances"/> are put back after the rules (an undo of a removal); an adult has none.</summary>
+    public static PersonEdit Add(HouseholdViewer viewer, ViewerNameEntry name, ChildRules? rules, IReadOnlyList<ChildLeagueAllowance>? allowances = null)
     {
         ArgumentNullException.ThrowIfNull(viewer);
         ArgumentNullException.ThrowIfNull(name);
@@ -58,16 +63,21 @@ public static class PersonEdits
         if (viewer.IsChild)
         {
             steps.Add(new(PersonWriteKind.Put, PersonRecord.Rules, null, null, rules ?? throw new ArgumentException("A child is added with rules.", nameof(rules))));
+            steps.AddRange(AllowanceSteps(PersonWriteKind.Put, allowances));
         }
 
         return new PersonEdit(steps);
     }
 
     /// <summary>The name record is dropped only when <paramref name="name"/> is given (a person never named has none).</summary>
-    public static PersonEdit Remove(HouseholdViewer viewer, ViewerNameEntry? name, ChildRules? rules)
+    /// <summary>
+    /// The child's league allowances go with them: a later child given the same id must not inherit every league
+    /// ticked for this one (child safety), so each is tombstoned too and the undo puts them back in the same edit.
+    /// </summary>
+    public static PersonEdit Remove(HouseholdViewer viewer, ViewerNameEntry? name, ChildRules? rules, IReadOnlyList<ChildLeagueAllowance>? allowances = null)
     {
         ArgumentNullException.ThrowIfNull(viewer);
-        var steps = new List<PersonStep>();
+        var steps = new List<PersonStep>(AllowanceSteps(PersonWriteKind.Remove, allowances));
         if (rules is not null)
         {
             steps.Add(new(PersonWriteKind.Remove, PersonRecord.Rules, null, null, rules));
@@ -82,22 +92,24 @@ public static class PersonEdits
         return new PersonEdit(steps);
     }
 
-    public static PersonEdit MakeChild(HouseholdViewer viewer, ChildRules rules)
+    public static PersonEdit MakeChild(HouseholdViewer viewer, ChildRules rules, IReadOnlyList<ChildLeagueAllowance>? allowances = null)
     {
         ArgumentNullException.ThrowIfNull(viewer);
         ArgumentNullException.ThrowIfNull(rules);
-        return new PersonEdit(
-        [
+        var steps = new List<PersonStep>
+        {
             new(PersonWriteKind.Put, PersonRecord.Viewer, viewer with { IsChild = true }, null, null),
             new(PersonWriteKind.Put, PersonRecord.Rules, null, null, rules),
-        ]);
+        };
+        steps.AddRange(AllowanceSteps(PersonWriteKind.Put, allowances));
+        return new PersonEdit(steps);
     }
 
     /// <summary>A person made an adult keeps no rules; <paramref name="rules"/> is null when none were ever written.</summary>
-    public static PersonEdit MakeAdult(HouseholdViewer viewer, ChildRules? rules)
+    public static PersonEdit MakeAdult(HouseholdViewer viewer, ChildRules? rules, IReadOnlyList<ChildLeagueAllowance>? allowances = null)
     {
         ArgumentNullException.ThrowIfNull(viewer);
-        var steps = new List<PersonStep>();
+        var steps = new List<PersonStep>(AllowanceSteps(PersonWriteKind.Remove, allowances));
         if (rules is not null)
         {
             steps.Add(new(PersonWriteKind.Remove, PersonRecord.Rules, null, null, rules));
@@ -121,6 +133,7 @@ public static class PersonEdits
             PersonRecord.Viewer => Write(document, HouseholdMaps.Viewer, step.Viewer, put, stamp, writer),
             PersonRecord.Name => Write(document, HouseholdMaps.ViewerName, step.Name, put, stamp, writer),
             PersonRecord.Rules => Write(document, HouseholdMaps.ChildRules, step.Rules, put, stamp, writer),
+            PersonRecord.LeagueAllowance => Write(document, HouseholdMaps.ChildLeague, step.Allowance, put, stamp, writer),
             _ => throw new ArgumentOutOfRangeException(nameof(step), step.Record, "Unknown person record."),
         };
     }
@@ -131,6 +144,9 @@ public static class PersonEdits
         ArgumentNullException.ThrowIfNull(edit);
         return edit.Steps.Aggregate(document, (current, step) => Apply(current, step, stamp, writer));
     }
+
+    private static IEnumerable<PersonStep> AllowanceSteps(PersonWriteKind kind, IReadOnlyList<ChildLeagueAllowance>? allowances) =>
+        (allowances ?? []).Select(allowance => new PersonStep(kind, PersonRecord.LeagueAllowance, null, null, null, allowance));
 
     private static HouseholdDocument Write<T>(HouseholdDocument document, RecordMap<T> map, T? value, bool put, HlcTimestamp stamp, string writer)
         where T : class =>

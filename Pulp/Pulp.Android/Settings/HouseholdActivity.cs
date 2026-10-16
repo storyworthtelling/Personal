@@ -13,6 +13,7 @@ using Pulp.Domain.Household;
 using Pulp.Domain.Household.Records;
 using Pulp.Domain.People;
 using Pulp.Domain.Settings;
+using Pulp.Domain.Sports;
 using Pulp.Infrastructure.Catalogue;
 using Pulp.Library;
 
@@ -43,6 +44,7 @@ public class HouseholdActivity : Activity
 
     private readonly CancellationTokenSource lifetime = new();
     private readonly Dictionary<ViewerId, ChildRules> rules = [];
+    private readonly Dictionary<ViewerId, HashSet<LeagueId>> leaguesAllowed = [];
     private readonly Dictionary<TitleId, string> titleNames = [];
     private readonly Dictionary<ViewerId, IReadOnlyList<CatalogueTitle>> results = [];
     private readonly Dictionary<ViewerId, string> searchStatus = [];
@@ -141,6 +143,15 @@ public class HouseholdActivity : Activity
                     view = read;
                     phone = answer;
                     rules.Clear();
+                    leaguesAllowed.Clear();
+                    foreach (var allowance in read.ChildLeagueAllowances)
+                    {
+                        if (!leaguesAllowed.TryAdd(allowance.Child, [allowance.League]))
+                        {
+                            leaguesAllowed[allowance.Child].Add(allowance.League);
+                        }
+                    }
+
                     foreach (var child in read.ChildRules)
                     {
                         rules[child.Child] = child;
@@ -262,9 +273,68 @@ public class HouseholdActivity : Activity
             return editor;
         }
 
+        if (viewer.IsChild == false)
+        {
+            editor.AddView(AccountEditor(viewer, name));
+        }
+
         editor.AddView(SettingsViews.CheckRow(this, "A child", viewer.IsChild, isChild => SetChild(viewer, name, isChild)));
         editor.AddView(PaperUi.QuietButton(this, $"Remove {name}", () => Remove(viewer, name)), SettingsViews.Spaced(this, DesignTokens.Space.X1));
         return editor;
+    }
+
+    /// <summary>
+    /// An adult's Google address (D304): the owner's install shares the Pulp calendar with it, read-only, on its
+    /// next nightly write. It is kept only in the encrypted household file. Blank clears it, undo-first (§13).
+    /// </summary>
+    private View AccountEditor(HouseholdViewer viewer, string name)
+    {
+        var form = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        form.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X3), 0, 0);
+        var current = view?.GoogleAccountOf(viewer.Id);
+        var draftKey = $"account:{viewer.Id}";
+        form.AddView(Muted("Google account, to share the Pulp calendar with"));
+        var field = DraftField(draftKey, "name@example.com", current ?? string.Empty);
+        field.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationEmailAddress;
+        form.AddView(field);
+        var refusal = Muted(string.Empty);
+        refusal.Visibility = ViewStates.Gone;
+        form.AddView(refusal);
+        form.AddView(PaperUi.SecondaryButton(this, "Save account", () =>
+        {
+            var typed = GoogleAddress.Clean(field.Text);
+            if (typed is null)
+            {
+                if (current is not null)
+                {
+                    drafts.Clear(draftKey);
+                    ClearAccount(viewer, name, current);
+                }
+
+                return;
+            }
+
+            var problem = GoogleAddress.Check(typed);
+            refusal.Text = problem ?? string.Empty;
+            refusal.Visibility = problem is null ? ViewStates.Gone : ViewStates.Visible;
+            if (problem is not null || typed == current)
+            {
+                return;
+            }
+
+            drafts.Clear(draftKey);
+            Enqueue($"record {viewer.Id}'s Google account", token =>
+                services.PutAsync(HouseholdMaps.AdultAccount, new AdultAccountEntry(viewer.Id, typed), token));
+        }), SettingsViews.Spaced(this, DesignTokens.Space.X2));
+        return form;
+    }
+
+    private void ClearAccount(HouseholdViewer viewer, string name, string address)
+    {
+        var entry = new AdultAccountEntry(viewer.Id, address);
+        Enqueue($"clear {viewer.Id}'s Google account", token => services.RemoveAsync(HouseholdMaps.AdultAccount, entry, token));
+        DogEar.Show(this, overlay, HouseholdText.Undo("clear account", name), () =>
+            Enqueue($"put {viewer.Id}'s Google account back", token => services.PutAsync(HouseholdMaps.AdultAccount, entry, token)));
     }
 
     private View AddPerson()
@@ -321,20 +391,41 @@ public class HouseholdActivity : Activity
         // taking the flag off drops the rules, and the dog-ear can put them back (§13). PersonEdits
         // decides the order the records are written in.
         rules.Remove(viewer.Id);
-        Enqueue($"make {viewer.Id} an adult", token => RunSteps(PersonEdits.MakeAdult(viewer, before), token));
+        var allowancesOf = AllowancesOf(viewer.Id);
+        Enqueue($"make {viewer.Id} an adult", token => RunSteps(PersonEdits.MakeAdult(viewer, before, allowancesOf), token));
         DogEar.Show(this, overlay, HouseholdText.Undo("change", name), () =>
-            Enqueue($"make {viewer.Id} a child again", token => RunSteps(PersonEdits.MakeChild(viewer, before ?? ChildRuleEdits.NewChild(viewer.Id)), token)));
+            Enqueue($"make {viewer.Id} a child again", token => RunSteps(PersonEdits.MakeChild(viewer, before ?? ChildRuleEdits.NewChild(viewer.Id), allowancesOf), token)));
     }
+
+    /// <summary>The leagues ticked for one child, as read; they are tombstoned and restored with the person (D362).</summary>
+    private IReadOnlyList<ChildLeagueAllowance> AllowancesOf(ViewerId child) =>
+        view?.ChildLeagueAllowances.Where(entry => entry.Child == child).ToList() ?? [];
 
     /// <summary>Undo-first (§13): the person, their name and a child's rules go at once; the dog-ear puts all three back.</summary>
     private void Remove(HouseholdViewer viewer, string name)
     {
         var named = view?.NameOf(viewer.Id) == viewer.Id.Value ? null : new ViewerNameEntry(viewer.Id, name);
         var childRules = rules.GetValueOrDefault(viewer.Id);
+        var allowancesOf = AllowancesOf(viewer.Id);
         editing = null;
-        Enqueue($"remove {viewer.Id}", token => RunSteps(PersonEdits.Remove(viewer, named, childRules), token));
+        var address = view?.GoogleAccountOf(viewer.Id);
+        Enqueue($"remove {viewer.Id}", async token =>
+        {
+            await RunSteps(PersonEdits.Remove(viewer, named, childRules, allowancesOf), token);
+            if (address is not null)
+            {
+                await services.RemoveAsync(HouseholdMaps.AdultAccount, new AdultAccountEntry(viewer.Id, address), token);
+            }
+        });
         DogEar.Show(this, overlay, HouseholdText.RemoveUndo(name), () =>
-            Enqueue($"put {viewer.Id} back", token => RunSteps(PersonEdits.Add(viewer, named ?? new ViewerNameEntry(viewer.Id, viewer.Id.Value), childRules ?? (viewer.IsChild ? ChildRuleEdits.NewChild(viewer.Id) : null)), token)));
+            Enqueue($"put {viewer.Id} back", async token =>
+            {
+                await RunSteps(PersonEdits.Add(viewer, named ?? new ViewerNameEntry(viewer.Id, viewer.Id.Value), childRules ?? (viewer.IsChild ? ChildRuleEdits.NewChild(viewer.Id) : null), allowancesOf), token);
+                if (address is not null)
+                {
+                    await services.PutAsync(HouseholdMaps.AdultAccount, new AdultAccountEntry(viewer.Id, address), token);
+                }
+            }));
     }
 
     /// <summary>
@@ -410,9 +501,46 @@ public class HouseholdActivity : Activity
             }
         }
 
+        LeagueSection(section, childRules.Child, name);
+
         section.AddView(TitleSearch(childRules.Child, name), SettingsViews.Spaced(this, DesignTokens.Space.X3));
         section.AddView(SettingsViews.Rule(this, PaperTheme.Hairline), SettingsViews.Spaced(this, DesignTokens.Space.X3));
         return section;
+    }
+
+    /// <summary>
+    /// The leagues a parent allows this child (D59, D72, D317): sport is allow-list only, so every league
+    /// starts unticked. Ticking one is a record of its own, written by the adult whose phone this is.
+    /// </summary>
+    private void LeagueSection(LinearLayout section, ViewerId child, string name)
+    {
+        section.AddView(Muted("Leagues"), SettingsViews.Spaced(this, DesignTokens.Space.X3));
+        if (phone.Viewer is not { } parent)
+        {
+            section.AddView(PaperUi.Secondary(this, "Say whose phone this is above to choose " + name + "'s leagues."));
+            return;
+        }
+
+        var allowed = leaguesAllowed.TryGetValue(child, out var current) ? current : [];
+        foreach (var row in ChildSports.Rows(services.SportsSources, allowed))
+        {
+            section.AddView(SettingsViews.CheckRow(this, row.Name, row.Allowed, ticked =>
+            {
+                var allowance = new ChildLeagueAllowance(child, row.League, parent, DateTimeOffset.UtcNow);
+                if (!leaguesAllowed.TryAdd(child, ticked ? [row.League] : []) && ticked)
+                {
+                    leaguesAllowed[child].Add(row.League);
+                }
+                else if (!ticked)
+                {
+                    leaguesAllowed[child].Remove(row.League);
+                }
+
+                Enqueue($"{(ticked ? "allow" : "stop allowing")} {row.League} for {child}", token => ticked
+                    ? services.PutAsync(HouseholdMaps.ChildLeague, allowance, token)
+                    : services.RemoveAsync(HouseholdMaps.ChildLeague, allowance, token));
+            }));
+        }
     }
 
     /// <summary>One list of titles on a child's rules; a tap takes a title off it at once, and the dog-ear puts it back.</summary>

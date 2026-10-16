@@ -47,7 +47,7 @@ public class UsageReceiver : BroadcastReceiver
                 return;
             }
 
-            PulpUsageStore.Save(PulpUsageStore.Load().Apply(receipt));
+            PulpUsageStore.Receive(receipt);
         }
         catch (Exception e)
         {
@@ -68,15 +68,37 @@ public class UsageReceiver : BroadcastReceiver
 public static class PulpUsageStore
 {
     private const string Key = "pulp-usage";
+    private const string SharedKey = "pulp-usage-shared";
     private static readonly object Gate = new();
 
+    /// <summary>What the line under a charge is drawn from: the receiver's ledger, filled out from the last good copy of Pulp's Drive file (Pulp D320).</summary>
     public static PulpUsageLedger Load()
+    {
+        lock (Gate)
+        {
+            return PulpUsageCodec.Decode(Preferences.Get(Key, string.Empty))
+                .WithSharedFrom(PulpUsageCodec.Decode(Preferences.Get(SharedKey, string.Empty)));
+        }
+    }
+
+    /// <summary>The ledger of receipts alone, which is what a new receipt applies to; the Drive copy never leaks into it.</summary>
+    private static PulpUsageLedger LoadReceived()
     {
         lock (Gate)
         {
             return PulpUsageCodec.Decode(Preferences.Get(Key, string.Empty));
         }
     }
+
+    public static void SaveShared(PulpUsageLedger ledger)
+    {
+        lock (Gate)
+        {
+            Preferences.Set(SharedKey, PulpUsageCodec.Encode(ledger));
+        }
+    }
+
+    public static void Receive(PulpUsageReceipt receipt) => Save(LoadReceived().Apply(receipt));
 
     public static void Save(PulpUsageLedger ledger)
     {

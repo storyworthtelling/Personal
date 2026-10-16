@@ -131,7 +131,7 @@ public class CalendarScreenRowsTests
     [Fact]
     public void ThereIsNoBottomBarAndNoPlanMakingOnThePage()
     {
-        // D246: plans are made from a title's page. The page model carries no action beyond opening a row.
+        // D246/D305: no bottom bar; the page model carries no action beyond opening a row. Adding a plan is the area's own form.
         var members = typeof(CalendarScreenRow).GetProperties().Select(property => property.Name).ToList();
         Assert.NotEmpty(members);
         Assert.DoesNotContain(members, name => name.Contains("Plan", StringComparison.OrdinalIgnoreCase) && name != "Title");
