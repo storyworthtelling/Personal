@@ -28,7 +28,8 @@ public class TimelineMerger
     private static string ThreadKeyOf(TimelineItem item, IIdentityResolver resolver) =>
         item.GroupId is { } groupId ? GroupThreadKey(groupId) : resolver.ResolveThreadKey(item.ContactKey);
 
-    private static string GroupThreadKey(string groupId) => "group:" + groupId;
+    /// <summary>The thread key a group conversation merges under; names and rows are keyed by it.</summary>
+    public static string GroupThreadKey(string groupId) => "group:" + groupId;
 
     private static ContactThread BuildThread(string threadKey, IEnumerable<TimelineItem> group, IIdentityResolver resolver)
     {

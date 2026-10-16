@@ -48,8 +48,18 @@ internal static class SmsProviderWriter
 
         context.ContentResolver?.Insert(Telephony.Sms.Inbox.ContentUri!, values);
 
-        return new IncomingSms(first.OriginatingAddress, body);
+        return new IncomingSms(first.OriginatingAddress, body)
+        {
+            SentAt = DateTimeOffset.FromUnixTimeMilliseconds(first.TimestampMillis),
+            Parts = messages.Length,
+        };
     }
 }
 
-internal sealed record IncomingSms(string? Address, string Body);
+internal sealed record IncomingSms(string? Address, string Body)
+{
+    /// <summary>When the sender's phone sent it, by the carrier's clock; null for an MMS.</summary>
+    public DateTimeOffset? SentAt { get; init; }
+
+    public int Parts { get; init; } = 1;
+}

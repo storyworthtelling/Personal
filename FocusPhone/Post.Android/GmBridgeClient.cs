@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Android.Content;
+using Codex.Domain.Post;
 using Codex.Domain.Timeline;
 
 namespace Post;
@@ -52,6 +53,7 @@ public sealed class GmBridgeClient
             bridge = global::Gmbridge.Gmbridge.NewBridge(session, new EventProxy(this));
             bridge?.Connect();
             connected = true;
+            PostDiagnostics.LogText("Bridge", "Bridge connected");
         }
         catch (Exception e)
         {
@@ -139,6 +141,14 @@ public sealed class GmBridgeClient
                     break;
                 case "paired":
                     SaveSession();
+                    PostDiagnostics.LogText("Bridge", "Bridge paired");
+                    break;
+                // Pairing failures and a revoked session used to be dropped here, which left
+                // a bridge that had quietly stopped looking exactly like one with nothing to say.
+                case "authError":
+                    connected = false;
+                    PostDiagnostics.LogWarning("Bridge",
+                        "Bridge sign-in failed: " + (root.TryGetProperty("error", out var error) ? error.GetString() : "no detail"));
                     break;
             }
         }
@@ -159,6 +169,9 @@ public sealed class GmBridgeClient
         {
             return;
         }
+        PostDiagnostics.LogText("Bridge", "Bridge message; sent "
+            + TextTrail.Lag(DateTimeOffset.UtcNow - BridgeTimestamp.ToInstant(timestampMs))
+            + " before it reached Post");
 
         // Key on the message id (a pure "gm:{id}") when present so it dedups and so
         // the delete path can recover the id to remote-delete; fall back otherwise.
@@ -166,7 +179,7 @@ public sealed class GmBridgeClient
         var item = new TimelineItem(
             TimelineItemKind.Message,
             ContactKeyNormalizer.NormalizeAny(sender),
-            DateTimeOffset.FromUnixTimeMilliseconds(timestampMs),
+            BridgeTimestamp.ToInstant(timestampMs),
             text,
             Incoming: true,
             SourceId: sourceId)

@@ -19,6 +19,7 @@ public record DiagnosticEntry(
 /// <summary>Severity labels for <see cref="DiagnosticEntry.Level"/>.</summary>
 public static class DiagnosticLevel
 {
+    public const string Info = "INFO";
     public const string Warning = "WARN";
     public const string Error = "ERROR";
     public const string Crash = "CRASH";

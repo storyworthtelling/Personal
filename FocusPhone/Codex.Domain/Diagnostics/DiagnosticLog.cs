@@ -37,9 +37,18 @@ public class DiagnosticLog
     {
     }
 
-    public DiagnosticLog(string directory, long maxBytes)
+    public DiagnosticLog(string directory, long maxBytes) : this(directory, maxBytes, FileName)
     {
-        filePath = Path.Combine(directory, FileName);
+    }
+
+    /// <summary>
+    /// A log under its own file name, for a trail that must not share the failure log's cap —
+    /// Post's texts trail writes a line per arriving text, which would roll the failure
+    /// history out within a day.
+    /// </summary>
+    public DiagnosticLog(string directory, long maxBytes, string fileName)
+    {
+        filePath = Path.Combine(directory, fileName);
         backupPath = filePath + BackupSuffix;
         this.maxBytes = maxBytes;
     }
