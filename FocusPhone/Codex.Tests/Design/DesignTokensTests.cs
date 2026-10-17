@@ -217,6 +217,18 @@ public class DesignTokensTests
         Assert.Equal("#82ACC1", DesignTokens.Identity.Constitution.Cloth);
     }
 
+    // Constitution's tab cloths, as the owner approved them on book p.11 strip B (D40, D45).
+    // Pinned as literals because they are a decision. Meals' steel is registered nowhere else.
+    [Fact]
+    public void ConstitutionAreaClothsAreTheApprovedStripB()
+    {
+        Assert.Equal("#143B4C", DesignTokens.AreaCloths.Constitution.Today);
+        Assert.Equal("#9E434B", DesignTokens.AreaCloths.Constitution.Workouts);
+        Assert.Equal("#383E44", DesignTokens.AreaCloths.Constitution.Meals);
+        Assert.Equal("#38734A", DesignTokens.AreaCloths.Constitution.Body);
+        Assert.Equal("#C0BDB9", DesignTokens.AreaCloths.Constitution.Settings);
+    }
+
     [Theory]
     [InlineData("#1B6A89", 3.0)]  // marks and UI, incl. the lit binder tab
     [InlineData("#15546E", 4.5)]  // identity-colored text at any size
