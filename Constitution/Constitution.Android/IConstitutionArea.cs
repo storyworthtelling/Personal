@@ -23,6 +23,12 @@ public interface IConstitutionArea
     /// <summary>The in-page Serif Black header text.</summary>
     string Title { get; }
 
+    /// <summary>
+    /// An optional muted Serif line under the header title, outside the well (D43): null for none. Today
+    /// puts its date here so nothing is lettered bare on the crinkled ground.
+    /// </summary>
+    string? Subtitle { get; }
+
     /// <summary>Plain for Settings, crinkled for the rest (D43, D71).</summary>
     PageGround Ground { get; }
 

@@ -29,6 +29,8 @@ public abstract class ConstitutionAreaBase(Activity host, string id, int glyphRe
 
     public string Title => Definition.Name;
 
+    public virtual string? Subtitle => null;
+
     public PageGround Ground => PageGround.For(Definition);
 
     /// <summary>

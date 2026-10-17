@@ -36,7 +36,7 @@ public sealed class SettingsArea(Activity host)
     private readonly PillarStore pillarStore = new(host);
     private readonly EquipmentStore equipmentStore = new(host);
     private readonly ConstitutionConnections connections = new(host);
-    private readonly VoiceGoogleAccount googleAccount = new();
+    private readonly VoiceGoogleAccount googleAccount = ConstitutionGoogle.Create();
 
     // Which group is open, which connection row is showing its entry, and the one inline sentence
     // each act leaves behind. Held here so a rebuild does not undo them.

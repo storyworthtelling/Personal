@@ -72,7 +72,7 @@ public sealed class ConstitutionVaultRunner
     {
         var appContext = context.ApplicationContext ?? context;
         var log = new ConstitutionVaultLog(appContext);
-        var account = new VoiceGoogleAccount();
+        var account = ConstitutionGoogle.Create();
         return new ConstitutionVaultRunner(
             () => VaultPassphraseStore.Passphrase,
             () => VoiceGoogleAccount.IsSignedIn,
