@@ -17,6 +17,7 @@ One phase branch (D89): `ccr-0de01a0f-8dnn7q`. Releases land as labelled commits
 | C-12.1.1 | review | 686ec8d | 4 ConstitutionWorkflowTests failed: workflow file absent | Updates.Tests 69 pass; workflow never run in CI |
 | C-12.2.1 | review | (guards commit) | key detector tests green from the start of the resumed run; guard source holds no key-shaped literal (runtime concatenation) | Constitution.Tests 111 pass |
 | C-12.2.2 | review | (guards commit) | 29 InventedDataTests failed against a stub detector (email 6, phone 9, address 4, person 6+2, planted fixtures) | Constitution.Tests 111 pass; people check only reaches Household*/Fixtures and markdown rosters |
+| C-1.3.3 | review (Owner) | (icon commit) | CS0117 Glyphs.ConstitutionPlate missing; ConstitutionResourcesAreGenerated failed (no matching spec); 3 existing tests failed on the 8x8 seed until SeedGrounds grew | IconStudio 36 pass, Constitution 111 pass, head compiles. Icon at 144px shows two runners; 48px small but discernible (agent's view). Owner has not seen it. Assembly-level Application attribute not yet checked in merged manifest/APK (CI ICON CHECK will). |
 
 ## Open questions
 - NYT: owner suggests Article Search may return Cooking content; wants it tested with their key from the vault. Vault passphrase NOT received and must not be taken in chat; offered environment secret route. Terms (D96) still bar storing recipes regardless.

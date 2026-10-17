@@ -395,6 +395,15 @@ public static class Glyphs
     }
 
     /// <summary>
+    /// Constitution's cover, as the launcher icon (book page 3, icon B; D12): nothing over the
+    /// painting. Like Pulp's, it has no keyline — the two runners on the slope are the picture,
+    /// and a frame around them would shrink the figures the 48 px icon has to keep legible.
+    /// </summary>
+    public static void ConstitutionPlate(SKCanvas canvas, float s)
+    {
+    }
+
+    /// <summary>
     /// Index's cover (D115, D117, D119): the same keyline-only window every cover ships, plus
     /// the one thing D119 adds — a corner flourish (the mockup's bracket, bulging toward the corner), drawn once for the
     /// top-left and <b>reflected</b>, never rotated, into the other three (an asymmetric mark
