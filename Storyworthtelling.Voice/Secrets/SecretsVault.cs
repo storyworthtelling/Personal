@@ -132,6 +132,13 @@ public sealed record PersonalVault
 
     public string WorkScheduleJson { get; init; } = string.Empty;
 
+    // Constitution's Health Connect choices: which signals this person agreed to share with the app.
+    // A per-install fact, so it is here and never in the shared vault — restored from the first phone
+    // onto the second it would hand one adult's choices to the other. Stored as the same JSON the app
+    // keeps on the phone, so restoring is a copy. The WIRE KEY is this property's name, with no naming
+    // policy, so it is frozen from the day it is first written.
+    public string HealthConnectChoicesJson { get; init; } = string.Empty;
+
     public static PersonalVault Empty { get; } = new();
 }
 
