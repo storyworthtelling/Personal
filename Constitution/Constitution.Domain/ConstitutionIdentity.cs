@@ -71,6 +71,31 @@ public static class ConstitutionIdentity
     /// <summary>The Body pillar's switch; see <see cref="PillarWorkoutsKey"/>.</summary>
     public const string PillarBodyKey = "pillar-body";
 
+    /// <summary>
+    /// The connections the vault restores into this install, one string each, inside
+    /// <see cref="SettingsPreferencesName"/>. Added with the Android vault services (C-4); the values
+    /// are kept in app-private preferences the way the sibling heads keep theirs. Absent means empty.
+    /// </summary>
+    public const string SleepNumberLoginKey = "connection-sleep-number-login";
+
+    /// <summary>The household Sleep Number password; see <see cref="SleepNumberLoginKey"/>.</summary>
+    public const string SleepNumberPasswordKey = "connection-sleep-number-password";
+
+    /// <summary>The reMarkable device token; see <see cref="SleepNumberLoginKey"/>.</summary>
+    public const string RemarkableTokenKey = "connection-remarkable-token";
+
+    /// <summary>The shared Claude key; see <see cref="SleepNumberLoginKey"/>.</summary>
+    public const string ClaudeKeyKey = "connection-claude-key";
+
+    /// <summary>The shared Gemini key; see <see cref="SleepNumberLoginKey"/>.</summary>
+    public const string GeminiKeyKey = "connection-gemini-key";
+
+    /// <summary>This person's Health Connect choices as JSON; see <see cref="SleepNumberLoginKey"/>.</summary>
+    public const string HealthConnectChoicesKey = "connection-health-connect-choices";
+
+    /// <summary>This person's work schedule as JSON, written by Foreword; see <see cref="SleepNumberLoginKey"/>.</summary>
+    public const string WorkScheduleKey = "connection-work-schedule";
+
     /// <summary>Every registered worker Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName];
 
@@ -78,5 +103,9 @@ public static class ConstitutionIdentity
     public static IReadOnlyList<string> WorkNames { get; } = [ReadBackWorkName, BodySyncWorkName];
 
     /// <summary>Every preference file name and key, for the guard to enumerate.</summary>
-    public static IReadOnlyList<string> PreferenceKeys { get; } = [SettingsPreferencesName, PillarWorkoutsKey, PillarMealsKey, PillarBodyKey];
+    public static IReadOnlyList<string> PreferenceKeys { get; } = [
+        SettingsPreferencesName, PillarWorkoutsKey, PillarMealsKey, PillarBodyKey,
+        SleepNumberLoginKey, SleepNumberPasswordKey, RemarkableTokenKey, ClaudeKeyKey, GeminiKeyKey,
+        HealthConnectChoicesKey, WorkScheduleKey,
+    ];
 }

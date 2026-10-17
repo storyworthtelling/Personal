@@ -35,6 +35,14 @@ public class ConstitutionInvariantsTests
         "pillar-workouts",
         "pillar-meals",
         "pillar-body",
+        // Added with the Android vault services (C-4): the connections the vault restores. A deliberate edit.
+        "connection-sleep-number-login",
+        "connection-sleep-number-password",
+        "connection-remarkable-token",
+        "connection-claude-key",
+        "connection-gemini-key",
+        "connection-health-connect-choices",
+        "connection-work-schedule",
     ];
 
     // ---- the package id ----

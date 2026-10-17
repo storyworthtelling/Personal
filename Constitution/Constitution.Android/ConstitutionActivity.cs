@@ -6,6 +6,7 @@ using Codex.Domain.Design;
 using Codex.Ui;
 using Constitution.Domain.Areas;
 using Constitution.Domain.Layout;
+using Constitution.Services;
 
 namespace Constitution;
 
@@ -64,6 +65,9 @@ public abstract class ConstitutionActivity : Activity
         SetContentView(BuildLayout());
         RefreshTabs();
         RenderPage();
+
+        // After a reset or reinstall, refill the connections from the Drive vault (background; no-op without a passphrase).
+        ConstitutionVaultRunner.RestoreAtLaunch(this);
     }
 
     protected override void OnResume()
