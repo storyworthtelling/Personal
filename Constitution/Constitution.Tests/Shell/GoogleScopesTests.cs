@@ -42,3 +42,34 @@ public sealed class GoogleScopesTests
         Assert.Matches(Construction, text);
     }
 }
+
+/// <summary>
+/// The signed Release build has no INTERNET permission unless the head declares it: Debug adds it
+/// automatically, which hides the omission until the first main build. Vault restore, reMarkable
+/// pairing and the voice calls would then fail without any message.
+/// </summary>
+public sealed class ManifestPermissionTests
+{
+    [Fact]
+    public void TheHeadDeclaresInternet()
+    {
+        var sources = ConstitutionSource.Files(".cs")
+            .Where(file => ConstitutionSource.Relative(file).Contains("Constitution.Android", StringComparison.Ordinal))
+            .ToList();
+        Assert.True(sources.Count >= 10, "The scan should cover the head's sources, found " + sources.Count);
+
+        var declared = sources.Any(file => File.ReadAllText(file)
+            .Contains("[assembly: UsesPermission(Android.Manifest.Permission.Internet)]", StringComparison.Ordinal));
+        Assert.True(declared, "Declare INTERNET on the head: [assembly: UsesPermission(Android.Manifest.Permission.Internet)].");
+    }
+
+    [Fact]
+    public void TheWorkflowChecksTheBuiltApkForInternet()
+    {
+        var workflow = Path.Combine(ConstitutionSource.Root(), "..", ".github", "workflows", "build-constitution.yml");
+        Assert.True(File.Exists(workflow), "build-constitution.yml was not found at " + workflow);
+        var text = File.ReadAllText(workflow);
+        Assert.Contains("INTERNET", text, StringComparison.Ordinal);
+        Assert.Contains("dump permissions", text, StringComparison.Ordinal);
+    }
+}
