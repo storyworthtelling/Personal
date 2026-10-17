@@ -54,6 +54,11 @@ public record PolicyContext(
     // Pulp.Domain holds the same value). Named here because the shelf draws it cover-out.
     public const string PulpPackage = "com.storyworthtelling.pulp";
 
+    // Constitution, the household's constitution app. Frozen from its first build
+    // (ConstitutionIdentity in Constitution.Domain holds the same value). A sibling repo app, so the
+    // owner prefix above is what clears it; named here so the shelf can recognise it.
+    public const string ConstitutionPackage = "com.storyworthtelling.constitution";
+
     public const string PlayStorePackage = "com.android.vending";
 
     // A protected system package: DevicePolicyManager.SetPackagesSuspended refuses to suspend

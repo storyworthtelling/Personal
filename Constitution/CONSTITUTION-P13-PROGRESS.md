@@ -11,8 +11,11 @@ One phase branch (D89): `ccr-0de01a0f-8dnn7q`. Releases land as labelled commits
 | C-1.3.2 | review | (this commit) | ConstitutionCoverIsTheApprovedSize failed: file absent | sha256 matches book cover.jpg, 864x1184 |
 | C-12.1.2 | done | (this commit) | ConstitutionIsBandTen red: Assert.Single found no match; BandsAreUnique guards future collisions (asserts >=3 non-band-1 entries) | Updates.Tests 65 pass |
 | C-11.4.1 | done | (this commit) | n/a (investigation) | Outcome PERMISSION NEEDED = NO; evidence second-hand, owner to confirm portal list |
+| C-1.1.2 | review | (ladder commit) | CS0117 PolicyContext.ConstitutionPackage missing; EverySuiteBook... failed until BookClothPalette bound | Codex.Tests 2470 pass |
+| C-1.2.1 | review | (ladder commit) | wrong hexes: TokenParity (no DESIGN.md row), DesignTokensTests (#143B4C vs 4D), 4 Paper separation/parity failures | Codex 2470, Paper 140, IconStudio 34 pass |
+| C-1.2.2 | review | (ladder commit) | ConstitutionDocumentHueIsTheMutedCerulean / ConstitutionClothInvertsToInk only compile-red (values were already right) | same suites |
 
 ## Open questions
-- NYT: confirm no Cooking entry at developer.nytimes.com/apis, then decide whether to send the drafted permission request (spikes/nyt-recipes.md). Page 14 revision needed (paste row dropped).
-- Frozen names chosen (plan gave none): workers ReadBackWorker, BodySyncWorker; work names constitution-read-back, constitution-body-sync; prefs file constitution-settings. Confirm or change before first ship.
+- NYT: owner suggests Article Search may return Cooking content; wants it tested with their key from the vault. Vault passphrase NOT received and must not be taken in chat; offered environment secret route. Terms (D96) still bar storing recipes regardless.
+- Frozen names CONFIRMED by owner (workers ReadBackWorker, BodySyncWorker; work names constitution-read-back, constitution-body-sync; prefs file constitution-settings).
 - Spikes C-11.4.2/3/4 need the owner (phone, bed login, tablets); not runnable from the cloud.
