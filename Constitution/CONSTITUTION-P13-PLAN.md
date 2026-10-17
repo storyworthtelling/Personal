@@ -233,7 +233,7 @@ both are 3:4, so nothing is cropped (TF §1.4).
 | PC5 | **A registered "Dose" rung** in `PaperTypeScale` for the 54 pt dose (p.5), recorded in DESIGN.md §19 | The no-literal guard would otherwise fail (TF §1.5, G6) |
 | PC6 | **Index's card rule tokens and 22 dp pitch move into the shared `MaterialTokens.cs`**, and Index re-points | "The same object in both apps" (p.11) then holds by construction (TF §1.2) |
 | PC7 | **A planning lease record** in the household file (who plans, with a heartbeat), so the partner's install takes over only while the owner's is silent | Two planners must never plan the same week (R8) |
-| PC8 | **Page 14's "Paste an NYT Cooking link" row is built only if the NYT spike succeeds.** Otherwise the picker shows the scan row alone, and the change goes back to the owner as a book revision | D82: raise, don't substitute |
+| PC8 | **Page 14's "Paste an NYT Cooking link" row is not built** (spike C-11.4.1, D96: no official recipe API; permission needed). The picker shows the scan row alone, and the change goes back to the owner as a book revision; revisit only on written permission | D82: raise, don't substitute |
 | PC9 | **Weather and air quality extend `Storyworthtelling.Google`** with the hourly forecast and Google's Air Quality API, on the same key | The bad-weather swap needs the slot's forecast, not current conditions (TF §1.6, G10) |
 | PC10 | **The weekly Keep hand-off is a Reference notice on the Waiting page**: "This week's groceries are ready", with one button, Send to Keep, which opens Keep's share sheet with the list. It appears once the sheet is approved. | Confirmed by D90 |
 
@@ -1297,7 +1297,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
 - *Tests first:* `MealFallbackTests.FavouritesWeekObeysTheRules`.
 - *Design / spec:* brief §failure table · *Depends:* C-6.3.1 · **S · D · Tests · L2 · medium**
 
-**C-6.3.4 · The NYT stretch dish (gated)**
+**C-6.3.4 · The NYT stretch dish (gated) — CLOSED UNBUILT (D96)**
 - *Story:* As the household, I want one NYT recipe a week that suits us, if NYT allows it, so that we
   try something new.
 - *Acceptance:* Built **only if** the spike (C-11.4.1) finds an official API or written permission
@@ -1988,7 +1988,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
 - **Design / spec:** TF §6; R1, R3, R5, R12.
 - **Risks:** a spike that finds "no" late; this is why they're in Release A.
 
-**C-11.4.1 · NYT: an official route, or none**
+**C-11.4.1 · NYT: an official route, or none** — *outcome: PERMISSION NEEDED, treated as NO; see `spikes/nyt-recipes.md`, D96*
 - *Story:* As the household, I want to know early whether NYT will allow its recipes in our planner,
   so that the box and the sheet are built for the answer.
 - *Acceptance:* Given developer.nytimes.com and NYT's terms, then the spike records whether any
