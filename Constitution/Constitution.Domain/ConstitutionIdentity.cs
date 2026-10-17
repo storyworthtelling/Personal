@@ -96,6 +96,12 @@ public static class ConstitutionIdentity
     /// <summary>This person's work schedule as JSON, written by Foreword; see <see cref="SleepNumberLoginKey"/>.</summary>
     public const string WorkScheduleKey = "connection-work-schedule";
 
+    /// <summary>
+    /// Which equipment this install has ticked, one comma-joined string of the frozen ids in
+    /// <c>EquipmentCatalogue</c> (a dash for none), inside <see cref="SettingsPreferencesName"/>. Absent means everything.
+    /// </summary>
+    public const string EquipmentOwnedKey = "equipment-owned";
+
     /// <summary>Every registered worker Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName];
 
@@ -106,6 +112,6 @@ public static class ConstitutionIdentity
     public static IReadOnlyList<string> PreferenceKeys { get; } = [
         SettingsPreferencesName, PillarWorkoutsKey, PillarMealsKey, PillarBodyKey,
         SleepNumberLoginKey, SleepNumberPasswordKey, RemarkableTokenKey, ClaudeKeyKey, GeminiKeyKey,
-        HealthConnectChoicesKey, WorkScheduleKey,
+        HealthConnectChoicesKey, WorkScheduleKey, EquipmentOwnedKey,
     ];
 }

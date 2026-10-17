@@ -1,4 +1,5 @@
 using Android.App;
+using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -33,6 +34,8 @@ public abstract class ConstitutionActivity : Activity
     private FrameLayout overlay = null!;
     private PillarStore pillarStore = null!;
 
+    private SettingsArea? settingsArea;
+
     private IConstitutionArea Active => areasById[activeId];
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -41,13 +44,14 @@ public abstract class ConstitutionActivity : Activity
         PaperTransitions.Apply(this);
 
         pillarStore = new PillarStore(this);
+        settingsArea = new SettingsArea(this);
         var areas = new IConstitutionArea[]
         {
             new TodayArea(this),
             new WorkoutsArea(this),
             new MealsArea(this),
             new BodyArea(this),
-            new SettingsArea(this),
+            settingsArea,
         };
         areasById = areas.ToDictionary(area => area.Definition.Id);
         foreach (var area in areas)
@@ -55,6 +59,8 @@ public abstract class ConstitutionActivity : Activity
             var which = area;
             area.Changed += () =>
             {
+                // A pillar switched on or off hides or shows its tab at once, not at the next resume.
+                RefreshTabs();
                 if (Active == which)
                 {
                     RenderPage();
@@ -68,6 +74,14 @@ public abstract class ConstitutionActivity : Activity
 
         // After a reset or reinstall, refill the connections from the Drive vault (background; no-op without a passphrase).
         ConstitutionVaultRunner.RestoreAtLaunch(this);
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+
+        // The Google account picker opened from Settings answers here.
+        settingsArea?.OnActivityResult(requestCode, resultCode, data);
     }
 
     protected override void OnResume()
@@ -152,8 +166,9 @@ public abstract class ConstitutionActivity : Activity
         header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
         frame.SetHeader(header);
 
+        // The well is bare: the area insets its own page to the screen edge (ConstitutionAreaBase.BuildView),
+        // because the crinkled ground has to reach the well's own edges (D43).
         var well = new FrameLayout(this);
-        well.SetPadding(edge, 0, edge, 0);
         well.AddView(active.BuildView(), new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
         frame.SetWell(well);

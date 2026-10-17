@@ -43,6 +43,8 @@ public class ConstitutionInvariantsTests
         "connection-gemini-key",
         "connection-health-connect-choices",
         "connection-work-schedule",
+        // Added with Settings (C-8.1.1): which equipment this install has ticked. A deliberate edit.
+        "equipment-owned",
     ];
 
     // ---- the package id ----
