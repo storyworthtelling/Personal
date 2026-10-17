@@ -1,6 +1,8 @@
 using Microsoft.Maui.Controls.Shapes;
 using Index.Domain.Design;
 using Storyworthtelling.Maui;
+// The index card is shared with Constitution (C-3.2.1, PC6): one token, read by both apps.
+using SharedMaterials = Storyworthtelling.Paper.MaterialTokens;
 
 namespace Index.Android.Views;
 
@@ -19,7 +21,7 @@ public static class ActionCardHaze
     {
         var card = new Border
         {
-            BackgroundColor = Color.FromArgb(MaterialTokens.NoteCardHex),
+            BackgroundColor = Color.FromArgb(SharedMaterials.NoteCardHex),
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = Storyworthtelling.Maui.DesignTokens.Shape.HairlineDp,
             StrokeShape = new RoundRectangle

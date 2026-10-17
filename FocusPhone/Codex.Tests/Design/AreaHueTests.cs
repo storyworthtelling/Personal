@@ -1,5 +1,7 @@
 using System.Text.RegularExpressions;
+using Codex.Domain.Design;
 using Xunit;
+using Cloths = Codex.Domain.Design.DesignTokens.AreaCloths.Constitution;
 
 namespace Codex.Tests.Design;
 
@@ -16,6 +18,13 @@ namespace Codex.Tests.Design;
 /// <para>Score shipped six areas in one hue. That is not a slightly-off palette: it is the strip
 /// doing none of its job, because a divider that is the same colour as every other divider is not a
 /// divider. It was recorded as scheduled work from P7 and this is the guard that closes it.</para>
+///
+/// <para><b>Constitution is the one app that may share (D84).</b> Its five tabs are deep cloths
+/// the owner chose by colour (D40, D45): Workouts' red is the Problem role's mark and Body's green
+/// is in the Positive family, which is exactly the overlap the rule above forbids Score and Post.
+/// The sharing is allowed, not accidental: a tab is a divider, not a state, and a fold wearing its
+/// own tab's hue on Workouts or Body passes. The other rules (Today carries the identity, Settings
+/// alone is grey) still hold, and are checked against Constitution's tokens below.</para>
 ///
 /// <para>Read from source rather than by loading types, because these live in Android heads that
 /// the test project cannot reference.</para>
@@ -206,6 +215,42 @@ public class AreaHueTests
         Assert.True(unexpected.Length == 0,
             "A page wearing its own tab's hue reads as a status rather than a divider (§9/§3). "
             + "In-page accents take the app's identity hue:\n" + string.Join("\n", unexpected));
+    }
+
+    /// <summary>Apps whose cloths may share a hue with each other or with a role (D84).</summary>
+    private static readonly string[] SharingAllowed = ["Constitution"];
+
+    [Fact]
+    public void OnlyConstitutionMaySharePerD84()
+    {
+        Assert.Equal(["Constitution"], SharingAllowed);
+        Assert.DoesNotContain(Apps, app => SharingAllowed.Contains(app.Identity));
+    }
+
+    [Fact]
+    public void ConstitutionsClothsMayShareARoleAndStillHoldTheFixedRules()
+    {
+        // Shared with a role: Workouts' red IS the Problem role's mark. Allowed under D84, and a
+        // fold wearing that hue on the Workouts page passes for the same reason.
+        Assert.Equal(DesignTokens.ProblemMark, Cloths.Workouts, ignoreCase: true);
+
+        // Settings alone is the neutral grey; every other cloth is chromatic.
+        Assert.True(Spread(Cloths.Settings) <= 12, "Settings must be the neutral grey.");
+        foreach (var cloth in new[] { Cloths.Workouts, Cloths.Meals, Cloths.Body })
+        {
+            Assert.False(string.Equals(Cloths.Settings, cloth, StringComparison.OrdinalIgnoreCase));
+        }
+
+        Assert.True(Spread(Cloths.Workouts) > 30 && Spread(Cloths.Body) > 30);
+
+        // Today wears the cerulean identity, not a role.
+        Assert.Equal(DesignTokens.Identity.Constitution.Deep, Cloths.Today, ignoreCase: true);
+    }
+
+    private static int Spread(string hex)
+    {
+        var (r, g, b) = DesignTestHelpers.ParseHex(hex);
+        return Math.Max(r, Math.Max(g, b)) - Math.Min(r, Math.Min(g, b));
     }
 
     private static IReadOnlyList<(string Name, string Mark, string Fill)> AreasOf(string head)

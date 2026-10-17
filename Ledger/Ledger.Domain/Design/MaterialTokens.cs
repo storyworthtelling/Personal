@@ -18,16 +18,10 @@ namespace Index.Domain.Design;
 /// </summary>
 public static class MaterialTokens
 {
-    // The index card's stock (D126) — a cream close to the page but not the page, so a card reads as
-    // a separate sheet lying on the graph paper rather than a cut-out of it.
-    public const string NoteCardHex = "#FFFEF8";
-
-    // The index card's two rule colours (D129): a red head rule under the title (mockup-02's `.ix-hd`
-    // border), and pale blue body rules the account's lines are written on, at a fixed pitch — the
-    // mockup's CSS repeating-linear-gradient step (mockup-02.html, `.ix-body`).
-    public const string CardHeadRuleHex = "#E4A7A2";
-    public const string CardBodyRuleHex = "#D6E3EF";
-    public const decimal CardRulePitchDp = 22m;
+    // The index card (D126/D129) is no longer defined here: its stock, head rule, body rule and 22 dp
+    // pitch moved to Storyworthtelling.Paper.MaterialTokens (NoteCardHex, CardHeadRuleHex,
+    // CardBodyRuleHex, CardRulePitchDp) in C-3.2.1/PC6, so Index and Constitution draw one card.
+    // MaterialParityTests.IndexAndConstitutionShareOneCard fails if a second copy returns.
 
     // The ordinary post-it (D127) — a hand-entered account, or a bank Plaid gives no colour for.
     // Index.Domain.Design.PostItTint.From returns this exact hex whenever there is no bank colour to

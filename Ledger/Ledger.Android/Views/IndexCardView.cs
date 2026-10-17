@@ -3,6 +3,8 @@ using Microsoft.Maui.Layouts;
 using Index.Domain.Design;
 using Index.Domain.Model;
 using Storyworthtelling.Maui;
+// The index card is shared with Constitution (C-3.2.1, PC6): one token, read by both apps.
+using SharedMaterials = Storyworthtelling.Paper.MaterialTokens;
 
 namespace Index.Android.Views;
 
@@ -48,7 +50,7 @@ public static class IndexCardView
         EventHandler<TappedEventArgs>? tapped = null, string? trailingGlyph = null,
         View? leading = null, View? titleChip = null, bool crossedOut = false)
     {
-        var pitch = (float)MaterialTokens.CardRulePitchDp;
+        var pitch = (float)SharedMaterials.CardRulePitchDp;
         var bodyHeight = pitch * rows.Count;
 
         var body = new AbsoluteLayout { HeightRequest = bodyHeight };
@@ -57,7 +59,7 @@ public static class IndexCardView
         {
             Drawable = new RuledLinesDrawable
             {
-                RuleColour = Color.FromArgb(MaterialTokens.CardBodyRuleHex),
+                RuleColour = Color.FromArgb(SharedMaterials.CardBodyRuleHex),
                 PitchDp = pitch,
             },
         };
@@ -117,13 +119,13 @@ public static class IndexCardView
             Children =
             {
                 headerRow,
-                new BoxView { HeightRequest = 1.5, Color = Color.FromArgb(MaterialTokens.CardHeadRuleHex) },
+                new BoxView { HeightRequest = 1.5, Color = Color.FromArgb(SharedMaterials.CardHeadRuleHex) },
             },
         };
 
         var card = new Border
         {
-            BackgroundColor = Color.FromArgb(MaterialTokens.NoteCardHex),
+            BackgroundColor = Color.FromArgb(SharedMaterials.NoteCardHex),
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(CornerRadiusDp) },

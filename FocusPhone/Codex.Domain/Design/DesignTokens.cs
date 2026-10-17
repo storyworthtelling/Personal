@@ -225,6 +225,26 @@ public static class DesignTokens
         }
     }
 
+    // ---- Binder-tab cloths for apps that choose theirs by colour (DESIGN.md §9, D84) ----
+    /// <summary>
+    /// Per-area binder-tab cloths for an app whose owner chose them by colour rather than from
+    /// the semantic roles. Each inactive tab is cut from a deep cloth with paper lettering (D45);
+    /// the cloths may share a hue with each other or with a role (D84), because a tab is a divider,
+    /// not a state. Today is the app's identity (its Deep tier) and Settings is the neutral grey.
+    /// </summary>
+    public static class AreaCloths
+    {
+        /// <summary>Constitution's five tabs (book p.11, strip B; D40, D45).</summary>
+        public static class Constitution
+        {
+            public const string Today = "#143B4C";
+            public const string Workouts = "#9E434B";
+            public const string Meals = "#383E44";
+            public const string Body = "#38734A";
+            public const string Settings = "#C0BDB9";
+        }
+    }
+
     /// <summary>
     /// Realistic-shelf material tones for the Flyleaf home + tray only — the scoped
     /// DESIGN.md §1/§5 exception. These are imagery (a Skia-rendered bookcase), not tokened

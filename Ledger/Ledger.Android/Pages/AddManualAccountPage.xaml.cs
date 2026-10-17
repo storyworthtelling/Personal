@@ -6,6 +6,8 @@ using Index.Domain.Model;
 using Index.Domain.Time;
 using Index.Infrastructure.Services;
 using Storyworthtelling.Maui;
+// The index card is shared with Constitution (C-3.2.1, PC6): one token, read by both apps.
+using SharedMaterials = Storyworthtelling.Paper.MaterialTokens;
 using Storyworthtelling.Maui.Views;
 
 namespace Index.Android.Pages;
@@ -166,7 +168,7 @@ public partial class AddManualAccountPage : LedgerBinderPage
             Children =
             {
                 new Label { Text = "New account", Style = PaperResources.Token<Style>("HeadingLabel") },
-                new BoxView { HeightRequest = 1.5, Color = Color.FromArgb(Index.Domain.Design.MaterialTokens.CardHeadRuleHex) },
+                new BoxView { HeightRequest = 1.5, Color = Color.FromArgb(SharedMaterials.CardHeadRuleHex) },
                 statusLabel,
                 FieldRow("Name", nameBox),
                 FieldRow("Bank or lender", bankBox, ManualAccountForm.BankHint),
@@ -181,7 +183,7 @@ public partial class AddManualAccountPage : LedgerBinderPage
 
         var card = new Border
         {
-            BackgroundColor = Color.FromArgb(Index.Domain.Design.MaterialTokens.NoteCardHex),
+            BackgroundColor = Color.FromArgb(SharedMaterials.NoteCardHex),
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(3) },
