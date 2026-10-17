@@ -117,6 +117,7 @@ Registered ladders (per-app `Design/DesignTokens.cs`, §19):
 | Index | `#B6C3A9` | `#839372` | `#596C45` | `#475735` | `#2F3C21` | `#4E5F3A` | 129° | positive, 0° |
 | Foreword | `#E8B99A` | `#DFA277` | `#CA662D` | — | — | — | 47° | caution, 29° |
 | Pulp | `#CCB8A2` | `#BCA080` | `#835618` | `#684414` | `#493113` | `#F7AC4D` | 70° | caution, 14° (recorded) |
+| Constitution | `#A4C1D0` | `#82ACC1` | `#1B6A89` | `#15546E` | `#143B4C` | `#82ACC1` | 230° | progress and reference, 23° |
 
 Flyleaf's three tiers predate the five-tier ladder and are **provisional** pending a resample.
 
@@ -163,6 +164,8 @@ flourishes and title in ink (6.72:1), Score's and Plate's construction. The ladd
 in `Tools/IconStudio/Tokens.cs`, `Storyworthtelling.Paper/AppIdentityTokens.cs` and `Codex.Domain`
 `DesignTokens.Identity.Pulp`. Flyleaf's warm icon ground (61.5°) is ~8.5° away; no guard compares
 that tier between apps, so it is noted rather than recorded.
+
+*Constitution* is cerulean at **230°**, taken from the binding cloth rather than the poster cover (Post's route), because the cover's own sky is an aged green-blue with no usable hue. 230° is the centre of one of the two windows left on the wheel that clear every role and every sibling by 20°: 23.0° from In-progress teal and Reference slate, 51.9° from Score, so **no departure is recorded**. The binding is the light ground tier (`#82ACC1`, Rec. 601 luma 0.635 against the 0.6 threshold, so the shelf draws rule and title in ink; a thin margin, pinned by `BookClothPaletteTests.ConstitutionClothInvertsToInk`). Its Document profile colour is the muted cerulean `#476F83`, the only identity colour its documents carry, so a greyscale rM2 loses nothing. The ladder is held identical in `Tools/IconStudio/Tokens.cs`, `Storyworthtelling.Paper/AppIdentityTokens.cs`, `Codex.Domain` `DesignTokens.Identity.Constitution` and this table, by `TokenParityTests.ConstitutionLadderIsIdenticalInEveryFile`.
 
 ### Contrast (binding)
 

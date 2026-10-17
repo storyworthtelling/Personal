@@ -204,6 +204,25 @@ public static class DesignTokens
             public const string Deep = "#493113";
             public const string Cloth = "#F7AC4D";
         }
+
+        /// <summary>
+        /// Constitution — cerulean, OKLCH 230 degrees, taken from the binding cloth (Post's
+        /// route) because the poster cover's own sky has no usable hue. 230 is the centre of one
+        /// of the two windows left on the wheel that clear every role and every sibling by 20
+        /// degrees, so no departure is recorded. The binding is the LIGHT ground tier with the
+        /// rule, flourishes and title in ink (Score's and Pulp's construction), so Cloth is the
+        /// Ground. Held identical to Tools/IconStudio/Tokens.cs and
+        /// Storyworthtelling.Paper/AppIdentityTokens.cs by TokenParityTests.
+        /// </summary>
+        public static class Constitution
+        {
+            public const string Fill = "#A4C1D0";
+            public const string Ground = "#82ACC1";
+            public const string Mark = "#1B6A89";
+            public const string Text = "#15546E";
+            public const string Deep = "#143B4C";
+            public const string Cloth = "#82ACC1";
+        }
     }
 
     /// <summary>

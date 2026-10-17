@@ -38,6 +38,7 @@ public class IdentitySeparationTests
         ("Folio", "FolioMarkHex"),
         ("Index", "IndexMarkHex"),
         ("Pulp", "PulpMarkHex"),
+        ("Constitution", "ConstitutionMarkHex"),
     ];
 
     /// <summary>
@@ -68,6 +69,52 @@ public class IdentitySeparationTests
         Assert.True(tooClose.Count == 0,
             "Two apps in the suite are wearing near enough the same colour to be confused on one "
             + $"shelf. Every pair must clear {RequiredSeparation}°:\n" + string.Join("\n", tooClose));
+    }
+
+    private static readonly string[] ConstitutionTiers =
+    [
+        "ConstitutionFillHex", "ConstitutionGroundHex", "ConstitutionMarkHex",
+        "ConstitutionTextHex", "ConstitutionDeepHex",
+    ];
+
+    /// <summary>
+    /// Every Constitution tier, not only its mark, clears every other app's identity mark and every
+    /// chromatic role by the floor. Constitution records no departure, so none is excepted.
+    /// </summary>
+    [Fact]
+    public void EveryConstitutionTierClearsEverySiblingAndEveryChromaticRole()
+    {
+        var tooClose = new List<string>();
+        foreach (var tier in ConstitutionTiers)
+        {
+            var hue = Oklch.FromHex(HexOf(tier)).HueDegrees;
+
+            foreach (var (app, constant) in Identities.Where(id => id.App != "Constitution"))
+            {
+                var separation = Oklch.HueSeparation(hue, Oklch.FromHex(HexOf(constant)).HueDegrees);
+                if (separation < RequiredSeparation && !Recorded.Contains($"{app}|Constitution"))
+                {
+                    tooClose.Add($"{tier} is {separation:F1}° from {app}");
+                }
+            }
+
+            foreach (var (role, (roleHue, roleChroma)) in PaletteSpec.RoleWheel)
+            {
+                if (roleChroma < 0.02)
+                {
+                    continue;
+                }
+                var separation = Oklch.HueSeparation(hue, roleHue);
+                if (separation < RequiredSeparation)
+                {
+                    tooClose.Add($"{tier} is {separation:F1}° from the {role} role");
+                }
+            }
+        }
+
+        Assert.True(tooClose.Count == 0,
+            $"Constitution's ladder must clear every sibling and role by {RequiredSeparation}°:\n"
+            + string.Join("\n", tooClose));
     }
 
     /// <summary>
