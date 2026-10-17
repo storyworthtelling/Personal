@@ -31,6 +31,10 @@ public class ConstitutionInvariantsTests
     private static readonly string[] ExpectedPreferenceKeys =
     [
         "constitution-settings",
+        // Added with the shell (C-3.1.1): which pillars this install shows. One key per pillar.
+        "pillar-workouts",
+        "pillar-meals",
+        "pillar-body",
     ];
 
     // ---- the package id ----

@@ -59,6 +59,18 @@ public static class ConstitutionIdentity
     /// </summary>
     public const string SettingsPreferencesName = "constitution-settings";
 
+    /// <summary>
+    /// Which pillars this install shows, one boolean each, inside <see cref="SettingsPreferencesName"/>.
+    /// Literals, not derived: a renamed property must not rename the stored key. Absent means on.
+    /// </summary>
+    public const string PillarWorkoutsKey = "pillar-workouts";
+
+    /// <summary>The Meals pillar's switch; see <see cref="PillarWorkoutsKey"/>.</summary>
+    public const string PillarMealsKey = "pillar-meals";
+
+    /// <summary>The Body pillar's switch; see <see cref="PillarWorkoutsKey"/>.</summary>
+    public const string PillarBodyKey = "pillar-body";
+
     /// <summary>Every registered worker Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName];
 
@@ -66,5 +78,5 @@ public static class ConstitutionIdentity
     public static IReadOnlyList<string> WorkNames { get; } = [ReadBackWorkName, BodySyncWorkName];
 
     /// <summary>Every preference file name and key, for the guard to enumerate.</summary>
-    public static IReadOnlyList<string> PreferenceKeys { get; } = [SettingsPreferencesName];
+    public static IReadOnlyList<string> PreferenceKeys { get; } = [SettingsPreferencesName, PillarWorkoutsKey, PillarMealsKey, PillarBodyKey];
 }
