@@ -14,6 +14,9 @@ One phase branch (D89): `ccr-0de01a0f-8dnn7q`. Releases land as labelled commits
 | C-1.1.2 | review | (ladder commit) | CS0117 PolicyContext.ConstitutionPackage missing; EverySuiteBook... failed until BookClothPalette bound | Codex.Tests 2470 pass |
 | C-1.2.1 | review | (ladder commit) | wrong hexes: TokenParity (no DESIGN.md row), DesignTokensTests (#143B4C vs 4D), 4 Paper separation/parity failures | Codex 2470, Paper 140, IconStudio 34 pass |
 | C-1.2.2 | review | (ladder commit) | ConstitutionDocumentHueIsTheMutedCerulean / ConstitutionClothInvertsToInk only compile-red (values were already right) | same suites |
+| C-12.1.1 | review | 686ec8d | 4 ConstitutionWorkflowTests failed: workflow file absent | Updates.Tests 69 pass; workflow never run in CI |
+| C-12.2.1 | review | (guards commit) | key detector tests green from the start of the resumed run; guard source holds no key-shaped literal (runtime concatenation) | Constitution.Tests 111 pass |
+| C-12.2.2 | review | (guards commit) | 29 InventedDataTests failed against a stub detector (email 6, phone 9, address 4, person 6+2, planted fixtures) | Constitution.Tests 111 pass; people check only reaches Household*/Fixtures and markdown rosters |
 
 ## Open questions
 - NYT: owner suggests Article Search may return Cooking content; wants it tested with their key from the vault. Vault passphrase NOT received and must not be taken in chat; offered environment secret route. Terms (D96) still bar storing recipes regardless.
