@@ -615,6 +615,7 @@ public class HomeActivity : Activity
             [PolicyContext.IndexPackage] = Resource.Drawable.cover_index,
             [PolicyContext.FolioPackage] = Resource.Drawable.cover_folio,
             [PolicyContext.PulpPackage] = Resource.Drawable.cover_pulp,
+            [PolicyContext.ConstitutionPackage] = Resource.Drawable.cover_constitution,
             [HomeFeatureSet.DrivePackage] = Resource.Drawable.cover_drive,
             [HomeFeatureSet.GoogleHomePackage] = Resource.Drawable.cover_googlehome,
         };

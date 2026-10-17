@@ -234,6 +234,15 @@ public class BookClothPaletteTests
         Assert.InRange(luma, 0.63, 0.64);
     }
 
+    [Fact]
+    public void ConstitutionBindsItsCloth()
+    {
+        Assert.True(BookClothPalette.HasChosenBinding(PolicyContext.ConstitutionPackage));
+        Assert.Equal(
+            DesignTokens.Identity.Constitution.Cloth,
+            BookClothPalette.ForPackage(PolicyContext.ConstitutionPackage));
+    }
+
     private static IEnumerable<string> SuitePackagesNamedInPolicy() =>
         typeof(PolicyContext)
             .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
