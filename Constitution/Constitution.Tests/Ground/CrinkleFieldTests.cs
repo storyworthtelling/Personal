@@ -1,5 +1,6 @@
 using Codex.Domain.Design;
 using Constitution.Domain.Ground;
+using Constitution.Domain.Scraps;
 
 namespace Constitution.Tests.Ground;
 
@@ -72,7 +73,20 @@ public class CrinkleFieldTests
     [Fact]
     public void TheGutterIsTheBindersOwnWidth()
     {
-        Assert.Equal(BinderTabLayout.PreferredHeightDp, CrinkleField.GutterWidthDp);
+        // ScrapLayoutTests.TheBinderGutterIsTheSuitesOwn holds this to BinderTabs.WidthDp in Codex.Ui.Android.
+        Assert.Equal(ScrapMetrics.BinderGutterDp, CrinkleField.GutterWidthDp);
+    }
+
+    [Fact]
+    public void TheGutterIsNotBorrowedFromATabHeight()
+    {
+        // BinderTabLayout.PreferredHeightDp is a tab's HEIGHT and happens to be 66 too; a width taken
+        // from it would drift the day either number moved. Value equality cannot see that, so read the source.
+        var source = File.ReadAllText(Directory.EnumerateFiles(ConstitutionSource.Root(), "CrinkleField.cs", SearchOption.AllDirectories)
+            .Single(file => ConstitutionSource.Relative(file).StartsWith("Constitution.Domain/", StringComparison.Ordinal)));
+
+        Assert.Contains("GutterWidthDp = ScrapMetrics.BinderGutterDp", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("BinderTabLayout", source, StringComparison.Ordinal);
     }
 
     [Fact]

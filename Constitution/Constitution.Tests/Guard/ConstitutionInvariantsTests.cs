@@ -47,6 +47,10 @@ public class ConstitutionInvariantsTests
         "equipment-owned",
         // Added with First run (C-8.3.1): the owner has explicitly confirmed the equipment checklist. A deliberate edit.
         "equipment-confirmed",
+        // Added with the Release A review (S8): when a login was saved or the tablet paired by hand, so an
+        // older failure is not held against the new credential. A deliberate edit.
+        "credential-sleep-number-saved-at",
+        "credential-remarkable-saved-at",
     ];
 
     // ---- the package id ----

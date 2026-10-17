@@ -7,6 +7,7 @@ using Codex.Ui;
 using Codex.Ui.Voice;
 using Constitution.Domain.Equipment;
 using Constitution.Domain.FirstRun;
+using Constitution.Domain.Settings;
 using Constitution.Services;
 using Constitution.Settings;
 
@@ -100,24 +101,37 @@ public sealed class FirstRunPage(Activity host, Action changed)
 
     private async Task SignInAsync()
     {
+        var settled = false;
         try
         {
             note = "Choosing an account.";
             changed();
-            await googleAccount.SignIn(host);
-            note = null;
+            try
+            {
+                await googleAccount.SignIn(host);
+                note = null;
+                settled = true;
+            }
+            catch (Exception e) when (ConnectionTrail.Expecting(host, ConnectionAct.SignIn, e,
+                e is InvalidOperationException or OperationCanceledException or TimeoutException or IOException
+                    or Java.Lang.Exception))
+            {
+                note = ConnectionFailure.Sentence(ConnectionAct.SignIn, e, callerCancelled: false);
+                settled = true;
+                return;
+            }
+
             await RestoreAsync();
         }
-        catch (InvalidOperationException e)
+        finally
         {
-            note = $"Sign-in did not complete. {e.Message}";
-        }
-        catch (Java.Lang.Exception e)
-        {
-            note = $"Sign-in did not complete ({e.GetType().Name}).";
-        }
+            if (!settled)
+            {
+                note = "Sign-in stopped unexpectedly. Try again.";
+            }
 
-        host.RunOnUiThread(() => changed());
+            host.RunOnUiThread(() => changed());
+        }
     }
 
     private void SavePassphrase()
@@ -144,7 +158,7 @@ public sealed class FirstRunPage(Activity host, Action changed)
 
     // The vault may hold what the later steps would ask for; the runner skips quietly when it cannot run.
     private async Task RestoreAsync() =>
-        await ConstitutionVaultRunner.Create(host).RestoreAsync(CancellationToken.None);
+        await ConstitutionVaults.Create(host).RestoreAsync(CancellationToken.None);
 
     private void AddEquipment(LinearLayout column)
     {

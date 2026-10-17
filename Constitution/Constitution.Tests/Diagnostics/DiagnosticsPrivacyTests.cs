@@ -207,6 +207,30 @@ public class DiagnosticsPrivacyTests
         Assert.Contains("date", kinds);
     }
 
+    [Theory]
+    [InlineData("1.0.1987")]
+    [InlineData("1.0.2026")]
+    [InlineData("1.0.12345")]
+    [InlineData("1.0.987654321")]
+    public void ALargeCiRunNumberStillExportsAndStillScansClean(string version)
+    {
+        // CI stamps 1.0.<run number>; the export must not start failing the day that passes 1900 or 99999.
+        var snapshot = new DiagnosticsSnapshot(
+            AppVersion.Parse(version), InstallRole.Owner, new DiagnosticsCounts(0, 0, 0, []), [], [], []);
+
+        var export = DiagnosticsRenderer.Render(snapshot);
+
+        Assert.Contains("Version: " + version, export);
+        Assert.Empty(PrivacyScan.Find(export));
+    }
+
+    [Fact]
+    public void TheVersionLineIsExcusedOnlyInTheShapeTheBuildProduces()
+    {
+        // 1.0.<run number> up to nine digits; a longer number on that line is a long number like any other.
+        Assert.Contains("long number", PrivacyScan.Find("Version: 1.0." + "1234567890\n"));
+    }
+
     [Fact]
     public void ADocumentFileNameIsTheOnlyPlaceADateIsAllowed()
     {

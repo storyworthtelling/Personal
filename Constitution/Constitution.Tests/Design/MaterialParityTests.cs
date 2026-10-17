@@ -37,16 +37,77 @@ public class MaterialParityTests
         }
 
         // ...and the card views read the shared one, so Index and Constitution draw the same object.
-        foreach (var view in new[] { "Views/IndexCardView.cs", "Views/ActionCardHaze.cs" })
+        // Index's own MaterialTokens keeps the other materials, so a bare "MaterialTokens.NoteCardHex"
+        // would not even compile there; the reads are found by name, wherever in Ledger.Android they sit.
+        var ledgerHead = LedgerHeadFiles();
+        Assert.True(ledgerHead.Count > 20, "The guard found too few Ledger.Android files to be reading the real head.");
+        var unaliased = ledgerHead
+            .SelectMany(file => UnaliasedCardReads(File.ReadAllText(file)).Select(read => Path.GetFileName(file) + ": " + read))
+            .ToList();
+        Assert.True(unaliased.Count == 0, "Index reads a card token off its own MaterialTokens:\n" + string.Join("\n", unaliased));
+
+        foreach (var view in new[] { "Views/IndexCardView.cs", "Views/ActionCardHaze.cs", "Pages/AddManualAccountPage.xaml.cs" })
         {
             var source = File.ReadAllText(Path.Combine(RepoRoot(), "Ledger", "Ledger.Android", view));
-            Assert.Contains("Storyworthtelling.Paper", source);
-            Assert.DoesNotContain("Index.Domain.Design.MaterialTokens.Card", source);
+            Assert.Contains("using SharedMaterials = Storyworthtelling.Paper.MaterialTokens;", source);
+            Assert.Matches(@"\bSharedMaterials\.(NoteCardHex|CardHeadRuleHex|CardBodyRuleHex|CardRulePitchDp)\b", source);
         }
+    }
 
-        var addPage = File.ReadAllText(Path.Combine(RepoRoot(), "Ledger", "Ledger.Android", "Pages", "AddManualAccountPage.xaml.cs"));
-        Assert.DoesNotContain("Index.Domain.Design.MaterialTokens.CardHeadRuleHex", addPage);
-        Assert.DoesNotContain("Index.Domain.Design.MaterialTokens.NoteCardHex", addPage);
+    private static IReadOnlyList<string> LedgerHeadFiles()
+    {
+        var head = Path.Combine(RepoRoot(), "Ledger", "Ledger.Android");
+        return Directory.EnumerateFiles(head, "*.cs", SearchOption.AllDirectories)
+            .Concat(Directory.EnumerateFiles(head, "*.xaml", SearchOption.AllDirectories))
+            .Where(file => !Path.GetRelativePath(head, file).Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj"))
+            .OrderBy(file => file, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Reads of the four card tokens off a type literally named <c>MaterialTokens</c>, which in Ledger's
+    /// head can only be Index's own (or a qualified copy of it). The shared type is reached through the
+    /// <c>SharedMaterials</c> alias, a different identifier, or fully qualified under
+    /// <c>Storyworthtelling.Paper</c>; neither is reported.
+    /// </summary>
+    internal static IReadOnlyList<string> UnaliasedCardReads(string source) =>
+        Regex.Matches(source, @"(?<prefix>(?:[A-Za-z_]\w*\.)*)MaterialTokens\.(?<name>NoteCardHex|CardHeadRuleHex|CardBodyRuleHex|CardRulePitchDp)\b",
+                RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2))
+            .Where(match => match.Groups["prefix"].Value != "Storyworthtelling.Paper.")
+            .Select(match => match.Value)
+            .ToList();
+
+    [Fact]
+    public void TheUnaliasedReadDetectorFiresOnAnOldStyleLine()
+    {
+        // Built at run time so this file holds no old-style read of its own for the guard to trip on.
+        var bare = "var stock = " + "MaterialTokens." + "NoteCardHex;";
+        var qualified = "var rule = Index.Domain.Design." + "MaterialTokens." + "CardHeadRuleHex;";
+
+        Assert.Equal(["MaterialTokens.NoteCardHex"], UnaliasedCardReads(bare));
+        Assert.Equal(["Index.Domain.Design.MaterialTokens.CardHeadRuleHex"], UnaliasedCardReads(qualified));
+        Assert.Single(UnaliasedCardReads("pitch = " + "MaterialTokens." + "CardRulePitchDp;"));
+    }
+
+    [Fact]
+    public void AnOldStyleLinePlantedInARealCardViewIsCaught()
+    {
+        var real = File.ReadAllText(Path.Combine(RepoRoot(), "Ledger", "Ledger.Android", "Views", "IndexCardView.cs"));
+        Assert.Empty(UnaliasedCardReads(real));
+
+        var planted = real.Replace("SharedMaterials.NoteCardHex", "MaterialTokens." + "NoteCardHex", StringComparison.Ordinal);
+
+        Assert.NotEqual(real, planted);
+        Assert.NotEmpty(UnaliasedCardReads(planted));
+    }
+
+    [Fact]
+    public void TheUnaliasedReadDetectorLeavesTheSharedReadsAndIndexOwnTokensAlone()
+    {
+        Assert.Empty(UnaliasedCardReads("var stock = SharedMaterials.NoteCardHex;"));
+        Assert.Empty(UnaliasedCardReads("var rule = Storyworthtelling.Paper.MaterialTokens.CardBodyRuleHex;"));
+        Assert.Empty(UnaliasedCardReads("var haze = MaterialTokens.HazeAlpha;"));
+        Assert.Empty(UnaliasedCardReads("// the note-card stock lives in MaterialTokens' shared copy"));
     }
 
     [Fact]

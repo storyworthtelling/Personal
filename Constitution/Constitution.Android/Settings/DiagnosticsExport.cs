@@ -5,7 +5,6 @@ using Constitution.Domain.Diagnostics;
 using Constitution.Domain.Notices;
 using Constitution.Services;
 using CredentialHealthReport = Storyworthtelling.Voice.Health.CredentialHealthReport;
-using HealthStatus = Storyworthtelling.Voice.Health.CredentialStatus;
 
 namespace Constitution.Settings;
 
@@ -24,14 +23,15 @@ public static class DiagnosticsExport
             ?? throw new InvalidOperationException("The package manager gave no version name.");
         var connections = new ConstitutionConnections(context);
         var report = ConstitutionHealthReport.Read();
+        var saves = new ConstitutionCredentialSaves(context);
 
         var credentials = new[]
         {
             Credential(ConnectionIds.SleepNumber, CredentialIds.SleepNumber,
-                connections.SleepNumberLogin.Length > 0 && connections.SleepNumberPassword.Length > 0, report),
-            Credential(ConnectionIds.ReMarkable, CredentialIds.Remarkable, connections.RemarkableDeviceToken.Length > 0, report),
-            Credential(ConnectionIds.Claude, CredentialIds.Claude, connections.ClaudeApiKey.Length > 0, report),
-            Credential(ConnectionIds.Gemini, CredentialIds.Gemini, connections.GeminiApiKey.Length > 0, report),
+                connections.SleepNumberLogin.Length > 0 && connections.SleepNumberPassword.Length > 0, report, saves),
+            Credential(ConnectionIds.ReMarkable, CredentialIds.Remarkable, connections.RemarkableDeviceToken.Length > 0, report, saves),
+            Credential(ConnectionIds.Claude, CredentialIds.Claude, connections.ClaudeApiKey.Length > 0, report, saves),
+            Credential(ConnectionIds.Gemini, CredentialIds.Gemini, connections.GeminiApiKey.Length > 0, report, saves),
             new CredentialStatus(
                 ConnectionId.Parse(ConnectionIds.Google),
                 VoiceGoogleAccount.IsSignedIn ? CredentialState.Working : CredentialState.Missing),
@@ -64,9 +64,9 @@ public static class DiagnosticsExport
         context.StartActivity(chooser);
     }
 
-    private static CredentialStatus Credential(string connectionId, string credentialId, bool isSet, CredentialHealthReport report)
+    private static CredentialStatus Credential(string connectionId, string credentialId, bool isSet, CredentialHealthReport report, ConstitutionCredentialSaves saves)
     {
-        var state = report.Get(credentialId).Status == HealthStatus.Failing
+        var state = ConstitutionHealthReport.HealthOf(report, credentialId, saves.SavedAt(credentialId)) == ConnectionHealth.Rejected
             ? CredentialState.Rejected
             : isSet ? CredentialState.Working : CredentialState.Missing;
         return new CredentialStatus(ConnectionId.Parse(connectionId), state);

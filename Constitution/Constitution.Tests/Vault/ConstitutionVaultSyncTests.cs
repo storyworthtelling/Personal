@@ -266,18 +266,24 @@ public class ConstitutionVaultSyncTests
 
     // ---- publish ----
 
-    private static async Task<ConstitutionPublishResult> Publish(TestPhone phone, string? passphrase = Invented.Passphrase) =>
-        await phone.Sync.PublishAsync(passphrase, default);
+    // Unless a test says what changed, every field this install can change counts as changed: the
+    // state of a phone whose owner has just set everything up.
+    private static async Task<ConstitutionPublishResult> Publish(
+        TestPhone phone, string? passphrase = Invented.Passphrase, IReadOnlyCollection<VaultField>? changed = null) =>
+        await phone.Sync.PublishAsync(passphrase, changed ?? Invented.EverythingChanged, default);
 
     [Fact]
-    public async Task TheOwnerPublishesItsSectionAndTheReusedOnes()
+    public async Task TheOwnerPublishesWhatChangedAndOnlyFillsTheReusedSections()
     {
-        // The vault holds older values; this install holds the current ones.
+        // The vault holds older values; this install holds the current ones and has just changed the
+        // Sleep Number login and paired the tablet. Claude and Gemini are Folio's to rotate: the vault
+        // already holds them, so what this install holds is left out of it.
         var cloud = new TestCloud();
         cloud.SeedShared(
             Invented.Shared() with
             {
                 Constitution = new ConstitutionSecrets("old@example.com", "example-old-word"),
+                Remarkable = new RemarkableSecrets("example-old-token"),
                 Claude = new ClaudeSecrets("example-old-claude"),
             },
             Invented.Passphrase);
@@ -291,13 +297,13 @@ public class ConstitutionVaultSyncTests
         Assert.Equal(Invented.SleepLogin, after.Constitution.SleepNumberLogin);
         Assert.Equal(Invented.SleepWord, after.Constitution.SleepNumberPassword);
         Assert.Equal(Invented.RemarkableToken, after.Remarkable.DeviceToken);
-        Assert.Equal(Invented.ClaudeKey, after.Claude.ApiKey);
+        Assert.Equal("example-old-claude", after.Claude.ApiKey);
         Assert.Equal(Invented.GeminiKey, after.Gemini.ApiKey);
         Assert.Equal(Invented.OwnerAccount, after.OwnerAccount);
     }
 
     [Fact]
-    public async Task OnlyTheFourSectionsMove()
+    public async Task OnlyConstitutionsOwnFieldsMove()
     {
         // Every other app's section, the file-id map and the owner come out byte-for-byte as they went in.
         // That includes Nyt: the New York Times is not used (D96), so the sync has no business there.
@@ -306,7 +312,7 @@ public class ConstitutionVaultSyncTests
         cloud.SeedShared(before, Invented.Passphrase);
         var phone = cloud.NewPhone(Invented.OwnerAccount);
         phone.FillLocalSharedConnections();
-        phone.Local.ClaudeApiKey = "example-newer-claude";
+        phone.Local.SleepNumberLogin = "newer@example.com";
 
         await Publish(phone);
 
@@ -316,7 +322,112 @@ public class ConstitutionVaultSyncTests
             Invented.WithoutTheSectionsConstitutionWrites(after));
         Assert.Equal("example-nyt-cookie", after.Nyt.SessionCookie);
         Assert.Equal("example-nyt-key", after.Nyt.ApiKey);
-        Assert.Equal("example-newer-claude", after.Claude.ApiKey);
+        Assert.Equal("newer@example.com", after.Constitution.SleepNumberLogin);
+    }
+
+    [Fact]
+    public async Task StaleLocalClaudeKeyNeverOverwritesARotatedVaultKey()
+    {
+        // Folio rotated the shared Claude key in the vault. This install still holds the old one, and it
+        // has just saved a Sleep Number login: that publish must not carry the old key back up.
+        var cloud = new TestCloud();
+        cloud.SeedShared(Invented.Shared() with { Claude = new ClaudeSecrets("example-rotated-claude") }, Invented.Passphrase);
+        var phone = cloud.NewPhone(Invented.OwnerAccount);
+        phone.FillLocalSharedConnections();
+        phone.Local.ClaudeApiKey = "example-stale-claude";
+
+        await Publish(phone, changed: [VaultField.SleepNumberLogin, VaultField.SleepNumberPassword]);
+        Assert.Equal("example-rotated-claude", cloud.ReadShared(Invented.Passphrase).Claude.ApiKey);
+
+        // Not even when the caller says the key changed: Constitution has no screen for it and never owns it.
+        await Publish(phone, changed: [VaultField.ClaudeApiKey, VaultField.GeminiApiKey]);
+        Assert.Equal("example-rotated-claude", cloud.ReadShared(Invented.Passphrase).Claude.ApiKey);
+    }
+
+    [Fact]
+    public async Task UnchangedFieldsAreNeverPublished()
+    {
+        // The install holds a different value for every shared field; it says only that the login changed.
+        var cloud = new TestCloud();
+        cloud.SeedShared(Invented.Shared(), Invented.Passphrase);
+        var phone = cloud.NewPhone(Invented.OwnerAccount);
+        phone.Local.SleepNumberLogin = "newer@example.com";
+        phone.Local.SleepNumberPassword = "example-newer-word";
+        phone.Local.RemarkableDeviceToken = "example-newer-token";
+        phone.Local.ClaudeApiKey = "example-newer-claude";
+        phone.Local.GeminiApiKey = "example-newer-gemini";
+
+        await Publish(phone, changed: [VaultField.SleepNumberLogin]);
+
+        var after = cloud.ReadShared(Invented.Passphrase);
+        Assert.Equal("newer@example.com", after.Constitution.SleepNumberLogin);
+        Assert.Equal(Invented.SleepWord, after.Constitution.SleepNumberPassword);
+        Assert.Equal(Invented.RemarkableToken, after.Remarkable.DeviceToken);
+        Assert.Equal(Invented.ClaudeKey, after.Claude.ApiKey);
+        Assert.Equal(Invented.GeminiKey, after.Gemini.ApiKey);
+    }
+
+    [Fact]
+    public async Task TheTabletTokenIsPublishedOnlyWhenJustPairedOrMissingFromTheVault()
+    {
+        var cloud = new TestCloud();
+        cloud.SeedShared(Invented.Shared(), Invented.Passphrase);
+        var phone = cloud.NewPhone(Invented.OwnerAccount);
+        phone.Local.RemarkableDeviceToken = "example-repaired-token";
+
+        // Held, but not just paired: the vault's token stands.
+        await Publish(phone, changed: []);
+        Assert.Equal(Invented.RemarkableToken, cloud.ReadShared(Invented.Passphrase).Remarkable.DeviceToken);
+
+        // Just paired: the new token replaces it.
+        await Publish(phone, changed: [VaultField.RemarkableDeviceToken]);
+        Assert.Equal("example-repaired-token", cloud.ReadShared(Invented.Passphrase).Remarkable.DeviceToken);
+    }
+
+    [Fact]
+    public async Task AValueTheVaultLacksIsFilledEvenWhenNothingChanged()
+    {
+        // A login saved before any passphrase existed is held locally and was never backed up. Adding the
+        // passphrase later (nothing changed since) must still carry it up, and into empty slots only.
+        var cloud = new TestCloud();
+        cloud.SeedShared(
+            Invented.Shared() with
+            {
+                Constitution = new ConstitutionSecrets(),
+                Remarkable = new RemarkableSecrets(),
+                Claude = new ClaudeSecrets(),
+            },
+            Invented.Passphrase);
+        var phone = cloud.NewPhone(Invented.OwnerAccount);
+        phone.FillLocalSharedConnections();
+        phone.Local.GeminiApiKey = "example-newer-gemini";
+
+        await Publish(phone, changed: []);
+
+        var after = cloud.ReadShared(Invented.Passphrase);
+        Assert.Equal(Invented.SleepLogin, after.Constitution.SleepNumberLogin);
+        Assert.Equal(Invented.SleepWord, after.Constitution.SleepNumberPassword);
+        Assert.Equal(Invented.RemarkableToken, after.Remarkable.DeviceToken);
+        Assert.Equal(Invented.ClaudeKey, after.Claude.ApiKey);
+        Assert.Equal(Invented.GeminiKey, after.Gemini.ApiKey);
+    }
+
+    [Fact]
+    public async Task HealthConnectChoicesArePublishedOnlyWhenChangedOrMissing()
+    {
+        var cloud = new TestCloud();
+        var phone = cloud.NewPhone(Invented.OwnerAccount);
+        phone.SeedPersonal(Invented.Personal(health: "{\"signals\":[\"example-older-choice\"]}"), Invented.Passphrase);
+        phone.Local.HealthConnectChoicesJson = Invented.HealthChoices;
+
+        var untouched = await Publish(phone, changed: []);
+        Assert.Equal("{\"signals\":[\"example-older-choice\"]}", phone.ReadPersonal(Invented.Passphrase).HealthConnectChoicesJson);
+        Assert.Equal(VaultWriteOutcome.NothingToPublish, untouched.Personal);
+        Assert.Equal(0, phone.PersonalDrive.Writes);
+
+        var changedNow = await Publish(phone, changed: [VaultField.HealthConnectChoices]);
+        Assert.Equal(Invented.HealthChoices, phone.ReadPersonal(Invented.Passphrase).HealthConnectChoicesJson);
+        Assert.Equal(VaultWriteOutcome.Published, changedNow.Personal);
     }
 
     [Fact]
@@ -327,15 +438,15 @@ public class ConstitutionVaultSyncTests
         var cloud = new TestCloud();
         cloud.SeedShared(Invented.Shared(), Invented.Passphrase);
         var phone = cloud.NewPhone(Invented.OwnerAccount);
-        phone.Local.GeminiApiKey = "example-newer-gemini";
+        phone.Local.SleepNumberLogin = "newer@example.com";
 
         var result = await Publish(phone);
 
         Assert.Equal(VaultWriteOutcome.Published, result.Shared);
         var after = cloud.ReadShared(Invented.Passphrase);
-        Assert.Equal("example-newer-gemini", after.Gemini.ApiKey);
-        Assert.Equal(Invented.SleepLogin, after.Constitution.SleepNumberLogin);
+        Assert.Equal("newer@example.com", after.Constitution.SleepNumberLogin);
         Assert.Equal(Invented.SleepWord, after.Constitution.SleepNumberPassword);
+        Assert.Equal(Invented.GeminiKey, after.Gemini.ApiKey);
         Assert.Equal(Invented.RemarkableToken, after.Remarkable.DeviceToken);
         Assert.Equal(Invented.ClaudeKey, after.Claude.ApiKey);
     }
@@ -407,14 +518,14 @@ public class ConstitutionVaultSyncTests
         cloud.SeedShared(Invented.Shared(), Invented.Passphrase);
         var phone = cloud.NewPhone(Invented.OwnerAccount);
         Break(phone.PersonalDrive, VaultReadOutcome.WrongPassphrase);
-        phone.Local.ClaudeApiKey = "example-newer-claude";
+        phone.Local.SleepNumberLogin = "newer@example.com";
         phone.Local.HealthConnectChoicesJson = Invented.HealthChoices;
 
         var result = await Publish(phone);
 
         Assert.Equal(VaultWriteOutcome.Published, result.Shared);
         Assert.Equal(VaultWriteOutcome.RefusedUnreadable, result.Personal);
-        Assert.Equal("example-newer-claude", cloud.ReadShared(Invented.Passphrase).Claude.ApiKey);
+        Assert.Equal("newer@example.com", cloud.ReadShared(Invented.Passphrase).Constitution.SleepNumberLogin);
     }
 
     [Fact]
@@ -507,12 +618,12 @@ public class ConstitutionVaultSyncTests
         var cloud = new TestCloud();
         cloud.SeedShared(Invented.Shared(owner: Invented.OwnerAccount), Invented.Passphrase);
         var phone = cloud.NewPhone("Owner@Example.com");
-        phone.Local.GeminiApiKey = "example-newer-gemini";
+        phone.Local.SleepNumberLogin = "newer@example.com";
 
         var result = await Publish(phone);
 
         Assert.Equal(VaultWriteOutcome.Published, result.Shared);
-        Assert.Equal("example-newer-gemini", cloud.ReadShared(Invented.Passphrase).Gemini.ApiKey);
+        Assert.Equal("newer@example.com", cloud.ReadShared(Invented.Passphrase).Constitution.SleepNumberLogin);
     }
 
     [Fact]
@@ -724,7 +835,7 @@ public class ConstitutionVaultSyncTests
         await gone.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => phone.Sync.PublishAsync(Invented.Passphrase, gone.Token));
+            () => phone.Sync.PublishAsync(Invented.Passphrase, Invented.EverythingChanged, gone.Token));
 
         Assert.Equal(0, cloud.SharedDrive.Writes);
     }

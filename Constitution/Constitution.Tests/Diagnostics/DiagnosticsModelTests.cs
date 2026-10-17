@@ -116,6 +116,14 @@ public class DiagnosticsModelTests
     [InlineData("1.0.57")]
     [InlineData("1.0.512")]
     [InlineData("2.10.9999")]
+    // The CI display version is 1.0.<run number>, which will pass 1900 and 99999. A date of birth cannot
+    // take that shape (no month 0), so it is carried whatever the number.
+    [InlineData("1.0.1987")]
+    [InlineData("1.0.2026")]
+    [InlineData("1.0.2100")]
+    [InlineData("1.0.12345")]
+    [InlineData("1.0.123456")]
+    [InlineData("1.0.999999999")]
     public void ABuildVersionParses(string text)
     {
         Assert.Equal(text, AppVersion.Parse(text).Value);
@@ -125,10 +133,12 @@ public class DiagnosticsModelTests
     [InlineData("81.3 kg")]
     [InlineData("1.0")]
     [InlineData("1.0.57-beta")]
-    [InlineData("1.0.1987")]
-    [InlineData("1.0.2026")]
     [InlineData("9.3.1987")]
-    [InlineData("1.0.123456")]
+    [InlineData("1.1.1987")]
+    [InlineData("12.3.2026")]
+    [InlineData("1.0.1234567890")]
+    [InlineData("1.0.")]
+    [InlineData("1.0.-5")]
     [InlineData("")]
     public void ANonVersionOrAYearShapedOneIsRefusedWithoutEchoingIt(string text)
     {

@@ -20,7 +20,7 @@ internal static class PrivacyScan
         ["Lentil", "soup", "stew", "curry", "chicken", "pasta", "salad", "rice", "Pad thai", "roast"];
 
     private static readonly Regex VersionLine = new(
-        @"^Version: [1-9]\.\d{1,2}\.\d{1,4}$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
+        @"^Version: (?:1\.0\.\d{1,9}|[1-9]\.\d{1,2}\.\d{1,4})$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
 
     private static readonly Regex DocumentLine = new(
         @"^\s*(workout|meals|digest)-\d{4}-\d{2}-\d{2}\.pdf\b", RegexOptions.Multiline | RegexOptions.CultureInvariant);

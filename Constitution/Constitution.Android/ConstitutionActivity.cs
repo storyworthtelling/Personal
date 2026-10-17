@@ -91,7 +91,7 @@ public abstract class ConstitutionActivity : Activity
         RenderPage();
 
         // After a reset or reinstall, refill the connections from the Drive vault (background; no-op without a passphrase).
-        ConstitutionVaultRunner.RestoreAtLaunch(this);
+        ConstitutionVaults.RestoreAtLaunch(this);
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)

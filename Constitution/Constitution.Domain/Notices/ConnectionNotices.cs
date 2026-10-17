@@ -62,4 +62,33 @@ public static class ConnectionNotices
             _ => false,
         };
     }
+
+    /// <summary>
+    /// A credential has just been replaced (a new login saved, the tablet paired again): the notice its
+    /// old failure raised is about a credential that is gone, so it goes. Returns whether one was waiting.
+    /// </summary>
+    public static bool Clear(NoticeBoard board, string credentialId)
+    {
+        ArgumentNullException.ThrowIfNull(board);
+        return KindFor(credentialId) is not null && board.Resolve(CauseKey(credentialId));
+    }
+
+    /// <summary>
+    /// What a stored health says about the credential held now. A judgement made before the credential
+    /// was last replaced says nothing about the replacement, so it reads as <see cref="ConnectionHealth.Unknown"/>
+    /// ("not yet judged") until a live call with the new one is recorded. A judgement made after the
+    /// replacement stands.
+    /// </summary>
+    /// <param name="stored">What the health report holds.</param>
+    /// <param name="checkedAt">When the report says it judged, or null when it does not say.</param>
+    /// <param name="savedAt">When the credential was last saved here, or null when it never has been by hand.</param>
+    public static ConnectionHealth Judge(ConnectionHealth stored, DateTimeOffset? checkedAt, DateTimeOffset? savedAt)
+    {
+        if (savedAt is null || stored == ConnectionHealth.Unknown)
+        {
+            return stored;
+        }
+
+        return checkedAt is { } judged && judged > savedAt.Value ? stored : ConnectionHealth.Unknown;
+    }
 }
