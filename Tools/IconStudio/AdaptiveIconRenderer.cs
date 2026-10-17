@@ -26,6 +26,7 @@ public static class AdaptiveIconRenderer
 
         var ground = LoadGround(repoRoot, spec);
         var plate = LoadPlate(repoRoot, spec);
+        ValidateCrop(spec, plate);
 
         written.Add(WriteText(Path.Combine(root, "mipmap-anydpi-v26", $"{spec.Name}.xml"), AdaptiveXml(spec)));
         written.Add(WriteText(Path.Combine(root, "mipmap-anydpi-v26", $"{spec.Name}_round.xml"), AdaptiveXml(spec)));
@@ -82,7 +83,7 @@ public static class AdaptiveIconRenderer
         // (D119) doubled the shelf's own brackets, so its cover is window only like the rest.
         if (plate is not null && !spec.CoverDrawsGlyph)
         {
-            surface.Canvas.DrawBitmap(plate, CentreSquare(plate), new SKRect(0, 0, px, px));
+            surface.Canvas.DrawBitmap(plate, SourceRect(spec, plate), new SKRect(0, 0, px, px));
             return Encode(surface);
         }
 
@@ -102,6 +103,39 @@ public static class AdaptiveIconRenderer
 
     // The largest centred square of a bitmap, so art of any aspect fills a square window
     // without being stretched.
+    // The spec's approved crop when it has one, else the centre square.
+    private static SKRect SourceRect(IconSpec spec, SKBitmap plate) =>
+        spec.Crop is { } crop
+            ? new SKRect(crop.X, crop.Y, crop.X + crop.Width, crop.Y + crop.Height)
+            : CentreSquare(plate);
+
+    // A crop that is not square, or reaches outside the painting, would stretch or smear edge
+    // pixels into the icon without any error, so it fails here, naming the spec and the rectangle.
+    private static void ValidateCrop(IconSpec spec, SKBitmap? plate)
+    {
+        if (spec.Crop is not { } crop)
+        {
+            return;
+        }
+
+        var rectangle = $"{crop.X},{crop.Y} {crop.Width}x{crop.Height}";
+        if (plate is null)
+        {
+            throw new InvalidOperationException(
+                $"{spec.App}: crop {rectangle} is set but the spec has no plate image to crop.");
+        }
+
+        var square = crop.Width > 0 && crop.Width == crop.Height;
+        var inside = crop.X >= 0 && crop.Y >= 0
+            && crop.X + crop.Width <= plate.Width && crop.Y + crop.Height <= plate.Height;
+        if (!square || !inside)
+        {
+            throw new InvalidOperationException(
+                $"{spec.App}: crop {rectangle} must be square and inside the {plate.Width}x{plate.Height} "
+                + $"image {spec.PlateImage}.");
+        }
+    }
+
     private static SKRect CentreSquare(SKBitmap bitmap)
     {
         var side = Math.Min(bitmap.Width, bitmap.Height);
@@ -163,7 +197,7 @@ public static class AdaptiveIconRenderer
 
         var inset = px * spec.PlateInset;
         var window = new SKRect(inset, inset, px - inset, px - inset);
-        canvas.DrawBitmap(plate, CentreSquare(plate), window);
+        canvas.DrawBitmap(plate, SourceRect(spec, plate), window);
     }
 
     // The cover art set into the window, if the spec has one.

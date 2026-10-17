@@ -100,4 +100,18 @@ public class BrandAssetsTests : IDisposable
             root, "Storyboarder", "Folio.Infrastructure", "Resources", "owner.png"));
         Assert.Equal(Tokens.Accent, medallion.GetPixel(medallion.Width / 2, medallion.Height / 2));
     }
+
+    // The approved Constitution painting (POS.6), IconStudio's source for that icon and cover.
+    [Fact]
+    public void ConstitutionCoverIsTheApprovedSize()
+    {
+        var path = Path.Combine(RepoRoot(), "Branding", "constitution-cover.jpg");
+        Assert.True(File.Exists(path), $"{path} is not committed.");
+
+        using var codec = SKCodec.Create(path);
+        Assert.NotNull(codec);
+        Assert.Equal(SKEncodedImageFormat.Jpeg, codec.EncodedFormat);
+        Assert.Equal(864, codec.Info.Width);
+        Assert.Equal(1184, codec.Info.Height);
+    }
 }
