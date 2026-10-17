@@ -102,6 +102,13 @@ public static class ConstitutionIdentity
     /// </summary>
     public const string EquipmentOwnedKey = "equipment-owned";
 
+    /// <summary>
+    /// Whether the owner has explicitly confirmed the equipment checklist on first run (C-8.3.1), a
+    /// boolean inside <see cref="SettingsPreferencesName"/>. Needed because <see cref="EquipmentOwnedKey"/>
+    /// reads as everything ticked when never stored, so "never asked" cannot be told from "confirmed".
+    /// </summary>
+    public const string EquipmentConfirmedKey = "equipment-confirmed";
+
     /// <summary>Every registered worker Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName];
 
@@ -113,5 +120,6 @@ public static class ConstitutionIdentity
         SettingsPreferencesName, PillarWorkoutsKey, PillarMealsKey, PillarBodyKey,
         SleepNumberLoginKey, SleepNumberPasswordKey, RemarkableTokenKey, ClaudeKeyKey, GeminiKeyKey,
         HealthConnectChoicesKey, WorkScheduleKey, EquipmentOwnedKey,
+        EquipmentConfirmedKey,
     ];
 }

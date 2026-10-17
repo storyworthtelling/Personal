@@ -10,7 +10,7 @@ using Constitution.Scrapbook;
 namespace Constitution.Today;
 
 /// <summary>
-/// Today's page (book p.11): the date, then the scraps, top to bottom. At Release A the only scrap is
+/// Today's page (book p.11): the scraps, top to bottom. The date is the header's subtitle (D43), not lettered here. At Release A the only scrap is
 /// the torn notepad leaf with the top line on it (D43: nothing lettered goes bare on the crinkle);
 /// the workout clipping and the dinner card are later releases' scraps and join the same host. The
 /// leaf's line is in the calligraphy hand only when it is voiced, plain Serif otherwise (p.18).
@@ -20,16 +20,9 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
 {
     public const string TopLineScrapId = "today-top-line";
 
-    public TodayPage(Context context, DateTime now, TodayTopLine topLine) : base(context)
+    public TodayPage(Context context, TodayTopLine topLine) : base(context)
     {
         Orientation = Orientation.Vertical;
-
-        var date = new TextView(context) { Text = TodayModel.Header(now) };
-        date.SetTextSize(Android.Util.ComplexUnitType.Sp, DesignTokens.TypeSp.Heading);
-        date.SetTextColor(PaperTheme.InkMuted);
-        date.Typeface = PaperTheme.SerifSemibold(context);
-        date.SetPadding(PaperTheme.Dp(context, ScrapMetrics.WellPaddingStartDp), PaperTheme.Dp(context, DesignTokens.Space.X3), 0, 0);
-        AddView(date, new LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
         var host = new ScrapHost(context);
         host.SetScraps([new ScrapEntry(ScrapKind.NotepadLeaf, TopLineScrapId, Line(context, topLine))]);

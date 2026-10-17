@@ -8,6 +8,7 @@ using Codex.Ui;
 using Constitution.Domain.Areas;
 using Constitution.Domain.Layout;
 using Constitution.Domain.Waiting;
+using Constitution.FirstRun;
 using Constitution.Services;
 using Constitution.Settings;
 using Constitution.Waiting;
@@ -39,6 +40,9 @@ public abstract class ConstitutionActivity : Activity
 
     private SettingsArea? settingsArea;
 
+    // First run: shown instead of the tabs until FirstRunModel says all three steps are satisfied.
+    private FirstRunPage firstRun = null!;
+
     // The corner fold, and the Waiting page it turns to. The page is not an area: it takes the well
     // (on the crinkled ground) while the binder shows nothing lit, and any tab turns back.
     private DogEarHost dogEar = null!;
@@ -54,6 +58,7 @@ public abstract class ConstitutionActivity : Activity
 
         pillarStore = new PillarStore(this);
         settingsArea = new SettingsArea(this);
+        firstRun = new FirstRunPage(this, RenderPage);
         var areas = new IConstitutionArea[]
         {
             new TodayArea(this),
@@ -95,6 +100,7 @@ public abstract class ConstitutionActivity : Activity
 
         // The Google account picker opened from Settings answers here.
         settingsArea?.OnActivityResult(requestCode, resultCode, data);
+        firstRun.OnActivityResult(requestCode, resultCode, data);
     }
 
     protected override void OnResume()
@@ -174,6 +180,12 @@ public abstract class ConstitutionActivity : Activity
 
     private void RenderPage()
     {
+        if (firstRun.Current is not null)
+        {
+            RenderFirstRun();
+            return;
+        }
+
         if (waitingOpen)
         {
             RenderWaiting();
@@ -192,6 +204,18 @@ public abstract class ConstitutionActivity : Activity
 
         var header = PaperUi.ScreenHeader(this, active.Title, active.Tab.Hue);
         header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        if (active.Subtitle is { Length: > 0 } subtitle)
+        {
+            // Muted Serif under the title, in the header and so outside the well (D43).
+            var line = new TextView(this) { Text = subtitle };
+            line.SetTextSize(Android.Util.ComplexUnitType.Sp, DesignTokens.TypeSp.Heading);
+            line.SetTextColor(PaperTheme.InkMuted);
+            line.Typeface = PaperTheme.SerifSemibold(this);
+            line.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X1), 0, 0);
+            header.AddView(line, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+        }
+
         frame.SetHeader(header);
 
         // The well is bare: the area insets its own page to the screen edge (ConstitutionAreaBase.BuildView),
@@ -202,6 +226,24 @@ public abstract class ConstitutionActivity : Activity
         frame.SetWell(well);
 
         frame.SetBar(active.BuildBottomBar());
+    }
+
+    // Plain paper, no tab lit, the step's action in the pinned bar (C-8.3.1).
+    private void RenderFirstRun()
+    {
+        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
+        var header = PaperUi.ScreenHeader(this, "Welcome", PaperTheme.Ink);
+        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        frame.SetHeader(header);
+
+        var well = new FrameLayout(this);
+        well.AddView(firstRun.BuildWell(), new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        frame.SetWell(well);
+        frame.SetBar(firstRun.BuildBar());
+
+        binder.SetActive(-1);
+        TabLettering.Apply(binder, visible, -1);
     }
 
     // ---- the dog-ear and the Waiting page (book p.18) ----
