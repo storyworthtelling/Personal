@@ -97,6 +97,16 @@ public static class ConstitutionIdentity
     public const string WorkScheduleKey = "connection-work-schedule";
 
     /// <summary>
+    /// When the Sleep Number login was last saved by hand here (UTC ticks as text), inside
+    /// <see cref="SettingsPreferencesName"/>. A failure recorded before it describes a login that has
+    /// since been replaced and must not shame the new one. Absent means never saved by hand.
+    /// </summary>
+    public const string SleepNumberSavedKey = "credential-sleep-number-saved-at";
+
+    /// <summary>When the reMarkable was last paired here; see <see cref="SleepNumberSavedKey"/>.</summary>
+    public const string RemarkableSavedKey = "credential-remarkable-saved-at";
+
+    /// <summary>
     /// Which equipment this install has ticked, one comma-joined string of the frozen ids in
     /// <c>EquipmentCatalogue</c> (a dash for none), inside <see cref="SettingsPreferencesName"/>. Absent means everything.
     /// </summary>
@@ -120,6 +130,6 @@ public static class ConstitutionIdentity
         SettingsPreferencesName, PillarWorkoutsKey, PillarMealsKey, PillarBodyKey,
         SleepNumberLoginKey, SleepNumberPasswordKey, RemarkableTokenKey, ClaudeKeyKey, GeminiKeyKey,
         HealthConnectChoicesKey, WorkScheduleKey, EquipmentOwnedKey,
-        EquipmentConfirmedKey,
+        EquipmentConfirmedKey, SleepNumberSavedKey, RemarkableSavedKey,
     ];
 }

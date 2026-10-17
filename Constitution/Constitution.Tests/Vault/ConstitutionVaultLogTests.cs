@@ -66,7 +66,7 @@ public class ConstitutionVaultLogTests
         var phone = Fresh(out _);
 
         await phone.Sync.RestoreAsync(string.Empty, default);
-        await phone.Sync.PublishAsync(null, default);
+        await phone.Sync.PublishAsync(null, Invented.EverythingChanged, default);
 
         Assert.Equal(2, phone.Log.Lines.Count);
         Assert.All(phone.Log.Lines, line => Assert.Contains("skipped: no passphrase", line));
@@ -79,7 +79,7 @@ public class ConstitutionVaultLogTests
         phone.FillLocalSharedConnections();
         phone.Local.HealthConnectChoicesJson = Invented.HealthChoices;
 
-        await phone.Sync.PublishAsync(Invented.Passphrase, default);
+        await phone.Sync.PublishAsync(Invented.Passphrase, Invented.EverythingChanged, default);
 
         var line = Assert.Single(phone.Log.Lines);
         Assert.Contains("vault publish", line);
@@ -96,7 +96,7 @@ public class ConstitutionVaultLogTests
         cloud.SharedDrive.Content = VaultEnvelope.Write("{}", Invented.OtherPassphrase);
         phone.PersonalDrive.Content = "{ not an envelope";
 
-        await phone.Sync.PublishAsync(Invented.Passphrase, default);
+        await phone.Sync.PublishAsync(Invented.Passphrase, Invented.EverythingChanged, default);
 
         var line = Assert.Single(phone.Log.Lines);
         Assert.Contains("shared refused: unreadable vault", line);
@@ -110,7 +110,7 @@ public class ConstitutionVaultLogTests
         phone.Account = Invented.PartnerAccount;
         phone.FillLocalSharedConnections();
 
-        await phone.Sync.PublishAsync(Invented.Passphrase, default);
+        await phone.Sync.PublishAsync(Invented.Passphrase, Invented.EverythingChanged, default);
 
         Assert.Contains("shared refused: not the owner", Assert.Single(phone.Log.Lines));
     }
@@ -125,7 +125,7 @@ public class ConstitutionVaultLogTests
         phone.Local.HealthConnectChoicesJson = Invented.HealthChoices;
 
         await phone.Sync.RestoreAsync(Invented.Passphrase, default);
-        await phone.Sync.PublishAsync(Invented.Passphrase, default);
+        await phone.Sync.PublishAsync(Invented.Passphrase, Invented.EverythingChanged, default);
 
         Assert.Equal(2, phone.Log.Lines.Count);
         Assert.Contains("shared unreachable", phone.Log.Lines[0]);
@@ -141,7 +141,7 @@ public class ConstitutionVaultLogTests
         phone.Local.HealthConnectChoicesJson = Invented.HealthChoices;
 
         await phone.Sync.RestoreAsync(Invented.Passphrase, default);
-        await phone.Sync.PublishAsync(Invented.Passphrase, default);
+        await phone.Sync.PublishAsync(Invented.Passphrase, Invented.EverythingChanged, default);
 
         Assert.All(phone.Log.Lines, line =>
         {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Android.App;
 using Android.Content;
 using Android.Graphics;
@@ -10,6 +11,7 @@ using Constitution.Domain.Areas;
 using Constitution.Domain.Credentials;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Settings;
+using Constitution.Infrastructure.Vault;
 using Constitution.Services;
 using Constitution.Settings;
 using Storyworthtelling.Remarkable;
@@ -184,14 +186,15 @@ public sealed class SettingsArea(Activity host)
     private IReadOnlyList<ConnectionInput> ConnectionInputs()
     {
         var report = ConstitutionHealthReport.Read();
+        var saves = new ConstitutionCredentialSaves(Host);
         return
         [
             new ConnectionInput(SettingsModel.HealthConnectId, connections.HealthConnectChoicesJson.Length > 0, ConnectionHealth.Unknown),
             new ConnectionInput(CredentialIds.SleepNumber,
                 connections.SleepNumberLogin.Length > 0 && connections.SleepNumberPassword.Length > 0,
-                ConstitutionHealthReport.HealthOf(report, CredentialIds.SleepNumber)),
+                ConstitutionHealthReport.HealthOf(report, CredentialIds.SleepNumber, saves.SavedAt(CredentialIds.SleepNumber))),
             new ConnectionInput(CredentialIds.Remarkable, connections.RemarkableDeviceToken.Length > 0,
-                ConstitutionHealthReport.HealthOf(report, CredentialIds.Remarkable)),
+                ConstitutionHealthReport.HealthOf(report, CredentialIds.Remarkable, saves.SavedAt(CredentialIds.Remarkable))),
         ];
     }
 
@@ -292,30 +295,68 @@ public sealed class SettingsArea(Activity host)
 
         connections.SleepNumberLogin = login;
         connections.SleepNumberPassword = password;
-        ConstitutionVaultRunner.PublishAfterChange(Host);
+        // A new login has not been judged yet: the old one's failure is not held against it.
+        ConstitutionHealthReport.CredentialReplaced(Host, CredentialIds.SleepNumber);
         entryOpenFor = null;
-        SetNote(credentialId, "Saved to the vault. It is checked on the next reading.");
+        SetNote(credentialId, "Saved on this phone. Saving to the vault.");
+        _ = SaveToVaultAsync(
+            credentialId, VaultNoteSubject.SleepNumber, [VaultField.SleepNumberLogin, VaultField.SleepNumberPassword]);
     }
 
+    // The note says what the vault actually did. The runner never throws: every ending is a result.
+    private async Task SaveToVaultAsync(string credentialId, VaultNoteSubject subject, IReadOnlyCollection<VaultField> changed)
+    {
+        var result = await ConstitutionVaults.Create(Host).PublishAsync(changed, CancellationToken.None);
+        var note = VaultNote.For(result, subject);
+        Host.RunOnUiThread(() => SetNote(credentialId, note));
+    }
+
+    // Whatever stops the pairing, the row ends on a sentence: a failure of a kind we expect is worded by
+    // ConnectionFailure; one nobody expected is recorded by type name and propagates with its stack, and
+    // the finally still returns the row to a defined state.
     private async Task PairRemarkableAsync(string code)
     {
-        string note;
+        var settled = false;
         try
         {
-            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
-            var token = await new RemarkableRegistrationClient(http).Register(code, CancellationToken.None);
-            connections.RemarkableDeviceToken = token;
-            ConstitutionVaultRunner.PublishAfterChange(Host);
-            entryOpenFor = null;
-            note = "Paired and saved to the vault. It is checked on the next delivery.";
-        }
-        catch (HttpRequestException e)
-        {
-            note = $"The tablet did not accept that code ({e.StatusCode?.ToString() ?? "no reply"}).";
-        }
+            string token;
+            try
+            {
+                using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+                token = await new RemarkableRegistrationClient(http).Register(code, CancellationToken.None);
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    throw new FormatException("The tablet's cloud replied with no token.");
+                }
+            }
+            catch (Exception e) when (ConnectionTrail.Expecting(Host, ConnectionAct.PairRemarkable, e,
+                e is HttpRequestException or OperationCanceledException or TimeoutException or JsonException
+                    or FormatException or IOException or Java.Lang.Exception))
+            {
+                Settle(ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, e, callerCancelled: false));
+                settled = true;
+                return;
+            }
 
-        Host.RunOnUiThread(() => SetNote(CredentialIds.Remarkable, note));
+            connections.RemarkableDeviceToken = token;
+            // A new pairing has not been judged yet: the old token's failure is not held against it.
+            ConstitutionHealthReport.CredentialReplaced(Host, CredentialIds.Remarkable);
+            entryOpenFor = null;
+            Settle("Paired and saved on this phone. Saving to the vault.");
+            var result = await ConstitutionVaults.Create(Host).PublishAsync([VaultField.RemarkableDeviceToken], CancellationToken.None);
+            Settle(VaultNote.For(result, VaultNoteSubject.Remarkable));
+            settled = true;
+        }
+        finally
+        {
+            if (!settled)
+            {
+                Settle("Pairing stopped unexpectedly. Try again.");
+            }
+        }
     }
+
+    private void Settle(string note) => Host.RunOnUiThread(() => SetNote(CredentialIds.Remarkable, note));
 
     private void SetNote(string credentialId, string note)
     {
@@ -350,29 +391,55 @@ public sealed class SettingsArea(Activity host)
         }
 
         VaultPassphraseStore.Passphrase = typed;
-        ConstitutionVaultRunner.PublishAfterChange(Host);
+        _ = RestoreThenPublishAsync();
+    }
+
+    // On a phone just reset the passphrase is typed last, so it is the moment the vault can be read:
+    // bring the household's connections back first, then say what this install has to add. The runner
+    // never throws; a restore that filled something is shown at once.
+    private async Task RestoreThenPublishAsync()
+    {
+        var result = await ConstitutionVaults.Create(Host).RestoreThenPublishAsync([], CancellationToken.None);
+        if (result.Restore is { Filled.Count: > 0 })
+        {
+            Host.RunOnUiThread(RaiseChanged);
+        }
     }
 
     private async Task SignInAsync()
     {
+        var settled = false;
         try
         {
             signInStatus = "Choosing an account.";
             RaiseChanged();
-            var email = await googleAccount.SignIn(Host);
-            signInStatus = $"Signed in as {email}.";
-            ConstitutionVaultRunner.RestoreAtLaunch(Host);
-        }
-        catch (InvalidOperationException e)
-        {
-            signInStatus = $"Sign-in did not complete. {e.Message}";
-        }
-        catch (Java.Lang.Exception e)
-        {
-            signInStatus = $"Sign-in did not complete ({e.GetType().Name}).";
-        }
+            try
+            {
+                var email = await googleAccount.SignIn(Host);
+                signInStatus = $"Signed in as {email}.";
+                settled = true;
+            }
+            catch (Exception e) when (ConnectionTrail.Expecting(Host, ConnectionAct.SignIn, e,
+                e is InvalidOperationException or OperationCanceledException or TimeoutException or IOException
+                    or Java.Lang.Exception))
+            {
+                signInStatus = ConnectionFailure.Sentence(ConnectionAct.SignIn, e, callerCancelled: false);
+                settled = true;
+                return;
+            }
 
-        Host.RunOnUiThread(RaiseChanged);
+            // Signing in can be the last step on a reset phone (passphrase first), so it brings the vault back too.
+            await RestoreThenPublishAsync();
+        }
+        finally
+        {
+            if (!settled)
+            {
+                signInStatus = "Sign-in stopped unexpectedly. Try again.";
+            }
+
+            Host.RunOnUiThread(RaiseChanged);
+        }
     }
 
     private void ExportDiagnostics()

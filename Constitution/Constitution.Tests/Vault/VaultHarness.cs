@@ -89,6 +89,13 @@ internal static class Invented
     public const string HealthChoices = "{\"signals\":[\"" + HealthMarker + "\"]}";
     public const string WorkSchedule = "{\"blocks\":[\"" + WorkMarker + "\"]}";
 
+    /// <summary>What a freshly set-up install has just changed: every field it can edit itself.</summary>
+    public static readonly VaultField[] EverythingChanged =
+    [
+        VaultField.SleepNumberLogin, VaultField.SleepNumberPassword, VaultField.RemarkableDeviceToken,
+        VaultField.HealthConnectChoices,
+    ];
+
     /// <summary>Every secret-bearing invented value, for the guards that search output for any of them.</summary>
     public static readonly string[] Everything =
     [

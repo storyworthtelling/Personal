@@ -88,23 +88,35 @@ public sealed class ConstitutionVaultSync
     }
 
     /// <summary>
-    /// Saves what this install holds to the vaults it belongs in. Nothing is ever written over a vault
+    /// Saves what this install changed to the vaults it belongs in. Nothing is ever written over a vault
     /// that could not be read, and only the account that owns the shared vault writes to it.
     ///
+    /// <para><b>Only what this install changed is published.</b> A vault is shared with other apps and
+    /// other phones, so a value that merely sits in local preferences may long since have been replaced
+    /// there (Folio rotates the Claude key; a second phone re-pairs the tablet). The caller says which
+    /// fields it just changed, and a field outside that set leaves the vault's value alone. The one
+    /// exception is a slot the vault leaves empty: filling an empty slot can only add, never overwrite,
+    /// and it is how a value saved before any passphrase existed reaches the vault once there is one.</para>
+    ///
     /// <list type="bullet">
-    /// <item><b>Shared vault</b> (owner's account only): Constitution's Sleep Number section, and the
-    /// reMarkable, Claude and Gemini sections it reuses. Every other section, and the owner, are left
-    /// exactly as they were; the Nyt section is never touched, as the New York Times is not used (D96).</item>
-    /// <item><b>Personal vault</b> (any account, its own Drive): the Health Connect choices. The work
-    /// schedule is Foreword's: it is restored here and never published from here, since a stale copy
-    /// would overwrite Foreword's newer one.</item>
+    /// <item><b>Shared vault</b> (owner's account only): Constitution's own Sleep Number section, when it
+    /// changed; the reMarkable token, when this install just paired. The Claude and Gemini keys belong to
+    /// Folio and the rest of the suite: Constitution fills them only into an empty vault slot and never
+    /// replaces one, whatever it holds. Every other section, and the owner, are left exactly as they were;
+    /// the Nyt section is never touched, as the New York Times is not used (D96).</item>
+    /// <item><b>Personal vault</b> (any account, its own Drive): the Health Connect choices, when they
+    /// changed. The work schedule is Foreword's: it is restored here and never published from here, since
+    /// a stale copy would overwrite Foreword's newer one.</item>
     /// </list>
     ///
     /// A value this install does not hold is never published: it leaves the vault's value in place
     /// rather than blanking it, so saving a setting on a freshly reset phone cannot wipe the household's
     /// keys. An install with nothing to say writes nothing, and so cannot claim an unowned vault.
     /// </summary>
-    public async Task<ConstitutionPublishResult> PublishAsync(string? passphrase, CancellationToken cancellationToken)
+    /// <param name="passphrase">Used for this call's reads and writes and never kept.</param>
+    /// <param name="changed">The fields this install has just changed (empty when none: a passphrase was entered, say).</param>
+    /// <param name="cancellationToken">The caller leaving.</param>
+    public async Task<ConstitutionPublishResult> PublishAsync(string? passphrase, IReadOnlyCollection<VaultField> changed, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(passphrase))
         {
@@ -112,14 +124,16 @@ public sealed class ConstitutionVaultSync
             return new ConstitutionPublishResult(VaultWriteOutcome.NoPassphrase, VaultWriteOutcome.NoPassphrase);
         }
 
-        var shared = await PublishSharedAsync(passphrase, cancellationToken);
-        var personal = await PublishPersonalAsync(passphrase, cancellationToken);
+        ArgumentNullException.ThrowIfNull(changed);
+        var changes = changed.ToHashSet();
+        var shared = await PublishSharedAsync(passphrase, changes, cancellationToken);
+        var personal = await PublishPersonalAsync(passphrase, changes, cancellationToken);
         log.Outcome($"vault publish: shared {Words(shared.Outcome)}, personal {Words(personal.Outcome)}");
         return new ConstitutionPublishResult(shared.Outcome, personal.Outcome, shared.Detail, personal.Detail);
     }
 
     private async Task<(VaultWriteOutcome Outcome, string? Detail)> PublishSharedAsync(
-        string passphrase, CancellationToken cancellationToken)
+        string passphrase, IReadOnlySet<VaultField> changes, CancellationToken cancellationToken)
     {
         // One snapshot, taken before the first await: the merge runs after the vault has been read, and
         // the settings screen may have changed a field in between.
@@ -155,12 +169,16 @@ public sealed class ConstitutionVaultSync
                 {
                     Constitution = vault.Constitution with
                     {
-                        SleepNumberLogin = Pick(login, vault.Constitution.SleepNumberLogin),
-                        SleepNumberPassword = Pick(word, vault.Constitution.SleepNumberPassword),
+                        SleepNumberLogin = Pick(login, vault.Constitution.SleepNumberLogin, changes.Contains(VaultField.SleepNumberLogin)),
+                        SleepNumberPassword = Pick(word, vault.Constitution.SleepNumberPassword, changes.Contains(VaultField.SleepNumberPassword)),
                     },
-                    Remarkable = vault.Remarkable with { DeviceToken = Pick(remarkable, vault.Remarkable.DeviceToken) },
-                    Claude = vault.Claude with { ApiKey = Pick(claude, vault.Claude.ApiKey) },
-                    Gemini = vault.Gemini with { ApiKey = Pick(gemini, vault.Gemini.ApiKey) },
+                    Remarkable = vault.Remarkable with
+                    {
+                        DeviceToken = Pick(remarkable, vault.Remarkable.DeviceToken, changes.Contains(VaultField.RemarkableDeviceToken)),
+                    },
+                    // Reused sections: Constitution never owns these keys, so it never replaces one.
+                    Claude = vault.Claude with { ApiKey = Pick(claude, vault.Claude.ApiKey, changed: false) },
+                    Gemini = vault.Gemini with { ApiKey = Pick(gemini, vault.Gemini.ApiKey, changed: false) },
                 },
                 cancellationToken);
 
@@ -182,7 +200,7 @@ public sealed class ConstitutionVaultSync
     }
 
     private async Task<(VaultWriteOutcome Outcome, string? Detail)> PublishPersonalAsync(
-        string passphrase, CancellationToken cancellationToken)
+        string passphrase, IReadOnlySet<VaultField> changes, CancellationToken cancellationToken)
     {
         var choices = connections.HealthConnectChoicesJson;
         if (string.IsNullOrEmpty(choices))
@@ -198,9 +216,19 @@ public sealed class ConstitutionVaultSync
                 return (VaultWriteOutcome.RefusedUnreadable, null);
             }
 
+            // Only a changed value, or one the vault lacks, is ours to say. Otherwise there is nothing to
+            // write, and the file is left exactly as it is.
+            var changedNow = changes.Contains(VaultField.HealthConnectChoices);
+            if (!changedNow && !string.IsNullOrEmpty(loaded.Vault.HealthConnectChoicesJson))
+            {
+                return (VaultWriteOutcome.NothingToPublish, null);
+            }
+
+            var chosen = Pick(choices, loaded.Vault.HealthConnectChoicesJson, changedNow);
+
             // Merged into whatever is there: Score's sign-in, Foreword's calendar choices and work
             // schedule are not ours, and an Empty status hands back a blank vault to start from.
-            await personalStore.SaveAsync(loaded.Vault with { HealthConnectChoicesJson = choices }, passphrase, cancellationToken);
+            await personalStore.SaveAsync(loaded.Vault with { HealthConnectChoicesJson = chosen }, passphrase, cancellationToken);
             return (VaultWriteOutcome.Published, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -209,8 +237,13 @@ public sealed class ConstitutionVaultSync
         }
     }
 
-    // A value this install holds replaces the vault's; a value it does not hold leaves the vault's alone.
-    private static string Pick(string local, string inVault) => string.IsNullOrEmpty(local) ? inVault : local;
+    // What the vault should hold for one slot. A value this install does not hold leaves the vault's
+    // alone; a slot the vault leaves empty takes what this install holds (adding, never overwriting);
+    // and a slot the vault already fills is replaced only by a value this install has just changed.
+    private static string Pick(string local, string inVault, bool changed) =>
+        string.IsNullOrEmpty(local) ? inVault
+        : changed || string.IsNullOrEmpty(inVault) ? local
+        : inVault;
 
     private static void Fill(VaultField field, string current, string fromVault, Action<string> set, List<VaultField> filled)
     {

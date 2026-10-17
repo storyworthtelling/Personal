@@ -1,4 +1,4 @@
-using Codex.Domain.Design;
+using Constitution.Domain.Scraps;
 
 namespace Constitution.Domain.Ground;
 
@@ -26,8 +26,11 @@ public sealed record CrinkleField(
     IReadOnlyList<CrinkleTick> Ticks,
     Perforation Perforation)
 {
-    /// <summary>The binder gutter's width, taken from the binder layout rather than restated.</summary>
-    public const int GutterWidthDp = BinderTabLayout.PreferredHeightDp;
+    /// <summary>
+    /// The binder gutter's width: the scrap page's own figure, which a test holds equal to the suite's
+    /// <c>BinderTabs.WidthDp</c>. (A binder tab's height is a different quantity that merely shares the number.)
+    /// </summary>
+    public const int GutterWidthDp = ScrapMetrics.BinderGutterDp;
 
     public const double MinIntensity = 0.04;
     public const double MaxIntensity = 0.09;

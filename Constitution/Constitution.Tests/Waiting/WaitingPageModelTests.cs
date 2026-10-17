@@ -87,7 +87,7 @@ public class WaitingPageModelTests
     }
 
     [Fact]
-    public void ALowConfidenceReadWithNoReadableCandidatesStillLists_WithoutChips()
+    public void ALowConfidenceReadWithNoReadableCandidatesStillListsWithoutChips()
     {
         var board = new NoticeBoard();
         board.Raise(NoticeKind.LowConfidenceRead, "unparseable", Now);

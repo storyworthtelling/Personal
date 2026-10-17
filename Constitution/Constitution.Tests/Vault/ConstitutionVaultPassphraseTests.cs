@@ -125,7 +125,7 @@ public class ConstitutionVaultPassphraseTests
     private static async Task<List<string>> EverythingSaid(TestPhone phone, string passphrase)
     {
         var restore = await phone.Sync.RestoreAsync(passphrase, default);
-        var publish = await phone.Sync.PublishAsync(passphrase, default);
+        var publish = await phone.Sync.PublishAsync(passphrase, Invented.EverythingChanged, default);
         return [.. TextsOf(restore), .. TextsOf(publish), .. phone.Log.Lines];
     }
 
@@ -174,7 +174,7 @@ public class ConstitutionVaultPassphraseTests
         var phone = Arrange("unreachable, message echoes the passphrase", passphrase);
 
         var restore = await phone.Sync.RestoreAsync(passphrase, default);
-        var publish = await phone.Sync.PublishAsync(passphrase, default);
+        var publish = await phone.Sync.PublishAsync(passphrase, Invented.EverythingChanged, default);
 
         // Still useful: the type and the rest of the message survive.
         Assert.Contains("HttpRequestException", restore.SharedDetail);
@@ -188,7 +188,7 @@ public class ConstitutionVaultPassphraseTests
         Assert.DoesNotContain(passphrase, publish.PersonalDetail, StringComparison.Ordinal);
 
         var writePhone = Arrange("write fails, message echoes the passphrase", passphrase);
-        var writeResult = await writePhone.Sync.PublishAsync(passphrase, default);
+        var writeResult = await writePhone.Sync.PublishAsync(passphrase, Invented.EverythingChanged, default);
         Assert.Contains("rejected the write", writeResult.SharedDetail);
         Assert.Contains("rejected the write", writeResult.PersonalDetail);
         Assert.DoesNotContain(passphrase, writeResult.SharedDetail, StringComparison.Ordinal);
@@ -204,7 +204,7 @@ public class ConstitutionVaultPassphraseTests
             var phone = Arrange(scenario, passphrase);
 
             var restore = await Record.ExceptionAsync(() => phone.Sync.RestoreAsync(passphrase, default));
-            var publish = await Record.ExceptionAsync(() => phone.Sync.PublishAsync(passphrase, default));
+            var publish = await Record.ExceptionAsync(() => phone.Sync.PublishAsync(passphrase, Invented.EverythingChanged, default));
 
             Assert.True(restore is null, $"{scenario}: restore threw {restore?.GetType().Name}");
             Assert.True(publish is null, $"{scenario}: publish threw {publish?.GetType().Name}");
@@ -220,14 +220,14 @@ public class ConstitutionVaultPassphraseTests
         cloud.SeedShared(Invented.Shared(), Invented.Passphrase);
         var phone = cloud.NewPhone(Invented.OwnerAccount);
         phone.FillLocalSharedConnections();
-        Assert.Equal(VaultWriteOutcome.Published, (await phone.Sync.PublishAsync(Invented.Passphrase, default)).Shared);
+        Assert.Equal(VaultWriteOutcome.Published, (await phone.Sync.PublishAsync(Invented.Passphrase, Invented.EverythingChanged, default)).Shared);
 
         // A different passphrase opens nothing: the first call's is not being reused.
-        var wrong = await phone.Sync.PublishAsync(Invented.OtherPassphrase, default);
+        var wrong = await phone.Sync.PublishAsync(Invented.OtherPassphrase, Invented.EverythingChanged, default);
         Assert.Equal(VaultWriteOutcome.RefusedUnreadable, wrong.Shared);
 
         // And with none given, nothing happens at all, rather than the last one being used.
-        var none = await phone.Sync.PublishAsync(string.Empty, default);
+        var none = await phone.Sync.PublishAsync(string.Empty, Invented.EverythingChanged, default);
         Assert.Equal(VaultWriteOutcome.NoPassphrase, none.Shared);
 
         var fresh = cloud.NewPhone(Invented.OwnerAccount);
