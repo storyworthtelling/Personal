@@ -7,7 +7,10 @@ using Codex.Domain.Design;
 using Codex.Ui;
 using Constitution.Domain.Areas;
 using Constitution.Domain.Layout;
+using Constitution.Domain.Waiting;
 using Constitution.Services;
+using Constitution.Settings;
+using Constitution.Waiting;
 
 namespace Constitution;
 
@@ -35,6 +38,12 @@ public abstract class ConstitutionActivity : Activity
     private PillarStore pillarStore = null!;
 
     private SettingsArea? settingsArea;
+
+    // The corner fold, and the Waiting page it turns to. The page is not an area: it takes the well
+    // (on the crinkled ground) while the binder shows nothing lit, and any tab turns back.
+    private DogEarHost dogEar = null!;
+    private BackToPage backToPage = null!;
+    private bool waitingOpen;
 
     private IConstitutionArea Active => areasById[activeId];
 
@@ -69,6 +78,10 @@ public abstract class ConstitutionActivity : Activity
         }
 
         SetContentView(BuildLayout());
+        dogEar = new DogEarHost(this, overlay);
+        dogEar.OpenWaiting += OpenWaiting;
+        dogEar.UndoTurned += OnUndoTurned;
+        backToPage = new BackToPage(this, CloseWaiting);
         RefreshTabs();
         RenderPage();
 
@@ -100,6 +113,7 @@ public abstract class ConstitutionActivity : Activity
     protected override void OnPause()
     {
         base.OnPause();
+        dogEar.Pause();
         foreach (var area in areasById.Values)
         {
             area.Pause();
@@ -135,6 +149,7 @@ public abstract class ConstitutionActivity : Activity
             return;
         }
 
+        CloseWaitingState();
         activeId = visible[index].Definition.Id;
         binder.SetActive(index);
         TabLettering.Apply(binder, visible, index);
@@ -159,6 +174,19 @@ public abstract class ConstitutionActivity : Activity
 
     private void RenderPage()
     {
+        if (waitingOpen)
+        {
+            RenderWaiting();
+            dogEar.Refresh();
+            return;
+        }
+
+        RenderArea();
+        dogEar.Refresh();
+    }
+
+    private void RenderArea()
+    {
         var active = Active;
         var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
 
@@ -174,5 +202,83 @@ public abstract class ConstitutionActivity : Activity
         frame.SetWell(well);
 
         frame.SetBar(active.BuildBottomBar());
+    }
+
+    // ---- the dog-ear and the Waiting page (book p.18) ----
+
+    private void OpenWaiting()
+    {
+        waitingOpen = true;
+        backToPage.Register();
+        RefreshTabs();
+        RenderPage();
+    }
+
+    private void CloseWaiting()
+    {
+        CloseWaitingState();
+        RefreshTabs();
+        RenderPage();
+    }
+
+    private void CloseWaitingState()
+    {
+        waitingOpen = false;
+        backToPage.Unregister();
+    }
+
+    private void RenderWaiting()
+    {
+        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
+        var header = PaperUi.ScreenHeader(this, "Waiting", PaperTheme.Ink);
+        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        frame.SetHeader(header);
+
+        var model = ConnectionNoticeBoard.With(board => WaitingPageModel.From(board, DateTimeOffset.UtcNow));
+        var page = WaitingPageView.Build(this, model, OnWaitingAction, OnWaitingChip);
+
+        // Written straight onto the crinkled ground, in the app's own frame (D43). The ground is
+        // reached through Today's painter, the seam an area exposes: only the area base class may
+        // name the crinkle (SettingsIsPlainTests), and Settings must never lend its plain one.
+        var ground = areasById[ConstitutionAreas.All[0].Id].GroundPainter;
+        var well = new FrameLayout(this);
+        well.AddView(ground.Paint(page), new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        frame.SetWell(well);
+        frame.SetBar(null);
+
+        // No tab is lit behind the turned page.
+        binder.SetActive(-1);
+        TabLettering.Apply(binder, visible, -1);
+    }
+
+    // PairAgain and SignInAgain go to Settings, where the connections are mended. The other acts have
+    // no screen to go to yet (the scan, the box and Keep arrive with Releases C-E), so a tap does nothing.
+    private void OnWaitingAction(WaitingActionId action)
+    {
+        if (action is not (WaitingActionId.PairAgain or WaitingActionId.SignInAgain))
+        {
+            return;
+        }
+
+        var index = visible.ToList().FindIndex(area => area.Definition.Id == "settings");
+        if (index >= 0)
+        {
+            OnTabSelected(index);
+        }
+    }
+
+    private void OnWaitingChip(WaitingItem item, ChipChoice choice)
+    {
+        // The pick is the answer and the row simply goes; nothing is stored until the read-back
+        // worker (Release C) exists to receive it.
+        ConnectionNoticeBoard.With(board => WaitingPageModel.Answer(board, item, choice));
+        RenderPage();
+    }
+
+    // An undo fold was turned. No area raises an undo yet; when one does, it reverses its act here.
+    private void OnUndoTurned(string actKey)
+    {
+        RenderPage();
     }
 }
