@@ -157,3 +157,19 @@ Append new rulings below rather than renumbering.
 | D77 | **The fold's colours stay as drawn:** errors rose, a low-confidence read ochre, a waiting scan teal, the 3-of-10 count slate, undo pine. |
 | D78 | **Page 19 approved:** the second suite row on its own ledge, and Constitution's book. |
 | D79 | **Constitution stands cover-out** on the suite shelf like every sibling; the bookmark is bound at its spine edge. |
+| D80 | **Constitution is a native .NET 10 Android head over `Codex.Ui.Android`,** on Pulp's four-project template (finding §1.1). |
+| D81 | **Groceries go to a new Google Keep note each week, through Keep's own share intent; nothing is read back** (finding Q1). The Keep API is enterprise-only and cannot edit items, so the pantry learns from the meal sheet's staples checklist alone. Overrides the brief's "Keep ticks read back" and "adds and removes only its own items". |
+| D82 | **NYT Cooking is never scraped; only an official API or NYT's written permission** (finding Q2). A discovery spike asks first. Until it succeeds there is no NYT route: the weekly stretch dish is a household card not cooked lately, and page 14's "Paste an NYT Cooking link" row waits on the spike rather than being built against the terms. |
+| D83 | **The partner doesn't use Flyleaf, so on her phone the brief's short list of notices also posts as ordinary Android notifications** (finding Q3). On the owner's phone they light the Flyleaf bookmark. Narrows the brief's "nothing is ever pushed" to the owner's install. |
+| D84 | **Tab cloths may share a hue with each other or with a role colour** (finding Q4). A fold wearing its own tab's hue on Workouts or Body is allowed; `AreaHueTests` and DESIGN.md §9 are amended to say so. |
+| D85 | **The reMarkable is paired the same way as Foreword:** Constitution uses the pairing that phone's Foreword uses (the vault's `RemarkableSecrets.DeviceToken`, restored into either app) (finding Q5). |
+| D86 | **The partner's phone uses the system camera,** one photo per page for a recipe card and one photo for "I ate something else". **The owner's phone scans recipes through Plate's multi-page scan tray** as page 14 draws, which needs a new `READ_RECIPE` request in Plate (finding Q6). |
+| D87 | **Constitution's own morning worker reads the ink,** scheduled after Foreword's delivery window, not Foreword (finding Q7). |
+| D88 | **Releases:** A identity, shell and Settings · B Body · C Workouts · D Meals · E digest and notices · F the device checks (brief: Body first). |
+| D89 | **One phase PR:** releases land as labelled commits on one branch, and the PR opens when CI is green (Index's and Pulp's way). |
+| D90 | **The weekly Keep hand-off is a Reference notice on the Waiting page,** "This week's groceries are ready", with one button, Send to Keep, which opens Keep's share sheet (plan OQ1, PC10). |
+| D91 | **A waiting scan's Flyleaf bookmark is Reference slate, as page 19 draws it;** its dog-ear stays In-progress teal (D77). The bookmark and the fold differ on purpose (plan OQ2). |
+| D92 | **Plan round 1 approved:** overview, releases A–F, architecture and plan choices PC1–PC10. |
+| D93 | **Plan round 2 approved:** Epics E1–E4, with an agent level and effort on every PBI. |
+| D94 | **Plan round 3 approved:** Epics E5–E9. Rounds 4 and 5 are merged into one final round. |
+| D95 | **The P13 plan is approved in full** (final round: Epics E10–E13, the cross-cutting sections and traceability). |
