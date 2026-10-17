@@ -26,6 +26,8 @@ One phase branch (D89): `ccr-0de01a0f-8dnn7q`. Releases land as labelled commits
 | C-3.1.2 | review | (shell-tokens commit) | compile-red (no Pillars) | same suites |
 | C-3.2.1 | review | (shell-tokens commit) | planted-literal test failed against a stub scanner (collection empty); leak guard then caught the agent's own quoted hexes; MaterialParityTests has no clean red | Codex 2476, Ledger 1754, Paper 140 pass. Ledger.Android NOT compiled here (maui-android workload missing); CI is its compiler, and no CI runs on this branch yet. |
 | C-4.1.5 | review | (shell-tokens commit) | parity test failed 2 of 2 (Constitution copy absent) | Codex parity + Constitution time tests pass. 'Tuesday, Nov 17' is a Constitution-only TodayHeader helper, not in shared TimeFormats (owner may prefer shared). |
+| C-9.2.2 | review | (seat-facts commit) | compile-red, then 68 of 290 red against throw-only stubs (FallbacksMatchPageEighteen, BodyStatesWorseningPlainly, NoFaithContent...); guard proven to fire on a planted word built at runtime | Constitution.Tests 290 pass. Steady bands per unit (0.25 h, 1 lb, 2 bpm...) are the agent's guess. No real model run. |
+| C-9.2.3 | review | (seat-facts commit) | UTC-vs-local day mutation failed 2 tests | same. Store is an in-memory fake; prefs-backed store still to build; failure memory 10 min mirrors Index. |
 
 ## Open questions
 - Ledger.Android cannot compile in this sandbox (maui-android workload missing) and CI does not run on branch ccr-0de01a0f-8dnn7q (workflows trigger on main and claude/** only). Index's re-point to shared card tokens is uncompiled; decide: manual Run workflow, or accept until PR/main.

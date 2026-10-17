@@ -26,7 +26,7 @@ namespace Constitution.Infrastructure.Voice;
 /// <para>Cancellation is the caller leaving the screen, not a failure, and propagates. Composing at
 /// most once per facts and day is C-9.2.3's, layered over this; this composes every time it is asked.</para>
 /// </summary>
-public sealed class SeatComposer
+public sealed class SeatComposer : ISeatComposer
 {
     private readonly VoicedMessenger messenger;
     private readonly DriveVoiceOptions voiceOptions;
