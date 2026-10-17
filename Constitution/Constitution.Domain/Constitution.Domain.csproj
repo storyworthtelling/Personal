@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Constitution's rules, pure .NET: every layer can see it, including the desktop test build,
+       which is what lets the guards run with no Android workload installed. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Constitution.Domain</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- TempoBands and DesignTokens (plan 2.1). -->
+    <ProjectReference Include="..\..\FocusPhone\Codex.Domain\Codex.Domain.csproj" />
+  </ItemGroup>
+</Project>
