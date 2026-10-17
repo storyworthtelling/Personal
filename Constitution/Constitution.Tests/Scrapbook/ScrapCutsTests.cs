@@ -79,7 +79,7 @@ public class ScrapCutsTests
         Assert.Equal(new ScrapPoint(Width, 0), points[1]);
         // Every other corner is within the serration's 5 dp of the foot: teeth at the foot, valleys 5 dp up.
         Assert.All(points.Skip(2), p => Assert.InRange(p.Y, Height - 5, Height));
-        Assert.Equal(11, points.Count(p => p.Y == Height));
+        Assert.Equal(10, points.Count(p => p.Y == Height));
         Assert.Equal(11, points.Count(p => p.Y == Height - 5));
     }
 

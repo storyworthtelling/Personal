@@ -41,7 +41,7 @@ public class ScrapRulingTests
     }
 
     [Fact]
-    public void NotepadRulesStartAtTheFoot23AndRepeatEveryPitch()
+    public void NotepadRulesStartAt23AndRepeat()
     {
         var tops = ScrapRuling.NotepadRuleTops(130, 24);
 
