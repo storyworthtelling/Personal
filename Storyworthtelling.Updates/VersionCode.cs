@@ -122,5 +122,8 @@ public static class SuiteVersionBands
 
         // Pulp (P12) is a new package with nothing shipped before; band 9 is unused by any other app.
         new("com.storyworthtelling.pulp", 9, 0),
+
+        // Constitution (P13) is a new package with nothing shipped before; band 10 is unused by any other app.
+        new("com.storyworthtelling.constitution", 10, 0),
     ];
 }
