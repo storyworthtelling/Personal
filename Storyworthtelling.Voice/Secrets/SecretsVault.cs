@@ -60,6 +60,17 @@ public sealed record SecretsVault
     [JsonPropertyName("Pulp")]
     public PulpSecrets Pulp { get; init; } = new();
 
+    // Constitution's one shared fact: the household's Sleep Number login. One bed account serves both
+    // adults, so it is a household fact and lives here. Per-install facts (Health Connect choices, the
+    // work schedule) are NOT here — restored from the first phone onto the second they would be
+    // Foreword Release I's bug again — they belong in PersonalVault.
+    //
+    // The WIRE KEY is "Constitution" and is frozen, pinned with [JsonPropertyName] for the same reason
+    // as Foreword's and Pulp's sections above: with no naming policy a property name is the key written
+    // to Drive, so a rename would load every existing vault's section as empty, silently.
+    [JsonPropertyName("Constitution")]
+    public ConstitutionSecrets Constitution { get; init; } = new();
+
     // Stable Drive file ids for the suite's well-known JSON files (voice profile/config, this vault, taste
     // profile, audio library), keyed by file name. Lets those files be MOVED in Drive without breaking the
     // apps (thread #13): the app resolves by remembered id first, falling back to a name search. Cross-app,
@@ -191,3 +202,9 @@ public sealed record PulpSecrets(
     string StreamingAvailabilityKey = "",
     string OmdbKey = "",
     string YouTubeKey = "");
+
+// Constitution's household Sleep Number login: the account's sign-in name (an email address) and its
+// password. Written to Drive under the key "Constitution", with these two inner names exactly — see above.
+public sealed record ConstitutionSecrets(
+    string SleepNumberLogin = "",
+    string SleepNumberPassword = "");
