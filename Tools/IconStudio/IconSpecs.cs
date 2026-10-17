@@ -124,5 +124,13 @@ public static class IconSpecs
         new("Pulp", "Pulp/Pulp.Android/Resources", "appicon", true, Glyphs.PulpPlate,
             Tokens.PulpClothHex, PlateImage: "Branding/pulp-cover.jpg",
             CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_pulp.png"),
+        // Constitution's icon IS its cover, like Pulp's: the approved painting full bleed on the
+        // cerulean cloth with no keyline (book page 3, icon B; D12). The painting is portrait
+        // (864x1184), so the crop is a closer square on the slope, rows 190-974 centred, which is
+        // what keeps the two runners large enough to read as two figures at 48 px.
+        new("Constitution", "Constitution/Constitution.Android/Resources", "appicon", false, Glyphs.ConstitutionPlate,
+            Tokens.ConstitutionClothHex, PlateImage: "Branding/constitution-cover.jpg",
+            CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_constitution.png",
+            Crop: new SourceCrop(40, 190, 784, 784)),
     ];
 }

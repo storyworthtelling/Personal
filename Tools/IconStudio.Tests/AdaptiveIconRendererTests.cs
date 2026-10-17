@@ -39,7 +39,7 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void SpecsCoverAllApps()
     {
-        Assert.Equal(8, IconSpecs.All.Count);
+        Assert.Equal(9, IconSpecs.All.Count);
 
         // Counted by where the resources land, not by what the app is called. The
         // phase renames rebrand one head at a time — Launcher became Flyleaf, Audio
@@ -87,11 +87,18 @@ public class AdaptiveIconRendererTests : IDisposable
             .OfType<string>()
             .Distinct();
 
+        // A cropped plate's stand-in must be big enough to hold the crop (Constitution's is a
+        // 784 px square out of a portrait painting), so seed it as large as the crop needs.
+        var sizes = IconSpecs.All
+            .Where(spec => spec.PlateImage is not null && spec.Crop is not null)
+            .ToDictionary(spec => spec.PlateImage!, spec => Math.Max(spec.Crop!.X + spec.Crop.Width, spec.Crop.Y + spec.Crop.Height));
+
         foreach (var relative in artwork)
         {
             var path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            using var bitmap = new SKBitmap(8, 8);
+            var size = sizes.GetValueOrDefault(relative, 8);
+            using var bitmap = new SKBitmap(size, size);
             bitmap.Erase(SKColors.Teal);
             using var image = SKImage.FromBitmap(bitmap);
             using var data = image.Encode(SKEncodedImageFormat.Png, 100);
@@ -385,7 +392,7 @@ public class AdaptiveIconRendererTests : IDisposable
         // way: its keyline and flourish are cream, not ink, and carry no terracotta at all. Pulp
         // draws nothing over its painting, so it has no line at all.
         foreach (var spec in IconSpecs.All.Where(
-            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio" or "Index" or "Pulp")))
+            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio" or "Index" or "Pulp" or "Constitution")))
         {
             using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);
@@ -629,13 +636,14 @@ public class AdaptiveIconRendererTests : IDisposable
     public void SpecsWithoutACropAreUnchanged()
     {
         var repo = RepoRootPath();
-        Assert.All(IconSpecs.All, spec => Assert.Null(spec.Crop));
+        // Only Constitution crops (C-1.3.3); every other spec must still be uncropped.
+        Assert.All(IconSpecs.All.Where(spec => spec.App != "Constitution"), spec => Assert.Null(spec.Crop));
 
         CopyDirectory(Path.Combine(repo, "Branding"), Path.Combine(root, "Branding"));
         CopyDirectory(Path.Combine(repo, "Fonts"), Path.Combine(root, "Fonts"));
 
         var compared = 0;
-        foreach (var spec in IconSpecs.All)
+        foreach (var spec in IconSpecs.All.Where(spec => spec.Crop is null))
         {
             foreach (var written in AdaptiveIconRenderer.Write(root, spec))
             {

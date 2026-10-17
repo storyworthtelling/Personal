@@ -4,6 +4,10 @@ using Android.OS;
 using Android.Widget;
 using Constitution.Domain;
 
+// The launcher icon IconStudio generates from the approved painting (spec "Constitution",
+// resource name appicon, which build-constitution.yml's ICON CHECK reads back out of the APK).
+[assembly: Application(Icon = "@mipmap/appicon", RoundIcon = "@mipmap/appicon_round", Label = "Constitution")]
+
 namespace Constitution;
 
 /// <summary>
