@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Constitution</RootNamespace>
+    <!-- Frozen: must equal ConstitutionIdentity.ApplicationId (guarded by ConstitutionInvariantsTests). -->
+    <ApplicationId>com.storyworthtelling.constitution</ApplicationId>
+    <ApplicationTitle>Constitution</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Constitution.Domain\Constitution.Domain.csproj" />
+    <ProjectReference Include="..\Constitution.Infrastructure\Constitution.Infrastructure.csproj" />
+    <!-- The Paper & Ink theme, PaperUi factories and the eight shared fonts. -->
+    <ProjectReference Include="..\..\FocusPhone\Codex.Ui.Android\Codex.Ui.Android.csproj" />
+    <!-- The update channel's shared decisions: which APKs this app installs on the phone it wakes on. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+  </ItemGroup>
+</Project>
