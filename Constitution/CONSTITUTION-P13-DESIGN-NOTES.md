@@ -173,3 +173,4 @@ Append new rulings below rather than renumbering.
 | D93 | **Plan round 2 approved:** Epics E1–E4, with an agent level and effort on every PBI. |
 | D94 | **Plan round 3 approved:** Epics E5–E9. Rounds 4 and 5 are merged into one final round. |
 | D95 | **The P13 plan is approved in full** (final round: Epics E10–E13, the cross-cutting sections and traceability). |
+| D96 | **NYT spike outcome (C-11.4.1): no official API covers recipes, and NYT's terms bar storing recipes or feeding them to AI without written permission,** so Constitution builds as if the answer were NO: page 14's paste row and C-6.3.4 are not built, and the change goes back to the owner as a book revision. `NoScrapingTests` (G25) still ships. Evidence was second-hand (the research tool could not read nytimes.com), so the owner confirms at developer.nytimes.com/apis that no Cooking entry exists before sending the drafted permission request. |
