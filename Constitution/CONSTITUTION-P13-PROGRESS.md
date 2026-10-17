@@ -31,6 +31,7 @@ One phase branch (D89): `ccr-0de01a0f-8dnn7q`. Releases land as labelled commits
 | C-3.2.2 | review (Owner, pure half) | (ground commit) | compile-red (no Ground namespace) | Ground tests 11 pass. Domain geometry only: no painter yet; owner has not seen the ground. Wander shape/perforation fraction are the agent's guess at the mockup. SettingsIsPlain source-scan half waits for the painter. |
 | C-8.2.3 | review | (ground commit) | compile-red only (no Credentials namespaces); no behavioural red against a stub | Credential tests 18 pass. Handler not wired to any HttpClient yet; prefs-backed health store later. |
 | C-8.3.2 | review | (ground commit) | compile-red, then mutation checks (string Dish member + '81.3 kg' line) turned 21 tests red | Diagnostics 67 pass. Document kinds (workout, meals, digest) inferred; owner to confirm. Nothing assembles a real snapshot until Settings exists. |
+| C-3.2.3 | review (Owner, pure half) | (scraps commit) | compile-red, then 20 of 37 red against naive stubs; 6 mutation checks (margins 0, tape proud, one-way tilt, 4x tilt, tape ignoring tilt, no well padding) each failed tests | Constitution.Tests 423 pass. Layout+tape only: no painters, nothing drawn. Verified for 360-430 dp only. Owner must see the scraps. |
 
 ## Open questions
 - Ledger.Android cannot compile in this sandbox (maui-android workload missing) and CI does not run on branch ccr-0de01a0f-8dnn7q (workflows trigger on main and claude/** only). Index's re-point to shared card tokens is uncompiled; decide: manual Run workflow, or accept until PR/main.
