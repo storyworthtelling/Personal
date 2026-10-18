@@ -23,9 +23,16 @@ internal static class InkPagePainter
 
         DrawHeader(canvas, layout, ink);
 
+        // Grounds first, so a tick on a shaded band is drawn over the shade and never under it.
+        foreach (var item in layout.Printed.Where(i => i.Role == PrintedRole.Band))
+        {
+            canvas.DrawRect(SKRect.Create(item.Bounds.Left, item.Bounds.Top, item.Bounds.Width, item.Bounds.Height), ink.Shade);
+        }
+
+        var bands = layout.Printed.Where(i => i.Role == PrintedRole.Band).Select(i => i.Bounds).ToList();
         foreach (var target in layout.Map.Targets)
         {
-            DrawTarget(canvas, target, ink);
+            DrawTarget(canvas, target, ink, bands.Any(band => band.Encloses(target.Bounds)));
         }
 
         foreach (var item in layout.Printed)
@@ -49,7 +56,7 @@ internal static class InkPagePainter
     /// the reason field is shaded and outlined. Lanes and the notes margin draw nothing of their own;
     /// their dividers and rules are printed items.
     /// </summary>
-    private static void DrawTarget(SKCanvas canvas, InkTarget target, DocumentInk ink)
+    private static void DrawTarget(SKCanvas canvas, InkTarget target, DocumentInk ink, bool onBand)
     {
         var rect = SKRect.Create(target.Bounds.Left, target.Bounds.Top, target.Bounds.Width, target.Bounds.Height);
 
@@ -58,6 +65,11 @@ internal static class InkPagePainter
             case InkTargetKind.LargeTick:
             case InkTargetKind.StandardTick:
             case InkTargetKind.NumberBox:
+                if (onBand)
+                {
+                    canvas.DrawRect(rect, ink.Bright);
+                }
+
                 canvas.DrawRect(rect, ink.TargetStroke);
                 break;
             case InkTargetKind.NoBecause:
@@ -69,9 +81,15 @@ internal static class InkPagePainter
 
     private static void DrawPrinted(SKCanvas canvas, PrintedItem item, DocumentInk ink)
     {
-        if (item.Role == PrintedRole.Rule)
+        if (item.Role is PrintedRole.Rule or PrintedRole.Dotted)
         {
-            canvas.DrawLine(item.Bounds.Left, item.Bounds.Top, item.Bounds.Right, item.Bounds.Bottom, ink.DividerStroke);
+            var stroke = item.Role == PrintedRole.Dotted ? ink.DottedStroke : ink.DividerStroke;
+            canvas.DrawLine(item.Bounds.Left, item.Bounds.Top, item.Bounds.Right, item.Bounds.Bottom, stroke);
+            return;
+        }
+
+        if (item.Role is PrintedRole.Band or PrintedRole.Slot)
+        {
             return;
         }
 
@@ -81,10 +99,15 @@ internal static class InkPagePainter
         }
 
         var font = ink.FontFor(item.Role);
-        var x = item.Align == PrintedAlign.Centre
-            ? item.Bounds.CentreX - font.MeasureText(item.Text) / 2f
-            : item.Bounds.Left;
+        var width = font.MeasureText(item.Text);
+        var x = item.Align switch
+        {
+            PrintedAlign.Centre => item.Bounds.CentreX - width / 2f,
+            PrintedAlign.Right => item.Bounds.Right - width,
+            _ => item.Bounds.Left,
+        };
 
-        canvas.DrawText(item.Text, x, item.Bounds.Bottom - font.Metrics.Descent, font, ink.Ink);
+        var colour = item.Role == PrintedRole.Small ? ink.Soft : ink.Ink;
+        canvas.DrawText(item.Text, x, item.Bounds.Bottom - font.Metrics.Descent, font, colour);
     }
 }
