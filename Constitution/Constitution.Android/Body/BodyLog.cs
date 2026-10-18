@@ -24,7 +24,7 @@ public sealed class BodyLog : IBodyLog, ISleepIqLog
 
     public BodyLog(Context context)
     {
-        var directory = context.FilesDir?.AbsolutePath;
+        var directory = context.NoBackupFilesDir?.AbsolutePath;
         log = directory is null ? null : new DiagnosticLog(directory, MaxBytes, FileName);
     }
 
