@@ -35,6 +35,20 @@ public static class ConstitutionIdentity
     public const string MainActivityName = ApplicationId + ".MainActivity";
 
     /// <summary>
+    /// The Health Connect permissions-rationale activity's registered Java name (C-7.1.1). Health
+    /// Connect finds it by intent filter in the merged manifest, and the alias below targets it by
+    /// this name, so a moved class leaves the permission request opening nothing, with no error.
+    /// </summary>
+    public const string HealthRationaleActivityName = ApplicationId + ".HealthRationaleActivity";
+
+    /// <summary>
+    /// The <c>activity-alias</c> Android 14 resolves <c>VIEW_PERMISSION_USAGE</c> through. It cannot be
+    /// written as a .NET attribute, so it lives in <c>Properties/AndroidManifest.xml</c>, which repeats
+    /// this name and its target as literals; <c>HealthManifestTests</c> checks the file against these.
+    /// </summary>
+    public const string PermissionUsageAliasName = ApplicationId + ".ViewPermissionUsageActivity";
+
+    /// <summary>
     /// The morning read-back worker's registered Java name. WorkManager persists a scheduled row
     /// by class name and periodic work is enqueued with <c>Keep</c>, so a moved class is one
     /// WorkManager can no longer instantiate and the job silently stops running.
@@ -118,6 +132,9 @@ public static class ConstitutionIdentity
     /// reads as everything ticked when never stored, so "never asked" cannot be told from "confirmed".
     /// </summary>
     public const string EquipmentConfirmedKey = "equipment-confirmed";
+
+    /// <summary>Every registered activity and alias Java name, for the guard to enumerate.</summary>
+    public static IReadOnlyList<string> Activities { get; } = [MainActivityName, HealthRationaleActivityName, PermissionUsageAliasName];
 
     /// <summary>Every registered worker Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName];
