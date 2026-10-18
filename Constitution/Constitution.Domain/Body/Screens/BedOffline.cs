@@ -16,13 +16,16 @@ public sealed record BedOfflineState(bool IsOffline, DateOnly? LastReading, stri
 /// <summary>
 /// "Waiting for the bed" (C-7.2.2, book page 16). Nothing says the bed is offline: the owner is told so by
 /// the sleep series stopping. With a side of the bed chosen and no sleep reading for two days, the sleep line
-/// stops at the last reading and waits, the Body sentence says so calmly, and a Problem notice carries the
-/// error, which is never voiced.
+/// stops at the last reading and waits, the Body sentence says so calmly, and a neutral notice waits behind the
+/// dog-ear. Only a refused login is a Problem (see <see cref="Apply"/>); an error is never voiced.
 /// </summary>
 public static class BedOffline
 {
     /// <summary>Days with no sleep reading, counting back from today, before the bed is called quiet.</summary>
     public const int SilentDays = 2;
+
+    /// <summary>The cause the neutral "silent" notice is raised under: its own, so it never fights the sign-in notice.</summary>
+    public const string SilentCauseKey = "bed:silent";
 
     /// <summary>The chart's strong line.</summary>
     public const string Headline = "Waiting for the bed";
@@ -60,20 +63,29 @@ public static class BedOffline
     }
 
     /// <summary>
-    /// States the bed to the board: quiet raises the Problem notice, under the same cause the Settings credential check
-    /// uses so the two never stack; reporting again takes it away, unless the login is refused, which is Settings' to clear.
+    /// States the bed to the board, one cause for each thing it can mean so the two never fight:
+    /// <list type="bullet">
+    /// <item>A <b>refused login</b> raises the sign-in Problem (<see cref="NoticeKind.BedOffline"/>) under the cause the
+    /// Settings credential check uses, whatever the readings say. Only a refusal is a thing to fix.</item>
+    /// <item>A bed that is merely <b>quiet</b> (no refusal) raises <see cref="NoticeKind.BedSilent"/>, a Reference notice:
+    /// waiting, not wrong, under its own cause.</item>
+    /// <item>Reporting again takes the silence notice away; the sign-in notice goes when the login is no longer refused
+    /// (a new login saved, a call that worked).</item>
+    /// </list>
     /// Returns whether the board changed.
     /// </summary>
     public static bool Apply(NoticeBoard board, BedOfflineState state, bool credentialRejected, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(board);
         ArgumentNullException.ThrowIfNull(state);
-        var cause = ConnectionNotices.CauseKey(CredentialIds.SleepNumber);
-        if (state.IsOffline)
+        var signIn = ConnectionNotices.CauseKey(CredentialIds.SleepNumber);
+        if (credentialRejected)
         {
-            return board.Raise(NoticeKind.BedOffline, cause, now);
+            var changed = board.Raise(NoticeKind.BedOffline, signIn, now);
+            return board.Resolve(SilentCauseKey) | changed;
         }
 
-        return !credentialRejected && board.Resolve(cause);
+        var cleared = board.Resolve(signIn);
+        return (state.IsOffline ? board.Raise(NoticeKind.BedSilent, SilentCauseKey, now) : board.Resolve(SilentCauseKey)) | cleared;
     }
 }

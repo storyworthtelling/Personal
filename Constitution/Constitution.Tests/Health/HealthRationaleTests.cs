@@ -10,7 +10,7 @@ public class HealthRationaleTests
 {
     private static readonly string[] Texts =
     [
-        HealthRationale.Title, HealthRationale.Sentence, HealthRationale.BackgroundSentence,
+        HealthRationale.Title, HealthRationale.Sentence, HealthRationale.BackgroundSentence, HealthRationale.OvernightLine,
     ];
 
     [Fact]
@@ -48,5 +48,27 @@ public class HealthRationaleTests
         {
             Assert.Contains(word, HealthRationale.Sentence, StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    [Fact]
+    public void TheSentenceNamesBodyFatAndNotLeanMass()
+    {
+        Assert.Contains("body fat", HealthRationale.Sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("lean", HealthRationale.Sentence, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OvernightReadsAreAskedForAndNotPromised()
+    {
+        // Review S10: the permission was declared and never requested, so "where Android allows it" promised what never happened.
+        Assert.Equal(
+            "Allow overnight reads in Health Connect so the morning check is current; otherwise values refresh when you open the app.",
+            HealthRationale.OvernightLine);
+        Assert.Equal(
+            "Constitution reads overnight only if you allow it in Health Connect, so the morning check is current. "
+            + "Otherwise it reads whenever you open the app.",
+            HealthRationale.BackgroundSentence);
+        Assert.DoesNotContain("Where Android allows", HealthRationale.BackgroundSentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("decline", HealthRationale.BackgroundSentence, StringComparison.OrdinalIgnoreCase);
     }
 }

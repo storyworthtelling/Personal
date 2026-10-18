@@ -43,6 +43,58 @@ public class ConstitutionWorkflowTests
         Assert.Contains("exit 1", step);
     }
 
+    // Typed out on purpose, as Constitution's own manifest guard does: the workflow's list cannot loosen by editing one place.
+    private static readonly string[] HealthReads =
+    [
+        "android.permission.health.READ_WEIGHT",
+        "android.permission.health.READ_BODY_FAT",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_EXERCISE",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
+    ];
+
+    [Fact]
+    public void TheHealthPermissionCheckFollowsThePermissionCheckAndIsFatal()
+    {
+        var yaml = Workflow();
+        var step = Step(yaml, "HEALTH PERMISSION CHECK");
+
+        Assert.True(
+            yaml.IndexOf("- name: HEALTH PERMISSION CHECK", StringComparison.Ordinal)
+            > yaml.IndexOf("- name: PERMISSION CHECK", StringComparison.Ordinal),
+            "The health check must come after the existing PERMISSION CHECK.");
+        Assert.Contains("set -e", step);
+        Assert.Contains("dump permissions", step);
+        Assert.Contains("exit 1", step);
+    }
+
+    [Fact]
+    public void TheHealthPermissionCheckNamesTheExactReadSet()
+    {
+        var step = Step(Workflow(), "HEALTH PERMISSION CHECK");
+
+        foreach (var permission in HealthReads)
+        {
+            Assert.True(step.Contains(permission, StringComparison.Ordinal), $"The health check does not name {permission}.");
+        }
+
+        // Body fat only: lean body mass is not declared (review S11), so the check must not allow it.
+        Assert.DoesNotContain("LEAN_BODY_MASS", step);
+    }
+
+    [Fact]
+    public void TheHealthPermissionCheckRefusesWritesHistoryAndMedicalData()
+    {
+        var step = Step(Workflow(), "HEALTH PERMISSION CHECK");
+
+        Assert.Contains("health\\.WRITE", step);
+        Assert.Contains("HISTORY", step);
+        Assert.Contains("MEDICAL_DATA", step);
+    }
+
     [Fact]
     public void TheIconCheckIsFatal()
     {

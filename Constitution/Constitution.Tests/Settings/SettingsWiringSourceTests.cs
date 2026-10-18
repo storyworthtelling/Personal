@@ -173,4 +173,52 @@ public class SettingsWiringSourceTests
         Assert.Contains("ConstitutionHealthReport.HealthOf(", settings, StringComparison.Ordinal);
         Assert.Contains("ConstitutionHealthReport.HealthOf(", export, StringComparison.Ordinal);
     }
+
+    // ---- review S7: nothing could choose a bed side, so the whole bed path was unreachable ----
+
+    [Fact]
+    public void TheBedSideRowIsBuiltFromTheDomainRowAndPublishedToTheVault()
+    {
+        var text = Head("SettingsArea.cs");
+
+        Assert.Contains("BedSideRow.Build(", text, StringComparison.Ordinal);
+        Assert.Contains("BedSideRow.StoredFor(", text, StringComparison.Ordinal);
+        Assert.Contains("PaperUi.Segmented(Host, side.Labels", text, StringComparison.Ordinal);
+        Assert.Contains("VaultField.SleeperSide", text, StringComparison.Ordinal);
+        Assert.Contains("new SleeperChoice(", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheSetterWritesTheChoiceNotTheBlank()
+    {
+        var text = Head("Body/SleeperChoice.cs");
+
+        Assert.Contains("SleeperSideCodec.WriteChoice(", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("SleeperSideCodec.Write(", text, StringComparison.Ordinal);
+    }
+
+    // ---- review S10: the overnight permission is asked for by a line that opens Health Connect ----
+
+    [Fact]
+    public void TheOvernightLineOpensHealthConnectsOwnPage()
+    {
+        var text = Head("SettingsArea.cs");
+
+        Assert.Contains("model.OvernightReads", text, StringComparison.Ordinal);
+        Assert.Contains("new ActivityHealthPermissionRequester(Host).OpenHealthConnectSettings(", text, StringComparison.Ordinal);
+        Assert.Contains("SettingsModel.HealthConnectId", BodyOf(text, "BuildConnections") ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    // ---- review S8: the trails could never be read off the device ----
+
+    [Fact]
+    public void TheExportCarriesTheBodyAndVaultTrailsThroughTheFilter()
+    {
+        var text = Head("Settings/DiagnosticsExport.cs");
+
+        Assert.Contains("TrailLines.Last(new BodyLog(context).ReadAll())", text, StringComparison.Ordinal);
+        Assert.Contains("TrailLines.Last(new ConstitutionVaultLog(context).ReadAll())", text, StringComparison.Ordinal);
+        Assert.Contains("TrailKind.Body", text, StringComparison.Ordinal);
+        Assert.Contains("TrailKind.Vault", text, StringComparison.Ordinal);
+    }
 }

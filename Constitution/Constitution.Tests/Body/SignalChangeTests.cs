@@ -21,18 +21,18 @@ public class SignalChangeTests
     [Fact]
     public void AveragesTheDaysOfEachPeriod()
     {
-        var readings = new List<BodyReading>
+        // Seven days a stretch since S4 (it was two): the values alternate so the average is not any one of them.
+        var readings = new List<BodyReading>();
+        for (var back = 0; back < 7; back++)
         {
-            BodyData.Reading(BodySignal.Weight, BodyData.Today, 180),
-            BodyData.Reading(BodySignal.Weight, BodyData.Today.AddDays(-10), 178),
-            BodyData.Reading(BodySignal.Weight, BodyData.Today.AddDays(-35), 184),
-            BodyData.Reading(BodySignal.Weight, BodyData.Today.AddDays(-40), 182),
-        };
+            readings.Add(BodyData.Reading(BodySignal.Weight, BodyData.Today.AddDays(-back), back % 2 == 0 ? 180 : 178));
+            readings.Add(BodyData.Reading(BodySignal.Weight, BodyData.Today.AddDays(-35 - back), back % 2 == 0 ? 184 : 182));
+        }
 
         var change = SignalChange.From(readings, BodySignal.Weight, BodyWindow.Month, BodyData.Today)!;
 
-        Assert.Equal(179, change.Current, 6);
-        Assert.Equal(183, change.Previous, 6);
+        Assert.Equal((4 * 180.0 + 3 * 178) / 7, change.Current, 6);
+        Assert.Equal((4 * 184.0 + 3 * 182) / 7, change.Previous, 6);
     }
 
     [Fact]
@@ -63,12 +63,10 @@ public class SignalChangeTests
     [Fact]
     public void ALaterReadingOfTheSameDayWins()
     {
-        var readings = new List<BodyReading>
-        {
-            BodyData.Reading(BodySignal.Weight, BodyData.Today, 181),
-            BodyData.Reading(BodySignal.Weight, BodyData.Today, 179),
-            BodyData.Reading(BodySignal.Weight, BodyData.Today.AddDays(-30), 183),
-        };
+        var readings = BodyData.Daily(BodySignal.Weight, BodyData.Today.AddDays(-1), 6, 179).ToList();
+        readings.Add(BodyData.Reading(BodySignal.Weight, BodyData.Today, 181));
+        readings.Add(BodyData.Reading(BodySignal.Weight, BodyData.Today, 179));
+        readings.AddRange(BodyData.Daily(BodySignal.Weight, BodyData.Today.AddDays(-30), 7, 183));
 
         var change = SignalChange.From(readings, BodySignal.Weight, BodyWindow.Month, BodyData.Today)!;
 

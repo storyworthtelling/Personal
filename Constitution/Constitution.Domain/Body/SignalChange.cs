@@ -64,10 +64,20 @@ public sealed record SignalChange
     /// <summary>The change in plain words: "down about 40 minutes a night".</summary>
     public string Words => ChangeWords.Phrase(this);
 
+    /// <summary>The most days of reading a stretch is ever asked for before it is compared (S4).</summary>
+    public const int EnoughDaysPerStretch = 7;
+
+    /// <summary>
+    /// The days of reading each stretch needs before it is compared: seven, or half the window where that is
+    /// fewer. One night set against a month of nights is not a change.
+    /// </summary>
+    public static int MinimumDays(int windowDays) => Math.Min(EnoughDaysPerStretch, (Math.Max(1, windowDays) + 1) / 2);
+
     /// <summary>
     /// The change for <paramref name="signal"/> from <paramref name="readings"/>, or null when the owner
-    /// has no reading in one of the two stretches (a fresh install has no earlier stretch yet, and a
-    /// change is never invented). Readings of other signals are ignored; a later reading of the same
+    /// has too few days of reading in one of the two stretches (<see cref="MinimumDays"/>: a fresh install
+    /// has no earlier stretch yet, one night is not a month, and a change is never invented). A day still
+    /// being counted (today's steps and active minutes) is not a reading yet. Readings of other signals are ignored; a later reading of the same
     /// day replaces an earlier one; the days of each stretch are averaged. The stretches are the
     /// <paramref name="window"/>'s days ending <paramref name="today"/>, and the same number before.
     /// </summary>
@@ -87,12 +97,18 @@ public sealed record SignalChange
                 throw new ArgumentException($"A {BodySignals.Name(signal)} reading on {reading.Day:yyyy-MM-dd} is not a real number.", nameof(readings));
             }
 
+            if (BodySignals.IsDayTotal(signal) && reading.Day >= today)
+            {
+                continue;
+            }
+
             byDay[reading.Day] = reading.Value;
         }
 
         var current = byDay.Where(pair => pair.Key >= currentStart && pair.Key <= today).Select(pair => pair.Value).ToList();
         var previous = byDay.Where(pair => pair.Key >= previousStart && pair.Key < currentStart).Select(pair => pair.Value).ToList();
-        return current.Count == 0 || previous.Count == 0
+        var needed = MinimumDays(days);
+        return current.Count < needed || previous.Count < needed
             ? null
             : new SignalChange(signal, current.Average(), previous.Average());
     }

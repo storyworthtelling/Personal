@@ -16,12 +16,19 @@ public static class HealthRationale
 
     /// <summary>The one sentence that matters: what is read, from when, and that it is never changed.</summary>
     public const string Sentence =
-        "Constitution only reads your weight, body fat and lean mass, resting heart rate, heart rate variability, "
+        "Constitution only reads your weight, body fat, resting heart rate, heart rate variability, "
         + "steps, exercise and sleep from Health Connect, starting from the day you installed it. "
         + "It never writes to Health Connect or changes anything in it.";
 
-    /// <summary>Said beneath the sentence: the one permission that is not a signal.</summary>
+    /// <summary>
+    /// Said beneath the sentence: the one permission that is not a signal. Honest about who decides: the overnight read
+    /// happens only if the owner allows it in Health Connect, and Constitution does not ask for it by itself.
+    /// </summary>
     public const string BackgroundSentence =
-        "Where Android allows it, Constitution also reads overnight, so the morning check is current. "
-        + "If you decline, it reads whenever you open the app instead.";
+        "Constitution reads overnight only if you allow it in Health Connect, so the morning check is current. "
+        + "Otherwise it reads whenever you open the app.";
+
+    /// <summary>The Settings line beside the button that opens Health Connect's own page for this app.</summary>
+    public const string OvernightLine =
+        "Allow overnight reads in Health Connect so the morning check is current; otherwise values refresh when you open the app.";
 }

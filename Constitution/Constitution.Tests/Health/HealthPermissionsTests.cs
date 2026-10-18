@@ -52,4 +52,17 @@ public class HealthPermissionsTests
         // A signal is asked when its chart opens; the background permission is asked once, separately.
         Assert.DoesNotContain(HealthPermissions.Signals, signal => signal.ReadPermissions.Contains(HealthPermissions.ReadInBackground));
     }
+
+    [Fact]
+    public void BodyCompositionReadsBodyFatOnly()
+    {
+        // Review S11: lean body mass was asked for and never read.
+        Assert.Equal([HealthPermissions.ReadBodyFat], HealthPermissions.Signals.Single(signal => signal.Id == "composition").ReadPermissions);
+    }
+
+    [Fact]
+    public void TheAllowlistIsEightReadsAndTheBackgroundOne()
+    {
+        Assert.Equal(8, HealthPermissions.All.Count);
+    }
 }

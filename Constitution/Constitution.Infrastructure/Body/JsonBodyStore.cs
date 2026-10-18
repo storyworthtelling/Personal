@@ -14,8 +14,7 @@ namespace Constitution.Infrastructure.Body;
 ///
 /// <para><b>An unreadable file is set aside, not overwritten.</b> The next write would otherwise replace
 /// whatever the damage left with a nearly empty file, and the only copy of months of readings would be gone.
-/// It is renamed to <c>.unreadable</c> and the store carries on empty, which also makes it the one state a backup
-/// may restore onto. A signal or a row from a newer version is skipped, not fatal.</para>
+/// It is renamed to <c>.unreadable</c> and the store carries on empty, so a backup restore (a merge) refills it. A signal or a row from a newer version is skipped, not fatal.</para>
 ///
 /// <para>The file holds signals, dates and numbers. No name, no label, no source.</para>
 /// </summary>
@@ -101,32 +100,33 @@ public sealed class JsonBodyStore : IBodyStore
         }
     }
 
-    /// <summary>
-    /// Puts a backup's install day and readings in place, but only on a store with no readings: a restore must
-    /// never merge into, or overwrite, a phone that has already been reading. Returns false, changing nothing,
-    /// when the store is not empty. This is the one way an install day moves, because a restored backup carries
-    /// its own and the install day this fresh store recorded on first open is only a stand-in for it.
-    /// </summary>
-    public bool ReplaceAll(DateOnly? installDay, IEnumerable<BodyReading> readings)
+    /// <inheritdoc />
+    public bool MergeRestored(DateOnly? installDay, IEnumerable<BodyReading> readings)
     {
         ArgumentNullException.ThrowIfNull(readings);
 
         lock (FileLock)
         {
             var content = Load();
-            if (content.Readings.Count > 0)
-            {
-                return false;
-            }
-
-            content.InstallDay = installDay ?? content.InstallDay;
+            var changed = false;
             foreach (var reading in readings)
             {
-                content.Readings[(reading.Signal, reading.Day)] = reading.Value;
+                // A day this install has read stays as this install read it.
+                changed |= content.Readings.TryAdd((reading.Signal, reading.Day), reading.Value);
             }
 
-            Save(content);
-            return true;
+            if (installDay is { } day && (content.InstallDay is null || day < content.InstallDay))
+            {
+                content.InstallDay = day;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                Save(content);
+            }
+
+            return changed;
         }
     }
 

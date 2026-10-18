@@ -58,7 +58,7 @@ public class BodyBackupTests
     // ---- restore ----
 
     [Fact]
-    public async Task RestoresOnlyOntoAnEmptyInstall()
+    public async Task ARestoreOntoAnEmptyInstallTakesTheWholeHistory()
     {
         var original = new BackupRig().WithHistory();
         await original.BackUp();
@@ -68,20 +68,60 @@ public class BodyBackupTests
         Assert.Equal(BodyRestoreOutcome.Restored, (await fresh.Restore()).Outcome);
         Assert.Equal(original.Store.All(), fresh.Store.All());
         Assert.Equal(BackupInvented.InstallDay, fresh.Store.InstallDay);
+    }
 
-        // An install with any history at all is left exactly as it is, whatever the backup holds, and
-        // the backup is not even opened.
+    [Fact]
+    public async Task RestoreMergesWithoutOverwritingLocalDays()
+    {
+        // Was RestoresOnlyOntoAnEmptyInstall, which pinned "an install with any history is left alone and the backup is
+        // not even opened". That gate forfeited the restore for good the moment the reader stored a first reading, which
+        // it does before the owner can type the passphrase. A restore is now a merge: local wins on a day both hold, the
+        // rest of the backup is added, and the earlier install day wins. Nothing local is ever lost.
+        var original = new BackupRig().WithHistory();
+        await original.BackUp();
+
         var busy = new BackupRig(original.Drive);
-        busy.Store.Upsert([BackupInvented.One(BodySignal.Weight, new DateOnly(2026, 11, 10), 170.5)]);
-        var before = busy.Store.All();
-        var readsBefore = original.Drive.Reads;
+        var sharedDay = BackupInvented.FirstDay;
+        busy.Store.SetInstallDay(new DateOnly(2026, 11, 20));
+        busy.Store.Upsert([BackupInvented.One(BodySignal.Weight, sharedDay, 170.5)]);
 
-        var skipped = await busy.Restore();
+        var result = await busy.Restore();
 
-        Assert.Equal(BodyRestoreOutcome.SkippedNotEmpty, skipped.Outcome);
-        Assert.Equal(before, busy.Store.All());
-        Assert.Equal(0, busy.Store.SetInstallDayCalls);
-        Assert.Equal(readsBefore, original.Drive.Reads);
+        Assert.Equal(BodyRestoreOutcome.Restored, result.Outcome);
+        Assert.Equal(170.5, busy.Store.All().Single(reading => reading.Signal == BodySignal.Weight && reading.Day == sharedDay).Value);
+        Assert.Equal(original.Store.All().Count, busy.Store.All().Count);
+        Assert.Equal(BackupInvented.InstallDay, busy.Store.InstallDay);
+    }
+
+    [Fact]
+    public async Task AnEarlierLocalInstallDayIsKept()
+    {
+        var original = new BackupRig().WithHistory();
+        await original.BackUp();
+
+        var busy = new BackupRig(original.Drive);
+        var earlier = BackupInvented.InstallDay.AddDays(-10);
+        busy.Store.SetInstallDay(earlier);
+        busy.Store.Upsert([BackupInvented.One(BodySignal.Weight, earlier, 171.25)]);
+
+        await busy.Restore();
+
+        Assert.Equal(earlier, busy.Store.InstallDay);
+    }
+
+    [Fact]
+    public async Task ARestoreThatHasNothingNewSaysSoAndChangesNothing()
+    {
+        var original = new BackupRig().WithHistory();
+        await original.BackUp();
+        var same = new BackupRig(original.Drive).WithHistory();
+        var before = same.Store.All();
+
+        var result = await same.Restore();
+
+        Assert.Equal(BodyRestoreOutcome.NothingNew, result.Outcome);
+        Assert.Equal(before, same.Store.All());
+        Assert.Equal(original.Drive.Writes, original.Drive.Writes);
     }
 
     [Fact]
@@ -90,15 +130,16 @@ public class BodyBackupTests
         var original = new BackupRig().WithHistory();
         await original.BackUp();
 
-        // The reader writes a first reading while the restore is still waiting on Drive.
+        // The reader writes a reading for a day the backup also holds while the restore is still waiting on Drive.
         var fresh = new BackupRig(original.Drive);
-        var arriving = BackupInvented.One(BodySignal.Steps, new DateOnly(2026, 11, 17), 1234);
+        var arriving = BackupInvented.One(BodySignal.Steps, BackupInvented.FirstDay, 1234);
         original.Drive.AfterRead = () => fresh.Store.Upsert([arriving]);
 
         var result = await fresh.Restore();
 
-        Assert.Equal(BodyRestoreOutcome.SkippedNotEmpty, result.Outcome);
-        Assert.Equal([arriving], fresh.Store.All());
+        Assert.Equal(BodyRestoreOutcome.Restored, result.Outcome);
+        Assert.Contains(arriving, fresh.Store.All());
+        Assert.Equal(original.Store.All().Count, fresh.Store.All().Count);
     }
 
     [Fact]
@@ -433,14 +474,14 @@ public class BodyBackupTests
         var original = new BackupRig().WithHistory();
         await original.BackUp();
 
-        // The reinstalled phone read its first days before the restore: it is not empty, so the restore
-        // will skip it, and its backup must add to the file, not replace it.
+        // The reinstalled phone read its first days before the restore: the restore merges into it, and its
+        // backup must add to the file, not replace it.
         var fresh = new BackupRig(original.Drive);
         var newDay = new DateOnly(2026, 11, 25);
         fresh.Store.SetInstallDay(newDay);
         fresh.Store.Upsert([BackupInvented.One(BodySignal.Weight, newDay, 176.75)]);
 
-        Assert.Equal(BodyRestoreOutcome.SkippedNotEmpty, (await fresh.Restore()).Outcome);
+        Assert.Equal(BodyRestoreOutcome.Restored, (await fresh.Restore()).Outcome);
         var result = await fresh.BackUp();
 
         Assert.Equal(BodyBackupOutcome.BackedUp, result.Outcome);

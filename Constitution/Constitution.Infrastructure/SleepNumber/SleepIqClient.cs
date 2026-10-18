@@ -31,7 +31,7 @@ namespace Constitution.Infrastructure.SleepNumber;
 ///
 /// <para><b>Failures are typed, never thrown for the network.</b> 401/403 is <see cref="SleepIqFailure.SignInRejected"/>
 /// (and, through <see cref="CredentialReportingHandler"/>, the only thing that flags the credential); 408, 429, 5xx,
-/// a dropped connection or a timeout is <see cref="SleepIqFailure.Offline"/>; any other status or a reply that is not
+/// a dropped connection (before or while the body is read) or a timeout is <see cref="SleepIqFailure.Offline"/>; any other status or a reply that is not
 /// the assumed shape is <see cref="SleepIqFailure.UnexpectedShape"/>. Only the caller's own cancellation propagates.</para>
 ///
 /// <para><b>The log</b> gets one phrase per call outcome: the endpoint label and the status code
@@ -252,8 +252,9 @@ public sealed class SleepIqClient : ISleepIqClient
                 return SleepIqResult<JsonDocument>.Failed(SleepIqFailure.UnexpectedShape);
             }
         }
-        catch (HttpRequestException error)
+        catch (Exception error) when (error is HttpRequestException or IOException)
         {
+            // A connection that drops while the body is still being read arrives as an IOException, not an HttpRequestException (S12).
             return Offline(label, error);
         }
         catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)

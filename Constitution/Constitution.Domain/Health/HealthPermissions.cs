@@ -21,8 +21,9 @@ public sealed record HealthSignal(string Id, IReadOnlyList<string> ReadPermissio
 /// <item>Names and the <c>android.permission.health.</c> prefix were read out of the reference
 /// assembly's own metadata (Mono.Android, <c>Microsoft.Android.Ref.36</c>): every name below exists
 /// there as a literal, so none is typed from memory.</item>
-/// <item>"Body composition" is body fat plus lean body mass, the two record types TF §1.3 lists
-/// (<c>BodyFatRecord</c>, <c>LeanBodyMassRecord</c>); one signal, two permissions.</item>
+/// <item>"Body composition" is body fat alone (<c>BodyFatRecord</c>). TF §1.3 also lists lean body mass, but
+/// nothing reads it and the chart draws body-fat percent, so it is not declared or asked for (review S11);
+/// adding it back is a deliberate edit here, to the manifest and to the guard.</item>
 /// <item>"Active minutes" has no record type of its own. <c>ExerciseSessionRecord</c> carries a
 /// start and an end, so its duration is minutes, which makes <c>READ_EXERCISE</c> the closest honest
 /// source. <c>READ_ACTIVE_CALORIES_BURNED</c> is calories, not minutes, and so is left out;
@@ -42,7 +43,6 @@ public static class HealthPermissions
 
     public const string ReadWeight = Prefix + "READ_WEIGHT";
     public const string ReadBodyFat = Prefix + "READ_BODY_FAT";
-    public const string ReadLeanBodyMass = Prefix + "READ_LEAN_BODY_MASS";
     public const string ReadRestingHeartRate = Prefix + "READ_RESTING_HEART_RATE";
     public const string ReadHeartRateVariability = Prefix + "READ_HEART_RATE_VARIABILITY";
     public const string ReadSteps = Prefix + "READ_STEPS";
@@ -59,7 +59,7 @@ public static class HealthPermissions
     public static IReadOnlyList<HealthSignal> Signals { get; } =
     [
         new("weight", [ReadWeight]),
-        new("composition", [ReadBodyFat, ReadLeanBodyMass]),
+        new("composition", [ReadBodyFat]),
         new("restingHeartRate", [ReadRestingHeartRate]),
         new("heartRateVariability", [ReadHeartRateVariability]),
         new("steps", [ReadSteps]),

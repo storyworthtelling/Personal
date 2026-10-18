@@ -207,6 +207,20 @@ public class SleepIqClientTests
     }
 
     [Fact]
+    public async Task AConnectionResetByThePlatformIsOffline()
+    {
+        // On the phone a reset socket reaches the client as an IOException from the platform's handler, not an HttpRequestException.
+        var bed = Bed.Working().On("sleeper", Bed.Fail(new IOException("example reset mid-body")));
+        var log = new CapturingSleepLog();
+
+        var result = await Bed.Client(bed, log).SleepersAsync(default);
+
+        Assert.Equal(SleepIqFailure.Offline, result.Failure);
+        Assert.Contains("sleepiq sleepers: offline (IOException)", log.Lines);
+        Assert.DoesNotContain(log.Lines, line => line.Contains("example reset", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ATimeoutIsOffline()
     {
         var bed = Bed.Working().On("sleeper", Bed.Fail(new TaskCanceledException("example timeout")));

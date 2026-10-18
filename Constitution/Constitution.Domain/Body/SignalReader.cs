@@ -12,6 +12,9 @@ public enum SignalReadStatus
     /// <summary>This platform cannot supply it.</summary>
     Unsupported,
 
+    /// <summary>The local date is earlier than the install day (a clock set back): nothing is asked, nothing earlier than install is ever read.</summary>
+    BeforeInstall,
+
     /// <summary>The platform refused the read.</summary>
     Denied,
 
@@ -43,11 +46,17 @@ public sealed class SignalReadReport
 /// Reads the signals Health Connect supplies into the Body store (C-7.1.2). Pure orchestration over
 /// <see cref="IHealthRecordSource"/>, so it runs, and is tested, with no phone.
 ///
-/// <para><b>From install day, never before.</b> The first pass records today as the install day; every
-/// pass after reads from the later of that day and the last day it stored (that day again, because it
-/// may have been mid-way through when last read), and anything a source returns dated earlier than
-/// install day is dropped as well. No history permission is asked for, so there is nothing earlier to
-/// read; this is the second lock on the same door.</para>
+/// <para><b>From install day, never before.</b> The first pass records today as the install day. Every pass
+/// after reads from the earlier of the last day it stored and <see cref="TrailingDays"/> back from today
+/// (late-syncing data, a watch that uploads at nine, would otherwise stay undercounted for good), but never
+/// before install day, and anything a source returns dated earlier than install day is dropped as well. A
+/// clock set back behind install day reads nothing at all. No history permission is asked for, so there is
+/// nothing earlier to read; this is the second lock on the same door.</para>
+///
+/// <para><b>The bed is not a retry loop.</b> The household login is shared, so a pass asks the bed about at
+/// most <see cref="BedNightsPerPass"/> nights, the latest ones, stops at the first night it cannot answer, and
+/// a bed that throws costs the watch's readings nothing. A person with a side chosen and no Health Connect
+/// sleep grant still gets a sleep line, from the bed alone.</para>
 ///
 /// <para><b>Granted only.</b> A signal the platform has not given this install is not asked for at all:
 /// asking would either fail or, worse, look like a prompt the owner never saw. The permission request
@@ -55,6 +64,12 @@ public sealed class SignalReadReport
 /// </summary>
 public sealed class SignalReader
 {
+    /// <summary>Days a pass reads again behind today, so data that arrives late (a watch syncing at nine) is not undercounted for good.</summary>
+    public const int TrailingDays = 3;
+
+    /// <summary>The most nights a pass asks the bed about: the household login is shared, so a pass is not allowed to be a storm.</summary>
+    public const int BedNightsPerPass = 14;
+
     private readonly IBodyStore store;
     private readonly IHealthRecordSource source;
     private readonly Func<DateOnly> today;
@@ -98,16 +113,20 @@ public sealed class SignalReader
         foreach (var signal in BodySignals.HealthConnect)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!source.IsGranted(signal))
+            if (day < install)
             {
-                entries.Add(new SignalReadEntry(signal, SignalReadStatus.NotGranted, 0));
+                entries.Add(new SignalReadEntry(signal, SignalReadStatus.BeforeInstall, 0));
                 continue;
             }
 
-            var from = lastStored.TryGetValue(signal, out var last) && last > install ? last : install;
-            if (from > day)
+            var from = FromFor(lastStored.TryGetValue(signal, out var last) ? last : null, install, day);
+            if (!source.IsGranted(signal))
             {
-                from = day;
+                // A bed-only sleeper: the watch is not read, the bed is the whole of the line.
+                entries.Add(signal == BodySignal.Sleep && sleepFiller is not null
+                    ? await ReadBedAloneAsync(from, day, cancellationToken).ConfigureAwait(false)
+                    : new SignalReadEntry(signal, SignalReadStatus.NotGranted, 0));
+                continue;
             }
 
             entries.Add(await ReadOneAsync(signal, from, day, cancellationToken).ConfigureAwait(false));
@@ -118,6 +137,31 @@ public sealed class SignalReader
             + $"{report.Count(SignalReadStatus.Unsupported) + report.Count(SignalReadStatus.Denied) + report.Count(SignalReadStatus.Failed)} not read, "
             + $"{report.ReadingsStored} readings stored");
         return report;
+    }
+
+    // Install day when nothing is stored; otherwise the earlier of the last stored day and the trailing window, never before install day and never after today.
+    private static DateOnly FromFor(DateOnly? lastStored, DateOnly install, DateOnly today)
+    {
+        if (lastStored is null)
+        {
+            return install;
+        }
+
+        var trailing = today.AddDays(-TrailingDays);
+        var from = lastStored.Value < trailing ? lastStored.Value : trailing;
+        return from < install ? install : from;
+    }
+
+    private async Task<SignalReadEntry> ReadBedAloneAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var readings = await BedNightsAsync([], from, to, cancellationToken).ConfigureAwait(false);
+        if (readings.Count > 0)
+        {
+            store.Upsert(readings);
+        }
+
+        log.Outcome($"body read sleep: bed only, {readings.Count} {(readings.Count == 1 ? "reading" : "readings")}");
+        return new SignalReadEntry(BodySignal.Sleep, SignalReadStatus.Read, readings.Count);
     }
 
     private async Task<SignalReadEntry> ReadOneAsync(
@@ -152,19 +196,38 @@ public sealed class SignalReader
         return new SignalReadEntry(signal, SignalReadStatus.Read, readings.Count);
     }
 
-    // The bed is asked about every day in the range; it answers only where the watch left a gap.
+    // The bed is asked about the latest nights of the range, newest first, at most BedNightsPerPass of them, and only where the
+    // watch left a gap. The first night it cannot answer ends its turn: asking again would be one more failed
+    // sign-in against a login the whole household shares.
     private async Task<List<BodyReading>> BedNightsAsync(
         IReadOnlyList<BodyReading> watch, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         var filled = new List<BodyReading>();
         var watchByDay = watch.ToDictionary(reading => reading.Day, reading => reading.Value);
-        for (var night = from; night <= to; night = night.AddDays(1))
+        var first = to.AddDays(1 - BedNightsPerPass);
+        for (var night = to; night >= (first > from ? first : from); night = night.AddDays(-1))
         {
-            double? watchHours = watchByDay.TryGetValue(night, out var hours) ? hours : null;
-            if (await sleepFiller!.BedHoursAsync(night, watchHours, cancellationToken).ConfigureAwait(false) is { } fromBed
-                && fromBed > 0)
+            if (sleepFiller!.GaveUp)
             {
-                filled.Add(new BodyReading(BodySignal.Sleep, night, fromBed));
+                break;
+            }
+
+            double? watchHours = watchByDay.TryGetValue(night, out var hours) ? hours : null;
+            double? fromBed;
+            try
+            {
+                fromBed = await sleepFiller.BedHoursAsync(night, watchHours, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                // The type only: the bed's message can echo what was asked. The watch's readings are kept either way.
+                log.Outcome($"body bed sleep: failed ({error.GetType().Name})");
+                break;
+            }
+
+            if (fromBed is { } bedHours && bedHours > 0)
+            {
+                filled.Add(new BodyReading(BodySignal.Sleep, night, bedHours));
             }
         }
 

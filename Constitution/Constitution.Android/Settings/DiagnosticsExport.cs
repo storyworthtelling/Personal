@@ -11,7 +11,9 @@ namespace Constitution.Settings;
 
 /// <summary>
 /// Builds a real <see cref="DiagnosticsSnapshot"/> from what this install can know, renders it, and
-/// hands the text to the share sheet. What it cannot know yet is stated as a shape, not guessed:
+/// hands the text to the share sheet. The last forty lines of the Body and vault trails ride along, each
+/// through <see cref="TrailLines.Filter"/> (review S8), so a device test can bring back what the platform and
+/// the bed answered. What it cannot know yet is stated as a shape, not guessed:
 /// every part but Body's sync reports <see cref="DiagnosticsOutcome.NeverRan"/> until its worker records outcomes,
 /// the role is <see cref="InstallRole.Unknown"/> until the household file says, and the counts that
 /// need the plan store are zero. Credentials come from the health report, by state only.
@@ -48,7 +50,12 @@ public static class DiagnosticsExport
             new DiagnosticsCounts(0, 0, 0, waiting),
             outcomes,
             [],
-            credentials);
+            credentials,
+            // The newest lines of each trail, each through the filter that keeps words and counts and withholds the rest.
+            [
+                new TrailSection(TrailKind.Body, TrailLines.Last(new BodyLog(context).ReadAll())),
+                new TrailSection(TrailKind.Vault, TrailLines.Last(new ConstitutionVaultLog(context).ReadAll())),
+            ]);
     }
 
     // Body's sync records how its last run ended; the other parts have no worker recording yet.

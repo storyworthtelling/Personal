@@ -50,6 +50,15 @@ public sealed class BodyServices
     /// <summary>The Body trail.</summary>
     public BodyLog Log { get; }
 
+    /// <summary>Just the readings file's store, for a caller that needs nothing else of the graph.</summary>
+    public static IBodyStore CreateStore(Context context)
+    {
+        var appContext = context.ApplicationContext ?? context;
+        var directory = appContext.NoBackupFilesDir?.AbsolutePath
+            ?? throw new InvalidOperationException("The app has no private files folder to keep Body's readings in.");
+        return new JsonBodyStore(Path.Combine(directory, ReadingsFile));
+    }
+
     /// <summary>The graph for this device.</summary>
     public static BodyServices Create(Context context)
     {
@@ -58,7 +67,7 @@ public sealed class BodyServices
             ?? throw new InvalidOperationException("The app has no private files folder to keep Body's readings in.");
         var log = new BodyLog(appContext);
         var source = new HealthConnectSource(appContext, log);
-        var store = new JsonBodyStore(Path.Combine(directory, ReadingsFile));
+        var store = CreateStore(appContext);
         var status = new BodySyncStatusFile(Path.Combine(directory, SyncStatusFile), () => DateTimeOffset.UtcNow);
 
         // The bed fills a night the watch missed, but only for someone who has said which side of it is theirs.
@@ -67,7 +76,7 @@ public sealed class BodyServices
             SleepIqClient.CreateHttpClient(new Xamarin.Android.Net.AndroidMessageHandler(), new CredentialHealthStore()),
             connections,
             log);
-        var filler = BedSleepGapFiller.Create(bed, new SleeperChoice(appContext), log);
+        var filler = BedSleepGapFiller.Create(bed, new SleeperChoice(appContext), log, new BedLoginStanding(appContext));
 
         var reader = new SignalReader(store, source, () => DateOnly.FromDateTime(DateTime.Now), log, filler);
         var sync = new BodySync(reader, source, status, log);

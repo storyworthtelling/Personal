@@ -16,7 +16,11 @@ public sealed record BodyTabInputs(
     HealthChoices Choices,
     Func<BodySignal, bool> IsGranted,
     bool BedChosen,
-    IReadOnlySet<BodySignal> RevokedSignals);
+    IReadOnlySet<BodySignal> RevokedSignals)
+{
+    /// <summary>These inputs with the day still being counted left out of the readings (S5), so every figure and line drawn from them agrees.</summary>
+    public BodyTabInputs Settled() => this with { Readings = BodySignals.Settled(Readings, Today).ToList() };
+}
 
 /// <summary>
 /// The Body tab (C-7.3.3, book page 16): the window switch, the month's sentence, then one chart per
@@ -72,6 +76,7 @@ public sealed class BodyTabModel
     public static BodyTabModel Build(BodyTabInputs inputs)
     {
         ArgumentNullException.ThrowIfNull(inputs);
+        inputs = inputs.Settled();
         var bed = BedOffline.Judge(inputs.Readings, inputs.BedChosen, inputs.Today);
         var cards = Signals(inputs).Select(signal => CardFor(inputs, signal, bed)).ToList();
         return new BodyTabModel(
@@ -141,18 +146,24 @@ public sealed class BodyTabModel
             own);
     }
 
-    internal static PermissionAsk AskFor(BodyTabInputs inputs, BodySignal signal) =>
-        PermissionAsk.For(
+    internal static PermissionAsk AskFor(BodyTabInputs inputs, BodySignal signal)
+    {
+        // A side of the bed chosen means the bed supplies sleep (S7): Health Connect's sleep is then a bonus, not a need.
+        var bedSupplies = signal == BodySignal.Sleep && inputs.BedChosen;
+        return PermissionAsk.For(
             signal,
             inputs.Choices.Of(signal),
-            !BodySignals.HealthConnect.Contains(signal) || inputs.IsGranted(signal),
-            inputs.RevokedSignals.Contains(signal));
+            bedSupplies || !BodySignals.HealthConnect.Contains(signal) || inputs.IsGranted(signal),
+            !bedSupplies && inputs.RevokedSignals.Contains(signal));
+    }
 
     /// <summary>The most recent reading in the window, or null.</summary>
     internal static BodyReading? LatestIn(IReadOnlyList<BodyReading> readings, BodyWindow window, DateOnly today)
     {
         var first = today.AddDays(1 - BodyWindows.Days(window));
-        return readings.Where(reading => reading.Day >= first && reading.Day <= today).MaxBy(reading => reading.Day);
+        return BodySignals.Settled(readings, today)
+            .Where(reading => reading.Day >= first && reading.Day <= today)
+            .MaxBy(reading => reading.Day);
     }
 
     // ---- the month's sentence ----

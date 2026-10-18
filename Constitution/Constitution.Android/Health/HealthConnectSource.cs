@@ -38,7 +38,7 @@ namespace Constitution.Health;
 /// fuller source rather than adding two together.</item>
 /// <item>Active minutes are the length of exercise sessions (<c>READ_EXERCISE</c>), the closest honest source (see
 /// <see cref="DomainPermissions"/>). Sleep is the time in a sleeping stage, or the whole session when it has no stages.</item>
-/// <item>Body composition reads body fat only. <c>READ_LEAN_BODY_MASS</c> is asked beside it but the chart draws body-fat percent.</item>
+/// <item>Body composition reads body fat only, and asks for nothing else: the chart draws body-fat percent.</item>
 /// </list>
 /// </summary>
 public sealed class HealthConnectSource : IHealthRecordSource
@@ -211,7 +211,7 @@ public sealed class HealthConnectSource : IHealthRecordSource
             };
 
             // The exception's type, and the platform's error reason when it gave one: a name for a kind of failure, no text.
-            var detail = (error?.Class?.SimpleName ?? "NoError") + (kind is { } reason ? $" {reason}" : string.Empty);
+            var detail = (error?.Class?.SimpleName ?? "NoError") + (kind is { } reason ? $" {reason.ToString().ToLowerInvariant()}" : string.Empty);
             done.TrySetResult(new Page([], -1, outcome, detail));
         }
     }

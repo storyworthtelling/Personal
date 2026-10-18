@@ -13,7 +13,8 @@ public sealed record WaitingAnswer(string NoticeCause, string ChosenValue);
 /// <summary>
 /// One row of the Waiting page: what happened and what to do. <paramref name="Chips"/> is empty for
 /// every row but a readable low-confidence read, and then <paramref name="Button"/> is null — a row
-/// has a button or chips, never both, and never two buttons.
+/// has a button or chips, never both, and never two buttons. A notice that is waiting rather than wrong
+/// (<see cref="NoticeKind.BedSilent"/>) has neither: there is nothing for the owner to do.
 /// </summary>
 public sealed record WaitingItem(
     NoticeKind Kind,
@@ -87,6 +88,11 @@ public sealed class WaitingPageModel
                 "The bed couldn’t be reached",
                 "Its sign-in was refused, so the sleep line is waiting. Sign in again and Constitution picks it back up.",
                 new WaitingButton("Sign in again", WaitingActionId.SignInAgain),
+                NoChips),
+            NoticeKind.BedSilent => (
+                "The bed hasn’t reported",
+                "The bed hasn’t reported for a few days. Nothing is wrong on your side that we can see.",
+                null,
                 NoChips),
             NoticeKind.LowConfidenceRead => LowConfidence(notice),
             NoticeKind.ScanToCheck => (

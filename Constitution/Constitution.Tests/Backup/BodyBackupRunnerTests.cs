@@ -63,25 +63,8 @@ public class BodyBackupRunnerTests
 
         public InMemoryBodyStore Store => Install.Store;
 
-        /// <summary>The seam a store gives the restore: the whole history in, but only onto a store with none.</summary>
-        public BodyReplaceAll ReplaceInto(InMemoryBodyStore store) => (installDay, readings) =>
-        {
-            if (!store.IsEmpty)
-            {
-                return false;
-            }
-
-            if (installDay is { } day)
-            {
-                store.SetInstallDay(day);
-            }
-
-            store.Upsert(readings);
-            return true;
-        };
-
         public Task<BodyBackupRunResult> Restore(CancellationToken cancellationToken = default) =>
-            Runner.RestoreAtLaunchAsync(Store, ReplaceInto(Store), Refresh, cancellationToken);
+            Runner.RestoreAtLaunchAsync(Store, Refresh, cancellationToken);
 
         public Task<BodyBackupRunResult> AfterSync(BodySyncResult? sync = null, BodyBackupTiming timing = BodyBackupTiming.WhenDue) =>
             Runner.AfterSyncAsync(sync ?? GoodSync(), Store, timing, default);
@@ -217,32 +200,37 @@ public class BodyBackupRunnerTests
     }
 
     [Fact]
-    public async Task RestoreLeavesAStoreWithHistoryAlone()
+    public async Task RestoreMergesIntoAStoreThatHasAlreadyRead()
     {
+        // Was RestoreLeavesAStoreWithHistoryAlone (see BodyBackupTests.RestoreMergesWithoutOverwritingLocalDays for why).
         var rig = new Rig(await DriveHoldingABackup());
         rig.Install.WithHistory([BackupInvented.One(BodySignal.Weight, BackupInvented.FirstDay, 1.5)]);
-        var drive = rig.Drive;
-        var readsBefore = drive.Reads;
+        var writesBefore = rig.Drive.Writes;
 
         var result = await rig.Restore();
 
         Assert.Equal(BodyBackupRunStatus.RestoreRan, result.Status);
-        Assert.Equal(BodyRestoreOutcome.SkippedNotEmpty, result.Restore!.Outcome);
-        Assert.Single(rig.Store.All());
-        Assert.Equal(readsBefore, drive.Reads);
-        Assert.Equal(0, rig.Refreshes);
+        Assert.Equal(BodyRestoreOutcome.Restored, result.Restore!.Outcome);
+        Assert.Equal(BackupInvented.EverySignal().Count, rig.Store.All().Count);
+        Assert.Equal(1.5, rig.Store.All().Single(reading => reading.Signal == BodySignal.Weight && reading.Day == BackupInvented.FirstDay).Value);
+        Assert.Equal(1, rig.Refreshes);
+        Assert.Equal(writesBefore, rig.Drive.Writes);
     }
 
     [Fact]
-    public async Task RestoreReachesNoFurtherThanTheStoreWhenItHasHistory()
+    public async Task RestoreWithAnIdenticalHistoryAddsNothingAndIsSettled()
     {
-        var rig = new Rig();
+        var rig = new Rig(await DriveHoldingABackup());
         rig.Install.WithHistory();
+        var readsBefore = rig.Drive.Reads;
 
-        await rig.Restore();
+        var first = await rig.Restore();
+        var second = await rig.Restore();
 
-        Assert.Equal(0, rig.FactoryCalls);
-        Assert.Equal(0, rig.Drive.Reads);
+        Assert.Equal(BodyRestoreOutcome.NothingNew, first.Restore!.Outcome);
+        Assert.Equal(readsBefore + 1, rig.Drive.Reads);
+        Assert.Equal(BodyBackupRunStatus.AlreadyRestored, second.Status);
+        Assert.Equal(0, rig.Refreshes);
     }
 
     [Fact]
@@ -258,7 +246,7 @@ public class BodyBackupRunnerTests
             store.SetInstallDay(new DateOnly(2026, 11, 9));
             Assert.True(store.IsEmpty);
 
-            var result = await rig.Runner.RestoreAtLaunchAsync(store, store.ReplaceAll, rig.Refresh, default);
+            var result = await rig.Runner.RestoreAtLaunchAsync(store, rig.Refresh, default);
 
             Assert.Equal(BodyRestoreOutcome.Restored, result.Restore!.Outcome);
             Assert.Equal(BackupInvented.InstallDay, store.InstallDay);
@@ -272,15 +260,62 @@ public class BodyBackupRunnerTests
     }
 
     [Fact]
-    public async Task ARestoreThatLostTheRaceDoesNotRefresh()
+    public async Task ARestoreIntoARealStoreThatHasReadKeepsTheEarlierInstallDayAndLocalDays()
+    {
+        // The reader's first pass records today as the install day with no readings, then stores some: the store is
+        // dated and not empty by the time the passphrase is typed. The real file-backed store, through the runner.
+        var path = Path.Combine(Path.GetTempPath(), "constitution-runner-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var rig = new Rig(await DriveHoldingABackup());
+            var store = new Constitution.Infrastructure.Body.JsonBodyStore(path);
+            store.SetInstallDay(new DateOnly(2026, 11, 9));
+            store.Upsert([BackupInvented.One(BodySignal.Weight, BackupInvented.FirstDay, 2.5)]);
+
+            var result = await rig.Runner.RestoreAtLaunchAsync(store, rig.Refresh, default);
+
+            Assert.Equal(BodyRestoreOutcome.Restored, result.Restore!.Outcome);
+            Assert.Equal(BackupInvented.InstallDay, store.InstallDay);
+            Assert.Equal(2.5, store.All().Single(reading => reading.Signal == BodySignal.Weight && reading.Day == BackupInvented.FirstDay).Value);
+            Assert.Equal(BackupInvented.EverySignal().Count, store.All().Count);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task ALaterBackupInstallDayNeverMovesAnEarlierOneForward()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "constitution-runner-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var rig = new Rig(await DriveHoldingABackup());
+            var store = new Constitution.Infrastructure.Body.JsonBodyStore(path);
+            var earlier = BackupInvented.InstallDay.AddDays(-20);
+            store.SetInstallDay(earlier);
+
+            await rig.Runner.RestoreAtLaunchAsync(store, rig.Refresh, default);
+
+            Assert.Equal(earlier, store.InstallDay);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task ARestoreThatAddsNothingDoesNotRefresh()
     {
         var rig = new Rig(await DriveHoldingABackup());
+        rig.Install.WithHistory();
 
-        // The store refuses: a first reading landed while Drive was answering.
-        var result = await rig.Runner.RestoreAtLaunchAsync(rig.Store, (_, _) => false, rig.Refresh, default);
+        var result = await rig.Restore();
 
         Assert.Equal(BodyBackupRunStatus.RestoreRan, result.Status);
-        Assert.Equal(BodyRestoreOutcome.SkippedNotEmpty, result.Restore!.Outcome);
+        Assert.Equal(BodyRestoreOutcome.NothingNew, result.Restore!.Outcome);
         Assert.Equal(0, rig.Refreshes);
     }
 
@@ -531,7 +566,7 @@ public class BodyBackupRunnerTests
         var rig = new Rig(await DriveHoldingABackup());
 
         var result = await rig.Runner.RestoreAtLaunchAsync(
-            rig.Store, rig.ReplaceInto(rig.Store), () => throw new ObjectDisposedException("page"), default);
+            rig.Store, () => throw new ObjectDisposedException("page"), default);
 
         Assert.Equal(BodyBackupRunStatus.Failed, result.Status);
         Assert.Equal(nameof(ObjectDisposedException), result.Detail);
@@ -601,6 +636,100 @@ public class BodyBackupRunnerTests
             .ToList();
 
         Assert.Empty(holdsBody);
+    }
+
+    // ---- the flush when the app is paused (review N1c) ----
+
+    [Fact]
+    public void ThePauseOfTheActivityFlushesWithoutWaiting()
+    {
+        var activity = File.ReadAllText(Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "ConstitutionActivity.cs"));
+        var wiring = File.ReadAllText(Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "Services", "BodyBackups.cs"));
+
+        var pause = Settings.SettingsWiringSourceTests.BodyOf(activity, "OnPause");
+        Assert.NotNull(pause);
+        Assert.Contains("BodyBackups.FlushOnPause(this)", pause, StringComparison.Ordinal);
+
+        var flush = Settings.SettingsWiringSourceTests.BodyOf(wiring, "FlushOnPause");
+        Assert.NotNull(flush);
+        Assert.Contains(".FlushAsync(", flush, StringComparison.Ordinal);
+        Assert.Contains("Task.Run(", flush, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Wait(", flush, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetResult()", flush, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Result", flush, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task APauseFlushWritesWhatIsPendingAtOnce()
+    {
+        var rig = new Rig();
+        rig.Install.WithHistory();
+        await rig.AfterSync(); // noted, not yet due
+        Assert.True(rig.Debouncer.HasPending);
+        Assert.Equal(0, rig.Drive.Writes);
+
+        var result = await rig.Runner.FlushAsync(rig.Store, default);
+
+        Assert.Equal(BodyBackupRunStatus.BackupRan, result.Status);
+        Assert.Equal(BodyBackupOutcome.BackedUp, result.Backup!.Outcome);
+        Assert.Equal(1, rig.Drive.Writes);
+        Assert.False(rig.Debouncer.HasPending);
+    }
+
+    [Fact]
+    public async Task APauseWithNothingPendingTouchesNothing()
+    {
+        var rig = new Rig();
+        rig.Install.WithHistory();
+
+        var result = await rig.Runner.FlushAsync(rig.Store, default);
+
+        Assert.Equal(BodyBackupRunStatus.NotDue, result.Status);
+        Assert.Equal(0, rig.Drive.Reads);
+        Assert.Equal(0, rig.Drive.Writes);
+    }
+
+    [Fact]
+    public async Task APauseWithNoPassphraseOrSignInMakesNoDriveCall()
+    {
+        var noPass = new Rig { Passphrase = null };
+        noPass.Install.WithHistory();
+        await noPass.AfterSync();
+        var signedOut = new Rig { SignedIn = false };
+        signedOut.Install.WithHistory();
+        await signedOut.AfterSync();
+
+        Assert.Equal(BodyBackupRunStatus.NoPassphrase, (await noPass.Runner.FlushAsync(noPass.Store, default)).Status);
+        Assert.Equal(BodyBackupRunStatus.NotSignedIn, (await signedOut.Runner.FlushAsync(signedOut.Store, default)).Status);
+        Assert.Equal(0, noPass.Drive.Reads + signedOut.Drive.Reads);
+        Assert.True(noPass.Debouncer.HasPending);
+    }
+
+    [Fact]
+    public async Task APauseFlushThatCannotReachDriveKeepsTheChangePending()
+    {
+        var rig = new Rig();
+        rig.Install.WithHistory();
+        await rig.AfterSync();
+        rig.Drive.ReadFailure = new HttpRequestException("no network");
+
+        var result = await rig.Runner.FlushAsync(rig.Store, default);
+
+        Assert.Equal(BodyBackupOutcome.Unreachable, result.Backup!.Outcome);
+        Assert.True(rig.Debouncer.HasPending);
+    }
+
+    [Fact]
+    public async Task APauseFlushFailureIsATypeNotACrash()
+    {
+        var rig = new Rig { Factory = () => throw new InvalidOperationException("marker-text-that-must-not-travel") };
+        rig.Install.WithHistory();
+        await rig.AfterSync();
+
+        var result = await rig.Runner.FlushAsync(rig.Store, default);
+
+        Assert.Equal(BodyBackupRunStatus.Failed, result.Status);
+        Assert.Equal(nameof(InvalidOperationException), result.Detail);
     }
 }
 

@@ -1,3 +1,4 @@
+using Constitution.Domain.Health;
 using Storyworthtelling.Voice.Secrets;
 
 namespace Constitution.Infrastructure.Vault;
@@ -77,8 +78,10 @@ public sealed class ConstitutionVaultSync
         var personal = await ReadPersonalAsync(passphrase, cancellationToken);
         if (personal.Vault is not null)
         {
-            Fill(VaultField.HealthConnectChoices, connections.HealthConnectChoicesJson, personal.Vault.HealthConnectChoicesJson, value => connections.HealthConnectChoicesJson = value, filled);
+            // A grant is this install's own: restored choices come back as asks (HealthChoices.AsRestored).
+            Fill(VaultField.HealthConnectChoices, connections.HealthConnectChoicesJson, HealthChoices.AsRestored(personal.Vault.HealthConnectChoicesJson), value => connections.HealthConnectChoicesJson = value, filled);
             Fill(VaultField.WorkSchedule, connections.WorkScheduleJson, personal.Vault.WorkScheduleJson, value => connections.WorkScheduleJson = value, filled);
+            Fill(VaultField.SleeperSide, connections.SleeperSide, personal.Vault.SleeperSide, value => connections.SleeperSide = value, filled);
         }
 
         log.Outcome(
@@ -104,8 +107,8 @@ public sealed class ConstitutionVaultSync
     /// Folio and the rest of the suite: Constitution fills them only into an empty vault slot and never
     /// replaces one, whatever it holds. Every other section, and the owner, are left exactly as they were;
     /// the Nyt section is never touched, as the New York Times is not used (D96).</item>
-    /// <item><b>Personal vault</b> (any account, its own Drive): the Health Connect choices, when they
-    /// changed. The work schedule is Foreword's: it is restored here and never published from here, since
+    /// <item><b>Personal vault</b> (any account, its own Drive): the Health Connect choices and the bed side,
+    /// when they changed. The work schedule is Foreword's: it is restored here and never published from here, since
     /// a stale copy would overwrite Foreword's newer one.</item>
     /// </list>
     ///
@@ -202,8 +205,10 @@ public sealed class ConstitutionVaultSync
     private async Task<(VaultWriteOutcome Outcome, string? Detail)> PublishPersonalAsync(
         string passphrase, IReadOnlySet<VaultField> changes, CancellationToken cancellationToken)
     {
+        // One snapshot, taken before the first await, as for the shared vault.
         var choices = connections.HealthConnectChoicesJson;
-        if (string.IsNullOrEmpty(choices))
+        var side = connections.SleeperSide;
+        if (string.IsNullOrEmpty(choices) && string.IsNullOrEmpty(side))
         {
             return (VaultWriteOutcome.NothingToPublish, null);
         }
@@ -218,17 +223,21 @@ public sealed class ConstitutionVaultSync
 
             // Only a changed value, or one the vault lacks, is ours to say. Otherwise there is nothing to
             // write, and the file is left exactly as it is.
-            var changedNow = changes.Contains(VaultField.HealthConnectChoices);
-            if (!changedNow && !string.IsNullOrEmpty(loaded.Vault.HealthConnectChoicesJson))
+            var choicesChanged = changes.Contains(VaultField.HealthConnectChoices);
+            var sideChanged = changes.Contains(VaultField.SleeperSide);
+            var chosenChoices = Pick(choices, loaded.Vault.HealthConnectChoicesJson, choicesChanged);
+            var chosenSide = Pick(side, loaded.Vault.SleeperSide, sideChanged);
+            var writesChoices = !string.IsNullOrEmpty(choices) && (choicesChanged || string.IsNullOrEmpty(loaded.Vault.HealthConnectChoicesJson));
+            var writesSide = !string.IsNullOrEmpty(side) && (sideChanged || string.IsNullOrEmpty(loaded.Vault.SleeperSide));
+            if (!writesChoices && !writesSide)
             {
                 return (VaultWriteOutcome.NothingToPublish, null);
             }
 
-            var chosen = Pick(choices, loaded.Vault.HealthConnectChoicesJson, changedNow);
-
             // Merged into whatever is there: Score's sign-in, Foreword's calendar choices and work
             // schedule are not ours, and an Empty status hands back a blank vault to start from.
-            await personalStore.SaveAsync(loaded.Vault with { HealthConnectChoicesJson = chosen }, passphrase, cancellationToken);
+            await personalStore.SaveAsync(
+                loaded.Vault with { HealthConnectChoicesJson = chosenChoices, SleeperSide = chosenSide }, passphrase, cancellationToken);
             return (VaultWriteOutcome.Published, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

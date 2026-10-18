@@ -69,6 +69,65 @@ public class BedSleepGapFillerTests
         Assert.Equal("body bed sleep: offline", Assert.Single(log.Lines));
     }
 
+    private sealed class Standing(bool refused) : ISignInStanding
+    {
+        public bool LoginRefused => refused;
+    }
+
+    [Theory]
+    [InlineData(SleepIqFailure.SignInRejected)]
+    [InlineData(SleepIqFailure.Offline)]
+    [InlineData(SleepIqFailure.UnexpectedShape)]
+    public async Task AFailedNightEndsTheBedsTurn(SleepIqFailure failure)
+    {
+        var bed = new ScriptedBed { Answer = SleepIqResult<BedNight?>.Failed(failure) };
+        var filler = BedSleepGapFiller.Create(bed, new Chosen(BedSide.Left), new CapturingBodyLog())!;
+        Assert.False(filler.GaveUp);
+
+        await filler.BedHoursAsync(Samples.Today, null, default);
+        var second = await filler.BedHoursAsync(Samples.Today.AddDays(-1), null, default);
+
+        Assert.Null(second);
+        Assert.Equal(1, bed.Nights);
+        Assert.True(filler.GaveUp);
+    }
+
+    [Fact]
+    public async Task ANightWithNoReadingIsNotAFailure()
+    {
+        var bed = new ScriptedBed { Answer = SleepIqResult<BedNight?>.Ok(null) };
+        var filler = BedSleepGapFiller.Create(bed, new Chosen(BedSide.Left), new CapturingBodyLog())!;
+
+        await filler.BedHoursAsync(Samples.Today, null, default);
+        await filler.BedHoursAsync(Samples.Today.AddDays(-1), null, default);
+
+        Assert.Equal(2, bed.Nights);
+        Assert.False(filler.GaveUp);
+    }
+
+    [Fact]
+    public async Task ARefusalRememberedForThisLoginIsNeverAsked()
+    {
+        var bed = new ScriptedBed();
+        var log = new CapturingBodyLog();
+        var filler = BedSleepGapFiller.Create(bed, new Chosen(BedSide.Left), log, new Standing(refused: true))!;
+
+        Assert.True(filler.GaveUp);
+        Assert.Null(await filler.BedHoursAsync(Samples.Today, null, default));
+        Assert.Equal(0, bed.Nights);
+        Assert.Equal("body bed sleep: login refused earlier, not asked", Assert.Single(log.Lines));
+    }
+
+    [Fact]
+    public async Task ALoginNotRefusedIsAskedAsBefore()
+    {
+        var bed = new ScriptedBed();
+        var filler = BedSleepGapFiller.Create(bed, new Chosen(BedSide.Left), new CapturingBodyLog(), new Standing(refused: false))!;
+
+        Assert.False(filler.GaveUp);
+        Assert.Equal(7.25, await filler.BedHoursAsync(Samples.Today, null, default));
+    }
+
     [Fact]
     public void NoSideChosenMeansNoFillerAtAll()
     {

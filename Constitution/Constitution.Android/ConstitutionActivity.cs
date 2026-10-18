@@ -158,6 +158,10 @@ public abstract class ConstitutionActivity : Activity
         {
             area.Pause();
         }
+
+        // A change still inside the backup's quiet window is written now: Android can end the process once the
+        // app is in the background, and the debounce would otherwise lose the last write. Not waited for.
+        BodyBackups.FlushOnPause(this);
     }
 
     private View BuildLayout()

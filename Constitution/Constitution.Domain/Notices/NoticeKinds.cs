@@ -23,6 +23,7 @@ public static class NoticeKinds
         NoticeKind.ReMarkableDelivery => FoldRole.Problem,
         NoticeKind.HealthConnectRevoked => FoldRole.Problem,
         NoticeKind.BedOffline => FoldRole.Problem,
+        NoticeKind.BedSilent => FoldRole.Reference,
         NoticeKind.LowConfidenceRead => FoldRole.Caution,
         NoticeKind.ScanToCheck => FoldRole.Progress,
         NoticeKind.BoxUnderTen => FoldRole.Reference,

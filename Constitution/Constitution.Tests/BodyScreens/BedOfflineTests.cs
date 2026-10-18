@@ -106,18 +106,71 @@ public class BedOfflineTests
     }
 
     [Fact]
-    public void TheProblemNoticeAndNothingElseCarriesTheError()
+    public void AQuietBedRaisesTheNeutralNoticeNotTheSignInOne()
     {
+        // Review S9: readings that are merely stale are waiting, not wrong. The sign-in Problem is for a refused login.
         var board = new NoticeBoard();
         var state = BedOffline.Judge(SleepThenSilence(), bedChosen: true, Today);
 
         Assert.True(BedOffline.Apply(board, state, credentialRejected: false, DateTimeOffset.UnixEpoch));
 
         var notice = Assert.Single(board.Waiting());
+        Assert.Equal(NoticeKind.BedSilent, notice.Kind);
+        Assert.Equal(Codex.Domain.Design.FoldRole.Reference, notice.Role);
+        Assert.Equal(BedOffline.SilentCauseKey, notice.CauseKey);
+        Assert.NotEqual(ConnectionNotices.CauseKey(CredentialIds.SleepNumber), notice.CauseKey);
+    }
+
+    [Fact]
+    public void ARefusedLoginRaisesTheSignInProblemUnderTheSettingsCause()
+    {
+        var board = new NoticeBoard();
+        var state = BedOffline.Judge(SleepThenSilence(), bedChosen: true, Today);
+
+        Assert.True(BedOffline.Apply(board, state, credentialRejected: true, DateTimeOffset.UnixEpoch));
+
+        var notice = Assert.Single(board.Waiting());
         Assert.Equal(NoticeKind.BedOffline, notice.Kind);
         Assert.Equal(Codex.Domain.Design.FoldRole.Problem, notice.Role);
         // The same cause the Settings credential check uses, so the two never stack as two cards.
         Assert.Equal(ConnectionNotices.CauseKey(CredentialIds.SleepNumber), notice.CauseKey);
+    }
+
+    [Fact]
+    public void ARefusedLoginIsAProblemEvenWhileReadingsAreFresh()
+    {
+        var board = new NoticeBoard();
+        var fresh = BedOffline.Judge(BodyData.Daily(BodySignal.Sleep, Today, 5, 6.5).ToList(), true, Today);
+
+        BedOffline.Apply(board, fresh, credentialRejected: true, DateTimeOffset.UnixEpoch);
+
+        Assert.Equal(NoticeKind.BedOffline, Assert.Single(board.Waiting()).Kind);
+    }
+
+    [Fact]
+    public void TheTwoNoticesNeverFightOverTheBoard()
+    {
+        // Settings states the credential, the Body tab states the readings; run them in turn as the app does.
+        var board = new NoticeBoard();
+        var quiet = BedOffline.Judge(SleepThenSilence(), bedChosen: true, Today);
+
+        for (var round = 0; round < 3; round++)
+        {
+            ConnectionNotices.Apply(board, CredentialIds.SleepNumber, ConnectionHealth.Working, DateTimeOffset.UnixEpoch);
+            BedOffline.Apply(board, quiet, credentialRejected: false, DateTimeOffset.UnixEpoch);
+        }
+
+        Assert.Equal(NoticeKind.BedSilent, Assert.Single(board.Waiting()).Kind);
+
+        // The login is then refused: the silence notice gives way to the Problem, one card at a time.
+        ConnectionNotices.Apply(board, CredentialIds.SleepNumber, ConnectionHealth.Rejected, DateTimeOffset.UnixEpoch);
+        BedOffline.Apply(board, quiet, credentialRejected: true, DateTimeOffset.UnixEpoch);
+        Assert.Equal(NoticeKind.BedOffline, Assert.Single(board.Waiting()).Kind);
+
+        // The owner signs in again: the Problem goes, and the silence notice is back until the bed speaks.
+        ConnectionNotices.Clear(board, CredentialIds.SleepNumber);
+        BedOffline.Apply(board, quiet, credentialRejected: false, DateTimeOffset.UnixEpoch);
+        Assert.Equal(NoticeKind.BedSilent, Assert.Single(board.Waiting()).Kind);
     }
 
     [Fact]

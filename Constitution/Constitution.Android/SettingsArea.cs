@@ -7,10 +7,13 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Codex.Ui.Voice;
+using Constitution.Body;
 using Constitution.Domain.Areas;
 using Constitution.Domain.Credentials;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Settings;
+using Constitution.Health;
+using Constitution.Infrastructure.SleepNumber;
 using Constitution.Infrastructure.Vault;
 using Constitution.Services;
 using Constitution.Settings;
@@ -233,10 +236,49 @@ public sealed class SettingsArea(Activity host)
                     Spaced(DesignTokens.Space.X2));
             }
 
+            if (row.CredentialId == SettingsModel.HealthConnectId)
+            {
+                // Review S10: the overnight permission can only be given from Health Connect's own page.
+                var overnight = model.OvernightReads;
+                block.AddView(PaperUi.Body(Host, overnight.Name), Spaced(DesignTokens.Space.X2));
+                block.AddView(PaperUi.Secondary(Host, overnight.Sentence));
+                block.AddView(
+                    PaperUi.SecondaryButton(Host, overnight.ButtonLabel, OpenOvernightSettings),
+                    Spaced(DesignTokens.Space.X2));
+            }
+
+            body.AddView(block, Spaced(DesignTokens.Space.X3));
+        }
+
+        // Review S7: the household shares one bed login, so which side is mine is chosen here, once a login is set.
+        var loginSet = connections.SleepNumberLogin.Length > 0 && connections.SleepNumberPassword.Length > 0;
+        if (BedSideRow.Build(loginSet, connections.SleeperSide) is { } side)
+        {
+            var block = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+            block.AddView(PaperUi.Body(Host, side.Name));
+            block.AddView(PaperUi.Secondary(Host, side.Caption));
+            block.AddView(PaperUi.Segmented(Host, side.Labels, SetBedSide, side.Selected), Spaced(DesignTokens.Space.X2));
             body.AddView(block, Spaced(DesignTokens.Space.X3));
         }
 
         return body;
+    }
+
+    // Names the page the platform has, or says so in the trail when it has none (by exception type only).
+    private void OpenOvernightSettings() =>
+        new ActivityHealthPermissionRequester(Host).OpenHealthConnectSettings(new BodyLog(Host));
+
+    // The side is written on this phone first, then published to the personal vault (never the shared one).
+    private void SetBedSide(int index)
+    {
+        var stored = BedSideRow.StoredFor(index);
+        new SleeperChoice(Host).Side = stored switch
+        {
+            "left" => BedSide.Left,
+            "right" => BedSide.Right,
+            _ => null,
+        };
+        _ = ConstitutionVaults.Create(Host).PublishAsync([VaultField.SleeperSide], CancellationToken.None);
     }
 
     private static string EntryVerb(string credentialId) =>

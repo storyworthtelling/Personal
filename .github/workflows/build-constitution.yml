@@ -144,6 +144,41 @@ jobs:
           echo "ok: INTERNET declared"
           echo "=== END PERMISSION CHECK ==="
 
+      # Fatal: the INTERNET check above would pass with any health permission at all. Constitution
+      # reads from Health Connect and never writes (the brief), so the APK must declare exactly the
+      # read set below and nothing that writes, reaches back before install day, or opens medical
+      # records. A stray one here is invisible on the phone until Health Connect lists it.
+      - name: HEALTH PERMISSION CHECK
+        working-directory: Constitution
+        run: |
+          set -e
+          echo "=== HEALTH PERMISSION CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          APK=$(ls -1 Constitution.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          echo "--- $APK"
+          DECLARED=$("$AAPT2" dump permissions "$APK" | grep -Eo "android\.permission\.health\.[A-Za-z_]+" | sort -u)
+          echo "$DECLARED"
+          if echo "$DECLARED" | grep -Eq "health\.WRITE|HISTORY|MEDICAL_DATA"; then
+            echo "FAIL: the APK declares a health write, history or medical-data permission."
+            exit 1
+          fi
+          EXPECTED=$(printf '%s\n' \
+            android.permission.health.READ_WEIGHT \
+            android.permission.health.READ_BODY_FAT \
+            android.permission.health.READ_RESTING_HEART_RATE \
+            android.permission.health.READ_HEART_RATE_VARIABILITY \
+            android.permission.health.READ_STEPS \
+            android.permission.health.READ_EXERCISE \
+            android.permission.health.READ_SLEEP \
+            android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND | sort -u)
+          if [ "$DECLARED" != "$EXPECTED" ]; then
+            echo "FAIL: the APK's health permissions are not exactly the expected read set."
+            diff <(echo "$EXPECTED") <(echo "$DECLARED") || true
+            exit 1
+          fi
+          echo "ok: exactly the health read set, nothing that writes"
+          echo "=== END HEALTH PERMISSION CHECK ==="
+
       # Fatal: two heads shipped the DEFAULT launcher icon for months because the wiring is easy
       # to get wrong and silent when it is.
       - name: ICON CHECK

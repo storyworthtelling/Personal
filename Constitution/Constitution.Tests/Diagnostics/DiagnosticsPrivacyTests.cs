@@ -34,6 +34,32 @@ public class DiagnosticsPrivacyTests
         "birth:1987" + "-03-09",
     ];
 
+    private const string TrailStamp = "[Oct 18, 9:05 am] ";
+
+    /// <summary>
+    /// Raw trail lines as a careless writer could have produced them: some real phrases, and some carrying the household's
+    /// private things (a weight, a name, an email, a long number). Every one goes in through the one door, the filter.
+    /// </summary>
+    internal static string[] RawTrailLines { get; } =
+    [
+        TrailStamp + "INFO Body — body read weight: ok, 2 readings",
+        TrailStamp + "INFO Body — body read weight: 18" + "7.4 lb",
+        TrailStamp + "INFO Body — Zeph" + "yrine slept 7 hours",
+        TrailStamp + "INFO Body — sleepiq sign-in: sleeper" + "@example" + ".com",
+        TrailStamp + "INFO Body — sleepiq sign-in: 200",
+        TrailStamp + "INFO Body — body read steps: 12345" + "6789 readings",
+        TrailStamp + "INFO Body — body bed sleep: failed (IOException)",
+        TrailStamp + "INFO Vault — vault restore: restored 3 fields (shared loaded, personal loaded)",
+    ];
+
+    internal static IReadOnlyList<TrailSection> SeededTrails() =>
+    [
+        new TrailSection(TrailKind.Body, RawTrailLines.Where(line => line.Contains("INFO Body", StringComparison.Ordinal))
+            .Select(line => TrailLine.From(line) ?? TrailLine.From(TrailStamp + "INFO Body — " + TrailLines.Withheld)!)),
+        new TrailSection(TrailKind.Vault, RawTrailLines.Where(line => line.Contains("INFO Vault", StringComparison.Ordinal))
+            .Select(line => TrailLine.From(line)!)),
+    ];
+
     internal static DiagnosticsSnapshot SeededSnapshot()
     {
         var board = new NoticeBoard();
@@ -66,7 +92,8 @@ public class DiagnosticsPrivacyTests
                 new CredentialStatus(ConnectionId.Parse(ConnectionIds.Claude), CredentialState.Working),
                 new CredentialStatus(ConnectionId.Parse(ConnectionIds.Gemini), CredentialState.Missing),
                 new CredentialStatus(ConnectionId.Parse(ConnectionIds.Google), CredentialState.Working),
-            ]);
+            ],
+            SeededTrails());
     }
 
     // ---- NoReadingsNamesOrRecipes -------------------------------------------------------------
@@ -99,6 +126,36 @@ public class DiagnosticsPrivacyTests
         Assert.Contains("gemini: Missing", export);
         Assert.Contains("Morning delivery:", export);
         Assert.Contains("Read-back:", export);
+    }
+
+    [Fact]
+    public void ThePlantedTrailValuesNeverReachTheExport()
+    {
+        var export = DiagnosticsRenderer.Render(SeededSnapshot());
+
+        Assert.Contains("body read weight: ok, 2 readings", export);
+        Assert.Contains("sleepiq sign-in: 200", export);
+        Assert.Contains("vault restore: restored 3 fields", export);
+        foreach (var planted in new[] { "18" + "7", "Zeph" + "yrine", "sleeper" + "@", "12345" + "6789", "slept" })
+        {
+            Assert.DoesNotContain(planted, export, StringComparison.Ordinal);
+        }
+
+        Assert.Contains(TrailLines.Withheld, export);
+        Assert.Empty(PrivacyScan.Find(export));
+    }
+
+    [Fact]
+    public void TheScanStillFiresOnAValueInsideTheTrailSection()
+    {
+        // The one allowance for trails is the signal's id after "read" or "permission"; a value there is still a value.
+        var clean = DiagnosticsRenderer.Render(SeededSnapshot());
+        Assert.Empty(PrivacyScan.Find(clean));
+
+        Assert.Contains("reading with a unit", PrivacyScan.Find(clean + "    " + TrailStamp + "INFO Body — body read weight: 18" + "7 lb\n"));
+        Assert.Contains("decimal number", PrivacyScan.Find(clean + "    " + TrailStamp + "INFO Body — body read weight: 18" + "7.4\n"));
+        Assert.Contains("forbidden word", PrivacyScan.Find(clean + "    " + TrailStamp + "INFO Body — We" + "ight was high\n"));
+        Assert.Contains("household name", PrivacyScan.Find(clean + "    " + TrailStamp + "INFO Body — Sa" + "m slept\n"));
     }
 
     [Fact]

@@ -60,6 +60,8 @@ internal sealed class FakeConnections : IConstitutionConnections
     public string HealthConnectChoicesJson { get; set; } = string.Empty;
 
     public string WorkScheduleJson { get; set; } = string.Empty;
+
+    public string SleeperSide { get; set; } = string.Empty;
 }
 
 internal sealed class CapturingLog : IConstitutionVaultLog

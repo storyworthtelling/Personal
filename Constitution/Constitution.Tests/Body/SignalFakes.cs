@@ -30,6 +30,23 @@ internal sealed class MemoryBodyStore : IBodyStore
         SetInstallDayCalls++;
         InstallDay ??= day;
     }
+
+    public bool MergeRestored(DateOnly? installDay, IEnumerable<BodyReading> incoming)
+    {
+        var changed = false;
+        foreach (var reading in incoming)
+        {
+            changed |= readings.TryAdd((reading.Signal, reading.Day), reading.Value);
+        }
+
+        if (installDay is { } day && (InstallDay is null || day < InstallDay))
+        {
+            InstallDay = day;
+            changed = true;
+        }
+
+        return changed;
+    }
 }
 
 /// <summary>A Health Connect stand-in: which signals are granted, what each read returns, and what was asked of it.</summary>
@@ -87,9 +104,22 @@ internal sealed class FakeSleepFiller : ISleepGapFiller
 
     public List<(DateOnly Day, double? Watch)> Asked { get; } = [];
 
+    /// <summary>The number of asks after which the filler reports that it has given up (the bed failed); unlimited by default.</summary>
+    public int GiveUpAfterAsks { get; set; } = int.MaxValue;
+
+    /// <summary>When set, the filler throws on every ask, as a bed that broke in some way nobody typed.</summary>
+    public Exception? ThrowOnAsk { get; set; }
+
+    public bool GaveUp => Asked.Count >= GiveUpAfterAsks;
+
     public Task<double?> BedHoursAsync(DateOnly day, double? watchHours, CancellationToken cancellationToken)
     {
         Asked.Add((day, watchHours));
+        if (ThrowOnAsk is not null)
+        {
+            throw ThrowOnAsk;
+        }
+
         return Task.FromResult<double?>(Nights.TryGetValue(day, out var hours) && !(watchHours > 0) ? hours : null);
     }
 }

@@ -139,6 +139,34 @@ public class WaitingPageModelTests
     }
 
     [Fact]
+    public void ASilentBedIsWaitingNotWrong()
+    {
+        var board = new NoticeBoard();
+        board.Raise(NoticeKind.BedSilent, "bed:silent", Now);
+
+        var item = Assert.Single(WaitingPageModel.From(board, Now).Items);
+
+        Assert.Equal(FoldRole.Reference, item.Role);
+        Assert.Null(item.Button);
+        Assert.Empty(item.Chips);
+        Assert.Equal("The bed hasn’t reported for a few days. Nothing is wrong on your side that we can see.", item.Body);
+        Assert.DoesNotContain("refused", item.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sign-in", item.Body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OnlyARefusedLoginSaysItsSignInWasRefused()
+    {
+        foreach (var kind in NoticeKinds.All.Where(kind => kind != NoticeKind.BedOffline && kind != NoticeKind.ReMarkableDelivery))
+        {
+            var board = new NoticeBoard();
+            board.Raise(kind, "cause", Now);
+            var item = Assert.Single(WaitingPageModel.From(board, Now).Items);
+            Assert.DoesNotContain("sign-in was refused", item.Body, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void TheReMarkableRowSaysWhatHappenedAndWhatToDo()
     {
         var board = new NoticeBoard();

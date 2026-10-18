@@ -53,6 +53,13 @@ public static class DiagnosticsPhrases
         _ => throw Undefined(nameof(role)),
     };
 
+    public static string Of(TrailKind kind) => kind switch
+    {
+        TrailKind.Body => "Body trail",
+        TrailKind.Vault => "Vault trail",
+        _ => throw Undefined(nameof(kind)),
+    };
+
     internal static ArgumentOutOfRangeException Undefined(string parameter) =>
         new(parameter, "That value is not one the Diagnostics export knows.");
 }

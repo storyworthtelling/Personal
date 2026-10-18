@@ -1,6 +1,7 @@
 using Constitution.Domain.Areas;
 using Constitution.Domain.Credentials;
 using Constitution.Domain.Equipment;
+using Constitution.Domain.Health;
 using Constitution.Domain.Notices;
 
 namespace Constitution.Domain.Settings;
@@ -48,6 +49,9 @@ public sealed class SettingsModel
     public string ConnectionsSummary { get; private init; } = string.Empty;
 
     public IReadOnlyList<ConnectionRow> Connections { get; private init; } = [];
+
+    /// <summary>The line under the Health Connect row that asks for the overnight permission (review S10).</summary>
+    public OvernightReadsRow OvernightReads { get; } = new("Overnight reads", HealthRationale.OvernightLine, "Open Health Connect");
 
     public PassphraseFieldSpec Passphrase { get; } = new(Masked: false, Mono: true, PassphraseHelper);
 
