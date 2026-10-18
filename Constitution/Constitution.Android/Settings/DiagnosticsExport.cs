@@ -1,5 +1,6 @@
 using Android.Content;
 using Codex.Ui.Voice;
+using Constitution.Body;
 using Constitution.Domain.Credentials;
 using Constitution.Domain.Diagnostics;
 using Constitution.Domain.Notices;
@@ -11,7 +12,7 @@ namespace Constitution.Settings;
 /// <summary>
 /// Builds a real <see cref="DiagnosticsSnapshot"/> from what this install can know, renders it, and
 /// hands the text to the share sheet. What it cannot know yet is stated as a shape, not guessed:
-/// every part reports <see cref="DiagnosticsOutcome.NeverRan"/> until the workers record outcomes,
+/// every part but Body's sync reports <see cref="DiagnosticsOutcome.NeverRan"/> until its worker records outcomes,
 /// the role is <see cref="InstallRole.Unknown"/> until the household file says, and the counts that
 /// need the plan store are zero. Credentials come from the health report, by state only.
 /// </summary>
@@ -39,7 +40,7 @@ public static class DiagnosticsExport
 
         var waiting = ConnectionNoticeBoard.With(board => NoticeCount.Tally(board.Waiting()));
         var outcomes = Enum.GetValues<DiagnosticsComponent>()
-            .Select(component => new ComponentOutcome(component, DiagnosticsOutcome.NeverRan));
+            .Select(component => new ComponentOutcome(component, OutcomeOf(context, component)));
 
         return new DiagnosticsSnapshot(
             AppVersion.Parse(version),
@@ -49,6 +50,10 @@ public static class DiagnosticsExport
             [],
             credentials);
     }
+
+    // Body's sync records how its last run ended; the other parts have no worker recording yet.
+    private static DiagnosticsOutcome OutcomeOf(Context context, DiagnosticsComponent component) =>
+        component == DiagnosticsComponent.BodySync ? BodyServices.Create(context).Status.LastOutcome() : DiagnosticsOutcome.NeverRan;
 
     /// <summary>The rendered text, ready to share.</summary>
     public static string Text(Context context) => DiagnosticsRenderer.Render(Build(context));

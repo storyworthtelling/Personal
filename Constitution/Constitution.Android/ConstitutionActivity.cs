@@ -1,11 +1,14 @@
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.OS;
+using Android.Runtime;
 using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Constitution.Body;
+using Constitution.Domain.Body;
 using Constitution.Domain.Areas;
 using Constitution.Domain.Layout;
 using Constitution.Domain.Waiting;
@@ -50,6 +53,12 @@ public abstract class ConstitutionActivity : Activity
     private BackToPage backToPage = null!;
     private bool waitingOpen;
 
+    // A signal's page (book p.16) turned to from a Body chart. Like Waiting it is a state of the shell rather than an
+    // area: it takes the well and the header, the Body tab stays lit behind it, and back (or any tab) turns it away.
+    private BodyArea? bodyArea;
+    private BackToPage backToSignal = null!;
+    private BodySignal? openSignal;
+
     private IConstitutionArea Active => areasById[activeId];
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -59,13 +68,15 @@ public abstract class ConstitutionActivity : Activity
 
         pillarStore = new PillarStore(this);
         settingsArea = new SettingsArea(this);
+        bodyArea = new BodyArea(this);
+        bodyArea.SignalRequested += OpenSignal;
         firstRun = new FirstRunPage(this, RenderPage);
         var areas = new IConstitutionArea[]
         {
             new TodayArea(this),
             new WorkoutsArea(this),
             new MealsArea(this),
-            new BodyArea(this),
+            bodyArea,
             settingsArea,
         };
         areasById = areas.ToDictionary(area => area.Definition.Id);
@@ -88,6 +99,7 @@ public abstract class ConstitutionActivity : Activity
         dogEar.OpenWaiting += OpenWaiting;
         dogEar.UndoTurned += OnUndoTurned;
         backToPage = new BackToPage(this, CloseWaiting);
+        backToSignal = new BackToPage(this, CloseSignal);
         RefreshTabs();
         RenderPage();
 
@@ -105,6 +117,14 @@ public abstract class ConstitutionActivity : Activity
         // The Google account picker opened from Settings answers here.
         settingsArea?.OnActivityResult(requestCode, resultCode, data);
         firstRun.OnActivityResult(requestCode, resultCode, data);
+    }
+
+    public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Permission[] grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        // Health Connect's answer for the signal being allowed from its page.
+        bodyArea?.OnRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     protected override void OnResume()
@@ -163,6 +183,7 @@ public abstract class ConstitutionActivity : Activity
         }
 
         CloseWaitingState();
+        CloseSignalState();
         activeId = visible[index].Definition.Id;
         binder.SetActive(index);
         TabLettering.Apply(binder, visible, index);
@@ -196,6 +217,13 @@ public abstract class ConstitutionActivity : Activity
         if (waitingOpen)
         {
             RenderWaiting();
+            dogEar.Refresh();
+            return;
+        }
+
+        if (openSignal is { } signal && bodyArea is not null && Active == bodyArea)
+        {
+            RenderSignal(bodyArea, signal);
             dogEar.Refresh();
             return;
         }
@@ -257,6 +285,7 @@ public abstract class ConstitutionActivity : Activity
 
     private void OpenWaiting()
     {
+        CloseSignalState();
         waitingOpen = true;
         backToPage.Register();
         RefreshTabs();
@@ -274,6 +303,43 @@ public abstract class ConstitutionActivity : Activity
     {
         waitingOpen = false;
         backToPage.Unregister();
+    }
+
+    // ---- a signal's page (book p.16) ----
+
+    private void OpenSignal(BodySignal signal)
+    {
+        openSignal = signal;
+        backToSignal.Register();
+        RenderPage();
+    }
+
+    private void CloseSignal()
+    {
+        CloseSignalState();
+        RenderPage();
+    }
+
+    private void CloseSignalState()
+    {
+        openSignal = null;
+        backToSignal.Unregister();
+    }
+
+    // The signal's name as the Serif header, the page on the crinkled ground, and the pinned bar only while the chart is
+    // waiting on Health Connect. The Body tab stays lit: this is a page of Body, not a place of its own.
+    private void RenderSignal(BodyArea body, BodySignal signal)
+    {
+        var edge = PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp);
+        var header = PaperUi.ScreenHeader(this, body.SignalTitle(signal), body.Tab.Hue);
+        header.SetPadding(edge, PaperTheme.Dp(this, DesignTokens.Space.X8), edge, 0);
+        frame.SetHeader(header);
+
+        var well = new FrameLayout(this);
+        well.AddView(body.BuildSignalView(signal), new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+        frame.SetWell(well);
+        frame.SetBar(body.BuildSignalBar(signal));
     }
 
     private void RenderWaiting()

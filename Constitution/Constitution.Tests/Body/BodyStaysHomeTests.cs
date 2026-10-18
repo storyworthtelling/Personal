@@ -606,9 +606,21 @@ internal static class BodyOutbound
 
     /// <summary>
     /// Files in Constitution.Android that may both handle Body and contain a way off the phone. Empty, and
-    /// it should stay so: add a file only with a reason a reviewer accepts.
+    /// it should stay short: add a file only with a reason a reviewer accepts. Each entry below says
+    /// what actually leaves, and it is never a Body value.
+    /// <list type="bullet">
+    /// <item>Health/ActivityHealthPermissionRequester.cs: the only intent extra is this app's own package
+    /// name, to open Health Connect's settings page (Release B review).</item>
+    /// <item>Settings/DiagnosticsExport.cs: shares the closed Diagnostics text, whose types hold only
+    /// counts, enums and validated identifiers (guarded by DiagnosticsSnapshotShapeTests); it touches Body
+    /// only to read the last Body-sync OUTCOME.</item>
+    /// </list>
     /// </summary>
-    public static readonly IReadOnlyList<string> HeadFilesMayHandleBodyAndLeave = [];
+    public static readonly IReadOnlyList<string> HeadFilesMayHandleBodyAndLeave =
+    [
+        "Health/ActivityHealthPermissionRequester.cs",
+        "Settings/DiagnosticsExport.cs",
+    ];
 
     /// <summary>Where Body may be named in Constitution.Infrastructure.</summary>
     public static IReadOnlyList<AllowedPath> InfrastructureAllowlist { get; } =
