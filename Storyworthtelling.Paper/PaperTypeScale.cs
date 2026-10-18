@@ -34,4 +34,14 @@ public static class PaperTypeScale
     public const float Secondary = 14f * Ratio;    // 10.5
     public const float Label = 13f * Ratio;        // 9.75
     public const float Mono = 14f * Ratio;         // 10.5
+
+    /// <summary>
+    /// The dose (PC5, DESIGN.md section 19): the one large figure a dose card prints, 54 points. It is
+    /// <b>printed-only</b> — it has no screen size to multiply, because the phone never draws a dose
+    /// this large — so it is the single rung that is a number rather than a product, and the parity
+    /// guard names it as the exception. Larger than <see cref="Display"/> on purpose: on the tablet
+    /// page it is read at arm's length with a pen in the other hand. A composer takes this rung; it
+    /// never types 54.
+    /// </summary>
+    public const float Dose = 54f;
 }

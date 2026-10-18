@@ -16,6 +16,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
+    <!-- PdfPig reads a rendered document back (the same version Folio, Index, Foreword and Paper's tests use);
+         the native Skia asset is what lets the desktop test build draw a PDF at all. -->
+    <PackageReference Include="PdfPig" Version="0.1.10" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
