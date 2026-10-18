@@ -48,6 +48,45 @@ public class PaperTypeScaleTests
         Assert.Equal(12f, PaperTypeScale.Body);
     }
 
+    /// <summary>
+    /// The dose rung (PC5): the one large figure a dose card prints, 54 points, registered here and in
+    /// DESIGN.md section 19 so that no composer ever types it. It is bigger than Display on purpose and
+    /// has no screen counterpart: the phone never draws a dose at this size, the tablet page does.
+    /// </summary>
+    [Fact]
+    public void DoseRungIsRegistered()
+    {
+        Assert.Equal(54f, PaperTypeScale.Dose);
+        Assert.True(PaperTypeScale.Dose > PaperTypeScale.Display, "The dose is the largest type on the page.");
+
+        var design = File.ReadAllText(RepoFile("DESIGN.md"));
+        var row = design.Split('\n').Single(line => line.Contains("Dose rung", StringComparison.Ordinal));
+
+        Assert.Contains("54 pt", row, StringComparison.Ordinal);
+        Assert.Contains("PaperTypeScale", row, StringComparison.Ordinal);
+        Assert.DoesNotContain("not yet in code", row, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The parity guard gains the dose as a named exception rather than a silent one: every rung is
+    /// its screen size at the ratio except the printed-only ones, and the dose is the only of those.
+    /// A second printed-only rung is a decision, not a diff.
+    /// </summary>
+    [Fact]
+    public void TheDoseIsTheOnlyPrintedOnlyRung()
+    {
+        var screen = ScreenLadder();
+        var printedOnly = typeof(PaperTypeScale)
+            .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(field => field.FieldType == typeof(float) && field.Name != nameof(PaperTypeScale.Ratio))
+            .Select(field => field.Name)
+            .Where(name => !screen.ContainsKey(name))
+            .ToArray();
+
+        Assert.Equal(new[] { "Dose" }, printedOnly);
+        Assert.True(screen.Count >= 7, "The screen ladder was not read; the guard is looking at nothing.");
+    }
+
     private static Dictionary<string, float> ScreenLadder()
     {
         var native = File.ReadAllText(RepoFile("FocusPhone/Codex.Domain/Design/DesignTokens.cs"));
