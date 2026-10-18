@@ -80,3 +80,5 @@ One phase branch (D89): `ccr-0de01a0f-8dnn7q`. Releases land as labelled commits
 - NYT: owner suggests Article Search may return Cooking content; wants it tested with their key from the vault. Vault passphrase NOT received and must not be taken in chat; offered environment secret route. Terms (D96) still bar storing recipes regardless.
 - Frozen names CONFIRMED by owner (workers ReadBackWorker, BodySyncWorker; work names constitution-read-back, constitution-body-sync; prefs file constitution-settings).
 - Spikes C-11.4.2/3/4: owner decided (D97) to skip them beforehand; build best-guess with logging, owner tests after the app is ready. R3 (no pen marks in the cloud PDF) is an accepted risk.
+
+- Open (found by the Release B fixer, not fixed): `HealthChoicesStore.SaveAsync` can publish an empty-choices JSON on a fresh install before the vault restore finishes, which could overwrite the vault's choices. A body restore is only attempted at launch; typing the passphrase later in Settings runs the vault restore, not the Body one.
