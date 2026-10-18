@@ -103,8 +103,15 @@ public abstract class ConstitutionActivity : Activity
         RefreshTabs();
         RenderPage();
 
-        // After a reset or reinstall, refill the connections from the Drive vault (background; no-op without a passphrase).
-        ConstitutionVaults.RestoreAtLaunch(this);
+        // After a reset or reinstall, refill the connections from the Drive vault and then the Body history from its
+        // backup, in that order and in the background (no-op without a passphrase); the page redraws if history landed.
+        BodyBackups.RestoreAtLaunch(this, () => RunOnUiThread(() =>
+        {
+            if (!IsFinishing && !IsDestroyed)
+            {
+                RenderPage();
+            }
+        }));
 
         // Body's overnight read, under its frozen unique name; Keep means a relaunch changes nothing (C-7.1.3).
         BodySyncWorker.Schedule(this);

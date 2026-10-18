@@ -2,6 +2,7 @@ using Android.Content;
 using Android.Runtime;
 using AndroidX.Work;
 using Constitution.Domain;
+using Constitution.Services;
 
 namespace Constitution.Body;
 
@@ -35,7 +36,11 @@ public class BodySyncWorker : Worker
         try
         {
             var services = BodyServices.Create(context);
-            services.Sync.RunInBackgroundAsync(CancellationToken.None).GetAwaiter().GetResult();
+            var sync = services.Sync.RunInBackgroundAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+            // The encrypted backup follows a read that stored something; its outcome is the runner's to log, and it
+            // never fails the read it follows.
+            BodyBackups.AfterWorkerSyncAsync(context, sync, services.Store, CancellationToken.None).GetAwaiter().GetResult();
             return Result.InvokeSuccess();
         }
         catch (Exception e)

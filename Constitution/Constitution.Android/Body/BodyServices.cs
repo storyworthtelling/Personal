@@ -96,8 +96,9 @@ public sealed class BodyServices
             try
             {
                 services = Create(context);
-                await services.Sync.OpenTimeReadsAsync(CancellationToken.None);
+                var sync = await services.Sync.OpenTimeReadsAsync(CancellationToken.None);
                 await services.Choices.ReconcileAsync(services.Source, CancellationToken.None);
+                await BodyBackups.AfterOpenSyncAsync(context, sync, services.Store, CancellationToken.None);
             }
             catch (Exception e)
             {
