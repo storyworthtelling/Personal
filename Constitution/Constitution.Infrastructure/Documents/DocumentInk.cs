@@ -16,11 +16,25 @@ internal sealed class DocumentInk : IDisposable
     public SKFont Dose { get; } = new(EmbeddedTypefaces.SerifBlack, PaperTypeScale.Dose);
     public SKFont Body { get; } = new(EmbeddedTypefaces.SansRegular, PaperTypeScale.Body);
     public SKFont Label { get; } = new(EmbeddedTypefaces.SansSemibold, PaperTypeScale.Label);
+    public SKFont Heading { get; } = new(EmbeddedTypefaces.SerifSemibold, PaperTypeScale.Heading);
+    public SKFont Choice { get; } = new(EmbeddedTypefaces.SerifRegular, PaperTypeScale.Heading);
+    public SKFont Strong { get; } = new(EmbeddedTypefaces.SansSemibold, PaperTypeScale.Body);
+    public SKFont Small { get; } = new(EmbeddedTypefaces.SansRegular, PaperTypeScale.Secondary);
+
+    /// <summary>The owner's hand (Pinyon Script) on the Title rung: the one place the encouragement seat prints.</summary>
+    public SKFont Voice { get; } = new(EmbeddedTypefaces.Script, PaperTypeScale.Title);
 
     public SKPaint Ink { get; } = Fill(PaperColorTokens.Ink);
+    public SKPaint Soft { get; } = Fill(PaperColorTokens.InkSoft);
     public SKPaint Shade { get; } = Fill(PaperColorTokens.PaperShade);
+
+    /// <summary>The bright paper a tick is filled with where it sits on a shaded band, so the box stays a white target.</summary>
+    public SKPaint Bright { get; } = Fill(PaperColorTokens.PaperBright);
     public SKPaint TargetStroke { get; } = Stroke(PaperColorTokens.InkMuted, InkTargets.BoxWeight);
     public SKPaint DividerStroke { get; } = Stroke(PaperColorTokens.InkMuted, InkTargets.DividerWeight);
+
+    /// <summary>The notes column's rules: the same hairline, dotted so they read as lines to write on and not as dividers.</summary>
+    public SKPaint DottedStroke { get; } = Dotted();
 
     public SKPaint HeaderRule { get; } = new()
     {
@@ -35,20 +49,32 @@ internal sealed class DocumentInk : IDisposable
         PrintedRole.Dose => Dose,
         PrintedRole.Body => Body,
         PrintedRole.Label => Label,
+        PrintedRole.Heading => Heading,
+        PrintedRole.Choice => Choice,
+        PrintedRole.Strong => Strong,
+        PrintedRole.Small => Small,
+        PrintedRole.Voice => Voice,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Only text roles have a font."),
     };
 
     public void Dispose()
     {
-        foreach (var font in new[] { Title, Dose, Body, Label })
+        foreach (var font in new[] { Title, Dose, Body, Label, Heading, Choice, Strong, Small, Voice })
         {
             font.Dispose();
         }
 
-        foreach (var paint in new[] { Ink, Shade, TargetStroke, DividerStroke, HeaderRule })
+        foreach (var paint in new[] { Ink, Soft, Shade, Bright, TargetStroke, DividerStroke, DottedStroke, HeaderRule })
         {
             paint.Dispose();
         }
+    }
+
+    private static SKPaint Dotted()
+    {
+        var paint = Stroke(PaperColorTokens.InkMuted, InkTargets.DividerWeight);
+        paint.PathEffect = SKPathEffect.CreateDash([InkTargets.DividerWeight * 3f, InkTargets.DividerWeight * 6f], 0f);
+        return paint;
     }
 
     private static SKPaint Fill(string hex) => new() { Color = SKColor.Parse(hex), Style = SKPaintStyle.Fill, IsAntialias = true };
