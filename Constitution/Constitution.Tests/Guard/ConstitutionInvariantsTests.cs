@@ -22,6 +22,15 @@ public class ConstitutionInvariantsTests
         "com.storyworthtelling.constitution.BodySyncWorker",
     ];
 
+    private static readonly string[] ExpectedActivities =
+    [
+        "com.storyworthtelling.constitution.MainActivity",
+        // Added with the Health Connect manifest (C-7.1.1): the permissions-rationale page, and the
+        // alias Android 14 resolves VIEW_PERMISSION_USAGE through. A deliberate edit.
+        "com.storyworthtelling.constitution.HealthRationaleActivity",
+        "com.storyworthtelling.constitution.ViewPermissionUsageActivity",
+    ];
+
     private static readonly string[] ExpectedWorkNames =
     [
         "constitution-read-back",
@@ -117,6 +126,19 @@ public class ConstitutionInvariantsTests
         Assert.Contains("Name = ConstitutionIdentity.MainActivityName", File.ReadAllText(activity), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The rationale activity is what Health Connect opens when the owner asks why Constitution wants
+    /// a permission, and it finds it by intent filter on the merged manifest's registered names. Move
+    /// either name and the request opens nothing, with no error anywhere.
+    /// </summary>
+    [Fact]
+    public void ActivitiesAreFrozen()
+    {
+        Assert.Equal(ExpectedActivities, ConstitutionIdentity.Activities);
+        Assert.Equal("com.storyworthtelling.constitution.HealthRationaleActivity", ConstitutionIdentity.HealthRationaleActivityName);
+        Assert.Equal("com.storyworthtelling.constitution.ViewPermissionUsageActivity", ConstitutionIdentity.PermissionUsageAliasName);
+    }
+
     // ---- workers, work names, preference keys ----
 
     /// <summary>
@@ -163,15 +185,17 @@ public class ConstitutionInvariantsTests
     [Fact]
     public void FrozenSetsAreNotEmpty()
     {
+        Assert.NotEmpty(ConstitutionIdentity.Activities);
         Assert.NotEmpty(ConstitutionIdentity.Workers);
         Assert.NotEmpty(ConstitutionIdentity.WorkNames);
         Assert.NotEmpty(ConstitutionIdentity.PreferenceKeys);
 
+        Assert.NotEmpty(ExpectedActivities);
         Assert.NotEmpty(ExpectedWorkers);
         Assert.NotEmpty(ExpectedWorkNames);
         Assert.NotEmpty(ExpectedPreferenceKeys);
 
-        Assert.All(ConstitutionIdentity.Workers.Concat(ConstitutionIdentity.WorkNames).Concat(ConstitutionIdentity.PreferenceKeys),
+        Assert.All(ConstitutionIdentity.Activities.Concat(ConstitutionIdentity.Workers).Concat(ConstitutionIdentity.WorkNames).Concat(ConstitutionIdentity.PreferenceKeys),
             value => Assert.False(string.IsNullOrWhiteSpace(value), "A frozen set holds a blank value."));
     }
 
