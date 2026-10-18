@@ -65,6 +65,20 @@ public static class BodySignals
     /// <summary>The units word on a chart's form head: "hours", "lb", "bpm", "ms", "a day".</summary>
     public static string Units(BodySignal signal) => Of(signal).Units;
 
+    /// <summary>True for a running total that is still being counted until its day is over: steps and active minutes.</summary>
+    public static bool IsDayTotal(BodySignal signal) => signal is BodySignal.Steps or BodySignal.ActiveMinutes;
+
+    /// <summary>
+    /// The readings with any day still being counted left out: today's steps and active minutes are a part of a
+    /// day, and shown or averaged they read as a collapse that rights itself by evening (S5). Every other
+    /// reading, and every earlier day, is kept.
+    /// </summary>
+    public static IEnumerable<BodyReading> Settled(IEnumerable<BodyReading> readings, DateOnly today)
+    {
+        ArgumentNullException.ThrowIfNull(readings);
+        return readings.Where(reading => !(IsDayTotal(reading.Signal) && reading.Day >= today));
+    }
+
     /// <summary>A move smaller than this is a wobble, not a move.</summary>
     internal static double SteadyBand(BodySignal signal) => Of(signal).SteadyBand;
 }

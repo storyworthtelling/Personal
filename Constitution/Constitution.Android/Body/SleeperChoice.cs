@@ -9,7 +9,7 @@ namespace Constitution.Body;
 /// "Which side of the bed is mine" over the app's private preferences, under the frozen key
 /// <see cref="ConstitutionIdentity.SleeperSideKey"/>. The household's Sleep Number login is shared, so the person is
 /// not: this is the only thing that tells the bed whose night to fetch. Until it is set, the bed is not used and the
-/// watch is read alone. The screen that sets it is another story; <see cref="Side"/> can be written when it exists.
+/// watch is read alone. Settings, Connections sets it (the Bed side row), and the same word is kept in the personal vault.
 /// </summary>
 public sealed class SleeperChoice(Context context) : ISleeperChoice
 {
@@ -22,7 +22,7 @@ public sealed class SleeperChoice(Context context) : ISleeperChoice
         set
         {
             using var editor = Preferences.Edit()!;
-            editor.PutString(ConstitutionIdentity.SleeperSideKey, SleeperSideCodec.Write(value));
+            editor.PutString(ConstitutionIdentity.SleeperSideKey, SleeperSideCodec.WriteChoice(value));
             editor.Apply();
         }
     }

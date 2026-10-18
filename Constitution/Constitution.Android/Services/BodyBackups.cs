@@ -3,7 +3,6 @@ using Codex.Ui.Voice;
 using Constitution.Body;
 using Constitution.Domain.Body;
 using Constitution.Infrastructure.Backup;
-using Constitution.Infrastructure.Body;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Http;
@@ -52,16 +51,34 @@ public static class BodyBackups
                 await ConstitutionVaults.Create(appContext).RestoreAsync(CancellationToken.None);
 
                 var store = BodyServices.Create(appContext).Store;
-                var replaceAll = store is JsonBodyStore file
-                    ? new BodyReplaceAll(file.ReplaceAll)
-                    : throw new InvalidOperationException("Body's store is not the file-backed store, so a restore has no way to place the install day.");
-                await RunnerFor(appContext).RestoreAtLaunchAsync(store, replaceAll, onRestored, CancellationToken.None);
+                await RunnerFor(appContext).RestoreAtLaunchAsync(store, onRestored, CancellationToken.None);
             }
             catch (Exception e)
             {
                 // The runners report their own failures as results; this is what is left (no files folder, a
                 // store of an unexpected kind). The next launch tries again, and the trail says why this one did not.
                 new ConstitutionVaultLog(appContext).Outcome($"body restore at launch failed: {e.GetType().Name}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// The app is leaving the foreground: writes any change still inside the backup's quiet window now, in the
+    /// background, without waiting. Nothing pending touches nothing; the runner reports its own failures, and what
+    /// is left is recorded by type name only.
+    /// </summary>
+    public static void FlushOnPause(Context context)
+    {
+        var appContext = context.ApplicationContext ?? context;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await RunnerFor(appContext).FlushAsync(BodyServices.CreateStore(appContext), CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                new ConstitutionVaultLog(appContext).Outcome($"body backup failed: {e.GetType().Name}");
             }
         });
     }

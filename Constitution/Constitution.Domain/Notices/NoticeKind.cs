@@ -17,6 +17,9 @@ public enum NoticeKind
     /// <summary>The bed cannot be reached; the line stops ("Waiting for the bed"). Problem.</summary>
     BedOffline,
 
+    /// <summary>The bed has not reported for a few days and nothing says why: waiting, not wrong. Reference.</summary>
+    BedSilent,
+
     /// <summary>A handwritten number was read with low confidence and has two chips to answer it. Caution.</summary>
     LowConfidenceRead,
 

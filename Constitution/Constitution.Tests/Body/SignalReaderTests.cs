@@ -98,18 +98,20 @@ public class SignalReaderTests
     public async Task NothingBeforeThisPassesRangeIsRewritten()
     {
         // A night that started before the range may come back as a partial reading of the day before it.
+        // (Moved a day earlier than before S6: a pass now reads a trailing window, so the day outside the range
+        // is the one before that window's first day.)
         var store = new MemoryBodyStore();
         store.SetInstallDay(Samples.Today.AddDays(-10));
-        store.Upsert([new BodyReading(BodySignal.Sleep, Samples.Today.AddDays(-3), 7.5), new BodyReading(BodySignal.Sleep, Samples.Today.AddDays(-2), 6)]);
+        store.Upsert([new BodyReading(BodySignal.Sleep, Samples.Today.AddDays(-4), 7.5), new BodyReading(BodySignal.Sleep, Samples.Today.AddDays(-2), 6)]);
         var source = new FakeHealthSource().Grant(
             BodySignal.Sleep,
-            Samples.Of(Samples.Today.AddDays(-3), 1.5),
+            Samples.Of(Samples.Today.AddDays(-4), 1.5),
             Samples.Of(Samples.Today.AddDays(-2), 6.25));
 
         await ReaderFor(store, source, Samples.Today).ReadAsync(default);
 
         var sleep = store.All().ToDictionary(reading => reading.Day, reading => reading.Value);
-        Assert.Equal(7.5, sleep[Samples.Today.AddDays(-3)]);
+        Assert.Equal(7.5, sleep[Samples.Today.AddDays(-4)]);
         Assert.Equal(6.25, sleep[Samples.Today.AddDays(-2)]);
     }
 
@@ -188,16 +190,37 @@ public class SignalReaderTests
     }
 
     [Fact]
-    public async Task NoSleepGrantMeansTheBedIsNotAsked()
+    public async Task NoSleepGrantAndNoSideMeansNoSleep()
     {
+        // Was NoSleepGrantMeansTheBedIsNotAsked, which pinned that the bed waited on Health Connect's sleep grant.
+        // Changed deliberately (S7): with no side chosen there is no filler, and with no grant the watch is not read either.
         var store = new MemoryBodyStore();
-        var filler = new FakeSleepFiller();
-        filler.Nights[Samples.Today] = 7;
         var source = new FakeHealthSource().Grant(BodySignal.Weight);
 
-        await ReaderFor(store, source, Samples.Today, filler: filler).ReadAsync(default);
+        await ReaderFor(store, source, Samples.Today, filler: null).ReadAsync(default);
 
-        Assert.Empty(filler.Asked);
+        Assert.DoesNotContain(source.Asked, ask => ask.Signal == BodySignal.Sleep);
+        Assert.DoesNotContain(store.All(), reading => reading.Signal == BodySignal.Sleep);
+    }
+
+    [Fact]
+    public async Task ABedOnlyPersonGetsSleepFromTheBed()
+    {
+        var store = new MemoryBodyStore();
+        store.SetInstallDay(Samples.Today.AddDays(-2));
+        var filler = new FakeSleepFiller();
+        filler.Nights[Samples.Today.AddDays(-1)] = 7.25;
+        filler.Nights[Samples.Today] = 6.5;
+        var source = new FakeHealthSource().Grant(BodySignal.Weight);
+
+        var report = await ReaderFor(store, source, Samples.Today, filler: filler).ReadAsync(default);
+
+        Assert.DoesNotContain(source.Asked, ask => ask.Signal == BodySignal.Sleep);
+        var sleep = store.All().Where(reading => reading.Signal == BodySignal.Sleep).ToDictionary(reading => reading.Day, reading => reading.Value);
+        Assert.Equal(7.25, sleep[Samples.Today.AddDays(-1)]);
+        Assert.Equal(6.5, sleep[Samples.Today]);
+        Assert.Equal(SignalReadStatus.Read, report.StatusOf(BodySignal.Sleep));
+        Assert.All(filler.Asked, ask => Assert.Null(ask.Watch));
     }
 
     [Fact]

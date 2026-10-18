@@ -144,18 +144,53 @@ public class JsonBodyStoreTests : IDisposable
     }
 
     [Fact]
-    public void ReplaceAllRestoresOntoAnEmptyStoreOnly()
+    public void MergeRestoredAddsWhatIsMissingAndKeepsLocalDays()
     {
         var store = new JsonBodyStore(FilePath);
         store.SetInstallDay(Samples.Today);
+        store.Upsert([Weight(2, 190)]);
 
-        Assert.True(store.ReplaceAll(Samples.Today.AddDays(-40), [Weight(3, 185), Weight(2, 184)]));
-        Assert.Equal(Samples.Today.AddDays(-40), store.InstallDay);
-        Assert.Equal(2, store.All().Count);
+        var changed = store.MergeRestored(Samples.Today.AddDays(-40), [Weight(3, 185), Weight(2, 184)]);
 
-        Assert.False(store.ReplaceAll(Samples.Today.AddDays(-80), [Weight(0, 1)]));
+        Assert.True(changed);
         Assert.Equal(Samples.Today.AddDays(-40), store.InstallDay);
-        Assert.Equal(2, store.All().Count);
+        var weights = store.All().ToDictionary(reading => reading.Day, reading => reading.Value);
+        Assert.Equal(2, weights.Count);
+        Assert.Equal(190, weights[Samples.Today.AddDays(-2)]);
+        Assert.Equal(185, weights[Samples.Today.AddDays(-3)]);
+    }
+
+    [Fact]
+    public void MergeRestoredNeverMovesTheInstallDayLater()
+    {
+        var store = new JsonBodyStore(FilePath);
+        store.SetInstallDay(Samples.Today.AddDays(-60));
+
+        var changed = store.MergeRestored(Samples.Today.AddDays(-10), []);
+
+        Assert.False(changed);
+        Assert.Equal(Samples.Today.AddDays(-60), store.InstallDay);
+    }
+
+    [Fact]
+    public void MergeRestoredOntoAnUndatedStoreTakesTheBackupsDay()
+    {
+        var store = new JsonBodyStore(FilePath);
+
+        Assert.True(store.MergeRestored(Samples.Today.AddDays(-5), [Weight(1, 180)]));
+        Assert.Equal(Samples.Today.AddDays(-5), store.InstallDay);
+    }
+
+    [Fact]
+    public void MergeRestoredWithNothingNewChangesNothingAndWritesNothing()
+    {
+        var store = new JsonBodyStore(FilePath);
+        store.SetInstallDay(Samples.Today.AddDays(-5));
+        store.Upsert([Weight(1, 180)]);
+        var before = File.ReadAllText(FilePath);
+
+        Assert.False(store.MergeRestored(Samples.Today.AddDays(-5), [Weight(1, 999)]));
+        Assert.Equal(before, File.ReadAllText(FilePath));
     }
 
     [Fact]

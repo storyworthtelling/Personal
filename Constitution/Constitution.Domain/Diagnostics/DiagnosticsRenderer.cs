@@ -7,7 +7,8 @@ namespace Constitution.Domain.Diagnostics;
 /// Turns a <see cref="DiagnosticsSnapshot"/> into the plain text the owner shares. Pure and
 /// deterministic: the snapshot in, the same text out, with the sentences all coming from
 /// <see cref="DiagnosticsPhrases"/> and the numbers all from bounded counts. The renderer holds no
-/// private information to leak because the snapshot holds none to give it.
+/// private information to leak because the snapshot holds none to give it. The trail lines are the one place free
+/// text could ride in, which is why each is a <see cref="TrailLine"/>: made only through <see cref="TrailLines.Filter"/>.
 /// </summary>
 public static class DiagnosticsRenderer
 {
@@ -61,6 +62,25 @@ public static class DiagnosticsRenderer
         if (snapshot.Credentials.Count == 0)
         {
             text.Append("  None reported\n");
+        }
+
+        // The newest lines of each trail, each already through TrailLines.Filter. Body first, whatever order they came in.
+        text.Append("\nTrails\n");
+        foreach (var section in snapshot.Trails.OrderBy(section => section.Kind))
+        {
+            text.Append("  ").Append(DiagnosticsPhrases.Of(section.Kind)).Append('\n');
+            foreach (var line in section.Lines)
+            {
+                text.Append("    ").Append(line.Value).Append('\n');
+            }
+            if (section.Lines.Count == 0)
+            {
+                text.Append("    Nothing recorded yet\n");
+            }
+        }
+        if (snapshot.Trails.Count == 0)
+        {
+            text.Append("  Nothing recorded yet\n");
         }
 
         return text.ToString();

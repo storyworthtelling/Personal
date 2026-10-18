@@ -23,7 +23,6 @@ public class HealthManifestTests
     [
         "android.permission.health.READ_WEIGHT",
         "android.permission.health.READ_BODY_FAT",
-        "android.permission.health.READ_LEAN_BODY_MASS",
         "android.permission.health.READ_RESTING_HEART_RATE",
         "android.permission.health.READ_HEART_RATE_VARIABILITY",
         "android.permission.health.READ_STEPS",
@@ -71,6 +70,25 @@ public class HealthManifestTests
         Assert.Contains(ShowRationale, HealthManifestReader.Actions(activity!));
 
         AssertAlias(merged, "the merged Release manifest");
+    }
+
+    [Fact]
+    public void TheMergedManifestReadIsTheLibraryMergedOne()
+    {
+        // Review S2. The pre-merge file has only what the head declares; the merged one also carries what the libraries add.
+        Assert.EndsWith(
+            Path.Combine("net10.0-android", "android", "AndroidManifest.xml"), MergedReleaseManifestPath(), StringComparison.Ordinal);
+
+        var merged = MergedReleaseManifest();
+        if (merged is null)
+        {
+            return;
+        }
+
+        var all = HealthManifestReader.ManifestPermissions(merged);
+        Assert.Contains("android.permission.INTERNET", all);
+        Assert.Contains(all, name => !name.StartsWith(HealthPermissions.Prefix, StringComparison.Ordinal) && name != "android.permission.INTERNET");
+        Assert.Equal("false", (string?)merged.Descendants("application").Single().Attribute(HealthManifestReader.Android + "allowBackup"));
     }
 
     [Fact]
@@ -138,6 +156,22 @@ public class HealthManifestTests
         Assert.True(nonLiteral.Count == 0, "Declare health permissions as string literals:\n" + string.Join("\n", nonLiteral));
     }
 
+    [Fact]
+    public void NothingDeclaresOrNamesLeanBodyMass()
+    {
+        // Review S11: it was declared and asked for but never read. Spelled in pieces so this file is not what trips it.
+        var word = "LEAN" + "_BODY" + "_MASS";
+        var camel = "LeanBody" + "Mass";
+        var mentions = ConstitutionSource.Files(".cs")
+            .Where(file => !ConstitutionSource.Relative(file).StartsWith("Constitution.Tests/", StringComparison.Ordinal))
+            .Where(file => File.ReadAllText(file) is var text
+                && (text.Contains(word, StringComparison.Ordinal) || text.Contains(camel, StringComparison.Ordinal)))
+            .Select(ConstitutionSource.Relative)
+            .ToList();
+
+        Assert.True(mentions.Count == 0, "Lean body mass is not read; remove it from:\n" + string.Join("\n", mentions));
+    }
+
     // ---- the detectors themselves ----
 
     [Fact]
@@ -199,9 +233,18 @@ public class HealthManifestTests
         return XDocument.Load(path);
     }
 
+    /// <summary>
+    /// Where the build writes the manifest the phone installs: after the libraries' manifests are merged in. The file one
+    /// folder up (<c>obj/Release/net10.0-android/AndroidManifest.xml</c>) is the head's own, BEFORE that merge, and was what
+    /// this guard read until review S2, so what WorkManager and friends add never reached it.
+    /// </summary>
+    private static string MergedReleaseManifestPath() =>
+        Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "obj", "Release", "net10.0-android", "android", "AndroidManifest.xml");
+
     private static XDocument? MergedReleaseManifest()
     {
-        var path = Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "obj", "Release", "net10.0-android", "AndroidManifest.xml");
+        // Null only when no Release build has been made here; CI's HEALTH PERMISSION CHECK reads the APK itself.
+        var path = MergedReleaseManifestPath();
         return File.Exists(path) ? XDocument.Load(path) : null;
     }
 

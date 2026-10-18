@@ -27,6 +27,9 @@ public enum VaultField
 
     /// <summary>This person's work schedule, written by Foreword and only ever read here (personal vault).</summary>
     WorkSchedule,
+
+    /// <summary>Which side of the household bed is this person's (personal vault).</summary>
+    SleeperSide,
 }
 
 /// <summary>
@@ -57,4 +60,10 @@ public interface IConstitutionConnections
 
     /// <summary>This person's work schedule as the JSON Foreword keeps, or empty. Restored here, never published from here.</summary>
     string WorkScheduleJson { get; set; }
+
+    /// <summary>
+    /// This person's side of the household bed: <c>left</c>, <c>right</c>, <c>none</c> (chosen: the bed is not theirs to
+    /// read) or empty (never chosen). Empty is the only state a restore fills, so choosing none is not undone by one.
+    /// </summary>
+    string SleeperSide { get; set; }
 }

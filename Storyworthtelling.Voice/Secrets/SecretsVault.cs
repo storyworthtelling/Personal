@@ -139,6 +139,13 @@ public sealed record PersonalVault
     // policy, so it is frozen from the day it is first written.
     public string HealthConnectChoicesJson { get; init; } = string.Empty;
 
+    // Constitution's bed side: which side of the household's Sleep Number bed is this person's, as the
+    // word "left" or "right", or "none" when they chose the bed is not theirs to read. Empty means never
+    // chosen. The household shares one bed login, so the side is the one fact that must differ between
+    // the two installs: here it is per person, and never in the shared vault. The WIRE KEY is this
+    // property's name, with no naming policy, so it is frozen from the day it is first written.
+    public string SleeperSide { get; init; } = string.Empty;
+
     public static PersonalVault Empty { get; } = new();
 }
 

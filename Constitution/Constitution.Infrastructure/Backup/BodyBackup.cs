@@ -15,10 +15,12 @@ namespace Constitution.Infrastructure.Backup;
 ///
 /// <para><b>Three rules outrank every feature here, and each has a test that names it.</b></para>
 /// <list type="number">
-/// <item><b>A restore lands only on an install with no history.</b> Whatever the backup holds, an
-/// install that already has readings is left exactly as it is, and the backup is not even opened. The
-/// check is made again after Drive answers, because the reader may have written a first reading in the
-/// meantime.</item>
+/// <item><b>A restore only ever adds.</b> It is a merge into whatever this install holds: a day the
+/// install already read keeps its own reading, every other reading of the backup is added, and the
+/// install day becomes the earlier of the two. (It used to land only on an empty install, which forfeited
+/// the restore the moment the reader stored a first reading, and the reader does that before the owner has
+/// typed the passphrase.) It still writes nothing to Drive, and the file it reads is the one in the
+/// signed-in account's own Drive.</item>
 /// <item><b>Nothing is ever written over a file that could not be read.</b> The Body history is kept for
 /// ever and this file may be the only copy of it, so a backup reads what is there first and refuses
 /// (<see cref="BodyBackupOutcome.RefusedUnreadable"/>) when it exists and will not open: a mistyped
@@ -74,8 +76,8 @@ public sealed class BodyBackup
     // ---- restore ----
 
     /// <summary>
-    /// Puts the backed-up history into <paramref name="store"/>, but only when the store holds no
-    /// history at all. Writes nothing to Drive.
+    /// Merges the backed-up history into <paramref name="store"/> without costing it anything it has
+    /// (<see cref="IBodyStore.MergeRestored"/>). Writes nothing to Drive.
     /// </summary>
     public async Task<BodyRestoreResult> RestoreAsync(string? passphrase, IBodyStore store, CancellationToken cancellationToken)
     {
@@ -101,12 +103,6 @@ public sealed class BodyBackup
             return new BodyRestoreResult(BodyRestoreOutcome.NoPassphrase);
         }
 
-        // Rule 1, first half: an install with history is not even looked at.
-        if (!store.IsEmpty)
-        {
-            return new BodyRestoreResult(BodyRestoreOutcome.SkippedNotEmpty);
-        }
-
         var remote = await ReadRemoteAsync(passphrase, cancellationToken);
         switch (remote.Kind)
         {
@@ -126,21 +122,10 @@ public sealed class BodyBackup
             return new BodyRestoreResult(BodyRestoreOutcome.NoBackup);
         }
 
-        // Rule 1, second half: the reader may have written a first reading while Drive was answering.
-        if (!store.IsEmpty)
-        {
-            return new BodyRestoreResult(BodyRestoreOutcome.SkippedNotEmpty);
-        }
-
-        // The install day first, so a store that takes it once takes the backup's. A failure in the
-        // store is the store's to report; it is not turned into an outcome here.
-        if (history.InstallDay is { } installDay)
-        {
-            store.SetInstallDay(installDay);
-        }
-
-        store.Upsert(history.Readings);
-        return new BodyRestoreResult(BodyRestoreOutcome.Restored);
+        // Merged: local days win, the rest is added, the earlier install day wins. A failure in the store is the
+        // store's to report; it is not turned into an outcome here.
+        var changed = store.MergeRestored(history.InstallDay, history.Readings);
+        return new BodyRestoreResult(changed ? BodyRestoreOutcome.Restored : BodyRestoreOutcome.NothingNew);
     }
 
     // ---- backup ----
@@ -397,8 +382,8 @@ public sealed class BodyBackup
         {
             case BodyRestoreOutcome.Restored:
                 return "body restore: restored";
-            case BodyRestoreOutcome.SkippedNotEmpty:
-                return "body restore: skipped (history already here)";
+            case BodyRestoreOutcome.NothingNew:
+                return "body restore: nothing new";
             case BodyRestoreOutcome.NoBackup:
                 return "body restore: no backup found";
             case BodyRestoreOutcome.WrongPassphrase:

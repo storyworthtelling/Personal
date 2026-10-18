@@ -13,4 +13,10 @@ public interface ISleepGapFiller
     /// the watch covered it, the bed had no reading, or the bed could not be reached.
     /// </summary>
     Task<double?> BedHoursAsync(DateOnly day, double? watchHours, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// True once the bed has failed to answer: the reader asks it no more for the rest of the pass (S1), so a
+    /// refused login is one failed sign-in and not one per night.
+    /// </summary>
+    bool GaveUp { get; }
 }

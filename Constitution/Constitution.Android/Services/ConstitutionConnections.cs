@@ -59,6 +59,12 @@ public sealed class ConstitutionConnections(Context context) : IConstitutionConn
         set => Write(ConstitutionIdentity.WorkScheduleKey, value);
     }
 
+    public string SleeperSide
+    {
+        get => Read(ConstitutionIdentity.SleeperSideKey);
+        set => Write(ConstitutionIdentity.SleeperSideKey, value);
+    }
+
     private string Read(string key) => Preferences.GetString(key, string.Empty) ?? string.Empty;
 
     private void Write(string key, string? value)

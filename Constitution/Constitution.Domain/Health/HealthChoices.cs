@@ -90,6 +90,47 @@ public sealed class HealthChoices
         return next;
     }
 
+    /// <summary>
+    /// The choices JSON as an install should hold it when it has been brought in from the personal vault rather
+    /// than made here. A grant belongs to the install it was given on (the platform holds it, not the vault), so a
+    /// restored "granted" is an "asked": the chart asks again. Left as it came, "granted but not granted now" reads
+    /// as a permission taken away, and a fresh install would raise a false Problem notice about Health Connect.
+    /// Anything else in the document, and a document of another shape, is handed back exactly as it was.
+    /// </summary>
+    public static string AsRestored(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return json ?? string.Empty;
+        }
+
+        try
+        {
+            if (System.Text.Json.Nodes.JsonNode.Parse(json) is not System.Text.Json.Nodes.JsonObject root
+                || root["signals"] is not System.Text.Json.Nodes.JsonObject signals)
+            {
+                return json;
+            }
+
+            foreach (var key in signals.Select(entry => entry.Key).ToList())
+            {
+                if (signals[key] is System.Text.Json.Nodes.JsonValue value
+                    && value.TryGetValue<string>(out var word)
+                    && word == "granted")
+                {
+                    signals[key] = "asked";
+                }
+            }
+
+            return root.ToJsonString();
+        }
+        catch (JsonException)
+        {
+            // Not JSON at all: nothing to demote, and not ours to repair. FromJson reads it as nothing chosen.
+            return json;
+        }
+    }
+
     /// <summary>The JSON the personal vault carries, signals in Health Connect order.</summary>
     public string ToJson()
     {

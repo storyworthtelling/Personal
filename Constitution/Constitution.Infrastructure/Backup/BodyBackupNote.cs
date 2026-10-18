@@ -29,8 +29,8 @@ public static class BodyBackupNote
         {
             case BodyRestoreOutcome.Restored:
                 return "Body history was brought back from the backup.";
-            case BodyRestoreOutcome.SkippedNotEmpty:
-                return "This phone already has Body history, so the backup was left as it is.";
+            case BodyRestoreOutcome.NothingNew:
+                return "This phone already has everything the Body backup holds.";
             case BodyRestoreOutcome.NoBackup:
                 return "There is no Body backup yet. One is made once Body has read.";
             case BodyRestoreOutcome.WrongPassphrase:

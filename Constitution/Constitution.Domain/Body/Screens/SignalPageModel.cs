@@ -64,6 +64,7 @@ public sealed class SignalPageModel
     public static SignalPageModel Build(BodyTabInputs inputs, BodySignal signal)
     {
         ArgumentNullException.ThrowIfNull(inputs);
+        inputs = inputs.Settled();
         var bed = BedOffline.Judge(inputs.Readings, inputs.BedChosen, inputs.Today);
         var card = BodyTabModel.CardFor(inputs, signal, bed);
         var ask = BodyTabModel.AskFor(inputs, signal);

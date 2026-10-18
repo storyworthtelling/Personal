@@ -29,8 +29,8 @@ public static class HealthSignalPermissions
     }
 
     /// <summary>
-    /// The permission whose grant lets the signal be read. For body composition that is body fat (the
-    /// charted unit is body-fat percent); lean body mass is asked for beside it but is not what the chart draws.
+    /// The permission whose grant lets the signal be read: the first of its read permissions. For body composition
+    /// that is body fat, which is also all it asks for (the charted unit is body-fat percent).
     /// </summary>
     public static string Primary(BodySignal signal) => For(signal)[0];
 }

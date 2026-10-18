@@ -8,7 +8,7 @@ namespace Constitution.Tests.Diagnostics;
 /// The first line of defence for C-8.3.2, and a stronger one than a scan: the snapshot's type graph
 /// has no member that <i>can</i> hold a reading, a name, a birthdate or a recipe. Walking the graph
 /// from <see cref="DiagnosticsSnapshot"/> over every field, property and public constructor
-/// parameter, the only leaves are integers (counts, capped), booleans, enums, and the three validated
+/// parameter, the only leaves are integers (counts, capped), booleans, enums, and the four validated
 /// identifiers — and no member is named for health or a person.
 ///
 /// <para>A new field with free text on it fails here, before anything is rendered; widening the
@@ -22,6 +22,9 @@ public class DiagnosticsSnapshotShapeTests
         "DocumentFile.Value", "DocumentFile.<Value>k__BackingField",
         "ConnectionId.Value", "ConnectionId.<Value>k__BackingField",
         "AppVersion.Value", "AppVersion.<Value>k__BackingField",
+        // Review S8, deliberately: a trail line is a fourth validated identifier. It can be made only through TrailLines.Filter,
+        // which keeps a line whole or withholds it (TrailLinesTests plants weights, names, emails and long digit runs).
+        "TrailLine.Value", "TrailLine.<Value>k__BackingField",
     ];
 
     /// <summary>The only integers: counts, each bounded by its constructor (see <c>ACountIsBounded</c>).</summary>
@@ -58,6 +61,7 @@ public class DiagnosticsSnapshotShapeTests
         [
             nameof(DiagnosticsSnapshot), nameof(DiagnosticsCounts), nameof(NoticeCount), nameof(ComponentOutcome),
             nameof(DocumentDelivery), nameof(DocumentFile), nameof(CredentialStatus), nameof(ConnectionId), nameof(AppVersion),
+            nameof(TrailSection), nameof(TrailLine),
         ];
         foreach (var name in expected)
         {
@@ -261,6 +265,6 @@ public class DiagnosticsSnapshotShapeTests
 
     /// <summary>The private constructor of a validated identifier takes its one string; it is the only door, and it checks the shape.</summary>
     private static bool IsParameterOfValidatedType(Type owner, Member member) =>
-        owner.Name is "DocumentFile" or "ConnectionId" or "AppVersion" && member.Name == "value"
+        owner.Name is "DocumentFile" or "ConnectionId" or "AppVersion" or "TrailLine" && member.Name == "value"
         && owner.GetConstructors(BindingFlags.Public | BindingFlags.Instance).Length == 0;
 }

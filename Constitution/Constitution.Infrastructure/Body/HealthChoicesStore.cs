@@ -44,7 +44,7 @@ public sealed class HealthChoicesStore
 
         connections.HealthConnectChoicesJson = json;
         var result = await publish([VaultField.HealthConnectChoices], cancellationToken).ConfigureAwait(false);
-        log.Outcome($"health choices saved; vault publish {result?.Status.ToString() ?? "queued"}");
+        log.Outcome($"health choices saved; vault publish {result?.Status.ToString().ToLowerInvariant() ?? "queued"}");
     }
 
     /// <summary>Brings the saved choices into line with what the platform grants now, and saves them if that changed anything.</summary>

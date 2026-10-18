@@ -21,4 +21,11 @@ public static class SleeperSideCodec
         BedSide.Right => "right",
         _ => string.Empty,
     };
+
+    /// <summary>
+    /// A side the person chose, or <c>none</c> when they chose not to use the bed. Unlike <see cref="Write"/>, which
+    /// leaves nothing chosen blank, this records a decision, so a restore from the vault (which fills only blanks)
+    /// cannot hand the old side back.
+    /// </summary>
+    public static string WriteChoice(BedSide? side) => side is null ? "none" : Write(side);
 }

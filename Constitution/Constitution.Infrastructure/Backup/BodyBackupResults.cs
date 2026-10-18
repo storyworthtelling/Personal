@@ -3,11 +3,11 @@ namespace Constitution.Infrastructure.Backup;
 /// <summary>How restoring the Body backup onto this install went.</summary>
 public enum BodyRestoreOutcome
 {
-    /// <summary>The backup was read and its history put into this install's empty store.</summary>
+    /// <summary>The backup was read and what this install lacked was added to it (a day this install already read is kept as it was).</summary>
     Restored,
 
-    /// <summary>This install already holds Body history, so the backup was left alone and not even opened.</summary>
-    SkippedNotEmpty,
+    /// <summary>The backup holds nothing this install lacks, and no earlier install day: there was nothing to bring back.</summary>
+    NothingNew,
 
     /// <summary>There is no backup in Drive yet, or it holds no readings: nothing to restore.</summary>
     NoBackup,

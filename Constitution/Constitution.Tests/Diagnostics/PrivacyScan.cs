@@ -25,6 +25,16 @@ internal static class PrivacyScan
     private static readonly Regex DocumentLine = new(
         @"^\s*(workout|meals|digest)-\d{4}-\d{2}-\d{2}\.pdf\b", RegexOptions.Multiline | RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// The one word a trail line is allowed to say that the export otherwise bans (review S8, a deliberate allowance):
+    /// the NAME of a signal after "read" or "permission" and before its colon ("body read weight: ok, 2 readings"). It
+    /// names which signal was read, never what it read, and it stops at the colon: a value after it, or the word
+    /// anywhere else, is still found. Nothing else in a trail line is excused; its stamp and counts have no unit,
+    /// decimal point or long run, which the shapes below would find.
+    /// </summary>
+    private static readonly Regex SignalNameInATrailLine = new(
+        @"(?<=\b(?:read|permission) )weight(?=:)", RegexOptions.CultureInvariant);
+
     private static readonly (string Kind, Regex Pattern)[] Shapes =
     [
         ("forbidden word", new Regex(@"(?i)weight|kcal|calorie|birth|bpm|\bkg\b", RegexOptions.CultureInvariant)),
@@ -53,7 +63,7 @@ internal static class PrivacyScan
             kinds.Add("dish");
         }
 
-        var stripped = DocumentLine.Replace(VersionLine.Replace(text, string.Empty), string.Empty);
+        var stripped = SignalNameInATrailLine.Replace(DocumentLine.Replace(VersionLine.Replace(text, string.Empty), string.Empty), string.Empty);
         foreach (var (kind, pattern) in Shapes)
         {
             if (pattern.IsMatch(stripped))

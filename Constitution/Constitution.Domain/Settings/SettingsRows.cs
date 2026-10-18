@@ -63,3 +63,10 @@ public sealed record ConnectionRow(
 {
     public bool IsProblem => Status == ConnectionStatus.Problem;
 }
+
+/// <summary>
+/// The "Overnight reads" line under the Health Connect row (review S10). The overnight permission is declared but the
+/// platform only grants it from Health Connect's own page, so the line says so in one sentence and offers the button
+/// that opens that page.
+/// </summary>
+public sealed record OvernightReadsRow(string Name, string Sentence, string ButtonLabel);

@@ -41,3 +41,21 @@ public class SleeperSideTests
         Assert.Contains("sleeper-side", ConstitutionIdentity.PreferenceKeys);
     }
 }
+
+/// <summary>Review S7: choosing no side is a choice, and is stored as one so a restore does not take it back.</summary>
+public class SleeperNoSideTests
+{
+    [Fact]
+    public void ChoosingNoSideIsWrittenAsNone()
+    {
+        Assert.Equal("none", Constitution.Infrastructure.Body.SleeperSideCodec.WriteChoice(null));
+        Assert.Equal("left", Constitution.Infrastructure.Body.SleeperSideCodec.WriteChoice(BedSide.Left));
+        Assert.Equal("right", Constitution.Infrastructure.Body.SleeperSideCodec.WriteChoice(BedSide.Right));
+    }
+
+    [Fact]
+    public void NoneReadsBackAsNoSide()
+    {
+        Assert.Null(Constitution.Infrastructure.Body.SleeperSideCodec.Read("none"));
+    }
+}

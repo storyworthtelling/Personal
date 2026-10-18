@@ -64,6 +64,20 @@ public class SettingsModelTests
     {
         Assert.Equal("Export diagnostics", Build().ExportLabel);
     }
+
+    // ---- review S10: the overnight permission is asked for by a line, not promised ----
+
+    [Fact]
+    public void ConnectionsCarryAnOvernightReadsLineWithItsPlainSentence()
+    {
+        var model = SettingsModel.Build(new Pillars(Body: true, Workouts: true, Meals: true), EquipmentSet.Of([]), []);
+
+        Assert.Equal("Overnight reads", model.OvernightReads.Name);
+        Assert.Equal(
+            "Allow overnight reads in Health Connect so the morning check is current; otherwise values refresh when you open the app.",
+            model.OvernightReads.Sentence);
+        Assert.Equal("Open Health Connect", model.OvernightReads.ButtonLabel);
+    }
 }
 
 public class EquipmentSetTests

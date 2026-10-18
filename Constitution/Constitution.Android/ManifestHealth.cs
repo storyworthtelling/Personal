@@ -9,12 +9,11 @@ using Android.App;
 // is Constitution.Domain.Health.HealthPermissions; the test fails if the two disagree. Every name was
 // read out of Mono.Android's own metadata (Microsoft.Android.Ref.36), not typed from memory.
 //
-// Body composition is body fat plus lean body mass; "active minutes" is read from exercise sessions
+// Body composition is body fat alone (lean body mass was declared and never read, review S11); "active minutes" is read from exercise sessions
 // (their duration), the closest source the platform has. See HealthPermissions for what was assumed,
 // since the device spike (C-11.4.2) was skipped (D97).
 [assembly: UsesPermission("android.permission.health.READ_WEIGHT")]
 [assembly: UsesPermission("android.permission.health.READ_BODY_FAT")]
-[assembly: UsesPermission("android.permission.health.READ_LEAN_BODY_MASS")]
 [assembly: UsesPermission("android.permission.health.READ_RESTING_HEART_RATE")]
 [assembly: UsesPermission("android.permission.health.READ_HEART_RATE_VARIABILITY")]
 [assembly: UsesPermission("android.permission.health.READ_STEPS")]

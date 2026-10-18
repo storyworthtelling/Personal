@@ -121,6 +121,34 @@ internal sealed class InMemoryBodyStore : IBodyStore
         SetInstallDayCalls++;
         InstallDay ??= day;
     }
+
+    public int MergeCalls { get; private set; }
+
+    public bool MergeRestored(DateOnly? installDay, IEnumerable<BodyReading> incoming)
+    {
+        MergeCalls++;
+        if (UpsertFailure is not null)
+        {
+            throw UpsertFailure;
+        }
+
+        var changed = false;
+        foreach (var reading in incoming)
+        {
+            if (readings.TryAdd((reading.Signal, reading.Day), reading.Value))
+            {
+                changed = true;
+            }
+        }
+
+        if (installDay is { } day && (InstallDay is null || day < InstallDay))
+        {
+            InstallDay = day;
+            changed = true;
+        }
+
+        return changed;
+    }
 }
 
 internal sealed class RecordingLog : IConstitutionVaultLog
