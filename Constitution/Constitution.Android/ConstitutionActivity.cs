@@ -5,6 +5,7 @@ using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
+using Constitution.Body;
 using Constitution.Domain.Areas;
 using Constitution.Domain.Layout;
 using Constitution.Domain.Waiting;
@@ -92,6 +93,9 @@ public abstract class ConstitutionActivity : Activity
 
         // After a reset or reinstall, refill the connections from the Drive vault (background; no-op without a passphrase).
         ConstitutionVaults.RestoreAtLaunch(this);
+
+        // Body's overnight read, under its frozen unique name; Keep means a relaunch changes nothing (C-7.1.3).
+        BodySyncWorker.Schedule(this);
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
@@ -110,6 +114,9 @@ public abstract class ConstitutionActivity : Activity
         {
             area.Resume();
         }
+
+        // Where background reads are not granted the app's own opening is the refresh (R5); off the UI thread.
+        BodyServices.RefreshAtOpen(this);
 
         // The pillars may have changed since the shell was last on screen.
         RefreshTabs();

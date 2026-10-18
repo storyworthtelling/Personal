@@ -133,6 +133,13 @@ public static class ConstitutionIdentity
     /// </summary>
     public const string EquipmentConfirmedKey = "equipment-confirmed";
 
+    /// <summary>
+    /// Which side of the Sleep Number bed this install's owner lies on, the word <c>left</c> or <c>right</c>, inside
+    /// <see cref="SettingsPreferencesName"/> (C-7.1.2). The household login is shared, so the person is not: this is
+    /// what tells the bed whose night to fetch. Absent means no side chosen, and then the watch is read alone.
+    /// </summary>
+    public const string SleeperSideKey = "sleeper-side";
+
     /// <summary>Every registered activity and alias Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Activities { get; } = [MainActivityName, HealthRationaleActivityName, PermissionUsageAliasName];
 
@@ -147,6 +154,6 @@ public static class ConstitutionIdentity
         SettingsPreferencesName, PillarWorkoutsKey, PillarMealsKey, PillarBodyKey,
         SleepNumberLoginKey, SleepNumberPasswordKey, RemarkableTokenKey, ClaudeKeyKey, GeminiKeyKey,
         HealthConnectChoicesKey, WorkScheduleKey, EquipmentOwnedKey,
-        EquipmentConfirmedKey, SleepNumberSavedKey, RemarkableSavedKey,
+        EquipmentConfirmedKey, SleepNumberSavedKey, RemarkableSavedKey, SleeperSideKey,
     ];
 }
