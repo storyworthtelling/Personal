@@ -60,6 +60,9 @@ public class ConstitutionInvariantsTests
         // older failure is not held against the new credential. A deliberate edit.
         "credential-sleep-number-saved-at",
         "credential-remarkable-saved-at",
+        // Added with reading the signals (C-7.1.2): which side of the bed is this install's owner, so the bed's
+        // night can fill one the watch missed. A deliberate edit.
+        "sleeper-side",
     ];
 
     // ---- the package id ----
