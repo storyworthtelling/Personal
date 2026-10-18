@@ -2130,7 +2130,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
 | G10 | a document carries meaning by colour | `DocumentGreyscaleTests` | C-2.1.3 |
 | G11 | a seventh voice seat appears, or an error reaches one | `VoicedOccasionTests` | C-9.2.1 |
 | G12 | a Body chart can carry a norm, score, streak, target or good/bad colour | `HonestChartTests` | C-7.3.2 |
-| G13 | Body data reaches any outbound path but its own backup | `BodyStaysHomeTests` | C-7.4.2 |
+| G13 | Body data reaches any outbound path but its own backup and the voice-seat facts (D98) | `BodyStaysHomeTests` | C-7.4.2 |
 | G14 | a store writes over a file it cannot decrypt | `BodyBackupTests`, `Storyworthtelling.Household.Tests` | C-7.4.1, C-6.1.1 |
 | G15 | two installs plan one week, or interleaved writes fail to converge | `PlanningLeaseTests`, household tests | C-6.1.3, C-6.1.1 |
 | G16 | a placement overlaps busy time or double-books | `PlacementPropertyTests` | C-5.3.4 |
