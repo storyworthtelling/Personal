@@ -1026,7 +1026,9 @@ public sealed class PodcastsArea : ScoreArea
     // Fetches one feed, folding the family of expected feed failures into a result rather than throwing, so
     // one bad feed never sinks the whole concurrent refresh: a moved feed serving HTML (InvalidDataException),
     // a network drop (HttpRequestException), a timeout (OperationCanceledException), or a corrupt stored URL
-    // (UriFormatException) all come back as a failed host.
+    // (UriFormatException) all come back as a failed host. On Android a DNS failure surfaces as a
+    // WebException (AndroidMessageHandler), not an HttpRequestException, and a dropped body read as an
+    // IOException — missing either let one offline feed fault the whole refresh as an unobserved task.
     private static async Task<FeedFetchResult> FetchFeedAsync(RssFeedClient client, PodcastSubscription subscription)
     {
         try
@@ -1035,7 +1037,8 @@ public sealed class PodcastsArea : ScoreArea
             return new FeedFetchResult(subscription, feed, null);
         }
         catch (Exception e) when (
-            e is HttpRequestException or InvalidDataException or System.OperationCanceledException or UriFormatException)
+            e is HttpRequestException or System.Net.WebException or System.IO.IOException or InvalidDataException
+                or System.OperationCanceledException or UriFormatException)
         {
             var host = Uri.TryCreate(subscription.FeedUrl, UriKind.Absolute, out var uri)
                 ? uri.Host
