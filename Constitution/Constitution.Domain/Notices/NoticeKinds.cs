@@ -28,6 +28,7 @@ public static class NoticeKinds
         NoticeKind.ScanToCheck => FoldRole.Progress,
         NoticeKind.BoxUnderTen => FoldRole.Reference,
         NoticeKind.KeepHandoff => FoldRole.Reference,
+        NoticeKind.NoPenMarks => FoldRole.Caution,
         _ => throw new ArgumentOutOfRangeException(
             nameof(kind), kind, "This notice kind has no role; add it to NoticeKinds.RoleOf and the role table in ConstitutionNoticeTests."),
     };

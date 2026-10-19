@@ -28,6 +28,7 @@ public class ConstitutionNoticeTests
         (NoticeKind.ScanToCheck, FoldRole.Progress),
         (NoticeKind.BoxUnderTen, FoldRole.Reference),
         (NoticeKind.KeepHandoff, FoldRole.Reference),
+        (NoticeKind.NoPenMarks, FoldRole.Caution),
     ];
 
     // ---- EachKindHasItsRole -------------------------------------------------------------------

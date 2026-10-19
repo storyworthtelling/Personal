@@ -110,6 +110,11 @@ public sealed class WaitingPageModel
                 "Send the list to Keep to shop from it.",
                 new WaitingButton("Send to Keep", WaitingActionId.SendToKeep),
                 NoChips),
+            NoticeKind.NoPenMarks => (
+                "Yesterday’s page came back with no pen marks",
+                "If you wrote on it, the reMarkable’s cloud may not be passing your ink along. Constitution keeps the page and looks again each morning.",
+                null,
+                NoChips),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(notice), notice.Kind, "This notice kind has no Waiting copy; add it to WaitingPageModel."),
         };

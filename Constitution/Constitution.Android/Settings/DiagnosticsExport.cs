@@ -4,6 +4,7 @@ using Constitution.Body;
 using Constitution.Domain.Credentials;
 using Constitution.Domain.Diagnostics;
 using Constitution.Domain.Notices;
+using Constitution.ReadBack;
 using Constitution.Services;
 using CredentialHealthReport = Storyworthtelling.Voice.Health.CredentialHealthReport;
 
@@ -58,9 +59,13 @@ public static class DiagnosticsExport
             ]);
     }
 
-    // Body's sync records how its last run ended; the other parts have no worker recording yet.
-    private static DiagnosticsOutcome OutcomeOf(Context context, DiagnosticsComponent component) =>
-        component == DiagnosticsComponent.BodySync ? BodyServices.Create(context).Status.LastOutcome() : DiagnosticsOutcome.NeverRan;
+    // Body's sync and the morning read-back record how their last run ended; the other parts have no worker recording yet.
+    private static DiagnosticsOutcome OutcomeOf(Context context, DiagnosticsComponent component) => component switch
+    {
+        DiagnosticsComponent.BodySync => BodyServices.Create(context).Status.LastOutcome(),
+        DiagnosticsComponent.ReadBack => ReadBackServices.StatusOf(context).LastOutcome(),
+        _ => DiagnosticsOutcome.NeverRan,
+    };
 
     /// <summary>The rendered text, ready to share.</summary>
     public static string Text(Context context) => DiagnosticsRenderer.Render(Build(context));
