@@ -15,6 +15,27 @@ public class SuiteRedirectTests
         Assert.True(SuiteRedirect.IsSuiteRedirect(new Uri(TidalSignIn.RedirectUri + "?code=abc&state=xyz")));
     }
 
+    // Chick-fil-A's sign-in ends by redirecting to its own app (cfa://…/oauth2/callback). It is
+    // handed to that one package only, and only for that callback path on that host.
+    [Fact]
+    public void ChickFilAsCallback_IsHandedToItsApp()
+    {
+        var callback = new Uri("cfa://order.chick-fil-a.com/oauth2/callback?code=abc&state=xyz");
+        Assert.Equal("com.chickfila.cfaflagship", SuiteRedirect.AppRedirectPackage(callback));
+    }
+
+    [Theory]
+    [InlineData("cfa://evil.example.com/oauth2/callback?code=abc")]
+    [InlineData("cfa://order.chick-fil-a.com/somewhere/else")]
+    [InlineData("cfa://order.chick-fil-a.com/oauth2/callbackx")]
+    [InlineData("cfb://order.chick-fil-a.com/oauth2/callback?code=abc")]
+    [InlineData("https://order.chick-fil-a.com/oauth2/callback")]
+    [InlineData("intent://order.chick-fil-a.com/oauth2/callback#Intent;scheme=cfa;end")]
+    public void OtherCallbacks_AreNotHandedToAnApp(string url)
+    {
+        Assert.Null(SuiteRedirect.AppRedirectPackage(new Uri(url)));
+    }
+
     [Theory]
     [InlineData("https://com.storyworthtelling.example/")]
     [InlineData("http://login.tidal.com/authorize")]

@@ -151,11 +151,17 @@ public class RestrictedBrowserActivity : Activity
     /// Hands a suite app's OAuth redirect to that app and closes, the way a Custom Tab does:
     /// the sign-in is finished, and this page has nothing left to show.
     /// </summary>
-    public void HandBack(string redirect)
+    public void HandBack(string redirect, string? targetPackage = null)
     {
         try
         {
-            StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(redirect)));
+            var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(redirect));
+            if (targetPackage is not null)
+            {
+                intent.SetPackage(targetPackage);
+            }
+
+            StartActivity(intent);
             Finish();
         }
         catch (ActivityNotFoundException)
@@ -234,6 +240,14 @@ public class RestrictedBrowserActivity : Activity
                 && SuiteRedirect.IsSuiteRedirect(redirectUri))
             {
                 activity.HandBack(target);
+                return true;
+            }
+
+            // A third-party app's sign-in callback (Chick-fil-A's cfa://) goes to that app's package only.
+            if (target is not null && Uri.TryCreate(target, UriKind.Absolute, out var appUri)
+                && SuiteRedirect.AppRedirectPackage(appUri) is { } appPackage)
+            {
+                activity.HandBack(target, appPackage);
                 return true;
             }
 
