@@ -31,4 +31,10 @@ public enum NoticeKind
 
     /// <summary>"This week's groceries are ready", with one Send to Keep button (D90). Reference (slate).</summary>
     KeepHandoff,
+
+    /// <summary>
+    /// Yesterday's page came back from the tablet's cloud with no pen marks on it, and no page has ever shown any (R3):
+    /// either the cloud is not passing the ink along or nothing was written. Waiting, nothing to press. Caution.
+    /// </summary>
+    NoPenMarks,
 }

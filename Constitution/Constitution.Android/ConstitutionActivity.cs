@@ -13,6 +13,7 @@ using Constitution.Domain.Areas;
 using Constitution.Domain.Layout;
 using Constitution.Domain.Waiting;
 using Constitution.FirstRun;
+using Constitution.ReadBack;
 using Constitution.Services;
 using Constitution.Settings;
 using Constitution.Waiting;
@@ -115,6 +116,11 @@ public abstract class ConstitutionActivity : Activity
 
         // Body's overnight read, under its frozen unique name; Keep means a relaunch changes nothing (C-7.1.3).
         BodySyncWorker.Schedule(this);
+
+        // Yesterday's ink read off the tablet each morning after Foreword's run (C-2.2.3, D87), and any question it left
+        // unanswered put back on the Waiting page (the board only lives as long as the process).
+        ReadBackWorker.Schedule(this);
+        ReadBackWaiting.Restore(this);
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
@@ -396,9 +402,10 @@ public abstract class ConstitutionActivity : Activity
 
     private void OnWaitingChip(WaitingItem item, ChipChoice choice)
     {
-        // The pick is the answer and the row simply goes; nothing is stored until the read-back
-        // worker (Release C) exists to receive it.
+        // The pick is the answer and the row simply goes; the read-back keeps the pick with the result that asked it,
+        // so the question is not put back and whatever uses the answer can find it.
         ConnectionNoticeBoard.With(board => WaitingPageModel.Answer(board, item, choice));
+        ReadBackWaiting.Answered(this, item.CauseKey, choice.Value);
         RenderPage();
     }
 
