@@ -28,3 +28,8 @@ using Android;
 // REQUEST_DELETE_PACKAGES — which is why the uninstall did "nothing" on device (no
 // ActivityNotFoundException was thrown, so the ACTION_DELETE fallback never ran either).
 [assembly: UsesPermission(Manifest.Permission.RequestDeletePackages)]
+
+// A page in RestrictedBrowserActivity asking for the camera (a video call, a QR or card photo
+// in a browser). A WebView can only be granted what the app itself holds, so the app declares it;
+// the owner is asked once at the phone's own prompt when the first page asks.
+[assembly: UsesPermission(Manifest.Permission.Camera)]

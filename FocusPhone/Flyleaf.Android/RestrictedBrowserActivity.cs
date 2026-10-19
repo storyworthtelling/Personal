@@ -1,5 +1,7 @@
+using Android;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Graphics;
 using Android.OS;
 using Android.Views;
@@ -32,9 +34,12 @@ namespace Flyleaf;
     DataSchemes = ["http", "https", "market"])]
 public class RestrictedBrowserActivity : Activity
 {
+    private const int CameraRequestCode = 4731;
+
     private WebView? webView;
     private TextView? addressDisplay;
     private string originHost = "the original site";
+    private PermissionRequest? pendingCamera;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -101,6 +106,67 @@ public class RestrictedBrowserActivity : Activity
 
         view.SetDownloadListener(new DownloadStartListener(this));
         view.SetWebViewClient(new SameDomainWebViewClient(this, policy, origin));
+        // Without a chrome client the WebView refuses every camera request outright.
+        view.SetWebChromeClient(new PermissionChromeClient(this, policy, origin));
+    }
+
+    /// <summary>
+    /// A page asked for a device permission. <see cref="WebPermissionPlan"/> decides what may be
+    /// granted; when the app does not yet hold the camera, the phone's own prompt is shown here and
+    /// the page's request is answered once the owner has replied.
+    /// </summary>
+    public void AnswerPermissionRequest(PermissionRequest request, LinkPolicy policy, Uri origin)
+    {
+        var originAllowed = request.Origin?.ToString() is { } pageOrigin
+            && Uri.TryCreate(pageOrigin, UriKind.Absolute, out var requester)
+            && policy.IsNavigationAllowed(origin, requester);
+        var cameraGranted = CheckSelfPermission(Manifest.Permission.Camera) == Permission.Granted;
+        var verdict = WebPermissionPlan.Decide(request.GetResources() ?? [], cameraGranted, originAllowed);
+
+        if (verdict.NeedsCameraPrompt)
+        {
+            // Only one page asks at a time; a request waiting behind another is refused rather than queued.
+            pendingCamera?.Deny();
+            pendingCamera = request;
+            RequestPermissions([Manifest.Permission.Camera], CameraRequestCode);
+            return;
+        }
+
+        if (verdict.Grant.Count > 0)
+        {
+            request.Grant(verdict.Grant.ToArray());
+        }
+        else
+        {
+            request.Deny();
+        }
+    }
+
+    public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)
+    {
+        if (requestCode == CameraRequestCode && pendingCamera is { } request)
+        {
+            pendingCamera = null;
+            var granted = grantResults.Length > 0 && grantResults[0] == Permission.Granted;
+            if (granted)
+            {
+                request.Grant([WebPermissionPlan.VideoCapture]);
+            }
+            else
+            {
+                request.Deny();
+            }
+        }
+
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
+
+    protected override void OnDestroy()
+    {
+        // A page still waiting on the owner's answer when the browser closes is refused, not left hanging.
+        pendingCamera?.Deny();
+        pendingCamera = null;
+        base.OnDestroy();
     }
 
     public void ShowAddress(string url) => addressDisplay!.Text = url;
@@ -271,6 +337,17 @@ public class RestrictedBrowserActivity : Activity
             if (url is not null)
             {
                 activity.ShowAddress(url);
+            }
+        }
+    }
+
+    private class PermissionChromeClient(RestrictedBrowserActivity activity, LinkPolicy policy, Uri origin) : WebChromeClient
+    {
+        public override void OnPermissionRequest(PermissionRequest? request)
+        {
+            if (request is not null)
+            {
+                activity.AnswerPermissionRequest(request, policy, origin);
             }
         }
     }
