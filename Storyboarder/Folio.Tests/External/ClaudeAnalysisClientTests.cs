@@ -746,6 +746,53 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
+    public async Task AnalyzeChapter_TruncatedReply_RetriesOnceWithDoubleTheBudget()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", FastModel = "test-fast-model",
+            MaxTokens = 256, ChapterNotesMaxTokens = 16000
+        });
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
+        // A dense chunk (a long annals excerpt) can outgrow even the full budget; the same chunk is
+        // asked again with more room rather than failing for good and stalling the whole book.
+        handler.Enqueue(HttpStatusCode.OK, Sse(
+            ("content_block_delta", Delta("{\"keyEvents\":[\"a")),
+            ("message_delta", "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"}}"),
+            ("message_stop", "{\"type\":\"message_stop\"}")), "text/event-stream");
+        handler.EnqueueOk(Reply("{\"keyEvents\":[\"a king dies\"]}"));
+
+        var notes = await client.AnalyzeChapter("excerpt", "Chapter 1", Array.Empty<string>(), "", CancellationToken.None);
+
+        Assert.Equal(2, handler.RequestBodies.Count);
+        Assert.Contains("\"max_tokens\":16000", handler.RequestBodies[0]);
+        Assert.Contains("\"max_tokens\":32000", handler.RequestBodies[1]);
+        Assert.Equal("a king dies", Assert.Single(notes.KeyEvents));
+    }
+
+    [Fact]
+    public async Task AnalyzeChapter_TruncatedTwice_StillThrows()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", FastModel = "test-fast-model",
+            MaxTokens = 256, ChapterNotesMaxTokens = 16000
+        });
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), options);
+        for (var i = 0; i < 2; i++)
+            handler.Enqueue(HttpStatusCode.OK, Sse(
+                ("content_block_delta", Delta("{\"keyEvents\":[\"a")),
+                ("message_delta", "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"}}"),
+                ("message_stop", "{\"type\":\"message_stop\"}")), "text/event-stream");
+
+        await Assert.ThrowsAsync<ResponseTruncatedException>(
+            () => client.AnalyzeChapter("excerpt", "Chapter 1", Array.Empty<string>(), "", CancellationToken.None));
+        Assert.Equal(2, handler.RequestBodies.Count);
+    }
+
+    [Fact]
     public async Task MaxTokensStopReason_ThrowsTruncatedResponse_NotSilentPartialBody()
     {
         var (client, handler) = Create();

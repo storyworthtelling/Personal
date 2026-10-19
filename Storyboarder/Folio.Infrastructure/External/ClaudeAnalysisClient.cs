@@ -331,9 +331,21 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
         // Fast tier: one call per chunk, recording observations against a fixed JSON contract. The
         // judgement calls — synthesising these notes into a report — stay on the strong model.
-        var reply = await SendMessage(
-            ChapterAnalysisInstruction, userContent, cancellationToken, options.ChapterNotesMaxTokens,
-            model: options.FastModel);
+        string reply;
+        try
+        {
+            reply = await SendMessage(
+                ChapterAnalysisInstruction, userContent, cancellationToken, options.ChapterNotesMaxTokens,
+                model: options.FastModel);
+        }
+        catch (ResponseTruncatedException)
+        {
+            // A dense chunk can outgrow even the full budget, and a truncated reply is unusable. Ask
+            // once more with double the room; a second truncation propagates so the chunk fails loudly.
+            reply = await SendMessage(
+                ChapterAnalysisInstruction, userContent, cancellationToken, options.ChapterNotesMaxTokens * 2,
+                model: options.FastModel);
+        }
         var json = JsonResponse.ExtractObject(reply);
         // The chapter is known exactly from the chunk's offsets, so it is stamped on here rather than
         // trusted to the model — even a reply that failed to parse still carries where it came from, and
