@@ -21,4 +21,29 @@ public static class SuiteRedirect
         && target.Scheme != Uri.UriSchemeHttps
         && target.Scheme.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal)
         && target.Scheme.Length > PolicyContext.OwnerPackagePrefix.Length;
+
+    /// <summary>
+    /// A third-party app's own OAuth callback that is also handed on, aimed at that app's package
+    /// alone so no other app registered for the scheme can take the code. Each entry names the
+    /// scheme, the host and the path the callback lives at; anything else on that scheme stays blocked.
+    /// </summary>
+    private static readonly (string Scheme, string Host, string Path, string Package)[] AppCallbacks =
+    [
+        ("cfa", "order.chick-fil-a.com", "/oauth2/callback", "com.chickfila.cfaflagship"),
+    ];
+
+    public static string? AppRedirectPackage(Uri target)
+    {
+        foreach (var callback in AppCallbacks)
+        {
+            if (target.Scheme == callback.Scheme
+                && string.Equals(target.Host, callback.Host, StringComparison.OrdinalIgnoreCase)
+                && target.AbsolutePath == callback.Path)
+            {
+                return callback.Package;
+            }
+        }
+
+        return null;
+    }
 }
