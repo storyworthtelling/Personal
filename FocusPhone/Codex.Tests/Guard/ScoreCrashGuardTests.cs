@@ -22,12 +22,23 @@ public class ScoreCrashGuardTests
     }
 
     [Fact]
-    public void TidalBindingPackagesTheDaggerRuntimeThePlayerComponentCallsInto()
+    public void ScorePackagesTheDaggerRuntimeThePlayerComponentCallsInto()
+    {
+        var csproj = File.ReadAllText(Path.Combine(
+            RepoRoot(), "FocusPhone", "Score.Android", "Score.Android.csproj"));
+
+        Assert.Contains("Xamarin.Google.Dagger", csproj);
+    }
+
+    // Dagger in the binding project makes the generator emit MembersInjector classes that do not
+    // compile (CS0535, the Flyleaf build on main). It belongs to the app that runs the player.
+    [Fact]
+    public void TidalBindingDoesNotPackageDaggerItself()
     {
         var csproj = File.ReadAllText(Path.Combine(
             RepoRoot(), "FocusPhone", "Codex.Tidal.Binding", "Codex.Tidal.Binding.csproj"));
 
-        Assert.Contains("Xamarin.Google.Dagger", csproj);
+        Assert.DoesNotContain("Xamarin.Google.Dagger", csproj);
     }
 
     private static string RepoRoot()
