@@ -1,9 +1,12 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
@@ -255,13 +258,16 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
     private readonly ICredentialHealthSink? healthSink;
+    private readonly ILogger<ClaudeAnalysisClient>? logger;
 
     public ClaudeAnalysisClient(
-        HttpClient httpClient, IOptions<ClaudeOptions> options, ICredentialHealthSink? healthSink = null)
+        HttpClient httpClient, IOptions<ClaudeOptions> options, ICredentialHealthSink? healthSink = null,
+        ILogger<ClaudeAnalysisClient>? logger = null)
     {
         this.httpClient = httpClient;
         this.options = options.Value;
         this.healthSink = healthSink;
+        this.logger = logger;
     }
 
     public async Task<DesignBibleFragment> ExtractEntities(string chunkText, CancellationToken cancellationToken)
@@ -713,7 +719,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         {
             // A section is allowed to find nothing, so an unparseable reply degrades to silence
             // rather than failing the read. The pass is still recorded as done: it ran, and a section
-            // with nothing to say prints nothing.
+            // with nothing to say prints nothing. It was still billed, though, and a reply that is not JSON
+            // at all is not the same as a section with nothing to say, so the log says which this was.
+            logger?.LogWarning(
+                "Claude call {Call}[{Persona}] replied with nothing readable as JSON ({Characters} characters); " +
+                "recorded as a silent section. The call was billed", nameof(ReadSection), persona.Id, reply.Length);
             return SectionRead.Silent(persona.Id);
         }
 
@@ -801,7 +811,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     /// visible wrong. <c>ReadingPrompt</c> decides the order and a guard holds it.</para>
     /// </summary>
     private Task<string> SendPass(
-        Persona persona, string manuscript, string format, CancellationToken cancellationToken)
+        Persona persona, string manuscript, string format, CancellationToken cancellationToken,
+        [CallerMemberName] string call = "")
     {
         var system = ReadingPrompt.System(manuscript, persona)
             .Select(block => block.Cached
@@ -811,12 +822,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
         var model = persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel;
         return SendRaw(system, ReadingPrompt.Question(persona) + "\n\n" + format,
-            options.PassMaxTokens, model, cancellationToken);
+            options.PassMaxTokens, model, $"{call}[{persona.Id}]", cancellationToken);
     }
 
     private Task<string> SendMessage(
         string instruction, string userText, CancellationToken cancellationToken,
-        int? maxTokens = null, string? cachedContext = null, string? model = null)
+        int? maxTokens = null, string? cachedContext = null, string? model = null,
+        [CallerMemberName] string call = "")
     {
         // Invariant, reused context (the design bible) is cached as its own block so repeated calls
         // within the cache window bill it as a cache read instead of full input. Both blocks share one
@@ -834,13 +846,59 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             ];
 
         return SendRaw(system, userText, maxTokens ?? options.MaxTokens,
-            string.IsNullOrWhiteSpace(model) ? options.Model : model, cancellationToken);
+            string.IsNullOrWhiteSpace(model) ? options.Model : model, call, cancellationToken);
     }
 
     // The transport both paths share: everything below this line is the same whatever the system
     // blocks say, so the ordering decision lives entirely in the two callers above.
     private async Task<string> SendRaw(
-        object[] system, string userText, int effectiveMaxTokens, string model,
+        object[] system, string userText, int effectiveMaxTokens, string model, string call,
+        CancellationToken cancellationToken)
+    {
+        // Every call is accounted for here, success or failure, because this is the one place that knows
+        // what was sent and what came back. A reply that dies after minutes of streaming has still been
+        // billed for its input; without a line per call there is no way to tell a book that is working
+        // from one that is paying for the same read again and again.
+        var usage = new CallUsage();
+        var started = Stopwatch.GetTimestamp();
+        try
+        {
+            var text = await SendRawCore(system, userText, effectiveMaxTokens, model, usage, cancellationToken);
+            logger?.LogInformation(
+                "Claude call {Call} succeeded in {Seconds:F1}s: model={Model} input={Input} cacheWrite={CacheWrite} " +
+                "cacheRead={CacheRead} output={Output} stop={Stop} requestId={RequestId}",
+                call, Elapsed(started), model, usage.Input, usage.CacheWrite, usage.CacheRead, usage.Output,
+                usage.StopReason, usage.RequestId);
+            return text;
+        }
+        catch (OperationCanceledException)
+        {
+            // Android stopping the worker mid-stream throws nothing a person would ever see: the process
+            // simply ends. This line is the only trace that the input was billed and the reply discarded.
+            logger?.LogWarning(
+                "Claude call {Call} cancelled after {Seconds:F1}s ({Characters} characters streamed): " +
+                "model={Model} input={Input} cacheWrite={CacheWrite} cacheRead={CacheRead} requestId={RequestId}. " +
+                "The worker was stopped mid-call; the input was billed and the reply is discarded",
+                call, Elapsed(started), usage.Characters, model, usage.Input, usage.CacheWrite, usage.CacheRead,
+                usage.RequestId);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger?.LogWarning(exception,
+                "Claude call {Call} failed after {Seconds:F1}s: model={Model} input={Input} cacheWrite={CacheWrite} " +
+                "cacheRead={CacheRead} output={Output} stop={Stop} requestId={RequestId}, " +
+                "streamed {Characters} characters: {Error}",
+                call, Elapsed(started), model, usage.Input, usage.CacheWrite, usage.CacheRead, usage.Output,
+                usage.StopReason, usage.RequestId, usage.Characters, ErrorText.Describe(exception));
+            throw;
+        }
+    }
+
+    private static double Elapsed(long started) => Stopwatch.GetElapsedTime(started).TotalSeconds;
+
+    private async Task<string> SendRawCore(
+        object[] system, string userText, int effectiveMaxTokens, string model, CallUsage usage,
         CancellationToken cancellationToken)
     {
         // Effort is set explicitly, never inherited: the 5.5 models default to medium, and Folio's reads and
@@ -873,6 +931,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         // headers first means the long generation isn't bounded by the send timeout.
         var response = await httpClient.SendAsync(
             request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        usage.RequestId = response.Headers.TryGetValues("request-id", out var ids) ? ids.FirstOrDefault() : null;
 
         if (!response.IsSuccessStatusCode)
         {
@@ -883,10 +942,23 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             throw ToException(response, body);
         }
 
-        var text = await ReadStreamedText(response, effectiveMaxTokens, cancellationToken);
+        var text = await ReadStreamedText(response, effectiveMaxTokens, usage, cancellationToken);
         // A successful authenticated call clears any prior failure on this key.
         healthSink?.MarkOk(CredentialIds.Claude);
         return text;
+    }
+
+    // What one call sent and got back, filled in as the stream arrives so a call that dies part-way can
+    // still report what it had cost by then.
+    private sealed class CallUsage
+    {
+        public int Input { get; set; }
+        public int CacheWrite { get; set; }
+        public int CacheRead { get; set; }
+        public int Output { get; set; }
+        public string? StopReason { get; set; }
+        public string? RequestId { get; set; }
+        public int Characters { get; set; }
     }
 
     // Accumulates the assistant's text from an Anthropic Messages streaming response. Only text_delta
@@ -895,7 +967,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     // event carries the final stop_reason: if the model ran out of output budget ("max_tokens") the
     // accumulated text is truncated, so we raise instead of returning a partial (unparseable) body.
     private static async Task<string> ReadStreamedText(
-        HttpResponseMessage response, int maxTokens, CancellationToken cancellationToken)
+        HttpResponseMessage response, int maxTokens, CallUsage usage, CancellationToken cancellationToken)
     {
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new StreamReader(stream);
@@ -919,12 +991,19 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
             switch (typeProperty.GetString())
             {
+                case "message_start"
+                    when root.TryGetProperty("message", out var message) &&
+                         message.TryGetProperty("usage", out var startUsage):
+                    ReadUsage(startUsage, usage);
+                    break;
+
                 case "content_block_delta"
                     when root.TryGetProperty("delta", out var delta) &&
                          delta.TryGetProperty("type", out var deltaType) &&
                          deltaType.GetString() == "text_delta" &&
                          delta.TryGetProperty("text", out var chunk):
                     text.Append(chunk.GetString());
+                    usage.Characters = text.Length;
                     break;
 
                 case "message_delta"
@@ -932,6 +1011,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                          messageDelta.TryGetProperty("stop_reason", out var reason) &&
                          reason.ValueKind == JsonValueKind.String:
                     stopReason = reason.GetString();
+                    usage.StopReason = stopReason;
+                    if (root.TryGetProperty("usage", out var endUsage))
+                        ReadUsage(endUsage, usage);
                     break;
 
                 case "error":
@@ -943,6 +1025,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         }
 
         return Finish(text, stopReason, maxTokens);
+    }
+
+    // message_start carries the input side (and a placeholder output count); message_delta carries the final
+    // output count. A field absent from an event leaves the earlier figure alone.
+    private static void ReadUsage(JsonElement element, CallUsage usage)
+    {
+        if (element.TryGetProperty("input_tokens", out var input) && input.TryGetInt32(out var inputTokens))
+            usage.Input = inputTokens;
+        if (element.TryGetProperty("cache_creation_input_tokens", out var write) && write.TryGetInt32(out var writeTokens))
+            usage.CacheWrite = writeTokens;
+        if (element.TryGetProperty("cache_read_input_tokens", out var read) && read.TryGetInt32(out var readTokens))
+            usage.CacheRead = readTokens;
+        if (element.TryGetProperty("output_tokens", out var output) && output.TryGetInt32(out var outputTokens))
+            usage.Output = outputTokens;
     }
 
     private static string Finish(StringBuilder text, string? stopReason, int maxTokens)
@@ -972,6 +1068,17 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private static Exception ToException(HttpResponseMessage response, string body)
     {
         var status = response.StatusCode;
+
+        // An empty credit balance arrives as an ordinary 400. Classed as a plain failure it spent the
+        // attempt budget of every unit in a book within seconds and gave up on all of them for good, when
+        // all that was wrong was a top-up away; flagged as exhausted quota it is waited out instead.
+        if (body.Contains("credit balance is too low", StringComparison.OrdinalIgnoreCase))
+        {
+            return new RateLimitException(
+                $"Anthropic credit balance is too low: {(int)status} ({status}): {body}",
+                kind: RateLimitKind.QuotaExhausted);
+        }
+
         if (status == HttpStatusCode.TooManyRequests || (int)status == 529 || IsRateLimitBody(body))
         {
             return new RateLimitException(

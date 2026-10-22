@@ -1,9 +1,11 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Model;
+using Folio.Domain.Reading;
 using Folio.Domain.Pipeline;
 using Folio.Infrastructure.Configuration;
 using Folio.Infrastructure.External;
@@ -880,4 +882,160 @@ public class ClaudeAnalysisClientTests
         await Assert.ThrowsAsync<RateLimitException>(() => client.ExtractEntities("x", CancellationToken.None));
     }
 
+
+    // ---- Every call is accounted for ------------------------------------------------------------------
+    //
+    // A reply that fails after minutes of streaming has still been billed, and the pipeline log used to
+    // say nothing about what each call sent, cost, or died of. The client is the one place that knows.
+
+    private static (ClaudeAnalysisClient Client, FakeHttpMessageHandler Handler, CapturingLogger<ClaudeAnalysisClient> Log)
+        CreateLogged()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var log = new CapturingLogger<ClaudeAnalysisClient>();
+        var options = Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", FastModel = "test-fast-model", MaxTokens = 256
+        });
+        return (new ClaudeAnalysisClient(new HttpClient(handler), options, logger: log), handler, log);
+    }
+
+    [Fact]
+    public async Task ASuccessfulCallLogsItsModelAndWhatItCost()
+    {
+        var (client, handler, log) = CreateLogged();
+        handler.Enqueue(HttpStatusCode.OK, Sse(
+            ("message_start", "{\"type\":\"message_start\",\"message\":{\"usage\":" +
+                              "{\"input_tokens\":1200,\"cache_creation_input_tokens\":3000," +
+                              "\"cache_read_input_tokens\":900,\"output_tokens\":1}}}"),
+            ("content_block_delta", Delta("{\"artStyle\":\"ink\"}")),
+            ("message_delta", "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}," +
+                              "\"usage\":{\"output_tokens\":350}}"),
+            ("message_stop", "{\"type\":\"message_stop\"}")), "text/event-stream");
+
+        await client.DeriveArtStyle("sample", new DesignBible([], []), CancellationToken.None);
+
+        var line = Assert.Single(log.Entries, e => e.Level == LogLevel.Information).Message;
+        Assert.Contains(nameof(client.DeriveArtStyle), line);
+        Assert.Contains("model=test-model", line);
+        Assert.Contains("input=1200", line);
+        Assert.Contains("cacheWrite=3000", line);
+        Assert.Contains("cacheRead=900", line);
+        Assert.Contains("output=350", line);
+        Assert.Contains("stop=end_turn", line);
+    }
+
+    [Fact]
+    public async Task ARejectedCallLogsTheStatusAndTheBodyAndStillThrows()
+    {
+        var (client, handler, log) = CreateLogged();
+        handler.Enqueue(HttpStatusCode.BadRequest,
+            "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"prompt is too long\"}}");
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.DeriveArtStyle("sample", new DesignBible([], []), CancellationToken.None));
+
+        var entry = Assert.Single(log.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains(nameof(client.DeriveArtStyle), entry.Message);
+        Assert.Contains("400", entry.Message);
+        Assert.Contains("prompt is too long", entry.Message);
+        Assert.IsType<HttpRequestException>(entry.Exception);
+    }
+
+    [Fact]
+    public async Task ATruncatedReplyIsLoggedWithWhatItCost()
+    {
+        var (client, handler, log) = CreateLogged();
+        handler.Enqueue(HttpStatusCode.OK, Sse(
+            ("message_start", "{\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":500}}}"),
+            ("content_block_delta", Delta("{\"artStyle\":\"in")),
+            ("message_delta", "{\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"max_tokens\"}," +
+                              "\"usage\":{\"output_tokens\":256}}"),
+            ("message_stop", "{\"type\":\"message_stop\"}")), "text/event-stream");
+
+        await Assert.ThrowsAsync<ResponseTruncatedException>(
+            () => client.DeriveArtStyle("sample", new DesignBible([], []), CancellationToken.None));
+
+        var entry = Assert.Single(log.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains("input=500", entry.Message);
+        Assert.Contains("output=256", entry.Message);
+        Assert.Contains("stop=max_tokens", entry.Message);
+    }
+
+    [Fact]
+    public async Task AStreamErrorEventIsLogged()
+    {
+        var (client, handler, log) = CreateLogged();
+        handler.Enqueue(HttpStatusCode.OK, Sse(
+            ("content_block_delta", Delta("{\"artStyle\":\"in")),
+            ("error", "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"Internal server error\"}}")),
+            "text/event-stream");
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.DeriveArtStyle("sample", new DesignBible([], []), CancellationToken.None));
+
+        var entry = Assert.Single(log.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains("Internal server error", entry.Message);
+        Assert.Contains("streamed 15 characters", entry.Message);
+    }
+
+    // A worker killed mid-stream is the cheapest-to-miss way to pay for nothing: nothing throws a
+    // message, the process just stops. The cancellation is the only trace there will ever be.
+    [Fact]
+    public async Task ACancelledCallIsLoggedAsWellAsRethrown()
+    {
+        var log = new CapturingLogger<ClaudeAnalysisClient>();
+        var client = new ClaudeAnalysisClient(
+            new HttpClient(new CancelledHandler()),
+            Options.Create(new ClaudeOptions { ApiKey = "test-key", Model = "test-model", MaxTokens = 256 }),
+            logger: log);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => client.DeriveArtStyle("sample", new DesignBible([], []), CancellationToken.None));
+
+        var entry = Assert.Single(log.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains("cancelled", entry.Message);
+        Assert.Contains(nameof(client.DeriveArtStyle), entry.Message);
+    }
+
+    [Fact]
+    public async Task AReadingPassNamesThePersonaInItsLogLine()
+    {
+        var (client, handler, log) = CreateLogged();
+        handler.Enqueue(HttpStatusCode.InternalServerError, "boom");
+        var persona = PersonaCatalogue.Readers[0];
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.ReadAsReader(persona, "the manuscript", CancellationToken.None));
+
+        var entry = Assert.Single(log.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains(nameof(client.ReadAsReader), entry.Message);
+        Assert.Contains(persona.Id, entry.Message);
+    }
+
+    // Depleted credits are not a malformed request. Classed as a plain error, a single empty balance
+    // spent the attempt budget of every unit in a book within seconds and abandoned all of them for good.
+    [Fact]
+    public async Task AnEmptyCreditBalanceIsQuotaExhaustedNotAnOrdinaryFailure()
+    {
+        var (client, handler, _) = CreateLogged();
+        handler.Enqueue(HttpStatusCode.BadRequest,
+            "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":" +
+            "\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to " +
+            "upgrade or purchase credits.\"}}");
+
+        var error = await Assert.ThrowsAsync<RateLimitException>(
+            () => client.DeriveArtStyle("sample", new DesignBible([], []), CancellationToken.None));
+
+        Assert.Equal(RateLimitKind.QuotaExhausted, error.Kind);
+        Assert.Contains("credit balance", error.Message);
+    }
+
+    // The worker being stopped mid-call, as the HTTP stack reports it.
+    private sealed class CancelledHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new TaskCanceledException("The worker was stopped.");
+    }
 }
