@@ -238,6 +238,7 @@ public sealed class ProjectService
 
         novel.LastError = null;
         novel.StageAttempts = 0;
+        novel.RetryNotBeforeUtc = null;
         novel.UpdatedAtUtc = clock.UtcNow;
 
         Revive(await db.Chunks.Where(c => c.NovelId == id).ToListAsync(cancellationToken));

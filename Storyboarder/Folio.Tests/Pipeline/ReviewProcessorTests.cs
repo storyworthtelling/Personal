@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -183,7 +184,7 @@ public class ReviewProcessorTests : IDisposable
 
     private ReviewProcessor NewProcessor(
         ArchiveOptions? archiveOptions = null, IRemarkableClient? remarkable = null,
-        IPaperDriveArchive? driveArchive = null) => new(
+        IPaperDriveArchive? driveArchive = null, ILogger<ReviewProcessor>? logger = null) => new(
         database,
         claude.Object,
         gemini.Object,
@@ -197,7 +198,7 @@ public class ReviewProcessorTests : IDisposable
             BaseDelaySeconds = 4, MaxDelaySeconds = 60, MaxAttempts = 6
         }),
         Options.Create(archiveOptions ?? new ArchiveOptions()),
-        NullLogger<ReviewProcessor>.Instance,
+        logger ?? NullLogger<ReviewProcessor>.Instance,
         delivery: remarkable is null && driveArchive is null
             ? null
             : new PaperDelivery(remarkable, driveArchive));
@@ -264,6 +265,217 @@ public class ReviewProcessorTests : IDisposable
         }
 
         Assert.Fail("The pipeline did not settle within the cycle budget.");
+    }
+
+
+    // ---- A failing whole-manuscript call must be visible, paced, and capped --------------------------
+    //
+    // The sixteen reads and the reduce calls each send the whole book to Claude. A failure used to be
+    // recorded nowhere but the manuscript's one-line error, was retried four seconds later with no limit
+    // (StageAttempts documented a cap that nothing applied), and the next worker cycle started again
+    // immediately — so a call that kept dying mid-stream was re-billed all day with nothing in the log.
+
+    private static ReadingPass FirstPass => ReadingPlan.Passes[0];
+
+    private void FailPass(ReadingPass pass, Func<int, Exception?> failure, List<int>? calls = null)
+    {
+        var count = 0;
+        claude.Setup(c => c.ReadSection(
+                It.Is<Persona>(persona => persona.Id == pass.Id), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, CancellationToken _) =>
+            {
+                count++;
+                calls?.Add(count);
+                return failure(count) is { } error
+                    ? Task.FromException<SectionRead>(error)
+                    : Task.FromResult(new SectionRead(
+                        persona.Id, $"{persona.Name}: one thing to report.",
+                        [new ReportFinding("Chapter 1", $"{persona.Name} found something.")]));
+            });
+    }
+
+    private static Exception ConnectionAbort() => new HttpRequestException(
+        "Error while copying content to a stream.", new IOException("Software caused connection abort"));
+
+    private async Task Cycle(ReviewProcessor processor, int cycles, bool advance = true)
+    {
+        for (var cycle = 0; cycle < cycles; cycle++)
+        {
+            var result = await processor.ProcessNextAsync(CancellationToken.None);
+            if (advance && result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+        }
+    }
+
+    // Steps the pipeline until the failing pass has been called once. The clock moves only for waits
+    // that come BEFORE that call, so the test then holds it still at the moment of the failure.
+    private async Task<ProcessResult> DriveToFirstCall(ReviewProcessor processor, List<int> calls)
+    {
+        var result = ProcessResult.Idle;
+        for (var cycle = 0; cycle < 200 && calls.Count == 0; cycle++)
+        {
+            result = await processor.ProcessNextAsync(CancellationToken.None);
+            if (calls.Count == 0 && result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+        }
+        Assert.NotEmpty(calls);
+        return result;
+    }
+
+    private Novel LoadNovel(Guid id)
+    {
+        using var context = database.NewContext();
+        return context.Novels.Single(n => n.Id == id);
+    }
+
+    [Fact]
+    public async Task AFailedReadingPassIsLoggedWithItsNameItsAttemptAndItsRootCause()
+    {
+        SeedManuscript();
+        FailPass(FirstPass, _ => ConnectionAbort());
+        var logger = new CapturingLogger<ReviewProcessor>();
+
+        await Cycle(NewProcessor(logger: logger), 60);
+
+        var failure = logger.Entries.First(e => e.Level == LogLevel.Warning && e.Message.Contains(FirstPass.Id));
+        Assert.Contains("attempt 1/6", failure.Message);
+        Assert.Contains("Software caused connection abort", failure.Message);
+        Assert.IsType<HttpRequestException>(failure.Exception);
+    }
+
+    [Fact]
+    public async Task AReduceCallThatFailsIsLoggedByNameToo()
+    {
+        SeedManuscript();
+        claude.Setup(c => c.ConsolidateAnalysis(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<DesignBible>(),
+                It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Anthropic request failed: 400 (BadRequest)"));
+        var logger = new CapturingLogger<ReviewProcessor>();
+
+        await Cycle(NewProcessor(logger: logger), 60);
+
+        Assert.Contains(logger.Entries, e =>
+            e.Level == LogLevel.Warning && e.Message.Contains(nameof(IClaudeAnalysisClient.ConsolidateAnalysis)) &&
+            e.Message.Contains("400 (BadRequest)"));
+    }
+
+    [Fact]
+    public async Task AReadThatKeepsFailingIsTriedOnlyAsOftenAsTheAttemptBudgetAllows()
+    {
+        var id = SeedManuscript();
+        var calls = new List<int>();
+        FailPass(FirstPass, _ => ConnectionAbort(), calls);
+        var logger = new CapturingLogger<ReviewProcessor>();
+
+        // Far more cycles, and far more waiting, than six attempts need.
+        await Cycle(NewProcessor(logger: logger), 200);
+
+        Assert.Equal(6, calls.Count);
+        var novel = LoadNovel(id);
+        Assert.Equal(ProjectStage.ComposingAnalysis, novel.Stage);
+        Assert.Equal(6, novel.StageAttempts);
+        Assert.Contains(FirstPass.Id, novel.LastError);
+        Assert.Contains("Software caused connection abort", novel.LastError);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("giving up"));
+    }
+
+    [Fact]
+    public async Task ARetryWaitsForTheBackoffEvenWhenTheWorkerStartsAFreshCycle()
+    {
+        var id = SeedManuscript();
+        var calls = new List<int>();
+        FailPass(FirstPass, _ => ConnectionAbort(), calls);
+
+        // Drive to the first failure, without letting the clock move past the wait that follows it.
+        var processor = NewProcessor();
+        var result = await DriveToFirstCall(processor, calls);
+        var callsAfterFailure = calls.Count;
+
+        // A new worker cycle is a new processor; the wait must live in the database, not in memory.
+        for (var cycle = 0; cycle < 5; cycle++)
+        {
+            result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+            Assert.Equal(ProcessOutcome.Waiting, result.Outcome);
+        }
+        Assert.Equal(callsAfterFailure, calls.Count);
+        Assert.NotNull(LoadNovel(id).RetryNotBeforeUtc);
+
+        clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+        await NewProcessor().ProcessNextAsync(CancellationToken.None);
+        Assert.Equal(callsAfterFailure + 1, calls.Count);
+    }
+
+    [Fact]
+    public async Task EachFailureWaitsLongerThanTheOneBefore()
+    {
+        var id = SeedManuscript();
+        var calls = new List<int>();
+        FailPass(FirstPass, _ => ConnectionAbort(), calls);
+        var processor = NewProcessor();
+
+        var waits = new List<TimeSpan>();
+        for (var cycle = 0; cycle < 100 && waits.Count < 4; cycle++)
+        {
+            var before = calls.Count;
+            var result = await processor.ProcessNextAsync(CancellationToken.None);
+            if (calls.Count > before && result.Outcome == ProcessOutcome.Waiting)
+            {
+                waits.Add(result.Wait);
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+            }
+            else if (result.Outcome == ProcessOutcome.Waiting)
+                clock.Advance(result.Wait + TimeSpan.FromSeconds(1));
+        }
+
+        Assert.Equal(4, waits.Count);
+        Assert.True(waits[3] > waits[0] * 4, $"Waits did not grow: {string.Join(", ", waits)}");
+        Assert.Equal(4, LoadNovel(id).StageAttempts);
+    }
+
+    [Fact]
+    public async Task ASuccessAfterFailuresClearsTheBudgetAndTheBookCompletes()
+    {
+        var id = SeedManuscript();
+        FailPass(FirstPass, attempt => attempt <= 2 ? ConnectionAbort() : null);
+
+        await DriveToCompletion(NewProcessor());
+
+        var novel = LoadNovel(id);
+        Assert.Equal(ProjectStage.Completed, novel.Stage);
+        Assert.Equal(0, novel.StageAttempts);
+        Assert.Null(novel.LastError);
+        Assert.Null(novel.RetryNotBeforeUtc);
+    }
+
+    [Fact]
+    public async Task ARateLimitNeverSpendsTheAttemptBudget()
+    {
+        var id = SeedManuscript();
+        FailPass(FirstPass, attempt => attempt <= 10 ? new RateLimitException("429 from test") : null);
+
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(ProjectStage.Completed, LoadNovel(id).Stage);
+    }
+
+    [Fact]
+    public async Task ExhaustedCreditsWaitTheLongFlatIntervalAndAreLogged()
+    {
+        var id = SeedManuscript();
+        var calls = new List<int>();
+        FailPass(FirstPass,
+            _ => new RateLimitException("Your credit balance is too low", kind: RateLimitKind.QuotaExhausted), calls);
+        var logger = new CapturingLogger<ReviewProcessor>();
+        var processor = NewProcessor(logger: logger);
+
+        await DriveToFirstCall(processor, calls);
+        var result = await processor.ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(ProcessOutcome.Waiting, result.Outcome);
+        Assert.True(result.Wait >= TimeSpan.FromSeconds(50), $"Waited only {result.Wait}");
+        Assert.Contains(logger.Entries, e => e.Message.Contains("credit balance"));
+        Assert.Equal(0, LoadNovel(id).StageAttempts);
     }
 
     [Fact]
