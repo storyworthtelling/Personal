@@ -561,4 +561,28 @@ public class ProjectServiceTests : IDisposable
         context.SaveChanges();
         return novel.Id;
     }
+
+    // A manuscript parked after its attempts ran out (or waiting out a backoff) must be runnable again the
+    // moment the owner taps Retry — a stale gate would leave the button doing nothing.
+    [Fact]
+    public async Task Retry_GivesAParkedManuscriptItsAttemptsBackAndClearsTheWait()
+    {
+        var id = SeedNovel(ProjectStage.ComposingAnalysis);
+        using (var context = database.NewContext())
+        {
+            var novel = context.Novels.Single(n => n.Id == id);
+            novel.StageAttempts = 6;
+            novel.LastError = "Reading pass 'x': HttpRequestException: connection abort";
+            novel.RetryNotBeforeUtc = clock.UtcNow.AddHours(1);
+            context.SaveChanges();
+        }
+
+        await NewService().RetryAsync(id, CancellationToken.None);
+
+        using var after = database.NewContext();
+        var retried = after.Novels.Single(n => n.Id == id);
+        Assert.Equal(0, retried.StageAttempts);
+        Assert.Null(retried.LastError);
+        Assert.Null(retried.RetryNotBeforeUtc);
+    }
 }

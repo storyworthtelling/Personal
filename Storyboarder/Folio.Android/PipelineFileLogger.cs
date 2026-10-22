@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Folio.Domain.Pipeline;
 
 namespace Folio.Android;
 
@@ -63,8 +64,11 @@ public sealed class PipelineFileLogger : ILoggerProvider, ILogger
 
         var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{prefix}]" +
                    (category is null ? " " : $" {category}: ") + message;
+        // The whole inner chain and the stack, not just the outermost message: a dropped connection reads
+        // "Error while copying content to a stream" on the outside and "Software caused connection abort"
+        // underneath, and the stack says which call it was. The file is size-capped, so this is affordable.
         if (exception != null)
-            line += $"\n       {exception.GetType().Name}: {exception.Message}";
+            line += $"\n       {ErrorText.Describe(exception)}\n       {exception.StackTrace}";
 
         try
         {
