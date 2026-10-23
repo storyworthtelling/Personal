@@ -37,6 +37,7 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
             entity.HasKey(novel => novel.Id);
             entity.Property(novel => novel.Stage).HasConversion<int>();
             entity.Property(novel => novel.RateLimitedUntilUtc).HasConversion(NullableTicksConverter);
+            entity.Property(novel => novel.RetryNotBeforeUtc).HasConversion(NullableTicksConverter);
             entity.Property(novel => novel.ArchivedAtUtc).HasConversion(NullableTicksConverter);
             entity.Property(novel => novel.ShelvedAtUtc).HasConversion(NullableTicksConverter);
             entity.Property(novel => novel.DeletedAtUtc).HasConversion(NullableTicksConverter);

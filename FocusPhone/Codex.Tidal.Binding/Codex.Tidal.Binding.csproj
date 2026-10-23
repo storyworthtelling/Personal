@@ -59,5 +59,9 @@
          was added. A community binding, not TIDAL's own; the type is otherwise a
          well-known, stable Java networking client. -->
     <PackageReference Include="Square.OkHttp3" Version="5.5.0" />
+
+    <!-- The Dagger runtime is NOT packaged here. Referencing it in this binding made the
+         generator emit MembersInjector classes that fail to compile (CS0535). It lives in
+         Score.Android, which runs the player and so needs the runtime on its classpath. -->
   </ItemGroup>
 </Project>

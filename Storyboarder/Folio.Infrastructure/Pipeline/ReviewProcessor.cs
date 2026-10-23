@@ -818,6 +818,11 @@ public sealed class ReviewProcessor : IPipelineStep
                 is { } mapWait)
             return mapWait == TimeSpan.MinValue ? ProcessResult.Idle : ProcessResult.Waiting(mapWait, novel.Id);
 
+        // A reduction or a reading failed earlier: honour the wait it set, or the parking it ended in, before
+        // sending the whole book to Claude again.
+        if (CallGate(novel, now) is { } gated)
+            return gated;
+
         var analysis = await db.BookAnalyses.FirstAsync(a => a.NovelId == novel.Id, cancellationToken);
 
         // 2) Reduce, story half: consolidate all chunk notes into the story report (one Claude call).
@@ -833,11 +838,11 @@ public sealed class ReviewProcessor : IPipelineStep
             {
                 var report = await claude.ConsolidateAnalysis(novel.Title, notes, bible, novel.ContinuitySummary, cancellationToken);
                 analysis.ConsolidatedJson = JsonSerializer.Serialize(report, JsonResponse.CaseInsensitive);
-                novel.LastError = null;
+                ClearCallFailures(novel);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, "ConsolidateAnalysis", cancellationToken);
             }
 
             Touch(novel);
@@ -860,11 +865,11 @@ public sealed class ReviewProcessor : IPipelineStep
             {
                 var craft = await claude.ConsolidateCraft(novel.Title, notes, cancellationToken);
                 analysis.CraftJson = JsonSerializer.Serialize(craft, JsonResponse.CaseInsensitive);
-                novel.LastError = null;
+                ClearCallFailures(novel);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, "ConsolidateCraft", cancellationToken);
             }
 
             Touch(novel);
@@ -887,11 +892,11 @@ public sealed class ReviewProcessor : IPipelineStep
             {
                 var voice = await claude.AssessVoiceConsistency(samples, cancellationToken);
                 analysis.VoiceJson = JsonSerializer.Serialize(voice, JsonResponse.CaseInsensitive);
-                novel.LastError = null;
+                ClearCallFailures(novel);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, "AssessVoiceConsistency", cancellationToken);
             }
 
             Touch(novel);
@@ -924,7 +929,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                    return await DeferAfterFailedCall(db, novel, ex, "ReconcileFindings", cancellationToken);
                 }
             }
             else
@@ -936,7 +941,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 occurrence.CreatedAtUtc = now;
             db.Findings.AddRange(outcome.Occurrences);
             analysis.FindingsReconciled = true;
-            novel.LastError = null;
+            ClearCallFailures(novel);
             Touch(novel);
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.DidWork(novel.Id);
@@ -958,11 +963,11 @@ public sealed class ReviewProcessor : IPipelineStep
             {
                 var expansion = await claude.ProposeExpansion(novel.Title, notes, novel.ContinuitySummary, wordCount, genre, cancellationToken);
                 analysis.ExpansionJson = JsonSerializer.Serialize(expansion, JsonResponse.CaseInsensitive);
-                novel.LastError = null;
+                ClearCallFailures(novel);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, "ProposeExpansion", cancellationToken);
             }
 
             Touch(novel);
@@ -987,11 +992,11 @@ public sealed class ReviewProcessor : IPipelineStep
                 var continuity = await claude.AssessSeriesContinuity(
                     novel.Title, canon, notes, novel.ContinuitySummary, cancellationToken);
                 analysis.SeriesContinuityJson = JsonSerializer.Serialize(continuity, JsonResponse.CaseInsensitive);
-                novel.LastError = null;
+                ClearCallFailures(novel);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, "AssessSeriesContinuity", cancellationToken);
             }
 
             Touch(novel);
@@ -1041,14 +1046,14 @@ public sealed class ReviewProcessor : IPipelineStep
 
                 row.CompletedAtUtc = clock.UtcNow;
                 row.LastError = null;
-                novel.LastError = null;
+                ClearCallFailures(novel);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 row.Attempts++;
                 row.LastError = ex.Message;
                 await db.SaveChangesAsync(cancellationToken);
-                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, $"Reading pass '{due.Id}'", cancellationToken);
             }
 
             Touch(novel);
@@ -1076,7 +1081,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 novel.CoverPath = imageStore.Save(
                     Path.Combine(novel.Id.ToString(), "covers", $"{Guid.NewGuid():N}.png"), jacket);
                 novel.CoverIsOwners = false;
-                novel.LastError = null;
+                ClearCallFailures(novel);
             }
             catch (ImageContentBlockedException blocked)
             {
@@ -1085,7 +1090,7 @@ public sealed class ReviewProcessor : IPipelineStep
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return await DeferAfterFailedCall(db, novel, ex, cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, "GenerateJacket", cancellationToken);
             }
 
             novel.CoverAttempted = true;
@@ -1348,20 +1353,78 @@ public sealed class ReviewProcessor : IPipelineStep
 
     // --- helpers ---
 
-    // Records a failed once-per-manuscript Claude call (a report consolidation) and parks the manuscript
-    // for a backoff window instead of letting the failure escape and fail the whole worker cycle. There is
-    // no per-unit attempt counter to hang the schedule off here — the unit IS the manuscript — so the delay
-    // is the base one, or whatever the provider asked us to wait.
+    // Records a failed once-per-manuscript call (a reduction, one of the sixteen reads, the jacket) and
+    // decides what happens next. These calls each send the whole book, so a failure that is simply
+    // retried is a failure that is simply re-billed:
+    //  - it is LOGGED, by name, with the attempt it was and the cause all the way down the inner chain;
+    //  - it is PACED: each failure waits longer than the last, and the wait is stored on the manuscript
+    //    (RetryNotBeforeUtc) so that the next worker cycle — a new process — honours it too;
+    //  - it is CAPPED: after MaxAttempts the manuscript is parked, with its error, until the owner taps
+    //    Retry (CallGate). StageAttempts documents this bound; nothing applied it until now.
+    // A provider rate limit is different in kind: it was refused before any work was done, so it never
+    // spends the budget — it waits as long as the provider asked, or, for an empty credit balance, for
+    // the long flat interval the per-unit steps use (no point asking again until someone tops up).
     private async Task<ProcessResult> DeferAfterFailedCall(
-        FolioDbContext db, Novel novel, Exception exception, CancellationToken cancellationToken)
+        FolioDbContext db, Novel novel, Exception exception, string call, CancellationToken cancellationToken)
     {
-        novel.LastError = exception.Message;
-        var retryAfter = (exception as RateLimitException)?.RetryAfter;
-        var delay = backoff.NextDelay(0, retryAfter);
-        if (exception is RateLimitException)
+        var cause = ErrorText.Describe(exception);
+        novel.LastError = $"{call}: {cause}";
+
+        TimeSpan delay;
+        if (exception is RateLimitException rateLimit)
+        {
+            delay = rateLimit.Kind == RateLimitKind.QuotaExhausted
+                ? TimeSpan.FromSeconds(rateLimits.MaxDelaySeconds)
+                : backoff.NextDelay(0, rateLimit.RetryAfter);
             novel.RateLimitedUntilUtc = clock.UtcNow + delay;
+            novel.RetryNotBeforeUtc = clock.UtcNow + delay;
+            logger.LogWarning(exception,
+                "{Call} deferred for manuscript {NovelId}: provider {Kind}; next try after {NextAttempt:u}" +
+                (rateLimit.Kind == RateLimitKind.QuotaExhausted ? " (add billing to resume)" : "") + ": {Error}",
+                call, novel.Id, rateLimit.Kind == RateLimitKind.QuotaExhausted ? "quota/credits exhausted" : "rate limit",
+                novel.RetryNotBeforeUtc, cause);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.Waiting(delay, novel.Id);
+        }
+
+        novel.StageAttempts++;
+        if (novel.StageAttempts >= rateLimits.MaxAttempts)
+        {
+            novel.RetryNotBeforeUtc = null;
+            logger.LogWarning(exception,
+                "{Call} failed for manuscript {NovelId} on attempt {Attempt}/{Max}; giving up and parking it " +
+                "until Retry is tapped, so the book is not sent again unattended: {Error}",
+                call, novel.Id, novel.StageAttempts, rateLimits.MaxAttempts, cause);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.Idle;
+        }
+
+        delay = backoff.NextDelay(novel.StageAttempts - 1);
+        novel.RetryNotBeforeUtc = clock.UtcNow + delay;
+        logger.LogWarning(exception,
+            "{Call} failed for manuscript {NovelId} (attempt {Attempt}/{Max}); next try after {NextAttempt:u}: {Error}",
+            call, novel.Id, novel.StageAttempts, rateLimits.MaxAttempts, novel.RetryNotBeforeUtc, cause);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.Waiting(delay, novel.Id);
+    }
+
+    // A call that worked: the failures before it no longer count, and nothing is waiting any more.
+    private static void ClearCallFailures(Novel novel)
+    {
+        novel.LastError = null;
+        novel.StageAttempts = 0;
+        novel.RetryNotBeforeUtc = null;
+    }
+
+    // Idle when a once-per-manuscript call has spent its attempts (parked until the owner retries),
+    // Waiting while a backoff set by an earlier failure is still running, otherwise null: go ahead.
+    private ProcessResult? CallGate(Novel novel, DateTimeOffset now)
+    {
+        if (novel.LastError is not null && novel.StageAttempts >= rateLimits.MaxAttempts)
+            return ProcessResult.Idle;
+        if (novel.RetryNotBeforeUtc is { } notBefore && notBefore > now)
+            return ProcessResult.Waiting(notBefore - now, novel.Id);
+        return null;
     }
 
     // Detects the manuscript's chapters exactly once (guarded by Novel.ChaptersDetected) and stamps
@@ -1457,8 +1520,8 @@ public sealed class ReviewProcessor : IPipelineStep
         if (!transient && unit.Attempts >= rateLimits.MaxAttempts)
         {
             unit.WorkState = WorkStatus.Failed;
-            logger.LogWarning("{Unit} failed after {Attempts} attempts and is given up on: {Error}",
-                unit.GetType().Name, unit.Attempts, exception.Message);
+            logger.LogWarning(exception, "{Unit} failed after {Attempts} attempts and is given up on: {Error}",
+                unit.GetType().Name, unit.Attempts, ErrorText.Describe(exception));
             return;
         }
 
@@ -1470,8 +1533,8 @@ public sealed class ReviewProcessor : IPipelineStep
         if (rateLimit?.Kind == RateLimitKind.QuotaExhausted)
         {
             unit.NextAttemptAtUtc = clock.UtcNow + TimeSpan.FromSeconds(rateLimits.MaxDelaySeconds);
-            logger.LogWarning("{Unit} deferred: provider quota/credits exhausted; next check {NextAttempt:u} (add billing to resume): {Error}",
-                unit.GetType().Name, unit.NextAttemptAtUtc, exception.Message);
+            logger.LogWarning(exception, "{Unit} deferred: provider quota/credits exhausted; next check {NextAttempt:u} (add billing to resume): {Error}",
+                unit.GetType().Name, unit.NextAttemptAtUtc, ErrorText.Describe(exception));
             return;
         }
 
@@ -1480,9 +1543,9 @@ public sealed class ReviewProcessor : IPipelineStep
         // expected resume time on the manuscript; a plain error retry doesn't (it's not a quota wait).
         if (transient)
             novel.RateLimitedUntilUtc = unit.NextAttemptAtUtc;
-        logger.LogWarning("{Unit} attempt {Attempts}/{Max} failed ({Kind}); retrying after {NextAttempt:u}: {Error}",
+        logger.LogWarning(exception, "{Unit} attempt {Attempts}/{Max} failed ({Kind}); retrying after {NextAttempt:u}: {Error}",
             unit.GetType().Name, unit.Attempts, rateLimits.MaxAttempts,
-            transient ? "rate limit" : "error", unit.NextAttemptAtUtc, exception.Message);
+            transient ? "rate limit" : "error", unit.NextAttemptAtUtc, ErrorText.Describe(exception));
     }
 
     // The manuscript's word count, so the report can frame length against the genre norm.
