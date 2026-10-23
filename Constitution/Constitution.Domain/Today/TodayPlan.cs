@@ -36,5 +36,8 @@ public sealed record TodayPlan
 
     public DinnerPlan? Dinner { get; }
 
+    /// <summary>The one Score setting the workout runs at, in beats a minute, or null while none is chosen.</summary>
+    public int? ScoreBpm { get; init; }
+
     public bool IsRestDay => WorkoutStart is null;
 }

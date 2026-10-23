@@ -20,12 +20,27 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
 {
     public const string TopLineScrapId = "today-top-line";
 
-    public TodayPage(Context context, TodayTopLine topLine) : base(context)
+    public const string WorkoutScrapId = "today-workout";
+
+    public TodayPage(Context context, TodayTopLine topLine, TodayClipping? clipping, string folio) : base(context)
     {
         Orientation = Orientation.Vertical;
 
         var host = new ScrapHost(context);
-        host.SetScraps([new ScrapEntry(ScrapKind.NotepadLeaf, TopLineScrapId, Line(context, topLine))]);
+        var scraps = new List<ScrapEntry> { new(ScrapKind.NotepadLeaf, TopLineScrapId, Line(context, topLine)) };
+        if (clipping is not null)
+        {
+            // The workout, as one magazine clipping (C-4.1.2). On a rest day there is none: its absence is the signal.
+            var column = ScrapContent.Column(context, ScrapContent.Kicker(context, clipping.Kicker), ScrapContent.Head(context, clipping.Headline));
+            if (clipping.ScoreLine is not null)
+            {
+                column.AddView(ScrapContent.Body(context, clipping.ScoreLine));
+            }
+
+            scraps.Add(new ScrapEntry(ScrapKind.MagazineClipping, WorkoutScrapId, column, folio));
+        }
+
+        host.SetScraps(scraps);
 
         var scroll = new ScrollView(context);
         scroll.AddView(host, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));

@@ -1,7 +1,11 @@
 using Constitution.Domain.Time;
 using Constitution.Domain.Voice;
+using Constitution.Domain.Workouts.Screens;
 
 namespace Constitution.Domain.Today;
+
+/// <summary>Today's workout as its clipping says it (C-4.1.2): "Workout · 5:30", "Strength, 40 minutes", "Score 132 bpm · Steady".</summary>
+public sealed record TodayClipping(string Kicker, string Headline, string? ScoreLine);
 
 /// <summary>
 /// The seat at the top of Today: its sentence, which of the six seats it is, whether it is in the
@@ -37,6 +41,23 @@ public static class TodayModel
             : SeatFacts.Today(new TodayFacts(plan.WorkoutStart!.Value, plan.WorkoutKind!, plan.WorkoutMinutes!.Value, dinner));
         return new TodayTopLine(request.Fallback, request.Seat, false, request);
     }
+
+    /// <summary>The workout clipping, or null on a rest day or when nothing is planned: an absent clipping is the rest day's whole signal.</summary>
+    public static TodayClipping? Clipping(TodayPlan? plan)
+    {
+        if (plan is null || plan.IsRestDay)
+        {
+            return null;
+        }
+
+        return new TodayClipping(
+            $"Workout · {SeatWords.Clock(plan.WorkoutStart!.Value)}",
+            $"{SeatWords.Sentence(plan.WorkoutKind!)}, {plan.WorkoutMinutes} minutes",
+            plan.ScoreBpm is { } bpm ? WorkoutWords.Score(bpm) : null);
+    }
+
+    /// <summary>The magazine page number a clipping prints in its corner, steady for a given day.</summary>
+    public static string Folio(DateOnly day) => $"— {2 + (Math.Abs(day.DayNumber) % 98):00} —";
 
     public static string Header(DateTime moment) => TodayHeader.Date(moment);
 }
