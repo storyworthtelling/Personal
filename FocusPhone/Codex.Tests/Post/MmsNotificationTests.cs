@@ -177,4 +177,121 @@ public class MmsNotificationTests
         Assert.Equal("txn-1", result!.TransactionId);
         Assert.Equal("http://example.com/m", result.ContentLocation);
     }
+
+    // The fields below all sit ahead of Content-Location in real carrier notices, and the
+    // first parser stopped at each of them, so every MMS was dropped before its download
+    // was ever asked for. The field codes and shapes are AOSP PduParser's.
+    private static List<byte> Start()
+    {
+        var bytes = new List<byte> { FieldMessageType, MessageTypeNotificationInd, FieldTransactionId };
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("txn-9"));
+        bytes.Add(0x00);
+        bytes.AddRange([FieldMmsVersion, 0x92]);
+        return bytes;
+    }
+
+    private static byte[] Finish(List<byte> bytes)
+    {
+        bytes.Add(FieldContentLocation);
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("http://mmsc.carrier.example/9"));
+        bytes.Add(0x00);
+        return [.. bytes];
+    }
+
+    private static void Encoded(List<byte> bytes, string text)
+    {
+        var raw = System.Text.Encoding.UTF8.GetBytes(text);
+        bytes.Add((byte)(raw.Length + 2));
+        bytes.Add(0xEA); // UTF-8
+        bytes.AddRange(raw);
+        bytes.Add(0x00);
+    }
+
+    [Fact]
+    public void ReadsPastASubject()
+    {
+        var bytes = Start();
+        bytes.Add(0x96);
+        Encoded(bytes, "Weekend plans");
+
+        Assert.Equal("txn-9", MmsNotificationParser.Parse(Finish(bytes))?.TransactionId);
+    }
+
+    [Fact]
+    public void ReadsPastADeliveryReportAndADate()
+    {
+        var bytes = Start();
+        bytes.AddRange([0x86, 0x81]);               // X-Mms-Delivery-Report: No
+        bytes.AddRange([0x85, 0x04, 0x68, 0x4E, 0xE1, 0x80]); // Date
+        bytes.AddRange([0x8F, 0x81]);               // Priority
+
+        Assert.Equal("http://mmsc.carrier.example/9", MmsNotificationParser.Parse(Finish(bytes))?.ContentLocation);
+    }
+
+    [Fact]
+    public void ReadsPastRecipientsAndACustomHeader()
+    {
+        var bytes = Start();
+        bytes.Add(0x97);
+        Encoded(bytes, "+15550100002/TYPE=PLMN");
+        bytes.Add(0x82);
+        Encoded(bytes, "+15550100003/TYPE=PLMN");
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("X-Carrier-Note"));
+        bytes.Add(0x00);
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("1"));
+        bytes.Add(0x00);
+
+        Assert.NotNull(MmsNotificationParser.Parse(Finish(bytes)));
+    }
+
+    [Fact]
+    public void ReadsPastATextMessageClass()
+    {
+        var bytes = Start();
+        bytes.Add(FieldMessageClass);
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("Personal"));
+        bytes.Add(0x00);
+
+        Assert.NotNull(MmsNotificationParser.Parse(Finish(bytes)));
+    }
+
+    [Fact]
+    public void KeepsTheExpiry_AbsoluteOrRelative()
+    {
+        var received = DateTimeOffset.FromUnixTimeSeconds(1_780_000_000);
+
+        var absolute = Start();
+        absolute.AddRange([FieldExpiry, 0x06, 0x80, 0x04, 0x6A, 0x18, 0x4D, 0x00]);
+        Assert.Equal(0x6A184D00, MmsNotificationParser.Parse(Finish(absolute), received)?.ExpirySeconds);
+
+        var relative = Start();
+        relative.AddRange([FieldExpiry, 0x05, 0x81, 0x03, 0x09, 0x3A, 0x80]); // 604800 s
+        Assert.Equal(1_780_000_000 + 604_800, MmsNotificationParser.Parse(Finish(relative), received)?.ExpirySeconds);
+    }
+
+    // When a notice still cannot be read, the log gets its layout — the field codes in
+    // order — and nothing that was in them: no number, no subject, no address.
+    [Fact]
+    public void Shape_NamesTheFieldsAndNothingInThem()
+    {
+        var bytes = Start();
+        bytes.Add(0x96);
+        Encoded(bytes, "Secret subject");
+        var pdu = Finish(bytes)[..^5];
+
+        var shape = MmsPduShape.Describe(pdu);
+
+        Assert.Equal($"{pdu.Length} bytes; type 0x82; fields 8C 98 8D 96 83; ends early", shape);
+        Assert.DoesNotContain("Secret", shape);
+        Assert.DoesNotContain("txn", shape);
+    }
+
+    [Fact]
+    public void Shape_OfADeliveryReport_SaysItsType()
+    {
+        byte[] pdu = [FieldMessageType, 0x86, FieldMmsVersion, 0x92];
+
+        Assert.Equal("4 bytes; type 0x86; fields 8C 8D", MmsPduShape.Describe(pdu));
+        Assert.Equal(0x86, MmsPduShape.MessageType(pdu));
+    }
 }

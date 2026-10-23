@@ -272,6 +272,18 @@ public class PolicyPlanBuilderTests
             plan.PermissionGrants);
     }
 
+    // Post reads this phone's own number to leave it out of a group's members; Android
+    // refuses the read without READ_PHONE_NUMBERS, even to the default SMS app.
+    [Fact]
+    public void Plan_GrantsReadPhoneNumbersSoGroupsLeaveThisPhoneOut()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.ReadPhoneNumbersPermission),
+            plan.PermissionGrants);
+    }
+
     [Fact]
     public void Plan_GrantsAreScopedToTheCommunicationApp()
     {
