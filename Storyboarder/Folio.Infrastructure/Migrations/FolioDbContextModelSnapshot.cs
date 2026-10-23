@@ -351,6 +351,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<long?>("RateLimitedUntilUtc")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("RetryNotBeforeUtc")
+                        .HasColumnType("INTEGER");
+
                     b.Property<Guid?>("SeriesId")
                         .HasColumnType("TEXT");
 

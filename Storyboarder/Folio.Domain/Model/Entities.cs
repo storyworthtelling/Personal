@@ -146,6 +146,12 @@ public class Novel
     // in local time. Auto-expires: it's only shown while still in the future.
     public DateTimeOffset? RateLimitedUntilUtc { get; set; }
 
+    // Persisted gate for the once-per-manuscript calls (the reads and the reductions): do not try the
+    // failed call again before this moment. It has to live in the database — a worker cycle is a new
+    // process, and a wait held only in memory is forgotten at the start of the next one, which then
+    // re-sends the whole book at once. Cleared on success and on a manual retry.
+    public DateTimeOffset? RetryNotBeforeUtc { get; set; }
+
     // The Drive folder the finished report was archived into (the folder holding the source
     // manuscript), and when the archive completed. Set by the Archiving stage; null until then.
     public string? ArchiveFolderId { get; set; }
