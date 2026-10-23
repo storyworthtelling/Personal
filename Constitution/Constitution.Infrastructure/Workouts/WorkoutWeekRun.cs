@@ -29,6 +29,13 @@ namespace Constitution.Infrastructure.Workouts;
 /// clock and leave a session that has begun alone. Sessions of days already gone stay in the plan; the writer refuses them
 /// (<see cref="PastWriteGuard"/>), so a run that comes late writes nothing into the past.</para>
 ///
+/// <para><b>The owner's moves are part of the base plan.</b> The Workouts tab moves a session by editing its event, and the plan
+/// is re-derived here on every run, so the run is handed what the owner did (<see cref="WorkoutWeekRequest.PlanOverrides"/>) and
+/// applies it right after the week is planned, before anything is adapted, placed or drawn. A moved session is planned where the
+/// owner put it, under the key the tab gave its event, and its page follows it; a swap is read whole, each key before either
+/// has moved. A skipped session stays in the plan (the keys after it must not move) but is never written, and its page is taken
+/// off if one was sent. With none, the run is exactly what it was.</para>
+///
 /// <para><b>What goes to the calendar is the week as planned, not as adapted</b> (<see cref="WorkoutWeekRequest.PlaceAdaptedWeek"/>
 /// switches it). The writer can create and never move or remove, and a key names a kind and a count, so a weather swap,
 /// a recovery swap or a soreness rest applied before placement would, on any run after the first, write a second event
@@ -105,6 +112,7 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         };
         var histories = adults.ToDictionary(name => name, learning.HistoryOf, StringComparer.OrdinalIgnoreCase);
         var phased = await PhasedWeek.PlanAsync(planRequest, histories, seams.Planner, cancellation);
+        phased = WithTheOwnersMoves(phased, request.PlanOverrides);
         RecordAssessmentWeeks(first, adults, histories, phased);
 
         var now = request.Now;
@@ -119,6 +127,7 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         var adapted = ProgressionPlan.ApplyCaps(travelled.Plan, learning.Progression);
 
         var placed = request.PlaceAdaptedWeek ? adapted : phased.Plan;
+        RememberSkips(new PlacementIndex(placed), request.PlanOverrides);
         var runner = new PlacementRunner(new PastWriteGuard(seams.CalendarWriter, () => now), seams.WrittenKeys);
         var placement = await runner.RunAsync(
             new PlacementRequest(first, busy, request.HouseholdEvents, placed) { Options = request.Placement },
@@ -155,6 +164,48 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
             busy.Where(item => !item.IsComplete).Select(item => item.Person).ToList(),
             placement,
             documents)));
+    }
+
+    // The base plan is re-derived on every run, so what the owner did to it on the Workouts tab is applied to it here, before
+    // anything is adapted, placed or drawn: the moved session is planned where the owner put it, under the key the tab gave its
+    // event, and the page follows it. An assessment session that moved is the same session on its new day.
+    private PhasedWeekPlan WithTheOwnersMoves(PhasedWeekPlan phased, PlanOverrides overrides)
+    {
+        if (overrides.IsEmpty)
+        {
+            return phased;
+        }
+
+        var applied = overrides.ApplyTo(phased.Plan);
+        if (applied.Unresolved.Count > 0)
+        {
+            seams.Log.Outcome(WorkoutWeekTrail.MoveNotFoundPhrase);
+        }
+
+        var assessments = phased.Assessments
+            .Select(item => applied.Relocated.FirstOrDefault(move => ReferenceEquals(move.Old, item.Placed)) is { } moved ? item with { Placed = moved.New } : item)
+            .ToList();
+        return phased with { Plan = applied.Plan, Assessments = assessments };
+    }
+
+    // A session the owner skipped stays in the plan (so the keys after it do not move) but must never be written. Placement
+    // already reads "written and not on the calendar" as the owner's delete, so the skipped session's key is put in the record
+    // of written ones. A record that cannot be read is left alone: treating it as empty is how every deleted event comes back.
+    private void RememberSkips(PlacementIndex index, PlanOverrides overrides)
+    {
+        foreach (var skip in overrides.Skips)
+        {
+            if (index.KeyFor(skip.Person, skip.Day) is not { } key)
+            {
+                continue;
+            }
+
+            var record = seams.WrittenKeys.Load();
+            if (record.IsReadable && !record.Keys.Contains(key))
+            {
+                seams.WrittenKeys.Save(record.Keys.With(key));
+            }
+        }
     }
 
     private WorkoutWeekOutcome Finish(WorkoutWeekOutcome outcome)
@@ -200,7 +251,8 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         var name = DeliveredName.For(DeliveryKind.Workout, day, person);
         var previous = seams.Delivered.Find(name);
         var session = context.Adapted.PlanFor(person)?.SessionsOn(day).FirstOrDefault();
-        var (standing, slot) = session is null ? (CalendarStanding.Gone, null) : StandingOnTheCalendar(context, person, day);
+        var skipped = context.Request.PlanOverrides.IsSkipped(person, day);
+        var (standing, slot) = session is null || skipped ? (CalendarStanding.Gone, null) : StandingOnTheCalendar(context, person, day);
         if (standing == CalendarStanding.Unknown)
         {
             // Not knowing is not a delete: a page already on the tablet is left exactly where it is, and none is made.
@@ -323,14 +375,14 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         };
     }
 
-    private async Task<IReadOnlyList<string?>?> EncouragementFor(DayContext context, string person, PlannedSession session, CancellationToken cancellation)
+    private async Task<IReadOnlyList<EncouragementLine?>?> EncouragementFor(DayContext context, string person, PlannedSession session, CancellationToken cancellation)
     {
         if (session.Session.Kind != SessionKind.Strength || IsAssessment(context, person, session))
         {
             return null;
         }
 
-        var lines = new List<string?>();
+        var lines = new List<EncouragementLine?>();
         foreach (var prescription in ProgressionPlan.Prescribe(context.Learning.Progression, person, session.Session, context.Learning.BaselinesOf(person)))
         {
             lines.Add(prescription.News is { } news ? await seams.Encouragement.LineAsync(news, context.Request.Now, cancellation) : null);
@@ -348,7 +400,7 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
     private static bool IsAssessment(DayContext context, string person, PlannedSession session) => AssessmentOf(context, person, session) is not null;
 
     private static Built Build(
-        DayContext context, string person, DateOnly day, PlannedSession session, DateTimeOffset start, IReadOnlyList<string?>? voice, DeliveredWorkout? previous)
+        DayContext context, string person, DateOnly day, PlannedSession session, DateTimeOffset start, IReadOnlyList<EncouragementLine?>? voice, DeliveredWorkout? previous)
     {
         if (AssessmentOf(context, person, session) is { } assessment)
         {

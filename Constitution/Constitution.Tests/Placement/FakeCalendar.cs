@@ -40,6 +40,16 @@ internal sealed class FakeCalendar : ICalendarWriter
         events[index] = events[index] with { Start = start, End = end };
     }
 
+    /// <summary>The narrow door a swap uses: the event found by its id is given the key and the time the move names.</summary>
+    public void Rekey(string id, PlacementKey key, DateTimeOffset start, DateTimeOffset end)
+    {
+        var index = events.FindIndex(item => item.Id == id);
+        Assert.True(index >= 0, "The tab tried to edit an event that is not on the calendar.");
+        events[index] = events[index] with { Key = key, Start = start, End = end };
+    }
+
+    public void Remove(string id) => events.RemoveAll(item => item.Id == id);
+
     public void OwnerDeletes(PlacementKey key, string person)
     {
         var removed = events.RemoveAll(item => item.Key == key && SamePerson(item.Person, person));

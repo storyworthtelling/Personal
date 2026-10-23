@@ -1,3 +1,4 @@
+using Constitution.Domain.Delivery;
 using Constitution.Domain.Ink;
 
 namespace Constitution.Domain.ReadBack;
@@ -10,6 +11,14 @@ public static class ReadBackPolicy
 
     /// <summary>A document that has not settled in a week is left on the tablet and not tried again.</summary>
     public const int GiveUpAfterDays = 7;
+
+    /// <summary>
+    /// Whether the read-back may look at a document today. A workout waits for its day to end: its page is blank until the
+    /// session has happened, and a blank is read as a skip once pen ink is proven. A meals sheet is read through its own
+    /// day (the deadline, not the date, decides what its silence means) and a digest is only ever trashed, by its own age.
+    /// </summary>
+    public static bool IsDue(DeliveryKind kind, DateOnly day, DateOnly today) =>
+        kind != DeliveryKind.Workout || day < today;
 
     public static bool DigestIsDue(DateOnly day, DateOnly today) => today.DayNumber - day.DayNumber >= DigestDays;
 

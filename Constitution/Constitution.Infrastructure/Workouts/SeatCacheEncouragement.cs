@@ -12,7 +12,7 @@ public sealed class SeatCacheEncouragement(SeatCache cache) : IWorkoutEncouragem
 {
     private readonly SeatCache cache = cache ?? throw new ArgumentNullException(nameof(cache));
 
-    public async Task<string?> LineAsync(ProgressionFacts news, DateTimeOffset now, CancellationToken cancellation)
+    public async Task<EncouragementLine?> LineAsync(ProgressionFacts news, DateTimeOffset now, CancellationToken cancellation)
     {
         ArgumentNullException.ThrowIfNull(news);
         if (SeatFacts.WorkoutEncouragement(news) is not { } request)
@@ -21,6 +21,6 @@ public sealed class SeatCacheEncouragement(SeatCache cache) : IWorkoutEncouragem
         }
 
         var line = await cache.ComposeAsync(request, now, cancellation);
-        return line.Text;
+        return new EncouragementLine(line.Text, line.IsVoiced);
     }
 }

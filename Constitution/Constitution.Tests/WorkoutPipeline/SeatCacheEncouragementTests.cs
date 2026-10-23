@@ -25,7 +25,8 @@ public class SeatCacheEncouragementTests
 
         var line = await seat.LineAsync(Up, Now, CancellationToken.None);
 
-        Assert.Equal("voiced line 1", line);
+        Assert.Equal("voiced line 1", line!.Text);
+        Assert.True(line.IsVoiced);
         Assert.Equal(1, composer.Calls);
     }
 
@@ -36,7 +37,8 @@ public class SeatCacheEncouragementTests
 
         var line = await seat.LineAsync(Up, Now, CancellationToken.None);
 
-        Assert.Equal("15 lb today, up from 10.", line);
+        Assert.Equal("15 lb today, up from 10.", line!.Text);
+        Assert.False(line.IsVoiced);
     }
 
     [Fact]

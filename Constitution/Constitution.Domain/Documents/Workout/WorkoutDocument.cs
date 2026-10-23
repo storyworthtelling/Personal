@@ -71,10 +71,12 @@ public static class WorkoutDocument
         {
             var exercise = model.Exercises[i];
             var baseline = rowTop + 18f + 34f * i;
+            var nameLines = CoverCell(exercise.Name, PageText.CoverNameChars, "name");
+            var loadLines = CoverCell(LoadText(exercise.Load), PageText.CoverLoadChars, "load");
             draft.Line(PrintedRole.Small, PageDraft.Left, baseline, 20f, (i + 1).ToString(CultureInfo.InvariantCulture));
-            draft.Line(PrintedRole.Strong, 58f, baseline, 170f, exercise.Name);
+            CoverLines(draft, PrintedRole.Strong, 58f, rowTop + 34f * i, baseline, 170f, nameLines);
             draft.Line(PrintedRole.Body, 230f, baseline, 60f, exercise.Dose);
-            draft.Line(PrintedRole.Small, 292f, baseline, 70f, LoadText(exercise.Load));
+            CoverLines(draft, PrintedRole.Small, 292f, rowTop + 34f * i, baseline, 70f, loadLines);
             draft.Line(PrintedRole.Small, PageDraft.RightEdge - 40f, baseline, 40f, $"p. {i + 2}", PrintedAlign.Right);
             draft.Rule($"list-row-{i + 1}", PageDraft.Left, rowTop + 34f * (i + 1), PageDraft.FullWidth, 0f);
         }
@@ -94,6 +96,35 @@ public static class WorkoutDocument
         }
 
         return draft.ToLayout();
+    }
+
+    /// <summary>A cover row is 34 points between its rules and holds two lines of a cell at most.</summary>
+    private const int CoverCellLines = 2;
+
+    /// <summary>Where the first and second line of a wrapped cell sit below the row's top rule.</summary>
+    private const float WrappedFirstBaseline = 14f;
+
+    private const float WrappedLeading = 14f;
+
+    private static IReadOnlyList<string> CoverCell(string text, int chars, string what)
+    {
+        var lines = PageText.Wrap(text, chars);
+        if (lines.Count > CoverCellLines)
+        {
+            throw new ArgumentException($"The {what} '{text}' takes {lines.Count} lines in its column and a cover row holds {CoverCellLines}.", nameof(text));
+        }
+
+        return lines;
+    }
+
+    // One line sits on the row's own baseline; two share the row, the first a little above and the second a little below it.
+    private static void CoverLines(PageDraft draft, PrintedRole role, float left, float rowTop, float baseline, float width, IReadOnlyList<string> lines)
+    {
+        for (var line = 0; line < lines.Count; line++)
+        {
+            var at = lines.Count == 1 ? baseline : rowTop + WrappedFirstBaseline + (WrappedLeading * line);
+            draft.Line(role, left, at, width, lines[line]);
+        }
     }
 
     private static InkPageLayout ExercisePage(WorkoutDocumentModel model, int index, int pages)
@@ -134,7 +165,7 @@ public static class WorkoutDocument
         }
 
         var labelBaseline = last + 26f;
-        var voiceLines = PageDraft.VoiceLines(exercise.Encouragement).Count;
+        var voiceLines = PageDraft.VoiceLines(exercise.Encouragement, exercise.EncouragementVoiced).Count;
         var doctor = sore is { DoctorNoteDue: true } && index == 0;
         if (exercise.ShowFigure)
         {
@@ -156,7 +187,7 @@ public static class WorkoutDocument
             : exercise.ScoreBpm;
         draft.Line(PrintedRole.Label, PageDraft.Left, labelBaseline, PageDraft.ColumnWidth, "SET SCORE TO");
         draft.Line(PrintedRole.Strong, PageDraft.Left, labelBaseline + 20f, PageDraft.ColumnWidth, ScoreLine(bpm));
-        var end = draft.Voice(exercise.Encouragement, labelBaseline + 48f, labelBaseline + 20f);
+        var end = draft.Voice(exercise.Encouragement, labelBaseline + 48f, labelBaseline + 20f, exercise.EncouragementVoiced);
 
         if (doctor)
         {

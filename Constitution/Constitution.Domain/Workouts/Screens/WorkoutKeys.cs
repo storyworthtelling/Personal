@@ -8,9 +8,16 @@ public static class WorkoutKeys
     public static IReadOnlyDictionary<PlannedSession, PlacementKey> Of(WorkoutWeek week, string person)
     {
         ArgumentNullException.ThrowIfNull(week);
-        var plan = week.Plan.PlanFor(person)
+        return Of(week.Plan, person);
+    }
+
+    /// <summary>The same keys for a plan on its own.</summary>
+    public static IReadOnlyDictionary<PlannedSession, PlacementKey> Of(HouseholdWorkoutPlan household, string person)
+    {
+        ArgumentNullException.ThrowIfNull(household);
+        var plan = household.PlanFor(person)
             ?? throw new ArgumentException("That person has no plan in this week.", nameof(person));
-        var weekIndex = PlacementKey.WeekIndexOf(week.Plan.WeekStart);
+        var weekIndex = PlacementKey.WeekIndexOf(household.WeekStart);
         var counts = new Dictionary<SessionKind, int>();
         var keys = new Dictionary<PlannedSession, PlacementKey>();
         foreach (var session in plan.Sessions.OrderBy(item => item.Start))
@@ -22,5 +29,14 @@ public static class WorkoutKeys
         }
 
         return keys;
+    }
+
+    /// <summary>The key of a session of this person in whichever of these weeks holds its day.</summary>
+    public static PlacementKey In(IReadOnlyList<WorkoutWeek> weeks, string person, PlannedSession session)
+    {
+        ArgumentNullException.ThrowIfNull(weeks);
+        ArgumentNullException.ThrowIfNull(session);
+        var week = weeks.First(item => session.Day >= item.Plan.WeekStart && session.Day < item.Plan.WeekStart.AddDays(7));
+        return Of(week, person)[session];
     }
 }
