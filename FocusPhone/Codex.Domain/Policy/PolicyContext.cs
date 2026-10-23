@@ -83,6 +83,10 @@ public record PolicyContext(
     public const string WriteCallLogPermission = "android.permission.WRITE_CALL_LOG";
     public const string WriteContactsPermission = "android.permission.WRITE_CONTACTS";
 
+    // This phone's own number, which Post leaves out of a group MMS's members (and its
+    // replies). Android refuses the read without it, default SMS app or not.
+    public const string ReadPhoneNumbersPermission = "android.permission.READ_PHONE_NUMBERS";
+
     public static readonly IReadOnlySet<string> FocusPhonePackages = new HashSet<string>
     {
         LauncherPackage,

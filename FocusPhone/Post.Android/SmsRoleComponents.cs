@@ -106,7 +106,18 @@ public class MmsDeliverReceiver : BroadcastReceiver
             var notification = MmsNotificationParser.Parse(pdu);
             if (notification is null)
             {
-                PostDiagnostics.LogWarning("Mms", "An MMS notification arrived but could not be read.");
+                // The layout, never the content, so the next export can say why.
+                var shape = pdu is null ? "no data" : MmsPduShape.Describe(pdu);
+                if (pdu is not null && MmsPduShape.MessageType(pdu) is { } type and not 0x82)
+                {
+                    // A delivery or read report on something the owner sent — not a message.
+                    PostDiagnostics.LogText("Mms", $"MMS report from the carrier, not a message ({shape})");
+                }
+                else
+                {
+                    PostDiagnostics.LogWarning("Mms", $"An MMS notification arrived but could not be read ({shape}).");
+                    PostDiagnostics.LogText("Mms", $"MMS notice unreadable ({shape})");
+                }
                 return;
             }
 

@@ -148,8 +148,11 @@ internal static class OwnNumbers
     // Read once per process: the timeline reload asks on every pass, and a SIM's number
     // does not change under a running app.
     private static IReadOnlyList<string>? known;
+    private static bool refusalLogged;
 
-    public static IReadOnlyList<string> Read(Context context) => known ??= ReadFromSim(context);
+    // A refusal is not cached, so the number is read as soon as the permission is granted;
+    // it is logged once per process rather than on every reload.
+    public static IReadOnlyList<string> Read(Context context) => known ?? ReadFromSim(context);
 
     private static IReadOnlyList<string> ReadFromSim(Context context)
     {
@@ -170,8 +173,14 @@ internal static class OwnNumbers
         }
         catch (Java.Lang.SecurityException e)
         {
-            PostDiagnostics.LogWarning("Mms", "Could not read this phone's number; group members will include it", e);
+            if (!refusalLogged)
+            {
+                refusalLogged = true;
+                PostDiagnostics.LogWarning("Mms", "Could not read this phone's number; group members will include it", e);
+            }
+            return numbers;
         }
+        known = numbers;
         return numbers;
     }
 }
