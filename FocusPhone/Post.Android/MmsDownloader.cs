@@ -92,6 +92,11 @@ internal static class MmsDownloader
         values.Put(Telephony.IBaseMmsColumns.MessageType, MessageTypeNotificationInd);
         values.Put(Telephony.IBaseMmsColumns.TransactionId, notification.TransactionId);
         values.Put(Telephony.IBaseMmsColumns.ContentLocation, notification.ContentLocation);
+        if (notification.ExpirySeconds is { } expiry)
+        {
+            // What the retry sweep reads to stop asking once the carrier has let it go.
+            values.Put(Telephony.IBaseMmsColumns.Expiry, expiry);
+        }
         values.Put(Telephony.IBaseMmsColumns.MessageBox, SmsLogReader.MmsBoxInbox);
         values.Put(Telephony.IBaseMmsColumns.Read, 0);
         values.Put(Telephony.IBaseMmsColumns.Seen, 0);
