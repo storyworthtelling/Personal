@@ -158,6 +158,7 @@ public static class MmsRetrieveConfParser
 
     private const int MessageTypeRetrieveConf = 0x84;
     private const int AddressPresentToken = 0x80;
+    private const int RelativeToken = 0x81;
 
     // Content-type parameters (PduPart).
     private const int ParamCharset = 0x81;
@@ -200,15 +201,84 @@ public static class MmsRetrieveConfParser
         }
     }
 
+    /// <summary>Reads the headers of any MMS PDU; null when it ends early or a length runs past its end.</summary>
+    internal static PduHeaders? ReadHeaders(byte[] pdu, List<string>? seen = null)
+    {
+        var reader = new Reader(pdu);
+        try
+        {
+            return reader.ReadHeaders();
+        }
+        catch (MalformedPduException)
+        {
+            return null;
+        }
+        finally
+        {
+            seen?.AddRange(reader.Seen);
+        }
+    }
+
+    internal sealed record PduHeaders(
+        int? MessageType,
+        string? TransactionId,
+        string? MessageId,
+        string? From,
+        IReadOnlyList<string> To,
+        IReadOnlyList<string> Cc,
+        string? Subject,
+        long? DateSeconds,
+        int? MmsVersion,
+        int? RetrieveStatus,
+        string? ContentType,
+        string? ContentLocation,
+        (bool Relative, long Value)? Expiry);
+
     private sealed class MalformedPduException(string message) : Exception(message);
 
     private sealed class Reader(byte[] pdu)
     {
         private int pos;
 
+        /// <summary>The header fields met, in order — codes only, for a log line about a PDU that would not read.</summary>
+        public List<string> Seen { get; } = [];
+
         public RetrievedMms? ReadMessage()
         {
+            var headers = ReadHeaders();
+            if (headers.MessageType != MessageTypeRetrieveConf)
+            {
+                return null;
+            }
+
+            var parts = new List<RetrievedPart>();
+            if (headers.ContentType is { } contentType && pos < pdu.Length)
+            {
+                if (contentType.StartsWith("application/vnd.wap.multipart.", StringComparison.OrdinalIgnoreCase))
+                {
+                    parts.AddRange(ReadParts());
+                }
+                else
+                {
+                    // A single-part message: the rest of the PDU is the content itself.
+                    parts.Add(new RetrievedPart(contentType, 0, null, null, null, pdu[pos..]));
+                }
+            }
+
+            return new RetrievedMms(
+                headers.TransactionId, headers.MessageId, headers.From, headers.To, headers.Cc, headers.Subject,
+                headers.DateSeconds, headers.MmsVersion, headers.RetrieveStatus, headers.ContentType, parts);
+        }
+
+        /// <summary>
+        /// Every header up to the body (which starts after Content-Type), each read in the
+        /// shape AOSP reads it.
+        /// </summary>
+        public PduHeaders ReadHeaders()
+        {
             int? messageType = null;
+            string? contentLocation = null;
+            (bool Relative, long Value)? expiry = null;
             string? transactionId = null;
             string? messageId = null;
             string? from = null;
@@ -226,11 +296,13 @@ public static class MmsRetrieveConfParser
                 if (field is >= TextMin and <= TextMax)
                 {
                     // A custom header: its name, then its value, both as text.
+                    Seen.Add("text");
                     ReadTextString();
                     ReadTextString();
                     continue;
                 }
                 pos++;
+                Seen.Add(field.ToString("X2"));
                 switch (field)
                 {
                     case MessageType:
@@ -261,8 +333,11 @@ public static class MmsRetrieveConfParser
                     case MessageId:
                         messageId = ReadTextString();
                         break;
+                    case ContentLocation:
+                        contentLocation = ReadTextString();
+                        break;
                     case ReplyChargingId or AuxApplicId or ApplicId or ReplyApplicId or ReplaceId
-                        or CancelId or ContentLocation:
+                        or CancelId:
                         ReadTextString();
                         break;
                     case Subject:
@@ -281,7 +356,10 @@ public static class MmsRetrieveConfParser
                     case Bcc:
                         ReadEncodedString();
                         break;
-                    case DeliveryTime or Expiry or ReplyChargingDeadline or PreviouslySentBy
+                    case Expiry:
+                        expiry = ReadTimeValue();
+                        break;
+                    case DeliveryTime or ReplyChargingDeadline or PreviouslySentBy
                         or PreviouslySentDate or MmFlags or MboxTotals or MboxQuotas:
                         SkipValueLengthBlock();
                         break;
@@ -315,27 +393,20 @@ public static class MmsRetrieveConfParser
                 }
             }
 
-            if (messageType != MessageTypeRetrieveConf)
-            {
-                return null;
-            }
+            return new PduHeaders(
+                messageType, transactionId, messageId, from, to, cc, subject, date, version, retrieveStatus,
+                contentType, contentLocation, expiry);
+        }
 
-            var parts = new List<RetrievedPart>();
-            if (contentType is not null && pos < pdu.Length)
-            {
-                if (contentType.StartsWith("application/vnd.wap.multipart.", StringComparison.OrdinalIgnoreCase))
-                {
-                    parts.AddRange(ReadParts());
-                }
-                else
-                {
-                    // A single-part message: the rest of the PDU is the content itself.
-                    parts.Add(new RetrievedPart(contentType, 0, null, null, null, pdu[pos..]));
-                }
-            }
-
-            return new RetrievedMms(
-                transactionId, messageId, from, to, cc, subject, date, version, retrieveStatus, contentType, parts);
+        // Value-length (Absolute-token Date-value | Relative-token Delta-seconds-value)
+        private (bool Relative, long Value) ReadTimeValue()
+        {
+            var length = ReadValueLength();
+            var end = Bounded(pos + length);
+            var relative = Byte() == RelativeToken;
+            var value = ReadLongInteger();
+            pos = end;
+            return (relative, value);
         }
 
         private static void AddAddress(List<string> addresses, string? value)
@@ -548,10 +619,12 @@ public static class MmsRetrieveConfParser
             return MmsCharsets.Decode(ReadTextBytes(), MmsCharsets.Utf8);
         }
 
+        // Latin-1, one character per octet: a transaction id goes back to the carrier in the
+        // acknowledgement, and MmsComposer writes it the same way, so it must survive byte for byte.
         private string? ReadTextString()
         {
             var bytes = ReadTextBytes();
-            return bytes.Length == 0 ? null : Encoding.UTF8.GetString(bytes);
+            return bytes.Length == 0 ? null : Encoding.Latin1.GetString(bytes);
         }
 
         // Text-string = [Quote] *TEXT End-of-string

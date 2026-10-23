@@ -43,6 +43,11 @@ using Android;
 // normal dialog is all this one needs.
 [assembly: UsesPermission(Manifest.Permission.ReadPhoneState)]
 
+// READ_PHONE_NUMBERS: this phone's own number, so a group MMS's members (and its replies)
+// leave it out. Android refuses the read without it even to the default SMS app; Flyleaf's
+// policy grants it on the locked phone, and the launch request asks for it elsewhere.
+[assembly: UsesPermission(Manifest.Permission.ReadPhoneNumbers)]
+
 // Needed to resolve/deep-link the dialer, Google Messages, and email apps under
 // Android 11+ package-visibility filtering. Sideloaded, so QUERY_ALL_PACKAGES is fine.
 [assembly: UsesPermission(Manifest.Permission.QueryAllPackages)]

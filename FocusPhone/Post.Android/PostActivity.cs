@@ -441,6 +441,8 @@ public class PostActivity : Activity
             // Without this, Android never delivers ACTION_PHONE_STATE_CHANGED to
             // CallStateReceiver at all, so the call-ended note prompt never fires.
             Manifest.Permission.ReadPhoneState,
+            // This phone's own number, so a group MMS leaves it out of the members.
+            Manifest.Permission.ReadPhoneNumbers,
         };
         var toRequest = wanted
             .Where(permission => CheckSelfPermission(permission) != Permission.Granted)

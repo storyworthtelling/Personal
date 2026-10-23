@@ -74,6 +74,7 @@ public static class PolicyPlanBuilder
             // into Contacts, are the unified inbox's destructive-CRUD writes.
             new(PolicyContext.CommunicationPackage, PolicyContext.WriteCallLogPermission),
             new(PolicyContext.CommunicationPackage, PolicyContext.WriteContactsPermission),
+            new(PolicyContext.CommunicationPackage, PolicyContext.ReadPhoneNumbersPermission),
         };
 
         // Disable the status bar so its swipe-down shade — notifications, quick
