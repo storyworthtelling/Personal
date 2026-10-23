@@ -17,6 +17,7 @@ using Constitution.ReadBack;
 using Constitution.Services;
 using Constitution.Settings;
 using Constitution.Waiting;
+using Constitution.WorkoutsTab;
 
 namespace Constitution;
 
@@ -409,9 +410,14 @@ public abstract class ConstitutionActivity : Activity
         RenderPage();
     }
 
-    // An undo fold was turned. No area raises an undo yet; when one does, it reverses its act here.
+    // An undo fold was turned: the area that raised it reverses its act, then the page redraws.
     private void OnUndoTurned(string actKey)
     {
+        foreach (var area in areasById.Values.OfType<IUndoableArea>())
+        {
+            area.UndoTurned(actKey);
+        }
+
         RenderPage();
     }
 }
