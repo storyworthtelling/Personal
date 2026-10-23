@@ -26,7 +26,7 @@ public class WorkoutDocumentBuilderTests
     private static PlannedSession Placed(Session session, Together together = Together.None, params string[] who) =>
         PlannedAt(1, (16, 0), (20, 0), (18, 0), session, together, who.Length == 0 ? [Sam] : who);
 
-    private static WorkoutDocumentModel Build(PlannedSession planned, IReadOnlyList<ExercisePrescription>? doses = null, IReadOnlyList<string?>? voice = null, Soreness? sore = null, IReadOnlyList<ExerciseSubstitution>? swaps = null) =>
+    private static WorkoutDocumentModel Build(PlannedSession planned, IReadOnlyList<ExercisePrescription>? doses = null, IReadOnlyList<EncouragementLine?>? voice = null, Soreness? sore = null, IReadOnlyList<ExerciseSubstitution>? swaps = null) =>
         WorkoutDocumentBuilder.Build(planned, Slot, Zone, doses, voice, sore, swaps);
 
     private static IReadOnlyList<ExercisePrescription> Prescribed(Session session, ProgressionLedger? ledger = null) =>
@@ -181,9 +181,23 @@ public class WorkoutDocumentBuilderTests
     {
         var session = Strength(new Exercise("Sit to stand from a chair"), new Exercise("Wall angels"));
 
-        var model = Build(Placed(session), Prescribed(session), voice: [null, "15 lb today, up from 10."]);
+        var model = Build(Placed(session), Prescribed(session), voice: [null, new EncouragementLine("15 lb today, up from 10.", true)]);
 
         Assert.Null(model.Exercises[0].Encouragement);
+        Assert.Equal("15 lb today, up from 10.", model.Exercises[1].Encouragement);
+    }
+
+    [Fact]
+    public void TheVoicedFlagFollowsTheSeatResult()
+    {
+        var session = Strength(new Exercise("Sit to stand from a chair"), new Exercise("Wall angels"), new Exercise("Hip hinge with hands on hips"));
+
+        var model = Build(
+            Placed(session), Prescribed(session),
+            voice: [new EncouragementLine("A voiced one.", true), new EncouragementLine("15 lb today, up from 10.", false), null]);
+
+        Assert.True(model.Exercises[0].EncouragementVoiced);
+        Assert.False(model.Exercises[1].EncouragementVoiced);
         Assert.Equal("15 lb today, up from 10.", model.Exercises[1].Encouragement);
     }
 

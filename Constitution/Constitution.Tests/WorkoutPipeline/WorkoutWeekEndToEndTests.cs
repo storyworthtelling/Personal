@@ -104,15 +104,16 @@ public sealed class WorkoutWeekEndToEndTests : IDisposable
     }
 
     [Fact]
-    public async Task WithoutTheFilterTodaysPageReadsAsASkip()
+    public async Task WithoutTheViewTodayIsNotASkip()
     {
-        // The hazard the DueExpectedDocuments view exists for: the read-back reads whatever it is told about, whatever its day.
+        // The hazard the DueExpectedDocuments view was made for: the service itself now refuses to read a workout before its day is over.
         await rig.PlannedAsync(rig.Request(Est(11, 2, 5, 30)));
         var (service, _, ledger, _, _) = ReadBack(Est(11, 2, 7, 15), onlyDueDocuments: false);
 
-        await service.Run();
+        var report = await service.Run();
 
-        Assert.Equal(SessionOutcome.Skipped, ledger.Held.OutcomeOf(Sam, Day(0)));
+        Assert.Empty(report.Documents);
+        Assert.Null(ledger.Held.OutcomeOf(Sam, Day(0)));
     }
 
     [Fact]

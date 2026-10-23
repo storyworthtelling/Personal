@@ -392,6 +392,46 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
         Assert.Contains("Five pounds more", TextOf(rig.Tablet.PdfOf(NameOf(Sam))), StringComparison.Ordinal);
     }
 
+    private static bool HasTheVoiceHand(byte[] pdf) =>
+        PdfReadBack.Open(pdf).GetPages().SelectMany(page => page.Letters).Any(letter => letter.FontName.Contains("Pinyon", StringComparison.Ordinal));
+
+    private async Task<byte[]> PageForALiftThatWentUp(bool voiced)
+    {
+        rig.BothAreEstablished();
+        var exercise = new Exercise("Squat holding a weight at your chest", EquipmentCatalogue.DumbbellsId);
+        var lift = new Session(SessionKind.Strength, TimeSpan.FromMinutes(40), false, [exercise]);
+        rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, 0, 16, lift)));
+        var pages = new SessionPages(Sam, new DateOnly(2026, 10, 28), SessionKind.Strength, [new ExercisePageRef(exercise, "done", "feel")]);
+        var ledger = ProgressionLedger.Empty;
+        foreach (var _ in Enumerable.Range(0, 2))
+        {
+            ledger = ledger.Settle(pages, [new InkResolution.PageDone("done", "easy")]);
+        }
+
+        rig.Learning.Held = rig.Learning.Held with { Progression = ledger };
+        rig.Encouragement.Answer = "Five pounds more than last time.";
+        rig.Encouragement.Voiced = voiced;
+
+        await rig.PlannedAsync();
+
+        return rig.Tablet.PdfOf(NameOf(Sam));
+    }
+
+    [Fact]
+    public async Task AVoicedLineIsInTheVoiceHand()
+    {
+        Assert.True(HasTheVoiceHand(await PageForALiftThatWentUp(voiced: true)));
+    }
+
+    [Fact]
+    public async Task APlainFallbackIsNot()
+    {
+        var pdf = await PageForALiftThatWentUp(voiced: false);
+
+        Assert.False(HasTheVoiceHand(pdf));
+        Assert.Contains("Five pounds more", TextOf(pdf), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ThePageIsSilentWhenThereIsNoNews()
     {

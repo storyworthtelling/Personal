@@ -50,7 +50,7 @@ public static class WorkoutDocumentBuilder
         DateTimeOffset start,
         TimeZoneInfo zone,
         IReadOnlyList<ExercisePrescription>? strengthDoses = null,
-        IReadOnlyList<string?>? encouragement = null,
+        IReadOnlyList<EncouragementLine?>? encouragement = null,
         Soreness? soreness = null,
         IReadOnlyList<ExerciseSubstitution>? substitutions = null)
     {
@@ -85,8 +85,9 @@ public static class WorkoutDocumentBuilder
                 strength ? StrengthRestSeconds : null,
                 false,
                 ScoreFor(session.Kind, index, count),
-                encouragement?[index],
-                substitutions?.FirstOrDefault(item => item.Replacement == exercise.Name)?.Text));
+                encouragement?[index]?.Text,
+                substitutions?.FirstOrDefault(item => item.Replacement == exercise.Name)?.Text,
+                encouragement?[index]?.IsVoiced ?? true));
         }
 
         return new WorkoutDocumentModel(

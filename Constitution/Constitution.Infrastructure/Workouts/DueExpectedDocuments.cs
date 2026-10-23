@@ -4,7 +4,8 @@ using Constitution.Infrastructure.ReadBack;
 namespace Constitution.Infrastructure.Workouts;
 
 /// <summary>
-/// The delivered documents as the morning read-back should see them: only those whose day has ended.
+/// The delivered documents as the morning read-back should see them: a workout only once its day has ended
+/// (<see cref="ReadBackPolicy.IsDue"/>, the rule <c>ReadBackService</c> now applies itself; this view states it at the store).
 ///
 /// <para><b>Why the read-back needs this.</b> <c>ReadBackService</c> reads every outstanding document whatever its day. A
 /// workout page delivered this morning is blank until the owner has done the workout, and once pen ink has been proven to
@@ -23,7 +24,7 @@ public sealed class DueExpectedDocuments(IExpectedDocuments inner, Func<DateTime
     public IReadOnlyList<OutstandingDocument> Outstanding()
     {
         var today = DateOnly.FromDateTime(clock().DateTime);
-        return inner.Outstanding().Where(item => item.Document.Day < today).ToList();
+        return inner.Outstanding().Where(item => ReadBackPolicy.IsDue(item.Document.Kind, item.Document.Day, today)).ToList();
     }
 
     public void Record(ExpectedDocument document) => inner.Record(document);

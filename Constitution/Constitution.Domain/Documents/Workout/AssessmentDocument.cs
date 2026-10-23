@@ -16,6 +16,9 @@ public static class AssessmentDocument
     /// <summary>The line that is the point of the week (p.6).</summary>
     public const string NoScoreLine = "There is no score and nothing to beat.";
 
+    /// <summary>The page test <paramref name="index"/> (from 0) is on: the cover is page 1.</summary>
+    public static int PageOfTest(int index) => index + 2;
+
     private const float FigureHeight = 170f;
 
     public static IReadOnlyList<InkPageLayout> Build(AssessmentDocumentModel model)
@@ -58,7 +61,7 @@ public static class AssessmentDocument
             draft.Line(PrintedRole.Small, PageDraft.Left, row, 20f, (i + 1).ToString(CultureInfo.InvariantCulture));
             draft.Line(PrintedRole.Strong, 58f, row, 218f, test.Name);
             draft.Line(PrintedRole.Small, 280f, row, 70f, test.Unit ?? "circle one");
-            draft.Line(PrintedRole.Small, PageDraft.RightEdge - 40f, row, 40f, $"p. {i + 2}", PrintedAlign.Right);
+            draft.Line(PrintedRole.Small, PageDraft.RightEdge - 40f, row, 40f, $"p. {PageOfTest(i)}", PrintedAlign.Right);
             draft.Rule($"list-row-{i + 1}", PageDraft.Left, rowTop + 34f * (i + 1), PageDraft.FullWidth, 0f);
         }
 
@@ -78,7 +81,7 @@ public static class AssessmentDocument
         var test = model.Tests[index];
         var draft = new PageDraft(test.Name);
         draft.Kicker($"ASSESSMENT · TEST {index + 1} OF {model.Tests.Count}");
-        draft.Footer(Name, model.Start, index + 2, pages);
+        draft.Footer(Name, model.Start, PageOfTest(index), pages);
         draft.NotesColumn();
 
         var last = 118f - 16f;

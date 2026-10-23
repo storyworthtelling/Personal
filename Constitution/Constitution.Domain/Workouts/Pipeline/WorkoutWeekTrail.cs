@@ -7,6 +7,9 @@ namespace Constitution.Domain.Workouts.Pipeline;
 /// </summary>
 public static class WorkoutWeekTrail
 {
+    /// <summary>A move the owner made that names a session the week's plan no longer has: it is left out, and said so once, never named.</summary>
+    public const string MoveNotFoundPhrase = "workout week, owner session not found in the plan, left out";
+
     /// <summary>The line for a whole run.</summary>
     public static string LogPhrase(WorkoutWeekOutcome outcome)
     {

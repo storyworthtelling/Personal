@@ -26,6 +26,11 @@ namespace Constitution.Infrastructure.ReadBack;
 /// happened in, and kept with its exception (stack and all) in the report; the caller logs its type. A caller's own
 /// cancellation is not a failure and is never caught.</para>
 ///
+/// <para><b>A workout is read only once its day is over.</b> One whose day is today or later is left alone (not read, not
+/// settled, not trashed): its page is blank because the session has not happened, and a blank is a skip once ink is proven
+/// (<see cref="ReadBackPolicy.IsDue"/>). The day is the date on the owner's own clock. A meals sheet is read through its
+/// own day, since its deadline rather than the date says what its silence means.</para>
+///
 /// <para>A document that has not settled in <see cref="ReadBackPolicy.GiveUpAfterDays"/> is retired and its page left
 /// where it is. The digest is not read at all, only trashed after <see cref="ReadBackPolicy.DigestDays"/>.</para>
 /// </summary>
@@ -49,7 +54,10 @@ public sealed class ReadBackService(
         var today = DateOnly.FromDateTime(now.DateTime);
         var outcomes = new List<DocumentReadBack>();
 
+        // A workout for today (or a later day) has not been done yet: read now it is a blank, and once ink is proven a blank
+        // settles a skip for a session that has not happened. A workout is read only once its day has ended on the owner's clock.
         var outstanding = expected.Outstanding()
+            .Where(entry => ReadBackPolicy.IsDue(entry.Document.Kind, entry.Document.Day, today))
             .OrderBy(entry => entry.Document.Day)
             .ThenBy(entry => entry.Document.Name, StringComparer.Ordinal);
         foreach (var entry in outstanding)

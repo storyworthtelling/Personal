@@ -24,6 +24,12 @@ internal static class PageText
     /// <summary>The secondary sans across a cover.</summary>
     public const int CoverSmallChars = 80;
 
+    /// <summary>An exercise's name in the cover's 170 point name column: the semibold runs about 5.1 points a character, so 30 leaves room for the wide letters.</summary>
+    public const int CoverNameChars = 30;
+
+    /// <summary>An exercise's load in the cover's 70 point load column: the secondary sans runs about 4.4 points a character.</summary>
+    public const int CoverLoadChars = 15;
+
     private static readonly Regex SentenceEnd = new(@"(?<=[.!?])\s+", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     /// <summary>Greedy wrap on spaces; a word longer than the limit stands on a line of its own.</summary>

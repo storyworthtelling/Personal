@@ -13,10 +13,8 @@ namespace Constitution.Domain.Workouts.Pipeline;
 ///
 /// <para>The instructions are the agent's plain wording of the four tests the catalogue names; no coach has read them.</para>
 ///
-/// <para><b>A known gap this does not close.</b> The page's number box is painted with the id <c>result</c> (and the circle
-/// with <c>choice</c>), while <see cref="AssessmentBaselines.Read"/> looks answers up by the catalogue's own measure ids
-/// (<c>assess-sit-to-stand</c> ...). The read-back therefore settles the day as done (any answer counts) but the baselines
-/// the progression ladder starts from are not yet read off these pages; joining the two is the read-back's to do.</para>
+/// <para>The page paints its number box as <c>result</c> and its circle as <c>choice</c>, on every test page alike, so the
+/// baselines are read by page and measure (<see cref="AssessmentBaselines.FromPages"/>), not by the catalogue's own ids.</para>
 /// </summary>
 public static class AssessmentDocumentBuilder
 {
@@ -50,7 +48,7 @@ public static class AssessmentDocumentBuilder
             InkRule rule = test.Words is null
                 ? new NumberRule(test.Name, WorkoutIds.Result)
                 : new RatingRule(test.Name, WorkoutIds.Choice);
-            pages.Add(new ExpectedPage(index + 2, new InkReadout(layouts[index + 1].Map), [rule]));
+            pages.Add(new ExpectedPage(AssessmentDocument.PageOfTest(index), new InkReadout(layouts[index + 1].Map), [rule]));
         }
 
         return new ExpectedDocument(Delivery.DeliveryKind.Workout, day, subject, person, session.Placed.Session.Kind, pages);

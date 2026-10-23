@@ -153,15 +153,19 @@ internal sealed class PageDraft
         return set.Lanes;
     }
 
-    /// <summary>The voiced line, one sentence to a line; the seat is hidden when there is none or it will not fit.</summary>
-    public float Voice(string? text, float firstBaseline, float after)
+    /// <summary>
+    /// The encouragement seat, one sentence to a line; hidden when there is none or it will not fit. A voiced line prints in the
+    /// owner's hand; the plain sentence the seat falls back to prints in the plain body face (the hand is for the voice alone),
+    /// on the same line pitch, so the page is laid out the same either way.
+    /// </summary>
+    public float Voice(string? text, float firstBaseline, float after, bool voiced = true)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             return after;
         }
 
-        var lines = VoiceLines(text);
+        var lines = VoiceLines(text, voiced);
         if (lines.Count == 0)
         {
             return after;
@@ -170,7 +174,7 @@ internal sealed class PageDraft
         var baseline = firstBaseline;
         foreach (var line in lines)
         {
-            Line(PrintedRole.Voice, Left, baseline, ColumnWidth, line);
+            Line(voiced ? PrintedRole.Voice : PrintedRole.Body, Left, baseline, ColumnWidth, line);
             baseline += 20f;
         }
 
@@ -180,14 +184,14 @@ internal sealed class PageDraft
     public const int VoiceMaxLines = 3;
 
     /// <summary>The lines the seat prints: none when there is no text or it would take more than three.</summary>
-    public static IReadOnlyList<string> VoiceLines(string? text)
+    public static IReadOnlyList<string> VoiceLines(string? text, bool voiced = true)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             return [];
         }
 
-        var lines = PageText.WrapBySentence(text, PageText.VoiceLineChars);
+        var lines = PageText.WrapBySentence(text, voiced ? PageText.VoiceLineChars : PageText.BodyColumnChars);
         return lines.Count > VoiceMaxLines ? [] : lines;
     }
 

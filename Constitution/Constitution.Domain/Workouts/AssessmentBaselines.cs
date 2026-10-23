@@ -1,5 +1,7 @@
 using System.Globalization;
+using Constitution.Domain.Documents;
 using Constitution.Domain.Ink;
+using Constitution.Domain.ReadBack;
 
 namespace Constitution.Domain.Workouts;
 
@@ -13,6 +15,46 @@ public sealed record AssessmentBaselines(
     IReadOnlyDictionary<string, string> Choices,
     IReadOnlyList<string> Missing)
 {
+    /// <summary>
+    /// The baselines as the pages print them. Every test page paints its number box as <c>result</c> and its circled word as
+    /// <c>choice</c> (<see cref="WorkoutIds"/>), so the measure an answer belongs to is told by its page: test <c>n</c> of the
+    /// document is on <see cref="AssessmentDocument.PageOfTest"/>, in the same order as the session's measures. A page the read
+    /// never got to has no answer, and its measure is missing.
+    /// </summary>
+    public static AssessmentBaselines FromPages(IReadOnlyList<AssessmentMeasure> measures, IEnumerable<PageResolutions> pages)
+    {
+        ArgumentNullException.ThrowIfNull(measures);
+        ArgumentNullException.ThrowIfNull(pages);
+
+        var byNumber = pages.ToDictionary(page => page.Number);
+        var keyed = new List<InkResolution>();
+        for (var index = 0; index < measures.Count; index++)
+        {
+            if (!byNumber.TryGetValue(AssessmentDocument.PageOfTest(index), out var page))
+            {
+                continue;
+            }
+
+            var measure = measures[index];
+            foreach (var resolution in page.Resolutions)
+            {
+                switch (resolution)
+                {
+                    case InkResolution.Written written when written.SubjectId == WorkoutIds.Result:
+                        keyed.Add(written with { SubjectId = measure.Id });
+                        break;
+                    case InkResolution.Circled circled when circled.SubjectId == WorkoutIds.Choice:
+                        keyed.Add(circled with { SubjectId = measure.Id });
+                        break;
+                }
+            }
+        }
+
+        return Read(measures, keyed);
+    }
+
+    /// <summary>The answers already keyed by measure id (<see cref="FromPages"/> does that keying from the pages as printed; use it for a read-back).</summary>
+
     public static AssessmentBaselines Read(IEnumerable<AssessmentMeasure> measures, IEnumerable<InkResolution> resolutions)
     {
         ArgumentNullException.ThrowIfNull(measures);

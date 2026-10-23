@@ -2,6 +2,7 @@ using Constitution.Domain.Calendar;
 using Constitution.Domain.Equipment;
 using Constitution.Domain.Placement;
 using Constitution.Domain.Workouts;
+using Constitution.Domain.Workouts.Pipeline;
 
 namespace Constitution.Infrastructure.Workouts;
 
@@ -40,6 +41,13 @@ public sealed record WorkoutWeekRequest(
     public IReadOnlyList<HouseholdEventRequest> HouseholdEvents { get; init; } = [];
 
     public PlacementOptions Placement { get; init; } = new();
+
+    /// <summary>
+    /// What the owner has done to the plan on the Workouts tab: the swaps, moves and skips. The run re-derives its base plan each
+    /// time, so without these a session the owner moved would be planned where it was, its event would read as gone and the page
+    /// for the day it went to would never be made. None by default; the caller reads them from <c>IWorkoutOverrides</c>.
+    /// </summary>
+    public PlanOverrides PlanOverrides { get; init; } = PlanOverrides.None;
 
     /// <summary>Where bad weather begins; null for the defaults, with the room to shower taken from <see cref="Placement"/>.</summary>
     public ConditionsLimits? Conditions { get; init; }

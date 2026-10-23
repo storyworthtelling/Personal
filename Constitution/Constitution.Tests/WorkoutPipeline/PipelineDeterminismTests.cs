@@ -24,7 +24,7 @@ public class PipelineDeterminismTests
             [new Exercise("Squat holding a weight at your chest", EquipmentCatalogue.DumbbellsId), new Exercise("Wall angels")]);
         var planned = new PlannedSession(Day(0), At(0, 16), new FreeGap(At(0, 16), At(0, 18)), session, [Sam], Together.None);
         var doses = ProgressionPlan.Prescribe(ProgressionLedger.Empty, Sam, session);
-        return WorkoutDocumentBuilder.Build(planned, planned.Start, Zone, doses, [line, null]);
+        return WorkoutDocumentBuilder.Build(planned, planned.Start, Zone, doses, [new EncouragementLine(line, true), null]);
     }
 
     private static byte[] Render(WorkoutDocumentModel model) => ConstitutionDocumentRenderer.Render(WorkoutDocument.Build(model));

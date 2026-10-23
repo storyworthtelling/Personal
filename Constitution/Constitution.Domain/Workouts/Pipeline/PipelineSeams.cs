@@ -106,8 +106,11 @@ public interface IRecoveryReadSource
 /// </summary>
 public interface IWorkoutEncouragement
 {
-    Task<string?> LineAsync(Constitution.Domain.Voice.ProgressionFacts news, DateTimeOffset now, CancellationToken cancellation);
+    Task<EncouragementLine?> LineAsync(Constitution.Domain.Voice.ProgressionFacts news, DateTimeOffset now, CancellationToken cancellation);
 }
+
+/// <summary>One encouragement sentence and whether it is the owner's voice (which prints in their hand) or the plain fallback (which does not).</summary>
+public sealed record EncouragementLine(string Text, bool IsVoiced);
 
 /// <summary>
 /// One workout document as it went to the tablet: its title, whose and when, the slot it was made for, and a fingerprint of

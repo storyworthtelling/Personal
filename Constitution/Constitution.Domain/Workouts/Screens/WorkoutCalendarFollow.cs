@@ -54,8 +54,8 @@ public sealed class WorkoutCalendarFollow(ICalendarWriter writer, IWorkoutEventE
             return Fill(outcomes, FollowOutcome.Unavailable);
         }
 
-        var oldKeys = swap.Moves.Select(move => KeyIn(swap.Before, swap.Person, move.Old)).ToList();
-        var newKeys = swap.Moves.Select(move => KeyIn(swap.After, swap.Person, move.New)).ToList();
+        var oldKeys = swap.Moves.Select(move => WorkoutKeys.In(swap.Before, swap.Person, move.Old)).ToList();
+        var newKeys = swap.Moves.Select(move => WorkoutKeys.In(swap.After, swap.Person, move.New)).ToList();
         var lookup = await writer.FindAsync(swap.Person, oldKeys, cancellationToken);
         if (!lookup.IsAvailable)
         {
@@ -140,11 +140,5 @@ public sealed class WorkoutCalendarFollow(ICalendarWriter writer, IWorkoutEventE
     {
         Array.Fill(outcomes, with);
         return outcomes;
-    }
-
-    private static PlacementKey KeyIn(IReadOnlyList<WorkoutWeek> weeks, string person, PlannedSession session)
-    {
-        var week = weeks.First(item => session.Day >= item.Plan.WeekStart && session.Day < item.Plan.WeekStart.AddDays(7));
-        return WorkoutKeys.Of(week, person)[session];
     }
 }
