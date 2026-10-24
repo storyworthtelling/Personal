@@ -154,6 +154,17 @@ public static class PolicyManager
             }
         }
 
+        // Hidden, not suspended (see PolicyPlanBuilder): a hidden app cannot be launched, but it keeps
+        // its background work. A refused hide is logged and re-applied on the next pass.
+        foreach (var package in plan.HiddenPackages.Where(p => IsInstalled(context, p)))
+        {
+            if (!dpm.SetApplicationHidden(admin, package, true))
+            {
+                Log.Warn(Tag, $"Could not hide: {package}");
+                events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not hide {package} from launching."));
+            }
+        }
+
         // Visibility IS runnability: actively un-suspend EVERY launchable app the plan doesn't
         // suspend (plus the allowlisted login browser, which is hidden and so not launchable) —
         // not merely leave them alone. A prior pass or the install watcher may have quarantined a
