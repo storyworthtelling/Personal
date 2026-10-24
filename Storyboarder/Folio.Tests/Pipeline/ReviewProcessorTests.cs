@@ -478,6 +478,70 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(0, LoadNovel(id).StageAttempts);
     }
 
+
+    // ---- No network is not a failure of the call --------------------------------------------------------
+    //
+    // A phone that has lost its connection fails every request instantly, naming the host it could not
+    // look up. Nothing was sent and nothing billed, so it must not use up the attempts that exist to stop
+    // a billed call being repeated: on a real book it spent attempts 1 and 2 of five chunks within ten
+    // seconds, with the phone simply offline.
+
+    private static Exception Offline() => new HttpRequestException("Connection failure",
+        new IOException("Unable to resolve host \"api.anthropic.com\": No address associated with hostname"));
+
+    [Fact]
+    public async Task AnOfflinePhoneNeverSpendsAChunksAttempts()
+    {
+        var id = SeedManuscript();
+        var offlineCalls = 0;
+        claude.Setup(c => c.AnalyzeChapter(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((string _, string chapterLabel, IReadOnlyList<string> _, string _, CancellationToken _) =>
+                ++offlineCalls <= 20
+                    ? Task.FromException<ChapterNotes>(Offline())
+                    : Task.FromResult(ChapterNotes.Empty with { Chapter = chapterLabel }));
+        var logger = new CapturingLogger<ReviewProcessor>();
+
+        await DriveToCompletion(NewProcessor(logger: logger));
+
+        using var context = database.NewContext();
+        Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
+        Assert.All(context.ChunkAnalyses.Where(a => a.NovelId == id), a => Assert.Equal(0, a.Attempts));
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("offline"));
+    }
+
+    [Fact]
+    public async Task AnOfflinePhoneNeverSpendsAReadsAttempts()
+    {
+        var id = SeedManuscript();
+        FailPass(FirstPass, attempt => attempt <= 12 ? Offline() : null);
+
+        await DriveToCompletion(NewProcessor());
+
+        var novel = LoadNovel(id);
+        Assert.Equal(ProjectStage.Completed, novel.Stage);
+        Assert.Equal(0, novel.StageAttempts);
+    }
+
+    [Fact]
+    public async Task AnOfflinePhoneWaitsBeforeAskingAgain_ForTheWholeBook()
+    {
+        SeedManuscript();
+        var calls = new List<int>();
+        FailPass(FirstPass, _ => Offline(), calls);
+        var processor = NewProcessor();
+
+        var result = await DriveToFirstCall(processor, calls);
+        var callsAfterFirst = calls.Count;
+        for (var cycle = 0; cycle < 5; cycle++)
+            result = await NewProcessor().ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(callsAfterFirst, calls.Count);
+        Assert.Equal(ProcessOutcome.Waiting, result.Outcome);
+        Assert.True(result.Wait > TimeSpan.FromSeconds(30), $"Waited only {result.Wait}");
+    }
+
     [Fact]
     public async Task Review_ProducesReportPdf_AndCompletes()
     {
