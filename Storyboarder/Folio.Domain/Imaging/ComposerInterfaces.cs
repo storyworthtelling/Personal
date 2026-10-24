@@ -11,6 +11,10 @@ public interface IImageStore
     byte[] Read(string absolutePath);
     bool Exists(string absolutePath);
 
+    // How big a stored file is, without reading it. Lets a caller refuse a file that would not fit in
+    // memory before it tries to hold it.
+    long Size(string absolutePath);
+
     // Recursively removes a file or directory under the output root (e.g. a whole novel's output
     // subtree). A no-op if nothing is there, so deleting an already-clean project can't throw.
     void Delete(string relativePath);

@@ -58,4 +58,8 @@ public sealed record NovelStatus(
     // Tries used by the current once-per-manuscript call, and how many it gets, so the desk can say
     // "2 of 6 tries used" rather than only that something went wrong.
     int Attempts = 0,
-    int MaxAttempts = 0);
+    int MaxAttempts = 0,
+    // Why the finished report did not reach the reMarkable, when delivery to it was asked for and failed.
+    // Null when it arrived or was never asked for. The review still counts as delivered (the report is in
+    // Drive and on the phone), so this is the only place the gap is visible.
+    string? DeliveryNote = null);

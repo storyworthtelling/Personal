@@ -13,10 +13,10 @@ public class DeskStatusTests
     private static NovelStatus Status(
         string stage = "ComposingAnalysis", string? lastError = null, bool needsAttention = false,
         string? step = "Reading the whole book through — read 3 of 17: Continuity editor",
-        int attempts = 0, int maxAttempts = 6, PhaseProgress? notes = null) =>
+        int attempts = 0, int maxAttempts = 6, PhaseProgress? notes = null, string? deliveryNote = null) =>
         new(Guid.NewGuid(), "The Salt Line", stage, lastError, None, None, None,
             notes ?? new PhaseProgress(41, 41), None, AnalysisReady: false, NeedsAttention: needsAttention,
-            Step: step, Attempts: attempts, MaxAttempts: maxAttempts);
+            Step: step, Attempts: attempts, MaxAttempts: maxAttempts, DeliveryNote: deliveryNote);
 
     [Fact]
     public void ABookBeingReadSaysWhichReadItIsOn()
@@ -85,6 +85,21 @@ public class DeskStatusTests
         Assert.Equal("Latest", line.Heading);
         Assert.Equal("Review delivered.", line.Summary);
         Assert.Null(line.Problem);
+    }
+
+    // The review finished, so "Review delivered." is true of the Drive copy — but the tablet is where it
+    // is meant to be read, and the owner must be able to see at a glance that it did not get there.
+    [Fact]
+    public void ACompletedBookThatNeverReachedTheTabletSaysSo()
+    {
+        var line = DeskStatus.Of(Status(
+            stage: "Completed", step: null,
+            deliveryNote: "It did not reach the reMarkable: the PDF is 173 MB and the tablet takes up to 100 MB."));
+
+        Assert.Equal("Latest", line.Heading);
+        Assert.Equal("Review delivered.", line.Summary);
+        Assert.Equal("It did not reach the reMarkable: the PDF is 173 MB and the tablet takes up to 100 MB.", line.Problem);
+        Assert.False(line.Stuck);
     }
 
     [Fact]

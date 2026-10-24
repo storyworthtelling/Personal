@@ -35,7 +35,11 @@ internal sealed class PageWriter : IDisposable
     private const float GrainScale = 72f / 150f;
 
     private readonly string runningFoot;
-    private readonly VectorPdfSink sink = new();
+    // The report's pictures are evidence, drawn a few inches wide on an e-ink page. Written losslessly,
+    // 67 scene illustrations made a 173 MB file; as JPEG at this quality the whole report is a few tens.
+    private const int PictureQuality = 80;
+
+    private readonly VectorPdfSink sink = new(PictureQuality);
     private readonly List<(string Title, int Page)> tocEntries = [];
 
     private SKCanvas canvas = null!;
