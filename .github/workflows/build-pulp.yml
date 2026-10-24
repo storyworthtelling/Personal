@@ -9,6 +9,7 @@ on:
       - 'FocusPhone/Codex.Ui.Android/**'
       - 'FocusPhone/Codex.Domain/**'
       - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Household/**'
       - 'Storyworthtelling.Updates/**'
       - 'Tools/IconStudio/**'
       - 'Fonts/**'
