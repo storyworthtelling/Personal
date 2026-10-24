@@ -150,4 +150,62 @@ public class VoicedLineServiceTests : IDisposable
         context.Novels.Single(n => n.Id == id).Stage = stage;
         context.SaveChanges();
     }
+
+    // ---- The line must not say a book is done when it is not ------------------------------------------
+    //
+    // It was told only "Stage: ComposingAnalysis", and wrote "Draft 1 is complete" over a book that was
+    // part-way through its reads and had in fact stopped on an error.
+
+    [Fact]
+    public async Task ABookInProgressIsToldItIsNotFinished()
+    {
+        var id = Seed(ProjectStage.ComposingAnalysis);
+        MessageRequest? sent = null;
+        client.Setup(c => c.ComposeAsync(
+                It.IsAny<VoiceProfile>(), It.IsAny<MessageRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<VoiceProfile, MessageRequest, CancellationToken>((_, request, _) => sent = request)
+            .ReturnsAsync("Still reading.");
+
+        await NewService().VoicedLineAsync(id, "Working on it.", CancellationToken.None);
+
+        Assert.NotNull(sent);
+        Assert.Contains("NOT finished", sent!.Context);
+        Assert.Contains("Do not say or imply", sent.Context);
+    }
+
+    [Fact]
+    public async Task ACompletedBookIsToldItIsDone()
+    {
+        var id = Seed(ProjectStage.Completed);
+        MessageRequest? sent = null;
+        client.Setup(c => c.ComposeAsync(
+                It.IsAny<VoiceProfile>(), It.IsAny<MessageRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<VoiceProfile, MessageRequest, CancellationToken>((_, request, _) => sent = request)
+            .ReturnsAsync("All done.");
+
+        await NewService().VoicedLineAsync(id, "Delivered.", CancellationToken.None);
+
+        Assert.Contains("finished and delivered", sent!.Context);
+    }
+
+    [Fact]
+    public async Task AStoppedBookGetsNoVoicedLine_EvenOneRememberedFromBefore()
+    {
+        var id = Seed(ProjectStage.ComposingAnalysis);
+        using (var context = database.NewContext())
+        {
+            var novel = context.Novels.Single(n => n.Id == id);
+            novel.VoicedLine = "Draft 1 is complete.";
+            novel.VoicedLineStage = ProjectStage.ComposingAnalysis;
+            novel.LastError = "Reading pass 'x': truncated";
+            novel.StageAttempts = new RateLimitOptions().MaxAttempts;
+            context.SaveChanges();
+        }
+
+        var line = await NewService().VoicedLineAsync(id, "Stopped · reading.", CancellationToken.None);
+
+        Assert.Equal("Stopped · reading.", line);
+        client.Verify(c => c.ComposeAsync(
+            It.IsAny<VoiceProfile>(), It.IsAny<MessageRequest>(), It.IsAny<CancellationToken>()), Times.Never());
+    }
 }
