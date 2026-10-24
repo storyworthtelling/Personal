@@ -22,11 +22,11 @@ public class WorkoutDocumentDeliveryTests
         var tablet = new FakeTablet();
         var access = new Access();
         var service = new DeliveryService(tablet, access, () => Est(11, 3, 6));
-        return (new WorkoutDocumentDelivery(service, tablet), tablet, access);
+        return (new WorkoutDocumentDelivery(service, tablet, new FakeInkProbe()), tablet, access);
     }
 
     [Fact]
-    public async Task ASendUploadsAtTheRootAndAsksNothing()
+    public async Task ASendLooksTheTitleUpThenUploadsAtTheRoot()
     {
         var (delivery, tablet, _) = Make();
 
@@ -34,7 +34,7 @@ public class WorkoutDocumentDeliveryTests
 
         Assert.True(result.Delivered);
         Assert.Equal(Name, result.Name);
-        Assert.Equal(["upload:" + Name], tablet.Calls);
+        Assert.Equal(["list", "upload:" + Name], tablet.Calls);
     }
 
     [Fact]
@@ -51,18 +51,17 @@ public class WorkoutDocumentDeliveryTests
     }
 
     [Fact]
-    public async Task ReplacementTrashesEveryPageOfThatTitle()
+    public async Task ReplacementTouchesOnlyThePageOfThatTitleMatchedWithoutCase()
     {
+        // Two pages under one title can no longer be replaced as one (InkGuardDeliveryTests): a look at one cannot clear the other.
         var (delivery, tablet, _) = Make();
-        tablet.Titles["old-1"] = Name;
-        tablet.Titles["old-2"] = Name.ToUpperInvariant();
+        tablet.Titles["old-1"] = Name.ToUpperInvariant();
         tablet.Titles["other"] = DeliveredName.For(DeliveryKind.Workout, Day, Lee);
         tablet.Titles["digest"] = DeliveredName.For(DeliveryKind.Digest, Day);
 
         await delivery.ReplaceAsync(Day, Sam, Pages);
 
         Assert.Contains("trash:old-1", tablet.Calls);
-        Assert.Contains("trash:old-2", tablet.Calls);
         Assert.DoesNotContain("trash:other", tablet.Calls);
         Assert.DoesNotContain("trash:digest", tablet.Calls);
         Assert.Equal(3, tablet.Titles.Count);
@@ -136,7 +135,7 @@ public class WorkoutDocumentDeliveryTests
         var (delivery, tablet, _) = Make();
         tablet.Titles["old-1"] = Name;
 
-        var failure = await delivery.WithdrawAsync(Day, Sam);
+        var failure = (await delivery.WithdrawAsync(Day, Sam)).Failure;
 
         Assert.Null(failure);
         Assert.Equal(["list", "trash:old-1"], tablet.Calls);
@@ -148,7 +147,7 @@ public class WorkoutDocumentDeliveryTests
     {
         var (delivery, tablet, _) = Make();
 
-        Assert.Null(await delivery.WithdrawAsync(Day, Sam));
+        Assert.Null((await delivery.WithdrawAsync(Day, Sam)).Failure);
         Assert.Equal(["list"], tablet.Calls);
     }
 
@@ -159,7 +158,7 @@ public class WorkoutDocumentDeliveryTests
         tablet.Titles["old-1"] = Name;
         tablet.TrashFails = new HttpRequestException("503");
 
-        var failure = await delivery.WithdrawAsync(Day, Sam);
+        var failure = (await delivery.WithdrawAsync(Day, Sam)).Failure;
 
         Assert.IsType<HttpRequestException>(failure);
     }

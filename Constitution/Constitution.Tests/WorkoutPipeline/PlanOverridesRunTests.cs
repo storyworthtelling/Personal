@@ -122,7 +122,7 @@ public sealed class PlanOverridesRunTests : IDisposable
     public async Task ASkippedSessionGetsNoEventOrPage()
     {
         var skip = new PendingSkip(Sam, Day(0), SessionKind.Strength, rig.Session(Sam, 0, 16, lift), null, null, MonSeven);
-        var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip, SkipLedger.Empty));
+        var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip));
 
         var report = await rig.PlannedAsync(Asked(Est(11, 2, 5, 30), overrides));
 
@@ -138,7 +138,7 @@ public sealed class PlanOverridesRunTests : IDisposable
         await rig.PlannedAsync(Asked(Est(11, 2, 5, 30)));
         Assert.Contains(NameOf(0), rig.Tablet.Titles.Values);
         var skip = new PendingSkip(Sam, Day(0), SessionKind.Strength, rig.Session(Sam, 0, 16, lift), null, null, MonSeven);
-        var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip, SkipLedger.Empty));
+        var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip));
 
         var report = await rig.PlannedAsync(Asked(MonSeven, overrides));
 

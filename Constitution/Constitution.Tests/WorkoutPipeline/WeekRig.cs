@@ -51,7 +51,11 @@ internal sealed class WeekRig : IDisposable
 
     public MemoryKeyStore Keys { get; } = new();
 
+    public MemoryKeyAssignments KeyAssignments { get; } = new();
+
     public FakeTablet Tablet { get; } = new();
+
+    public FakeInkProbe InkProbe { get; } = new();
 
     public Access Access { get; } = new();
 
@@ -141,8 +145,10 @@ internal sealed class WeekRig : IDisposable
         Encouragement,
         Writer,
         Keys,
+        KeyAssignments,
         Delivery,
         Tablet,
+        InkProbe,
         Expected,
         Delivered,
         Log);

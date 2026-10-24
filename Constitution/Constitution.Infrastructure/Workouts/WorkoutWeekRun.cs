@@ -21,13 +21,20 @@ namespace Constitution.Infrastructure.Workouts;
 /// <see cref="TripAdapter"/> and <see cref="ProgressionPlan.ApplyCaps"/>, then <see cref="PlacementRunner"/>, then the pages.
 /// Nothing is written until the week has been planned, and nothing is sent to the tablet until its event is on the calendar.</para>
 ///
-/// <para><b>The week is planned as of its first instant on every run, and adapted as of now.</b> Placement keys a workout by
-/// its place among the person's sessions of its kind in the plan it is handed (<see cref="PlacementIndex"/>), so a plan
-/// re-made from the middle of the week would renumber and a key already written would stand for the wrong day. Planning from
-/// the week's start gives the same plan on every run that sees the same calendars (the seam drops the app's own events, so
-/// they never change it), and the adapters, which are the only things that should differ from run to run, take the real
-/// clock and leave a session that has begun alone. Sessions of days already gone stay in the plan; the writer refuses them
-/// (<see cref="PastWriteGuard"/>), so a run that comes late writes nothing into the past.</para>
+/// <para><b>The week is planned as of its first instant on every run, and adapted as of now.</b> Planning from the week's start
+/// gives the same plan on every run that sees the same calendars (the seam drops the app's own events, so they never change
+/// it), and the adapters, which are the only things that should differ from run to run, take the real clock and leave a session
+/// that has begun alone. Sessions of days already gone stay in the plan; the writer refuses them (<see cref="PastWriteGuard"/>),
+/// so a run that comes late writes nothing into the past.</para>
+///
+/// <para><b>A session keeps its key however the week is re-planned</b> (B2). The week is re-made on every run, so a key that
+/// meant "the nth session of its kind" changes the moment the owner's new Monday meeting takes the first one out of the plan:
+/// every event after it is then held under the key of the day before. Keys are therefore taken from the record of issued numbers
+/// (<see cref="KeyAssignments"/>, <see cref="WorkoutWeekSeams.KeyAssignments"/>): a session is named by its kind and its weekday,
+/// keeps the number it was first given, and a new session takes a number above every one ever issued. Where the record cannot
+/// vouch for a key the run does not guess: that person's sessions of that kind are left undecided
+/// (<see cref="UnplacedReason.KeysUncertain"/>), nothing is written, read as deleted or paged for them, and the trail counts them.
+/// A record that cannot be read stops placement as the record of written events does. The week must begin on a Monday.</para>
 ///
 /// <para><b>The owner's moves are part of the base plan.</b> The Workouts tab moves a session by editing its event, and the plan
 /// is re-derived here on every run, so the run is handed what the owner did (<see cref="WorkoutWeekRequest.PlanOverrides"/>) and
@@ -47,6 +54,11 @@ namespace Constitution.Infrastructure.Workouts;
 /// page already sent for it is taken off if its slot has not begun. A session whose event cannot be known (the calendar could
 /// not be looked into, the write failed, it could not be placed) gets no new page and loses none: not knowing is not a
 /// delete, and a calendar that is unreachable must not empty the tablet.</para>
+///
+/// <para><b>A page the owner has begun is never replaced or taken off</b> (S3). The read-back reads a blank page as a skip, so before
+/// a page is trashed or set down over, it is looked at (<see cref="IPageInkProbe"/>): ink on it, or no way to say, leaves it exactly where
+/// it is (<see cref="DocumentVerdict.Kept"/>, and the trail says which). And a first send, which has no record of what is on the tablet,
+/// looks the title up first rather than uploading a second document under it (<see cref="WorkoutDocumentDelivery"/>).</para>
 ///
 /// <para><b>C-2.3.6.</b> A page already on the tablet is replaced only before its slot (<see cref="RedeliveryRules"/>), under
 /// the same title, and what it says is judged by a fingerprint of the page without the voiced line, so a line that arrives
@@ -69,6 +81,13 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentOutOfRangeException.ThrowIfNegative(request.DeliverAheadDays);
+        if (request.WeekStart.DayOfWeek != DayOfWeek.Monday)
+        {
+            throw new ArgumentException(
+                $"A workout week begins on a Monday, and {request.WeekStart:yyyy-MM-dd} is a {request.WeekStart.DayOfWeek}; a session's key names its weekday within the week.",
+                nameof(request));
+        }
+
         var rules = request.Rules;
         var adults = rules.Adults.Select(adult => adult.Name).ToList();
         if (adults.Count == 0)
@@ -112,7 +131,8 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         };
         var histories = adults.ToDictionary(name => name, learning.HistoryOf, StringComparer.OrdinalIgnoreCase);
         var phased = await PhasedWeek.PlanAsync(planRequest, histories, seams.Planner, cancellation);
-        phased = WithTheOwnersMoves(phased, request.PlanOverrides);
+        var numbers = seams.KeyAssignments.Load();
+        phased = WithTheOwnersMoves(phased, request.PlanOverrides, numbers.IsReadable ? numbers.Assignments : null);
         RecordAssessmentWeeks(first, adults, histories, phased);
 
         var now = request.Now;
@@ -127,13 +147,13 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         var adapted = ProgressionPlan.ApplyCaps(travelled.Plan, learning.Progression);
 
         var placed = request.PlaceAdaptedWeek ? adapted : phased.Plan;
-        RememberSkips(new PlacementIndex(placed), request.PlanOverrides);
-        var runner = new PlacementRunner(new PastWriteGuard(seams.CalendarWriter, () => now), seams.WrittenKeys);
+        var issued = numbers.IsReadable ? RememberSkips(placed, numbers.Assignments, request.PlanOverrides) : numbers.Assignments;
+        var runner = new PlacementRunner(new PastWriteGuard(seams.CalendarWriter, () => now), seams.WrittenKeys, seams.KeyAssignments);
         var placement = await runner.RunAsync(
             new PlacementRequest(first, busy, request.HouseholdEvents, placed) { Options = request.Placement },
             cancellation);
 
-        var context = new DayContext(request, learning, phased, sore.Adjustments, reads, adapted, new PlacementIndex(placed), placement, zone);
+        var context = new DayContext(request, learning, phased, sore.Adjustments, reads, adapted, new PlacementIndex(placed, issued), placement, zone);
         var documents = new List<DocumentOutcome>();
         var days = Enumerable.Range(0, request.DeliverAheadDays + 1).Select(today.AddDays).Where(day => day >= first && day <= last).ToList();
         foreach (var person in deliverFor)
@@ -169,14 +189,14 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
     // The base plan is re-derived on every run, so what the owner did to it on the Workouts tab is applied to it here, before
     // anything is adapted, placed or drawn: the moved session is planned where the owner put it, under the key the tab gave its
     // event, and the page follows it. An assessment session that moved is the same session on its new day.
-    private PhasedWeekPlan WithTheOwnersMoves(PhasedWeekPlan phased, PlanOverrides overrides)
+    private PhasedWeekPlan WithTheOwnersMoves(PhasedWeekPlan phased, PlanOverrides overrides, KeyAssignments? issued)
     {
         if (overrides.IsEmpty)
         {
             return phased;
         }
 
-        var applied = overrides.ApplyTo(phased.Plan);
+        var applied = overrides.ApplyTo(phased.Plan, issued);
         if (applied.Unresolved.Count > 0)
         {
             seams.Log.Outcome(WorkoutWeekTrail.MoveNotFoundPhrase);
@@ -191,21 +211,39 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
     // A session the owner skipped stays in the plan (so the keys after it do not move) but must never be written. Placement
     // already reads "written and not on the calendar" as the owner's delete, so the skipped session's key is put in the record
     // of written ones. A record that cannot be read is left alone: treating it as empty is how every deleted event comes back.
-    private void RememberSkips(PlacementIndex index, PlanOverrides overrides)
+    // The skipped session's number is kept first: a key recorded as written that no record issued is exactly what placement
+    // refuses to read as a delete. Returns the record of issued numbers as it now stands.
+    private KeyAssignments RememberSkips(HouseholdWorkoutPlan placed, KeyAssignments issued, PlanOverrides overrides)
     {
+        var skipped = new List<KeyIssue>();
+        var numbered = SessionKeys.For(placed, issued);
         foreach (var skip in overrides.Skips)
         {
-            if (index.KeyFor(skip.Person, skip.Day) is not { } key)
+            if (numbered.IssueOn(skip.Person, skip.Day) is { } issue)
             {
-                continue;
-            }
-
-            var record = seams.WrittenKeys.Load();
-            if (record.IsReadable && !record.Keys.Contains(key))
-            {
-                seams.WrittenKeys.Save(record.Keys.With(key));
+                skipped.Add(issue);
             }
         }
+
+        var record = seams.WrittenKeys.Load();
+        if (skipped.Count == 0 || !record.IsReadable)
+        {
+            return issued;
+        }
+
+        var kept = issued.With(skipped);
+        if (!ReferenceEquals(kept, issued))
+        {
+            seams.KeyAssignments.Save(kept);
+        }
+
+        var keys = record.Keys.With(skipped.Select(issue => issue.Key));
+        if (!ReferenceEquals(keys, record.Keys))
+        {
+            seams.WrittenKeys.Save(keys);
+        }
+
+        return kept;
     }
 
     private WorkoutWeekOutcome Finish(WorkoutWeekOutcome outcome)
@@ -283,22 +321,32 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
             case Redelivery.TooLate:
                 return new DocumentOutcome(name, person, day, DocumentVerdict.TooLate);
             case Redelivery.Withdraw:
-                return await Withdraw(name, person, day);
+                return await Withdraw(name, person, day, cancellation);
             case Redelivery.Send:
-                return await Send(person, day, session!, slot!.Value, built!, previous, replace: false);
+                return await Send(person, day, session!, slot!.Value, built!, previous, replace: false, now, cancellation);
             case Redelivery.Replace:
-                return await Send(person, day, session!, slot!.Value, built!, previous, replace: true);
+                return await Send(person, day, session!, slot!.Value, built!, previous, replace: true, now, cancellation);
             default:
                 throw new InvalidOperationException("The redelivery rules gave an answer this run does not know.");
         }
     }
 
-    private async Task<DocumentOutcome> Send(string person, DateOnly day, PlannedSession session, DateTimeOffset slot, Built built, DeliveredWorkout? previous, bool replace)
+    private async Task<DocumentOutcome> Send(
+        string person, DateOnly day, PlannedSession session, DateTimeOffset slot, Built built, DeliveredWorkout? previous, bool replace, DateTimeOffset now, CancellationToken cancellation)
     {
-        var delivery = new WorkoutDocumentDelivery(seams.Delivery, seams.Tablet);
-        var result = replace
-            ? await delivery.ReplaceAsync(day, person, built.Pdf)
-            : await delivery.SendAsync(day, person, built.Pdf);
+        var delivery = new WorkoutDocumentDelivery(seams.Delivery, seams.Tablet, seams.InkProbe);
+
+        // A replacement is only ever asked for before the slot (RedeliveryRules). A first send has no record to say what is on the
+        // tablet, so it looks the title up; a blank page it finds is replaced only while the slot has not begun.
+        var sent = replace
+            ? await delivery.ReplaceAsync(day, person, built.Pdf, cancellation)
+            : await delivery.SendAsync(day, person, built.Pdf, mayReplaceBlank: now < slot, cancellation);
+        if (sent.Kept is { } kept)
+        {
+            return new DocumentOutcome(sent.Name, person, day, DocumentVerdict.Kept, kept.Failure, kept.Ink);
+        }
+
+        var result = sent.Result;
         if (!result.Delivered)
         {
             return new DocumentOutcome(result.Name, person, day, DocumentVerdict.NotDelivered, result.Failure);
@@ -323,10 +371,15 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         return new DocumentOutcome(result.Name, person, day, replace ? DocumentVerdict.Replaced : DocumentVerdict.Delivered);
     }
 
-    private async Task<DocumentOutcome> Withdraw(string name, string person, DateOnly day)
+    private async Task<DocumentOutcome> Withdraw(string name, string person, DateOnly day, CancellationToken cancellation)
     {
-        var failure = await new WorkoutDocumentDelivery(seams.Delivery, seams.Tablet).WithdrawAsync(day, person);
-        if (failure is not null)
+        var withdrawn = await new WorkoutDocumentDelivery(seams.Delivery, seams.Tablet, seams.InkProbe).WithdrawAsync(day, person, cancellation);
+        if (withdrawn.Kept is { } kept)
+        {
+            return new DocumentOutcome(name, person, day, DocumentVerdict.Kept, kept.Failure, kept.Ink);
+        }
+
+        if (withdrawn.Failure is { } failure)
         {
             return new DocumentOutcome(name, person, day, DocumentVerdict.NotDelivered, failure);
         }

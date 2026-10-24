@@ -20,16 +20,31 @@ namespace Constitution;
 ///
 /// <para>A skip happens on the page at once and folds the shell's one dog-ear (the shared notice board) for six seconds.
 /// Only when the window closes is it recorded and its calendar event taken off; a turn of the fold inside it undoes it.</para>
+///
+/// <para><b>A change is never fire-and-forget</b> (S2). Swaps and skips go through <see cref="WorkoutChanges"/>, which writes the change
+/// down, asks the calendar to follow and reads what it answered into a sentence; the sentence is the line under the header
+/// (<see cref="WorkoutsTabModel.StatusWith"/>), so a calendar that did not change says so in words. A swap that could not be written down is
+/// taken back on the page. A skip stays on show and owed until it has been recorded, and is tried again; closing its window never loses it,
+/// and neither does a tab that had not finished loading. A calendar that did not change and moved nothing is asked again when the tab is
+/// next opened.</para>
 /// </summary>
 public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
 {
+    // How long a skip that could not be written down waits before it is tried again while the tab stays open.
+    private const long RetryMilliseconds = 30_000;
+
     private readonly Handler handler = new(Looper.MainLooper!);
     private readonly SkipUndo undo = new();
     private readonly WorkoutsLog log;
+    private readonly HashSet<DateOnly> recording = [];
 
+    private IWorkoutsSource source = new NoWorkoutsSource();
+    private WorkoutCalendarFollow? calendar;
+    private WorkoutChanges? changes;
     private WorkoutsRead? read;
     private WorkoutCardView? card;
     private DateOnly? pressed;
+    private string? notice;
     private int loadNumber;
 
     public WorkoutsArea(Activity host)
@@ -39,12 +54,30 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
     }
 
     /// <summary>Where the plan comes from and where a change goes; set by whoever wires the weekly pipeline.</summary>
-    public IWorkoutsSource Source { get; set; } = new NoWorkoutsSource();
+    public IWorkoutsSource Source
+    {
+        get => source;
+        set
+        {
+            source = value;
+            changes = null;
+        }
+    }
 
     /// <summary>Makes the owner's calendar follow a swap or a skip; null until the pipeline wires one, and then the calendar is left as it is.</summary>
-    public WorkoutCalendarFollow? Calendar { get; set; }
+    public WorkoutCalendarFollow? Calendar
+    {
+        get => calendar;
+        set
+        {
+            calendar = value;
+            changes = null;
+        }
+    }
 
-    public override string? Subtitle => read is WorkoutsRead.Ready ? WorkoutsTabModel.StatusSentence : null;
+    private WorkoutChanges Changes => changes ??= new WorkoutChanges(source, calendar);
+
+    public override string? Subtitle => read is WorkoutsRead.Ready ? WorkoutsTabModel.StatusWith(notice) : null;
 
     protected override string LoadingSentence => "Reading the week.";
 
@@ -55,7 +88,7 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
             return PageFurniture.Sentence(Host, WorkoutsTabModel.NoPlan().Status);
         }
 
-        var model = WorkoutsTabModel.Build(ready.Snapshot, undo.Pending);
+        var model = WorkoutsTabModel.Build(ready.Snapshot, undo.Shown);
         return new WorkoutsTabPage(Host, model, pressed, OnHeld);
     }
 
@@ -71,6 +104,7 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
 
         Load();
         ScheduleCommit();
+        RetryTheCalendar();
     }
 
     public override void Pause()
@@ -168,25 +202,34 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
         }
 
         shown.Dismiss();
-        read = new WorkoutsRead.Ready(SwapChoices.Apply(snapshot, result));
+        var previous = read;
+        var optimistic = new WorkoutsRead.Ready(SwapChoices.Apply(snapshot, result));
+        read = optimistic;
         RaiseChanged();
-        var source = Source;
-        var follow = Calendar;
+        var changes = Changes;
         _ = Task.Run(async () =>
         {
-            try
-            {
-                source.Record(new WorkoutsChange.Swapped(result));
-                if (follow is not null)
-                {
-                    await follow.FollowSwapAsync(result, CancellationToken.None);
-                }
-            }
-            catch (Exception e) when (e is not System.OperationCanceledException)
-            {
-                log.Outcome($"plan not kept: {e.GetType().Name}");
-            }
+            var outcome = await Settle(() => changes.SwapAsync(result, CancellationToken.None), FollowWords.SwapNotKept, "plan not kept");
+            Host.RunOnUiThread(() => SwapDone(previous, optimistic, outcome));
         });
+    }
+
+    private void SwapDone(WorkoutsRead? previous, WorkoutsRead optimistic, ChangeResult outcome)
+    {
+        if (!outcome.Kept)
+        {
+            // It could not be written down, so the plan is as it was: the page takes it back rather than waiting for a reload to.
+            if (ReferenceEquals(read, optimistic) && previous is not null)
+            {
+                read = previous;
+            }
+            else
+            {
+                Load();
+            }
+        }
+
+        SaySo(outcome.Sentence);
     }
 
     // ---- skip, with undo ----
@@ -199,12 +242,12 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
             return;
         }
 
-        var key = WorkoutKeys.Of(snapshot.WeekOf(session.Day)!, snapshot.Person)[session];
+        var key = WorkoutKeys.Of(snapshot.WeekOf(session.Day)!, snapshot.Person, snapshot.Assignments)[session];
         var replaced = ConnectionNoticeBoard.With(board =>
             undo.Begin(board, snapshot.Person, session, snapshot.FactsOn(day.Day).OnCalendar, key, DateTimeOffset.UtcNow));
         if (replaced is not null)
         {
-            Commit(replaced);
+            StartRecording(replaced);
         }
 
         RaiseChanged();
@@ -222,53 +265,122 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
 
     private void ScheduleCommit()
     {
-        if (undo.Pending is not { } waiting)
+        long wait;
+        if (undo.Pending is { } waiting)
+        {
+            wait = (long)Math.Max(0, (waiting.Expires - DateTimeOffset.UtcNow).TotalMilliseconds) + 1;
+        }
+        else if (undo.Unrecorded.Count > 0)
+        {
+            wait = RetryMilliseconds;
+        }
+        else
         {
             return;
         }
 
         handler.RemoveCallbacksAndMessages(null);
-        var wait = (long)Math.Max(0, (waiting.Expires - DateTimeOffset.UtcNow).TotalMilliseconds) + 1;
         handler.PostDelayed(() =>
         {
             CommitDue();
             RaiseChanged();
+            ScheduleCommit();
         }, wait);
     }
 
+    // The window of a skip has closed, or one that could not be written down is owed another go: record each, once at a time.
     private void CommitDue()
     {
         if (undo.Due(DateTimeOffset.UtcNow) is { } due)
         {
-            Commit(due);
+            StartRecording(due);
+        }
+
+        foreach (var owed in undo.Unrecorded)
+        {
+            StartRecording(owed);
         }
     }
 
-    private void Commit(SkipCommit commit)
+    // Records one skip whether or not the tab has finished loading: the skip is the owner's word and does not wait on a page.
+    private void StartRecording(SkipCommit commit)
     {
-        if (read is not WorkoutsRead.Ready ready)
+        if (!recording.Add(commit.Skip.Day))
         {
             return;
         }
 
-        var ledger = commit.Record(ready.Snapshot.Skips);
-        read = new WorkoutsRead.Ready(ready.Snapshot with { Skips = ledger });
-        var source = Source;
-        var follow = Calendar;
+        var changes = Changes;
         _ = Task.Run(async () =>
         {
-            try
-            {
-                source.Record(new WorkoutsChange.SkipCommitted(commit.Skip, ledger));
-                if (follow is not null)
-                {
-                    await follow.FollowSkipAsync(commit.Skip, CancellationToken.None);
-                }
-            }
-            catch (Exception e) when (e is not System.OperationCanceledException)
-            {
-                log.Outcome($"record not kept: {e.GetType().Name}");
-            }
+            var result = await Settle(() => changes.SkipAsync(commit.Skip, CancellationToken.None), FollowWords.SkipNotKept, "record not kept");
+            Host.RunOnUiThread(() => RecordingDone(commit, result));
         });
+    }
+
+    private void RecordingDone(SkipCommit commit, ChangeResult result)
+    {
+        recording.Remove(commit.Skip.Day);
+        if (result.Kept)
+        {
+            // Let go of only now that it is written down. The page shows the day skipped from the ledger as it was loaded, plus this.
+            undo.Recorded(commit);
+            if (read is WorkoutsRead.Ready ready)
+            {
+                read = new WorkoutsRead.Ready(ready.Snapshot with { Skips = commit.Record(ready.Snapshot.Skips) });
+            }
+        }
+
+        SaySo(result.Sentence);
+        if (!result.Kept)
+        {
+            ScheduleCommit();
+        }
+    }
+
+    // ---- the calendar, asked again ----
+
+    private void RetryTheCalendar()
+    {
+        if (!Changes.HasOwed)
+        {
+            return;
+        }
+
+        var changes = Changes;
+        _ = Task.Run(async () =>
+        {
+            var result = await Settle(() => changes.RetryAsync(CancellationToken.None), FollowWords.CalendarUnchanged, "calendar not kept");
+            Host.RunOnUiThread(() => SaySo(result.Sentence));
+        });
+    }
+
+    // ---- what the tab says ----
+
+    private void SaySo(string? sentence)
+    {
+        notice = sentence ?? (Changes.HasOwed ? FollowWords.CalendarUnchanged : null);
+        RaiseChanged();
+    }
+
+    // Runs a change off the UI thread and keeps what stopped it, by type only, in the trail. A failure the models do not name is still
+    // reported as a change that was not kept, never swallowed into silence.
+    private async Task<ChangeResult> Settle(Func<Task<ChangeResult>> change, string sentenceIfNotKept, string phrase)
+    {
+        try
+        {
+            var result = await change();
+            if (result.Failure is { } failure)
+            {
+                log.Outcome($"{phrase}: {failure.GetType().Name}");
+            }
+
+            return result;
+        }
+        catch (Exception e) when (e is not System.OperationCanceledException)
+        {
+            log.Outcome($"{phrase}: {e.GetType().Name}");
+            return new ChangeResult(false, sentenceIfNotKept, e);
+        }
     }
 }

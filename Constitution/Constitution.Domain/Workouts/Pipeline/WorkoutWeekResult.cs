@@ -42,10 +42,16 @@ public enum DocumentVerdict
 
     /// <summary>The tablet did not take it (or the old page could not be taken off first). A notice is on the board where the tablet refused; the next run tries again.</summary>
     NotDelivered,
+
+    /// <summary>
+    /// The page on the tablet was left exactly where it was, because the owner has ink on it or nobody could tell (S3), or because a
+    /// page is already there that no record accounts for and the slot has begun. <see cref="DocumentOutcome.Ink"/> says which.
+    /// </summary>
+    Kept,
 }
 
-/// <summary>One document's outcome. <see cref="Failure"/> is kept with its stack for the verdicts that failed; null otherwise.</summary>
-public sealed record DocumentOutcome(string Name, string Person, DateOnly Day, DocumentVerdict Verdict, Exception? Failure = null);
+/// <summary>One document's outcome. <see cref="Failure"/> is kept with its stack for the verdicts that failed; null otherwise. <see cref="Ink"/> is what the look at the page found, for <see cref="DocumentVerdict.Kept"/>.</summary>
+public sealed record DocumentOutcome(string Name, string Person, DateOnly Day, DocumentVerdict Verdict, Exception? Failure = null, PageInk? Ink = null);
 
 /// <summary>
 /// What a run that planned the week did. <see cref="Plan"/> is the week as the paper and the Workouts tab read it (every

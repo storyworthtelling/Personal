@@ -14,6 +14,12 @@ public enum UnplacedReason
 
     /// <summary>Someone's calendar could not be looked into for our events (a share not done yet), so nothing is written or concluded.</summary>
     CalendarUnavailable,
+
+    /// <summary>
+    /// A key on the calendar or in the record of written events cannot be tied to this session by anything that was issued, so
+    /// the week's numbering for this person and kind is in doubt and nothing is written, skipped or paged for it on a guess.
+    /// </summary>
+    KeysUncertain,
 }
 
 /// <summary>What placement decided about one event on one person's calendar.</summary>
@@ -41,6 +47,19 @@ public sealed record EventUnplaced(PlacementKey Key, string Person, string Title
 /// <summary>Every event asked for, with what became of it, in the order it was considered.</summary>
 public sealed record PlacementPlan(IReadOnlyList<PlacementOutcome> Outcomes)
 {
+    /// <summary>
+    /// The workout numbers this plan issued, for the caller to keep before it writes anything: sessions the record of issued
+    /// numbers did not know, whose person and kind are not in doubt and whose calendar was looked into. Empty when the request
+    /// carried no record, since a caller that keeps none has nothing to keep.
+    /// </summary>
+    public IReadOnlyList<KeyIssue> Issued { get; init; } = [];
+
+    /// <summary>
+    /// The people and kinds the plan would not decide anything for, and why (<see cref="UnplacedReason.KeysUncertain"/>): the
+    /// typed result of the engine refusing to guess. Each one is a person's sessions of one kind in the week.
+    /// </summary>
+    public IReadOnlyList<UncertainKind> UncertainKinds { get; init; } = [];
+
     public IReadOnlyList<EventToCreate> ToCreate => Outcomes.OfType<EventToCreate>().ToList();
 
     public IReadOnlyList<EventHeld> Held => Outcomes.OfType<EventHeld>().ToList();
@@ -52,3 +71,6 @@ public sealed record PlacementPlan(IReadOnlyList<PlacementOutcome> Outcomes)
     /// <summary>What became of the event with that key, or null if it was not asked for.</summary>
     public PlacementOutcome? For(PlacementKey key) => Outcomes.FirstOrDefault(outcome => outcome.Key == key);
 }
+
+/// <summary>One person's sessions of one kind that a plan left undecided, and the plain reason (no name, time or key in it).</summary>
+public sealed record UncertainKind(string Person, Constitution.Domain.Workouts.SessionKind Kind, string Why);

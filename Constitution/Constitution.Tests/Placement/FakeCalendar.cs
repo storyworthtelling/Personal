@@ -106,3 +106,19 @@ internal sealed class MemoryKeyStore : IWrittenKeyStore
         Json = WrittenKeysCodec.Encode(keys);
     }
 }
+
+/// <summary>The record of issued workout numbers held as the text the phone would store, so every save goes through the codec.</summary>
+internal sealed class MemoryKeyAssignments : IKeyAssignmentStore
+{
+    public string? Json { get; set; }
+
+    public int Saves { get; private set; }
+
+    public KeyAssignmentsRead Load() => KeyAssignmentsCodec.Decode(Json);
+
+    public void Save(KeyAssignments assignments)
+    {
+        Saves++;
+        Json = KeyAssignmentsCodec.Encode(assignments);
+    }
+}

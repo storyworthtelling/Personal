@@ -1,4 +1,5 @@
 using Constitution.Domain.Calendar;
+using Constitution.Domain.Placement;
 using Constitution.Domain.Workouts.Screens;
 
 namespace Constitution.Domain.Workouts.Pipeline;
@@ -65,14 +66,16 @@ public sealed record PlanOverrides(IReadOnlyList<MoveGroup> Groups, IReadOnlyLis
         Skips.Any(item => Same(item.Person, person) && item.Day == day);
 
     /// <summary>
-    /// The week with the owner's moves in it (skips leave the plan alone). A pure function of the plan and these overrides, so a run
+    /// The week with the owner's moves in it (skips leave the plan alone). A pure function of the plan, these overrides and the record of
+    /// issued workout numbers (<paramref name="assignments"/>: a move names its session by the number it wore, so it is found again in a
+    /// week that has been re-planned; null names sessions by their place among their kind). So a run
     /// on a week that has not changed makes the same plan every time. The moves are made in the order they were made, each group
     /// whole: every key in it is read from the plan before any of it has moved, which is how the tab named them.
     ///
     /// <para>A group whose session cannot be found by its key in this week (the plan has changed under it) is left out of this
     /// week entirely and named in <see cref="AppliedOverrides.Unresolved"/>: half a swap would put one session on two days.</para>
     /// </summary>
-    public AppliedOverrides ApplyTo(HouseholdWorkoutPlan plan)
+    public AppliedOverrides ApplyTo(HouseholdWorkoutPlan plan, KeyAssignments? assignments = null)
     {
         ArgumentNullException.ThrowIfNull(plan);
         var current = plan;
@@ -80,16 +83,16 @@ public sealed record PlanOverrides(IReadOnlyList<MoveGroup> Groups, IReadOnlyLis
         var unresolved = new List<string>();
         foreach (var group in Groups)
         {
-            current = Apply(current, group, relocated, unresolved);
+            current = Apply(current, group, relocated, unresolved, assignments);
         }
 
         return new AppliedOverrides(current, relocated, unresolved);
     }
 
     private static SessionMoved Moved(SwapResult swap, SessionMove move) =>
-        new(swap.Person, WorkoutKeys.In(swap.Before, swap.Person, move.Old).Value, move.Old.Day, move.New.Day, move.New.Start, move.New.Gap, move.New.Session);
+        new(swap.Person, WorkoutKeys.In(swap.Before, swap.Person, move.Old, swap.Assignments).Value, move.Old.Day, move.New.Day, move.New.Start, move.New.Gap, move.New.Session);
 
-    private static HouseholdWorkoutPlan Apply(HouseholdWorkoutPlan plan, MoveGroup group, List<Relocation> relocated, List<string> unresolved)
+    private static HouseholdWorkoutPlan Apply(HouseholdWorkoutPlan plan, MoveGroup group, List<Relocation> relocated, List<string> unresolved, KeyAssignments? assignments)
     {
         var leaving = group.Moves.Where(move => InWeek(plan, move.FromDay)).ToList();
         var arriving = group.Moves.Where(move => InWeek(plan, move.Day)).ToList();
@@ -101,7 +104,7 @@ public sealed record PlanOverrides(IReadOnlyList<MoveGroup> Groups, IReadOnlyLis
         var found = new Dictionary<SessionMoved, PlannedSession>();
         foreach (var move in leaving)
         {
-            var old = Resolve(plan, move);
+            var old = Resolve(plan, move, assignments);
             if (old is null)
             {
                 unresolved.Add($"{move.Person}: no {move.Key} in the week of {plan.WeekStart:yyyy-MM-dd}");
@@ -139,14 +142,14 @@ public sealed record PlanOverrides(IReadOnlyList<MoveGroup> Groups, IReadOnlyLis
         return plan with { Plans = plans };
     }
 
-    private static PlannedSession? Resolve(HouseholdWorkoutPlan plan, SessionMoved move)
+    private static PlannedSession? Resolve(HouseholdWorkoutPlan plan, SessionMoved move, KeyAssignments? assignments)
     {
         if (plan.PlanFor(move.Person) is null)
         {
             return null;
         }
 
-        return WorkoutKeys.Of(plan, move.Person).FirstOrDefault(pair => pair.Value.Value == move.Key).Key;
+        return WorkoutKeys.Of(plan, move.Person, assignments).FirstOrDefault(pair => pair.Value.Value == move.Key).Key;
     }
 
     // The session as it was, now where the owner put it; or, in a week that only receives it, the session as the record carried it.
