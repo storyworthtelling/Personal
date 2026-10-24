@@ -33,6 +33,18 @@ public class ConstitutionInvariantsTests
         "com.storyworthtelling.constitution.ViewPermissionUsageActivity",
     ];
 
+    private static readonly string[] ExpectedReceivers =
+    [
+        // Added with the budget contract (PBI C-11.1.1): Index addresses this exact component. A deliberate edit, owner-approved.
+        "com.storyworthtelling.constitution.BudgetReceiver",
+    ];
+
+    private static readonly string[] ExpectedDeclaredPermissions =
+    [
+        // The signature permission that protects the receiver above. Declared by Constitution, held by Index. A deliberate edit.
+        "com.storyworthtelling.constitution.RECEIVE_BUDGET",
+    ];
+
     private static readonly string[] ExpectedWorkNames =
     [
         "constitution-read-back",
@@ -159,6 +171,20 @@ public class ConstitutionInvariantsTests
         Assert.Equal(ExpectedWorkers, ConstitutionIdentity.Workers);
     }
 
+    /// <summary>
+    /// Index sends the month's grocery budget to this exact component, under this action, behind this signature permission.
+    /// Move any of the three and the broadcast reaches nothing (or is refused) with no error on either phone.
+    /// </summary>
+    [Fact]
+    public void BudgetContractNamesAreFrozen()
+    {
+        Assert.Equal(ExpectedReceivers, ConstitutionIdentity.Receivers);
+        Assert.Equal(ExpectedDeclaredPermissions, ConstitutionIdentity.DeclaredPermissions);
+        Assert.Equal("com.storyworthtelling.constitution.BudgetReceiver", ConstitutionIdentity.BudgetReceiverName);
+        Assert.Equal("com.storyworthtelling.constitution.action.BUDGET", ConstitutionIdentity.BudgetAction);
+        Assert.Equal("com.storyworthtelling.constitution.RECEIVE_BUDGET", ConstitutionIdentity.BudgetPermission);
+    }
+
     /// <summary>The unique work name is persisted beside the class name: change it and the phone runs two schedules or none.</summary>
     [Fact]
     public void WorkNamesAreFrozen()
@@ -196,13 +222,17 @@ public class ConstitutionInvariantsTests
         Assert.NotEmpty(ConstitutionIdentity.Workers);
         Assert.NotEmpty(ConstitutionIdentity.WorkNames);
         Assert.NotEmpty(ConstitutionIdentity.PreferenceKeys);
+        Assert.NotEmpty(ConstitutionIdentity.Receivers);
+        Assert.NotEmpty(ConstitutionIdentity.DeclaredPermissions);
 
         Assert.NotEmpty(ExpectedActivities);
         Assert.NotEmpty(ExpectedWorkers);
         Assert.NotEmpty(ExpectedWorkNames);
         Assert.NotEmpty(ExpectedPreferenceKeys);
+        Assert.NotEmpty(ExpectedReceivers);
+        Assert.NotEmpty(ExpectedDeclaredPermissions);
 
-        Assert.All(ConstitutionIdentity.Activities.Concat(ConstitutionIdentity.Workers).Concat(ConstitutionIdentity.WorkNames).Concat(ConstitutionIdentity.PreferenceKeys),
+        Assert.All(ConstitutionIdentity.Activities.Concat(ConstitutionIdentity.Receivers).Concat(ConstitutionIdentity.DeclaredPermissions).Concat(ConstitutionIdentity.Workers).Concat(ConstitutionIdentity.WorkNames).Concat(ConstitutionIdentity.PreferenceKeys),
             value => Assert.False(string.IsNullOrWhiteSpace(value), "A frozen set holds a blank value."));
     }
 
