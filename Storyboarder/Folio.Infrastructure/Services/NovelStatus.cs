@@ -48,4 +48,14 @@ public sealed record NovelStatus(
     // The jacket, and whether it is the owner's. Null falls back to plain cloth — a book with no
     // painted cover is the ordinary case, not a missing file.
     string? CoverPath = null,
-    bool CoverIsOwners = false);
+    bool CoverIsOwners = false,
+    // Which of the whole-book reads have finished, out of how many. Null outside the report stage, or
+    // while the chapters are still being mapped and no read has started.
+    PhaseProgress? Reads = null,
+    // One sentence naming exactly which part of the report the book is in ("Reading the whole book
+    // through — read 3 of 17: Continuity editor"). Null when the stage is not the report's.
+    string? Step = null,
+    // Tries used by the current once-per-manuscript call, and how many it gets, so the desk can say
+    // "2 of 6 tries used" rather than only that something went wrong.
+    int Attempts = 0,
+    int MaxAttempts = 0);

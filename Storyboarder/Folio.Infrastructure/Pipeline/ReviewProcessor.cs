@@ -1412,13 +1412,23 @@ public sealed class ReviewProcessor : IPipelineStep
         }
 
         novel.StageAttempts++;
-        if (novel.StageAttempts >= rateLimits.MaxAttempts)
+        var truncated = exception is ResponseTruncatedException;
+        if (novel.StageAttempts >= rateLimits.MaxAttempts ||
+            (truncated && novel.StageAttempts >= rateLimits.MaxTruncatedAttempts))
         {
+            var attemptsMade = novel.StageAttempts;
+            // Parked is "attempts spent and an error recorded" (CallGate, and the card's needs-attention
+            // line, both read it that way), so a truncation that stops early spends the rest of the budget.
+            novel.StageAttempts = rateLimits.MaxAttempts;
             novel.RetryNotBeforeUtc = null;
+            var reason = truncated
+                ? $" (the reply was truncated at the output limit, and a truncated reply is truncated again: " +
+                  $"such a call is tried at most {rateLimits.MaxTruncatedAttempts} times)"
+                : string.Empty;
             logger.LogWarning(exception,
                 "{Call} failed for manuscript {NovelId} on attempt {Attempt}/{Max}; giving up and parking it " +
-                "until Retry is tapped, so the book is not sent again unattended: {Error}",
-                call, novel.Id, novel.StageAttempts, rateLimits.MaxAttempts, cause);
+                "until Retry is tapped, so the book is not sent again unattended{Reason}: {Error}",
+                call, novel.Id, attemptsMade, rateLimits.MaxAttempts, reason, cause);
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.Idle;
         }
