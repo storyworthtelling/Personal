@@ -31,6 +31,9 @@ public enum PrintedRole
 
     /// <summary>Room kept free for a figure. Draws nothing and asks no clearance.</summary>
     Slot,
+
+    /// <summary>Cascadia Code on the Mono rung: quantities and clock times, set so a column of them lines up.</summary>
+    Mono,
 }
 
 public enum PrintedAlign
