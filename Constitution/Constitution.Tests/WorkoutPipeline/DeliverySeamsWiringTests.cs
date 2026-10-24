@@ -121,9 +121,9 @@ public class DeliverySeamsWiringTests
     }
 
     [Fact]
-    public void TheManifestAndSkeletonAreUntouched()
+    public void TheServicesSignatureIsUntouched()
     {
         var services = Source("WorkoutWeekServices.cs");
-        Assert.Contains("public static Task<WorkoutWeekOutcome> RunAsync(Context context, CancellationToken cancellation)", services, StringComparison.Ordinal);
+        Assert.Contains("public static async Task<WorkoutWeekOutcome> RunAsync(Context context, CancellationToken cancellation)", services, StringComparison.Ordinal);
     }
 }

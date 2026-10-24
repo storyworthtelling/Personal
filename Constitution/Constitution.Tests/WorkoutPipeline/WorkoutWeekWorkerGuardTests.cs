@@ -79,7 +79,7 @@ public class WorkoutWeekWorkerGuardTests
         var source = Source("WorkoutWeekServices.cs");
 
         Assert.Contains("Task<WorkoutWeekOutcome> RunAsync(Context context, CancellationToken cancellation)", source, StringComparison.Ordinal);
-        Assert.Contains("NotPlannedBecause.NotConfigured", source, StringComparison.Ordinal);
+        Assert.Contains("WorkoutWeekPreparation.Stop", source, StringComparison.Ordinal);
         Assert.Contains("WorkoutWeekTrail.LogPhrase(", source, StringComparison.Ordinal);
     }
 
