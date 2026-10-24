@@ -3,6 +3,7 @@ using Moq;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
+using Folio.Domain.Reading;
 using Folio.Infrastructure.Configuration;
 using Folio.Infrastructure.Persistence;
 using Folio.Infrastructure.Services;
@@ -183,5 +184,127 @@ public class NovelStatusTests : IDisposable
 
         Assert.Equal(new PhaseProgress(0, 0), status!.SceneImages);
         Assert.Equal(new PhaseProgress(0, 0), status.AnalysisNotes);
+    }
+
+    // ---- Which read is happening ----------------------------------------------------------------------
+
+    private Guid SeedReading(int readsDone, Action<Novel>? shape = null)
+    {
+        return SeedNovel(ProjectStage.ComposingAnalysis, seed =>
+        {
+            var novel = seed.Context.Novels.Local.First();
+            shape?.Invoke(novel);
+            for (var i = 0; i < 2; i++)
+                seed.Context.ChunkAnalyses.Add(new ChunkAnalysis
+                {
+                    NovelId = seed.NovelId, Ordinal = i, Status = WorkStatus.Completed
+                });
+            seed.Context.BookAnalyses.Add(new BookAnalysis
+            {
+                NovelId = seed.NovelId, ConsolidatedJson = "{}", CraftJson = "{}", VoiceJson = "{}",
+                ExpansionJson = "{}", FindingsReconciled = true
+            });
+            for (var i = 0; i < readsDone; i++)
+                seed.Context.PassReads.Add(new PassRead
+                {
+                    NovelId = seed.NovelId, PassId = ReadingPlan.Passes[i].Id, Json = "{}"
+                });
+        });
+    }
+
+    [Fact]
+    public async Task Reads_progress_counts_the_passes_that_have_finished()
+    {
+        var id = SeedReading(readsDone: 3);
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.Equal(3, status!.Reads!.Done);
+        Assert.Equal(ReadingPlan.Passes.Count, status.Reads.Total);
+    }
+
+    [Fact]
+    public async Task The_step_names_the_next_read_and_its_place_in_the_plan()
+    {
+        var id = SeedReading(readsDone: 3);
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.Equal(
+            $"Reading the whole book through — read 4 of {ReadingPlan.Passes.Count}: {ReadingPlan.Passes[3].Name}",
+            status!.Step);
+    }
+
+    [Fact]
+    public async Task A_pass_that_failed_is_not_counted_as_read()
+    {
+        var id = SeedNovel(ProjectStage.ComposingAnalysis, seed =>
+        {
+            seed.Context.ChunkAnalyses.Add(new ChunkAnalysis
+            {
+                NovelId = seed.NovelId, Ordinal = 0, Status = WorkStatus.Completed
+            });
+            seed.Context.BookAnalyses.Add(new BookAnalysis
+            {
+                NovelId = seed.NovelId, ConsolidatedJson = "{}", CraftJson = "{}", VoiceJson = "{}",
+                ExpansionJson = "{}", FindingsReconciled = true
+            });
+            seed.Context.PassReads.Add(new PassRead
+            {
+                NovelId = seed.NovelId, PassId = ReadingPlan.Passes[0].Id, Json = null, Attempts = 5,
+                LastError = "truncated"
+            });
+        });
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.Equal(0, status!.Reads!.Done);
+        Assert.Contains($"read 1 of {ReadingPlan.Passes.Count}: {ReadingPlan.Passes[0].Name}", status.Step);
+    }
+
+    [Fact]
+    public async Task Before_the_reads_the_step_is_whichever_reduction_is_next()
+    {
+        var id = SeedNovel(ProjectStage.ComposingAnalysis, seed =>
+        {
+            seed.Context.ChunkAnalyses.Add(new ChunkAnalysis
+            {
+                NovelId = seed.NovelId, Ordinal = 0, Status = WorkStatus.Completed
+            });
+            seed.Context.BookAnalyses.Add(new BookAnalysis
+            {
+                NovelId = seed.NovelId, ConsolidatedJson = "{}"   // the story report is done; craft is next
+            });
+        });
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.Equal("Gathering the line edits, prose and dialogue notes", status!.Step);
+    }
+
+    [Fact]
+    public async Task There_is_no_step_outside_the_report_stage()
+    {
+        var id = SeedNovel(ProjectStage.RenderingSceneImages);
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.Null(status!.Step);
+        Assert.Null(status.Reads);
+    }
+
+    [Fact]
+    public async Task The_status_carries_the_attempts_used_and_allowed()
+    {
+        var id = SeedReading(readsDone: 1, novel =>
+        {
+            novel.LastError = "Reading pass 'x': IOException: Software caused connection abort";
+            novel.StageAttempts = 2;
+        });
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.Equal(2, status!.Attempts);
+        Assert.Equal(new RateLimitOptions().MaxAttempts, status.MaxAttempts);
     }
 }

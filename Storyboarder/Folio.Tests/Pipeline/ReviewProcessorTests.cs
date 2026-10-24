@@ -542,6 +542,41 @@ public class ReviewProcessorTests : IDisposable
         Assert.True(result.Wait > TimeSpan.FromSeconds(30), $"Waited only {result.Wait}");
     }
 
+
+    // A reply cut off at the output limit comes back cut off again: it is the same request with the same
+    // limit. Five repeats of a whole-book read bought nothing five times, so the book is parked after two.
+    [Fact]
+    public async Task ATruncatedReadIsNotRepeatedMoreThanTwice()
+    {
+        var id = SeedManuscript();
+        var calls = new List<int>();
+        FailPass(FirstPass, _ => new ResponseTruncatedException(
+            "Claude response was truncated at the 8000-token output limit"), calls);
+        var logger = new CapturingLogger<ReviewProcessor>();
+
+        await Cycle(NewProcessor(logger: logger), 200);
+
+        Assert.Equal(2, calls.Count);
+        var novel = LoadNovel(id);
+        Assert.Equal(ProjectStage.ComposingAnalysis, novel.Stage);
+        Assert.Contains(FirstPass.Id, novel.LastError);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("giving up") &&
+                                             e.Message.Contains("truncat"));
+    }
+
+    [Fact]
+    public async Task ATruncationThenASuccessStillCompletes()
+    {
+        var id = SeedManuscript();
+        FailPass(FirstPass, attempt => attempt == 1
+            ? new ResponseTruncatedException("Claude response was truncated at the 8000-token output limit")
+            : null);
+
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(ProjectStage.Completed, LoadNovel(id).Stage);
+    }
+
     [Fact]
     public async Task Review_ProducesReportPdf_AndCompletes()
     {
