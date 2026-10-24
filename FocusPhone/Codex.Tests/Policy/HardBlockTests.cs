@@ -12,15 +12,37 @@ public class HardBlockTests
 
     [Theory]
     [InlineData(Game, true)]
-    // CATEGORY_SOCIAL is NOT auto-blocked: first-party utilities (Google Messages, Contacts, Meet,
-    // Gemini) declare appCategory="social" and were wrongly hard-suspended. Real social media is
-    // caught by the curated list instead.
     [InlineData(Social, false)]
     [InlineData(Undefined, false)]
     [InlineData(Productivity, false)]
     public void IsNeverVisibleCategory_FlagsGamesOnly(int category, bool expected)
     {
         Assert.Equal(expected, HardBlock.IsNeverVisibleCategory(category));
+    }
+
+    [Theory]
+    [InlineData(Social, true)]
+    [InlineData(Game, false)]
+    [InlineData(Undefined, false)]
+    public void IsSocialCategory_FlagsSocialOnly(int category, bool expected)
+    {
+        Assert.Equal(expected, HardBlock.IsSocialCategory(category));
+    }
+
+    [Theory]
+    [InlineData("com.google.android.apps.messaging", true)]
+    [InlineData("com.google.android.apps.bard", true)]
+    [InlineData("com.google.android.apps.tachyon", true)]
+    [InlineData("com.google.android.contacts", true)]
+    [InlineData("com.google.android.youtube", true)]
+    [InlineData("com.storyworthtelling.focusphone.audio", true)]
+    [InlineData("com.facebook.orca", false)]
+    [InlineData("com.whatsapp", false)]
+    [InlineData("com.google.ar.lens", true)]
+    [InlineData("com.google.android.apps.docs", true)]
+    public void IsFirstParty_IsGoogleOrSuiteNamespaceOnly(string package, bool expected)
+    {
+        Assert.Equal(expected, HardBlock.IsFirstParty(package));
     }
 
     [Fact]
@@ -32,15 +54,37 @@ public class HardBlockTests
     }
 
     [Fact]
-    public void Detect_DoesNotBlockSocialCategoryUtilities()
+    public void Detect_BlocksSocialCategoryApps_ThatAreNotFirstParty()
     {
-        // Google Messages / Contacts / Meet declare the social category but must stay visible.
+        var blocked = HardBlock.Detect(
+        [
+            ("com.whatsapp", Social),
+            ("org.telegram.messenger", Social),
+        ]);
+
+        Assert.Contains("com.whatsapp", blocked);
+        Assert.Contains("org.telegram.messenger", blocked);
+    }
+
+    [Fact]
+    public void Detect_LeavesFirstPartyGoogleSocialAppsVisible()
+    {
+        // Google Messages / Contacts / Meet / Gemini declare the social category but are first-party.
         var blocked = HardBlock.Detect(
         [
             ("com.google.android.apps.messaging", Social),
             ("com.google.android.contacts", Social),
             ("com.google.android.apps.tachyon", Social),
+            ("com.google.android.apps.bard", Social),
         ]);
+
+        Assert.Empty(blocked);
+    }
+
+    [Fact]
+    public void Detect_LeavesOwnSuiteSocialAppsVisible()
+    {
+        var blocked = HardBlock.Detect([("com.storyworthtelling.someapp", Social)]);
 
         Assert.Empty(blocked);
     }
