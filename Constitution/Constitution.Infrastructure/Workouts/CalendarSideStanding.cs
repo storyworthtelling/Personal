@@ -71,4 +71,38 @@ public static class PlanningSetupFile
             return new HouseholdSetupRead.NotSet(UnreadableReason);
         }
     }
+
+    /// <summary>
+    /// Writes the setup atomically (a temporary file beside it, then a move). A file already there that cannot be used as a setup is
+    /// <b>never overwritten</b>: it is set aside first (<c>UnreadableCopies</c>), so the owner's earlier file survives whatever it held.
+    /// </summary>
+    public static PlanningSetupWrite Write(string path, PlanningSetup setup)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(setup);
+        if (Directory.Exists(path))
+        {
+            throw new IOException("The household setup was not saved: a directory sits where the file belongs, and it was left alone.");
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        var result = PlanningSetupWrite.Written;
+        if (File.Exists(path) && Read(path) is HouseholdSetupRead.NotSet)
+        {
+            UnreadableCopies.SetAside(path);
+            result = PlanningSetupWrite.WrittenAfterSettingAsideAnUnreadableFile;
+        }
+
+        var temporary = path + ".tmp";
+        File.WriteAllText(temporary, PlanningSetupCodec.Write(setup));
+        File.Move(temporary, path, overwrite: true);
+        return result;
+    }
+}
+
+/// <summary>What <see cref="PlanningSetupFile.Write"/> did.</summary>
+public enum PlanningSetupWrite
+{
+    Written,
+    WrittenAfterSettingAsideAnUnreadableFile,
 }
