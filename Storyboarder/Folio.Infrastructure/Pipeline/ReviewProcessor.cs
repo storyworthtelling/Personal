@@ -1273,6 +1273,21 @@ public sealed class ReviewProcessor : IPipelineStep
     private async Task<ProcessResult?> DeliverToRemarkable(
         FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
     {
+        // The upload holds the whole file in memory (and the HTTP stack buffers a second copy), so a file
+        // over the tablet's limit is refused before it is even read: on a real book a 173 MB report ran
+        // the phone out of memory, six times over.
+        var size = imageStore.Size(analysis.PdfPath!);
+        if (size > archive.RemarkableMaxBytes)
+        {
+            logger.LogWarning(
+                "Manuscript {NovelId}: the report is {SizeMb:0} MB, over the {LimitMb:0} MB the reMarkable takes; " +
+                "not sending it to the tablet (the report remains available elsewhere)",
+                novel.Id, size / 1_000_000.0, archive.RemarkableMaxBytes / 1_000_000.0);
+            return await SettleWithoutTablet(db, novel, analysis,
+                $"It did not reach the reMarkable: the PDF is {size / 1_000_000.0:0} MB, over the tablet's " +
+                $"{archive.RemarkableMaxBytes / 1_000_000.0:0} MB limit.", cancellationToken);
+        }
+
         try
         {
             await delivery!.DeliverToRemarkableRoot(
@@ -1280,12 +1295,24 @@ public sealed class ReviewProcessor : IPipelineStep
                 imageStore.Read(analysis.PdfPath!), cancellationToken);
 
             analysis.DeliveredToRemarkable = true;
+            analysis.RemarkableNote = null;
             novel.StageAttempts = 0;
             novel.LastError = null;
             Touch(novel);
             await db.SaveChangesAsync(cancellationToken);
             logger.LogInformation("Delivered the revision report of manuscript {NovelId} to the reMarkable root", novel.Id);
             return ProcessResult.DidWork(novel.Id);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && MemoryFailure.IsOutOfMemory(ex))
+        {
+            // The same file in the same heap runs out again, and each attempt fills the heap further
+            // before it does, so this is not tried a second time.
+            logger.LogWarning(ex,
+                "Manuscript {NovelId}: the phone ran out of memory sending the report to the reMarkable; " +
+                "not repeating it with the same file ({SizeMb:0} MB)", novel.Id, size / 1_000_000.0);
+            return await SettleWithoutTablet(db, novel, analysis,
+                $"It did not reach the reMarkable: the phone ran out of memory sending it ({size / 1_000_000.0:0} MB).",
+                cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -1299,16 +1326,32 @@ public sealed class ReviewProcessor : IPipelineStep
                     "Manuscript {NovelId}: giving up on reMarkable delivery after {Attempts} attempts; nothing " +
                     "was delivered to the tablet, continuing (the report remains available elsewhere)",
                     novel.Id, novel.StageAttempts);
-                analysis.DeliveredToRemarkable = true;   // settled
-                novel.StageAttempts = 0;                 // hand a fresh budget to the Drive target
-                await db.SaveChangesAsync(cancellationToken);
-                return null;
+                var attempts = novel.StageAttempts;
+                var cause = PlainError.Describe(ex.Message);
+                return await SettleWithoutTablet(db, novel, analysis,
+                    $"It did not reach the reMarkable after {attempts} tries" +
+                    (cause.Length == 0 ? "." : $": {cause}."), cancellationToken);
             }
 
             var delay = backoff.NextDelay(novel.StageAttempts - 1, (ex as RateLimitException)?.RetryAfter);
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.Waiting(delay, novel.Id);
         }
+    }
+
+    // The tablet step is over without the report having reached it. Settled, so the review goes on to the
+    // Drive target and finishes — but the reason is kept on the report, because the error recorded on the
+    // manuscript is cleared by the very next successful step and the owner would never otherwise know.
+    private async Task<ProcessResult?> SettleWithoutTablet(
+        FolioDbContext db, Novel novel, BookAnalysis analysis, string note, CancellationToken cancellationToken)
+    {
+        analysis.DeliveredToRemarkable = true;
+        analysis.RemarkableNote = note;
+        novel.StageAttempts = 0;      // hand a fresh budget to the Drive target
+        novel.LastError = null;
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return null;
     }
 
     // Leaves the archive stage: stamps when it happened (only when the report was actually uploaded),

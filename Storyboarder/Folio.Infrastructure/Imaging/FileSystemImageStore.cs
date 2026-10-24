@@ -15,6 +15,8 @@ public sealed class FileSystemImageStore : IImageStore
         root = Path.GetFullPath(options.Value.OutputRoot);
     }
 
+    public long Size(string absolutePath) => new FileInfo(absolutePath).Length;
+
     public string Save(string relativePath, byte[] content)
     {
         var fullPath = Path.GetFullPath(Path.Combine(root, relativePath));

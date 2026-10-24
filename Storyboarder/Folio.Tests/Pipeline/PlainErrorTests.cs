@@ -24,6 +24,12 @@ public class PlainErrorTests
         "ConsolidateAnalysis: RateLimitException: Anthropic rate limited: 429 (TooManyRequests)",
         "Anthropic is rate-limiting requests")]
     [InlineData(
+        "Could not deliver to reMarkable: Failed to allocate a 8208 byte allocation with 203360 free bytes and 198KB until OOM",
+        "the phone ran out of memory")]
+    [InlineData(
+        "Could not deliver to reMarkable: java.lang.OutOfMemoryError: Java heap space",
+        "the phone ran out of memory")]
+    [InlineData(
         "ConsolidateAnalysis: HttpRequestException: Anthropic request failed: 401 (Unauthorized): invalid x-api-key",
         "the Claude key was rejected")]
     public void KnownCausesBecomeASentenceFragment(string recorded, string expected)

@@ -23,14 +23,24 @@ namespace Storyworthtelling.Paper;
 /// </summary>
 public sealed class VectorPdfSink : IDisposable
 {
+    /// <summary>Skia's value for "write pictures losslessly", and the default.</summary>
+    public const int Lossless = 101;
+
     private readonly MemoryStream stream = new();
     private readonly SKDocument document;
     private int pagesBegun;
     private bool closed;
 
-    public VectorPdfSink()
+    /// <param name="imageQuality">
+    /// <see cref="Lossless"/> (the default), or 1–100 to have every <b>opaque</b> picture written as a
+    /// JPEG at that quality. Skia writes pictures losslessly otherwise, which is right for a document
+    /// whose pictures are line work and wrong for one whose pictures are illustrations: a report with 67
+    /// of them came out at 173 MB, over the reMarkable's documented 100 MB, and large enough to run a
+    /// phone out of memory just holding the bytes. Text and vector drawing are unaffected either way.
+    /// </param>
+    public VectorPdfSink(int imageQuality = Lossless)
     {
-        document = SKDocument.CreatePdf(stream)
+        document = SKDocument.CreatePdf(stream, new SKDocumentPdfMetadata { EncodingQuality = imageQuality })
             ?? throw new InvalidOperationException(
                 "Skia would not create a PDF document. The native library is probably missing — a "
                 + "head needs SkiaSharp.NativeAssets for its platform.");

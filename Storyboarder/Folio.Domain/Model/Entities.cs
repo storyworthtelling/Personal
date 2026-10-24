@@ -365,6 +365,12 @@ public class BookAnalysis
     // Archiving stage can advance. Parallel to ArchivedDriveFileId; the two delivery targets are independent.
     public bool DeliveredToRemarkable { get; set; }
 
+    // Why the report did NOT reach the tablet, in a sentence the desk can show; null when it did, or when
+    // delivery was never asked for. DeliveredToRemarkable only says the step has SETTLED (delivered or
+    // given up), and the recorded error is cleared by the Drive upload that follows, so without this the
+    // owner would never learn the tablet had not got it.
+    public string? RemarkableNote { get; set; }
+
     // The cross-book continuity read (Phase 5), serialized as a SeriesContinuity: where this book contradicts
     // the prior book's established canon, and the status of the prior book's carried-over open threads. Its own
     // resumable call and column, folded in at render like the craft/voice/expansion halves. Null until it runs;

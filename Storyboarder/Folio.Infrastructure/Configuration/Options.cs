@@ -110,6 +110,11 @@ public sealed class ArchiveOptions
     // where it's read and annotated by hand. Off by default (it needs a device-code pairing); best-effort
     // like the Drive upload — a reMarkable failure never blocks the review from finishing.
     public bool DeliverToRemarkable { get; set; }
+
+    // The largest report to try sending to the tablet. reMarkable documents 100 MB for an imported file;
+    // anything larger is not attempted, because the upload holds the whole file in memory on the phone
+    // and a file that big only ever ended in running it out of memory, six times over.
+    public long RemarkableMaxBytes { get; set; } = 100_000_000;
 }
 
 public sealed class StorageOptions
