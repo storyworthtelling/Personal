@@ -1,5 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Folio.Domain.Model;
 using Folio.Infrastructure.Persistence;
 using Xunit;
@@ -65,6 +67,47 @@ public class MigrationSafetyTests : IDisposable
             Assert.Equal(ProjectStage.RenderingSceneImages, novel.Stage);
             Assert.Single(db.Scenes.ToList());
             Assert.Equal("text", db.SourceTexts.Single().FullText);
+        }
+    }
+
+    // A desk line stored before the model was told whether the book had finished could say "Draft 1 is
+    // complete" about a book still mid-read, and it is kept until the stage moves — so it was cleared
+    // once, for every book that is not Completed. A finished book's line was composed knowing it was done.
+    [Fact]
+    public void TheClearUnreliableVoicedLinesMigration_ClearsUnfinishedBooksOnly()
+    {
+        var options = Options(Path.Combine(dir, "voiced.db"));
+        using (var db = new FolioDbContext(options))
+        {
+            db.GetService<IMigrator>().Migrate("20261022192414_RetryNotBefore");
+
+            var now = DateTimeOffset.UtcNow;
+            foreach (var stage in new[] { ProjectStage.ComposingAnalysis, ProjectStage.Completed, ProjectStage.Failed })
+            {
+                var id = Guid.NewGuid();
+                db.Novels.Add(new Novel
+                {
+                    Id = id, ProjectId = id, Title = stage.ToString(), GoogleDocId = "doc", Stage = stage,
+                    VoicedLine = "Draft 1 is complete.", VoicedLineStage = stage,
+                    CreatedAtUtc = now, UpdatedAtUtc = now
+                });
+            }
+            db.SaveChanges();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using (var db = new FolioDbContext(options))
+            db.Database.Migrate();
+        SqliteConnection.ClearAllPools();
+
+        using (var db = new FolioDbContext(options))
+        {
+            var novels = db.Novels.ToDictionary(n => n.Title);
+            Assert.Equal(string.Empty, novels["ComposingAnalysis"].VoicedLine);
+            Assert.Null(novels["ComposingAnalysis"].VoicedLineStage);
+            Assert.Equal(string.Empty, novels["Failed"].VoicedLine);
+            Assert.Equal("Draft 1 is complete.", novels["Completed"].VoicedLine);
+            Assert.Equal(ProjectStage.Completed, novels["Completed"].VoicedLineStage);
         }
     }
 }

@@ -6,7 +6,9 @@ using Folio.Domain.Analysis;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
+using Folio.Domain.Pipeline;
 using Folio.Domain.Readiness;
+using Folio.Domain.Reading;
 using Folio.Domain.Text;
 using Folio.Domain.Time;
 using Folio.Domain.Voice;
@@ -403,10 +405,19 @@ public sealed class ProjectService
         if (novel is null)
             return fallback;
 
+        // The model is told what is true, in words, and a stopped book gets no line at all: the desk shows
+        // the error where this would go, and a cheerful note over a stalled book is worse than silence.
+        // (It used to be told only the stage's name, and wrote "Draft 1 is complete" over a book that was
+        // part-way through its reads and had stopped on an error.)
+        var status = await BuildStatus(db, id, rateLimits, clock.UtcNow, cancellationToken);
+        var facts = status is null ? null : DeskStatus.VoiceFacts(status);
+        if (facts is null)
+            return fallback;
+
         if (!VoicedLinePlan.NeedsComposing(novel.VoicedLine, novel.VoicedLineStage, novel.Stage))
             return novel.VoicedLine;
 
-        var composed = await ComposeLine(novel, cancellationToken);
+        var composed = await ComposeLine(novel, facts, cancellationToken);
         if (string.IsNullOrWhiteSpace(composed))
             return fallback;
 
@@ -421,7 +432,7 @@ public sealed class ProjectService
     /// every ordinary case of the voice being unavailable: no key, no profile learned yet, offline.
     /// Never throws into a screen.
     /// </summary>
-    private async Task<string?> ComposeLine(Novel novel, CancellationToken cancellationToken)
+    private async Task<string?> ComposeLine(Novel novel, string facts, CancellationToken cancellationToken)
     {
         if (voiceStore is null || voiceClient is null)
             return null;
@@ -436,7 +447,7 @@ public sealed class ProjectService
                 profile,
                 new MessageRequest(
                     VoicedOccasions.DeskLine,
-                    $"Title: {novel.Title}. Draft {novel.DraftNumber}. Stage: {novel.Stage}.",
+                    $"Title: {novel.Title}. Draft {novel.DraftNumber}. {facts}",
                     MaxWords: 18),
                 cancellationToken);
 
@@ -1011,6 +1022,8 @@ public sealed class ProjectService
         // card stops showing it (and the worker has presumably resumed).
         var rateLimitedUntil = novel.RateLimitedUntilUtc is { } until && until > now ? novel.RateLimitedUntilUtc : null;
 
+        var (reads, step) = await ReportPosition(db, novel, analysisNotes, analysisReady, cancellationToken);
+
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
             chunks, sheets, sceneImages, analysisNotes, analysis, analysisReady, needsAttention,
@@ -1019,7 +1032,41 @@ public sealed class ProjectService
             novel.SeriesId is not null, novel.SeriesSequence, novel.SeriesId,
             await SeriesNameOf(db, novel, cancellationToken),
             novel.ShelvedAtUtc is not null, novel.WordCount,
-            novel.CoverPath, novel.CoverIsOwners);
+            novel.CoverPath, novel.CoverIsOwners,
+            reads, step, novel.StageAttempts, limits.MaxAttempts);
+    }
+
+    // Where the book is inside the revision report: how many of the whole-book reads are done and which
+    // part of the report is being worked on. Only meaningful once the chapters have been mapped; before
+    // that the desk reports the mapping's own progress.
+    private static async Task<(PhaseProgress? Reads, string? Step)> ReportPosition(
+        FolioDbContext db, Novel novel, PhaseProgress analysisNotes, bool rendered, CancellationToken cancellationToken)
+    {
+        var mapped = analysisNotes.Total > 0 && analysisNotes.Done >= analysisNotes.Total;
+        if (novel.Stage != ProjectStage.ComposingAnalysis || !mapped)
+            return (null, null);
+
+        var book = await db.BookAnalyses.FirstOrDefaultAsync(a => a.NovelId == novel.Id, cancellationToken);
+        var finished = await db.PassReads
+            .Where(pass => pass.NovelId == novel.Id && pass.Json != null)
+            .Select(pass => pass.PassId)
+            .ToListAsync(cancellationToken);
+
+        var passes = ReadingPlan.Passes;
+        var reads = new PhaseProgress(passes.Count(pass => finished.Contains(pass.Id)), passes.Count);
+        var next = passes.FirstOrDefault(pass => !finished.Contains(pass.Id));
+
+        var step = ReportStep.Describe(new ReportProgress(
+            StoryReport: book?.ConsolidatedJson is not null,
+            Craft: book?.CraftJson is not null,
+            Voice: book?.VoiceJson is not null,
+            Findings: book?.FindingsReconciled == true,
+            Expansion: book?.ExpansionJson is not null,
+            SeriesPending: novel.PreviousBookId is not null && book?.SeriesContinuityJson is null,
+            reads.Done, reads.Total, next?.Name,
+            JacketPending: novel.CoverPath is null && !novel.CoverAttempted,
+            Rendered: rendered));
+        return (reads, step);
     }
 
     // A human-readable snapshot of everything that might be wrong: config, last worker run, and per

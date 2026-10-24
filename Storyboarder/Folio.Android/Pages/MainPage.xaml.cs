@@ -143,7 +143,12 @@ public partial class MainPage : FolioBinderPage
 
                 var line = await projects.VoicedLineAsync(status.Id, row.Summary, CancellationToken.None);
                 if (line == row.Summary)
+                {
+                    // No line to show (stopped, or no voice yet): forget any earlier one rather than
+                    // leave it on the desk over a state it no longer describes.
+                    changed |= voicedLines.Remove(status.Id);
                     continue;
+                }
 
                 voicedLines[status.Id] = line;
                 changed = true;
@@ -240,7 +245,11 @@ public partial class MainPage : FolioBinderPage
         // Available, not offered: last, muted, no colour, no confirmation.
         actions.Add(new CardAction(DeleteAction, Glyphs.Bin, ActionWeight.Quiet, () => Chose(DeleteAction, status)));
 
-        Present(ActionCard.Build(status.Title, ProjectRow.From(status).Summary, actions, Dismiss));
+        var shown = ProjectRow.From(status);
+        Present(ActionCard.Build(
+            status.Title,
+            string.IsNullOrWhiteSpace(shown.Problem) ? shown.Summary : $"{shown.Summary}\n{shown.Problem}",
+            actions, Dismiss));
     }
 
     private async void Chose(string label, NovelStatus status)
@@ -436,12 +445,16 @@ public partial class MainPage : FolioBinderPage
             return;
         }
 
-        // What is being read is whatever is still running; failing that, the newest thing here.
-        var reading = onDesk.FirstOrDefault(pair => Active(pair.Status)) is { Status: not null } running
-            ? running
-            : onDesk[0];
+        // What is being read is whatever is still running; failing that, a book that has stopped and needs
+        // the owner (it must not hide among the others); failing that, the newest thing here.
+        var reading =
+            onDesk.FirstOrDefault(pair => Active(pair.Status) && !pair.Status.NeedsAttention) is { Status: not null } running
+                ? running
+                : onDesk.FirstOrDefault(pair => Active(pair.Status)) is { Status: not null } stopped
+                    ? stopped
+                    : onDesk[0];
 
-        Desk.Add(DeskPaper.Strip("Reading now"));
+        Desk.Add(DeskPaper.Strip(reading.Row.Heading));
         Desk.Add(Hero(reading.Row, reading.Status));
 
         if (!string.IsNullOrWhiteSpace(voice))
@@ -476,17 +489,41 @@ public partial class MainPage : FolioBinderPage
 
     private View Hero(ProjectRow row, NovelStatus status)
     {
+        // The facts first and always: what the book is doing, and — in red — what is wrong with it. The
+        // owner's voice is a note under them, never a replacement for them (it used to replace them, and
+        // said "Draft 1 is complete" over a book that had stopped part-way through its reads).
         var lines = new List<View>
         {
             new Label { Text = row.Title, FontFamily = "SerifSemibold", FontSize = 17, LineHeight = 1.15 },
             new Label
             {
-                Text = voicedLines.TryGetValue(row.Id, out var voiced) ? voiced : row.Summary,
+                Text = row.Summary,
                 FontSize = 14,
                 TextColor = PaperResources.Colour(status.NeedsAttention ? "ProblemMark" : "InkBlue"),
                 Margin = new Thickness(0, 8, 0, 0),
             },
         };
+
+        if (!string.IsNullOrWhiteSpace(row.Problem))
+        {
+            lines.Add(new Label
+            {
+                Text = row.Problem,
+                FontSize = 13,
+                TextColor = PaperResources.Colour("ProblemMark"),
+                Margin = new Thickness(0, 6, 0, 0),
+            });
+        }
+
+        if (!status.NeedsAttention && voicedLines.TryGetValue(row.Id, out var voiced) && !string.IsNullOrWhiteSpace(voiced))
+        {
+            lines.Add(new Label
+            {
+                Text = voiced,
+                Style = PaperResources.Token<Style>("VoiceLabel"),
+                Margin = new Thickness(0, 10, 0, 0),
+            });
+        }
 
         var card = DeskPaper.Card([.. lines]);
         card.Rotation = 0.8;
@@ -523,8 +560,8 @@ public partial class MainPage : FolioBinderPage
             var (row, status) = books[i];
             var note = DeskPaper.PostIt(
                 row.Title,
-                row.Summary,
-                PaperResources.Colour(status.NeedsAttention ? "ProblemMark" : "InkSoft"));
+                string.IsNullOrWhiteSpace(row.Problem) ? row.Summary : $"{row.Summary}\n{row.Problem}",
+                PaperResources.Colour(status.NeedsAttention || !string.IsNullOrWhiteSpace(row.Problem) ? "ProblemMark" : "InkSoft"));
             note.Rotation = noteTilts[i % noteTilts.Length];
 
             var cover = new FlatBook(row.Title, Jacket(status), 88, 110, tilts[i % tilts.Length]);
@@ -728,30 +765,23 @@ public partial class MainPage : FolioBinderPage
     public sealed record PhaseChipRow(string Text, bool IsActive);
 
     // Display projection of a NovelStatus for the list. Public so the XAML binding can read it.
+    // The words themselves come from DeskStatus, so the heading, the status sentence and the note the
+    // owner's voice writes are decided in one place and cannot contradict each other.
     public sealed record ProjectRow(
         Guid Id, string Title, string Summary, string? Error, bool HasError,
-        IReadOnlyList<PhaseChipRow> Phases)
+        IReadOnlyList<PhaseChipRow> Phases, string Heading = "Reading now", string? Problem = null)
     {
         public bool SameAs(ProjectRow other) =>
             Id == other.Id && Title == other.Title && Summary == other.Summary &&
-            Error == other.Error && Phases.SequenceEqual(other.Phases);
+            Error == other.Error && Heading == other.Heading && Problem == other.Problem &&
+            Phases.SequenceEqual(other.Phases);
 
         public static ProjectRow From(NovelStatus s)
         {
             // Loading is words (DESIGN.md §5): one readable sentence for the active stage — and, for the
             // stages that walk a list, the running count so it's clear how much is left.
-            var summary = s.Stage switch
-            {
-                "Created" or "Ingesting" => "Reading the manuscript…",
-                "BuildingDesignBible" => DesignBibleSentence(s),
-                "RenderingSceneImages" => Sentence("Illustrating the scenes", "scenes", s.SceneImages),
-                "ComposingAnalysis" => AnalysisSentence(s),
-                "Archiving" => "Delivering the report…",
-                "Completed" => "Review delivered.",
-                "Failed" => "Stopped.",
-                "Cancelled" => "Stopped by you.",
-                _ => s.Stage,
-            };
+            var line = DeskStatus.Of(s);
+            var summary = line.Summary;
 
             // A book in a series wears a "Book N" badge at the head of its status line.
             if (s.InSeries)
@@ -774,25 +804,14 @@ public partial class MainPage : FolioBinderPage
             AddChip(chips, "chunks", s.Chunks, s.Stage == "BuildingDesignBible" && !Complete(s.Chunks));
             AddChip(chips, "sheets", s.ReferenceSheets, s.Stage == "BuildingDesignBible" && Complete(s.Chunks));
             AddChip(chips, "scenes", s.SceneImages, s.Stage == "RenderingSceneImages");
-            AddChip(chips, "analysis", s.AnalysisNotes, s.Stage == "ComposingAnalysis");
+            AddChip(chips, "analysis", s.AnalysisNotes, s.Stage == "ComposingAnalysis" && !Complete(s.AnalysisNotes));
+            if (s.Reads is { } reads)
+                AddChip(chips, "reads", reads, s.Stage == "ComposingAnalysis" && !line.Stuck);
 
             var showError = s.NeedsAttention;
             return new ProjectRow(
-                s.Id, s.Title, summary, showError ? s.LastError : null, showError, chips);
+                s.Id, s.Title, summary, showError ? s.LastError : null, showError, chips, line.Heading, line.Problem);
         }
-
-        // The design bible has two sub-steps: read every chunk for characters & settings, then draw a
-        // reference sheet for each. Report whichever is in flight so the sentence never stalls.
-        private static string DesignBibleSentence(NovelStatus s) =>
-            Complete(s.Chunks)
-                ? Sentence("Drawing reference sheets", "sheets", s.ReferenceSheets)
-                : Sentence("Building the design bible", "chunks", s.Chunks);
-
-        // The report maps every chapter into notes, then consolidates and renders it as a PDF.
-        private static string AnalysisSentence(NovelStatus s) =>
-            Complete(s.AnalysisNotes)
-                ? "Writing the revision report…"
-                : Sentence("Analysing the manuscript", "chapters", s.AnalysisNotes);
 
         private static string Approximately(TimeSpan duration) => duration.TotalDays switch
         {
@@ -804,9 +823,6 @@ public partial class MainPage : FolioBinderPage
         };
 
         private static bool Complete(PhaseProgress phase) => phase.Total > 0 && phase.Done >= phase.Total;
-
-        private static string Sentence(string verb, string noun, PhaseProgress phase) =>
-            phase.Total > 0 ? $"{verb} — {noun} {phase.Done} of {phase.Total}…" : $"{verb}…";
 
         private static void AddChip(List<PhaseChipRow> chips, string name, PhaseProgress phase, bool active)
         {
