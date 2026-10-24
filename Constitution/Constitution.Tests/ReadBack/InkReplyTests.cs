@@ -12,7 +12,12 @@ public class InkReplyTests
 {
     private static readonly ExpectedDocument Document = Workout();
 
+    // The id is asked for, and answered, qualified by its page ("p2:done"): the same two ids sit on every exercise page.
     private static string Entry(int page, string id, string marked = "false", string text = "null", string alternative = "null", string confidence = "0.95") =>
+        Raw(page, InkInstruction.QualifiedId(page, id), marked, text, alternative, confidence);
+
+    // An entry exactly as the reply spells it, so a reply that disagrees with itself can be written.
+    private static string Raw(int page, string id, string marked = "false", string text = "null", string alternative = "null", string confidence = "0.95") =>
         $"{{\"page\":{page},\"id\":\"{id}\",\"marked\":{marked},\"text\":{text},\"alternative\":{alternative},\"confidence\":{confidence}}}";
 
     private static string Reply(string strokes, params string[] entries) =>
@@ -175,5 +180,84 @@ public class InkReplyTests
         var read = InkReply.Parse(Everything(), Digest());
 
         Assert.False(read.PageFor(1).WasRead);
+    }
+
+    // ---- review finding S5: a page number that disagrees with the id is a box not read ----
+
+    [Fact]
+    public void APageNumberOffByOneCreditsNothing()
+    {
+        // The model numbered the pages from the cover: what it saw on page 2 it calls page 3, and the id it was given says 2.
+        var read = InkReply.Parse(Everything("seen", Raw(3, "p2:done", "true")), Document);
+
+        Assert.Null(read.PageFor(2).For("done"));
+        Assert.Null(read.PageFor(3).For("done"));
+        Assert.NotNull(read.PageFor(3).For("feel-1"));
+    }
+
+    [Fact]
+    public void AMarkTheIdPutsOnOnePageAndTheNumberOnAnotherIsOnNeither()
+    {
+        var read = InkReply.Parse(Everything("seen", Raw(2, "p3:done", "true")), Document);
+
+        Assert.Null(read.PageFor(2).For("done"));
+        Assert.Null(read.PageFor(3).For("done"));
+    }
+
+    [Fact]
+    public void AReplyWholeShiftedByOneReadsNoBoxAtAll()
+    {
+        var shifted = Reply(
+            "seen",
+            [.. new[] { 2, 3 }.SelectMany(page => new[] { "feel-1", "feel-2", "feel-3", "done" }.Select(id => Raw(page + 1, InkInstruction.QualifiedId(page, id), marked: id == "done" && page == 2 ? "true" : "false")))]);
+
+        var read = InkReply.Parse(shifted, Document);
+
+        Assert.False(read.PageFor(2).WasRead);
+        Assert.False(read.PageFor(3).WasRead);
+    }
+
+    [Fact]
+    public void AnIdWithNoPageInItIsNotAnswerEnough()
+    {
+        var bare = Reply("seen", [.. new[] { 2, 3 }.SelectMany(page => new[] { "feel-1", "feel-2", "feel-3", "done" }.Select(id => Raw(page, id)))]);
+
+        var read = InkReply.Parse(bare, Document);
+
+        Assert.False(read.PageFor(2).WasRead);
+        Assert.False(read.PageFor(3).WasRead);
+    }
+
+    [Theory]
+    [InlineData("p2done")]
+    [InlineData("P2:done")]
+    [InlineData("p:done")]
+    [InlineData("p02:done")]
+    [InlineData("p+2:done")]
+    [InlineData("p2:")]
+    [InlineData("2:done")]
+    [InlineData("p2: done")]
+    public void AnIdNotSpelledAsAskedIsIgnored(string id)
+    {
+        var read = InkReply.Parse(Everything("seen", Raw(2, id, "true")), Document);
+
+        Assert.False(read.PageFor(2).For("done")!.Marked);
+    }
+
+    [Fact]
+    public void AnAgreeingEntryForAnotherPageIsStillThatPages()
+    {
+        var read = InkReply.Parse(Everything("seen", Entry(3, "done", "true")), Document);
+
+        // Page 3's done is answered twice (the sure empty one and this), which is the older rule: neither is taken.
+        Assert.Null(read.PageFor(3).For("done"));
+        Assert.NotNull(read.PageFor(2).For("done"));
+    }
+
+    [Fact]
+    public void TheQualifiedIdIsPageThenBox()
+    {
+        Assert.Equal("p2:done", InkInstruction.QualifiedId(2, "done"));
+        Assert.Equal("p12:feel-3", InkInstruction.QualifiedId(12, "feel-3"));
     }
 }

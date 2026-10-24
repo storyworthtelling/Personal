@@ -101,7 +101,7 @@ public sealed class ReadBackService(
             // The result this page was waiting on has gone; the page is the only copy of the answer, so it is read again.
         }
 
-        return await ReadAndSettle(document, now, cancellation);
+        return await ReadAndSettle(document, now, today, cancellation);
     }
 
     // ---- the digest: only ever trashed ----
@@ -133,7 +133,7 @@ public sealed class ReadBackService(
 
     private async Task<DocumentReadBack> FinishSaved(ExpectedDocument document, DocumentResult saved, DateTimeOffset now, CancellationToken cancellation)
     {
-        var asked = Ask(document, saved.All, now, newlyProven: false, cancellation);
+        var asked = Ask(document, saved.All, now, inkSeen: false, cancellation);
         if (asked is not null)
         {
             return asked;
@@ -158,7 +158,7 @@ public sealed class ReadBackService(
 
     // ---- a page to read ----
 
-    private async Task<DocumentReadBack> ReadAndSettle(ExpectedDocument document, DateTimeOffset now, CancellationToken cancellation)
+    private async Task<DocumentReadBack> ReadAndSettle(ExpectedDocument document, DateTimeOffset now, DateOnly today, CancellationToken cancellation)
     {
         var name = document.Name;
 
@@ -186,19 +186,40 @@ public sealed class ReadBackService(
             return new DocumentReadBack.Unfinished(name, read.PageFor(document.Pages[0].Number).WhyNotRead);
         }
 
-        // R3: the cloud's PDF may simply not carry the pen. No ink anywhere, and none ever seen before, is not yet silence.
-        var wasProven = Attempt(name, ReadBackStage.Persist, () => proof.PenMarksSeen, cancellation);
-        if (wasProven.Failure is not null)
+        // R3: the cloud's PDF may simply not carry the pen. No ink anywhere, and none ever proven, is not yet silence.
+        var proofStep = Attempt(name, ReadBackStage.Persist, () => proof.Current, cancellation);
+        if (proofStep.Failure is not null)
         {
-            return wasProven.Failure;
+            return proofStep.Failure;
         }
 
-        var provesInk = read.PenStrokes == PenStrokes.Seen || readPages.Any(expectedPage => HasConfidentMark(expectedPage, read));
-        if (!wasProven.Value && read.PenStrokes != PenStrokes.Seen && !readPages.Any(expectedPage => HasAnyMark(expectedPage, read)))
+        var wasProven = proofStep.Value!;
+        var anyBoxMarked = readPages.Any(expectedPage => HasAnyMark(expectedPage, read));
+
+        // The read saw pen ink on the pages and not one box is marked: the ink may be a tick it could not put in a box, or the
+        // owner writing about the session instead of ticking it. Either way "everything is empty" is not what it saw, so the
+        // session is not called skipped; the page stays and is read again.
+        if (read.PenStrokes == PenStrokes.Seen && !anyBoxMarked)
+        {
+            return new DocumentReadBack.Unfinished(name, "Pen ink was seen on the pages but no box was marked, so nothing was settled.");
+        }
+
+        if (!wasProven.IsEstablished && !anyBoxMarked)
         {
             var raised = Attempt(name, ReadBackStage.Ask, () => notices.With(board => ReadBackNotices.NoPenMarks(board, now)), cancellation);
             return Otherwise(raised.Failure, new DocumentReadBack.NoMarksInCloud(name));
         }
+
+        // The ink was proven this very morning, and a blank page read now may be one whose ink the cloud had not yet caught up
+        // with. It waits one more morning before it is called a skip and its page goes.
+        if (wasProven.IsEstablished && wasProven.EstablishedOn == today && !anyBoxMarked)
+        {
+            return new DocumentReadBack.Unfinished(name, "Pen ink has only just been proven to come through, so a blank page is kept one more morning.");
+        }
+
+        // A sighting is ink in this document that the read is sure of, or its word "seen" with a mark behind it (the word with no
+        // mark behind it was turned away above).
+        var sawInk = read.PenStrokes == PenStrokes.Seen || readPages.Any(expectedPage => HasConfidentMark(expectedPage, read));
 
         var resolved = Attempt(name, ReadBackStage.Resolve, () => Resolve(document, read, now), cancellation);
         if (resolved.Failure is not null)
@@ -213,14 +234,13 @@ public sealed class ReadBackService(
         }
 
         var result = new DocumentResult(name, document.Kind, document.Day, document.Person, now, pages);
-        var newlyProven = provesInk && !wasProven.Value;
-        var saved = Now(name, ReadBackStage.Persist, () => Persist(document, result, newlyProven), cancellation);
+        var saved = Now(name, ReadBackStage.Persist, () => Persist(document, result, sawInk ? new InkSighting(name, today) : null), cancellation);
         if (saved is not null)
         {
             return saved;
         }
 
-        var asked = Ask(document, result.All, now, newlyProven, cancellation);
+        var asked = Ask(document, result.All, now, sawInk, cancellation);
         if (asked is not null)
         {
             return asked;
@@ -238,13 +258,16 @@ public sealed class ReadBackService(
 
     // Everything that must be safe before the page goes. The ledger is looked at first so a file that cannot be read
     // is found before anything is written; saving again after a failure part-way is harmless, since both writes replace.
-    private void Persist(ExpectedDocument document, DocumentResult result, bool newlyProven)
+    private void Persist(ExpectedDocument document, DocumentResult result, InkSighting? sighting)
     {
         SkipLedgerRead? current = null;
         if (document.Marks is not null)
         {
             current = ledger.Load();
-            if (current.WholeFileUnreadable)
+            // A ledger that is only partly readable is as unsafe to save as one that is not readable at all: the entries this
+            // version cannot read (a kind or outcome it does not know) are not in the ledger it would write, and the file
+            // it writes replaces the only copy of them.
+            if (current.WholeFileUnreadable || current.UnreadableEntries > 0)
             {
                 throw new LedgerUnreadableException();
             }
@@ -261,19 +284,20 @@ public sealed class ReadBackService(
             }
         }
 
-        if (newlyProven)
+        if (sighting is not null)
         {
-            proof.RecordPenMarksSeen();
+            proof.Record(sighting);
         }
 
         expected.MarkSaved(document.Name);
     }
 
-    // Questions go to the Waiting page; a mark that has just proved the ink comes through takes the "no pen marks" notice away.
+    // Questions go to the Waiting page; a mark seen in this document takes the "no pen marks" notice away, since that notice says
+    // none ever has been, which is no longer true (the proof itself waits for a second document).
     private DocumentReadBack.Failed? Ask(
-        ExpectedDocument document, IReadOnlyList<InkResolution> resolutions, DateTimeOffset now, bool newlyProven, CancellationToken cancellation)
+        ExpectedDocument document, IReadOnlyList<InkResolution> resolutions, DateTimeOffset now, bool inkSeen, CancellationToken cancellation)
     {
-        if (!newlyProven && !resolutions.OfType<InkResolution.NeedsAsking>().Any())
+        if (!inkSeen && !resolutions.OfType<InkResolution.NeedsAsking>().Any())
         {
             return null;
         }
@@ -281,7 +305,7 @@ public sealed class ReadBackService(
         return Now(document.Name, ReadBackStage.Ask, () => notices.With(board =>
         {
             InkAsks.Raise(board, resolutions, now);
-            if (newlyProven)
+            if (inkSeen)
             {
                 ReadBackNotices.PenMarksSeen(board);
             }

@@ -35,7 +35,7 @@ public sealed class ReadBackStatusFile
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
-            writer.WriteString("outcome", outcome.ToString());
+            writer.WriteString("outcome", ReadBackWireNames.Of(outcome));
             writer.WriteString("at", clock().ToString("O", CultureInfo.InvariantCulture));
             writer.WriteEndObject();
         }
@@ -62,7 +62,7 @@ public sealed class ReadBackStatusFile
                 var root = document.RootElement;
                 if (root.ValueKind == JsonValueKind.Object
                     && root.TryGetProperty("outcome", out var word) && word.ValueKind == JsonValueKind.String
-                    && Enum.TryParse<DiagnosticsOutcome>(word.GetString(), out var outcome) && Enum.IsDefined(outcome))
+                    && ReadBackWireNames.DiagnosticsOutcomeOf(word.GetString()) is { } outcome)
                 {
                     return outcome;
                 }

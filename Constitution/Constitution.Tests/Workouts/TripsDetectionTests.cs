@@ -219,7 +219,8 @@ public class TripDetectionTests
 
         var trip = Assert.Single(Detect(Calendars(sam: [Away("Conference trip"), booking])).For(Sam));
 
-        Assert.Equal("Check in: Juniper Hotel", trip.Hotel?.Name);
+        // Only the hotel phrase leaves for the places lookup, not the booking title (review finding N1).
+        Assert.Equal("Juniper Hotel", trip.Hotel?.Name);
     }
 
     [Fact]
@@ -341,11 +342,12 @@ public class TripCalendarsTests
     }
 
     [Fact]
-    public void AWorkTripOnTheFamilyCalendarStopsTakingTheDay()
+    public void AWorkTripOnTheFamilyCalendarKeepsTakingTheDay()
     {
+        // Corrected by review finding N1: the family calendar is read for both adults, so it frees nothing (see TripsFreeingTests).
         var entries = Family(Calendars(family: [TripsFixtures.AllDay("Sam at the conference", 2, 4)]));
 
-        Assert.Equal(Availability.Free, Assert.Single(entries).Availability);
+        Assert.Equal(Availability.Busy, Assert.Single(entries).Availability);
     }
 
     [Fact]

@@ -66,11 +66,11 @@ internal static class ExpectedDocumentCodec
     {
         var document = item.Document;
         writer.WriteStartObject();
-        writer.WriteString("kind", document.Kind.ToString());
+        writer.WriteString("kind", ReadBackWireNames.Of(document.Kind));
         writer.WriteString("day", document.Day.ToString(DayFormat, CultureInfo.InvariantCulture));
         writer.WriteString("subject", document.Subject);
         writer.WriteString("person", document.Person);
-        writer.WriteString("session", document.Session?.ToString());
+        writer.WriteString("session", document.Session is { } session ? ReadBackWireNames.Of(session) : null);
         writer.WriteBoolean("saved", item.Saved);
         writer.WriteStartArray("pages");
         foreach (var page in document.Pages)
@@ -102,7 +102,7 @@ internal static class ExpectedDocumentCodec
     {
         writer.WriteStartObject();
         writer.WriteString("id", target.Id);
-        writer.WriteString("kind", target.Kind.ToString());
+        writer.WriteString("kind", ReadBackWireNames.Of(target.Kind));
         writer.WriteNumber("left", target.Bounds.Left);
         writer.WriteNumber("top", target.Bounds.Top);
         writer.WriteNumber("width", target.Bounds.Width);
@@ -161,11 +161,12 @@ internal static class ExpectedDocumentCodec
 
     private static OutstandingDocument ReadDocument(JsonElement item)
     {
-        var kind = Enum.Parse<DeliveryKind>(Text(item, "kind"));
-        var session = Optional(item, "session") is { } word ? Enum.Parse<SessionKind>(word) : (SessionKind?)null;
-        if (!Enum.IsDefined(kind) || (session is { } known && !Enum.IsDefined(known)))
+        var kind = ReadBackWireNames.DeliveryKindOf(Text(item, "kind"))
+            ?? throw new FormatException("The manifest names a document kind this app does not know.");
+        SessionKind? session = null;
+        if (Optional(item, "session") is { } word)
         {
-            throw new FormatException("The manifest names a kind this app does not know.");
+            session = ReadBackWireNames.SessionKindOf(word) ?? throw new FormatException("The manifest names a session kind this app does not know.");
         }
 
         var pages = item.GetProperty("pages").EnumerateArray().Select(ReadPage).ToList();
@@ -184,11 +185,8 @@ internal static class ExpectedDocumentCodec
 
     private static InkTarget ReadTarget(JsonElement target)
     {
-        var kind = Enum.Parse<InkTargetKind>(Text(target, "kind"));
-        if (!Enum.IsDefined(kind))
-        {
-            throw new FormatException("The manifest names a box kind this app does not know.");
-        }
+        var kind = ReadBackWireNames.InkTargetKindOf(Text(target, "kind"))
+            ?? throw new FormatException("The manifest names a box kind this app does not know.");
 
         var bounds = new InkRect(
             target.GetProperty("left").GetSingle(), target.GetProperty("top").GetSingle(),

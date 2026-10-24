@@ -35,12 +35,17 @@ public interface ILedgerStore
     void Save(SkipLedger ledger);
 }
 
-/// <summary>Whether pen ink has ever come through the cloud's PDF. Once it has, a document with no ink is the owner's silence and not a missing round trip (R3).</summary>
+/// <summary>
+/// What the read-back knows of whether pen ink comes through the cloud's PDF at all (R3). Once it is established, a
+/// document with no ink is the owner's silence and not a missing round trip. It takes sightings on two separate
+/// documents, read on two separate mornings (<see cref="InkProof"/>), since one read's word is not proof.
+/// </summary>
 public interface IInkProof
 {
-    bool PenMarksSeen { get; }
+    InkProof Current { get; }
 
-    void RecordPenMarksSeen();
+    /// <summary>Remembers that ink was seen in this document this morning, and returns what is now known.</summary>
+    InkProof Record(InkSighting sighting);
 }
 
 /// <summary>A delivered document waiting to be read, and whether its result is already saved so only the trash is left.</summary>

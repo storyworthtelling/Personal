@@ -44,7 +44,7 @@ public sealed class WorkoutWeekEndToEndTests : IDisposable
     {
         var calls = new CallLog();
         var ledger = new ReadBackFakeLedger(calls);
-        var vision = new FakeVision(calls) { Reply = document => ReadBackFixture.Read(document, PenStrokes.Seen) };
+        var vision = new FakeVision(calls) { Reply = document => ReadBackFixture.Read(document, PenStrokes.None) };
         var log = new FakeLog();
         IExpectedDocuments store = onlyDueDocuments ? new DueExpectedDocuments(rig.Expected, () => morning) : rig.Expected;
         var service = new ReadBackService(
@@ -95,7 +95,7 @@ public sealed class WorkoutWeekEndToEndTests : IDisposable
         var (service, _, ledger, vision, _) = ReadBack(Est(11, 3, 7, 15), onlyDueDocuments: true);
         vision.Reply = document => document.Person == Sam
             ? ReadBackFixture.Read(document, PenStrokes.Seen, (2, Constitution.Domain.Documents.WorkoutIds.Done))
-            : ReadBackFixture.Read(document, PenStrokes.Seen);
+            : ReadBackFixture.Read(document, PenStrokes.None);
 
         await service.Run();
 

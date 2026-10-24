@@ -79,6 +79,27 @@ public class InkInstructionTests
     }
 
     [Fact]
+    public void TheRequestQualifiesEveryIdByItsPage()
+    {
+        var request = InkInstruction.Request(Workout());
+
+        // Both exercise pages print a "done" box and a "feel" choice; only the page-qualified id says which is meant.
+        Assert.Contains("- p2:done is ", request, StringComparison.Ordinal);
+        Assert.Contains("- p3:done is ", request, StringComparison.Ordinal);
+        Assert.Contains("- p2:feel-1 is ", request, StringComparison.Ordinal);
+        Assert.Contains("- p3:feel-1 is ", request, StringComparison.Ordinal);
+        Assert.DoesNotContain("- done is ", request, StringComparison.Ordinal);
+        Assert.DoesNotContain("- feel-1 is ", request, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheSystemTextShowsTheQualifiedIdInTheReply()
+    {
+        Assert.Contains("\"id\":\"p2:done\"", InkInstruction.System, StringComparison.Ordinal);
+        Assert.Contains("qualified", InkInstruction.System, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void TheRequestSaysWhereEachBoxIs()
     {
         var done = Workout().Pages[0].AskedTargets.Single(target => target.Id == "done");
