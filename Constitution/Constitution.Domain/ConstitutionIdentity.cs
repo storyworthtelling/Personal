@@ -164,6 +164,14 @@ public static class ConstitutionIdentity
     /// </summary>
     public const string BudgetPermission = ApplicationId + ".RECEIVE_BUDGET";
 
+    /// <summary>
+    /// The household file's name in the owner's Drive (C-6.1.2): recipes, the week plan, ratings, the roster and
+    /// the planning lease, sealed under the vault passphrase. It is found by name on first run, so a rename leaves
+    /// the partner's phone looking for a file that is not there and the old one unread. Frozen; the kinds inside
+    /// it are <c>ConstitutionKinds</c>.
+    /// </summary>
+    public const string HouseholdFileName = "storyworthtelling-constitution-household.json";
+
     /// <summary>Every registered activity and alias Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Activities { get; } = [MainActivityName, HealthRationaleActivityName, PermissionUsageAliasName];
 

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Constitution's I/O. Empty until the later releases fill it; every external service is faked
-       in tests. Storyworthtelling.Household (PC4) joins when it exists. -->
+       in tests. Storyworthtelling.Household (PC4), the household file store, is referenced below. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Constitution.Infrastructure</RootNamespace>
@@ -15,5 +15,6 @@
     <ProjectReference Include="..\..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Handwriting\Storyworthtelling.Handwriting.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Google\Storyworthtelling.Google.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Household\Storyworthtelling.Household.csproj" />
   </ItemGroup>
 </Project>
