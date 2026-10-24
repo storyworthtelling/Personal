@@ -27,6 +27,14 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- Pure head files with no Android type, compiled in so the real classes are exercised. -->
+  <ItemGroup>
+    <Compile Include="..\Constitution.Android\ReadBack\ReadBackPaths.cs" Link="Linked\ReadBackPaths.cs" />
+    <Compile Include="..\Constitution.Android\WorkoutWeek\WorkoutWeekPaths.cs" Link="Linked\WorkoutWeekPaths.cs" />
+    <Compile Include="..\Constitution.Android\WorkoutWeek\DeliverySeamAdapters.cs" Link="Linked\DeliverySeamAdapters.cs" />
+    <Compile Include="..\Constitution.Android\Settings\ConnectionNoticeBoard.cs" Link="Linked\ConnectionNoticeBoard.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
