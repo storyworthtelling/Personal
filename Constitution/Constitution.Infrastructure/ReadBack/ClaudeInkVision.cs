@@ -17,8 +17,8 @@ namespace Constitution.Infrastructure.ReadBack;
 /// one request header and nowhere else.
 ///
 /// <para><b>What leaves the phone:</b> the cloud's PDF of the page, the standing instruction (<see cref="InkInstruction.System"/>)
-/// and the list of boxes (<see cref="InkInstruction.Request"/>). No person, no plan, no reading (D98). The page image does
-/// include whatever the owner wrote on it, the notes margin among it: that is the design of a vision read of the page, and
+/// and the list of boxes (<see cref="InkInstruction.Request"/>). No name and no Body reading is added beside it (D98). The PDF itself prints that
+/// day's plan and, if there is one, the sore place, and carries whatever the owner wrote, the notes margin among it: that is the design of a vision read of the page, and
 /// the request asks about the listed boxes only.</para>
 ///
 /// <para><b>A reply that makes no sense is not an error.</b> It comes back as pages not read (<see cref="InkReply"/>), which

@@ -65,7 +65,15 @@ public sealed class WorkoutsTabModel
 
     public static WorkoutsTabModel NoPlan() => new(null, [], NoPlanSentence);
 
-    public static WorkoutsTabModel Build(WorkoutsSnapshot snapshot, PendingSkip? pending)
+    /// <summary>
+    /// The line under the tab's header: the sentence about a change that did not go through cleanly (<see cref="FollowWords"/>) while there is
+    /// one, otherwise the usual <see cref="StatusSentence"/>. An inline state, in words, in the place the page already says its status.
+    /// </summary>
+    public static string StatusWith(string? notice) => string.IsNullOrWhiteSpace(notice) ? StatusSentence : notice;
+
+    /// <param name="snapshot">What the tab is made from.</param>
+    /// <param name="pending">The skips on show as skipped: those inside their undo window and those whose window has closed but which are not yet written down (<see cref="SkipUndo.Shown"/>).</param>
+    public static WorkoutsTabModel Build(WorkoutsSnapshot snapshot, IReadOnlyCollection<PendingSkip>? pending)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var today = Clip(snapshot, snapshot.Today, pending);
@@ -75,7 +83,7 @@ public sealed class WorkoutsTabModel
 
     private const int DaysAhead = 7;
 
-    private static DayClipping Clip(WorkoutsSnapshot snapshot, DateOnly day, PendingSkip? pending)
+    private static DayClipping Clip(WorkoutsSnapshot snapshot, DateOnly day, IReadOnlyCollection<PendingSkip>? pending)
     {
         var isToday = day == snapshot.Today;
         var label = WorkoutWords.ShortDay(day);
@@ -98,7 +106,7 @@ public sealed class WorkoutsTabModel
         }
 
         var facts = snapshot.FactsOn(day);
-        var skipped = snapshot.IsSkipped(day) || (pending is not null && pending.Day == day);
+        var skipped = snapshot.IsSkipped(day) || (pending?.Any(skip => skip.Day == day) ?? false);
         var kind = WorkoutWords.Kind(session);
         var minutes = WorkoutWords.Minutes(session);
         var start = WorkoutWords.Clock(session.Start);

@@ -75,7 +75,7 @@ internal static class SessionMover
         var after = before.Select(week => Edit(week, snapshot.Person, moves)).ToList();
         var reason = FirstNewBreak(snapshot, before, after);
         return reason is null
-            ? new MoveCheck(new SwapResult(snapshot.Person, moves, before, after), null)
+            ? new MoveCheck(new SwapResult(snapshot.Person, moves, before, after) { Assignments = snapshot.Assignments }, null)
             : Blocked(reason);
     }
 

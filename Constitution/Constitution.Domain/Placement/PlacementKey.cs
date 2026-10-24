@@ -11,10 +11,12 @@ namespace Constitution.Domain.Placement;
 /// And it never appears in a title (<see cref="PlacementEngine"/> refuses a title that holds its own key).
 ///
 /// <para><b>What names an event.</b> Who it is on the calendar of, what kind of thing it is, which week's plan
-/// it came from, and a slot in that week: for a workout, the count of sessions of that kind before it in the
-/// person's week (so a second strength session is not the first); for a household event, the identity its
-/// caller chose. The week is a number (<see cref="WeekIndexOf"/>), not a day, and nothing about where in the
-/// week the event sits goes in at all.</para>
+/// it came from, and a slot in that week: for a workout, the number issued to the session
+/// (<see cref="KeyAssignments"/>, <see cref="SessionKeys"/>), which for a week planned once is the count of sessions
+/// of that kind before it (so a second strength session is not the first) and which, once issued, stays with that
+/// session however the week is later re-planned; for a household event, the identity its caller chose. The week
+/// is a number (<see cref="WeekIndexOf"/>), not a day, and nothing about where in the week the event sits goes in
+/// at all.</para>
 ///
 /// <para><b>The spelling is frozen</b>, as a literal under <c>PlacementKeyTests</c>: it is stored on events in
 /// the owner's Google Calendar, so changing it strands every event already written. Treat the text as opaque:
@@ -55,7 +57,7 @@ public readonly record struct PlacementKey
     /// </summary>
     public static int WeekIndexOf(DateOnly weekStart) => weekStart.DayNumber / DaysPerWeek;
 
-    /// <summary>The key of a workout: <paramref name="ordinal"/> counts this person's sessions of this kind before it in the week.</summary>
+    /// <summary>The key of a workout: <paramref name="ordinal"/> is the number issued to this person's session of this kind in the week (see <see cref="SessionKeys"/>).</summary>
     /// <exception cref="ArgumentException">The person is blank, the kind has no frozen name, or a number is negative.</exception>
     public static PlacementKey ForWorkout(string person, SessionKind kind, int weekIndex, int ordinal)
     {
@@ -146,6 +148,51 @@ public readonly record struct PlacementKey
         {
             throw new ArgumentOutOfRangeException(name, value, "A week or a slot is counted from zero.");
         }
+    }
+
+    /// <summary>
+    /// What a workout key says: whose, which kind, which week, which number. False for a household key or text that is not a key.
+    /// The one place a key is taken apart, and it is the key's own file: callers elsewhere compare keys and never parse them.
+    /// </summary>
+    internal static bool TryWorkoutParts(PlacementKey key, out string person, out SessionKind kind, out int week, out int ordinal)
+    {
+        person = string.Empty;
+        kind = default;
+        week = 0;
+        ordinal = 0;
+        var parts = key.Value.Split(Separator);
+        if (parts.Length != Parts || parts[0] != Version || !TryKindNamed(parts[2], out kind))
+        {
+            return false;
+        }
+
+        if (!int.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out week)
+            || !int.TryParse(parts[4], NumberStyles.None, CultureInfo.InvariantCulture, out ordinal))
+        {
+            return false;
+        }
+
+        person = Uri.UnescapeDataString(parts[1]);
+        return true;
+    }
+
+    /// <summary>The frozen spelling of a kind inside a key, for the one other record that stores it (<see cref="KeyAssignmentsCodec"/>).</summary>
+    internal static string NameOfKind(SessionKind kind) => KindName(kind);
+
+    /// <summary>The kind a frozen spelling names, or false for a spelling this app never wrote.</summary>
+    internal static bool TryKindNamed(string? name, out SessionKind kind)
+    {
+        foreach (var candidate in Enum.GetValues<SessionKind>())
+        {
+            if (string.Equals(KindName(candidate), name, StringComparison.Ordinal))
+            {
+                kind = candidate;
+                return true;
+            }
+        }
+
+        kind = default;
+        return false;
     }
 
     private static string KindName(SessionKind kind) => kind switch

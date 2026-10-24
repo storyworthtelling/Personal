@@ -7,7 +7,10 @@ using static Constitution.Tests.Calendar.InventedFamily;
 
 namespace Constitution.Tests.WorkoutPipeline;
 
-/// <summary>What the Workouts tab does when the owner swaps two days, played against the rig: the plan the tab shows, the change checked by the tab's own rules, the calendar made to follow.</summary>
+/// <summary>
+/// What the Workouts tab does when the owner swaps two days, played against the rig: the plan the tab shows, the change checked by the tab's own rules, the calendar made to follow.
+/// The tab is handed the record of issued numbers the run keeps, as the source that fills its snapshot must: the keys it names events by are those numbers.
+/// </summary>
 internal static class OwnerHand
 {
     public static WorkoutsSnapshot TabShows(WeekRig rig, WorkoutWeekReport report, DateOnly today, DateTimeOffset now)
@@ -15,14 +18,17 @@ internal static class OwnerHand
         var onCalendar = rig.Writer.Of(Sam).ToDictionary(
             item => DateOnly.FromDateTime(item.Start.DateTime),
             item => new DayFacts(OnCalendar: new PlacedTime(item.Start, item.End)));
-        return new WorkoutsSnapshot(Sam, today, now, [new WorkoutWeek(report.Request, report.PlacedPlan)], onCalendar, SkipLedger.Empty);
+        return new WorkoutsSnapshot(Sam, today, now, [new WorkoutWeek(report.Request, report.PlacedPlan)], onCalendar, SkipLedger.Empty)
+        {
+            Assignments = rig.KeyAssignments.Load().Assignments,
+        };
     }
 
     public static async Task<(SwapResult Swap, PlanOverrides Overrides)> Swaps(WeekRig rig, WorkoutsSnapshot snapshot, DateOnly from, DateOnly to)
     {
         var check = SwapChoices.Check(snapshot, from, to);
         var swap = check.Result ?? throw new InvalidOperationException($"The tab would not allow it: {check.Reason}");
-        var follow = new WorkoutCalendarFollow(rig.Writer, new CalendarEditor(rig.Writer), rig.Keys);
+        var follow = new WorkoutCalendarFollow(rig.Writer, new CalendarEditor(rig.Writer), rig.Keys, rig.KeyAssignments);
         await follow.FollowSwapAsync(swap, CancellationToken.None);
         return (swap, PlanOverrides.From(new WorkoutsChange.Swapped(swap)));
     }

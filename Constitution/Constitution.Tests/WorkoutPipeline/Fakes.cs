@@ -195,3 +195,17 @@ internal sealed class FixedAuthor(Func<WorkoutPlanRequest, HouseholdWorkoutPlan>
     public Task<PlanAuthorResult> AuthorAsync(WorkoutPlanRequest request, CancellationToken cancellation) =>
         Task.FromResult<PlanAuthorResult>(new PlanAuthorResult.Authored(plan(request)));
 }
+
+/// <summary>The owner's ink as the probe finds it: whatever the test says, and a record of which titles were looked at.</summary>
+internal sealed class FakeInkProbe : IPageInkProbe
+{
+    public InkProbe Answer { get; set; } = InkProbe.Blank;
+
+    public List<string> Asked { get; } = [];
+
+    public Task<InkProbe> ProbeAsync(string title, CancellationToken cancellation)
+    {
+        Asked.Add(title);
+        return Task.FromResult(Answer);
+    }
+}

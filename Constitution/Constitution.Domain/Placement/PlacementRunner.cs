@@ -28,19 +28,27 @@ public sealed record PlacementRun(
 ///   the record did not know it (a run that died between writing and saving), so a later delete is still a skip.</item>
 ///   <item><b>A re-run on an unchanged week writes nothing</b> (R8): every event is then held, and a held event is
 ///   never touched.</item>
+///   <item><b>A session keeps its key</b> (B2). Given a store of issued numbers (<see cref="IKeyAssignmentStore"/>) the run plans by
+///   them, and keeps the numbers the plan issued <i>before</i> it writes anything, so an event on the calendar always has a number
+///   in the record. A record that cannot be read blocks the run exactly as an unreadable record of written events does.</item>
 /// </list>
 /// </summary>
 public sealed class PlacementRunner
 {
     private readonly ICalendarWriter writer;
     private readonly IWrittenKeyStore store;
+    private readonly IKeyAssignmentStore? issuedNumbers;
 
-    public PlacementRunner(ICalendarWriter writer, IWrittenKeyStore store)
+    /// <param name="writer">The calendar, found in and written to.</param>
+    /// <param name="store">The record of keys written.</param>
+    /// <param name="assignments">The record of workout numbers issued; null plans by whatever record the request itself carries (none, usually).</param>
+    public PlacementRunner(ICalendarWriter writer, IWrittenKeyStore store, IKeyAssignmentStore? assignments = null)
     {
         ArgumentNullException.ThrowIfNull(writer);
         ArgumentNullException.ThrowIfNull(store);
         this.writer = writer;
         this.store = store;
+        issuedNumbers = assignments;
     }
 
     public async Task<PlacementRun> RunAsync(PlacementRequest request, CancellationToken cancellationToken)
@@ -51,6 +59,19 @@ public sealed class PlacementRunner
         if (!record.IsReadable)
         {
             return new PlacementRun(null, [], [], $"The record of written events could not be read, so nothing was written: {record.UnreadableBecause}");
+        }
+
+        KeyAssignments? issued = null;
+        if (issuedNumbers is not null)
+        {
+            var numbers = issuedNumbers.Load();
+            if (!numbers.IsReadable)
+            {
+                return new PlacementRun(null, [], [], $"The record of issued workout numbers could not be read, so nothing was written: {numbers.UnreadableBecause}");
+            }
+
+            issued = numbers.Assignments;
+            request = request with { Assignments = issued };
         }
 
         // Asked before any calendar is touched, so a request that makes no sense is refused with nothing done.
@@ -74,6 +95,12 @@ public sealed class PlacementRunner
 
         var written = record.Keys.With(found.Select(item => item.Key));
         var plan = PlacementEngine.Plan(request, new CalendarState(written, found, unavailable));
+
+        // Before the first write, so that whatever is written afterwards has a number in the record, whatever happens next.
+        if (issuedNumbers is not null && plan.Issued.Count > 0)
+        {
+            issuedNumbers.Save(issued!.With(plan.Issued));
+        }
 
         var created = new List<EventToCreate>();
         var failed = new List<CreateFailure>();

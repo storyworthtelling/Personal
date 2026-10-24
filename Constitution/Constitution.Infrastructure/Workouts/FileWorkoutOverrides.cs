@@ -5,7 +5,6 @@ using Constitution.Domain.Calendar;
 using Constitution.Domain.Workouts;
 using Constitution.Domain.Workouts.Pipeline;
 using Constitution.Infrastructure.Body;
-using Constitution.Infrastructure.ReadBack;
 
 namespace Constitution.Infrastructure.Workouts;
 
@@ -93,7 +92,7 @@ public static class PlanOverridesCodec
         writer.WriteString("start", move.Start.ToString("O", CultureInfo.InvariantCulture));
         writer.WriteString("gapStart", move.Gap.Start.ToString("O", CultureInfo.InvariantCulture));
         writer.WriteString("gapEnd", move.Gap.End.ToString("O", CultureInfo.InvariantCulture));
-        writer.WriteString("kind", move.Session.Kind.ToString());
+        writer.WriteString("kind", WorkoutWireNames.Of(move.Session.Kind));
         writer.WriteString("duration", move.Session.Duration.ToString(DurationFormat, CultureInfo.InvariantCulture));
         writer.WriteBoolean("sweaty", move.Session.IsSweaty);
         writer.WriteStartArray("exercises");
@@ -115,11 +114,8 @@ public static class PlanOverridesCodec
 
     private static SessionMoved ReadMove(JsonElement item)
     {
-        var kind = Enum.Parse<SessionKind>(Text(item, "kind"));
-        if (!Enum.IsDefined(kind))
-        {
-            throw new FormatException("The record names a kind of session this app does not know.");
-        }
+        var kind = WorkoutWireNames.SessionKindOf(Text(item, "kind"))
+            ?? throw new FormatException("The record names a kind of session this app does not know.");
 
         var exercises = item.GetProperty("exercises").EnumerateArray()
             .Select(exercise => new Exercise(Text(exercise, "name"), exercise.TryGetProperty("equipment", out var equipment) ? equipment.GetString() : null))
@@ -152,7 +148,7 @@ public static class PlanOverridesCodec
 
 /// <summary>
 /// The owner's moves in one file in the app's private storage, read and written whole on every call. A file that cannot be
-/// read is set aside (<see cref="StoredFiles.SetAside"/>) and the store carries on empty: that costs the moves in it (the week
+/// read is set aside (<see cref="UnreadableCopies.SetAside"/>) and the store carries on empty: that costs the moves in it (the week
 /// is planned as the planner made it, the same as before the moves were kept), never the morning's run.
 /// </summary>
 public sealed class FileWorkoutOverrides : IWorkoutOverrides
@@ -200,7 +196,7 @@ public sealed class FileWorkoutOverrides : IWorkoutOverrides
         }
         catch (FormatException)
         {
-            StoredFiles.SetAside(path);
+            UnreadableCopies.SetAside(path);
             return PlanOverrides.None;
         }
     }

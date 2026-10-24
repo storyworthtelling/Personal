@@ -4,7 +4,6 @@ using System.Text.Json;
 using Constitution.Domain.Workouts;
 using Constitution.Domain.Workouts.Pipeline;
 using Constitution.Infrastructure.Body;
-using Constitution.Infrastructure.ReadBack;
 
 namespace Constitution.Infrastructure.Workouts;
 
@@ -14,7 +13,7 @@ namespace Constitution.Infrastructure.Workouts;
 ///
 /// <para>An entry is let go when a newer one is recorded and it is more than <see cref="KeepDays"/> days older than that
 /// one: a page that old has been read back or given up on. A file that cannot be read is set aside
-/// (<see cref="StoredFiles.SetAside"/>) and the store carries on empty, which costs a page possibly sent again, not a page lost.</para>
+/// (<see cref="UnreadableCopies.SetAside"/>) and the store carries on empty, which costs a page possibly sent again, not a page lost.</para>
 /// </summary>
 public sealed class FileDeliveredWorkouts : IDeliveredWorkouts
 {
@@ -79,7 +78,7 @@ public sealed class FileDeliveredWorkouts : IDeliveredWorkouts
         }
         catch (FormatException)
         {
-            StoredFiles.SetAside(path);
+            UnreadableCopies.SetAside(path);
             return [];
         }
     }
@@ -100,7 +99,7 @@ public sealed class FileDeliveredWorkouts : IDeliveredWorkouts
                 writer.WriteString("name", item.Name);
                 writer.WriteString("person", item.Person);
                 writer.WriteString("day", item.Day.ToString(DayFormat, CultureInfo.InvariantCulture));
-                writer.WriteString("kind", item.Kind.ToString());
+                writer.WriteString("kind", WorkoutWireNames.Of(item.Kind));
                 writer.WriteString("slotStart", item.SlotStart.ToString("O", CultureInfo.InvariantCulture));
                 writer.WriteString("fingerprint", item.Fingerprint);
                 writer.WriteBoolean("doctorNote", item.CarriesDoctorNote);
@@ -135,11 +134,8 @@ public sealed class FileDeliveredWorkouts : IDeliveredWorkouts
 
     private static DeliveredWorkout Read(JsonElement item)
     {
-        var kind = Enum.Parse<SessionKind>(Text(item, "kind"));
-        if (!Enum.IsDefined(kind))
-        {
-            throw new FormatException("The record names a kind of session this app does not know.");
-        }
+        var kind = WorkoutWireNames.SessionKindOf(Text(item, "kind"))
+            ?? throw new FormatException("The record names a kind of session this app does not know.");
 
         return new DeliveredWorkout(
             Text(item, "name"),

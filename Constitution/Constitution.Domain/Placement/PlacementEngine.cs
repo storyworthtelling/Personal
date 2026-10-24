@@ -37,9 +37,19 @@ public sealed record CalendarState(WrittenKeys Written, IReadOnlyList<HeldEvent>
 /// squeezed in, shortened or placed on a guess. A person whose calendar could not be read or looked into has
 /// nothing placed for them, and a session shared with them waits as a whole.</para>
 ///
-/// <para><b>Known limit.</b> A workout's key counts the sessions of its kind before it in the plan it is given, so
-/// the plan handed over should be the week's plan from the start of the week. A plan re-made mid-week without
-/// the days already past would number its sessions from the wrong place.</para>
+/// <para><b>Whose key a session wears is decided by what was issued, not by where it sits this run</b> (B2,
+/// <see cref="SessionKeys"/>). The week is re-planned from its first instant on every run, and a number that means "the nth
+/// strength session" moves the moment one session is dropped from the front: Wednesday's event is then held under the key that
+/// now names Friday's session, nothing new is written, and Friday's event is left under a key nobody wants. With a record of
+/// issued numbers (<see cref="PlacementRequest.Assignments"/>) a session keeps its key however the plan around it changes, and a
+/// new session takes a number above every one ever issued.</para>
+///
+/// <para><b>And where the record cannot vouch for a key the engine does not guess.</b> A key it has just numbered (the record has
+/// no issue for it) that already stands on the calendar on another day than its session, or is recorded as written with nothing
+/// on the calendar, or a workout key of the week that nobody issued: any of these means the numbering the events were written
+/// under is not this one, so that person's sessions of that kind are left undecided (<see cref="UnplacedReason.KeysUncertain"/>,
+/// <see cref="PlacementPlan.UncertainKinds"/>): not written, not read as deleted, not paged. A key the record does vouch for, on
+/// another day, is the owner's move, and stands.</para>
 /// </summary>
 public static class PlacementEngine
 {
@@ -48,7 +58,7 @@ public static class PlacementEngine
     public static IReadOnlyList<WantedEvent> Wanted(PlacementRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return Build(request)
+        return Build(request).Units
             .SelectMany(unit => unit.Copies.Select(copy => new WantedEvent(copy.Key, copy.Person, unit.Title)))
             .ToList();
     }
@@ -60,7 +70,8 @@ public static class PlacementEngine
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(state);
 
-        var units = Build(request);
+        var layout = Build(request);
+        var units = layout.Units;
         var ledger = new PlacementLedger(request.People);
         var held = state.Held
             .GroupBy(item => item.Key)
@@ -68,6 +79,7 @@ public static class PlacementEngine
 
         // First pass: what the calendars already say. The owner's times are claimed before anything new is placed.
         var standings = new Dictionary<PlacementKey, Standing>();
+        var doubts = new Dictionary<(string Person, SessionKind Kind), string>();
         foreach (var unit in units)
         {
             foreach (var copy in unit.Copies)
@@ -80,10 +92,49 @@ public static class PlacementEngine
                 {
                     standings[copy.Key] = Standing.Held;
                     ledger.Claim(copy.Person, found.Start, found.End + unit.Shower);
+                    if (copy.Kind is { } kind && !copy.Vouched && !SameDay(found, copy))
+                    {
+                        doubts.TryAdd((Normal(copy.Person), kind), "An event under a key just numbered for this session stands on another day, and no record says the key was ever issued to it.");
+                    }
+                }
+                else if (state.Written.Contains(copy.Key))
+                {
+                    standings[copy.Key] = Standing.Skipped;
+                    if (copy.Kind is { } kind && !copy.Vouched)
+                    {
+                        doubts.TryAdd((Normal(copy.Person), kind), "A key just numbered for this session is recorded as written with nothing on the calendar, and no record says it was ever issued to it: a delete cannot be told from a different numbering.");
+                    }
                 }
                 else
                 {
-                    standings[copy.Key] = state.Written.Contains(copy.Key) ? Standing.Skipped : Standing.Fresh;
+                    standings[copy.Key] = Standing.Fresh;
+                }
+            }
+        }
+
+        // An event under a workout key of this week that nobody asked for and no record issued is a key from some other
+        // numbering. It only matters to the person and kind whose sessions are being placed.
+        if (layout.Record is { } record)
+        {
+            var asked = units.SelectMany(unit => unit.Copies).Select(copy => copy.Key).ToHashSet();
+            foreach (var stray in held.Values.Where(item => !asked.Contains(item.Key) && !record.Vouches(item.Key)))
+            {
+                if (PlacementKey.TryWorkoutParts(stray.Key, out var owner, out var kind, out var week, out _)
+                    && week == layout.Week
+                    && units.Any(unit => unit.Copies.Any(copy => copy.Kind == kind && Normal(copy.Person) == Normal(owner))))
+                {
+                    doubts.TryAdd((Normal(owner), kind), "An event holds a workout key of this week that no record issued.");
+                }
+            }
+        }
+
+        foreach (var unit in units)
+        {
+            foreach (var copy in unit.Copies)
+            {
+                if (copy.Kind is { } kind && doubts.ContainsKey((Normal(copy.Person), kind)) && standings[copy.Key] != Standing.Unavailable)
+                {
+                    standings[copy.Key] = Standing.Uncertain;
                 }
             }
         }
@@ -102,13 +153,31 @@ public static class PlacementEngine
                     Standing.Held => new EventHeld(copy.Key, copy.Person, unit.Title, held[copy.Key].Start, held[copy.Key].End),
                     Standing.Skipped => new EventSkipped(copy.Key, copy.Person, unit.Title),
                     Standing.Unavailable => new EventUnplaced(copy.Key, copy.Person, unit.Title, UnplacedReason.CalendarUnavailable),
+                    Standing.Uncertain => new EventUnplaced(copy.Key, copy.Person, unit.Title, UnplacedReason.KeysUncertain),
                     _ => decision!.Outcome(copy, unit),
                 });
             }
         }
 
-        return new PlacementPlan(outcomes);
+        // What to keep: the numbers for sessions the record did not know, unless their person and kind are in doubt or their
+        // calendar was not looked into (a number kept without having seen the calendar would later vouch for an event it never met).
+        var issued = layout.Keys?.Issued
+            .Where(issue => layout.Record is not null
+                && !doubts.ContainsKey((issue.Person, issue.Kind))
+                && !state.UnavailablePeople.Any(name => Normal(name) == issue.Person))
+            .ToList() ?? [];
+        return new PlacementPlan(outcomes)
+        {
+            Issued = issued,
+            UncertainKinds = doubts.Select(pair => new UncertainKind(pair.Key.Person, pair.Key.Kind, pair.Value)).ToList(),
+        };
     }
+
+    // The day the calendar has the event on, read in the offset the session was planned in.
+    private static bool SameDay(HeldEvent found, Copy copy) =>
+        copy.Day is { } day && DateOnly.FromDateTime(found.Start.ToOffset(copy.PlannedOffset).DateTime) == day;
+
+    private static string Normal(string person) => person.Trim().ToLowerInvariant();
 
     // ---- placing one unit ----
 
@@ -123,6 +192,12 @@ public static class PlacementEngine
         if (unit.Copies.Any(copy => standings[copy.Key] == Standing.Unavailable))
         {
             return Decision.Refused(UnplacedReason.CalendarUnavailable);
+        }
+
+        // So does one shared with someone whose numbering is in doubt: half of a shared session is a guess about the other half.
+        if (unit.Copies.Any(copy => standings[copy.Key] == Standing.Uncertain))
+        {
+            return Decision.Refused(UnplacedReason.KeysUncertain);
         }
 
         var names = fresh.Select(copy => copy.Person).ToList();
@@ -172,7 +247,7 @@ public static class PlacementEngine
 
     // ---- what is being asked for ----
 
-    private static List<Unit> Build(PlacementRequest request)
+    private static Layout Build(PlacementRequest request)
     {
         Validate(request);
         var week = PlacementKey.WeekIndexOf(request.WeekStart);
@@ -190,9 +265,11 @@ public static class PlacementEngine
             units.Add(new Unit(household.Title, household.Length, TimeSpan.Zero, copies, regions, null));
         }
 
+        SessionKeys? keys = null;
         if (request.Workouts is { } workouts)
         {
-            units.AddRange(BuildWorkouts(request, workouts, week, canonical));
+            keys = SessionKeys.For(workouts, request.Assignments);
+            units.AddRange(BuildWorkouts(request, workouts, keys, canonical));
         }
 
         foreach (var unit in units)
@@ -203,42 +280,28 @@ public static class PlacementEngine
             }
         }
 
-        return units;
+        return new Layout(units, keys, request.Assignments, week);
     }
 
-    private static List<Unit> BuildWorkouts(PlacementRequest request, HouseholdWorkoutPlan workouts, int week, Dictionary<string, string> canonical)
+    private static List<Unit> BuildWorkouts(PlacementRequest request, HouseholdWorkoutPlan workouts, SessionKeys keys, Dictionary<string, string> canonical)
     {
         var sessions = new Dictionary<string, PlannedSession>(StringComparer.Ordinal);
         foreach (var session in workouts.Plans.SelectMany(plan => plan.Sessions).Concat(workouts.JointSessions))
         {
-            sessions.TryAdd(SessionId(session), session);
-        }
-
-        // The ordinal of a session is its place among this person's sessions of its kind, in time order.
-        var ordinals = new Dictionary<(string Person, string Session), int>();
-        foreach (var person in sessions.Values.SelectMany(session => session.Participants).Select(name => canonical[name.Trim()]).Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            var mine = sessions
-                .Where(pair => pair.Value.Participants.Any(name => string.Equals(name.Trim(), person, StringComparison.OrdinalIgnoreCase)))
-                .OrderBy(pair => pair.Value.Start)
-                .ThenBy(pair => pair.Key, StringComparer.Ordinal);
-            var counts = new Dictionary<SessionKind, int>();
-            foreach (var pair in mine)
-            {
-                var kind = pair.Value.Session.Kind;
-                var next = counts.GetValueOrDefault(kind);
-                ordinals[(person, pair.Key)] = next;
-                counts[kind] = next + 1;
-            }
+            sessions.TryAdd(SessionKeys.SessionId(session), session);
         }
 
         var units = new List<Unit>();
-        foreach (var (id, session) in sessions)
+        foreach (var session in sessions.Values)
         {
             var copies = session.Participants
                 .Select(name => canonical[name.Trim()])
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(person => new Copy(PlacementKey.ForWorkout(person, session.Session.Kind, week, ordinals[(person, id)]), person))
+                .Select(person =>
+                {
+                    var key = keys.KeyOf(person, session)!.Value;
+                    return new Copy(key, person, session.Session.Kind, session.Day, session.Start.Offset, request.Assignments is null || request.Assignments.Vouches(key));
+                })
                 .OrderBy(copy => copy.Key.Value, StringComparer.Ordinal)
                 .ToList();
             var shower = session.Session.IsSweaty ? request.Options.ShowerBuffer : TimeSpan.Zero;
@@ -254,21 +317,17 @@ public static class PlacementEngine
         return units.OrderBy(unit => unit.Proposal).ThenBy(unit => unit.Copies[0].Key.Value, StringComparer.Ordinal).ToList();
     }
 
-    // The same session reached by two routes (each participant's plan, and the joint list) is one session.
-    private static string SessionId(PlannedSession session) => string.Join(
-        '|',
-        session.Start.ToString("O", CultureInfo.InvariantCulture),
-        session.Gap.Start.ToString("O", CultureInfo.InvariantCulture),
-        session.Gap.End.ToString("O", CultureInfo.InvariantCulture),
-        (int)session.Session.Kind,
-        session.Session.Duration.Ticks,
-        (int)session.Together,
-        string.Join(',', session.Participants.Select(name => name.Trim().ToLowerInvariant()).Order(StringComparer.Ordinal)));
-
     private static void Validate(PlacementRequest request)
     {
         ArgumentNullException.ThrowIfNull(request.People);
         ArgumentNullException.ThrowIfNull(request.HouseholdEvents);
+        if (request.WeekStart.DayOfWeek != DayOfWeek.Monday)
+        {
+            throw new ArgumentException(
+                $"A placed week begins on a Monday, and {request.WeekStart:yyyy-MM-dd} is a {request.WeekStart.DayOfWeek}. A key names a session by its weekday within the week, so a week begun on another day would number the same days differently from one run to the next.",
+                nameof(request));
+        }
+
         var twice = request.People
             .GroupBy(person => person.Person, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(group => group.Count() > 1);
@@ -298,6 +357,11 @@ public static class PlacementEngine
         if (request.Workouts is not { } workouts)
         {
             return;
+        }
+
+        if (workouts.WeekStart.DayOfWeek != DayOfWeek.Monday)
+        {
+            throw new ArgumentException($"The workout plan's week begins on a Monday, and {workouts.WeekStart:yyyy-MM-dd} is a {workouts.WeekStart.DayOfWeek}.", nameof(request));
         }
 
         if (PlacementKey.WeekIndexOf(workouts.WeekStart) != PlacementKey.WeekIndexOf(request.WeekStart))
@@ -330,9 +394,14 @@ public static class PlacementEngine
         Held,
         Skipped,
         Unavailable,
+        Uncertain,
     }
 
-    private sealed record Copy(PlacementKey Key, string Person);
+    // A workout copy also says what it is (kind, day, the offset it was planned in) and whether the record of issued numbers
+    // vouches for its key; a household copy has no kind and is never in doubt.
+    private sealed record Copy(PlacementKey Key, string Person, SessionKind? Kind = null, DateOnly? Day = null, TimeSpan PlannedOffset = default, bool Vouched = true);
+
+    private sealed record Layout(List<Unit> Units, SessionKeys? Keys, KeyAssignments? Record, int Week);
 
     private sealed record Unit(string Title, TimeSpan Length, TimeSpan Shower, List<Copy> Copies, List<Stretch> Regions, DateTimeOffset? Proposal);
 

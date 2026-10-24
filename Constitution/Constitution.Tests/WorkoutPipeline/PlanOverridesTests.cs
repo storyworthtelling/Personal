@@ -181,7 +181,7 @@ public class PlanOverridesTests
         var session = snapshot.SessionOn(Thu)!;
         var skip = new PendingSkip(Sam, Thu, SessionKind.Strength, session, null, null, Now);
 
-        var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip, SkipLedger.Empty));
+        var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip));
 
         Assert.True(overrides.IsSkipped(Sam, Thu));
         Assert.True(overrides.IsSkipped(" sam ", Thu));
@@ -195,7 +195,7 @@ public class PlanOverridesTests
     {
         var snapshot = Start();
         var skip = new PendingSkip(Sam, Thu, SessionKind.Strength, snapshot.SessionOn(Thu)!, null, null, Now);
-        var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip, SkipLedger.Empty));
+        var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip));
 
         var applied = overrides.ApplyTo(BaseWeek(snapshot, 0));
 

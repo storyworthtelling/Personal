@@ -15,7 +15,14 @@ public sealed record ChoiceCard(string Title, string Subtitle, IReadOnlyList<Cho
 public sealed record SessionMove(PlannedSession Old, PlannedSession New, PlacedTime? OldPlaced);
 
 /// <summary>The outcome of a swap or a move: the moves, and the weeks before and after, so the plan and the calendar can both follow.</summary>
-public sealed record SwapResult(string Person, IReadOnlyList<SessionMove> Moves, IReadOnlyList<WorkoutWeek> Before, IReadOnlyList<WorkoutWeek> After);
+public sealed record SwapResult(string Person, IReadOnlyList<SessionMove> Moves, IReadOnlyList<WorkoutWeek> Before, IReadOnlyList<WorkoutWeek> After)
+{
+    /// <summary>
+    /// The record of issued workout numbers the change was checked against (the snapshot's), which is what names the events it moves.
+    /// The calendar follow prefers the record as it stands when it acts, since a run may have issued more since the tab loaded.
+    /// </summary>
+    public KeyAssignments? Assignments { get; init; }
+}
 
 /// <summary>The answer to "may this day go there": a result, or the plain reason it may not.</summary>
 public sealed record MoveCheck(SwapResult? Result, string? Reason)

@@ -9,7 +9,7 @@ namespace Constitution.Tests.WorkoutsTab;
 public class WorkoutsTabModelTests
 {
     private static WorkoutsTabModel Model(WorkoutsSnapshot? snapshot = null, PendingSkip? pending = null) =>
-        WorkoutsTabModel.Build(snapshot ?? Snapshot(), pending);
+        WorkoutsTabModel.Build(snapshot ?? Snapshot(), pending is null ? null : [pending]);
 
     private static DayClipping Row(WorkoutsTabModel model, DateOnly day) => model.Days.Single(item => item.Day == day);
 

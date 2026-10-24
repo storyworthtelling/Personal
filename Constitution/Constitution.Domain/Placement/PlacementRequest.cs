@@ -18,4 +18,13 @@ public sealed record PlacementRequest(
     HouseholdWorkoutPlan? Workouts)
 {
     public PlacementOptions Options { get; init; } = new();
+
+    /// <summary>
+    /// The workout numbers issued so far (<see cref="KeyAssignments"/>). With a record the engine gives every session the key it
+    /// was issued, numbers new ones above the highest ever issued, and refuses to decide for a person and kind whose keys the
+    /// record cannot vouch for; the week's re-plan then cannot move a session onto another's key. <b>Null means the caller keeps
+    /// no record</b>: workouts are numbered by their place among their kind and nothing is judged, which is only right for a
+    /// caller that plans a week once (the weekly run always passes one).
+    /// </summary>
+    public KeyAssignments? Assignments { get; init; }
 }

@@ -21,8 +21,10 @@ namespace Constitution.Infrastructure.Workouts;
 /// <param name="Encouragement">The voiced seat; <see cref="SeatCacheEncouragement"/> over the shared cache.</param>
 /// <param name="CalendarWriter">Google Calendar, written. The run puts <see cref="PastWriteGuard"/> in front of it.</param>
 /// <param name="WrittenKeys">The record of keys written, which placement reads and grows.</param>
+/// <param name="KeyAssignments">The record of workout numbers issued (B2), which gives a session the same key on every run however the week is re-planned.</param>
 /// <param name="Delivery">The tablet service, already bound to this phone's pairing.</param>
 /// <param name="Tablet">The same tablet client, for taking a replaced page off.</param>
+/// <param name="InkProbe">Looks at a page on the tablet for the owner's ink before it is replaced or taken off (S3).</param>
 /// <param name="Expected">The read-back's record of pages waiting for their ink.</param>
 /// <param name="Delivered">What has gone to the tablet, for C-2.3.6.</param>
 /// <param name="Log">The Body trail.</param>
@@ -36,8 +38,10 @@ public sealed record WorkoutWeekSeams(
     IWorkoutEncouragement Encouragement,
     ICalendarWriter CalendarWriter,
     IWrittenKeyStore WrittenKeys,
+    IKeyAssignmentStore KeyAssignments,
     DeliveryService Delivery,
     IRemarkableClient Tablet,
+    IPageInkProbe InkProbe,
     IExpectedDocuments Expected,
     IDeliveredWorkouts Delivered,
     IWorkoutWeekLog Log);

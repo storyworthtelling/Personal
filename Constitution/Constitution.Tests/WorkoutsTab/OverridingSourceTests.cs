@@ -89,7 +89,7 @@ public class OverridingSourceTests
         var (source, inner, kept, _) = Make();
         var skip = new PendingSkip(Sam, Thu, SessionKind.Strength, Snapshot().SessionOn(Thu)!, null, null, Now);
 
-        source.Record(new WorkoutsChange.SkipCommitted(skip, SkipLedger.Empty));
+        source.Record(new WorkoutsChange.SkipCommitted(skip));
 
         Assert.True(kept.Held.IsSkipped(Sam, Thu));
         Assert.Single(inner.Recorded);

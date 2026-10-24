@@ -1,4 +1,5 @@
 using Constitution.Domain.Calendar;
+using Constitution.Domain.Placement;
 
 namespace Constitution.Domain.Workouts.Screens;
 
@@ -24,6 +25,13 @@ public sealed record WorkoutsSnapshot(
     IReadOnlyDictionary<DateOnly, DayFacts> Facts,
     SkipLedger Skips)
 {
+    /// <summary>
+    /// The record of issued workout numbers (<see cref="KeyAssignments"/>) the plan was read with. <b>The source that fills the snapshot
+    /// reads it from the same store the weekly run keeps</b>: the keys the tab names events by (a skip's, a swap's) are those numbers, and
+    /// without them they are the old count of the nth session of its kind, which no longer names the event once the week has been re-planned.
+    /// </summary>
+    public KeyAssignments? Assignments { get; init; }
+
     /// <summary>The week of the plan that holds the day, or null when no plan was made for it.</summary>
     public WorkoutWeek? WeekOf(DateOnly day) =>
         Weeks.FirstOrDefault(week => day >= week.Plan.WeekStart && day < week.Plan.WeekStart.AddDays(7));
@@ -55,7 +63,12 @@ public interface IWorkoutsSource
 {
     WorkoutsRead Read(DateTimeOffset now);
 
-    /// <summary>Keeps a change: the swapped plan, or the skip written to the ledger. Called once per change.</summary>
+    /// <summary>
+    /// Keeps a change: the swapped plan, or the skip written to the ledger. May be called again for a change that did not get kept, so
+    /// keeping one must be harmless to repeat (a skip already kept is not kept twice). Throws <see cref="IOException"/> or
+    /// <see cref="UnauthorizedAccessException"/> when the change could not be written down, and <see cref="InvalidOperationException"/>
+    /// when there is nothing to change; the tab then says so, and a skip stays owed.
+    /// </summary>
     void Record(WorkoutsChange change);
 }
 
@@ -64,7 +77,12 @@ public abstract record WorkoutsChange
 {
     public sealed record Swapped(SwapResult Swap) : WorkoutsChange;
 
-    public sealed record SkipCommitted(PendingSkip Skip, SkipLedger Ledger) : WorkoutsChange;
+    /// <summary>
+    /// A skip whose undo window closed. <b>It carries the skip and nothing else</b>: it used to carry a whole ledger built from the snapshot the
+    /// tab loaded, so a source that saved it wrote over everything the read-back had settled since. The source settles the skip into the ledger
+    /// as it stands when it records (<see cref="ISkipSettler"/>).
+    /// </summary>
+    public sealed record SkipCommitted(PendingSkip Skip) : WorkoutsChange;
 }
 
 /// <summary>The source used until the pipeline is wired: it has no plan, and says so.</summary>

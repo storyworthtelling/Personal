@@ -22,8 +22,12 @@ public static class WorkoutWeekTrail
             case WorkoutWeekOutcome.Planned planned:
                 var report = planned.Report;
                 var sessions = WeekRewrite.Distinct(report.Plan).Count;
-                return $"workout week planned, {sessions} sessions, {report.Placement.Created.Count} events written, "
+                var line = $"workout week planned, {sessions} sessions, {report.Placement.Created.Count} events written, "
                     + $"{report.Placement.Failed.Count} events failed, {report.PeopleWithUnreadableCalendars.Count} people unreadable";
+
+                // Said only when it happened, so a week that is known reads as it always did.
+                var unknown = report.Placement.Plan?.Unplaced.Count(item => item.Reason == Constitution.Domain.Placement.UnplacedReason.KeysUncertain) ?? 0;
+                return unknown == 0 ? line : $"{line}, {unknown} events not known";
             default:
                 throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "This outcome has no trail phrase; add one here.");
         }
@@ -56,6 +60,15 @@ public static class WorkoutWeekTrail
                 return outcome.Failure is null
                     ? "workout document not delivered, will try again"
                     : $"workout document not delivered: {outcome.Failure.GetType().Name}, will try again";
+            case DocumentVerdict.Kept:
+                return outcome.Ink switch
+                {
+                    PageInk.HasInk => "workout document kept, ink on the page",
+                    PageInk.Blank => "workout document kept, page already on the tablet",
+                    _ => outcome.Failure is null
+                        ? "workout document kept, ink not known"
+                        : $"workout document kept, ink not known: {outcome.Failure.GetType().Name}",
+                };
             default:
                 throw new ArgumentOutOfRangeException(nameof(outcome), outcome.Verdict, "This verdict has no trail phrase; add one here.");
         }
