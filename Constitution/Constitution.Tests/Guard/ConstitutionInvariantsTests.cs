@@ -81,6 +81,14 @@ public class ConstitutionInvariantsTests
         "sleeper-side",
     ];
 
+    /// <summary>
+    /// The household file is found by name in the owner's Drive and shared by that name: rename it and the
+    /// partner's phone looks for a file that is not there while the old one sits unread. Added with the
+    /// household file's kinds (C-6.1.2), a deliberate edit; the kinds themselves are held by
+    /// <c>ConstitutionKindsTests</c>.
+    /// </summary>
+    private const string ExpectedHouseholdFileName = "storyworthtelling-constitution-household.json";
+
     // ---- the package id ----
 
     /// <summary>
@@ -128,6 +136,12 @@ public class ConstitutionInvariantsTests
         Assert.True(stray.Count == 0,
             "The application id is copied instead of referenced; use ConstitutionIdentity.ApplicationId:\n"
             + string.Join("\n", stray));
+    }
+
+    [Fact]
+    public void HouseholdFileNameIsFrozen()
+    {
+        Assert.Equal(ExpectedHouseholdFileName, ConstitutionIdentity.HouseholdFileName);
     }
 
     // ---- registered Java names ----
@@ -231,6 +245,8 @@ public class ConstitutionInvariantsTests
         Assert.NotEmpty(ExpectedPreferenceKeys);
         Assert.NotEmpty(ExpectedReceivers);
         Assert.NotEmpty(ExpectedDeclaredPermissions);
+        Assert.False(string.IsNullOrWhiteSpace(ConstitutionIdentity.HouseholdFileName));
+        Assert.False(string.IsNullOrWhiteSpace(ExpectedHouseholdFileName));
 
         Assert.All(ConstitutionIdentity.Activities.Concat(ConstitutionIdentity.Receivers).Concat(ConstitutionIdentity.DeclaredPermissions).Concat(ConstitutionIdentity.Workers).Concat(ConstitutionIdentity.WorkNames).Concat(ConstitutionIdentity.PreferenceKeys),
             value => Assert.False(string.IsNullOrWhiteSpace(value), "A frozen set holds a blank value."));
