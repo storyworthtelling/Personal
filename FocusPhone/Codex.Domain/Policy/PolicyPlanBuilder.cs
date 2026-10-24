@@ -36,9 +36,11 @@ public static class PolicyPlanBuilder
         // background function (sync, alarms, notifications) the owner still relies on.
         suspended.UnionWith(context.NeverVisiblePackages);
         suspended.ExceptWith(context.OwnPackages);
-        // Suspending the Play Store would break background auto-updates; it is
-        // kept runnable but never surfaced in the launcher.
+        // Suspending the Play Store would break background auto-updates, so it is
+        // hidden instead: a hidden app cannot be launched (the watch's "Open on Phone"
+        // and every other launch fail) but still runs its background updates.
         suspended.Remove(PolicyContext.PlayStorePackage);
+        var hidden = new HashSet<string> { PolicyContext.PlayStorePackage };
         // The platform refuses to suspend this one regardless of what the plan asks for; asking
         // anyway just repeats a permanent, expected failure in the policy log every pass.
         suspended.Remove(PolicyContext.SettingsPackage);
@@ -83,7 +85,7 @@ public static class PolicyPlanBuilder
         // (tile tints and message capture are unaffected); only the overlay UI is
         // blocked. Device-owner only, so this takes effect at provisioning.
         return new PolicyPlan(
-            restrictions, suspended, runnable, permissionGrants,
+            restrictions, suspended, hidden, runnable, permissionGrants,
             EnforceAutoTime: true, FamilyDnsHost, DisableStatusBar: true,
             // Chrome is only ever runnable during an Admin session (above), so the URL lock only
             // ever matters there — but it does matter there: without it, an Admin-mode sign-in
