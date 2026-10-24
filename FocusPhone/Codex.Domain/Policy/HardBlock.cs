@@ -1,8 +1,9 @@
 namespace Codex.Domain.Policy;
 
 /// <summary>
-/// The always-hidden app categories the owner never wants on the phone — Games, Social media,
-/// Dating, Gambling/betting, and Short-form video. Unlike the reversible Admin blocklist, these
+/// The always-hidden app categories the owner never wants on the phone — Games, Social apps (any
+/// app declaring the social category, except Google's own and the owner's suite), Dating,
+/// Gambling/betting, and Short-form video. Unlike the reversible Admin blocklist, these
 /// are hard-suspended by policy and never surfaced, not even in Admin. Detected by BOTH Android's
 /// declared application category AND a curated package list, because many apps mis-declare their
 /// category. (Browsers other than the Flyleaf web view are handled separately, by the existing
@@ -12,14 +13,23 @@ namespace Codex.Domain.Policy;
 public static class HardBlock
 {
     // Android's ApplicationInfo.Category ints. Only Game maps cleanly to a never-visible category.
-    // CATEGORY_SOCIAL (4) is deliberately NOT auto-blocked: first-party communication utilities —
-    // Google Messages, Contacts, Meet, Gemini — declare appCategory="social" and were wrongly
-    // hard-suspended ("blocked by your administrator"). Social media / dating / gambling / short-form
-    // are caught by the curated list below instead, which doesn't sweep up those utilities.
     private const int CategoryGame = 0;
+    private const int CategorySocial = 4;
+
+    // Google's own namespace (Messages, Contacts, Meet, Gemini, Lens, YouTube …) and the owner's suite.
+    // Many of these declare the social category, so the social rule must not catch them.
+    private const string GooglePackagePrefix = "com.google.";
 
     public static bool IsNeverVisibleCategory(int androidCategory) =>
         androidCategory is CategoryGame;
+
+    public static bool IsSocialCategory(int androidCategory) =>
+        androidCategory is CategorySocial;
+
+    /// <summary>True for Google's own apps and the owner's suite: never blocked by the social rule.</summary>
+    public static bool IsFirstParty(string package) =>
+        package.StartsWith(GooglePackagePrefix, StringComparison.Ordinal)
+        || package.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal);
 
     /// <summary>Well-known packages in the never-visible categories that don't reliably self-declare.
     /// Not exhaustive — extend as new ones surface; the Android-category check catches the rest.</summary>
@@ -49,7 +59,8 @@ public static class HardBlock
         var blocked = new HashSet<string>();
         foreach (var (package, androidCategory) in installed)
         {
-            if (IsNeverVisibleCategory(androidCategory) || CuratedPackages.Contains(package))
+            var social = IsSocialCategory(androidCategory) && !IsFirstParty(package);
+            if (IsNeverVisibleCategory(androidCategory) || social || CuratedPackages.Contains(package))
             {
                 blocked.Add(package);
             }
