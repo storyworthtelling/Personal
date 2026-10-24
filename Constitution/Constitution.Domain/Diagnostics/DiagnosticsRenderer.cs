@@ -43,6 +43,16 @@ public static class DiagnosticsRenderer
             text.Append("  Nothing has run yet\n");
         }
 
+        // Said only when something was assumed, so an export from a household that gave everything reads as it always did.
+        if (snapshot.Assumed.Count > 0)
+        {
+            text.Append("\nAssumed (not given by the household)\n");
+            foreach (var setting in snapshot.Assumed)
+            {
+                text.Append("  ").Append(DiagnosticsPhrases.Of(setting)).Append('\n');
+            }
+        }
+
         text.Append("\nDocuments\n");
         foreach (var entry in snapshot.Documents)
         {
