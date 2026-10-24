@@ -10,15 +10,7 @@ internal static class WorkoutWords
 {
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
-    public static string Kind(PlannedSession session) => session.Session.Kind switch
-    {
-        SessionKind.Strength => "Strength",
-        SessionKind.OutdoorCardio => "Outdoor walk",
-        SessionKind.Treadmill => "Treadmill",
-        SessionKind.Mobility => "Mobility",
-        SessionKind.GentleWalk => session.Together == Together.FamilyWalk ? "Family walk" : "Gentle walk",
-        _ => throw new ArgumentOutOfRangeException(nameof(session), session.Session.Kind, "The tab has no word for this kind of session."),
-    };
+    public static string Kind(PlannedSession session) => KindWords.Of(session.Session.Kind, session.Together);
 
     public static int Minutes(PlannedSession session) => (int)Math.Round(session.Session.Duration.TotalMinutes);
 

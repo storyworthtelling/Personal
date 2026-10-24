@@ -53,6 +53,13 @@ public abstract record WorkoutsRead
     public sealed record NoPlanYet : WorkoutsRead;
 
     public sealed record Ready(WorkoutsSnapshot Snapshot) : WorkoutsRead;
+
+    /// <summary>
+    /// There may be a plan, but it cannot be read right now: a saved week that is damaged, a record that cannot be opened. The reason is a fixed
+    /// sentence that quotes nothing, shown where the tab would say there is no plan, so a file that is there and unreadable is never taken for
+    /// a week that was not planned.
+    /// </summary>
+    public sealed record Unavailable(string Reason) : WorkoutsRead;
 }
 
 /// <summary>

@@ -14,7 +14,8 @@ namespace Constitution;
 /// <see cref="ActionCardModel"/>, <see cref="SwapChoices"/>, <see cref="MoveHere"/> and <see cref="SkipUndo"/>; this reads,
 /// hands them over, and paints.
 ///
-/// <para>Where the weekly pipeline has not been wired, <see cref="Source"/> is <see cref="NoWorkoutsSource"/> and the tab
+/// <para><see cref="WorkoutsTabServices.Wire"/> gives the area its source (the weekly run's saved week) and its calendar follow. Where
+/// there is no saved week, <see cref="Source"/> answers <see cref="WorkoutsRead.NoPlanYet"/> and the tab
 /// says there is no plan yet, in a sentence, with nothing invented. The plan is read off the UI thread and the page says
 /// so in a sentence while it waits.</para>
 ///
@@ -51,6 +52,7 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
         : base(host, "workouts", Resource.Drawable.areaworkouts)
     {
         log = new WorkoutsLog(host);
+        WorkoutsTabServices.Wire(host, this);
     }
 
     /// <summary>Where the plan comes from and where a change goes; set by whoever wires the weekly pipeline.</summary>
@@ -85,7 +87,8 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
     {
         if (read is not WorkoutsRead.Ready ready)
         {
-            return PageFurniture.Sentence(Host, WorkoutsTabModel.NoPlan().Status);
+            // A saved week that is there and cannot be read says so in its own sentence; no week at all is the plain "no plan yet".
+            return PageFurniture.Sentence(Host, read is WorkoutsRead.Unavailable unavailable ? unavailable.Reason : WorkoutsTabModel.NoPlan().Status);
         }
 
         var model = WorkoutsTabModel.Build(ready.Snapshot, undo.Shown);
