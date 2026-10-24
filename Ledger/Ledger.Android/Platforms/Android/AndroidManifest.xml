@@ -26,6 +26,8 @@
        from this app and PackageManager reports it as not installed. -->
   <queries>
     <package android:name="com.android.chrome" />
+    <!-- Constitution (budget contract): the sender asks whether it is installed before it broadcasts. -->
+    <package android:name="com.storyworthtelling.constitution" />
     <intent>
       <action android:name="android.intent.action.VIEW" />
       <category android:name="android.intent.category.BROWSABLE" />

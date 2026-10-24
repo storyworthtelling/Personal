@@ -149,8 +149,29 @@ public static class ConstitutionIdentity
     /// </summary>
     public const string SleeperSideKey = "sleeper-side";
 
+    /// <summary>
+    /// The budget receiver's registered Java name (PBI C-11.1.1). Index addresses it as an explicit component, so a moved class
+    /// is a broadcast that reaches nothing, with no error on either phone. Frozen with the action and permission below.
+    /// </summary>
+    public const string BudgetReceiverName = ApplicationId + ".BudgetReceiver";
+
+    /// <summary>The action Index sends the month's grocery budget under; frozen for the same reason as <see cref="BudgetReceiverName"/>.</summary>
+    public const string BudgetAction = ApplicationId + ".action.BUDGET";
+
+    /// <summary>
+    /// The signature-level permission that protects <see cref="BudgetReceiverName"/>. Constitution declares it and Index
+    /// holds it, so only an app signed with the suite's one keystore can send a budget. Not an Android runtime permission.
+    /// </summary>
+    public const string BudgetPermission = ApplicationId + ".RECEIVE_BUDGET";
+
     /// <summary>Every registered activity and alias Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Activities { get; } = [MainActivityName, HealthRationaleActivityName, PermissionUsageAliasName];
+
+    /// <summary>Every registered broadcast receiver Java name, for the guard to enumerate.</summary>
+    public static IReadOnlyList<string> Receivers { get; } = [BudgetReceiverName];
+
+    /// <summary>Every custom permission this app declares, for the guard to enumerate.</summary>
+    public static IReadOnlyList<string> DeclaredPermissions { get; } = [BudgetPermission];
 
     /// <summary>Every registered worker Java name, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName, WorkoutWeekWorkerName];
