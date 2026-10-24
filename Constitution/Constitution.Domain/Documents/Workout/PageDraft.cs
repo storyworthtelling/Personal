@@ -51,6 +51,7 @@ internal sealed class PageDraft
         PrintedRole.Voice => 27f,
         PrintedRole.Small => 15f,
         PrintedRole.Label => 14f,
+        PrintedRole.Mono => 12.2f,
         _ => 17f,
     };
 
@@ -61,6 +62,7 @@ internal sealed class PageDraft
         PrintedRole.Voice => 8f,
         PrintedRole.Heading or PrintedRole.Choice => 4.5f,
         PrintedRole.Small => 4.2f,
+        PrintedRole.Mono => 2.46f,
         PrintedRole.Label => 3.9f,
         _ => 4.8f,
     };
