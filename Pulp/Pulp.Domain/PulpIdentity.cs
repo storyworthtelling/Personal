@@ -60,4 +60,10 @@ public static class PulpIdentity
     /// other never wrote, so the household quietly splits in two.
     /// </summary>
     public const string HouseholdFileName = "storyworthtelling-pulp-household.json";
+
+    /// <summary>
+    /// The phone's own working copy of the household, in the app's data directory. The shared engine's
+    /// <c>LocalHouseholdStore</c> is told this name; it is the address of the household on this phone.
+    /// </summary>
+    public const string LocalHouseholdFileName = "pulp-household.json";
 }

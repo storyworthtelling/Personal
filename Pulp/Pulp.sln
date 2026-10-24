@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Codex.Ui.Android", "..\Focu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Storyworthtelling.Updates", "..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj", "{D98B90FA-AC59-4643-92D8-8D28C2560ECB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Storyworthtelling.Household", "..\Storyworthtelling.Household\Storyworthtelling.Household.csproj", "{401EBDDE-914E-4563-AA4C-984E558F09CD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +127,18 @@ Global
 		{D98B90FA-AC59-4643-92D8-8D28C2560ECB}.Release|x64.Build.0 = Release|Any CPU
 		{D98B90FA-AC59-4643-92D8-8D28C2560ECB}.Release|x86.ActiveCfg = Release|Any CPU
 		{D98B90FA-AC59-4643-92D8-8D28C2560ECB}.Release|x86.Build.0 = Release|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Debug|x64.Build.0 = Debug|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Debug|x86.Build.0 = Debug|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Release|x64.ActiveCfg = Release|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Release|x64.Build.0 = Release|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Release|x86.ActiveCfg = Release|Any CPU
+		{401EBDDE-914E-4563-AA4C-984E558F09CD}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

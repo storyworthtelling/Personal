@@ -4,6 +4,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Pulp.Calendar;
+using Pulp.Domain;
 using Pulp.Domain.Calendar;
 using Pulp.Domain.Catalogue;
 using Pulp.Domain.Core;
@@ -31,6 +32,11 @@ using Pulp.Infrastructure.Usage;
 using Pulp.Sessions;
 using Pulp.Usage;
 using Storyworthtelling.Voice;
+
+// Pulp keeps one small piece of the sync policy (Readiness); the rest is the shared engine's. Both are named
+// HouseholdSync, so each is spelled out.
+using HouseholdSync = Pulp.Domain.Household.HouseholdSync;
+using SharedHouseholdSync = Storyworthtelling.Household.HouseholdSync;
 
 namespace Pulp.App;
 
@@ -129,7 +135,7 @@ public sealed class PulpServices
         // Android can start with no shell, finds it once these services exist. The hook only records evidence.
         SessionHooks.Record = RecordSession;
 
-        household = new LocalHouseholdStore(files);
+        household = new LocalHouseholdStore(files, PulpIdentity.LocalHouseholdFileName);
         install = new LocalInstallStore(files);
         cache = new CatalogueCache(Path.Combine(cacheRoot, "catalogue"));
 
@@ -143,15 +149,16 @@ public sealed class PulpServices
             () => DateTimeOffset.Now);
 
         sharedHousehold = new DriveHouseholdStore(
-            new DriveTextFile(DriveFactory(account), DriveHouseholdStore.FileName, SharedDriveFileIds.Store),
+            new DriveTextFile(DriveFactory(account), PulpIdentity.HouseholdFileName, SharedDriveFileIds.Store),
+            PulpIdentity.HouseholdFileName,
             () => VaultPassphraseStore.Passphrase,
-            () => HouseholdSync.MayCreateFile(HouseholdFileRole));
+            () => SharedHouseholdSync.MayCreateFile(HouseholdFileRole));
         usageFile = new IndexUsageFilePublisher(
             new DriveIndexUsageStore(
                 new DriveTextFile(DriveFactory(account), IndexUsageFile.FileName, SharedDriveFileIds.Store),
                 () => VaultPassphraseStore.Passphrase,
                 ServiceCatalogue.Public,
-                () => HouseholdSync.MayCreateFile(HouseholdFileRole)),
+                () => SharedHouseholdSync.MayCreateFile(HouseholdFileRole)),
             (message, exception) => Diagnostics.Warn("handoff", message, exception));
         rememberedRole = ReadRememberedRole();
 
@@ -600,7 +607,7 @@ public sealed class PulpServices
     /// <summary>
     /// One pass (finding §2.7): the phone's file as it stands, published through the Drive store
     /// (read → merge → write if needed → re-read, <see cref="HouseholdPublish"/>), and what that settles on
-    /// merged back into the phone's file as it stands <i>then</i> (<see cref="HouseholdSync.Adopt"/>), so an
+    /// merged back into the phone's file as it stands <i>then</i> (<see cref="SharedHouseholdSync.Adopt"/>), so an
     /// edit made while the pass was on the network is kept. Every failure is caught here, logged with its
     /// reason and turned into <see cref="SyncStatus"/>; the phone's own file is never the casualty.
     /// </summary>
@@ -638,7 +645,7 @@ public sealed class PulpServices
                 HouseholdPublishOutcome.AlreadyCurrent or HouseholdPublishOutcome.Written => HouseholdSyncStatus.Synced(now),
                 HouseholdPublishOutcome.NotYetShared => HouseholdSyncStatus.WaitingForShare(
                     SyncStatus.LastSynced,
-                    $"No household file is shared with this account yet. The owner shares '{DriveHouseholdStore.FileName}' from their Drive; until then this phone keeps its household to itself."),
+                    $"No household file is shared with this account yet. The owner shares '{PulpIdentity.HouseholdFileName}' from their Drive; until then this phone keeps its household to itself."),
                 _ => SyncStatus.WentOffline("The other phone was saving at the same moment; this phone's changes are kept and go up on the next pass."),
             };
 
@@ -677,7 +684,7 @@ public sealed class PulpServices
         try
         {
             var now = await household.LoadAsync(cancellationToken);
-            var kept = HouseholdSync.Adopt(now, published);
+            var kept = SharedHouseholdSync.Adopt(now, published);
             if (kept.ContentEquals(now))
             {
                 return false;

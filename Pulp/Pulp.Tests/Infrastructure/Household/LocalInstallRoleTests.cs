@@ -55,7 +55,7 @@ public sealed class LocalInstallRoleTests : IDisposable
     {
         var store = new LocalInstallStore(directory);
         store.SaveRole(HouseholdFileRole.Owner, "owner@example.com");
-        store.SaveClock(new Pulp.Domain.Household.HlcTimestamp(9, 1));
+        store.SaveClock(new HlcTimestamp(9, 1));
         store.SaveViewer(null);
 
         Assert.Equal(HouseholdFileRole.Owner, store.Load().Role?.Role);
