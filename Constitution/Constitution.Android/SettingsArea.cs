@@ -9,7 +9,9 @@ using Codex.Ui;
 using Codex.Ui.Voice;
 using Constitution.Body;
 using Constitution.Domain.Areas;
+using Constitution.Domain.Calendar;
 using Constitution.Domain.Credentials;
+using Constitution.Domain.Household;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Settings;
 using Constitution.Health;
@@ -28,7 +30,8 @@ namespace Constitution;
 /// way to answer "did that update land?" on a phone with no adb. The page is drawn from
 /// <see cref="SettingsModel"/>; this file only paints it and writes what the owner changes.
 ///
-/// <para>The Household group (C-8.1.2) arrives with the household file and is not drawn. NYT Cooking
+/// <para>The Household group (C-8.1.2) is drawn from <see cref="HouseholdGroupModel"/>; with no household file wired to this head it says so
+/// and edits the planning-setup file the weekly run reads. NYT Cooking
 /// is not built (spike D96). Success is an inline change of the text, never a toast.</para>
 /// </summary>
 public sealed class SettingsArea(Activity host)
@@ -36,10 +39,12 @@ public sealed class SettingsArea(Activity host)
 {
     private const string PillarsGroup = "pillars";
     private const string EquipmentGroup = "equipment";
+    private const string HouseholdGroup = "household";
     private const string ConnectionsGroup = "connections";
 
     private readonly PillarStore pillarStore = new(host);
     private readonly EquipmentStore equipmentStore = new(host);
+    private readonly HouseholdSetupStore householdStore = new(host);
     private readonly ConstitutionConnections connections = new(host);
     private readonly VoiceGoogleAccount googleAccount = ConstitutionGoogle.Create();
 
@@ -49,6 +54,7 @@ public sealed class SettingsArea(Activity host)
     private string? entryOpenFor;
     private string? signInStatus;
     private string? exportStatus;
+    private string? householdNote;
     private readonly Dictionary<string, string> rowNotes = [];
 
     private EditText? passphraseField;
@@ -78,6 +84,14 @@ public sealed class SettingsArea(Activity host)
 
         AddGroup(column, PillarsGroup, "Pillars", model.PillarsSummary, BuildPillars(model));
         AddGroup(column, EquipmentGroup, "Equipment", model.EquipmentSummary, BuildEquipment(model));
+        // The household file is not wired to this head yet, so there is no roster to read: the group says so and edits the setup file.
+        var household = HouseholdGroupModel.Build(null, RosterRole.Owner, householdStore.Read());
+        var householdChoices = householdStore.Read() is HouseholdSetupRead.Configured saved ? HouseholdChoices.From(saved.Setup) : new HouseholdChoices();
+        AddGroup(column, HouseholdGroup, "Household", household.Summary, HouseholdGroupView.Build(Host, household, householdChoices, householdStore, householdNote, note =>
+        {
+            householdNote = note;
+            RaiseChanged();
+        }));
         AddGroup(column, ConnectionsGroup, "Connections", model.ConnectionsSummary, BuildConnections(model));
 
         column.AddView(Spaced(PaperUi.Label(Host, "Vault passphrase"), DesignTokens.Space.X6, DesignTokens.Space.X1));
