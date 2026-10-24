@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace Folio.Domain.Analysis;
 
@@ -53,4 +54,36 @@ public sealed record EntityProfile(
 // The whole design bible: canonical characters and settings for the novel.
 public sealed record DesignBible(
     IReadOnlyList<EntityProfile> Characters,
-    IReadOnlyList<EntityProfile> Settings);
+    IReadOnlyList<EntityProfile> Settings)
+{
+    // How many of the most-mentioned entities stand in when a scene names nobody ("She crossed the room").
+    private const int FallbackCharacters = 3;
+    private const int FallbackSettings = 2;
+
+    // The part of the bible a single scene needs: the characters and settings it names, by name or alias.
+    // The whole bible runs to ~90,000 tokens on a long book, and a scene prompt that sends it all pays for
+    // that every time to be told about people who are not in the scene. A scene that names no one still
+    // needs someone to draw, so the book's most-mentioned entities stand in.
+    public DesignBible ForScene(string sceneText)
+    {
+        var characters = Characters.Where(entity => Appears(sceneText, entity)).ToList();
+        var settings = Settings.Where(entity => Appears(sceneText, entity)).ToList();
+
+        if (characters.Count == 0 && settings.Count == 0)
+        {
+            characters = Characters.OrderByDescending(entity => entity.ChunkMentions).Take(FallbackCharacters).ToList();
+            settings = Settings.OrderByDescending(entity => entity.ChunkMentions).Take(FallbackSettings).ToList();
+        }
+
+        return new DesignBible(characters, settings);
+    }
+
+    // Whole-word, case-insensitive: "Ann" is not named by "cannon" or "banner".
+    public static bool Names(string text, string name) =>
+        !string.IsNullOrWhiteSpace(name) &&
+        Regex.IsMatch(text, $@"(?<![\p{{L}}\p{{N}}]){Regex.Escape(name.Trim())}(?![\p{{L}}\p{{N}}])",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static bool Appears(string sceneText, EntityProfile entity) =>
+        Names(sceneText, entity.Name) || entity.Aliases.Any(alias => Names(sceneText, alias));
+}

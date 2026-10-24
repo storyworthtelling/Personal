@@ -308,7 +308,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         string sceneText, DesignBible bible, string artStyle, IReadOnlyList<string> avoidMoments,
         CancellationToken cancellationToken)
     {
-        var bibleJson = JsonSerializer.Serialize(bible, JsonResponse.CaseInsensitive);
+        // Only the cast and settings this scene names: see DesignBible.ForScene.
+        var bibleJson = JsonSerializer.Serialize(bible.ForScene(sceneText), JsonResponse.CaseInsensitive);
         var avoid = avoidMoments.Count == 0
             ? "(none)"
             : string.Join("\n", avoidMoments.Select(m => $"- {m}"));
@@ -822,7 +823,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
         var model = persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel;
         return SendRaw(system, ReadingPrompt.Question(persona) + "\n\n" + format,
-            options.PassMaxTokens, model, $"{call}[{persona.Id}]", cancellationToken);
+            options.PassMaxTokens, model, $"{call}[{persona.Id}]", options.PassEffort, cancellationToken);
     }
 
     private Task<string> SendMessage(
@@ -846,13 +847,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             ];
 
         return SendRaw(system, userText, maxTokens ?? options.MaxTokens,
-            string.IsNullOrWhiteSpace(model) ? options.Model : model, call, cancellationToken);
+            string.IsNullOrWhiteSpace(model) ? options.Model : model, call, options.Effort, cancellationToken);
     }
 
     // The transport both paths share: everything below this line is the same whatever the system
     // blocks say, so the ordering decision lives entirely in the two callers above.
     private async Task<string> SendRaw(
-        object[] system, string userText, int effectiveMaxTokens, string model, string call,
+        object[] system, string userText, int effectiveMaxTokens, string model, string call, string effort,
         CancellationToken cancellationToken)
     {
         // Every call is accounted for here, success or failure, because this is the one place that knows
@@ -863,7 +864,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var started = Stopwatch.GetTimestamp();
         try
         {
-            var text = await SendRawCore(system, userText, effectiveMaxTokens, model, usage, cancellationToken);
+            var text = await SendRawCore(system, userText, effectiveMaxTokens, model, effort, usage, cancellationToken);
             logger?.LogInformation(
                 "Claude call {Call} succeeded in {Seconds:F1}s: model={Model} input={Input} cacheWrite={CacheWrite} " +
                 "cacheRead={CacheRead} output={Output} stop={Stop} requestId={RequestId}",
@@ -898,17 +899,16 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private static double Elapsed(long started) => Stopwatch.GetElapsedTime(started).TotalSeconds;
 
     private async Task<string> SendRawCore(
-        object[] system, string userText, int effectiveMaxTokens, string model, CallUsage usage,
+        object[] system, string userText, int effectiveMaxTokens, string model, string effort, CallUsage usage,
         CancellationToken cancellationToken)
     {
-        // Effort is set explicitly, never inherited: the 5.5 models default to medium, and Folio's reads and
-        // reports are tuned to the depth the previous default gave. See EveryCall_RequestsHighEffort.
+        // Effort is set explicitly, never inherited. See ClaudeOptions.Effort.
         var payload = new
         {
             model,
             max_tokens = effectiveMaxTokens,
             stream = true,
-            output_config = new { effort = "high" },
+            output_config = new { effort },
             system,
             messages = new[]
             {

@@ -147,24 +147,62 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
-    public async Task EveryCall_RequestsHighEffort_SoTheNewerModelsKeepTheOldDefault()
+    public async Task EveryCall_SetsItsEffortExplicitly_MediumForWorkAndHighForTheReads()
     {
-        // The 5.5 models default to medium effort, where the models Folio was tuned on defaulted to high.
-        // Folio's quality depends on that depth, so high is set explicitly on every request rather than
-        // inherited from a default that changes with the model.
+        // Effort is set on every request rather than inherited from a default that changes with the model.
+        // The extraction, notes, reductions and image prompts run at medium: at high the model's reasoning
+        // shares the output limit with the reply, and the long structured replies were being cut off
+        // (the reasoning took most of the 16,000-20,000 tokens, leaving too little for the JSON). The
+        // sixteen whole-book reads are the product, so they keep high.
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
         handler.EnqueueOk(Reply("{}"));
         handler.EnqueueOk(Reply("{}"));
+        handler.EnqueueOk(Reply("{\"summary\":\"\",\"findings\":[]}"));
 
         await client.ExtractEntities("excerpt", CancellationToken.None);
         await client.AnalyzeChapter("excerpt", "Chapter 1", [], string.Empty, CancellationToken.None);
         await client.ConsolidateAnalysis("Title", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+        await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", CancellationToken.None);
 
-        foreach (var body in handler.RequestBodies)
-            Assert.Contains("\"output_config\":{\"effort\":\"high\"}", body);
+        Assert.Equal(4, handler.RequestBodies.Count);
+        foreach (var body in handler.RequestBodies.Take(3))
+            Assert.Contains("\"output_config\":{\"effort\":\"medium\"}", body);
+        Assert.Contains("\"output_config\":{\"effort\":\"high\"}", handler.RequestBodies[3]);
     }
 
+    [Fact]
+    public void TheReductionsGetRoomForTheirReply()
+    {
+        // 16,000 and 20,000 were both hit repeatedly on a real book, so the ceilings sit above what was
+        // observed rather than at it.
+        var options = new ClaudeOptions();
+        Assert.True(options.AnalysisMaxTokens >= 24_000);
+        Assert.True(options.CraftMaxTokens >= 32_000);
+    }
+
+    // The scene prompt needs the people and places the scene names, not the whole book's cast: sending
+    // every entity cost ~95,000 input tokens per scene, uncached, 67 times over.
+    [Fact]
+    public async Task DescribeSceneImage_SendsOnlyTheEntitiesTheSceneNames()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("A knight at a gate."));
+        var bible = new DesignBible(
+            [new EntityProfile("Aldric", "a grey-eyed knight", "tall", ["the Knight"]),
+             new EntityProfile("Zephyrine", "a distant queen in violet", "average", [])],
+            [new EntityProfile("The Keep", "a stone tower", "huge", []),
+             new EntityProfile("Saltmarsh", "a salt flat", "vast", [])]);
+
+        await client.DescribeSceneImage(
+            "The knight reached the Keep at dusk.", bible, "ink wash", [], CancellationToken.None);
+
+        var body = Assert.Single(handler.RequestBodies);
+        Assert.Contains("grey-eyed knight", body);
+        Assert.Contains("stone tower", body);
+        Assert.DoesNotContain("violet", body);
+        Assert.DoesNotContain("salt flat", body);
+    }
     [Fact]
     public async Task ExtractEntities_ToleratesProseAroundJson()
     {
