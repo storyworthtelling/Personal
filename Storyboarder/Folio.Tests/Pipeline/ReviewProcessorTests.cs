@@ -920,6 +920,83 @@ public class ReviewProcessorTests : IDisposable
         Assert.True(context.BookAnalyses.Single(a => a.NovelId == id).DeliveredToRemarkable);   // settled
     }
 
+
+    // ---- Delivery to the tablet ------------------------------------------------------------------------
+    //
+    // The first full book rendered a 173 MB report. The reMarkable upload buffers the whole file in
+    // memory, ran the phone out of it, and was then tried five more times with the same file. The
+    // outcome was a line in a log: the Drive upload that followed cleared the recorded error, so
+    // nothing on the desk said the tablet had not got it.
+
+    private BookAnalysis AnalysisOf(Guid id)
+    {
+        using var context = database.NewContext();
+        return context.BookAnalyses.Single(a => a.NovelId == id);
+    }
+
+    [Fact]
+    public async Task AnUploadThatRunsOutOfMemoryIsNotRepeated()
+    {
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()))
+            .ThrowsAsync(new Exception(
+                "Failed to allocate a 8208 byte allocation with 203360 free bytes and 198KB until OOM, " +
+                "target footprint 268435456, growth limit 268435456"));
+        var logger = new CapturingLogger<ReviewProcessor>();
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object, logger: logger));
+
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Once());
+        using var context = database.NewContext();
+        Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
+        var analysis = AnalysisOf(id);
+        Assert.True(analysis.DeliveredToRemarkable);   // settled, not retried
+        Assert.Contains("memory", analysis.RemarkableNote, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("not repeating"));
+    }
+
+    [Fact]
+    public async Task AReportOverTheTabletsLimitIsNotEvenAttempted()
+    {
+        var remarkable = new Mock<IRemarkableClient>();
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor(
+            new ArchiveOptions { DeliverToRemarkable = true, RemarkableMaxBytes = 1_000 }, remarkable.Object));
+
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Never());
+        var analysis = AnalysisOf(id);
+        Assert.True(analysis.DeliveredToRemarkable);
+        Assert.Contains("MB", analysis.RemarkableNote);
+        Assert.Contains("limit", analysis.RemarkableNote, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ADeliveryThatGaveUpLeavesANoteEvenAfterDriveSucceeds()
+    {
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()))
+            .ThrowsAsync(new HttpRequestException("reMarkable is down"));
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        Assert.False(string.IsNullOrWhiteSpace(AnalysisOf(id).RemarkableNote));
+    }
+
+    [Fact]
+    public async Task ASuccessfulDeliveryLeavesNoNote()
+    {
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>())).Returns(Task.CompletedTask);
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        Assert.Null(AnalysisOf(id).RemarkableNote);
+    }
+
     [Fact]
     public async Task Review_PersistsTheExpansionRead_AndFoldsItIntoTheReport()
     {

@@ -192,4 +192,76 @@ public class VectorPdfSinkTests
         using var paint = new SKPaint { Color = SKColors.Black, IsAntialias = true };
         canvas.DrawText(text, 54, 100, font, paint);
     }
+
+    // ---- Pictures --------------------------------------------------------------------------------------
+    //
+    // Skia's PDF backend writes an opaque picture losslessly unless told otherwise, so a report with 67
+    // scene illustrations came out at 173 MB: too big for the reMarkable (100 MB documented) and enough to
+    // run a phone out of memory just holding it. The sink can be told to encode opaque pictures as JPEG.
+
+    [Fact]
+    public void ALossyQualityMakesAnOpaquePictureFarSmaller()
+    {
+        var picture = TexturedPng(1024, 1792);
+
+        var lossless = WithPicture(new VectorPdfSink(), picture);
+        var lossy = WithPicture(new VectorPdfSink(imageQuality: 80), picture);
+
+        Assert.True(lossy.Length < lossless.Length / 3,
+            $"lossy {lossy.Length:N0} bytes was not under a third of lossless {lossless.Length:N0}");
+    }
+
+    [Fact]
+    public void ThePictureStillShowsUpAsAPictureOnThePage()
+    {
+        var pdf = WithPicture(new VectorPdfSink(imageQuality: 80), TexturedPng(512, 512));
+
+        using var document = PdfDocument.Open(new MemoryStream(pdf));
+        Assert.Single(document.GetPage(1).GetImages());
+    }
+
+    // The sink is shared with documents whose pictures must not be touched, so lossless stays the default
+    // and a document opts in.
+    [Fact]
+    public void TheDefaultIsStillLossless()
+    {
+        var picture = TexturedPng(512, 512);
+
+        var byDefault = WithPicture(new VectorPdfSink(), picture);
+        var explicitlyLossless = WithPicture(new VectorPdfSink(imageQuality: VectorPdfSink.Lossless), picture);
+
+        Assert.Equal(explicitlyLossless.Length, byDefault.Length);
+    }
+
+    private static byte[] WithPicture(VectorPdfSink sink, byte[] png)
+    {
+        var canvas = sink.BeginPage(LetterWidth, LetterHeight);
+        using var image = SKImage.FromEncodedData(png);
+        canvas.DrawImage(image, new SKRect(36, 36, 36 + 288, 36 + 504));
+        sink.EndPage();
+        return sink.Close();
+    }
+
+    // A smooth picture with a little grain, the way a painted illustration is: a PNG of it is large
+    // (the grain defeats lossless compression) and a JPEG of it is small.
+    private static byte[] TexturedPng(int width, int height)
+    {
+        var random = new Random(7);
+        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var grain = random.Next(-5, 6);
+                var r = (byte)Math.Clamp(x * 255 / width + grain, 0, 255);
+                var g = (byte)Math.Clamp(y * 255 / height + grain, 0, 255);
+                var b = (byte)Math.Clamp(128 + (x + y) % 40 + grain, 0, 255);
+                bitmap.SetPixel(x, y, new SKColor(r, g, b));
+            }
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
+    }
 }
