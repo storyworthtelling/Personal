@@ -19,6 +19,15 @@ public sealed class ClaudeOptions
 
     public int MaxTokens { get; set; } = 8_000;
 
+    // Reasoning effort, set on every request rather than inherited from a default that changes with the
+    // model. At high, the model's reasoning shares the output limit with its reply, and the long
+    // structured replies (the chunk notes, the craft and story reductions) were cut off again and again:
+    // 20,000 output tokens spent with a few thousand of visible JSON, the last attempt with none at all.
+    // Everything that fills a fixed JSON contract therefore runs at medium. The sixteen whole-book reads
+    // are the product and keep PassEffort.
+    public string Effort { get; set; } = "medium";
+    public string PassEffort { get; set; } = "high";
+
     // Entity extraction is EXHAUSTIVE by design — every character and setting in a chunk of up to ~48K
     // characters, each with a description, an approximate scale, and aliases — so its JSON output
     // routinely outgrows the small default MaxTokens. A reply that runs out of budget is not merely
@@ -37,7 +46,7 @@ public sealed class ClaudeOptions
     // The consolidated revision report is long (many sections + several reviews), so its "reduce"
     // call gets a larger output budget than the per-chunk/per-panel calls. This covers the STORY half
     // only — synopsis, character map, plot holes, inconsistencies, pacing, reviews, revision plan.
-    public int AnalysisMaxTokens { get; set; } = 16_000;
+    public int AnalysisMaxTokens { get; set; } = 24_000;
 
     // The CRAFT half of the report (line edits, prose/voice, dialogue, the scene-by-scene map) is
     // consolidated by its own call with its own budget. The scene map alone is one entry per scene
@@ -46,7 +55,7 @@ public sealed class ClaudeOptions
     // truncation (the client throws on stop_reason=max_tokens rather than returning a partial report)
     // and streams for long enough that Android's background worker can be killed mid-response. Two
     // calls of this size each stream for about as long as the storyboard calls that already work.
-    public int CraftMaxTokens { get; set; } = 20_000;
+    public int CraftMaxTokens { get; set; } = 32_000;
 
     // One persona's whole-book pass. Measured (F49): a reader review runs to about 4,000 output
     // tokens and a section to about 3,000, and both stopped at the cap rather than finishing, so the
@@ -130,4 +139,8 @@ public sealed class RateLimitOptions
     public int BaseDelaySeconds { get; set; } = 4;
     public int MaxDelaySeconds { get; set; } = 600;
     public int IdlePollSeconds { get; set; } = 10;
+
+    // How long to wait before asking again when the phone has no network. A flat, short interval: nothing
+    // is billed while offline, so there is no reason to back off — only to stop asking every few seconds.
+    public int OfflineRetrySeconds { get; set; } = 60;
 }
