@@ -143,8 +143,17 @@ public sealed class ReviewProcessor : IPipelineStep
         return soonestWait ?? ProcessResult.Idle;
     }
 
-    private Task<ProcessResult> Dispatch(FolioDbContext db, Novel novel, CancellationToken cancellationToken) =>
-        novel.Stage switch
+    private Task<ProcessResult> Dispatch(FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        // A wait stored on the manuscript (an offline phone, a backed-off call) holds every stage that talks
+        // to a provider, not just the step that set it, so a book that cannot reach the network is not
+        // walked through the same failing request once per unit.
+        if (novel.Stage is ProjectStage.BuildingDesignBible or ProjectStage.RenderingSceneImages
+                or ProjectStage.ComposingAnalysis &&
+            novel.RetryNotBeforeUtc is { } notBefore && notBefore > clock.UtcNow)
+            return Task.FromResult(ProcessResult.Waiting(notBefore - clock.UtcNow, novel.Id));
+
+        return novel.Stage switch
         {
             ProjectStage.Created => Advance(db, novel, cancellationToken),
             ProjectStage.Ingesting => Ingest(db, novel, cancellationToken),
@@ -154,6 +163,7 @@ public sealed class ReviewProcessor : IPipelineStep
             ProjectStage.Archiving => ArchiveOutputs(db, novel, cancellationToken),
             _ => Task.FromResult(ProcessResult.Idle)
         };
+    }
 
     // Created -> Ingesting (the only transition with no work of its own).
     private async Task<ProcessResult> Advance(FolioDbContext db, Novel novel, CancellationToken cancellationToken)
@@ -1371,6 +1381,20 @@ public sealed class ReviewProcessor : IPipelineStep
         novel.LastError = $"{call}: {cause}";
 
         TimeSpan delay;
+        if (NetworkFailure.IsOffline(exception))
+        {
+            // Nothing reached the provider, so nothing was billed and nothing was learned about the call:
+            // wait a short flat interval and ask again without spending an attempt.
+            delay = TimeSpan.FromSeconds(rateLimits.OfflineRetrySeconds);
+            novel.RetryNotBeforeUtc = clock.UtcNow + delay;
+            logger.LogWarning(exception,
+                "{Call} could not reach the network for manuscript {NovelId}: the phone is offline; this does " +
+                "not count as an attempt; next check after {NextAttempt:u}: {Error}",
+                call, novel.Id, novel.RetryNotBeforeUtc, cause);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.Waiting(delay, novel.Id);
+        }
+
         if (exception is RateLimitException rateLimit)
         {
             delay = rateLimit.Kind == RateLimitKind.QuotaExhausted
@@ -1512,6 +1536,22 @@ public sealed class ReviewProcessor : IPipelineStep
 
     private void ScheduleRetry(IRetryable unit, Exception exception, Novel novel)
     {
+        if (NetworkFailure.IsOffline(exception))
+        {
+            // The phone has no network: the request never left it. That is not an attempt at the work, so it
+            // is not counted, and the whole manuscript waits rather than every unit failing in turn.
+            unit.LastError = ErrorText.Describe(exception);
+            unit.WorkState = WorkStatus.NeedsRetry;
+            unit.NextAttemptAtUtc = clock.UtcNow + TimeSpan.FromSeconds(rateLimits.OfflineRetrySeconds);
+            novel.RetryNotBeforeUtc = unit.NextAttemptAtUtc;
+            logger.LogWarning(exception,
+                "{Unit} could not reach the network: the phone is offline; this does not count as an attempt " +
+                "({Attempts}/{Max} used); next check {NextAttempt:u}: {Error}",
+                unit.GetType().Name, unit.Attempts, rateLimits.MaxAttempts, unit.NextAttemptAtUtc,
+                ErrorText.Describe(exception));
+            return;
+        }
+
         unit.Attempts++;
         unit.LastError = exception.Message;
         var rateLimit = exception as RateLimitException;
