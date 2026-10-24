@@ -50,6 +50,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<int>("PdfStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("RemarkableNote")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("SeriesContinuityJson")
                         .HasColumnType("TEXT");
 

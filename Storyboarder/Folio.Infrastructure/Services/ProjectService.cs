@@ -1023,6 +1023,10 @@ public sealed class ProjectService
         var rateLimitedUntil = novel.RateLimitedUntilUtc is { } until && until > now ? novel.RateLimitedUntilUtc : null;
 
         var (reads, step) = await ReportPosition(db, novel, analysisNotes, analysisReady, cancellationToken);
+        var deliveryNote = await db.BookAnalyses
+            .Where(a => a.NovelId == id)
+            .Select(a => a.RemarkableNote)
+            .FirstOrDefaultAsync(cancellationToken);
 
         return new NovelStatus(
             novel.Id, novel.Title, novel.Stage.ToString(), novel.LastError,
@@ -1033,7 +1037,7 @@ public sealed class ProjectService
             await SeriesNameOf(db, novel, cancellationToken),
             novel.ShelvedAtUtc is not null, novel.WordCount,
             novel.CoverPath, novel.CoverIsOwners,
-            reads, step, novel.StageAttempts, limits.MaxAttempts);
+            reads, step, novel.StageAttempts, limits.MaxAttempts, deliveryNote);
     }
 
     // Where the book is inside the revision report: how many of the whole-book reads are done and which

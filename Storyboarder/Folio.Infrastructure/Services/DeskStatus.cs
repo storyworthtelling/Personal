@@ -76,8 +76,13 @@ public static class DeskStatus
 
     private static string? Problem(NovelStatus s, bool active, bool stuck)
     {
+        // A finished review can still have missed the tablet. That is not a stopped book, but it is
+        // the one thing the owner most needs to see on a book that says "delivered".
+        if (s.Stage == "Completed")
+            return string.IsNullOrWhiteSpace(s.DeliveryNote) ? null : s.DeliveryNote;
+
         var plain = PlainError.Describe(s.LastError);
-        if (plain.Length == 0 || s.Stage is "Completed" or "Cancelled")
+        if (plain.Length == 0 || s.Stage is "Cancelled")
             return null;
 
         var said = char.ToUpperInvariant(plain[0]) + plain[1..];

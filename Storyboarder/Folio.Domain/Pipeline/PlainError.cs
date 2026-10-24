@@ -15,6 +15,7 @@ public static partial class PlainError
     [
         (["credit balance"], "your Anthropic credit balance is too low"),
         (["truncated", "max_tokens"], "the reply was cut off at the output limit"),
+        (["OutOfMemory", "Failed to allocate", "Java heap space", "until OOM"], "the phone ran out of memory"),
         (["Unable to resolve host", "No address associated", "Network is unreachable", "EAI_NODATA"],
             "the phone has no network"),
         (["401", "403", "invalid x-api-key", "authentication_error", "permission_error"],

@@ -307,4 +307,19 @@ public class NovelStatusTests : IDisposable
         Assert.Equal(2, status!.Attempts);
         Assert.Equal(new RateLimitOptions().MaxAttempts, status.MaxAttempts);
     }
+
+    [Fact]
+    public async Task The_status_carries_the_note_about_a_delivery_that_did_not_reach_the_tablet()
+    {
+        var id = SeedNovel(ProjectStage.Completed, seed =>
+            seed.Context.BookAnalyses.Add(new BookAnalysis
+            {
+                NovelId = seed.NovelId, DeliveredToRemarkable = true,
+                RemarkableNote = "It did not reach the reMarkable: the phone ran out of memory."
+            }));
+
+        var status = await NewService().GetStatusAsync(id, CancellationToken.None);
+
+        Assert.Equal("It did not reach the reMarkable: the phone ran out of memory.", status!.DeliveryNote);
+    }
 }
