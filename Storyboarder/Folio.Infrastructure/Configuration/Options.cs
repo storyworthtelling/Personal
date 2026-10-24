@@ -23,10 +23,11 @@ public sealed class ClaudeOptions
     // model. At high, the model's reasoning shares the output limit with its reply, and the long
     // structured replies (the chunk notes, the craft and story reductions) were cut off again and again:
     // 20,000 output tokens spent with a few thousand of visible JSON, the last attempt with none at all.
-    // Everything that fills a fixed JSON contract therefore runs at medium. The sixteen whole-book reads
-    // are the product and keep PassEffort.
+    // Everything that fills a fixed JSON contract therefore runs at medium. The whole-book reads have
+    // their own setting, and it is medium too: at high, the first read of a real book spent all 8,000 of
+    // its output tokens reasoning and wrote nothing, on every one of twelve attempts.
     public string Effort { get; set; } = "medium";
-    public string PassEffort { get; set; } = "high";
+    public string PassEffort { get; set; } = "medium";
 
     // Entity extraction is EXHAUSTIVE by design — every character and setting in a chunk of up to ~48K
     // characters, each with a description, an approximate scale, and aliases — so its JSON output
@@ -61,7 +62,7 @@ public sealed class ClaudeOptions
     // tokens and a section to about 3,000, and both stopped at the cap rather than finishing, so the
     // budget is set above what was observed rather than at it. A reply that runs out of budget is
     // thrown away wholesale, not trimmed — a truncated read costs the whole pass.
-    public int PassMaxTokens { get; set; } = 8_000;
+    public int PassMaxTokens { get; set; } = 16_000;
 
     // The two models the seventeen passes run on (the finding's reversal 2). Judgement — the seven
     // readers and the two synthesis passes — goes to the strong one, because there the judgement is
@@ -136,6 +137,12 @@ public sealed class RateLimitOptions
     public int GeminiRequestsPerMinute { get; set; } = 60;
     public int GeminiRequestsPerDay { get; set; } = 5_000;
     public int MaxAttempts { get; set; } = 6;
+
+    // A reply cut off at the output limit is the same request with the same limit, so it is cut off again:
+    // five repeats of one whole-book read bought nothing five times. A truncated whole-manuscript call is
+    // tried this many times in all, then the manuscript is parked. (Per-chunk calls are not bound by this;
+    // a chunk's truncation is sometimes a near miss that the next attempt squeezes under.)
+    public int MaxTruncatedAttempts { get; set; } = 2;
     public int BaseDelaySeconds { get; set; } = 4;
     public int MaxDelaySeconds { get; set; } = 600;
     public int IdlePollSeconds { get; set; } = 10;

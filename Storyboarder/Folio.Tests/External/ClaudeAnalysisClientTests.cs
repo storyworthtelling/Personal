@@ -147,13 +147,12 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
-    public async Task EveryCall_SetsItsEffortExplicitly_MediumForWorkAndHighForTheReads()
+    public async Task EveryCall_SetsItsEffortExplicitly_AndNoneOfThemDefaultsToHigh()
     {
         // Effort is set on every request rather than inherited from a default that changes with the model.
-        // The extraction, notes, reductions and image prompts run at medium: at high the model's reasoning
-        // shares the output limit with the reply, and the long structured replies were being cut off
-        // (the reasoning took most of the 16,000-20,000 tokens, leaving too little for the JSON). The
-        // sixteen whole-book reads are the product, so they keep high.
+        // At high, the model's reasoning shares the output limit with the reply: the long structured
+        // replies were cut off (the reasoning took most of the 16,000-20,000 tokens) and, on a real book,
+        // the first whole-book read spent all 8,000 of its tokens thinking and wrote nothing, twelve times.
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"characters\":[],\"settings\":[]}"));
         handler.EnqueueOk(Reply("{}"));
@@ -166,9 +165,30 @@ public class ClaudeAnalysisClientTests
         await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", CancellationToken.None);
 
         Assert.Equal(4, handler.RequestBodies.Count);
-        foreach (var body in handler.RequestBodies.Take(3))
+        foreach (var body in handler.RequestBodies)
             Assert.Contains("\"output_config\":{\"effort\":\"medium\"}", body);
-        Assert.Contains("\"output_config\":{\"effort\":\"high\"}", handler.RequestBodies[3]);
+    }
+
+    [Fact]
+    public async Task AReadingPass_RequestsItsOwnEffortSetting()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var client = new ClaudeAnalysisClient(new HttpClient(handler), Options.Create(new ClaudeOptions
+        {
+            ApiKey = "test-key", Model = "test-model", MaxTokens = 256, PassEffort = "low"
+        }));
+        handler.EnqueueOk(Reply("{\"summary\":\"\",\"findings\":[]}"));
+
+        await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", CancellationToken.None);
+
+        Assert.Contains("\"output_config\":{\"effort\":\"low\"}", Assert.Single(handler.RequestBodies));
+    }
+
+    [Fact]
+    public void AReadingPassGetsRoomForItsReasoningAsWellAsItsReply()
+    {
+        // 8,000 was spent entirely on reasoning with nothing written, on every attempt at the first read.
+        Assert.True(new ClaudeOptions().PassMaxTokens >= 16_000);
     }
 
     [Fact]
