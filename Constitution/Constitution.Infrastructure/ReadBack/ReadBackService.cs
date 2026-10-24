@@ -43,7 +43,8 @@ public sealed class ReadBackService(
     IInkProof proof,
     INoticeBoardAccess notices,
     IReadBackLog log,
-    Func<DateTimeOffset> clock)
+    Func<DateTimeOffset> clock,
+    IReadBackSettled? settled = null)
 {
     private readonly record struct Step<T>(T? Value, DocumentReadBack.Failed? Failure);
 
@@ -283,6 +284,10 @@ public sealed class ReadBackService(
                 ledger.Save(next);
             }
         }
+
+        // What the pages taught: told after the skip ledger and before the document is marked saved, so a failure keeps the page
+        // and the next morning tries again (learning from the same day twice changes nothing).
+        settled?.Settled(document, result);
 
         if (sighting is not null)
         {
