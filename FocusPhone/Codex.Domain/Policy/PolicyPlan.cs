@@ -3,9 +3,6 @@ namespace Codex.Domain.Policy;
 public record PolicyPlan(
     IReadOnlySet<string> UserRestrictions,
     IReadOnlySet<string> SuspendedPackages,
-    // Hidden rather than suspended: a hidden app cannot be launched, but it keeps running its
-    // background work. Applied with DevicePolicyManager.setApplicationHidden.
-    IReadOnlySet<string> HiddenPackages,
     IReadOnlySet<string> RunnablePackages,
     IReadOnlyList<PermissionGrant> PermissionGrants,
     bool EnforceAutoTime,
