@@ -60,6 +60,17 @@ public static class DiagnosticsPhrases
         _ => throw Undefined(nameof(kind)),
     };
 
+    public static string Of(AssumedSetting setting) => setting switch
+    {
+        AssumedSetting.DinnerTime => "Dinner time",
+        AssumedSetting.BedtimeRoutine => "Bedtime routine",
+        AssumedSetting.LunchGap => "Lunch gap",
+        AssumedSetting.PickupDuty => "Pickup duty",
+        AssumedSetting.WorkHours => "Work hours",
+        AssumedSetting.TimeZone => "Time zone",
+        _ => throw Undefined(nameof(setting)),
+    };
+
     internal static ArgumentOutOfRangeException Undefined(string parameter) =>
         new(parameter, "That value is not one the Diagnostics export knows.");
 }

@@ -115,6 +115,11 @@ public sealed class WaitingPageModel
                 "If you wrote on it, the reMarkable’s cloud may not be passing your ink along. Constitution keeps the page and looks again each morning.",
                 null,
                 NoChips),
+            NoticeKind.WeekNotPlanned => (
+                "This week couldn’t be planned",
+                "Constitution couldn’t read a calendar or record it needs, so it has not planned the week, written to a calendar or sent a page. It looks again at the next run.",
+                null,
+                NoChips),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(notice), notice.Kind, "This notice kind has no Waiting copy; add it to WaitingPageModel."),
         };

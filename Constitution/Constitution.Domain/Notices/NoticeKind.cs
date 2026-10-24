@@ -37,4 +37,11 @@ public enum NoticeKind
     /// either the cloud is not passing the ink along or nothing was written. Waiting, nothing to press. Caution.
     /// </summary>
     NoPenMarks,
+
+    /// <summary>
+    /// The week could not be planned: a calendar it needs could not be read (not set up, not shared, would not answer), or a
+    /// record it learns from could not be read, so nothing was planned, written to a calendar or sent to the tablet. It looks
+    /// again at the next run, so there is nothing to press. Problem.
+    /// </summary>
+    WeekNotPlanned,
 }

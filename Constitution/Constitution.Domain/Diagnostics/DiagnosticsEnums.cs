@@ -99,3 +99,28 @@ public enum DocumentKind
     /// <summary>The read-back digest.</summary>
     Digest,
 }
+
+/// <summary>
+/// A setting the weekly run needed and the household has not given, so it used a stated stand-in. A closed list: the export names
+/// what was assumed by this value and a fixed phrase, never by anything the household wrote (a time, a name, a calendar).
+/// </summary>
+public enum AssumedSetting
+{
+    /// <summary>When the family dinner is (<c>FamilyDinner.Assumed</c>).</summary>
+    DinnerTime,
+
+    /// <summary>When the children's bedtime routine runs (<c>BedtimeRoutine.Assumed</c>).</summary>
+    BedtimeRoutine,
+
+    /// <summary>The lunch gap freed on a day worked from home (<c>WorkFromHomeLunch.Assumed</c>); no setting for it exists yet.</summary>
+    LunchGap,
+
+    /// <summary>Whether an adult is on pickup duty, taken as yes for anyone not known to be off it.</summary>
+    PickupDuty,
+
+    /// <summary>Foreword's work schedule was missing or unreadable, so weekday hours were assumed.</summary>
+    WorkHours,
+
+    /// <summary>The household's time zone was not set, so the phone's was used.</summary>
+    TimeZone,
+}

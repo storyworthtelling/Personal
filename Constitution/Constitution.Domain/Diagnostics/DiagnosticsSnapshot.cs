@@ -27,7 +27,8 @@ public sealed class DiagnosticsSnapshot
         IEnumerable<ComponentOutcome> outcomes,
         IEnumerable<DocumentDelivery> documents,
         IEnumerable<CredentialStatus> credentials,
-        IEnumerable<TrailSection>? trails = null)
+        IEnumerable<TrailSection>? trails = null,
+        IEnumerable<AssumedSetting>? assumed = null)
     {
         ArgumentNullException.ThrowIfNull(version);
         ArgumentNullException.ThrowIfNull(counts);
@@ -42,6 +43,7 @@ public sealed class DiagnosticsSnapshot
         Documents = documents.ToList();
         Credentials = credentials.ToList();
         Trails = (trails ?? []).ToList();
+        Assumed = (assumed ?? []).Select(setting => ComponentOutcome.Defined(setting, nameof(assumed))).ToList();
 
         if (Outcomes.Select(entry => entry.Component).Distinct().Count() != Outcomes.Count)
         {
@@ -50,6 +52,10 @@ public sealed class DiagnosticsSnapshot
         if (Trails.Select(section => section.Kind).Distinct().Count() != Trails.Count)
         {
             throw new ArgumentException("Each trail may appear once.", nameof(trails));
+        }
+        if (Assumed.Distinct().Count() != Assumed.Count)
+        {
+            throw new ArgumentException("A setting is assumed once or not at all.", nameof(assumed));
         }
         if (Credentials.Select(entry => entry.Connection.Value).Distinct(StringComparer.Ordinal).Count() != Credentials.Count)
         {
@@ -68,6 +74,9 @@ public sealed class DiagnosticsSnapshot
     public IReadOnlyList<DocumentDelivery> Documents { get; }
 
     public IReadOnlyList<CredentialStatus> Credentials { get; }
+
+    /// <summary>The settings the weekly run used a stated stand-in for because the household had not given them.</summary>
+    public IReadOnlyList<AssumedSetting> Assumed { get; }
 
     /// <summary>The newest lines of the Body and vault trails, each through <see cref="TrailLines.Filter"/>.</summary>
     public IReadOnlyList<TrailSection> Trails { get; }
