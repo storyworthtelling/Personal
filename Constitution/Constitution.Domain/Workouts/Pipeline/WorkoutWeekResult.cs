@@ -14,6 +14,9 @@ public enum NotPlannedBecause
 
     /// <summary>The rules name no adult to plan for.</summary>
     NoOneToPlan,
+
+    /// <summary>The run's seams are not assembled on this install yet (no sources, no sinks), so nothing was read and nothing could be planned.</summary>
+    NotConfigured,
 }
 
 /// <summary>What became of one document in a run.</summary>
