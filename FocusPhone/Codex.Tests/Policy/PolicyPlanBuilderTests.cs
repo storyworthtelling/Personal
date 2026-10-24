@@ -135,6 +135,21 @@ public class PolicyPlanBuilderTests
         Assert.DoesNotContain("com.android.vending", plan.SuspendedPackages);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayStore_IsHidden_SoItCannotBeLaunched_InEveryMode(bool adminModeActive)
+    {
+        // Hidden, not suspended: a hidden app cannot be started by an intent, so the watch's "Open on
+        // Phone" and any other launch fail, while the app keeps its background work for updates. It
+        // holds in Admin mode too, because the owner never opens the Play Store on this phone.
+        var plan = PolicyPlanBuilder.Build(DefaultContext(adminModeActive: adminModeActive));
+
+        Assert.Contains(PolicyContext.PlayStorePackage, plan.HiddenPackages);
+        Assert.DoesNotContain(PolicyContext.PlayStorePackage, plan.SuspendedPackages);
+        Assert.DoesNotContain(PolicyContext.PlayStorePackage, plan.RunnablePackages);
+    }
+
     [Fact]
     public void SettingsPackage_IsNotSuspended_EvenIfDetectedAsABrowser()
     {
