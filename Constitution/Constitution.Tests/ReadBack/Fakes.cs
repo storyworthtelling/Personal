@@ -180,6 +180,9 @@ internal sealed class FakeLedger(CallLog calls) : ILedgerStore
 
     public bool Unreadable { get; set; }
 
+    /// <summary>Entries the file held that this version could not read, as a ledger with an entry of a kind it does not know would report.</summary>
+    public int UnreadableEntries { get; set; }
+
     public Exception? SaveFails { get; set; }
 
     public int Saves { get; private set; }
@@ -187,7 +190,7 @@ internal sealed class FakeLedger(CallLog calls) : ILedgerStore
     public SkipLedgerRead Load()
     {
         calls.Add("LoadLedger");
-        return Unreadable ? new SkipLedgerRead(SkipLedger.Empty, 0, true) : new SkipLedgerRead(Held, 0, false);
+        return Unreadable ? new SkipLedgerRead(SkipLedger.Empty, 0, true) : new SkipLedgerRead(Held, UnreadableEntries, false);
     }
 
     public void Save(SkipLedger ledger)
@@ -205,12 +208,18 @@ internal sealed class FakeLedger(CallLog calls) : ILedgerStore
 
 internal sealed class FakeProof(CallLog calls, bool seen = false) : IInkProof
 {
-    public bool PenMarksSeen { get; private set; } = seen;
+    public InkProof Current { get; set; } = seen ? InkProof.EstablishedEarlier : InkProof.None;
 
-    public void RecordPenMarksSeen()
+    public bool PenMarksSeen => Current.IsEstablished;
+
+    public List<InkSighting> Recorded { get; } = [];
+
+    public InkProof Record(InkSighting sighting)
     {
         calls.Add("RecordProof");
-        PenMarksSeen = true;
+        Recorded.Add(sighting);
+        Current = Current.Record(sighting);
+        return Current;
     }
 }
 

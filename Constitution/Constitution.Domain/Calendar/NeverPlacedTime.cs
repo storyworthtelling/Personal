@@ -18,9 +18,10 @@ namespace Constitution.Domain.Calendar;
 ///   <item><b>The bedtime routine</b> is every day, for both adults, up to the bedtime and not after.</item>
 /// </list>
 ///
-/// <para>An entry frees time only if it names this person or nobody (so "Lee off" on the family
-/// calendar frees Lee's hours, never Sam's). Freeing time is the unsafe direction, so it is narrow
-/// where blocking is broad.</para>
+/// <para>An entry frees time only if it names this person, or names nobody and is on this person's own
+/// calendar. "Lee off" on the family calendar frees Lee's hours, never Sam's, and "Kids off school" there,
+/// which names no one, frees no one's. Freeing time is the unsafe direction, so it is narrow where blocking
+/// is broad.</para>
 /// </summary>
 public static class NeverPlacedTime
 {
@@ -160,11 +161,14 @@ public static class NeverPlacedTime
             // Only a known schedule reaches the markers (WorkHours returns an unknown one's assumed hours
             // first), so the off-day words here are the schedule's own. An unknown schedule frees nothing.
             var offWords = rules.Work.OffKeywords;
-            offEntries = own.Concat(family)
-                .Where(entry => entry.IsAllDay && Applies(entry, adult, rules) && offWords.Any(word => WholeWord.Contains(entry.Title, word)))
+            // An off day on the person's own calendar speaks for them when it names them or nobody; on the family calendar it speaks
+            // only for whom it names ("Kids off school" names no one, and is no one's day off).
+            offEntries = own.Where(entry => Applies(entry, adult, rules, mustName: false))
+                .Concat(family.Where(entry => Applies(entry, adult, rules, mustName: true)))
+                .Where(entry => entry.IsAllDay && offWords.Any(word => WholeWord.Contains(entry.Title, word)))
                 .ToList();
             homeEntries = own
-                .Where(entry => entry.IsAllDay && Applies(entry, adult, rules) && rules.Lunch.Keywords.Any(word => WholeWord.Contains(entry.Title, word)))
+                .Where(entry => entry.IsAllDay && Applies(entry, adult, rules, mustName: false) && rules.Lunch.Keywords.Any(word => WholeWord.Contains(entry.Title, word)))
                 .ToList();
         }
 
@@ -175,11 +179,11 @@ public static class NeverPlacedTime
         private static bool Covers(CalendarEntry entry, DateOnly day) =>
             entry.IsAllDay && entry.FirstDay <= day && day < entry.EndDayExclusive;
 
-        // An entry speaks for this adult when it names them, or names nobody at all.
-        private static bool Applies(CalendarEntry entry, Adult adult, PlanningRules rules)
+        // An entry speaks for this adult when it names them, or (unless it must name someone) names nobody at all.
+        private static bool Applies(CalendarEntry entry, Adult adult, PlanningRules rules, bool mustName)
         {
             var named = NamedAdults.In(entry, rules.Adults);
-            return named.Count == 0 || named.Any(other => string.Equals(other.Name, adult.Name, StringComparison.OrdinalIgnoreCase));
+            return (named.Count == 0 && !mustName) || named.Any(other => string.Equals(other.Name, adult.Name, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

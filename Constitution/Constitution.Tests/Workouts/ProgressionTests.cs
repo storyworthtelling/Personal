@@ -2,8 +2,10 @@ using System.Text.Json;
 using Constitution.Domain.Calendar;
 using Constitution.Domain.Equipment;
 using Constitution.Domain.Ink;
+using Constitution.Domain.ReadBack;
 using Constitution.Domain.Voice;
 using Constitution.Domain.Workouts;
+using WorkoutIds = Constitution.Domain.Documents.WorkoutIds;
 using static Constitution.Tests.Calendar.InventedFamily;
 using static Constitution.Tests.Workouts.WorkoutFixture;
 
@@ -83,20 +85,27 @@ public class ProgressionTests
 
     private static SessionPages Pages(int day, params Exercise[] exercises) => Pages(Sam, SessionKind.Strength, day, exercises);
 
+    // The ids are the ones the real exercise pages print (WorkoutIds), the same on every page, so what tells the pages apart
+    // is their number in the document, as it is in a real read-back. A fixture with an id per page would hide the very
+    // fault this suite exists to catch.
     private static SessionPages Pages(string person, SessionKind kind, int day, params Exercise[] exercises) =>
-        new(person, Day(day), kind, exercises.Select((exercise, index) => new ExercisePageRef(exercise, $"done-{index + 1}", $"feel-{index + 1}")).ToList());
+        new(person, Day(day), kind, exercises.Select(exercise => new ExercisePageRef(exercise)).ToList());
 
-    private static InkResolution[] Rated(int page, string word) => [new InkResolution.Ticked($"done-{page}"), new InkResolution.Circled($"feel-{page}", word)];
+    // Exercise n of the session is page n + 1 of the document (page 1 is the cover).
+    private static PageResolutions[] OnPage(int exercise, params InkResolution[] resolutions) => [new PageResolutions(exercise + 1, resolutions)];
 
-    private static InkResolution[] TickedOnly(int page) => [new InkResolution.Ticked($"done-{page}"), new InkResolution.Unchanged($"feel-{page}")];
+    private static PageResolutions[] Rated(int page, string word) => OnPage(page, new InkResolution.Ticked(WorkoutIds.Done), new InkResolution.Circled(WorkoutIds.Rating, word));
 
-    private static InkResolution[] Empty(int page) => [new InkResolution.Skipped($"done-{page}"), new InkResolution.Unchanged($"feel-{page}")];
+    private static PageResolutions[] TickedOnly(int page) => OnPage(page, new InkResolution.Ticked(WorkoutIds.Done), new InkResolution.Unchanged(WorkoutIds.Rating));
 
-    private static InkResolution[] CircledAlone(int page, string word) => [new InkResolution.PageDone($"done-{page}", word)];
+    private static PageResolutions[] Empty(int page) => OnPage(page, new InkResolution.Skipped(WorkoutIds.Done), new InkResolution.Unchanged(WorkoutIds.Rating));
 
-    private static InkResolution[] Unread(int page) => [new InkResolution.NotRead($"done-{page}", "page not read"), new InkResolution.NotRead($"feel-{page}", "page not read")];
+    private static PageResolutions[] CircledAlone(int page, string word) => OnPage(page, new InkResolution.PageDone(WorkoutIds.Done, word));
 
-    private static InkResolution[] All(params InkResolution[][] pages) => pages.SelectMany(page => page).ToArray();
+    private static PageResolutions[] Unread(int page) =>
+        OnPage(page, new InkResolution.NotRead(WorkoutIds.Done, "page not read"), new InkResolution.NotRead(WorkoutIds.Rating, "page not read"));
+
+    private static PageResolutions[] All(params PageResolutions[][] pages) => pages.SelectMany(page => page).ToArray();
 
     private static ProgressionLedger Climbed(params Exercise[] exercises)
     {
@@ -630,7 +639,7 @@ public class ProgressionTests
         using var document = JsonDocument.Parse(ledger.ToJson());
         var root = document.RootElement;
 
-        Assert.Equal(["caps", "exercises", "version"], root.EnumerateObject().Select(item => item.Name).Order().ToArray());
+        Assert.Equal(["caps", "exercises", "settled", "version"], root.EnumerateObject().Select(item => item.Name).Order().ToArray());
         Assert.Equal(1, root.GetProperty("version").GetInt32());
         var exercise = root.GetProperty("exercises").EnumerateArray().First();
         Assert.Equal(["easyRun", "exercise", "person", "pounds", "rung", "upFrom"], exercise.EnumerateObject().Select(item => item.Name).Order().ToArray());
@@ -692,8 +701,8 @@ public class ProgressionTests
     [Fact]
     public void ASessionWithNoPagesOrNoOneIsRefused()
     {
-        Assert.Throws<ArgumentException>(() => ProgressionLedger.Empty.Settle(new SessionPages(Sam, Day(0), SessionKind.Strength, []), []));
-        Assert.Throws<ArgumentException>(() => ProgressionLedger.Empty.Settle(new SessionPages(" ", Day(0), SessionKind.Strength, Pages(0, Goblet).Pages), []));
+        Assert.Throws<ArgumentException>(() => ProgressionLedger.Empty.Settle(new SessionPages(Sam, Day(0), SessionKind.Strength, []), Array.Empty<PageResolutions>()));
+        Assert.Throws<ArgumentException>(() => ProgressionLedger.Empty.Settle(new SessionPages(" ", Day(0), SessionKind.Strength, Pages(0, Goblet).Pages), Array.Empty<PageResolutions>()));
     }
 
     [Fact]

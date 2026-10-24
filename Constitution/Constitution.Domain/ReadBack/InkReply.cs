@@ -7,6 +7,10 @@ namespace Constitution.Domain.ReadBack;
 /// Turns the vision read's reply into per-page reads. A reply that cannot be read is pages that were not read,
 /// never an exception and never an empty page; a box the reply spoils (answered twice, no true-or-false mark) is a
 /// box it did not report. Anything the reply says about a page or a box the document does not ask about is ignored.
+///
+/// <para><b>A box is answered under its page-qualified id</b> (<see cref="InkInstruction.QualifiedId"/>), because every exercise
+/// page prints the same ids. An id with no page in it is not an answer; an entry whose page number and qualified id disagree
+/// (a model counting pages from the cover) spoils both boxes it could mean, and they come back not read.</para>
 /// </summary>
 public static class InkReply
 {
@@ -86,15 +90,35 @@ public static class InkReply
         var asked = document.Pages.ToDictionary(
             page => page.Number, page => page.AskedTargets.Select(target => target.Id).ToHashSet(StringComparer.Ordinal));
         var seen = new Dictionary<(int Page, string Id), List<InkTargetRead>>();
+        var spoiled = new HashSet<(int Page, string Id)>();
 
         foreach (var entry in targets.EnumerateArray())
         {
             if (entry.ValueKind != JsonValueKind.Object
                 || !entry.TryGetProperty("page", out var pageValue) || pageValue.ValueKind != JsonValueKind.Number || !pageValue.TryGetInt32(out var page)
                 || !entry.TryGetProperty("id", out var idValue) || idValue.ValueKind != JsonValueKind.String
-                || !entry.TryGetProperty("marked", out var marked) || marked.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
-                || !asked.TryGetValue(page, out var ids)
-                || idValue.GetString() is not { } id || !ids.Contains(id))
+                || !entry.TryGetProperty("marked", out var marked) || marked.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            {
+                continue;
+            }
+
+            // The same ids sit on every exercise page, so only the id qualified by its page says which box was meant. An id
+            // that is not spelled that way says nothing about a page, and is not an answer.
+            if (!TryUnqualify(idValue.GetString(), out var idPage, out var id))
+            {
+                continue;
+            }
+
+            // The page field and the id disagree: a model that counts its pages from the cover credits a mark to the page after
+            // the one it is on. Which of the two is right cannot be told, so neither box is read.
+            if (idPage != page)
+            {
+                spoiled.Add((idPage, id));
+                spoiled.Add((page, id));
+                continue;
+            }
+
+            if (!asked.TryGetValue(page, out var ids) || !ids.Contains(id))
             {
                 continue;
             }
@@ -111,7 +135,7 @@ public static class InkReply
 
         // A box answered twice has two answers that cannot both be the owner's; neither is taken.
         var byPage = new Dictionary<int, List<InkTargetRead>>();
-        foreach (var ((page, _), reads) in seen.Where(pair => pair.Value.Count == 1))
+        foreach (var ((page, _), reads) in seen.Where(pair => pair.Value.Count == 1 && !spoiled.Contains(pair.Key)))
         {
             if (!byPage.TryGetValue(page, out var list))
             {
@@ -122,6 +146,33 @@ public static class InkReply
         }
 
         return byPage;
+    }
+
+    // "p2:done" is page 2, box "done"; only that exact spelling (a plain page number, no sign, no leading zero) is taken.
+    private static bool TryUnqualify(string? qualified, out int page, out string id)
+    {
+        page = 0;
+        id = string.Empty;
+        if (qualified is not { Length: > 3 } || qualified[0] != 'p')
+        {
+            return false;
+        }
+
+        var colon = qualified.IndexOf(':', StringComparison.Ordinal);
+        if (colon < 2 || colon == qualified.Length - 1)
+        {
+            return false;
+        }
+
+        var digits = qualified.AsSpan(1, colon - 1);
+        if (digits[0] == '0' || !digits.ToString().All(char.IsAsciiDigit)
+            || !int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out page))
+        {
+            return false;
+        }
+
+        id = qualified[(colon + 1)..];
+        return true;
     }
 
     // Missing or not a number is no confidence at all, which the resolver asks about; out of range is pulled to the nearest end.

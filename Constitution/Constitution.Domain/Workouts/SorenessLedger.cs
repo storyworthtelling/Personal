@@ -149,8 +149,10 @@ public sealed class SorenessLedger
             return false;
         }
 
-        // Every box has to have said "better": one left out, unread or waiting on a question is not the owner's answer.
-        return boxIds.All(id => relevant.Any(item => item.SubjectId == id && item is InkResolution.Better));
+        // Every box has to have said "better": one left out, unread or waiting on a question is not the owner's answer. The tick is
+        // printed under one id on every page, so a page that said better does not speak for a page, under the same id, that has not.
+        return relevant.All(item => item is InkResolution.Better)
+            && boxIds.All(id => relevant.Any(item => item.SubjectId == id));
     }
 
     private static bool Same(string left, string right) => string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);

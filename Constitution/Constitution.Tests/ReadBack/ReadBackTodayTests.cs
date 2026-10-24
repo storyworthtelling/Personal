@@ -16,7 +16,7 @@ public class ReadBackTodayTests
     private static Rig Proven(params ExpectedDocument[] documents)
     {
         var rig = new Rig(true, documents);
-        rig.Vision.Reply = document => Read(document, PenStrokes.Seen);
+        rig.Vision.Reply = document => Read(document, PenStrokes.None);
         return rig;
     }
 

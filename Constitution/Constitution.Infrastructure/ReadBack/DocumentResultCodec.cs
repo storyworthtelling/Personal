@@ -27,7 +27,7 @@ internal static class DocumentResultCodec
             writer.WriteStartObject();
             writer.WriteNumber("version", Version);
             writer.WriteString("name", result.Name);
-            writer.WriteString("kind", result.Kind.ToString());
+            writer.WriteString("kind", ReadBackWireNames.Of(result.Kind));
             writer.WriteString("day", result.Day.ToString(DayFormat, CultureInfo.InvariantCulture));
             writer.WriteString("person", result.Person);
             writer.WriteString("readAt", result.ReadAt.ToString("O", CultureInfo.InvariantCulture));
@@ -75,11 +75,8 @@ internal static class DocumentResultCodec
                 throw new FormatException("This result file is of a version this app does not read.");
             }
 
-            var kind = Enum.Parse<DeliveryKind>(Text(root, "kind"));
-            if (!Enum.IsDefined(kind))
-            {
-                throw new FormatException("This result file names a document kind this app does not know.");
-            }
+            var kind = ReadBackWireNames.DeliveryKindOf(Text(root, "kind"))
+                ?? throw new FormatException("This result file names a document kind this app does not know.");
 
             var pages = root.GetProperty("pages").EnumerateArray()
                 .Select(page => new PageResolutions(

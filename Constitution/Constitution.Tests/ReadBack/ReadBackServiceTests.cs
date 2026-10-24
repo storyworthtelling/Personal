@@ -342,8 +342,8 @@ public class ReadBackServiceTests
         var outcome = await rig.RunOne();
 
         Assert.IsType<DocumentReadBack.Settled>(outcome);
-        Assert.True(rig.Proof.PenMarksSeen);
         Assert.Empty(rig.Notices.Board.Waiting());
+        Assert.Single(rig.Proof.Recorded);
     }
 
     [Fact]
@@ -358,27 +358,178 @@ public class ReadBackServiceTests
         Assert.Equal(SessionOutcome.Skipped, rig.Ledger.Held.OutcomeOf(Person, Day));
     }
 
+    // Review finding S4 · ink is proven by two documents on two mornings, not by one read's word.
+
+    private static readonly DateOnly TheMorning = DateOnly.FromDateTime(Morning.DateTime);
+
     [Fact]
-    public async Task StrokesOutsideABoxStillProveInk()
+    public async Task OneDocumentWithInkDoesNotProveTheCloudCarriesIt()
     {
-        // The owner wrote in the notes margin and ticked nothing: that is a skip, and the cloud plainly carries ink.
-        var rig = Arranged(reply: document => Read(document, PenStrokes.Seen));
+        var rig = Arranged(reply: document => Read(document, PenStrokes.Seen, (2, "done")));
 
         var outcome = await rig.RunOne();
 
+        // The page's own marks settle that page, and the sighting is kept; the flag that makes later blanks skips is not set.
         Assert.IsType<DocumentReadBack.Settled>(outcome);
-        Assert.True(rig.Proof.PenMarksSeen);
-        Assert.Equal(SessionOutcome.Skipped, rig.Ledger.Held.OutcomeOf(Person, Day));
+        Assert.False(rig.Proof.PenMarksSeen);
+        Assert.Equal([new InkSighting(Name, TheMorning)], rig.Proof.Recorded.ToArray());
+        Assert.Equal(SessionOutcome.Done, rig.Ledger.Held.OutcomeOf(Person, Day));
     }
 
     [Fact]
-    public async Task AConfidentMarkAloneProvesTheInk()
+    public async Task AConfidentMarkAloneIsASighting()
     {
         var rig = Arranged(reply: document => Read(document, PenStrokes.Unknown, (2, "done")));
 
         await rig.RunOne();
 
+        Assert.Single(rig.Proof.Recorded);
+        Assert.False(rig.Proof.PenMarksSeen);
+    }
+
+    [Fact]
+    public async Task TwoDocumentsOnTwoMorningsProveTheInk()
+    {
+        var next = Workout(Day.AddDays(1));
+        var rig = Arranged(documents: [Workout(), next], reply: document => Read(document, PenStrokes.Seen, (2, "done")));
+
+        await rig.Service.Run();
+        Assert.False(rig.Proof.PenMarksSeen);
+        rig.Now = Morning.AddDays(1);
+        await rig.Service.Run();
+
         Assert.True(rig.Proof.PenMarksSeen);
+        Assert.Equal(TheMorning.AddDays(1), rig.Proof.Current.EstablishedOn);
+    }
+
+    [Fact]
+    public async Task ABlankPageIsKeptTheMorningTheInkIsProven()
+    {
+        // Proof was established this morning, so a page that is blank now may be one whose ink the cloud has not caught up with.
+        var rig = Arranged(reply: document => Read(document, PenStrokes.None));
+        rig.Proof.Current = InkProof.EstablishedOnMorning(TheMorning);
+
+        var outcome = await rig.RunOne();
+
+        Assert.IsType<DocumentReadBack.Unfinished>(outcome);
+        Assert.Equal(0, rig.Ledger.Saves);
+        Assert.Equal(0, rig.Results.Saves);
+        Assert.Empty(rig.Tablet.Trashed);
+        Assert.Empty(rig.Expected.Retired);
+        Assert.Empty(rig.Notices.Board.Waiting());
+    }
+
+    [Fact]
+    public async Task TheBlankPageIsASkipTheMorningAfter()
+    {
+        var rig = Arranged(reply: document => Read(document, PenStrokes.None));
+        rig.Proof.Current = InkProof.EstablishedOnMorning(TheMorning);
+        await rig.RunOne();
+
+        rig.Now = Morning.AddDays(1);
+        var outcome = await rig.RunOne();
+
+        Assert.IsType<DocumentReadBack.Settled>(outcome);
+        Assert.Equal(SessionOutcome.Skipped, rig.Ledger.Held.OutcomeOf(Person, Day));
+        Assert.Single(rig.Tablet.Trashed);
+    }
+
+    [Fact]
+    public async Task ABlankPageAfterTheProofWasEstablishedEarlierIsASkip()
+    {
+        var rig = Arranged(reply: document => Read(document, PenStrokes.None));
+        rig.Proof.Current = InkProof.EstablishedOnMorning(TheMorning.AddDays(-1));
+
+        var outcome = await rig.RunOne();
+
+        Assert.IsType<DocumentReadBack.Settled>(outcome);
+        Assert.Equal(SessionOutcome.Skipped, rig.Ledger.Held.OutcomeOf(Person, Day));
+    }
+
+    [Fact]
+    public async Task APageWithAMarkIsNotHeldOnTheMorningTheInkIsProven()
+    {
+        var rig = Arranged(reply: document => Read(document, PenStrokes.Seen, (2, "done")));
+        rig.Proof.Current = InkProof.EstablishedOnMorning(TheMorning);
+
+        var outcome = await rig.RunOne();
+
+        Assert.IsType<DocumentReadBack.Settled>(outcome);
+        Assert.Equal(SessionOutcome.Done, rig.Ledger.Held.OutcomeOf(Person, Day));
+    }
+
+    [Fact]
+    public async Task ABlankPageReadRightAfterTheProofIsEstablishedIsHeldToo()
+    {
+        // Two documents in one morning: the first establishes the proof (a sighting on an earlier morning was already kept),
+        // and the second is blank. It is read after the proof exists, so it waits a morning like any other blank page.
+        var first = Workout(Day, "A");
+        var second = Workout(Day, "B");
+        var rig = Arranged(documents: [first, second], reply: document => document.Subject == "A"
+            ? Read(document, PenStrokes.Seen, (2, "done"))
+            : Read(document, PenStrokes.None));
+        rig.Proof.Current = InkProof.None.Record(new InkSighting("Constitution — Workout — 2026-11-02", TheMorning.AddDays(-1)));
+
+        var report = await rig.Service.Run();
+
+        Assert.IsType<DocumentReadBack.Settled>(report.Documents[0]);
+        Assert.True(rig.Proof.PenMarksSeen);
+        Assert.IsType<DocumentReadBack.Unfinished>(report.Documents[1]);
+        Assert.Single(rig.Tablet.Trashed);
+    }
+
+    [Fact]
+    public async Task StrokesWithNoBoxMarkedAreNotASkipEvenWhenProven()
+    {
+        // The owner wrote in the notes margin and ticked nothing. The read saw ink, so a blank box may be a tick it did not
+        // attribute; it is not safe to call the session skipped, and the page stays.
+        var rig = Arranged(proven: true, reply: document => Read(document, PenStrokes.Seen));
+
+        var outcome = await rig.RunOne();
+
+        Assert.IsType<DocumentReadBack.Unfinished>(outcome);
+        Assert.Equal(0, rig.Ledger.Saves);
+        Assert.Equal(0, rig.Results.Saves);
+        Assert.Empty(rig.Tablet.Trashed);
+        Assert.Empty(rig.Expected.Retired);
+    }
+
+    [Fact]
+    public async Task StrokesWithNoBoxMarkedAreNotASkipBeforeProofEither()
+    {
+        var rig = Arranged(reply: document => Read(document, PenStrokes.Seen));
+
+        var outcome = await rig.RunOne();
+
+        Assert.IsType<DocumentReadBack.Unfinished>(outcome);
+        Assert.Equal(0, rig.Ledger.Saves);
+        Assert.Empty(rig.Proof.Recorded);
+        Assert.False(rig.Proof.PenMarksSeen);
+        Assert.Empty(rig.Tablet.Trashed);
+    }
+
+    [Fact]
+    public async Task StrokesAloneAreNotASighting()
+    {
+        var rig = Arranged(reply: document => Read(document, PenStrokes.Seen));
+
+        await rig.RunOne();
+
+        Assert.Empty(rig.Proof.Recorded);
+    }
+
+    [Fact]
+    public async Task APageHeldForItsStrokesIsReadAgainNextMorning()
+    {
+        var rig = Arranged(reply: document => Read(document, PenStrokes.Seen));
+        await rig.RunOne();
+
+        rig.Vision.Reply = document => Read(document, PenStrokes.Seen, (2, "done"));
+        rig.Now = Morning.AddDays(1);
+        var outcome = await rig.RunOne();
+
+        Assert.IsType<DocumentReadBack.Settled>(outcome);
+        Assert.Equal(SessionOutcome.Done, rig.Ledger.Held.OutcomeOf(Person, Day));
     }
 
     [Fact]
@@ -390,6 +541,7 @@ public class ReadBackServiceTests
 
         Assert.IsType<DocumentReadBack.Settled>(outcome);
         Assert.False(rig.Proof.PenMarksSeen);
+        Assert.Empty(rig.Proof.Recorded);
         Assert.DoesNotContain(rig.Notices.Board.Waiting(), notice => notice.Kind == NoticeKind.NoPenMarks);
     }
 
@@ -419,7 +571,7 @@ public class ReadBackServiceTests
             Now = Morning,
         };
         rig.Vision.Reply = stage == ReadBackStage.Resolve
-            ? read => Read(read, PenStrokes.Seen)
+            ? read => Read(read, PenStrokes.Seen, (2, "feel-1"))
             : read => WithDoubt(read, 2, "done", 0.5, marked: true);
         var injected = new HttpRequestException("injected for " + stage);
         switch (stage)
@@ -463,6 +615,24 @@ public class ReadBackServiceTests
         Assert.Equal(0, rig.Ledger.Saves);
         Assert.Equal(0, rig.Results.Saves);
         Assert.Empty(rig.Tablet.Trashed);
+    }
+
+    [Fact]
+    public async Task ALedgerWithEntriesItCannotReadIsNeverWrittenOver()
+    {
+        // An entry of a kind this version does not know is part of the only copy: saving the readable ones would drop it.
+        var rig = Arranged();
+        rig.Ledger.UnreadableEntries = 1;
+
+        var outcome = await rig.RunOne();
+
+        var failed = Assert.IsType<DocumentReadBack.Failed>(outcome);
+        Assert.Equal(ReadBackStage.Persist, failed.Stage);
+        Assert.IsType<LedgerUnreadableException>(failed.Failure);
+        Assert.Equal(0, rig.Ledger.Saves);
+        Assert.Equal(0, rig.Results.Saves);
+        Assert.Empty(rig.Tablet.Trashed);
+        Assert.Empty(rig.Expected.Saved);
     }
 
     [Fact]

@@ -303,7 +303,9 @@ public class TravelTests
     {
         var onTheRoad = 0;
         var paused = 0;
-        for (var seed = 1; seed <= 80; seed++)
+        // More weeks than it once took: only a clear work phrase on an own calendar leaves the day free to plan on the road
+        // (review finding N1), so fewer of the generated weeks reach the adapter than when the family calendar could free a day too.
+        for (var seed = 1; seed <= 400; seed++)
         {
             var random = new Random(seed);
             var first = random.Next(0, 6);

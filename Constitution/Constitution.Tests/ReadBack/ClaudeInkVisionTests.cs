@@ -48,7 +48,7 @@ public class ClaudeInkVisionTests
 
     private static string Everything(ExpectedDocument document) =>
         "{\"penStrokes\":\"seen\",\"targets\":[" + string.Join(",", document.Pages.SelectMany(page => page.AskedTargets.Select(target =>
-            $"{{\"page\":{page.Number},\"id\":\"{target.Id}\",\"marked\":{(page.Number == 2 && target.Id == "done" ? "true" : "false")},\"text\":null,\"alternative\":null,\"confidence\":0.95}}"))) + "]}";
+            $"{{\"page\":{page.Number},\"id\":\"{InkInstruction.QualifiedId(page.Number, target.Id)}\",\"marked\":{(page.Number == 2 && target.Id == "done" ? "true" : "false")},\"text\":null,\"alternative\":null,\"confidence\":0.95}}"))) + "]}";
 
     private static (ClaudeInkVision Vision, Handler Handler, Mock<ICredentialHealthSink> Health) Make(
         Func<HttpRequestMessage, string, HttpResponseMessage> respond, string key = "sample-test-value")

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Constitution.Domain.Ink;
+using Constitution.Domain.ReadBack;
 
 namespace Constitution.Domain.Workouts;
 
@@ -33,6 +34,9 @@ public sealed record ExerciseState(int Rung, int Pounds, int EasyRun, int? UpFro
 /// A skipped page in the middle is not stopping early, and nor is anything unread: with a page unknown there is no
 /// "everything after it".</para>
 ///
+/// <para><b>A day is learned from once.</b> A session already settled for the same person and day is left as it is, so reading
+/// the same page again cannot count an easy run twice. A read that reached none of the pages does not use the day up.</para>
+///
 /// <para><b>Only strength sessions teach it.</b> Mobility and the walks have no dose to climb; their pages are ignored here.</para>
 /// </summary>
 public sealed class ProgressionLedger
@@ -45,23 +49,36 @@ public sealed class ProgressionLedger
     /// <summary>The most a strength session holds; a cap that reaches this is gone.</summary>
     public const int MaximumExercises = 5;
 
+    /// <summary>How long a settled day is remembered. A page is given up on after a week, so no retry comes back to a day older than this.</summary>
+    public const int RetainDays = 28;
+
     private readonly IReadOnlyDictionary<(string Person, string Exercise), Entry> states;
     private readonly IReadOnlyDictionary<string, CapEntry> caps;
+    private readonly IReadOnlySet<SettledDay> settled;
 
-    private ProgressionLedger(IReadOnlyDictionary<(string Person, string Exercise), Entry> states, IReadOnlyDictionary<string, CapEntry> caps)
+    private ProgressionLedger(
+        IReadOnlyDictionary<(string Person, string Exercise), Entry> states,
+        IReadOnlyDictionary<string, CapEntry> caps,
+        IReadOnlySet<SettledDay> settled)
     {
         this.states = states;
         this.caps = caps;
+        this.settled = settled;
     }
 
     public static ProgressionLedger Empty { get; } = new(
         new Dictionary<(string Person, string Exercise), Entry>(),
-        new Dictionary<string, CapEntry>());
+        new Dictionary<string, CapEntry>(),
+        new HashSet<SettledDay>());
 
-    public ProgressionLedger Settle(SessionPages session, IEnumerable<InkResolution> resolutions, AssessmentBaselines? baselines = null)
+    /// <summary>
+    /// Settles a session from the pages of its read document. Exercise <c>n</c> of the session is page <c>n + 2</c> of the
+    /// document (<see cref="PageReading"/>), so each page answers for its own exercise whatever ids the pages share.
+    /// </summary>
+    public ProgressionLedger Settle(SessionPages session, IEnumerable<PageResolutions> pages, AssessmentBaselines? baselines = null)
     {
         ArgumentNullException.ThrowIfNull(session);
-        ArgumentNullException.ThrowIfNull(resolutions);
+        ArgumentNullException.ThrowIfNull(pages);
         if (string.IsNullOrWhiteSpace(session.Person))
         {
             throw new ArgumentException("A session belongs to someone.", nameof(session));
@@ -78,7 +95,22 @@ public sealed class ProgressionLedger
         }
 
         var person = session.Person.Trim();
-        var reads = PageReading.Read(session, resolutions);
+
+        // A day is learned from once. The same page read again (a retry after a step that failed, a second morning's run) must
+        // not count the same easy run twice.
+        var day = new SettledDay(NormalPerson(person), session.Day);
+        if (settled.Contains(day))
+        {
+            return this;
+        }
+
+        var reads = PageReading.Read(session, pages);
+        if (reads.All(read => read.Verdict == PageVerdict.Unknown))
+        {
+            // Nothing was read, so nothing was learned and the day is still to be learned from.
+            return this;
+        }
+
         var lastDone = StoppedEarlyAt(reads);
 
         var nextStates = states.ToDictionary(pair => pair.Key, pair => pair.Value);
@@ -113,7 +145,32 @@ public sealed class ProgressionLedger
             nextStates[key] = new Entry(person, exercise.Name, next);
         }
 
-        return new ProgressionLedger(nextStates, NextCaps(person, reads, lastDone));
+        return new ProgressionLedger(nextStates, NextCaps(person, reads, lastDone), NextSettled(day));
+    }
+
+    /// <summary>
+    /// The same, from answers that came without their page. Only safe when no answer can belong to two pages: one whose id
+    /// is shared by several pages is refused (<see cref="PageReading.Read(SessionPages, IEnumerable{InkResolution})"/>).
+    /// Prefer the overload that takes the pages.
+    /// </summary>
+    public ProgressionLedger Settle(SessionPages session, IEnumerable<InkResolution> resolutions, AssessmentBaselines? baselines = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(resolutions);
+        if (session.Pages is null || session.Pages.Count == 0)
+        {
+            throw new ArgumentException("A session with no exercise pages teaches nothing.", nameof(session));
+        }
+
+        return Settle(session, PageReading.ByPage(session, resolutions), baselines);
+    }
+
+    // The days already learned from, forgetting those too old for a retry to come back to.
+    private IReadOnlySet<SettledDay> NextSettled(SettledDay day)
+    {
+        var next = settled.Where(item => item.Day >= day.Day.AddDays(-RetainDays)).ToHashSet();
+        next.Add(day);
+        return next;
     }
 
     /// <summary>What the exercise asks of the person next time: where the pages have left it, or its starting dose.</summary>
@@ -273,6 +330,16 @@ public sealed class ProgressionLedger
             }
 
             writer.WriteEndArray();
+            writer.WriteStartArray("settled");
+            foreach (var day in settled.OrderBy(item => item.Person, StringComparer.Ordinal).ThenBy(item => item.Day))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("person", day.Person);
+                writer.WriteString("day", day.Day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
             writer.WriteEndObject();
         }
 
@@ -335,7 +402,29 @@ public sealed class ProgressionLedger
                 }
             }
 
-            return new ProgressionLedgerRead(new ProgressionLedger(readStates, readCaps), unreadable, false);
+            var readSettled = new HashSet<SettledDay>();
+            if (root.TryGetProperty("settled", out var settledList))
+            {
+                // A file written before settled days were kept has no list, and that is not a fault.
+                if (settledList.ValueKind != JsonValueKind.Array)
+                {
+                    return new ProgressionLedgerRead(Empty, 0, true);
+                }
+
+                foreach (var item in settledList.EnumerateArray())
+                {
+                    if (TrySettled(item) is { } day)
+                    {
+                        readSettled.Add(day);
+                    }
+                    else
+                    {
+                        unreadable++;
+                    }
+                }
+            }
+
+            return new ProgressionLedgerRead(new ProgressionLedger(readStates, readCaps, readSettled), unreadable, false);
         }
         catch (JsonException)
         {
@@ -387,6 +476,19 @@ public sealed class ProgressionLedger
         return new CapEntry(person.Trim(), cap);
     }
 
+    private static SettledDay? TrySettled(JsonElement item)
+    {
+        if (item.ValueKind != JsonValueKind.Object
+            || Text(item, "person") is not { } person || string.IsNullOrWhiteSpace(person)
+            || Text(item, "day") is not { } day
+            || !DateOnly.TryParseExact(day, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            return null;
+        }
+
+        return new SettledDay(NormalPerson(person), parsed);
+    }
+
     private static string? Text(JsonElement item, string name) =>
         item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
@@ -396,4 +498,6 @@ public sealed class ProgressionLedger
     private sealed record Entry(string Person, string Exercise, ExerciseState State);
 
     private sealed record CapEntry(string Person, int Cap);
+
+    private sealed record SettledDay(string Person, DateOnly Day);
 }

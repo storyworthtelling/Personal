@@ -111,9 +111,10 @@ public class WorkoutDocumentBuilderTests
         var session = Strength(exercise);
         var pages = new SessionPages(Sam, new DateOnly(2026, 10, 27), SessionKind.Strength, [new ExercisePageRef(exercise, "done", "feel")]);
         var ledger = ProgressionLedger.Empty;
-        foreach (var _ in Enumerable.Range(0, 2))
+        foreach (var dayOffset in Enumerable.Range(0, 2))
         {
-            ledger = ledger.Settle(pages, [new InkResolution.PageDone("done", "easy")]);
+            // Two different days: a day is learned from once, so the same day twice is one easy rating.
+            ledger = ledger.Settle(pages with { Day = pages.Day.AddDays(dayOffset) }, [new InkResolution.PageDone("done", "easy")]);
         }
 
         var model = Build(Placed(session), Prescribed(session, ledger));

@@ -346,9 +346,10 @@ public class BusyTimeTests
         Assert.Contains(ForSam(named).NeverPlaced, interval => interval.Reasons.HasFlag(BusyReason.WorkHours));
         Assert.DoesNotContain(ForLee(named).NeverPlaced, interval => interval.Reasons.HasFlag(BusyReason.WorkHours));
 
-        // A bare "Vacation" on the family calendar is everyone's.
-        Assert.DoesNotContain(ForSam(unnamed).NeverPlaced, interval => interval.Reasons.HasFlag(BusyReason.WorkHours));
-        Assert.DoesNotContain(ForLee(unnamed).NeverPlaced, interval => interval.Reasons.HasFlag(BusyReason.WorkHours));
+        // A bare "Vacation" on the family calendar names no one, so it frees no one (review finding N1; "Kids off school" is
+        // the same shape). Blocking is the safe direction.
+        Assert.Contains(ForSam(unnamed).NeverPlaced, interval => interval.Reasons.HasFlag(BusyReason.WorkHours));
+        Assert.Contains(ForLee(unnamed).NeverPlaced, interval => interval.Reasons.HasFlag(BusyReason.WorkHours));
     }
 
     [Theory]
