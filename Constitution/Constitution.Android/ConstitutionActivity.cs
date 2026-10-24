@@ -14,6 +14,7 @@ using Constitution.Domain.Layout;
 using Constitution.Domain.Waiting;
 using Constitution.FirstRun;
 using Constitution.ReadBack;
+using Constitution.WorkoutWeek;
 using Constitution.Services;
 using Constitution.Settings;
 using Constitution.Waiting;
@@ -122,6 +123,10 @@ public abstract class ConstitutionActivity : Activity
         // unanswered put back on the Waiting page (the board only lives as long as the process).
         ReadBackWorker.Schedule(this);
         ReadBackWaiting.Restore(this);
+
+        // The week's workouts planned each morning before the read-back (P13), and once on open when the last plan is stale.
+        WorkoutWeekWorker.Schedule(this);
+        WorkoutWeekWorker.RunOnOpen(this);
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)

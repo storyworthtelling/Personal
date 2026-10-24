@@ -118,6 +118,7 @@ public class WorkoutWeekTrailTests
         Assert.Equal("workout week not planned, records unreadable", WorkoutWeekTrail.LogPhrase(new WorkoutWeekOutcome.NotPlanned(NotPlannedBecause.RecordsUnreadable, [], "x")));
         Assert.Equal("workout week not planned, calendars unreadable", WorkoutWeekTrail.LogPhrase(new WorkoutWeekOutcome.NotPlanned(NotPlannedBecause.CalendarsUnreadable, unreadable, "x")));
         Assert.Equal("workout week not planned, no one to plan", WorkoutWeekTrail.LogPhrase(new WorkoutWeekOutcome.NotPlanned(NotPlannedBecause.NoOneToPlan, [], "x")));
+        Assert.Equal("workout week not planned, not configured", WorkoutWeekTrail.LogPhrase(new WorkoutWeekOutcome.NotPlanned(NotPlannedBecause.NotConfigured, [], "x")));
     }
 
     [Fact]

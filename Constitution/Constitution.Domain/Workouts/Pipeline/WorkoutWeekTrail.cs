@@ -84,6 +84,8 @@ public static class WorkoutWeekTrail
                 return "workout week not planned, calendars unreadable";
             case NotPlannedBecause.NoOneToPlan:
                 return "workout week not planned, no one to plan";
+            case NotPlannedBecause.NotConfigured:
+                return "workout week not planned, not configured";
             default:
                 throw new ArgumentOutOfRangeException(nameof(because), because, "This reason has no trail phrase; add one here.");
         }

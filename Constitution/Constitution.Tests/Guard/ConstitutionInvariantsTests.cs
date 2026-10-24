@@ -20,6 +20,8 @@ public class ConstitutionInvariantsTests
     [
         "com.storyworthtelling.constitution.ReadBackWorker",
         "com.storyworthtelling.constitution.BodySyncWorker",
+        // Added with the weekly workout worker shell (P13): a deliberate edit, approved by the owner.
+        "com.storyworthtelling.constitution.WorkoutWeekWorker",
     ];
 
     private static readonly string[] ExpectedActivities =
@@ -35,6 +37,8 @@ public class ConstitutionInvariantsTests
     [
         "constitution-read-back",
         "constitution-body-sync",
+        // Added with the weekly workout worker shell (P13): a deliberate edit, approved by the owner.
+        "constitution-workout-week",
     ];
 
     private static readonly string[] ExpectedPreferenceKeys =

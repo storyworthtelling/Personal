@@ -32,6 +32,7 @@ public class BodySyncWorkerGuardTests
         {
             nameof(ConstitutionIdentity.BodySyncWorkerName) => ConstitutionIdentity.BodySyncWorkerName,
             nameof(ConstitutionIdentity.ReadBackWorkerName) => ConstitutionIdentity.ReadBackWorkerName,
+            nameof(ConstitutionIdentity.WorkoutWeekWorkerName) => ConstitutionIdentity.WorkoutWeekWorkerName,
             _ => "unknown constant " + match.Groups["constant"].Value,
         };
     }
