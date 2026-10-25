@@ -15,10 +15,10 @@ public static class ReadBackPolicy
     /// <summary>
     /// Whether the read-back may look at a document today. A workout waits for its day to end: its page is blank until the
     /// session has happened, and a blank is read as a skip once pen ink is proven. A meals sheet is read through its own
-    /// day (the deadline, not the date, decides what its silence means) and a digest is only ever trashed, by its own age.
+    /// day (the deadline, not the date, decides what its silence means) and a digest is only ever trashed, by its own age. A recipe waits for its day to end like a workout: its rating page is blank until dinner has been eaten, and a blank is read as "unchanged".
     /// </summary>
     public static bool IsDue(DeliveryKind kind, DateOnly day, DateOnly today) =>
-        kind != DeliveryKind.Workout || day < today;
+        kind is not (DeliveryKind.Workout or DeliveryKind.Recipe) || day < today;
 
     public static bool DigestIsDue(DateOnly day, DateOnly today) => today.DayNumber - day.DayNumber >= DigestDays;
 
