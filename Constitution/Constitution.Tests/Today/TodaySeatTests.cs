@@ -98,9 +98,9 @@ public class TodaySeatTests
     }
 
     [Fact]
-    public void TheOnlyActionIsIAteSomethingElseAndItIsInertUntilReleaseD()
+    public void TheOnlyActionIsIAteSomethingElseAndItIsLive()
     {
         Assert.Equal("I ate something else", TodayModel.ActionLabel);
-        Assert.False(TodayModel.ActionIsLive);
+        Assert.True(TodayModel.ActionIsLive);
     }
 }

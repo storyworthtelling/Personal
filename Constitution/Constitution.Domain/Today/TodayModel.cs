@@ -24,11 +24,11 @@ public static class TodayModel
 {
     public const string NeutralLine = "Nothing is planned yet.";
 
-    /// <summary>The page's one action; built in Release D, inert before it.</summary>
+    /// <summary>The page's one action.</summary>
     public const string ActionLabel = "I ate something else";
 
-    /// <summary>False until Release D builds the action (F-6.6).</summary>
-    public const bool ActionIsLive = false;
+    /// <summary>True from Release D: the action opens the photo flow (F-6.6).</summary>
+    public const bool ActionIsLive = true;
 
     public static TodayTopLine TopLine(TodayPlan? plan)
     {

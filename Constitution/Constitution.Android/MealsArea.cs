@@ -70,6 +70,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     private CuisineCardView? cuisineCard;
     private string? notice;
     private int loadNumber;
+    private AteSomethingElseFlow? ate;
 
     public MealsArea(Activity host)
         : base(host, "meals", Resource.Drawable.areameals)
@@ -77,6 +78,20 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         scanLauncher = new ScanRecipeLauncher(host);
         capture = new CameraCaptureLauncher(host);
         textReader = new AndroidRecipeTextReader(host);
+    }
+
+    /// <summary>The "I ate something else" flow the bar opens on This week and whose lines sit on its cards; shared with Today.</summary>
+    public AteSomethingElseFlow? Ate
+    {
+        get => ate;
+        set
+        {
+            ate = value;
+            if (value is not null)
+            {
+                value.Changed += RaiseChanged;
+            }
+        }
     }
 
     /// <summary>Where the cards come from and where a change goes; set by whoever wires the household file.</summary>
@@ -193,7 +208,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
 
         var model = MealsWeekModel.Build(weekRead, DateOnly.FromDateTime(DateTime.Now));
-        return model.State == WeekState.Planned ? new ThisWeekPage(Host, model) : PageFurniture.Sentence(Host, model.Status);
+        return model.State == WeekState.Planned ? new ThisWeekPage(Host, model, AteCards.Lines(Ate, DateOnly.FromDateTime(DateTime.Now))) : PageFurniture.Sentence(Host, model.Status);
     }
 
     private View BoxBody(RecipeBoxSnapshot snapshot)
@@ -283,7 +298,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         return Picker().IsOpen ? new PickerSheet(Host, Picker().Rows, OnPick, bar) : bar;
     }
 
-    // "I ate something else" stays in the bar on this view (book p.13). It is built with F-6.6; until then it is drawn disabled, as on Today.
+    // "I ate something else" stays in the bar on this view (book p.13) and opens the same camera flow as Today's (book p.15).
     private View? ThisWeekBar()
     {
         if (weekRead is not MealWeekScreenRead.Ready)
@@ -291,8 +306,9 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             return null;
         }
 
-        var button = PaperUi.SecondaryButton(Host, MealsWeekModel.ActionLabel, () => { });
-        button.Enabled = TodayModel.ActionIsLive;
+        var flow = Ate;
+        var button = PaperUi.SecondaryButton(Host, MealsWeekModel.ActionLabel, () => flow?.Start());
+        button.Enabled = flow is { CanStart: true };
         return PaperUi.BottomBar(Host, button);
     }
 
@@ -308,6 +324,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
     public override void Resume()
     {
+        Ate?.LoadOnce();
         ExpireMove();
         if (read is null)
         {
@@ -517,8 +534,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             return;
         }
 
-        var granted = Host.CheckSelfPermission(Android.Manifest.Permission.Camera) == Permission.Granted;
-        switch (CameraAccess.Decide(textReader.CanRead, granted))
+        switch (CameraAccess.Decide(textReader.CanRead, CameraAllowed()))
         {
             case CameraStep.NoCamera:
                 notice = CameraAccess.NoCameraSentence;
@@ -527,13 +543,22 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             case CameraStep.AskFirst:
                 notice = CameraAccess.AskingSentence;
                 RaiseChanged();
-                Host.RequestPermissions([Android.Manifest.Permission.Camera], CameraCaptureLauncher.PermissionRequestCode);
+                AskForCamera(CameraCaptureLauncher.PermissionRequestCode);
                 break;
             default:
                 OpenCamera();
                 break;
         }
     }
+
+    /// <summary>
+    /// Whether the camera is allowed right now. The one place the camera permission is checked, so "I ate something else" asks through
+    /// here too (D105 keeps the permission to one asking place) rather than naming it again.
+    /// </summary>
+    public bool CameraAllowed() => Host.CheckSelfPermission(Android.Manifest.Permission.Camera) == Permission.Granted;
+
+    /// <summary>The one place the camera permission is requested; the answer comes back to the shell under <paramref name="requestCode"/>.</summary>
+    public void AskForCamera(int requestCode) => Host.RequestPermissions([Android.Manifest.Permission.Camera], requestCode);
 
     /// <summary>The camera permission's answer, handed over by the shell. A denial is said plainly and typing stays in the picker.</summary>
     public void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)

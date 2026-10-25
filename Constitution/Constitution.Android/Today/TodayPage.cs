@@ -3,9 +3,11 @@ using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
+using Constitution.Domain.Meals;
 using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Scraps;
 using Constitution.Domain.Today;
+using Constitution.MealsTab;
 using Constitution.Scrapbook;
 
 namespace Constitution.Today;
@@ -25,9 +27,10 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
 
     public const string DinnerScrapId = "today-dinner";
 
-    public TodayPage(Context context, TodayTopLine topLine, TodayClipping? clipping, string folio, DinnerClipping? dinner = null) : base(context)
+    public TodayPage(Context context, TodayTopLine topLine, TodayClipping? clipping, string folio, DinnerClipping? dinner = null, IReadOnlyDictionary<AteMeal, AteLine>? ate = null) : base(context)
     {
         Orientation = Orientation.Vertical;
+        ate ??= new Dictionary<AteMeal, AteLine>();
 
         var host = new ScrapHost(context);
         var scraps = new List<ScrapEntry> { new(ScrapKind.NotepadLeaf, TopLineScrapId, Line(context, topLine)) };
@@ -46,8 +49,11 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
         if (dinner is not null)
         {
             // Tonight's dinner (C-4.1.3): an index card, or a restaurant receipt when the household is eating out (D46).
-            scraps.Add(new ScrapEntry(dinner.Paper, DinnerScrapId, DinnerContent(context, dinner)));
+            scraps.Add(new ScrapEntry(dinner.Paper, DinnerScrapId, DinnerContent(context, dinner, ate)));
         }
+
+        // "I ate something else" (book p.15): its line is on the meal's card; a meal with no card here gets a small one of its own.
+        scraps.AddRange(AteCards.Extras(context, ate, dinner?.Paper == ScrapKind.IndexCard));
 
         host.SetScraps(scraps);
 
@@ -56,7 +62,7 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
         AddView(scroll, new LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
     }
 
-    private static View DinnerContent(Context context, DinnerClipping dinner)
+    private static View DinnerContent(Context context, DinnerClipping dinner, IReadOnlyDictionary<AteMeal, AteLine> ate)
     {
         if (dinner.Paper == ScrapKind.Receipt)
         {
@@ -73,6 +79,11 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
         if (dinner.Line is not null)
         {
             card.AddView(ScrapContent.IndexLine(context, dinner.Line));
+        }
+
+        if (AteCards.OnTheDinnerCard(context, ate, dinnerIsAnIndexCard: true) is { } written)
+        {
+            card.AddView(written);
         }
 
         return card;
