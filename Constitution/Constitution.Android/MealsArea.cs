@@ -2,9 +2,11 @@ using Android.App;
 using Android.OS;
 using Android.Views;
 using Codex.Ui;
+using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Recipes;
 using Constitution.Domain.Recipes.Screens;
+using Constitution.Domain.Today;
 using Constitution.MealsTab;
 using Constitution.Settings;
 using Constitution.WorkoutsTab;
@@ -23,18 +25,18 @@ namespace Constitution;
 ///
 /// <para>Moving a card's cuisine happens on the page at once and folds the shell's one dog-ear (the shared notice board) for
 /// the undo window; a turn of the fold applies the move's inverse. Cook this soon is the card changing to "Planned for next
-/// week": no toast. This week is not built yet and says so.</para>
+/// week": no toast. This week reads the approved week through <see cref="WeekSource"/> and says so plainly when there is none.</para>
 /// </summary>
 public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 {
-    private const string ThisWeekSentence = "No meals are planned yet.";
-
     private readonly Handler handler = new(Looper.MainLooper!);
     private readonly CuisineMoveUndo undo = new();
     private readonly Dictionary<RecipeId, CookSoonState> cooks = [];
 
     private IRecipeBoxSource source = new NoRecipeBoxSource();
     private RecipeBoxRead? read;
+    private IMealWeekSource weekSource = new NoMealWeekSource();
+    private MealWeekScreenRead? weekRead;
     private MealsView view = MealsView.ThisWeek;
     private string query = string.Empty;
     private CardSelection selection = CardSelection.None;
@@ -55,6 +57,13 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         set => source = value;
     }
 
+    /// <summary>Where the approved week comes from; set by whoever wires the weekly meal run's saved week.</summary>
+    public IMealWeekSource WeekSource
+    {
+        get => weekSource;
+        set => weekSource = value;
+    }
+
     /// <summary>Raised by the pinned bar's button. Add a recipe (F-6.5) listens; until it does the button is drawn disabled.</summary>
     public event Action<string>? PrimaryActionRequested;
 
@@ -70,7 +79,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         View body;
         if (view == MealsView.ThisWeek)
         {
-            body = PageFurniture.Sentence(Host, ThisWeekSentence);
+            body = ThisWeekBody();
         }
         else
         {
@@ -84,6 +93,17 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
 
         return new MealsPage(Host, Tab.Hue, view, OnSwitch, body);
+    }
+
+    private View ThisWeekBody()
+    {
+        if (weekRead is null)
+        {
+            return PageFurniture.StatusSentence(Host, LoadingSentence);
+        }
+
+        var model = MealsWeekModel.Build(weekRead, DateOnly.FromDateTime(DateTime.Now));
+        return model.State == WeekState.Planned ? new ThisWeekPage(Host, model) : PageFurniture.Sentence(Host, model.Status);
     }
 
     private View BoxBody(RecipeBoxSnapshot snapshot)
@@ -123,6 +143,11 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
     public override View? BuildBottomBar()
     {
+        if (view == MealsView.ThisWeek)
+        {
+            return ThisWeekBar();
+        }
+
         if (view != MealsView.RecipeBox || read is not RecipeBoxRead.Ready ready)
         {
             return null;
@@ -131,6 +156,19 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         var action = RecipeBoxScreenModel.Build(ready.Snapshot.Cards, null).PrimaryAction;
         var button = PaperUi.PrimaryButton(Host, action, () => PrimaryActionRequested?.Invoke(action));
         button.Enabled = PrimaryActionRequested is not null;
+        return PaperUi.BottomBar(Host, button);
+    }
+
+    // "I ate something else" stays in the bar on this view (book p.13). It is built with F-6.6; until then it is drawn disabled, as on Today.
+    private View? ThisWeekBar()
+    {
+        if (weekRead is not MealWeekScreenRead.Ready)
+        {
+            return null;
+        }
+
+        var button = PaperUi.SecondaryButton(Host, MealsWeekModel.ActionLabel, () => { });
+        button.Enabled = TodayModel.ActionIsLive;
         return PaperUi.BottomBar(Host, button);
     }
 
@@ -165,8 +203,10 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     {
         var number = Interlocked.Increment(ref loadNumber);
         var current = source;
+        var currentWeek = weekSource;
         _ = Task.Run(() =>
         {
+            var week = ReadWeek(currentWeek);
             RecipeBoxRead result;
             try
             {
@@ -178,11 +218,24 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
                 result = read ?? new RecipeBoxRead.Unavailable("The recipe box could not be read just now (" + e.GetType().Name + ").");
             }
 
-            Host.RunOnUiThread(() => Adopt(result, number));
+            Host.RunOnUiThread(() => Adopt(result, week, number));
         });
     }
 
-    private void Adopt(RecipeBoxRead result, int number)
+    private MealWeekScreenRead ReadWeek(IMealWeekSource current)
+    {
+        try
+        {
+            return current.Read(DateTimeOffset.Now);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // The type only, never the message: the page keeps the week it had, or says it cannot be read.
+            return weekRead ?? new MealWeekScreenRead.Unavailable("The week could not be read just now (" + e.GetType().Name + ").");
+        }
+    }
+
+    private void Adopt(RecipeBoxRead result, MealWeekScreenRead week, int number)
     {
         if (number != Volatile.Read(ref loadNumber))
         {
@@ -190,6 +243,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
 
         read = result;
+        weekRead = week;
         Loading = false;
         RaiseChanged();
     }

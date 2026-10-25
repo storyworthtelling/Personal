@@ -1,3 +1,4 @@
+using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Time;
 using Constitution.Domain.Voice;
 using Constitution.Domain.Workouts.Screens;
@@ -55,6 +56,9 @@ public static class TodayModel
             $"{SeatWords.Sentence(plan.WorkoutKind!)}, {plan.WorkoutMinutes} minutes",
             plan.ScoreBpm is { } bpm ? WorkoutWords.Score(bpm) : null);
     }
+
+    /// <summary>Tonight's dinner card or receipt, or null when the meal week has nothing for tonight (C-4.1.3).</summary>
+    public static DinnerClipping? Dinner(TodayPlan? plan) => plan?.DinnerCard;
 
     /// <summary>The magazine page number a clipping prints in its corner, steady for a given day.</summary>
     public static string Folio(DateOnly day) => $"— {2 + (Math.Abs(day.DayNumber) % 98):00} —";
