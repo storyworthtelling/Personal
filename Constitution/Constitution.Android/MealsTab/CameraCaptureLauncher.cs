@@ -12,7 +12,7 @@ namespace Constitution.MealsTab;
 /// the words, so at most one photograph exists and only while it is being read. Decides nothing else: whether to ask for the camera
 /// permission, and what a result means, are the area's and the domain's.
 /// </summary>
-internal sealed class CameraCaptureLauncher(Activity host)
+internal sealed class CameraCaptureLauncher(Activity host, int answerCode = CameraCaptureLauncher.RequestCode, string? targetPackage = null)
 {
     /// <summary>The request code the camera's answer comes back under. Health uses 7311, Plate's scan 7412.</summary>
     public const int RequestCode = 7413;
@@ -25,7 +25,9 @@ internal sealed class CameraCaptureLauncher(Activity host)
 
     /// <summary>
     /// Opens the camera. Null when it opened; otherwise the sentence for why it did not. A photograph left from an earlier capture
-    /// is cleared first, so the camera never starts on top of someone's old page.
+    /// is cleared first, so the camera never starts on top of someone's old page. A launcher given a package aims at that app's
+    /// camera first (Plate on the owner's phone) and falls back to whatever camera the phone has when that app is not there; the
+    /// answer comes back under the code the launcher was given, so two flows sharing this route cannot read each other's answer.
     /// </summary>
     public string? Start()
     {
@@ -38,9 +40,24 @@ internal sealed class CameraCaptureLauncher(Activity host)
         var intent = new Intent(MediaStore.ActionImageCapture);
         intent.PutExtra(MediaStore.ExtraOutput, address);
         intent.AddFlags(ActivityFlags.GrantWriteUriPermission | ActivityFlags.GrantReadUriPermission);
+        if (targetPackage is not null)
+        {
+            intent.SetPackage(targetPackage);
+            try
+            {
+                host.StartActivityForResult(intent, answerCode);
+                return null;
+            }
+            catch (ActivityNotFoundException)
+            {
+                // That app is not on this phone: the plain camera intent below is the fallback, not a failure.
+                intent.SetPackage(null);
+            }
+        }
+
         try
         {
-            host.StartActivityForResult(intent, RequestCode);
+            host.StartActivityForResult(intent, answerCode);
             return null;
         }
         catch (ActivityNotFoundException)

@@ -4,6 +4,7 @@ using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
+using Constitution.Domain.Meals;
 using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Scraps;
 using Constitution.Scrapbook;
@@ -23,21 +24,31 @@ internal sealed class ThisWeekPage : LinearLayout
 
     private const int DayLabelWidthDp = DesignTokens.Space.X8;
 
-    public ThisWeekPage(Context context, MealsWeekModel model) : base(context)
+    public ThisWeekPage(Context context, MealsWeekModel model, IReadOnlyDictionary<AteMeal, AteLine>? ate = null) : base(context)
     {
         Orientation = Orientation.Vertical;
+        ate ??= new Dictionary<AteMeal, AteLine>();
         var scraps = new List<ScrapEntry>();
         if (model.Tonight is { } tonight)
         {
-            scraps.Add(new ScrapEntry(ScrapKind.IndexCard, TonightScrapId, TonightCard(context, tonight)));
+            scraps.Add(new ScrapEntry(ScrapKind.IndexCard, TonightScrapId, TonightCard(context, tonight, ate)));
         }
         else
         {
-            scraps.Add(new ScrapEntry(ScrapKind.IndexCard, TonightScrapId, ScrapContent.Column(
+            var none = ScrapContent.Column(
                 context,
                 ScrapContent.IndexLabel(context, "Tonight"),
-                ScrapContent.IndexLine(context, model.TonightSentence, strong: true))));
+                ScrapContent.IndexLine(context, model.TonightSentence, strong: true));
+            if (AteCards.OnTheDinnerCard(context, ate, dinnerIsAnIndexCard: true) is { } written)
+            {
+                none.AddView(written);
+            }
+
+            scraps.Add(new ScrapEntry(ScrapKind.IndexCard, TonightScrapId, none));
         }
+
+        // "I ate something else" (book p.15): the dinner's line is on tonight's card; any other meal's line gets a card of its own.
+        scraps.AddRange(AteCards.Extras(context, ate, dinnerIsAnIndexCard: true));
 
         scraps.Add(new ScrapEntry(ScrapKind.IndexCard, WeekScrapId, WeekCard(context, model)));
 
@@ -48,7 +59,7 @@ internal sealed class ThisWeekPage : LinearLayout
         AddView(scroll, new LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
     }
 
-    private static View TonightCard(Context context, TonightCard tonight)
+    private static View TonightCard(Context context, TonightCard tonight, IReadOnlyDictionary<AteMeal, AteLine> ate)
     {
         var column = ScrapContent.Column(
             context,
@@ -57,6 +68,11 @@ internal sealed class ThisWeekPage : LinearLayout
         if (!string.IsNullOrWhiteSpace(tonight.CookLine))
         {
             column.AddView(ScrapContent.IndexLine(context, tonight.CookLine));
+        }
+
+        if (AteCards.OnTheDinnerCard(context, ate, dinnerIsAnIndexCard: true) is { } written)
+        {
+            column.AddView(written);
         }
 
         return column;

@@ -10,9 +10,11 @@ using Codex.Ui;
 using Constitution.Body;
 using Constitution.Domain.Body;
 using Constitution.Domain.Areas;
+using Constitution.Domain.Diagnostics;
 using Constitution.Domain.Layout;
 using Constitution.Domain.Waiting;
 using Constitution.FirstRun;
+using Constitution.MealsTab;
 using Constitution.ReadBack;
 using Constitution.WorkoutWeek;
 using Constitution.Services;
@@ -50,6 +52,9 @@ public abstract class ConstitutionActivity : Activity
     // Plate's answer to a recipe scan comes back to the activity, and Meals is the area that reads it.
     private MealsArea? mealsArea;
 
+    // "I ate something else": one camera flow for Today's bar and Meals' bar, so both cards say the same thing (book p.15).
+    private AteSomethingElseFlow? ateFlow;
+
     // First run: shown instead of the tabs until FirstRunModel says all three steps are satisfied.
     private FirstRunPage firstRun = null!;
 
@@ -78,9 +83,12 @@ public abstract class ConstitutionActivity : Activity
         mealsArea = new MealsArea(this);
         bodyArea.SignalRequested += OpenSignal;
         firstRun = new FirstRunPage(this, RenderPage);
+        ateFlow = new AteSomethingElseFlow(this, () => mealsArea?.Role ?? InstallRole.Unknown, () => mealsArea.CameraAllowed(), mealsArea.AskForCamera);
+        mealsArea.Ate = ateFlow;
+        var todayArea = new TodayArea(this) { Ate = ateFlow };
         var areas = new IConstitutionArea[]
         {
-            new TodayArea(this),
+            todayArea,
             new WorkoutsArea(this),
             mealsArea,
             bodyArea,
@@ -143,6 +151,9 @@ public abstract class ConstitutionActivity : Activity
 
         // Plate's recipe read answers here.
         mealsArea?.OnActivityResult(requestCode, resultCode, data);
+
+        // The camera's photo for "I ate something else" answers here, under its own code.
+        ateFlow?.OnActivityResult(requestCode, resultCode);
     }
 
     public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Permission[] grantResults)
@@ -154,6 +165,9 @@ public abstract class ConstitutionActivity : Activity
 
         // The camera's answer for the partner's recipe scan.
         mealsArea?.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        // The camera's answer for "I ate something else".
+        ateFlow?.OnCameraAnswer(requestCode, grantResults);
     }
 
     protected override void OnResume()
