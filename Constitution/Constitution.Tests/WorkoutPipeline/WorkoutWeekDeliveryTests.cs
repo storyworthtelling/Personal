@@ -23,7 +23,7 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
 
     private static readonly Session Cardio = new(SessionKind.OutdoorCardio, TimeSpan.FromMinutes(35), true, [new("Warm-up walk"), new("Brisk walk"), new("Cool-down walk")]);
 
-    private static string NameOf(string person, int dayOffset = 0) => DeliveredName.For(DeliveryKind.Workout, Day(dayOffset), person);
+    private static string NameOf(string person, int dayOffset = 0) => DeliveredName.For(DeliveryKind.Workout, MondayDay(dayOffset), person);
 
     private static string TextOf(byte[] pdf) =>
         string.Join(" ", PdfReadBack.Open(pdf).GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text));
@@ -44,7 +44,7 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
 
         var report = await rig.PlannedAsync();
 
-        var today = report.Plan.Plans.SelectMany(week => week.Sessions).Count(session => session.Day == Day(0));
+        var today = report.Plan.Plans.SelectMany(week => week.Sessions).Count(session => session.Day == MondayDay(0));
         Assert.True(today >= 1, "The invented week should have a session on Monday.");
         Assert.Equal(today, rig.Tablet.Uploads);
         Assert.All(rig.UploadedTitles, title => Assert.Contains("2026-11-02", title, StringComparison.Ordinal));
@@ -57,7 +57,7 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
 
         var report = await rig.PlannedAsync(rig.Request() with { DeliverAheadDays = 1 });
 
-        var wanted = report.Plan.Plans.SelectMany(week => week.Sessions).Count(session => session.Day <= Day(1));
+        var wanted = report.Plan.Plans.SelectMany(week => week.Sessions).Count(session => session.Day >= MondayDay(0) && session.Day <= MondayDay(1));
         Assert.Equal(wanted, rig.Tablet.Uploads);
         Assert.Contains(rig.UploadedTitles, title => title.Contains("2026-11-03", StringComparison.Ordinal));
         Assert.DoesNotContain(rig.UploadedTitles, title => title.Contains("2026-11-04", StringComparison.Ordinal));
@@ -86,7 +86,7 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
 
         var report = await rig.PlannedAsync(rig.Request(Est(11, 3, 5, 30)));
 
-        Assert.Equal([Day(1)], report.Documents.Select(item => item.Day));
+        Assert.Equal([MondayDay(1)], report.Documents.Select(item => item.Day));
         Assert.Equal([NameOf(Sam, 1)], rig.UploadedTitles);
     }
 
@@ -130,7 +130,7 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
         Assert.Equal(SessionKind.OutdoorCardio, waiting.Document.Session);
         Assert.False(waiting.Saved);
         var delivered = rig.Delivered.Find(NameOf(Sam))!;
-        Assert.Equal(At(0, 16), delivered.SlotStart);
+        Assert.Equal(MondayAt(0, 16), delivered.SlotStart);
         Assert.Equal(64, delivered.Fingerprint.Length);
     }
 
@@ -237,13 +237,13 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
     {
         rig.BothAreEstablished();
         var sunday = new Session(SessionKind.GentleWalk, TimeSpan.FromMinutes(30), false, [new Exercise("Easy walk")]);
-        rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, 6, 14, sunday)));
-        var request = rig.Request(Est(11, 8, 6)) with { Equipment = EquipmentSet.Of([]) };
+        rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, -1, 14, sunday)));
+        var request = rig.Request(Est(11, 1, 6)) with { Equipment = EquipmentSet.Of([]) };
         await rig.PlannedAsync(request);
         Assert.Single(rig.Tablet.Titles);
-        rig.Conditions.Read = ConditionsRead.Of(WorkoutWeekRunTests.RainAcross(6, 6, 18));
+        rig.Conditions.Read = ConditionsRead.Of(WorkoutWeekRunTests.RainAcross(-1, 6, 18));
 
-        var report = await rig.PlannedAsync(request with { Now = Est(11, 8, 10) });
+        var report = await rig.PlannedAsync(request with { Now = Est(11, 1, 10) });
 
         Assert.Equal(DocumentVerdict.Withdrawn, Assert.Single(report.Documents).Verdict);
         Assert.Empty(rig.Tablet.Titles);
@@ -256,7 +256,7 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
     {
         SamWalksMonday();
         var first = await rig.PlannedAsync();
-        var key = new PlacementIndex(first.PlacedPlan).KeyFor(Sam, Day(0))!.Value;
+        var key = new PlacementIndex(first.PlacedPlan).KeyFor(Sam, MondayDay(0))!.Value;
         rig.Writer.OwnerDeletes(key, Sam);
 
         var report = await rig.PlannedAsync(rig.Request(Est(11, 2, 9)));
@@ -302,13 +302,13 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
     {
         SamWalksMonday();
         var first = await rig.PlannedAsync();
-        var key = new PlacementIndex(first.PlacedPlan).KeyFor(Sam, Day(0))!.Value;
-        rig.Writer.OwnerMoves(key, Sam, At(0, 17), At(0, 17, 35));
+        var key = new PlacementIndex(first.PlacedPlan).KeyFor(Sam, MondayDay(0))!.Value;
+        rig.Writer.OwnerMoves(key, Sam, MondayAt(0, 17), MondayAt(0, 17, 35));
 
         var report = await rig.PlannedAsync(rig.Request(Est(11, 2, 9)));
 
         Assert.Equal(DocumentVerdict.Replaced, Assert.Single(report.Documents).Verdict);
-        Assert.Equal(At(0, 17), rig.Delivered.Find(NameOf(Sam))!.SlotStart);
+        Assert.Equal(MondayAt(0, 17), rig.Delivered.Find(NameOf(Sam))!.SlotStart);
         Assert.Contains("5:00", TextOf(rig.Tablet.PdfOf(NameOf(Sam))), StringComparison.Ordinal);
     }
 

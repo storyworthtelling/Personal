@@ -321,12 +321,7 @@ public static class PlacementEngine
     {
         ArgumentNullException.ThrowIfNull(request.People);
         ArgumentNullException.ThrowIfNull(request.HouseholdEvents);
-        if (request.WeekStart.DayOfWeek != DayOfWeek.Monday)
-        {
-            throw new ArgumentException(
-                $"A placed week begins on a Monday, and {request.WeekStart:yyyy-MM-dd} is a {request.WeekStart.DayOfWeek}. A key names a session by its weekday within the week, so a week begun on another day would number the same days differently from one run to the next.",
-                nameof(request));
-        }
+        PlanningWeek.RequireStart(request.WeekStart, nameof(request));
 
         var twice = request.People
             .GroupBy(person => person.Person, StringComparer.OrdinalIgnoreCase)
@@ -359,10 +354,7 @@ public static class PlacementEngine
             return;
         }
 
-        if (workouts.WeekStart.DayOfWeek != DayOfWeek.Monday)
-        {
-            throw new ArgumentException($"The workout plan's week begins on a Monday, and {workouts.WeekStart:yyyy-MM-dd} is a {workouts.WeekStart.DayOfWeek}.", nameof(request));
-        }
+        PlanningWeek.RequireStart(workouts.WeekStart, nameof(request));
 
         if (PlacementKey.WeekIndexOf(workouts.WeekStart) != PlacementKey.WeekIndexOf(request.WeekStart))
         {

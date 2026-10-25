@@ -8,7 +8,7 @@ namespace Constitution.Domain.Workouts.Pipeline;
 /// One session the owner moved on the Workouts tab. <paramref name="Key"/> names it the way the tab and the calendar do (the
 /// placement key of the session in the plan as it stood when the owner moved it: kind and place among its kind, never the date),
 /// <paramref name="FromDay"/> is the day it left, and the rest is where it went (its start, and the free gap it was fitted into).
-/// The session itself rides along, so a week that only receives it (a move across Sunday) can be made without the week it left.
+/// The session itself rides along, so a week that only receives it (a move across the Saturday-to-Sunday edge) can be made without the week it left.
 /// </summary>
 public sealed record SessionMoved(
     string Person,

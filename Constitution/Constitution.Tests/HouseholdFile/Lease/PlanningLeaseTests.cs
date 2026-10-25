@@ -17,7 +17,7 @@ public class PlanningLeaseTests
     public void OnlyTheHolderPlans()
     {
         var (sam, lee) = Phones();
-        var open = OpeningMonday;
+        var open = OpeningSunday;
 
         // Nothing claimed yet. The owner is to take; the partner waits for an owner it can hear.
         sam.Beat(open);
@@ -34,7 +34,7 @@ public class PlanningLeaseTests
         Assert.Equal(LeaseReason.ClaimNotSettled, sam.Ask(open + Settle - TimeSpan.FromMinutes(1)).Reason);
 
         // Then, however the week goes, with Sam heard from, only Sam is told to plan.
-        for (var at = open + Settle; at < Est(11, 1, 23, 0); at += LeaseTerms.HeartbeatPeriod)
+        for (var at = open + Settle; at < Edt(10, 31, 23, 0); at += LeaseTerms.HeartbeatPeriod)
         {
             sam.Beat(at);
             Share(sam, lee);
@@ -51,8 +51,8 @@ public class PlanningLeaseTests
     public void TheHolderIsNotToldToPlanOnAnEmptyFile()
     {
         var (sam, lee) = Phones();
-        Assert.NotEqual(LeaseVerdict.Plan, sam.Ask(OpeningMonday).Verdict);
-        Assert.NotEqual(LeaseVerdict.Plan, lee.Ask(OpeningMonday).Verdict);
+        Assert.NotEqual(LeaseVerdict.Plan, sam.Ask(OpeningSunday).Verdict);
+        Assert.NotEqual(LeaseVerdict.Plan, lee.Ask(OpeningSunday).Verdict);
     }
 
     [Fact]
@@ -60,8 +60,8 @@ public class PlanningLeaseTests
     {
         var (sam, lee) = Phones();
 
-        // Sam's phone was last heard on Sunday evening, before the week opened, and has said nothing since.
-        var lastHeard = Edt(10, 25, 20);
+        // Sam's phone was last heard on Saturday evening, before the week opened, and has said nothing since.
+        var lastHeard = Edt(10, 24, 20);
         sam.Beat(lastHeard);
         Share(sam, lee);
         lee.Beat(lastHeard);
@@ -87,14 +87,14 @@ public class PlanningLeaseTests
     [Fact]
     public void AStandingClaimIsNotTakenMidWeek()
     {
-        // Sam claims on Monday, may well have planned, and then goes quiet. However long, Lee does not plan Sam's week:
-        // two installs planning one week is the silent failure, so the lease changes hands at the Monday.
+        // Sam claims on Sunday, may well have planned, and then goes quiet. However long, Lee does not plan Sam's week:
+        // two installs planning one week is the silent failure, so the lease changes hands at the Sunday boundary.
         var (sam, lee) = Phones();
-        sam.Pass(OpeningMonday);
+        sam.Pass(OpeningSunday);
         Share(sam, lee);
-        lee.Beat(OpeningMonday);
+        lee.Beat(OpeningSunday);
 
-        foreach (var at in new[] { OpeningMonday + Lease + TimeSpan.FromMinutes(1), Edt(10, 30, 9), Est(11, 1, 23, 59) })
+        foreach (var at in new[] { OpeningSunday + Lease + TimeSpan.FromMinutes(1), Edt(10, 30, 9), Edt(10, 31, 23, 59) })
         {
             lee.Beat(at);
             var decision = lee.Ask(at);
@@ -103,7 +103,7 @@ public class PlanningLeaseTests
         }
 
         // At the boundary Sam has been silent past the lease with nothing claimed, and the week is Lee's to take.
-        var boundary = Est(11, 2, 0, 0);
+        var boundary = Edt(11, 1, 0, 0);
         lee.Beat(boundary);
         Assert.Equal(LeaseVerdict.Take, lee.Pass(boundary).Verdict);
         lee.Beat(boundary + Settle);
@@ -114,18 +114,18 @@ public class PlanningLeaseTests
     public void SilenceBeforeAnyClaimAlsoHandsItOver()
     {
         var (sam, lee) = Phones();
-        sam.Beat(OpeningMonday);
+        sam.Beat(OpeningSunday);
         Share(sam, lee);
 
-        Assert.Equal(LeaseReason.OwnerIsAlive, lee.Ask(OpeningMonday + Lease).Reason);
-        Assert.Equal(LeaseVerdict.Take, lee.Ask(OpeningMonday + Lease + TimeSpan.FromMinutes(1)).Verdict);
+        Assert.Equal(LeaseReason.OwnerIsAlive, lee.Ask(OpeningSunday + Lease).Reason);
+        Assert.Equal(LeaseVerdict.Take, lee.Ask(OpeningSunday + Lease + TimeSpan.FromMinutes(1)).Verdict);
     }
 
     [Fact]
     public void AnAliveOwnerNeverLosesTheLease()
     {
         var (sam, lee) = Phones();
-        for (var at = OpeningMonday; at < OpeningMonday.AddDays(6); at += LeaseTerms.HeartbeatPeriod)
+        for (var at = OpeningSunday; at < OpeningSunday.AddDays(6); at += LeaseTerms.HeartbeatPeriod)
         {
             sam.Beat(at);
             Share(sam, lee);
@@ -138,10 +138,10 @@ public class PlanningLeaseTests
     public void ItReturnsAtTheWeekBoundary()
     {
         var (sam, lee) = Phones();
-        var week = WeekOf(OpeningMonday);
+        var week = WeekOf(OpeningSunday);
 
-        // Sam is last heard on Monday morning. On Wednesday Lee takes the week and, once settled, plans it.
-        sam.Beat(OpeningMonday);
+        // Sam is last heard on Sunday morning. On Wednesday Lee takes the week and, once settled, plans it.
+        sam.Beat(OpeningSunday);
         Share(sam, lee);
         var wednesday = Edt(10, 28, 8, 1);
         Assert.Equal(LeaseVerdict.Take, lee.Pass(wednesday).Verdict);
@@ -151,7 +151,7 @@ public class PlanningLeaseTests
 
         // Sam's phone is back on Thursday. The week is Lee's until it ends: Sam is told to wait, every day.
         sam.Read(lee.Local);
-        for (var at = Edt(10, 29, 9); at < Est(11, 1, 23, 59); at = at.AddHours(6))
+        for (var at = Edt(10, 29, 9); at < Edt(10, 31, 23, 59); at = at.AddHours(6))
         {
             sam.Beat(at);
             lee.Beat(at);
@@ -163,7 +163,7 @@ public class PlanningLeaseTests
         }
 
         // The last minute of the week is still Lee's.
-        var lastMinute = Est(11, 1, 23, 59);
+        var lastMinute = Edt(10, 31, 23, 59);
         sam.Beat(lastMinute);
         lee.Beat(lastMinute);
         Share(sam, lee);
@@ -171,7 +171,7 @@ public class PlanningLeaseTests
         Assert.Equal(LeaseVerdict.Plan, lee.Ask(lastMinute).Verdict);
 
         // At the boundary it goes home: Sam takes the new week, and Lee's old claim is let go.
-        var boundary = Est(11, 2, 0, 0);
+        var boundary = Edt(11, 1, 0, 0);
         sam.Beat(boundary);
         lee.Beat(boundary);
         Share(sam, lee);
@@ -200,12 +200,12 @@ public class PlanningLeaseTests
     public void TheOwnerBackMidWeekDoesNotTakeItBack()
     {
         var (sam, lee) = Phones();
-        sam.Beat(OpeningMonday);
+        sam.Beat(OpeningSunday);
         Share(sam, lee);
         lee.Pass(Edt(10, 28, 8, 1));
         Share(sam, lee);
 
-        for (var at = Edt(10, 28, 9); at < Est(11, 2, 0, 0); at = at.AddHours(1))
+        for (var at = Edt(10, 28, 9); at < Edt(11, 1, 0, 0); at = at.AddHours(1))
         {
             sam.Beat(at);
             lee.Beat(at);
@@ -219,7 +219,7 @@ public class PlanningLeaseTests
     public void BothTakingAtOnceLeavesOneHolder()
     {
         var (sam, lee) = Phones();
-        sam.Beat(OpeningMonday);
+        sam.Beat(OpeningSunday);
         Share(sam, lee);
 
         // Sam's phone wakes at the very minute Lee decides Sam is silent, neither having read the other.
@@ -247,10 +247,10 @@ public class PlanningLeaseTests
     public void ASimultaneousClaimGoesToTheLargerId()
     {
         // The library's tie-break, relied on here: the same moment, the larger writer id wins. Ordinal: "install-sam" > "install-lee".
-        var week = WeekOf(OpeningMonday);
-        var stamp = new HlcTimestamp(OpeningMonday.ToUnixTimeMilliseconds(), 0);
-        var samClaim = ClaimRecord(Sam, week, OpeningMonday, stamp, Sam);
-        var leeClaim = ClaimRecord(Lee, week, OpeningMonday, stamp, Lee);
+        var week = WeekOf(OpeningSunday);
+        var stamp = new HlcTimestamp(OpeningSunday.ToUnixTimeMilliseconds(), 0);
+        var samClaim = ClaimRecord(Sam, week, OpeningSunday, stamp, Sam);
+        var leeClaim = ClaimRecord(Lee, week, OpeningSunday, stamp, Lee);
 
         var one = HouseholdDocument.Empty.With(samClaim).With(leeClaim);
         var other = HouseholdDocument.Empty.With(leeClaim).With(samClaim);

@@ -20,7 +20,7 @@ public sealed class WorkoutWeekReportStoreTests : IDisposable
     private string PathOf() => Path.Combine(folder.FullName, "nested", WorkoutWeekFiles.ReportFile);
 
     private static StoredWorkoutWeek Week() => new(
-        new DateOnly(2026, 11, 2),
+        new DateOnly(2026, 11, 1),
         Est(11, 4, 6, 45),
         [new StoredSession(Sam, new DateOnly(2026, 11, 4), Est(11, 4, 16), "Strength", 40, false, [Sam], "None", ["Squat", "Row"], 132)],
         [new StoredReason(Sam, new DateOnly(2026, 11, 4), "Rain is due, so the walk moves indoors.")],

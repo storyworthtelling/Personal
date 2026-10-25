@@ -23,7 +23,7 @@ public sealed class PlanOverridesAssessmentTests : IDisposable
     {
         var morning = Est(11, 2, 5, 30);
         var first = await rig.PlannedAsync(rig.Request(morning, Sam));
-        var snapshot = OwnerHand.TabShows(rig, first, Day(0), morning);
+        var snapshot = OwnerHand.TabShows(rig, first, MondayDay(0), morning);
         var session = first.PlacedPlan.PlanFor(Sam)!.Sessions.First();
         var card = SwapChoices.For(snapshot, session.Day);
         var target = card.Rows.First(row => row.IsEnabled && snapshot.SessionOn(row.Day) is null).Day;

@@ -37,7 +37,8 @@ public sealed class WorkoutWeekRunTests : IDisposable
         await rig.PlannedAsync();
 
         Assert.Equal(1, rig.Calendars.Calls);
-        Assert.Equal(At(0, 0), rig.Calendars.From);
+        // The week opens at midnight on its Sunday, still on daylight time that morning, and closes at the next Sunday's midnight.
+        Assert.Equal(Edt(11, 1, 0, 0), rig.Calendars.From);
         Assert.Equal(At(7, 0), rig.Calendars.To);
     }
 
@@ -212,7 +213,8 @@ public sealed class WorkoutWeekRunTests : IDisposable
     {
         rig.BothAreEstablished();
 
-        var report = await rig.PlannedAsync();
+        // Made on the week's own first morning, Sunday, so every session of the week is still ahead of it.
+        var report = await rig.PlannedAsync(rig.Request(Est(11, 1, 5, 30)));
 
         var wanted = report.PlacedPlan.Plans.Sum(week => week.Sessions.Count);
         Assert.True(wanted >= 4, "The invented week should hold at least four sessions.");
@@ -235,7 +237,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
         var index = new PlacementIndex(report.PlacedPlan);
         foreach (var week in report.PlacedPlan.Plans)
         {
-            foreach (var session in week.Sessions)
+            foreach (var session in week.Sessions.Where(item => item.Day >= MondayDay(0)))
             {
                 Assert.NotNull(rig.Writer.By(index.KeyFor(week.Person, session.Day)!.Value, week.Person));
             }
@@ -290,7 +292,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
     {
         rig.BothAreEstablished();
         var first = await rig.PlannedAsync();
-        var session = first.PlacedPlan.PlanFor(Sam)!.Sessions[0];
+        var session = first.PlacedPlan.PlanFor(Sam)!.Sessions.First(item => item.Start >= rig.Clock);
         var key = new PlacementIndex(first.PlacedPlan).KeyFor(Sam, session.Day)!.Value;
         rig.Writer.OwnerDeletes(key, Sam);
         var creates = rig.Writer.CreateCalls;
@@ -331,7 +333,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
     }
 
     internal static IEnumerable<HourConditions> RainAcross(int dayOffset, int fromHour, int toHour) =>
-        Enumerable.Range(fromHour, toHour - fromHour).Select(hour => new HourConditions(At(dayOffset, hour), 48, 90, PrecipitationKind.Rain, 30, true));
+        Enumerable.Range(fromHour, toHour - fromHour).Select(hour => new HourConditions(MondayAt(dayOffset, hour), 48, 90, PrecipitationKind.Rain, 30, true));
 
     // ---- the adaptations, in the order each documented ----
 
@@ -397,14 +399,14 @@ public sealed class WorkoutWeekRunTests : IDisposable
     public async Task AFamilyHolidayPausesTheDaysItCovers()
     {
         rig.BothAreEstablished();
-        rig.Calendars.Snapshot = Calendars(family: [CalendarEntry.AllDay("Family holiday", Day(0), Day(3))]);
+        rig.Calendars.Snapshot = Calendars(family: [CalendarEntry.AllDay("Family holiday", MondayDay(0), MondayDay(3))]);
 
         var report = await rig.PlannedAsync();
 
         Assert.All(new[] { Sam, Lee }, person =>
-            Assert.DoesNotContain(report.Plan.PlanFor(person)!.Sessions, session => session.Day < Day(3)));
+            Assert.DoesNotContain(report.Plan.PlanFor(person)!.Sessions, session => session.Day >= MondayDay(0) && session.Day < MondayDay(3)));
         Assert.NotEmpty(report.DayNotes);
-        Assert.All(report.Documents, item => Assert.True(item.Day >= Day(3)));
+        Assert.All(report.Documents, item => Assert.True(item.Day >= MondayDay(3)));
     }
 
     [Fact]
@@ -413,12 +415,12 @@ public sealed class WorkoutWeekRunTests : IDisposable
         // Why the calendar seam must leave a declined or cancelled holiday out rather than hand it over as free: trips are
         // read whatever an entry's availability says, so a "free" holiday is still a holiday.
         rig.BothAreEstablished();
-        rig.Calendars.Snapshot = Calendars(family: [CalendarEntry.AllDay("Family holiday", Day(0), Day(3), Availability.Free)]);
+        rig.Calendars.Snapshot = Calendars(family: [CalendarEntry.AllDay("Family holiday", MondayDay(0), MondayDay(3), Availability.Free)]);
 
         var report = await rig.PlannedAsync();
 
         Assert.All(new[] { Sam, Lee }, person =>
-            Assert.DoesNotContain(report.Plan.PlanFor(person)!.Sessions, session => session.Day < Day(3)));
+            Assert.DoesNotContain(report.Plan.PlanFor(person)!.Sessions, session => session.Day >= MondayDay(0) && session.Day < MondayDay(3)));
     }
 
     // ---- every stage of the pipeline is really in it ----
@@ -465,7 +467,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
     public async Task AWorkTripRebuildsTheSessionForTheRoad()
     {
         rig.BothAreEstablished();
-        rig.Calendars.Snapshot = Calendars(sam: [CalendarEntry.AllDay("Conference", Day(1), Day(2))]);
+        rig.Calendars.Snapshot = Calendars(sam: [CalendarEntry.AllDay("Conference", MondayDay(1), MondayDay(2))]);
         var lift = Strength(new Exercise("Band row", EquipmentCatalogue.BandsId), new Exercise("Wall angels"));
         rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, 1, 16, lift)));
 
@@ -482,18 +484,18 @@ public sealed class WorkoutWeekRunTests : IDisposable
     public async Task ATripDoesNotBlockTheDayItsEntrySits()
     {
         rig.BothAreEstablished();
-        rig.Calendars.Snapshot = Calendars(sam: [CalendarEntry.AllDay("Conference", Day(1), Day(2)), .. BlockDays(0, 2, 3, 4, 5, 6)]);
+        rig.Calendars.Snapshot = Calendars(sam: [CalendarEntry.AllDay("Conference", MondayDay(1), MondayDay(2)), .. BlockDays(0, 1, 3, 4, 5, 6)]);
 
         var report = await rig.PlannedAsync();
 
-        Assert.Contains(report.PlacedPlan.PlanFor(Sam)!.Sessions, session => session.Day == Day(1));
+        Assert.Contains(report.PlacedPlan.PlanFor(Sam)!.Sessions, session => session.Day == MondayDay(1));
     }
 
     [Fact]
     public async Task TheWeatherIsLeftAloneOnADayWhoeverIsAway()
     {
         rig.BothAreEstablished();
-        rig.Calendars.Snapshot = Calendars(sam: [CalendarEntry.AllDay("Conference", Day(0), Day(1))]);
+        rig.Calendars.Snapshot = Calendars(sam: [CalendarEntry.AllDay("Conference", MondayDay(0), MondayDay(1))]);
         rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, 0, 16, Cardio)));
         rig.Conditions.Read = ConditionsRead.Of(RainAcross(0, 16, 18));
 
@@ -513,7 +515,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
         var usual = await rig.PlannedAsync();
         var change = Assert.Single(usual.ConditionChanges);
         Assert.Equal(ConditionAction.MovedInTime, change.Action);
-        Assert.Equal(At(0, 17), change.Replacement!.Start);
+        Assert.Equal(MondayAt(0, 17), change.Replacement!.Start);
 
         // With an hour and a half kept for the shower there is no clear start left inside the gap, so the walk goes indoors.
         var request = rig.Request(Est(11, 2, 6)) with { Placement = new PlacementOptions { ShowerBuffer = TimeSpan.FromMinutes(90) } };
@@ -532,7 +534,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
 
         await rig.PlannedAsync();
 
-        var text = string.Join(" ", Constitution.Tests.Documents.PdfReadBack.Open(rig.Tablet.PdfOf(DeliveredName.For(DeliveryKind.Workout, Day(0), Sam))).GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text));
+        var text = string.Join(" ", Constitution.Tests.Documents.PdfReadBack.Open(rig.Tablet.PdfOf(DeliveredName.For(DeliveryKind.Workout, MondayDay(0), Sam))).GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text));
         Assert.Contains("2 × 10", text, StringComparison.Ordinal);
     }
 

@@ -15,9 +15,9 @@ namespace Constitution.Domain.Household.Lease;
 /// it has heard of has been silent <i>past</i> the lease. <b>A standing claim is never taken mid-week</b>, by
 /// either install, whether its holder is alive, back, or gone quiet: the holder may already have planned,
 /// and a second planner is the failure this lease exists to prevent. So the lease changes hands only on
-/// an unclaimed week, which is to say at the Monday boundary, and the owner back mid-week waits for the
-/// next one. The cost, stated: an owner who claims on Monday and then vanishes leaves the week unplanned
-/// by anyone until the next Monday (and the settle window after it). Taking is not planning: the holder
+/// an unclaimed week, which is to say at the Sunday boundary, and the owner back mid-week waits for the
+/// next one. The cost, stated: an owner who claims on Sunday and then vanishes leaves the week unplanned
+/// by anyone until the next Sunday (and the settle window after it). Taking is not planning: the holder
 /// plans only once its claim has stood for <see cref="LeaseTerms.SettleWindow"/> and its own heartbeat is
 /// current in the file.</para>
 ///

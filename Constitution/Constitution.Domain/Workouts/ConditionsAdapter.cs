@@ -221,7 +221,7 @@ public static class ConditionsAdapter
         }
 
         var kind = hasTreadmill ? SessionKind.Treadmill : SessionKind.Mobility;
-        var weekIndex = request.WeekStart.DayNumber / 7;
+        var weekIndex = PlanningWeek.IndexOf(request.WeekStart);
         var duration = SessionLibrary.DurationFor(kind, session.Together, original.Duration);
         return session with { Session = SessionLibrary.Build(kind, session.Together, duration, request.Equipment, weekIndex) };
     }

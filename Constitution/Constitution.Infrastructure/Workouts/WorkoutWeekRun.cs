@@ -28,13 +28,13 @@ namespace Constitution.Infrastructure.Workouts;
 /// so a run that comes late writes nothing into the past.</para>
 ///
 /// <para><b>A session keeps its key however the week is re-planned</b> (B2). The week is re-made on every run, so a key that
-/// meant "the nth session of its kind" changes the moment the owner's new Monday meeting takes the first one out of the plan:
+/// meant "the nth session of its kind" changes the moment the owner's new early-week meeting takes the first one out of the plan:
 /// every event after it is then held under the key of the day before. Keys are therefore taken from the record of issued numbers
 /// (<see cref="KeyAssignments"/>, <see cref="WorkoutWeekSeams.KeyAssignments"/>): a session is named by its kind and its weekday,
 /// keeps the number it was first given, and a new session takes a number above every one ever issued. Where the record cannot
 /// vouch for a key the run does not guess: that person's sessions of that kind are left undecided
 /// (<see cref="UnplacedReason.KeysUncertain"/>), nothing is written, read as deleted or paged for them, and the trail counts them.
-/// A record that cannot be read stops placement as the record of written events does. The week must begin on a Monday.</para>
+/// A record that cannot be read stops placement as the record of written events does. The week must begin on the household's first day, a Sunday (<see cref="PlanningWeek"/>).</para>
 ///
 /// <para><b>The owner's moves are part of the base plan.</b> The Workouts tab moves a session by editing its event, and the plan
 /// is re-derived here on every run, so the run is handed what the owner did (<see cref="WorkoutWeekRequest.PlanOverrides"/>) and
@@ -81,12 +81,7 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentOutOfRangeException.ThrowIfNegative(request.DeliverAheadDays);
-        if (request.WeekStart.DayOfWeek != DayOfWeek.Monday)
-        {
-            throw new ArgumentException(
-                $"A workout week begins on a Monday, and {request.WeekStart:yyyy-MM-dd} is a {request.WeekStart.DayOfWeek}; a session's key names its weekday within the week.",
-                nameof(request));
-        }
+        PlanningWeek.RequireStart(request.WeekStart, nameof(request));
 
         var rules = request.Rules;
         var adults = rules.Adults.Select(adult => adult.Name).ToList();

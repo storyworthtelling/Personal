@@ -38,7 +38,7 @@ public sealed class WorkoutWeekEndToEndTests : IDisposable
 
     public void Dispose() => rig.Dispose();
 
-    private static string NameOf(string person, int dayOffset) => DeliveredName.For(DeliveryKind.Workout, Day(dayOffset), person);
+    private static string NameOf(string person, int dayOffset) => DeliveredName.For(DeliveryKind.Workout, MondayDay(dayOffset), person);
 
     private (ReadBackService Service, CallLog Calls, ReadBackFakeLedger Ledger, FakeVision Vision, FakeLog Log) ReadBack(DateTimeOffset morning, bool onlyDueDocuments, bool proven = true)
     {
@@ -99,8 +99,8 @@ public sealed class WorkoutWeekEndToEndTests : IDisposable
 
         await service.Run();
 
-        Assert.Equal(SessionOutcome.Done, ledger.Held.OutcomeOf(Sam, Day(0)));
-        Assert.Equal(SessionOutcome.Skipped, ledger.Held.OutcomeOf(Lee, Day(0)));
+        Assert.Equal(SessionOutcome.Done, ledger.Held.OutcomeOf(Sam, MondayDay(0)));
+        Assert.Equal(SessionOutcome.Skipped, ledger.Held.OutcomeOf(Lee, MondayDay(0)));
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class WorkoutWeekEndToEndTests : IDisposable
         var report = await service.Run();
 
         Assert.Empty(report.Documents);
-        Assert.Null(ledger.Held.OutcomeOf(Sam, Day(0)));
+        Assert.Null(ledger.Held.OutcomeOf(Sam, MondayDay(0)));
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public sealed class WorkoutWeekEndToEndTests : IDisposable
 
         Assert.Empty(report.Documents);
         Assert.Equal(0, vision.Reads);
-        Assert.Null(ledger.Held.OutcomeOf(Sam, Day(0)));
+        Assert.Null(ledger.Held.OutcomeOf(Sam, MondayDay(0)));
         Assert.Equal(2, rig.Tablet.Titles.Count);
     }
 

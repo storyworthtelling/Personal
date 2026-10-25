@@ -34,7 +34,7 @@ public sealed class PlanOverridesRunTests : IDisposable
 
     public void Dispose() => rig.Dispose();
 
-    private static string NameOf(int dayOffset) => DeliveredName.For(DeliveryKind.Workout, Day(dayOffset), Sam);
+    private static string NameOf(int dayOffset) => DeliveredName.For(DeliveryKind.Workout, MondayDay(dayOffset), Sam);
 
     private static DateTimeOffset MonSeven => Est(11, 2, 7);
 
@@ -45,7 +45,7 @@ public sealed class PlanOverridesRunTests : IDisposable
         string.Join(" ", PdfReadBack.Open(pdf).GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text));
 
     private async Task<(SwapResult Swap, PlanOverrides Overrides)> OwnerSwaps(WorkoutWeekReport first, DateTimeOffset now, int fromDay, int toDay) =>
-        await OwnerHand.Swaps(rig, OwnerHand.TabShows(rig, first, Day(0), now), Day(fromDay), Day(toDay));
+        await OwnerHand.Swaps(rig, OwnerHand.TabShows(rig, first, MondayDay(0), now), MondayDay(fromDay), MondayDay(toDay));
 
     [Fact]
     public async Task AMoveToARestDayTakesThePageOff()
@@ -69,7 +69,7 @@ public sealed class PlanOverridesRunTests : IDisposable
         var first = await rig.PlannedAsync(Asked(Est(11, 2, 5, 30)));
         var (swap, overrides) = await OwnerSwaps(first, MonSeven, 0, 4);
         var created = rig.Writer.CreateCalls;
-        var friday = swap.Moves.Single(move => move.New.Day == Day(4)).New;
+        var friday = swap.Moves.Single(move => move.New.Day == MondayDay(4)).New;
 
         var friMorning = await rig.PlannedAsync(Asked(Est(11, 6, 5, 30), overrides));
 
@@ -121,7 +121,7 @@ public sealed class PlanOverridesRunTests : IDisposable
     [Fact]
     public async Task ASkippedSessionGetsNoEventOrPage()
     {
-        var skip = new PendingSkip(Sam, Day(0), SessionKind.Strength, rig.Session(Sam, 0, 16, lift), null, null, MonSeven);
+        var skip = new PendingSkip(Sam, MondayDay(0), SessionKind.Strength, rig.Session(Sam, 0, 16, lift), null, null, MonSeven);
         var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip));
 
         var report = await rig.PlannedAsync(Asked(Est(11, 2, 5, 30), overrides));
@@ -137,7 +137,7 @@ public sealed class PlanOverridesRunTests : IDisposable
     {
         await rig.PlannedAsync(Asked(Est(11, 2, 5, 30)));
         Assert.Contains(NameOf(0), rig.Tablet.Titles.Values);
-        var skip = new PendingSkip(Sam, Day(0), SessionKind.Strength, rig.Session(Sam, 0, 16, lift), null, null, MonSeven);
+        var skip = new PendingSkip(Sam, MondayDay(0), SessionKind.Strength, rig.Session(Sam, 0, 16, lift), null, null, MonSeven);
         var overrides = PlanOverrides.From(new WorkoutsChange.SkipCommitted(skip));
 
         var report = await rig.PlannedAsync(Asked(MonSeven, overrides));
@@ -164,8 +164,8 @@ public sealed class PlanOverridesRunTests : IDisposable
         var second = await rig.PlannedAsync(Asked(MonSeven, overrides));
 
         var sessions = second.PlacedPlan.PlanFor(Sam)!.Sessions;
-        Assert.DoesNotContain(sessions, item => item.Day == Day(0));
-        Assert.Equal(Day(4), sessions.Single(item => item.Session.Kind == SessionKind.Strength).Day);
+        Assert.DoesNotContain(sessions, item => item.Day == MondayDay(0));
+        Assert.Equal(MondayDay(4), sessions.Single(item => item.Session.Kind == SessionKind.Strength).Day);
         Assert.Equal(swap.Moves[0].New.Start, sessions.Single(item => item.Session.Kind == SessionKind.Strength).Start);
     }
 }

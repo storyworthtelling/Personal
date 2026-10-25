@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Constitution.Domain.Calendar;
 using Constitution.Domain.Workouts;
 
 namespace Constitution.Domain.Placement;
@@ -31,7 +32,6 @@ public readonly record struct PlacementKey
     private const string Version = "c1";
     private const char Separator = ':';
     private const int Parts = 5;
-    private const int DaysPerWeek = 7;
     private const string HouseholdKind = "household";
 
     // Shapes a date takes: 2026-11-03, 2026/11/3, 11/03/2026, 3.11.2026, and any run of six or more digits
@@ -52,10 +52,11 @@ public readonly record struct PlacementKey
     public string Value => text ?? string.Empty;
 
     /// <summary>
-    /// The number of the week the date falls in, counting Monday-to-Sunday weeks (the same arithmetic the
-    /// workout planner uses). Every day of a week gives the same number.
+    /// The number of the week the date falls in, counting the household's Sunday-to-Saturday weeks
+    /// (<see cref="PlanningWeek.IndexOf(DateOnly)"/>, the arithmetic the workout planner and the lease use too).
+    /// Every day of a week gives the same number.
     /// </summary>
-    public static int WeekIndexOf(DateOnly weekStart) => weekStart.DayNumber / DaysPerWeek;
+    public static int WeekIndexOf(DateOnly weekStart) => PlanningWeek.IndexOf(weekStart);
 
     /// <summary>The key of a workout: <paramref name="ordinal"/> is the number issued to this person's session of this kind in the week (see <see cref="SessionKeys"/>).</summary>
     /// <exception cref="ArgumentException">The person is blank, the kind has no frozen name, or a number is negative.</exception>

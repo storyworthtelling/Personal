@@ -27,7 +27,7 @@ public sealed class StableKeysRunTests : IDisposable
 
     private static readonly Session Cardio = new(SessionKind.OutdoorCardio, TimeSpan.FromMinutes(35), true, [new("Warm-up walk"), new("Brisk walk"), new("Cool-down walk")]);
 
-    private static string NameOf(string person, int dayOffset) => DeliveredName.For(DeliveryKind.Workout, Day(dayOffset), person);
+    private static string NameOf(string person, int dayOffset) => DeliveredName.For(DeliveryKind.Workout, MondayDay(dayOffset), person);
 
     private static PlacementKey Key(int ordinal) => PlacementKey.ForWorkout(Sam, SessionKind.OutdoorCardio, PlacementKey.WeekIndexOf(WeekStart), ordinal);
 
@@ -73,8 +73,8 @@ public sealed class StableKeysRunTests : IDisposable
 
         var page = Assert.Single(report.Documents);
         Assert.Equal(DocumentVerdict.Delivered, page.Verdict);
-        Assert.Equal(Day(2), page.Day);
-        Assert.Equal(At(2, 16), rig.Delivered.Find(NameOf(Sam, 2))!.SlotStart);
+        Assert.Equal(MondayDay(2), page.Day);
+        Assert.Equal(MondayAt(2, 16), rig.Delivered.Find(NameOf(Sam, 2))!.SlotStart);
         Assert.Contains(NameOf(Sam, 2), rig.Tablet.Titles.Values);
     }
 
@@ -88,7 +88,7 @@ public sealed class StableKeysRunTests : IDisposable
 
         var page = Assert.Single(report.Documents);
         Assert.Equal(DocumentVerdict.Delivered, page.Verdict);
-        Assert.Equal(At(4, 16), rig.Delivered.Find(NameOf(Sam, 4))!.SlotStart);
+        Assert.Equal(MondayAt(4, 16), rig.Delivered.Find(NameOf(Sam, 4))!.SlotStart);
         Assert.Empty(report.Placement.Created);
     }
 
@@ -107,7 +107,7 @@ public sealed class StableKeysRunTests : IDisposable
         Assert.Equal(Key(2), Assert.Single(second.Placement.Created).Key);
         Assert.Empty(third.Placement.Created);
         Assert.Equal([Key(0), Key(1), Key(2)], rig.Writer.Of(Sam).Select(item => item.Key).Order(Comparer<PlacementKey>.Create((a, b) => string.CompareOrdinal(a.Value, b.Value))));
-        Assert.Equal(At(4, 16), rig.Writer.By(Key(1), Sam)!.Start);
+        Assert.Equal(MondayAt(4, 16), rig.Writer.By(Key(1), Sam)!.Start);
     }
 
     // ---- the record ----
@@ -150,7 +150,7 @@ public sealed class StableKeysRunTests : IDisposable
         var first = await rig.PlannedAsync(rig.Request(Est(11, 2, 5, 30), Sam));
 
         // Sam swaps Wednesday's cardio with Friday's lift on the tab; then a Monday meeting takes Monday's session out of the plan.
-        var (_, overrides) = await OwnerHand.Swaps(rig, OwnerHand.TabShows(rig, first, Day(0), Est(11, 2, 7)), Day(2), Day(4));
+        var (_, overrides) = await OwnerHand.Swaps(rig, OwnerHand.TabShows(rig, first, MondayDay(0), Est(11, 2, 7)), MondayDay(2), MondayDay(4));
         var written = rig.Writer.CreateCalls;
         rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, 2, 16, Cardio), rig.Session(Sam, 4, 16, lift)));
 
@@ -180,12 +180,12 @@ public sealed class StableKeysRunTests : IDisposable
 
         // A gap opens on Wednesday, so the re-plan has three sessions; the owner skips the new one.
         SamTrains(0, 2, 4);
-        var skip = new PlanOverrides([], [new SessionSkipped(Sam, Day(2))]);
+        var skip = new PlanOverrides([], [new SessionSkipped(Sam, MondayDay(2))]);
         var report = await rig.PlannedAsync(rig.Request(Est(11, 2, 9, 0)) with { PlanOverrides = skip });
 
         Assert.Empty(report.Placement.Created);
         Assert.Equal(2, rig.Writer.Of(Sam).Count);
-        var wednesday = new PlacementIndex(report.PlacedPlan, KeyAssignmentsCodec.Decode(rig.KeyAssignments.Json).Assignments).KeyFor(Sam, Day(2))!.Value;
+        var wednesday = new PlacementIndex(report.PlacedPlan, KeyAssignmentsCodec.Decode(rig.KeyAssignments.Json).Assignments).KeyFor(Sam, MondayDay(2))!.Value;
         Assert.Equal(Key(2), wednesday);
         Assert.True(rig.Keys.Load().Keys.Contains(wednesday));
         Assert.Contains(Key(1), report.Placement.Plan!.Held.Select(held => held.Key));
@@ -256,13 +256,13 @@ public sealed class StableKeysRunTests : IDisposable
     [InlineData(1)]
     [InlineData(3)]
     [InlineData(6)]
-    public async Task AWeekThatDoesNotBeginOnAMondayIsRefusedBeforeAnythingIsRead(int dayOffset)
+    public async Task ABadWeekStartIsRefusedBeforeAnyRead(int dayOffset)
     {
-        var request = rig.Request() with { WeekStart = Day(dayOffset) };
+        var request = rig.Request() with { WeekStart = WeekStart.AddDays(dayOffset) };
 
         var error = await Assert.ThrowsAsync<ArgumentException>(() => rig.Run.RunAsync(request, CancellationToken.None));
 
-        Assert.Contains("Monday", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Sunday", error.Message, StringComparison.Ordinal);
         Assert.Equal(0, rig.Calendars.Calls);
         Assert.Equal(0, rig.Writer.FindCalls);
         Assert.Empty(rig.Tablet.Calls);
