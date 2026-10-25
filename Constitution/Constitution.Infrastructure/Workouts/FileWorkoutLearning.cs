@@ -230,7 +230,9 @@ public sealed class FileWorkoutLearning : IWorkoutLearning, IReadBackSettled
         var unreadable = new List<string>();
 
         var skipRead = skips.Load();
-        if (skipRead.WholeFileUnreadable || skipRead.UnreadableEntries > 0)
+        // Learning only reads the skip ledger, and the ledger carries any entry it cannot interpret through its own saves,
+        // so only a file that is not a ledger at all stops learning.
+        if (skipRead.WholeFileUnreadable)
         {
             unreadable.Add("skip ledger");
         }

@@ -5,8 +5,9 @@ using static Constitution.Tests.ReadBack.ReadBackFixture;
 namespace Constitution.Tests.ReadBack;
 
 /// <summary>
-/// The read-back against the real ledger file (review finding S1). A ledger the app can only partly read is the only
-/// copy of the part it cannot: saving the readable part back is how that part is lost, so the file is left byte for byte as it was.
+/// The read-back against the real ledger file (review finding S1, as decided afterwards). A ledger the app can only partly read
+/// is the only copy of the part it cannot: skips keep being recorded and every entry it cannot interpret is written back
+/// verbatim. A file that is not a ledger at all is left byte for byte as it was.
 /// </summary>
 public sealed class LedgerFileSafetyTests : IDisposable
 {
@@ -36,32 +37,53 @@ public sealed class LedgerFileSafetyTests : IDisposable
         return rig;
     }
 
+    private const string YogaEntry = "{\"person\":\"Juniper\",\"day\":\"2026-10-31\",\"kind\":\"yoga\",\"outcome\":\"done\"}";
+
     [Fact]
-    public async Task AnEntryOfAnUnknownKindIsNotDroppedByTheNextSave()
+    public async Task AnUnknownKindSurvivesTheSave()
     {
         var rig = Arranged();
         var path = Written(WithAnUnknownKind);
 
         var report = await ServiceOver(rig, path).Run();
 
-        var failed = Assert.IsType<DocumentReadBack.Failed>(Assert.Single(report.Documents));
-        Assert.Equal(ReadBackStage.Persist, failed.Stage);
-        Assert.IsType<LedgerUnreadableException>(failed.Failure);
-        Assert.Equal(WithAnUnknownKind, File.ReadAllText(path));
-        Assert.Empty(rig.Tablet.Trashed);
+        Assert.IsType<DocumentReadBack.Settled>(Assert.Single(report.Documents));
+        var saved = File.ReadAllText(path);
+        Assert.Contains(YogaEntry, saved, StringComparison.Ordinal);
+        Assert.Contains("2026-11-03", saved, StringComparison.Ordinal);
+        Assert.Contains("2026-10-30", saved, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task AnEntryWithAnUnknownOutcomeIsNotDroppedEither()
+    public async Task AnUnknownOutcomeSurvivesTheSave()
     {
         var rig = Arranged();
-        var text = WithAnUnknownKind.Replace("\"kind\":\"yoga\",\"outcome\":\"done\"", "\"kind\":\"strength\",\"outcome\":\"postponed\"", StringComparison.Ordinal);
+        const string Odd = "{\"person\":\"Juniper\",\"day\":\"2026-10-31\",\"kind\":\"strength\",\"outcome\":\"postponed\"}";
+        var text = WithAnUnknownKind.Replace(YogaEntry, Odd, StringComparison.Ordinal);
         var path = Written(text);
 
         var report = await ServiceOver(rig, path).Run();
 
-        Assert.IsType<DocumentReadBack.Failed>(Assert.Single(report.Documents));
-        Assert.Equal(text, File.ReadAllText(path));
+        Assert.IsType<DocumentReadBack.Settled>(Assert.Single(report.Documents));
+        var saved = File.ReadAllText(path);
+        Assert.Contains(Odd, saved, StringComparison.Ordinal);
+        Assert.Contains("2026-11-03", saved, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AWholeFileThatIsNotALedgerIsStillKept()
+    {
+        var rig = Arranged();
+        const string Text = "{\"version\":2,\"records\":[]}";
+        var path = Written(Text);
+
+        var report = await ServiceOver(rig, path).Run();
+
+        var failed = Assert.IsType<DocumentReadBack.Failed>(Assert.Single(report.Documents));
+        Assert.Equal(ReadBackStage.Persist, failed.Stage);
+        Assert.IsType<LedgerUnreadableException>(failed.Failure);
+        Assert.Equal(Text, File.ReadAllText(path));
+        Assert.Empty(rig.Tablet.Trashed);
     }
 
     [Fact]

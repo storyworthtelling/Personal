@@ -265,10 +265,10 @@ public sealed class ReadBackService(
         if (document.Marks is not null)
         {
             current = ledger.Load();
-            // A ledger that is only partly readable is as unsafe to save as one that is not readable at all: the entries this
-            // version cannot read (a kind or outcome it does not know) are not in the ledger it would write, and the file
-            // it writes replaces the only copy of them.
-            if (current.WholeFileUnreadable || current.UnreadableEntries > 0)
+            // A file that is not a ledger at all is not written over. A ledger that is only partly readable is: the entries this
+            // version cannot read (a kind or outcome it does not know) ride inside the ledger as their raw JSON and are written
+            // back as they were, so recording a skip does not cost the only copy of them.
+            if (current.WholeFileUnreadable)
             {
                 throw new LedgerUnreadableException();
             }

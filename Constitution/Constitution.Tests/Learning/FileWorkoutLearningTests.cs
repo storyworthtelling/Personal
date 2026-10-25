@@ -77,6 +77,23 @@ public class FileWorkoutLearningTests
         Assert.Equal("{ not a ledger", File.ReadAllText(folder.File("skips.json")));
     }
 
+    [Fact]
+    public void APartlyReadableSkipLedgerStillTeaches()
+    {
+        // The skip ledger keeps what it cannot interpret and learning only reads it, so one odd entry is no reason to stop learning.
+        using var folder = new LearningFolder();
+        File.WriteAllText(
+            folder.File("skips.json"),
+            "{\"version\":1,\"records\":[{\"person\":\"Juniper\",\"day\":\"2026-10-31\",\"kind\":\"yoga\",\"outcome\":\"done\"}]}");
+        var learning = new FileWorkoutLearning(folder.Ledger(), folder.Path);
+        var (document, result) = Resolved.Strength((2, "done"), (3, "done"));
+
+        Assert.Null(learning.Load().UnreadableBecause);
+        learning.Settled(document, result);
+
+        Assert.NotEqual(ProgressionLedger.Empty.ToJson(), learning.Load().Progression.ToJson());
+    }
+
     [Theory]
     [InlineData("progression.json")]
     [InlineData("soreness.json")]

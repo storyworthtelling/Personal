@@ -50,4 +50,13 @@ public class SorenessSharedIdTests
     [Fact]
     public void AnswersToOtherBoxesAreNotThisOnesBusiness() =>
         Assert.False(Open(Settled(new InkResolution.Better("sore"), new InkResolution.NotRead("done", "page not read"))));
+
+    [Fact]
+    public void ASkippedDaysBetterBesideAnOpenQuestionKeepsIt() =>
+        Assert.True(Open(Noted().Settle(
+            Sam,
+            Day(2),
+            SessionOutcome.Skipped,
+            Shared,
+            [new InkResolution.Better("sore"), new InkResolution.NeedsAsking("sore", "left knee", "Still sore", "Better", "read:left knee:Still sore|Better")])));
 }

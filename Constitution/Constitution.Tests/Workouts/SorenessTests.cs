@@ -363,12 +363,29 @@ public class SorenessTests
     }
 
     [Fact]
-    public void ASessionNotDoneHasNoAnswerToGive()
+    public void ABlankClearsEvenOnASkippedDay()
+    {
+        // D28 literally: a blank always means better, whether or not the workout was done.
+        var sore = Sore("left knee");
+
+        Assert.Empty(Settled(sore, 2, SessionOutcome.Skipped, Blank()).OpenFor(Sam));
+        Assert.Empty(Settled(sore, 2, SessionOutcome.Unsettled, Blank()).OpenFor(Sam));
+    }
+
+    [Fact]
+    public void AMarkStillKeepsItOnASkippedDay()
     {
         var sore = Sore("left knee");
 
-        Assert.Single(Settled(sore, 2, SessionOutcome.Skipped, Blank()).OpenFor(Sam));
-        Assert.Single(Settled(sore, 2, SessionOutcome.Unsettled, Blank()).OpenFor(Sam));
+        Assert.Single(Settled(sore, 2, SessionOutcome.Skipped, Marked("sore-2")).OpenFor(Sam));
+        Assert.Single(Settled(sore, 2, SessionOutcome.Unsettled, Marked("sore-2")).OpenFor(Sam));
+    }
+
+    [Fact]
+    public void ASkippedBlankBeforeTheNoteStillDoesNotClear()
+    {
+        Assert.Single(Settled(Sore("left knee", noted: 3), 1, SessionOutcome.Skipped, Blank()).OpenFor(Sam));
+        Assert.Single(Settled(Sore("left knee", noted: 2), 2, SessionOutcome.Skipped, Blank()).OpenFor(Sam));
     }
 
     [Fact]
@@ -382,6 +399,9 @@ public class SorenessTests
         Assert.Single(Settled(sore, 2, SessionOutcome.Done, unread).OpenFor(Sam));
         Assert.Single(Settled(sore, 2, SessionOutcome.Done, asking).OpenFor(Sam));
         Assert.Single(Settled(sore, 2, SessionOutcome.Done, waiting).OpenFor(Sam));
+        Assert.Single(Settled(sore, 2, SessionOutcome.Skipped, unread).OpenFor(Sam));
+        Assert.Single(Settled(sore, 2, SessionOutcome.Unsettled, asking).OpenFor(Sam));
+        Assert.Single(Settled(sore, 2, SessionOutcome.Skipped, waiting).OpenFor(Sam));
     }
 
     [Fact]

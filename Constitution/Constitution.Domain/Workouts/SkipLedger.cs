@@ -83,6 +83,12 @@ public sealed record SkipLedgerRead(SkipLedger Ledger, int UnreadableEntries, bo
 /// skipped Sunday walk does not ease the week and a done one does not earn a fourth session; both still appear in the
 /// digest and in <see cref="LastDoneDay"/>.</para>
 ///
+/// <para><b>What this version cannot read is carried, not dropped.</b> An entry of a kind or outcome it does not know (or one
+/// that is malformed) is kept as its raw JSON by <see cref="FromJson"/> and written back unchanged by <see cref="ToJson"/>,
+/// so recording a new day never costs the only copy of the rest. Position is not kept: the readable records are written in
+/// day order and the preserved entries follow them, in the order they were found. The first save after a read moves them to
+/// the end; every save after that is byte for byte the same.</para>
+///
 /// <para><b>An answer is only replaced by another answer.</b> A later read that cannot settle (<see cref="SessionOutcome.Unsettled"/>)
 /// leaves the record alone; a later read that can replaces it, so a page scanned late corrects an earlier skip.</para>
 /// </summary>
@@ -93,13 +99,15 @@ public sealed class SkipLedger
     private const string DayFormat = "yyyy-MM-dd";
 
     private readonly IReadOnlyList<SessionRecord> records;
+    private readonly IReadOnlyList<string> preserved;
 
-    private SkipLedger(IReadOnlyList<SessionRecord> records)
+    private SkipLedger(IReadOnlyList<SessionRecord> records, IReadOnlyList<string> preserved)
     {
         this.records = records;
+        this.preserved = preserved;
     }
 
-    public static SkipLedger Empty { get; } = new([]);
+    public static SkipLedger Empty { get; } = new([], []);
 
     /// <summary>Every settled session, earliest day first, then by person.</summary>
     public IReadOnlyList<SessionRecord> Records => records;
@@ -172,6 +180,11 @@ public sealed class SkipLedger
                 writer.WriteEndObject();
             }
 
+            foreach (var raw in preserved)
+            {
+                writer.WriteRawValue(raw, skipInputValidation: true);
+            }
+
             writer.WriteEndArray();
             writer.WriteEndObject();
         }
@@ -182,7 +195,7 @@ public sealed class SkipLedger
     /// <summary>
     /// Reads the stored file. Nothing stored is an empty ledger with no problem (a fresh install); a file that cannot be read
     /// as a ledger at all comes back empty with <see cref="SkipLedgerRead.WholeFileUnreadable"/> set, so the caller can raise
-    /// a notice and not write over it; an entry that cannot be read is skipped and counted, and the rest are kept.
+    /// a notice and not write over it; an entry that cannot be read is counted and its raw JSON kept, to be written back as it was.
     /// </summary>
     public static SkipLedgerRead FromJson(string? json)
     {
@@ -207,7 +220,7 @@ public sealed class SkipLedger
             }
 
             var ledger = Empty;
-            var unreadable = 0;
+            var unreadable = new List<string>();
             foreach (var entry in array.EnumerateArray())
             {
                 if (TryRecord(entry) is { } record)
@@ -216,11 +229,11 @@ public sealed class SkipLedger
                 }
                 else
                 {
-                    unreadable++;
+                    unreadable.Add(entry.GetRawText());
                 }
             }
 
-            return new SkipLedgerRead(ledger, unreadable, false);
+            return new SkipLedgerRead(new SkipLedger(ledger.records, unreadable), unreadable.Count, false);
         }
         catch (JsonException)
         {
@@ -290,10 +303,12 @@ public sealed class SkipLedger
         records.Where(item => Same(item.Person, person) && item.Day >= first && item.Day <= last);
 
     private SkipLedger With(SessionRecord record) =>
-        new(records
-            .Where(item => !(item.Day == record.Day && Same(item.Person, record.Person)))
-            .Append(record)
-            .OrderBy(item => item.Day)
-            .ThenBy(item => item.Person, StringComparer.OrdinalIgnoreCase)
-            .ToList());
+        new(
+            records
+                .Where(item => !(item.Day == record.Day && Same(item.Person, record.Person)))
+                .Append(record)
+                .OrderBy(item => item.Day)
+                .ThenBy(item => item.Person, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            preserved);
 }

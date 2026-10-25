@@ -426,6 +426,61 @@ public class SkipLedgerTests
             read.Ledger.Records.ToArray());
     }
 
+    private const string Yoga = "{\"person\":\"Sam\",\"day\":\"2026-11-03\",\"kind\":\"yoga\",\"outcome\":\"done\"}";
+    private const string Odd = "{ \"person\" : \"\", \"day\":\"soon\", \"extra\":[1,2] }";
+
+    private static string WithUnreadable() =>
+        "{\"version\":1,\"records\":["
+        + "{\"person\":\"Sam\",\"day\":\"2026-11-02\",\"kind\":\"strength\",\"outcome\":\"done\"},"
+        + Yoga + ","
+        + Odd + ","
+        + "{\"person\":\"Lee\",\"day\":\"2026-11-06\",\"kind\":\"mobility\",\"outcome\":\"skipped\"}]}";
+
+    [Fact]
+    public void UnreadableEntriesAreWrittenBackVerbatim()
+    {
+        var written = SkipLedger.FromJson(WithUnreadable()).Ledger.ToJson();
+
+        Assert.Contains(Yoga, written, StringComparison.Ordinal);
+        Assert.Contains(Odd, written, StringComparison.Ordinal);
+        var again = SkipLedger.FromJson(written);
+        Assert.Equal(2, again.UnreadableEntries);
+        Assert.Equal(2, again.Ledger.Records.Count);
+    }
+
+    [Fact]
+    public void ASaveThatAddsARecordKeepsThemToo()
+    {
+        var read = SkipLedger.FromJson(WithUnreadable());
+
+        var next = read.Ledger.Settle(Marks(9), AllEmpty());
+
+        Assert.Equal(3, next.Records.Count);
+        var written = next.ToJson();
+        Assert.Contains(Yoga, written, StringComparison.Ordinal);
+        Assert.Contains(Odd, written, StringComparison.Ordinal);
+        Assert.Equal(2, SkipLedger.FromJson(written).UnreadableEntries);
+    }
+
+    [Fact]
+    public void WritingTwiceIsByteStable()
+    {
+        var first = SkipLedger.FromJson(WithUnreadable()).Ledger.Settle(Marks(9), AllEmpty()).ToJson();
+
+        var second = SkipLedger.FromJson(first).Ledger.ToJson();
+
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void ALedgerWithNothingUnreadableWritesNoExtras()
+    {
+        var read = SkipLedger.FromJson(SkipLedger.Empty.Settle(Marks(0), AllEmpty()).ToJson());
+
+        Assert.Equal(0, read.UnreadableEntries);
+        Assert.DoesNotContain("yoga", read.Ledger.ToJson(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void RecordsComeBackInDayOrder()
     {
