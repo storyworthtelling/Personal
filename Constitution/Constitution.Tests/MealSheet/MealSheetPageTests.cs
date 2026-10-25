@@ -119,11 +119,34 @@ public class MealSheetPageTests
     {
         var text = Rendered(MealSheetSamples.Page());
 
-        Assert.Contains("Sam cooks", text);
-        Assert.Contains("Lee cooks", text);
+        Assert.Contains("Sam cooks from 5:15 pm", text);
+        Assert.Contains("Lee cooks from 5:15 pm", text);
         Assert.Contains("Sam starts it 7:40 am", text);
         Assert.Contains("Leave 5:45 pm", text);
         Assert.Contains("Kids: buttered noodles", text);
+    }
+
+    [Fact]
+    public void EveryCookedRowStatesItsStartTime()
+    {
+        var text = Rendered(MealSheetSamples.Page());
+
+        Assert.Equal(6, System.Text.RegularExpressions.Regex.Matches(text, @"cooks from 5:15 pm").Count + System.Text.RegularExpressions.Regex.Matches(text, @"starts it 7:40 am").Count);
+        Assert.DoesNotContain("cooks ", text.Replace("cooks from", string.Empty));
+        Assert.DoesNotMatch(@"\d:\d\d(?! ?[ap]m)", text.Replace("Leave 5:45 pm", string.Empty));
+    }
+
+    [Fact]
+    public void ALongCookNameWrapsAndStillFits()
+    {
+        var dinners = MealSheetSamples.Dinners().ToList();
+        var day = MealSheetSamples.Monday.AddDays(6);
+        var start = new DateTimeOffset(day.Year, day.Month, day.Day, 18, 5, 0, TimeSpan.FromHours(-5));
+        dinners[6] = DinnerChoice.Cooked(day, MealSheetSamples.Id("veggie-fried-rice"), "Alexandria-Josephine", start, start.AddHours(1), false, false, "Planned.");
+        var page = MealSheetSamples.Page(MealSheetSamples.Model(dinners));
+
+        Assert.Contains("6:05 pm", Rendered(page));
+        Assert.Empty(page.Violations());
     }
 
     [Fact]
