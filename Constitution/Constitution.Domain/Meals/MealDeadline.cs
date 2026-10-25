@@ -90,13 +90,8 @@ public static class MealDeadline
             return Approved(itemId, onTime, late);
         }
 
-        var lateTier = LatestPerPerson(late);
-        if (lateTier.Count == 0)
-        {
-            return new MealItemDecision(itemId, MealItemOutcome.Unheard, MealApprovalBasis.None, [], []);
-        }
-
-        return lateTier.Any(answer => answer.Verdict == MealVerdict.Denied) ? Denied(itemId, lateTier, []) : Approved(itemId, lateTier, []);
+        // D103: a line no tablet was read for by the deadline is approved like any untouched line. Late readings never decide it.
+        return new MealItemDecision(itemId, MealItemOutcome.Approved, MealApprovalBasis.Silence, [], late, NothingWasRead: true);
     }
 
     private static MealItemDecision Denied(string itemId, List<MealAnswer> deciding, List<MealAnswer> ignored) =>
