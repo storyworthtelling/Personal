@@ -46,17 +46,31 @@ internal static class MealSheetSamples
         [Sunday.AddDays(5)] = new("Corner noodle house", new DateTime(2026, 11, 20, 17, 45, 0)),
     };
 
+    /// <summary>Pages 2 and 3 as book p.7 draws them (invented dishes).</summary>
+    public static MealSheetDailyMeals Daily() => new(
+        [new("Sam", "Overnight oats, berries"), new("Lee", "Yogurt, granola, banana"), new("Kids", "Toast, peanut butter, apple")],
+        [new("Sam", "Hummus and turkey wrap, carrots"), new("Lee", "Chickpea salad, crackers")],
+        "Banana pancakes, everyone",
+        "Cheese quesadillas, salsa, fruit",
+        new("Sunflower butter and jam", "Clementine", "Cheese stick", "Cucumber slices", "Oat granola bar"));
+
     public static MealSheetModel Model(
         IEnumerable<DinnerChoice>? dinners = null,
         IReadOnlyDictionary<RecipeId, MealSheetDish>? dishes = null,
         string? voice = "Soup weather is here. One new dish, Thursday, and Friday is somebody else’s kitchen.",
-        DateTimeOffset? deadline = null) =>
+        DateTimeOffset? deadline = null,
+        MealSheetDailyMeals? daily = null,
+        int pages = 5) =>
         new(
             MealWeek.Planned(Sunday, dinners ?? Dinners()),
             dishes ?? Dishes(),
             deadline ?? Deadline,
             Outings(),
-            voice);
+            voice,
+            Pages: pages,
+            Daily: daily);
+
+    public static MealSheetModel FullModel(MealSheetDailyMeals? daily = null) => Model(daily: daily ?? Daily());
 
     public static InkPageLayout Page(MealSheetModel? model = null) => MealSheetDocument.Build(model ?? Model()).Single();
 }
