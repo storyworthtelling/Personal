@@ -5,7 +5,9 @@ using Constitution.Domain.Time;
 namespace Constitution.Domain.Documents;
 
 /// <summary>
-/// Page 1 of the weekly meal sheet (book p.7, treatment B): a row per evening in the planning week's order (Sunday to Saturday), each with a YES box under which "YES" is
+/// The weekly meal sheet: page 1 is the dinners, and pages 2 and 3 (breakfast and lunch, then lunchboxes, built by
+/// <see cref="MealSheetItemPage"/>) follow when the model carries <see cref="MealSheetModel.Daily"/>.
+/// Page 1 (book p.7, treatment B): a row per evening in the planning week's order (Sunday to Saturday), each with a YES box under which "YES" is
 /// written, the day, the dish, who cooks and when, any outlined-word marker, and the shaded "No, because" field at the
 /// other end of the row. Every box comes from <see cref="InkTargets"/> and every id from <see cref="MealSheetIds"/>, so
 /// the ink reader reads the instances the painter drew. Silence approves at <see cref="MealSheetModel.Deadline"/>;
@@ -85,8 +87,21 @@ public static class MealSheetDocument
             Row(draft, model, model.Week.Dinners[index], FirstRule + index * RowPitch);
         }
 
-        Footer(draft, model);
-        return [draft.ToLayout()];
+        Footer(draft, model, 1);
+        var pages = new List<InkPageLayout> { draft.ToLayout() };
+
+        if (model.Daily is { } daily)
+        {
+            if (model.Pages < MealSheetItems.LunchboxSheetNumber)
+            {
+                throw new ArgumentException($"A sheet of {model.Pages} pages has no room for the breakfast, lunch and lunchbox pages (pages 2 and 3).", nameof(model));
+            }
+
+            pages.Add(MealSheetItemPage.Build(model, MealSheetItems.BreakfastSheetNumber, MealSheetItems.BreakfastTitle, MealSheetItems.BreakfastIntro, MealSheetItems.BreakfastPage(daily)));
+            pages.Add(MealSheetItemPage.Build(model, MealSheetItems.LunchboxSheetNumber, MealSheetItems.LunchboxTitle, MealSheetItems.LunchboxIntro, MealSheetItems.LunchboxPage(daily)));
+        }
+
+        return pages;
     }
 
     /// <summary>"Sunday morning": the day and which part of it, as the book words the deadline.</summary>
@@ -118,13 +133,13 @@ public static class MealSheetDocument
             $"Anything untouched is approved {DeadlineWords(model.Deadline)}.", name: "deadline-line");
     }
 
-    private static void Footer(PageDraft draft, MealSheetModel model)
+    internal static void Footer(PageDraft draft, MealSheetModel model, int number)
     {
         var weekOf = model.Week.WeekStart.ToDateTime(TimeOnly.MinValue).ToString("MMM d", CultureInfo.InvariantCulture);
         draft.Line(PrintedRole.Small, PageDraft.Left, 578f, 300f, $"Constitution · Meals · week of {weekOf} · both tablets", name: "footer");
         draft.Line(
             PrintedRole.Small, PageDraft.RightEdge - 100f, 578f, 100f,
-            $"1 of {model.Pages.ToString(CultureInfo.InvariantCulture)}", PrintedAlign.Right, name: "page-number");
+            $"{number.ToString(CultureInfo.InvariantCulture)} of {model.Pages.ToString(CultureInfo.InvariantCulture)}", PrintedAlign.Right, name: "page-number");
     }
 
     private static void Row(PageDraft draft, MealSheetModel model, DinnerChoice dinner, float top)

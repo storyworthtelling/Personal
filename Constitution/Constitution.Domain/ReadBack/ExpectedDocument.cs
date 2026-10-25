@@ -135,13 +135,14 @@ public sealed partial class ExpectedDocument
 
     /// <summary>
     /// The rules of the dinners page as <see cref="MealSheetDocument"/> draws it: one <see cref="MealItemRule"/> per evening in the sheet's own order (the planning week's, Sunday to Saturday),
-    /// tick or written reason, approved by silence at the model's deadline. Later pages of the sheet add their own rules.
+    /// tick or written reason, approved by silence at the model's deadline. Pages 2 and 3 add one rule per breakfast, lunch and lunchbox line when the model carries them; later pages add their own.
     /// </summary>
     public static ExpectedDocument ForMealSheet(MealSheetModel model, string person)
     {
         ArgumentNullException.ThrowIfNull(model);
 
-        var map = MealSheetDocument.Build(model)[0].Map;
+        var layouts = MealSheetDocument.Build(model);
+        var map = layouts[0].Map;
         var rules = new List<InkRule>();
         foreach (var dinner in model.Week.Dinners)
         {
@@ -154,7 +155,17 @@ public sealed partial class ExpectedDocument
             }
         }
 
-        return new ExpectedDocument(DeliveryKind.Meals, model.Week.WeekStart, null, person, null, [new ExpectedPage(1, new InkReadout(map), rules)]);
+        var pages = new List<ExpectedPage> { new(1, new InkReadout(map), rules) };
+
+        // Pages 2 and 3 (breakfast and lunch, lunchboxes): every line is its own item, approved by silence at the same deadline (D30).
+        foreach (var (number, items) in MealSheetItems.Pages(model))
+        {
+            var pageMap = layouts[number - 1].Map;
+            var itemRules = items.Select(item => (InkRule)new MealItemRule(item.Subject, item.YesId, item.ReasonId, model.Deadline)).ToList();
+            pages.Add(new ExpectedPage(number, new InkReadout(pageMap), itemRules));
+        }
+
+        return new ExpectedDocument(DeliveryKind.Meals, model.Week.WeekStart, null, person, null, pages);
     }
 
     private static string DinnerWords(MealSheetModel model, DinnerChoice dinner) => dinner.Kind switch

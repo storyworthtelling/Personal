@@ -47,6 +47,47 @@ public static class MealSheetIds
         DinnerReasonSaturday,
     ];
 
+    // Pages 2 and 3. A weekday line is answered under its slot in the page's order (the first person listed is slot 1), the weekend's
+    // two lines and the lunchbox's five parts under their own words. Literals, so a stored reply finds its row by them.
+    public const string WeekendBreakfastYes = "weekend-breakfast-yes";
+    public const string WeekendBreakfastReason = "weekend-breakfast-why";
+    public const string WeekendLunchYes = "weekend-lunch-yes";
+    public const string WeekendLunchReason = "weekend-lunch-why";
+
+    public const string BoxSandwichYes = "box-sandwich-yes";
+    public const string BoxSandwichReason = "box-sandwich-why";
+    public const string BoxFruitYes = "box-fruit-yes";
+    public const string BoxFruitReason = "box-fruit-why";
+    public const string BoxSnackYes = "box-snack-yes";
+    public const string BoxSnackReason = "box-snack-why";
+    public const string SnackFruitYes = "snack-fruit-yes";
+    public const string SnackFruitReason = "snack-fruit-why";
+    public const string SnackBarYes = "snack-bar-yes";
+    public const string SnackBarReason = "snack-bar-why";
+
+    /// <summary>The most weekday lines one group can number; the page has room for five between breakfast and lunch.</summary>
+    public const int WeekdaySlots = 5;
+
+    private static readonly string[] BreakfastYesIds = ["breakfast-1-yes", "breakfast-2-yes", "breakfast-3-yes", "breakfast-4-yes", "breakfast-5-yes"];
+    private static readonly string[] BreakfastReasonIds = ["breakfast-1-why", "breakfast-2-why", "breakfast-3-why", "breakfast-4-why", "breakfast-5-why"];
+    private static readonly string[] LunchYesIds = ["lunch-1-yes", "lunch-2-yes", "lunch-3-yes", "lunch-4-yes", "lunch-5-yes"];
+    private static readonly string[] LunchReasonIds = ["lunch-1-why", "lunch-2-why", "lunch-3-why", "lunch-4-why", "lunch-5-why"];
+
+    /// <summary>The YES box of the weekday breakfast in this slot (1 to <see cref="WeekdaySlots"/>).</summary>
+    public static string BreakfastYes(int slot) => BreakfastYesIds[Slot(slot)];
+
+    /// <summary>The "No, because" field of the weekday breakfast in this slot.</summary>
+    public static string BreakfastReason(int slot) => BreakfastReasonIds[Slot(slot)];
+
+    /// <summary>The YES box of the weekday lunch in this slot.</summary>
+    public static string LunchYes(int slot) => LunchYesIds[Slot(slot)];
+
+    /// <summary>The "No, because" field of the weekday lunch in this slot.</summary>
+    public static string LunchReason(int slot) => LunchReasonIds[Slot(slot)];
+
+    private static int Slot(int slot) =>
+        slot is >= 1 and <= WeekdaySlots ? slot - 1 : throw new ArgumentOutOfRangeException(nameof(slot), slot, $"A weekday group has slots 1 to {WeekdaySlots}.");
+
     /// <summary>The YES box of the dinner on this weekday.</summary>
     public static string DinnerYes(DayOfWeek day) => Yes[Checked(day)];
 
