@@ -1,3 +1,4 @@
+using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Voice;
 
 namespace Constitution.Domain.Today;
@@ -39,5 +40,12 @@ public sealed record TodayPlan
     /// <summary>The one Score setting the workout runs at, in beats a minute, or null while none is chosen.</summary>
     public int? ScoreBpm { get; init; }
 
+    /// <summary>Tonight's dinner as its scrap says it (C-4.1.3), or null while the meal week has none to show.</summary>
+    public DinnerClipping? DinnerCard { get; init; }
+
     public bool IsRestDay => WorkoutStart is null;
+
+    /// <summary>The same day with its dinner filled in from the meal week: the dish for the top line and the card for the scrap.</summary>
+    public TodayPlan WithDinner(DinnerPlan? dinner, DinnerClipping? card) =>
+        new(WorkoutStart, WorkoutKind, WorkoutMinutes, dinner) { ScoreBpm = ScoreBpm, DinnerCard = card };
 }

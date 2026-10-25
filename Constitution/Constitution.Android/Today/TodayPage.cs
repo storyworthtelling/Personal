@@ -3,6 +3,7 @@ using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
+using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Scraps;
 using Constitution.Domain.Today;
 using Constitution.Scrapbook;
@@ -22,7 +23,9 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
 
     public const string WorkoutScrapId = "today-workout";
 
-    public TodayPage(Context context, TodayTopLine topLine, TodayClipping? clipping, string folio) : base(context)
+    public const string DinnerScrapId = "today-dinner";
+
+    public TodayPage(Context context, TodayTopLine topLine, TodayClipping? clipping, string folio, DinnerClipping? dinner = null) : base(context)
     {
         Orientation = Orientation.Vertical;
 
@@ -40,11 +43,39 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
             scraps.Add(new ScrapEntry(ScrapKind.MagazineClipping, WorkoutScrapId, column, folio));
         }
 
+        if (dinner is not null)
+        {
+            // Tonight's dinner (C-4.1.3): an index card, or a restaurant receipt when the household is eating out (D46).
+            scraps.Add(new ScrapEntry(dinner.Paper, DinnerScrapId, DinnerContent(context, dinner)));
+        }
+
         host.SetScraps(scraps);
 
         var scroll = new ScrollView(context);
         scroll.AddView(host, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
         AddView(scroll, new LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
+    }
+
+    private static View DinnerContent(Context context, DinnerClipping dinner)
+    {
+        if (dinner.Paper == ScrapKind.Receipt)
+        {
+            var receipt = ScrapContent.Column(context, ScrapContent.ReceiptLine(context, dinner.Kicker), ScrapContent.ReceiptLine(context, dinner.Headline));
+            if (dinner.Line is not null)
+            {
+                receipt.AddView(ScrapContent.ReceiptLine(context, dinner.Line));
+            }
+
+            return receipt;
+        }
+
+        var card = ScrapContent.Column(context, ScrapContent.IndexLabel(context, dinner.Kicker), ScrapContent.IndexLine(context, dinner.Headline, strong: true));
+        if (dinner.Line is not null)
+        {
+            card.AddView(ScrapContent.IndexLine(context, dinner.Line));
+        }
+
+        return card;
     }
 
     private static TextView Line(Context context, TodayTopLine topLine)
