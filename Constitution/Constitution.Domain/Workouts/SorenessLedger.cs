@@ -19,12 +19,12 @@ public sealed record SorenessLedgerRead(SorenessLedger Ledger, int UnreadableEnt
 /// workout documents after that asks "Still sore?" until the question is answered by a blank (D28); the doctor suggestion
 /// prints once (D29). Immutable: every method returns the next ledger.
 ///
-/// <para><b>What counts as a blank.</b> A blank on every "Still sore?" of a session the owner <i>did</i> (some page marked)
-/// and on a page printed after the note was made (a blank on the day it was noted, or before, could not have been an
-/// answer to a question that was not yet on the page). A mark on any page keeps it open. A page not read, a question
-/// waiting to be asked, or a box the read left out is no answer. <b>A session not done is no answer either</b>: D28 says
-/// silence means better, but a page the pen never touched is not the owner saying so, and wrongly clearing a soreness
-/// has a worse cost than asking once more. One answer applies to all of that person's open notes.</para>
+/// <para><b>What counts as a blank.</b> D28 literally: a blank "Still sore?" always means better, <i>whether or not the
+/// workout was done</i> (a skipped day or an unsettled one clears it just the same). It has to be a blank that was actually
+/// read, on every "Still sore?" box, on a page printed after the note was made (a blank on the day it was noted, or before,
+/// could not have been an answer to a question that was not yet on the page). A mark on any page keeps it open. A page not
+/// read, a question waiting to be asked, or a box the read left out is no answer: silence is a blank that was read, not
+/// a page that was never looked at. One answer applies to all of that person's open notes.</para>
 ///
 /// <para><b>The doctor suggestion</b> is due when the soreness has lasted <see cref="PersistsAfterDays"/> days, or the
 /// morning's signals read as <see cref="RecoveryState.Alarming"/>, and it has not yet printed for this person's
@@ -87,7 +87,8 @@ public sealed class SorenessLedger
 
     /// <summary>
     /// Reads back a finished day. <paramref name="stillSoreBoxIds"/> are the "Still sore?" boxes the person's pages carried;
-    /// <paramref name="outcome"/> is how <see cref="DayClose"/> judged the session. See the class for what clears a note.
+    /// <paramref name="outcome"/> is how <see cref="DayClose"/> judged the session; it is no longer consulted, because a blank
+    /// clears whatever became of the session (the parameter stays so the callers do not move). See the class for what clears a note.
     /// </summary>
     public SorenessLedger Settle(string person, DateOnly day, SessionOutcome outcome, IReadOnlyCollection<string> stillSoreBoxIds, IEnumerable<InkResolution> resolutions)
     {
@@ -103,7 +104,7 @@ public sealed class SorenessLedger
             throw new ArgumentException("A page that asked nothing cannot have been answered.", nameof(stillSoreBoxIds));
         }
 
-        if (outcome != SessionOutcome.Done || !IsBlank(stillSoreBoxIds, resolutions))
+        if (!IsBlank(stillSoreBoxIds, resolutions))
         {
             return this;
         }

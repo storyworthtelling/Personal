@@ -618,21 +618,17 @@ public class ReadBackServiceTests
     }
 
     [Fact]
-    public async Task ALedgerWithEntriesItCannotReadIsNeverWrittenOver()
+    public async Task EntriesItCannotReadDoNotStopTheRecord()
     {
-        // An entry of a kind this version does not know is part of the only copy: saving the readable ones would drop it.
+        // The ledger itself carries what it cannot interpret (see LedgerFileSafetyTests), so the service records on.
         var rig = Arranged();
         rig.Ledger.UnreadableEntries = 1;
 
         var outcome = await rig.RunOne();
 
-        var failed = Assert.IsType<DocumentReadBack.Failed>(outcome);
-        Assert.Equal(ReadBackStage.Persist, failed.Stage);
-        Assert.IsType<LedgerUnreadableException>(failed.Failure);
-        Assert.Equal(0, rig.Ledger.Saves);
-        Assert.Equal(0, rig.Results.Saves);
-        Assert.Empty(rig.Tablet.Trashed);
-        Assert.Empty(rig.Expected.Saved);
+        Assert.IsType<DocumentReadBack.Settled>(outcome);
+        Assert.Equal(1, rig.Ledger.Saves);
+        Assert.Equal(1, rig.Results.Saves);
     }
 
     [Fact]
