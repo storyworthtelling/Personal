@@ -151,6 +151,9 @@ public abstract class ConstitutionActivity : Activity
 
         // Health Connect's answer for the signal being allowed from its page.
         bodyArea?.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        // The camera's answer for the partner's recipe scan.
+        mealsArea?.OnRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     protected override void OnResume()

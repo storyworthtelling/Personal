@@ -4,7 +4,7 @@ namespace Constitution.Tests.RecipeScan;
 
 /// <summary>
 /// The picker and the typed page are compile-checked, not run, so what can be said about them is said by reading the source: no
-/// toast or dialog, no literal colour or size, no empty catch, no picture type, no camera permission, the actions only in the pinned
+/// toast or dialog, no literal colour or size, no empty catch, no picture type, the camera permission and capture only in their own files, the actions only in the pinned
 /// bar and every word from the models. Nothing here says the picker looks like book page 14; the owner has not compared them.
 /// </summary>
 public class PickerSourceTests
@@ -69,17 +69,27 @@ public class PickerSourceTests
     }
 
     [Fact]
-    public void NoCameraPermissionOrCaptureIntentExistsYet()
+    public void CameraAndCaptureLiveOnlyInTheirOwnFiles()
     {
-        var heads = ConstitutionSource.Files(".cs")
-            .Where(file => ConstitutionSource.Relative(file).StartsWith("Constitution.Android/", StringComparison.Ordinal))
-            .Select(File.ReadAllText);
-        var all = string.Join("\n", heads);
+        // D105 allows CAMERA and the capture intent, in exactly these places: the permission file, the launcher that starts the
+        // camera, and (the permission name only) the area that asks for it at the tap. Anywhere else is a surprise.
+        var permissionFile = "Constitution.Android/RecipeCameraPermission.cs";
+        var launcher = "Constitution.Android/MealsTab/CameraCaptureLauncher.cs";
+        var area = "Constitution.Android/MealsArea.cs";
+        var offenders = new List<string>();
+        foreach (var file in ConstitutionSource.Files(".cs").Where(file => ConstitutionSource.Relative(file).StartsWith("Constitution.Android/", StringComparison.Ordinal)))
+        {
+            var relative = ConstitutionSource.Relative(file);
+            var text = File.ReadAllText(file);
+            var permission = text.Contains("permission.CAMERA", StringComparison.Ordinal) || text.Contains("Manifest.Permission.Camera", StringComparison.Ordinal);
+            var capture = text.Contains("ActionImageCapture", StringComparison.Ordinal) || text.Contains("IMAGE_CAPTURE", StringComparison.Ordinal);
+            if ((permission && relative != permissionFile && relative != area) || (capture && relative != launcher))
+            {
+                offenders.Add(relative);
+            }
+        }
 
-        Assert.DoesNotContain("permission.CAMERA", all, StringComparison.Ordinal);
-        Assert.DoesNotContain("Manifest.Permission.Camera", all, StringComparison.Ordinal);
-        Assert.DoesNotContain("ActionImageCapture", all, StringComparison.Ordinal);
-        Assert.DoesNotContain("IMAGE_CAPTURE", all, StringComparison.Ordinal);
+        Assert.True(offenders.Count == 0, "CAMERA or the capture intent outside their files:\n" + string.Join("\n", offenders));
     }
 
     [Fact]

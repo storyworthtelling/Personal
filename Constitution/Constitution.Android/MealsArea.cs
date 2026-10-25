@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.OS;
 using Android.Views;
 using Codex.Ui;
@@ -10,6 +11,7 @@ using Constitution.Domain.Recipes;
 using Constitution.Domain.Recipes.Screens;
 using Constitution.Domain.Today;
 using Constitution.MealsTab;
+using Constitution.Services;
 using Constitution.Settings;
 using Constitution.WorkoutsTab;
 
@@ -43,6 +45,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     private readonly TypedEntryUndo typedUndo = new();
     private readonly TypedEntry typed = new();
     private readonly ScanRecipeLauncher scanLauncher;
+    private readonly CameraCaptureLauncher capture;
     private readonly Dictionary<RecipeId, CookSoonState> cooks = [];
 
     private IRecipeBoxSource source = new NoRecipeBoxSource();
@@ -50,7 +53,10 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     private IRecipeWordJudge wordJudge = new NoRecipeWordJudge();
     private ScanConfirmModel? scan;
     private ScanReadPage? scanPage;
+    private IRecipeTextReader textReader;
+    private CameraLoop? cameraLoop;
     private bool scanBusy;
+    private bool cameraBusy;
     private bool typing;
     private InstallRole role = InstallRole.Unknown;
     private RecipePickerModel? picker;
@@ -69,6 +75,8 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         : base(host, "meals", Resource.Drawable.areameals)
     {
         scanLauncher = new ScanRecipeLauncher(host);
+        capture = new CameraCaptureLauncher(host);
+        textReader = new AndroidRecipeTextReader(host);
     }
 
     /// <summary>Where the cards come from and where a change goes; set by whoever wires the household file.</summary>
@@ -106,6 +114,20 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
     }
 
+    /// <summary>
+    /// Reads a photographed card page on the phone, for the partner's camera row (C-6.5.2, D105). The row is live only when this
+    /// phone can read a card; a phone without a camera shows it disabled and typing stays.
+    /// </summary>
+    public IRecipeTextReader TextReader
+    {
+        get => textReader;
+        set
+        {
+            textReader = value;
+            picker = null;
+        }
+    }
+
     /// <summary>Where the approved week comes from; set by whoever wires the weekly meal run's saved week.</summary>
     public IMealWeekSource WeekSource
     {
@@ -119,9 +141,9 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     /// </summary>
     public event Action<string>? PrimaryActionRequested;
 
-    // No phone can read a photograph of a card yet (C-6.5.2 waits on a dependency decision), and the paste row waits on written
-    // permission (PC8, D82), so the picker is built without either and says so in its rows.
-    private RecipePickerModel Picker() => picker ??= RecipePickerModel.For(role, cameraCanRead: false, pasteAllowed: false);
+    // The partner's camera row is live where the phone has a camera to read with (D105); the paste row waits on written permission
+    // (PC8, D82), so the picker is built without it.
+    private RecipePickerModel Picker() => picker ??= RecipePickerModel.For(role, cameraCanRead: textReader.CanRead, pasteAllowed: false);
 
     public override string? Subtitle => notice;
 
@@ -216,6 +238,16 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             var letGo = PaperUi.SecondaryButton(Host, TypedEntry.LetGoAction, LetGoOfTyping);
             var check = PaperUi.PrimaryButton(Host, TypedEntry.CheckAction, CheckTyping);
             return PaperUi.BottomBar(Host, letGo, check);
+        }
+
+        if (cameraLoop is not null)
+        {
+            // One photo per page: Add a page opens the camera again, Done turns the pages into a card.
+            var addPage = PaperUi.SecondaryButton(Host, cameraLoop.AddPageAction, OpenCamera);
+            addPage.Enabled = !cameraBusy;
+            var done = PaperUi.PrimaryButton(Host, cameraLoop.DoneAction, FinishCamera);
+            done.Enabled = cameraLoop.CanFinish && !cameraBusy;
+            return PaperUi.BottomBar(Host, addPage, done);
         }
 
         if (scan is not null)
@@ -460,6 +492,9 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             case PickerSource.Plate:
                 LaunchPlate();
                 break;
+            case PickerSource.Camera:
+                StartCamera();
+                break;
             case PickerSource.TypeIn:
                 OpenTyping();
                 break;
@@ -470,6 +505,185 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
                 break;
         }
     }
+
+    // ---- the partner's camera (C-6.5.2, D105) ----
+
+    // The camera row was tapped. The permission is asked for here, at the tap, after a sentence that says why; a phone without a
+    // camera is told so. Nothing is asked at install or at launch.
+    private void StartCamera()
+    {
+        if (cameraBusy)
+        {
+            return;
+        }
+
+        var granted = Host.CheckSelfPermission(Android.Manifest.Permission.Camera) == Permission.Granted;
+        switch (CameraAccess.Decide(textReader.CanRead, granted))
+        {
+            case CameraStep.NoCamera:
+                notice = CameraAccess.NoCameraSentence;
+                RaiseChanged();
+                break;
+            case CameraStep.AskFirst:
+                notice = CameraAccess.AskingSentence;
+                RaiseChanged();
+                Host.RequestPermissions([Android.Manifest.Permission.Camera], CameraCaptureLauncher.PermissionRequestCode);
+                break;
+            default:
+                OpenCamera();
+                break;
+        }
+    }
+
+    /// <summary>The camera permission's answer, handed over by the shell. A denial is said plainly and typing stays in the picker.</summary>
+    public void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)
+    {
+        if (requestCode != CameraCaptureLauncher.PermissionRequestCode)
+        {
+            return;
+        }
+
+        if (grantResults.Length > 0 && grantResults[0] == Permission.Granted)
+        {
+            notice = null;
+            OpenCamera();
+            return;
+        }
+
+        notice = CameraAccess.DeniedSentence;
+        cameraLoop = null;
+        RecordCamera(CameraEvent.PermissionDenied, null);
+        RaiseChanged();
+    }
+
+    // One photo per page: opens the camera for the next page. A loop already holding pages is kept if the camera cannot open.
+    private void OpenCamera()
+    {
+        if (cameraBusy)
+        {
+            return;
+        }
+
+        cameraLoop ??= new CameraLoop();
+        if (capture.Start() is { } sentence)
+        {
+            notice = sentence;
+            if (!cameraLoop.CanFinish)
+            {
+                cameraLoop = null;
+            }
+
+            RaiseChanged();
+            return;
+        }
+
+        notice = null;
+        cameraBusy = true;
+    }
+
+    // The camera has answered. A backed-out capture leaves the pages read so far as they were and the photograph deleted.
+    private void OnCameraResult(Result resultCode)
+    {
+        // An app the phone ended while the camera was open has lost its loop; the page just taken still counts as the first.
+        cameraLoop ??= new CameraLoop();
+        if (resultCode != Result.Ok)
+        {
+            capture.Discard();
+            cameraBusy = false;
+            notice = cameraLoop.CanFinish ? cameraLoop.Status : ScanReturns.CancelledSentence(scan is not null);
+            if (!cameraLoop.CanFinish)
+            {
+                cameraLoop = null;
+            }
+
+            RaiseChanged();
+            return;
+        }
+
+        cameraBusy = true;
+        notice = null;
+        RaiseChanged();
+        ReadPhoto(capture.PhotoPath);
+    }
+
+    // Recognition is slow enough to keep off the UI thread. The reader deletes the photograph before it returns or throws.
+    private void ReadPhoto(string photo)
+    {
+        var reader = textReader;
+        _ = Task.Run(async () =>
+        {
+            IReadOnlyList<string>? lines = null;
+            Exception? failure = null;
+            try
+            {
+                lines = await reader.ReadPhotoAsync(photo).ConfigureAwait(false);
+            }
+            catch (Exception e) when (e is RecipeTextReadException or IOException or ArgumentException or InvalidOperationException)
+            {
+                // The type only is recorded and the sentence is fixed: a message could hold a word read off the card.
+                failure = e;
+            }
+            finally
+            {
+                Host.RunOnUiThread(() => PageRead(lines, failure));
+            }
+        });
+    }
+
+    private void PageRead(IReadOnlyList<string>? lines, Exception? failure)
+    {
+        cameraBusy = false;
+        cameraLoop ??= new CameraLoop();
+        if (lines is null)
+        {
+            RecordCamera(CameraEvent.ReadFailed, failure);
+            notice = CameraAccess.ReadFailedSentence;
+        }
+        else
+        {
+            var added = cameraLoop.AddPage(lines);
+            RecordCamera(added ? CameraEvent.PageRead : CameraEvent.NothingRead, null);
+            notice = cameraLoop.Status;
+        }
+
+        if (!cameraLoop.CanFinish)
+        {
+            cameraLoop = null;
+        }
+
+        RaiseChanged();
+    }
+
+    // Done: the pages become a card by Plate's reading rules and take the same checking step as any scan. The loop forgets its lines.
+    private void FinishCamera()
+    {
+        if (cameraLoop is null || !cameraLoop.CanFinish || cameraBusy)
+        {
+            return;
+        }
+
+        var finished = cameraLoop.Finish();
+        cameraLoop = null;
+        switch (finished)
+        {
+            case ScanReturn.Read read:
+                notice = null;
+                BeginDraft(read.Payload);
+                break;
+            case ScanReturn.Refused refused:
+                notice = refused.Sentence;
+                RaiseChanged();
+                break;
+            default:
+                notice = ScanReturns.CancelledSentence(scan is not null);
+                RaiseChanged();
+                break;
+        }
+    }
+
+    // The camera trail: the step and, for a failure, the exception's type. Never a word of the card and never a path.
+    private void RecordCamera(CameraEvent step, Exception? failure) =>
+        new ConstitutionVaultLog(Host.ApplicationContext ?? Host).Outcome(RecipeCameraTrail.LogPhrase(step, failure));
 
     // ---- typing a card in ----
 
@@ -541,6 +755,12 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     /// <summary>The answer from Plate, handed over by the shell. A back-out is quiet; an unusable answer is a sentence.</summary>
     public void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
+        if (requestCode == CameraCaptureLauncher.RequestCode)
+        {
+            OnCameraResult(resultCode);
+            return;
+        }
+
         if (requestCode != ScanRecipeLauncher.RequestCode)
         {
             return;
