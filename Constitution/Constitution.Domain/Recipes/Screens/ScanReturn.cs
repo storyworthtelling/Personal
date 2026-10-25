@@ -18,6 +18,11 @@ public static class ScanReturns
 {
     public const string NothingOnTheCardSentence = "Plate found no ingredients or steps on that card, so nothing was kept.";
 
+    /// <summary>Said when Plate closes without a card. A draft already on the page is left as it was, and the sentence says so.</summary>
+    public static string CancelledSentence(bool hasDraft) => hasDraft
+        ? "Plate closed without a new card, so the card on the page is as it was."
+        : "Plate closed before reading a card, so nothing was kept.";
+
     /// <summary>
     /// <paramref name="ok"/> is whether Plate returned a result at all. The three strings are its extras exactly as received; the
     /// parse is <see cref="RecipeReadContract.Parse"/> and nothing else, so what Constitution accepts is what the contract says.

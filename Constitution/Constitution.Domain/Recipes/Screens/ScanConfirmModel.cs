@@ -120,8 +120,11 @@ public sealed class ScanConfirmModel
     private string title;
     private bool discarded;
 
-    private ScanConfirmModel(RecipeReadPayload payload, List<Doubt> doubts)
+    private readonly ScanOrigin origin;
+
+    private ScanConfirmModel(RecipeReadPayload payload, List<Doubt> doubts, ScanOrigin origin)
     {
+        this.origin = origin;
         title = payload.Title;
         ingredientLines = [.. payload.Ingredients];
         stepLines = [.. payload.Steps];
@@ -130,17 +133,22 @@ public sealed class ScanConfirmModel
 
     // ---- the page's words ----
 
+    /// <summary>Whether the words were scanned or typed. It decides the label, the status line and what Scan again means.</summary>
+    public ScanOrigin Origin => origin;
+
     /// <summary>The small label over the card.</summary>
-    public string Label => "Just scanned";
+    public string Label => origin == ScanOrigin.Typed ? "Just typed" : "Just scanned";
 
     /// <summary>The line under the header: what is and is not kept.</summary>
-    public string StatusSentence => "The picture isn’t kept, only the words.";
+    public string StatusSentence => origin == ScanOrigin.Typed
+        ? "Check the words, then keep the card."
+        : "The picture isn’t kept, only the words.";
 
     /// <summary>The page's primary action, pinned in the bar.</summary>
     public string KeepAction => "Looks right";
 
     /// <summary>The page's secondary action: read the card again.</summary>
-    public string ScanAgainAction => "Scan again";
+    public string ScanAgainAction => origin == ScanOrigin.Typed ? "Type again" : "Scan again";
 
     // ---- the draft ----
 
@@ -211,11 +219,11 @@ public sealed class ScanConfirmModel
     /// The draft for a payload. The judge, when there is one, is asked once about the words alone; what it doubts is kept only if
     /// the doubted word really is on the line it names.
     /// </summary>
-    public static ScanConfirmModel From(RecipeReadPayload payload, IRecipeWordJudge? judge = null)
+    public static ScanConfirmModel From(RecipeReadPayload payload, IRecipeWordJudge? judge = null, ScanOrigin origin = ScanOrigin.Scanned)
     {
         ArgumentNullException.ThrowIfNull(payload);
         var words = judge?.Judge(payload) ?? [];
-        return new ScanConfirmModel(payload, Accept(payload, words));
+        return new ScanConfirmModel(payload, Accept(payload, words), origin);
     }
 
     private static List<Doubt> Accept(RecipeReadPayload payload, IReadOnlyList<UncertainWord> words)
@@ -378,7 +386,7 @@ public sealed class ScanConfirmModel
         Ingredients.Select(draft => new Ingredient(draft.Quantity, draft.Unit, draft.Name)),
         Steps.Select(draft => new RecipeStep(draft.Text, draft.Minutes, active: false)),
         Servings,
-        RecipeSource.Scanned,
+        origin == ScanOrigin.Typed ? RecipeSource.Typed : RecipeSource.Scanned,
         forKids: false);
 
     private string TextOf(ScanLineKind kind, int index) =>
