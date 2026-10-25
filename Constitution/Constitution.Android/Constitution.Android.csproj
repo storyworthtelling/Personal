@@ -18,6 +18,17 @@
     <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
   </ItemGroup>
 
+  <!-- The partner's phone reads a photographed recipe card page in the app (C-6.5.2, D105). On-device text recognition, the same
+       package and version Plate carries, so the card is read on the phone and no image leaves it. -->
+  <ItemGroup>
+    <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" Version="116.0.1.9" />
+    <!-- With ML Kit in the graph two transitive AndroidX packages are wanted newer than Work.Runtime's own ranges allow (NU1107):
+         Concurrent.Futures (>= 1.3.0.4, Work.Runtime's Ktx caps it below 1.2.1) and Lifecycle.LiveData.Core (>= 2.11.0.1, LiveData
+         caps it below 2.9.2). Referencing each directly is the fix NuGet prescribes, as Index does for the first of the pair. -->
+    <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" Version="1.3.0.4" />
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.11.0.1" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Constitution.Domain\Constitution.Domain.csproj" />
     <ProjectReference Include="..\Constitution.Infrastructure\Constitution.Infrastructure.csproj" />

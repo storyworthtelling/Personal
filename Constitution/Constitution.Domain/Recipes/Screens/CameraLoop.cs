@@ -4,26 +4,29 @@ using Codex.Domain.Plate;
 namespace Constitution.Domain.Recipes.Screens;
 
 /// <summary>
-/// The seam to the partner's phone reading a photographed page into words (C-6.5.2). An implementation owns the capture and the
-/// recognition both and lets the photograph go the moment it has the lines; what crosses this seam is text and nothing that could
-/// hold a picture. <see cref="NoRecipeTextReader"/> stands in until one exists, because reading a photograph on the phone needs a
-/// text-recognition dependency this project does not carry and the owner has not decided on.
+/// The seam to the partner's phone reading a photographed page into words (C-6.5.2, D105). An implementation recognises the text of a
+/// photograph on the phone and lets the photograph go the moment it has the lines, whatever the reading came to; what crosses this
+/// seam is a path in and text out, and no picture. <see cref="NoRecipeTextReader"/> stands in on a phone that cannot read a card.
 /// </summary>
 public interface IRecipeTextReader
 {
-    /// <summary>Whether this phone can read a card page at all. The picker shows the camera row only if it can.</summary>
+    /// <summary>Whether this phone can read a card page at all. The picker shows the camera row live only if it can.</summary>
     bool CanRead { get; }
 
-    /// <summary>One page's lines in reading order, or null when the person backed out of the camera.</summary>
-    IReadOnlyList<string>? ReadPage();
+    /// <summary>
+    /// One page's lines in reading order. The photograph at <paramref name="photoPath"/> is deleted before this returns or throws.
+    /// A failure to read is thrown with its stack, not turned into an empty page.
+    /// </summary>
+    Task<IReadOnlyList<string>> ReadPhotoAsync(string photoPath);
 }
 
-/// <summary>The reader used until one is built: this phone cannot read a card.</summary>
+/// <summary>The reader used on a phone that cannot read a card: nothing is offered, and asking anyway says so.</summary>
 public sealed class NoRecipeTextReader : IRecipeTextReader
 {
     public bool CanRead => false;
 
-    public IReadOnlyList<string>? ReadPage() => null;
+    public Task<IReadOnlyList<string>> ReadPhotoAsync(string photoPath) =>
+        throw new InvalidOperationException("This phone cannot read a recipe card, so no photograph was read.");
 }
 
 /// <summary>

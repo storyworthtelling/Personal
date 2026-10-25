@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the capture provider may share with the camera app, and nothing else: the one cache subfolder the photograph of a recipe
+     card page is written into (CameraCaptureCache.Folder). Never files-path, external-path or root-path: the files directory holds the
+     household's records and the vault, and public storage is where another app or a backup could find the photograph. A guard test
+     reads this file and fails on a second entry or a different path. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+  <cache-path name="recipe-capture" path="recipe-capture/" />
+</paths>

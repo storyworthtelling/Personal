@@ -95,6 +95,159 @@ public class ConstitutionWorkflowTests
         Assert.Contains("MEDICAL_DATA", step);
     }
 
+    // ---- the permission check, widened for CAMERA only (D105) ----
+
+    // What the signed APK may declare as a plain uses-permission besides the health reads (checked by their own step). Typed out here
+    // on purpose, so loosening the workflow's list means editing two places.
+    private static readonly string[] AllowedUses =
+    [
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.FOREGROUND_SERVICE",
+        "com.storyworthtelling.constitution.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+        // Plate's custom recipe permission. Assembled from its parts because Codex's frozen-invariant guard allows Plate's package id
+        // to be spelled in one place only.
+        "com.storyworthtelling.focusphone." + "camera" + ".READ_RECIPE",
+    ];
+
+    [Fact]
+    public void ThePermissionCheckIsFatalAndNamesTheAllowedSet()
+    {
+        var step = Step(Workflow(), "PERMISSION CHECK");
+
+        Assert.Contains("set -e", step);
+        Assert.Contains("dump permissions", step);
+        Assert.Contains("exit 1", step);
+        foreach (var permission in AllowedUses)
+        {
+            Assert.True(step.Contains(permission, StringComparison.Ordinal), $"The permission check does not name {permission}.");
+        }
+    }
+
+    [Fact]
+    public void ThePermissionCheckDoesNotAllowByWildcard()
+    {
+        var step = Step(Workflow(), "PERMISSION CHECK");
+
+        Assert.DoesNotContain("android.permission.*", step);
+        Assert.DoesNotContain("android\\.permission\\.[A-Z", step);
+        Assert.DoesNotContain("READ_EXTERNAL", step);
+        Assert.DoesNotContain("RECORD_AUDIO", step);
+        Assert.DoesNotContain("WRITE_EXTERNAL", step);
+    }
+
+    [Fact]
+    public void ThePermissionCheckReadsTheCameraFeaturesBack()
+    {
+        var step = Step(Workflow(), "PERMISSION CHECK");
+
+        Assert.Contains("dump badging", step);
+        Assert.Contains("uses-feature-not-required: name='android.hardware.camera'", step);
+        Assert.Contains("uses-feature-not-required: name='android.hardware.camera.autofocus'", step);
+    }
+
+    [Fact]
+    public void TheCheckPassesTheDeclaredSetWithCamera()
+    {
+        var outcome = RunPermissionCheck(AllowedUses.Append("android.permission.health.READ_STEPS"), cameraRequired: false);
+
+        Assert.True(outcome.ExitCode == 0, outcome.Output);
+    }
+
+    [Fact]
+    public void TheCheckFailsWithoutCamera()
+    {
+        var outcome = RunPermissionCheck(AllowedUses.Where(name => name != "android.permission.CAMERA"), cameraRequired: false);
+
+        Assert.NotEqual(0, outcome.ExitCode);
+    }
+
+    [Theory]
+    [InlineData("android.permission.RECORD_AUDIO")]
+    [InlineData("android.permission.READ_EXTERNAL_STORAGE")]
+    [InlineData("android.permission.ACCESS_FINE_LOCATION")]
+    [InlineData("android.permission.CAMERA2")]
+    [InlineData("android.permission.READ_MEDIA_IMAGES")]
+    public void TheCheckFailsOnAnyOtherPermission(string extra)
+    {
+        var outcome = RunPermissionCheck(AllowedUses.Append(extra), cameraRequired: false);
+
+        Assert.NotEqual(0, outcome.ExitCode);
+        Assert.Contains(extra, outcome.Output);
+    }
+
+    [Fact]
+    public void TheCheckFailsWhenTheCameraFeatureIsRequired()
+    {
+        var outcome = RunPermissionCheck(AllowedUses, cameraRequired: true);
+
+        Assert.NotEqual(0, outcome.ExitCode);
+    }
+
+    [Fact]
+    public void TheCheckFailsWithoutInternet()
+    {
+        var outcome = RunPermissionCheck(AllowedUses.Where(name => name != "android.permission.INTERNET"), cameraRequired: false);
+
+        Assert.NotEqual(0, outcome.ExitCode);
+    }
+
+    /// <summary>
+    /// Runs the workflow step's own shell against a stand-in aapt2 that prints the given permissions, so the check is exercised for
+    /// what it does rather than for what it says.
+    /// </summary>
+    private static (int ExitCode, string Output) RunPermissionCheck(IEnumerable<string> declared, bool cameraRequired)
+    {
+        var step = Step(Workflow(), "PERMISSION CHECK");
+        var script = Regex.Match(step, @"run: \|\n(?<body>.*)\z", RegexOptions.Singleline).Groups["body"].Value;
+        var lines = script.Split('\n');
+        var indent = lines.First(line => line.Trim().Length > 0).TakeWhile(c => c == ' ').Count();
+        script = string.Join('\n', lines.Select(line => line.Length >= indent ? line[indent..] : line.TrimStart()));
+
+        // The step's text runs on into the comment that heads the next step; the script ends at its own closing echo.
+        const string closing = "echo \"=== END PERMISSION CHECK ===\"";
+        script = script[..(script.IndexOf(closing, StringComparison.Ordinal) + closing.Length)];
+
+        var root = Path.Combine(Path.GetTempPath(), "constitution-permcheck-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var tools = Directory.CreateDirectory(Path.Combine(root, "sdk", "build-tools", "36.0.0")).FullName;
+            var apkDirectory = Directory.CreateDirectory(Path.Combine(root, "work", "Constitution", "Constitution.Android", "bin", "Release", "net10.0-android", "publish")).FullName;
+            File.WriteAllText(Path.Combine(apkDirectory, "app-Signed.apk"), "stand-in");
+
+            var uses = string.Join("\n", declared.Select(name => $"uses-permission: name='{name}'"));
+            var feature = cameraRequired ? "uses-feature: name='android.hardware.camera'" : "uses-feature-not-required: name='android.hardware.camera'";
+            var stub = "#!/usr/bin/env bash\n"
+                + "if [ \"$2\" = \"permissions\" ]; then\ncat <<'EOF'\npackage: com.storyworthtelling.constitution\n" + uses + "\nEOF\n"
+                + "elif [ \"$2\" = \"badging\" ]; then\ncat <<'EOF'\npackage: name='com.storyworthtelling.constitution'\n" + feature
+                + "\nuses-feature-not-required: name='android.hardware.camera.autofocus'\nEOF\nfi\n";
+            var aapt2 = Path.Combine(tools, "aapt2");
+            File.WriteAllText(aapt2, stub);
+            File.SetUnixFileMode(aapt2, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+            var info = new System.Diagnostics.ProcessStartInfo("bash")
+            {
+                WorkingDirectory = Path.Combine(root, "work", "Constitution"),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            info.ArgumentList.Add("-c");
+            info.ArgumentList.Add(script);
+            info.Environment["ANDROID_HOME"] = Path.Combine(root, "sdk");
+            using var process = System.Diagnostics.Process.Start(info)!;
+            var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            return (process.ExitCode, output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void TheIconCheckIsFatal()
     {

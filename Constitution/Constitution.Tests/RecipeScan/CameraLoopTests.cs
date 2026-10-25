@@ -6,8 +6,8 @@ namespace Constitution.Tests.RecipeScan;
 
 /// <summary>
 /// The partner's one-photo-per-page loop (C-6.5.2), as far as it can be built without a way to read a photograph on the phone: the
-/// loop takes the lines each page was read into, and what it does with them is pure. The capture itself waits on a dependency
-/// decision, so nothing here opens a camera.
+/// loop takes the lines each page was read into, and what it does with them is pure. The capture and the recognition are the
+/// phone's (D105), so nothing here opens a camera.
 /// </summary>
 public class CameraLoopTests
 {
@@ -130,11 +130,11 @@ public class CameraLoopTests
     }
 
     [Fact]
-    public void TheNoReaderSaysItCannotRead()
+    public async Task TheNoReaderSaysItCannotRead()
     {
         var reader = new NoRecipeTextReader();
 
         Assert.False(reader.CanRead);
-        Assert.Null(reader.ReadPage());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => reader.ReadPhotoAsync("/cache/recipe-capture/page.jpg"));
     }
 }
