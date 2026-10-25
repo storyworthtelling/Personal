@@ -1,4 +1,5 @@
 using Android.App;
+using Android.Content;
 using Android.OS;
 using Android.Views;
 using Codex.Ui;
@@ -23,6 +24,12 @@ namespace Constitution;
 /// <para>Where there is no household file, <see cref="Source"/> answers so and the box says it in a sentence, with nothing
 /// invented. The cards are read off the UI thread and the page says so in a sentence while it waits.</para>
 ///
+/// <para>Scanning a recipe card (book p.14, PBI C-6.5.3): the pinned bar's Scan a recipe card starts Plate's recipe read through
+/// <see cref="ScanRecipeLauncher"/>; the words come back to <see cref="OnActivityResult"/>, become a <see cref="ScanConfirmModel"/>
+/// and take the whole page until the owner says Looks right (the card goes to <see cref="Keeper"/>, the only way it is kept) or
+/// scans again (the old draft waits out the dog-ear's undo window, then its words are forgotten). Plate returns text only (D99), so
+/// nothing about a picture exists here; <see cref="WordJudge"/> is the seam for p.14's doubted words and offers none until built.</para>
+///
 /// <para>Moving a card's cuisine happens on the page at once and folds the shell's one dog-ear (the shared notice board) for
 /// the undo window; a turn of the fold applies the move's inverse. Cook this soon is the card changing to "Planned for next
 /// week": no toast. This week reads the approved week through <see cref="WeekSource"/> and says so plainly when there is none.</para>
@@ -31,9 +38,16 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 {
     private readonly Handler handler = new(Looper.MainLooper!);
     private readonly CuisineMoveUndo undo = new();
+    private readonly ScanDiscardUndo scanUndo = new();
+    private readonly ScanRecipeLauncher scanLauncher;
     private readonly Dictionary<RecipeId, CookSoonState> cooks = [];
 
     private IRecipeBoxSource source = new NoRecipeBoxSource();
+    private IRecipeKeeper keeper = new NoRecipeKeeper();
+    private IRecipeWordJudge wordJudge = new NoRecipeWordJudge();
+    private ScanConfirmModel? scan;
+    private ScanReadPage? scanPage;
+    private bool scanBusy;
     private RecipeBoxRead? read;
     private IMealWeekSource weekSource = new NoMealWeekSource();
     private MealWeekScreenRead? weekRead;
@@ -48,6 +62,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     public MealsArea(Activity host)
         : base(host, "meals", Resource.Drawable.areameals)
     {
+        scanLauncher = new ScanRecipeLauncher(host);
     }
 
     /// <summary>Where the cards come from and where a change goes; set by whoever wires the household file.</summary>
@@ -57,6 +72,20 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         set => source = value;
     }
 
+    /// <summary>Where a checked scan is kept; set by whoever wires the household file. Until then it says there is no file.</summary>
+    public IRecipeKeeper Keeper
+    {
+        get => keeper;
+        set => keeper = value;
+    }
+
+    /// <summary>The second reading of a scan's words, for p.14's doubted words; none is built, so none are offered.</summary>
+    public IRecipeWordJudge WordJudge
+    {
+        get => wordJudge;
+        set => wordJudge = value;
+    }
+
     /// <summary>Where the approved week comes from; set by whoever wires the weekly meal run's saved week.</summary>
     public IMealWeekSource WeekSource
     {
@@ -64,7 +93,10 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         set => weekSource = value;
     }
 
-    /// <summary>Raised by the pinned bar's button. Add a recipe (F-6.5) listens; until it does the button is drawn disabled.</summary>
+    /// <summary>
+    /// Raised by the pinned bar's button with the action's words. Scan a recipe card is carried out here as well; Add a recipe
+    /// (the picker, C-6.5.4) listens, and until it does that button is drawn disabled.
+    /// </summary>
     public event Action<string>? PrimaryActionRequested;
 
     public override string? Subtitle => notice;
@@ -76,6 +108,13 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     protected override View BuildPage()
     {
         boxPage = null;
+        scanPage = null;
+        if (scan is not null)
+        {
+            scanPage = new ScanReadPage(Host, scan, OnChoose, OnOther, OnTitle);
+            return scanPage;
+        }
+
         View body;
         if (view == MealsView.ThisWeek)
         {
@@ -143,6 +182,15 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
     public override View? BuildBottomBar()
     {
+        if (scan is not null)
+        {
+            var again = PaperUi.SecondaryButton(Host, scan.ScanAgainAction, StartScan);
+            again.Enabled = !scanBusy;
+            var looksRight = PaperUi.PrimaryButton(Host, scan.KeepAction, KeepScan);
+            looksRight.Enabled = !scanBusy;
+            return PaperUi.BottomBar(Host, again, looksRight);
+        }
+
         if (view == MealsView.ThisWeek)
         {
             return ThisWeekBar();
@@ -154,8 +202,8 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
 
         var action = RecipeBoxScreenModel.Build(ready.Snapshot.Cards, null).PrimaryAction;
-        var button = PaperUi.PrimaryButton(Host, action, () => PrimaryActionRequested?.Invoke(action));
-        button.Enabled = PrimaryActionRequested is not null;
+        var button = PaperUi.PrimaryButton(Host, action, () => OnPrimary(action));
+        button.Enabled = action == RecipeBoxText.ScanAction ? !scanBusy : PrimaryActionRequested is not null;
         return PaperUi.BottomBar(Host, button);
     }
 
@@ -324,6 +372,174 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
     }
 
+    // ---- scanning a recipe card ----
+
+    private void OnPrimary(string action)
+    {
+        if (action == RecipeBoxText.ScanAction)
+        {
+            StartScan();
+        }
+
+        PrimaryActionRequested?.Invoke(action);
+    }
+
+    // Opens Plate. A draft already on the page stays until a new read replaces it, so backing out of Plate loses nothing.
+    private void StartScan()
+    {
+        if (scanBusy)
+        {
+            return;
+        }
+
+        if (scanLauncher.Start() is { } sentence)
+        {
+            notice = sentence;
+            RaiseChanged();
+            return;
+        }
+
+        notice = null;
+        scanBusy = true;
+    }
+
+    /// <summary>The answer from Plate, handed over by the shell. A back-out is quiet; an unusable answer is a sentence.</summary>
+    public void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        if (requestCode != ScanRecipeLauncher.RequestCode)
+        {
+            return;
+        }
+
+        scanBusy = false;
+        switch (ScanRecipeLauncher.Read(resultCode, data))
+        {
+            case ScanReturn.Read read:
+                BeginDraft(read.Payload);
+                break;
+            case ScanReturn.Refused refused:
+                notice = refused.Sentence;
+                RaiseChanged();
+                break;
+        }
+    }
+
+    // The second reading, if one is ever built, may be slow, so the draft is made off the UI thread.
+    private void BeginDraft(RecipeReadPayload payload)
+    {
+        var judge = wordJudge;
+        _ = Task.Run(() =>
+        {
+            ScanConfirmModel draft;
+            string? sentence = null;
+            try
+            {
+                draft = ScanConfirmModel.From(payload, judge);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // The type only, never the message: the card is shown without doubts rather than not at all.
+                draft = ScanConfirmModel.From(payload);
+                sentence = "The words could not be double-checked (" + e.GetType().Name + ").";
+            }
+
+            Host.RunOnUiThread(() => TakeDraft(draft, sentence));
+        });
+    }
+
+    private void TakeDraft(ScanConfirmModel draft, string? sentence)
+    {
+        if (scan is { } earlier)
+        {
+            ConnectionNoticeBoard.With(board =>
+            {
+                scanUndo.Begin(board, earlier, DateTimeOffset.UtcNow);
+                return true;
+            });
+        }
+
+        scan = draft;
+        notice = sentence;
+        RaiseChanged();
+        ScheduleExpiry();
+    }
+
+    private void OnChoose(int question, int option)
+    {
+        scan?.Choose(question, option);
+        ShowScan();
+    }
+
+    private void OnOther(int question, string text)
+    {
+        if (scan?.ChooseOther(question, text) == true)
+        {
+            ShowScan();
+        }
+    }
+
+    private void OnTitle(string text) => scan?.SetTitle(text);
+
+    private void ShowScan()
+    {
+        if (scan is not null)
+        {
+            scanPage?.Show(scan);
+        }
+    }
+
+    // Looks right. The card goes through the keeper, off the UI thread; only a kept card leaves the page.
+    private void KeepScan()
+    {
+        if (scan is not { } draft || scanBusy)
+        {
+            return;
+        }
+
+        var target = keeper;
+        var taken = ExistingIds();
+        scanBusy = true;
+        _ = Task.Run(() =>
+        {
+            ScanKeepResult result;
+            try
+            {
+                result = draft.Keep(target, taken);
+            }
+            catch (Exception e) when (e is InvalidOperationException or ArgumentException or NotSupportedException)
+            {
+                result = new ScanKeepResult(ScanKeepOutcome.NotKept, null, ScanConfirmModel.NotKeptSentence + " (" + e.GetType().Name + ")");
+            }
+
+            Host.RunOnUiThread(() => KeepDone(draft, result));
+        });
+    }
+
+    private void KeepDone(ScanConfirmModel draft, ScanKeepResult result)
+    {
+        scanBusy = false;
+        if (!ReferenceEquals(scan, draft))
+        {
+            return;
+        }
+
+        if (result.Outcome is ScanKeepOutcome.Kept or ScanKeepOutcome.AlreadyKept or ScanKeepOutcome.NothingToKeep)
+        {
+            // The card is in the box now; the page goes back to the box and reads it again, so the card shows in its pile.
+            scan = null;
+            notice = null;
+            view = MealsView.RecipeBox;
+            Load();
+            return;
+        }
+
+        notice = result.Sentence;
+        RaiseChanged();
+    }
+
+    private HashSet<RecipeId> ExistingIds() =>
+        read is RecipeBoxRead.Ready ready ? ready.Snapshot.Cards.Select(card => card.Id).ToHashSet() : [];
+
     // ---- moving a card's cuisine, with undo ----
 
     private void OnHold(Recipe card)
@@ -366,6 +582,16 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     /// <summary>The shell turned the fold and the board gave back this act: the card goes back to where it was filed.</summary>
     public void UndoTurned(string actKey)
     {
+        if (scanUndo.Reverse(actKey) is { } brought)
+        {
+            // The draft the owner scanned over comes back; the read that replaced it is let go.
+            var replaced = scan;
+            scan = brought;
+            replaced?.Discard();
+            handler.RemoveCallbacksAndMessages(null);
+            return;
+        }
+
         if (undo.Reverse(actKey) is { } inverse)
         {
             handler.RemoveCallbacksAndMessages(null);
@@ -399,7 +625,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
     private void ScheduleExpiry()
     {
-        if (undo.Pending is null)
+        if (undo.Pending is null && scanUndo.Pending is null)
         {
             return;
         }
@@ -412,5 +638,10 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }, (long)NoticeBoard.UndoWindow.TotalMilliseconds + 1);
     }
 
-    private void ExpireMove() => undo.Expire(DateTimeOffset.UtcNow);
+    private void ExpireMove()
+    {
+        var now = DateTimeOffset.UtcNow;
+        undo.Expire(now);
+        scanUndo.Expire(now);
+    }
 }

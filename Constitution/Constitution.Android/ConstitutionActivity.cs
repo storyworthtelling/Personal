@@ -47,6 +47,9 @@ public abstract class ConstitutionActivity : Activity
 
     private SettingsArea? settingsArea;
 
+    // Plate's answer to a recipe scan comes back to the activity, and Meals is the area that reads it.
+    private MealsArea? mealsArea;
+
     // First run: shown instead of the tabs until FirstRunModel says all three steps are satisfied.
     private FirstRunPage firstRun = null!;
 
@@ -72,13 +75,14 @@ public abstract class ConstitutionActivity : Activity
         pillarStore = new PillarStore(this);
         settingsArea = new SettingsArea(this);
         bodyArea = new BodyArea(this);
+        mealsArea = new MealsArea(this);
         bodyArea.SignalRequested += OpenSignal;
         firstRun = new FirstRunPage(this, RenderPage);
         var areas = new IConstitutionArea[]
         {
             new TodayArea(this),
             new WorkoutsArea(this),
-            new MealsArea(this),
+            mealsArea,
             bodyArea,
             settingsArea,
         };
@@ -136,6 +140,9 @@ public abstract class ConstitutionActivity : Activity
         // The Google account picker opened from Settings answers here.
         settingsArea?.OnActivityResult(requestCode, resultCode, data);
         firstRun.OnActivityResult(requestCode, resultCode, data);
+
+        // Plate's recipe read answers here.
+        mealsArea?.OnActivityResult(requestCode, resultCode, data);
     }
 
     public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Permission[] grantResults)
