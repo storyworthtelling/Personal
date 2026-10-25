@@ -29,6 +29,14 @@ public sealed record RecipeIngredient(string Group, string Quantity, string Name
 /// <param name="ExtraEquipment">Equipment the card names that no step mentions.</param>
 /// <param name="Pages">How many pages the recipe document has, for "1 of N".</param>
 /// <param name="KidsDinnerPage">The page of the children's dinner when they eat differently tonight, else null.</param>
+/// <param name="Steps">
+/// The timed steps (book p.8). When present the document numbers its own pages: ingredients, steps, the kids' page when
+/// <paramref name="KidsMeal"/> is present, then <paramref name="TrailingPages"/>; <paramref name="Pages"/> and
+/// <paramref name="KidsDinnerPage"/> are read only when there are no timed steps.
+/// </param>
+/// <param name="KidsMeal">The children's different dinner on nights they eat differently, else null.</param>
+/// <param name="NotBefore">The earliest a step may start (the moment the cook is handed the page); null for no limit.</param>
+/// <param name="TrailingPages">Pages that come after these and are built elsewhere (the rating page), counted in "x of N".</param>
 public sealed record RecipeDocumentModel(
     string Title,
     string? Cuisine,
@@ -46,4 +54,43 @@ public sealed record RecipeDocumentModel(
     IReadOnlyList<string> StepTexts,
     IReadOnlyList<string> ExtraEquipment,
     int Pages,
-    int? KidsDinnerPage = null);
+    int? KidsDinnerPage = null,
+    IReadOnlyList<RecipeClockStep>? Steps = null,
+    RecipeKidsMeal? KidsMeal = null,
+    DateTime? NotBefore = null,
+    int TrailingPages = 1);
+
+/// <summary>
+/// One step with the time it takes, from the card. <paramref name="Minutes"/> is how long until the next step is due;
+/// <paramref name="Active"/> is whether the cook is busy for it (chopping) or waiting (baking). A <paramref name="Morning"/>
+/// step of a slow-cooker meal runs forward from the morning start; every other step is counted back from dinner.
+/// </summary>
+/// <param name="Aside">One line under the step: the why, or a warning.</param>
+/// <param name="CalendarEvent">The title of the calendar event the planner placed for this step, named so paper and calendar agree.</param>
+/// <param name="KidsHandOff">Points the cook at the children's page ("Kids' noodles: page 3.").</param>
+public sealed record RecipeClockStep(
+    string Text,
+    int Minutes,
+    bool Active = true,
+    string? Aside = null,
+    bool Morning = false,
+    string? CalendarEvent = null,
+    bool KidsHandOff = false);
+
+/// <summary>
+/// The children's dinner on a night they eat differently (book p.9): one line saying why, its own short ingredient list
+/// and steps timed to the same dinner. It has no member that could hold a nutrition figure: the children's meals are
+/// balanced but not counted.
+/// </summary>
+/// <param name="ShortName">How the steps page refers to it: "noodles" in "Kids' noodles: page 3."</param>
+/// <param name="Children">Who it is for, in the words printed ("Robin", "Juniper").</param>
+/// <param name="WhyLine">Why tonight is different.</param>
+/// <param name="DinnerLine">The final row's words: "Dinner, with carrot sticks."</param>
+public sealed record RecipeKidsMeal(
+    string Title,
+    string ShortName,
+    IReadOnlyList<string> Children,
+    string WhyLine,
+    IReadOnlyList<RecipeIngredient> Ingredients,
+    IReadOnlyList<RecipeClockStep> Steps,
+    string DinnerLine = "Dinner.");

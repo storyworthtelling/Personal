@@ -24,6 +24,9 @@ internal sealed class DocumentInk : IDisposable
     /// <summary>Cascadia Code on the Mono rung: the recipe's quantity column.</summary>
     public SKFont Mono { get; } = new(EmbeddedTypefaces.Mono, PaperTypeScale.Mono);
 
+    /// <summary>Cascadia Code on the Title rung: the recipe's step times, 21 points on the counter.</summary>
+    public SKFont Time { get; } = new(EmbeddedTypefaces.Mono, PaperTypeScale.Title);
+
     /// <summary>The owner's hand (Pinyon Script) on the Title rung: the one place the encouragement seat prints.</summary>
     public SKFont Voice { get; } = new(EmbeddedTypefaces.Script, PaperTypeScale.Title);
 
@@ -58,12 +61,13 @@ internal sealed class DocumentInk : IDisposable
         PrintedRole.Small => Small,
         PrintedRole.Voice => Voice,
         PrintedRole.Mono => Mono,
+        PrintedRole.Time => Time,
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Only text roles have a font."),
     };
 
     public void Dispose()
     {
-        foreach (var font in new[] { Title, Dose, Body, Label, Heading, Choice, Strong, Small, Mono, Voice })
+        foreach (var font in new[] { Title, Dose, Body, Label, Heading, Choice, Strong, Small, Mono, Time, Voice })
         {
             font.Dispose();
         }
