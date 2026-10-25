@@ -145,6 +145,18 @@ public static class InkTargets
             "a written reason for saying no");
     }
 
+    public const float WriteLineHeight = 24f;
+
+    /// <summary>
+    /// A blank line a word is written on (a new staple): an open outlined box, read as written text. It takes the number box's kind, so the
+    /// painter and the vision read treat it as the open box they already know, and carries no unit.
+    /// </summary>
+    public static InkTarget WriteLine(string id, float left, float top, float width, string meaning)
+    {
+        InkTarget.Require(id, meaning, "write-in line");
+        return new InkTarget(id, InkTargetKind.NumberBox, new InkRect(left, top, width, WriteLineHeight), meaning);
+    }
+
     /// <summary>The 91-point ruled column down the right edge for the owner's notes.</summary>
     public static InkTarget NotesMargin(string id, float top, float bottom)
     {

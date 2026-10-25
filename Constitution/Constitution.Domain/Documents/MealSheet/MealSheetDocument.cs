@@ -78,6 +78,13 @@ public static class MealSheetDocument
             throw new ArgumentException("A week that was not planned has no dinners to print: " + model.Week.StopReason, nameof(model));
         }
 
+        var groceryPages = model.Groceries is null ? 0 : MealSheetGroceryPages.Count(model);
+        if (groceryPages > 1)
+        {
+            // A long list runs onto more pages, and every footer counts them: "x of N" is the sheet's real length.
+            model = model with { Pages = model.Pages + groceryPages - 1 };
+        }
+
         var draft = new PageDraft("Dinners");
         draft.Kicker($"{Kind} · 1 OF {model.Pages.ToString(CultureInfo.InvariantCulture)}");
         Header(draft, model);
@@ -99,6 +106,28 @@ public static class MealSheetDocument
 
             pages.Add(MealSheetItemPage.Build(model, MealSheetItems.BreakfastSheetNumber, MealSheetItems.BreakfastTitle, MealSheetItems.BreakfastIntro, MealSheetItems.BreakfastPage(daily)));
             pages.Add(MealSheetItemPage.Build(model, MealSheetItems.LunchboxSheetNumber, MealSheetItems.LunchboxTitle, MealSheetItems.LunchboxIntro, MealSheetItems.LunchboxPage(daily)));
+        }
+
+        if (model.Groceries is not null)
+        {
+            var first = pages.Count + 1;
+            if (first > model.Pages - (groceryPages - 1))
+            {
+                throw new ArgumentException($"A sheet of {model.Pages} pages has no room for the groceries page (page {first}).", nameof(model));
+            }
+
+            pages.AddRange(MealSheetGroceryPages.Build(model, first));
+        }
+
+        if (model.AskAhead is { } ask)
+        {
+            var number = pages.Count + 1;
+            if (number > model.Pages)
+            {
+                throw new ArgumentException($"A sheet of {model.Pages} pages has no room for the holiday ask-ahead page (page {number}).", nameof(model));
+            }
+
+            pages.Add(MealSheetAskPage.Build(model, ask, number));
         }
 
         return pages;

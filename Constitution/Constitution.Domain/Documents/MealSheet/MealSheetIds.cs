@@ -1,3 +1,6 @@
+using System.Globalization;
+using Constitution.Domain.Groceries;
+
 namespace Constitution.Domain.Documents;
 
 /// <summary>
@@ -87,6 +90,21 @@ public static class MealSheetIds
 
     private static int Slot(int slot) =>
         slot is >= 1 and <= WeekdaySlots ? slot - 1 : throw new ArgumentOutOfRangeException(nameof(slot), slot, $"A weekday group has slots 1 to {WeekdaySlots}.");
+
+    // The groceries page. A staple's box is answered under its aisle's frozen word (Aisles.Words) and its place in that aisle's run, in name
+    // order; the blank lines for new staples under their number. A box is "need more": ticked is a need, blank is none.
+    public const int NewStapleLines = 2;
+
+    /// <summary>The box of the standing staple in this slot (1 and up) of this aisle, as "staple-dry-goods-2".</summary>
+    public static string StapleNeed(Aisle aisle, int slot) =>
+        slot >= 1 ? "staple-" + Aisles.Words.Word(aisle) + "-" + slot.ToString(CultureInfo.InvariantCulture)
+            : throw new ArgumentOutOfRangeException(nameof(slot), slot, "Slots count from 1.");
+
+    /// <summary>The blank line for a new staple (1 to <see cref="NewStapleLines"/>), as "staple-new-1".</summary>
+    public static string NewStaple(int line) =>
+        line is >= 1 and <= NewStapleLines
+            ? "staple-new-" + line.ToString(CultureInfo.InvariantCulture)
+            : throw new ArgumentOutOfRangeException(nameof(line), line, $"There are {NewStapleLines} blank lines.");
 
     /// <summary>The YES box of the dinner on this weekday.</summary>
     public static string DinnerYes(DayOfWeek day) => Yes[Checked(day)];
