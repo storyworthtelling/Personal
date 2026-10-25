@@ -44,7 +44,7 @@ public class CookAssignmentTests
         var (scenario, run) = await PlaceAsync(request, week);
 
         Assert.Equal(Sam, tuesday.Cook);
-        var block = scenario.Calendar.By(MealCalendar.KeyOf(MealEventRole.Cook, Sam, Monday, tuesday.Day), Sam)!;
+        var block = scenario.Calendar.By(MealCalendar.KeyOf(MealEventRole.Cook, Sam, Sunday, tuesday.Day), Sam)!;
         Assert.Equal((tuesday.CookStart, tuesday.CookEnd), (block.Start, block.End));
         Assert.Equal(DinnerStart(1), block.End);
         Assert.DoesNotContain(scenario.Calendar.Of(Lee), item => EveningOf(item.Start) == 1);
@@ -63,7 +63,7 @@ public class CookAssignmentTests
         Assert.Equal(cooked.Count, run.Created.Count);
         foreach (var dinner in cooked)
         {
-            var block = scenario.Calendar.By(MealCalendar.KeyOf(MealEventRole.Cook, dinner.Cook!, Monday, dinner.Day), dinner.Cook!);
+            var block = scenario.Calendar.By(MealCalendar.KeyOf(MealEventRole.Cook, dinner.Cook!, Sunday, dinner.Day), dinner.Cook!);
             Assert.NotNull(block);
             Assert.Equal((dinner.CookStart, dinner.CookEnd), (block.Start, block.End));
             Assert.StartsWith("Cook: ", block.Title, StringComparison.Ordinal);
@@ -82,7 +82,7 @@ public class CookAssignmentTests
         Assert.Equal(cooked.Count * 2, run.Created.Count);
         foreach (var dinner in cooked)
         {
-            var start = scenario.Calendar.By(MealCalendar.KeyOf(MealEventRole.StartSlowCooker, dinner.Cook!, Monday, dinner.Day), dinner.Cook!)!;
+            var start = scenario.Calendar.By(MealCalendar.KeyOf(MealEventRole.StartSlowCooker, dinner.Cook!, Sunday, dinner.Day), dinner.Cook!)!;
             Assert.Equal("Start the slow cooker", start.Title);
             Assert.True(start.End <= ZoneClock.At(dinner.Day, new TimeOnly(12, 0), request.Rules.Zone, ClockEdge.End), "The start is in the morning.");
             Assert.True(start.End <= dinner.CookStart);

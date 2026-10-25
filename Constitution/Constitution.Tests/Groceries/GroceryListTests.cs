@@ -218,7 +218,7 @@ public class GroceryListTests
             OnHand("onion", Aisle.Produce),
         ]);
 
-        var after = pantry.AfterUncooked(lastWeek, new HashSet<DateOnly> { Monday.AddDays(1) }, Cards);
+        var after = pantry.AfterUncooked(lastWeek, new HashSet<DateOnly> { Sunday.AddDays(1) }, Cards);
 
         Assert.Null(after.Find("garlic"));
         Assert.True(after.Find("parmesan")!.NeedMore);
@@ -232,7 +232,7 @@ public class GroceryListTests
     {
         var lastWeek = Cooking((0, Chili), (1, Pasta));
 
-        var after = Pantry.Empty.AfterUncooked(lastWeek, new HashSet<DateOnly> { Monday.AddDays(1) }, Cards);
+        var after = Pantry.Empty.AfterUncooked(lastWeek, new HashSet<DateOnly> { Sunday.AddDays(1) }, Cards);
 
         Assert.All(["spaghetti", "crushed tomatoes", "olive oil"], name =>
         {
@@ -251,7 +251,7 @@ public class GroceryListTests
         var lastWeek = Cooking((1, Pasta));
         var pantry = Pantry.From([OnHand("garlic", Aisle.Produce), Out("honey", Aisle.BakingAndSpices)]);
 
-        var after = pantry.AfterUncooked(lastWeek, new HashSet<DateOnly> { Monday.AddDays(1) }, Cards);
+        var after = pantry.AfterUncooked(lastWeek, new HashSet<DateOnly> { Sunday.AddDays(1) }, Cards);
         var list = ListFor(Cooking((0, Pasta)), after);
 
         Assert.Contains("garlic", Names(list));
@@ -276,7 +276,7 @@ public class GroceryListTests
     {
         var lastWeek = Cooking((0, Chili));
 
-        var after = Pantry.Empty.AfterUncooked(lastWeek, new HashSet<DateOnly> { Monday.AddDays(4) }, Cards);
+        var after = Pantry.Empty.AfterUncooked(lastWeek, new HashSet<DateOnly> { Sunday.AddDays(4) }, Cards);
 
         Assert.Empty(after.Items);
     }
@@ -287,10 +287,10 @@ public class GroceryListTests
     public void LeftoversAndEatingOutAddNothing()
     {
         var week = MealWeek.Planned(
-            Monday,
+            Sunday,
             Enumerable.Range(0, MealWeek.Evenings).Select(offset => offset % 2 == 0
-                ? DinnerChoice.EatOut(Monday.AddDays(offset), "Out.")
-                : DinnerChoice.Leftovers(Monday.AddDays(offset), "Leftovers.")));
+                ? DinnerChoice.EatOut(Sunday.AddDays(offset), "Out.")
+                : DinnerChoice.Leftovers(Sunday.AddDays(offset), "Leftovers.")));
 
         Assert.True(ListFor(week).IsEmpty);
     }
@@ -298,7 +298,7 @@ public class GroceryListTests
     [Fact]
     public void AWeekNotPlannedIsAnEmptyList()
     {
-        var week = MealWeek.NotPlanned(Monday, MealStop.BoxTooSmall, "The box is too small.");
+        var week = MealWeek.NotPlanned(Sunday, MealStop.BoxTooSmall, "The box is too small.");
 
         var list = ListFor(week);
 
@@ -311,7 +311,7 @@ public class GroceryListTests
     {
         var error = Assert.Throws<ArgumentException>(() => GroceryList.From(ThreeDinners(), [Chili], Pantry.Empty, 4));
 
-        Assert.Contains("Tuesday", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Monday", error.Message, StringComparison.Ordinal);
     }
 
     [Theory]

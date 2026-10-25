@@ -35,7 +35,7 @@ public class SeatFactsTests
     private static ProgressionFacts SquatUp() => new("goblet squat", 25, 20);
 
     private static MealWeekFacts NovemberWeek() =>
-        new(new DateOnly(2026, 11, 16), [DayOfWeek.Thursday], [DayOfWeek.Friday]);
+        new(new DateOnly(2026, 11, 15), [DayOfWeek.Thursday], [DayOfWeek.Friday]);
 
     [Fact]
     public void FallbacksMatchPageEighteen()
@@ -48,7 +48,7 @@ public class SeatFactsTests
         Assert.Equal("Sleep: 6.2 hours last night, 40 minutes less than October's average.",
             SeatFacts.Signal(SleepSignal()).Fallback);
         Assert.Equal("25 lb today, up from 20.", SeatFacts.WorkoutEncouragement(SquatUp())!.Fallback);
-        Assert.Equal("Dinners for the week of Nov 16. One new recipe, Thursday.",
+        Assert.Equal("Dinners for the week of Nov 15. One new recipe, Thursday.",
             SeatFacts.MealSheetIntro(NovemberWeek()).Fallback);
     }
 
@@ -109,16 +109,17 @@ public class SeatFactsTests
         yield return [new[] { DayOfWeek.Thursday }, "One new recipe, Thursday."];
         yield return [new[] { DayOfWeek.Thursday, DayOfWeek.Tuesday }, "Two new recipes, Tuesday and Thursday."];
         yield return [new[] { DayOfWeek.Saturday, DayOfWeek.Tuesday, DayOfWeek.Thursday }, "Three new recipes, Tuesday, Thursday and Saturday."];
-        yield return [new[] { DayOfWeek.Sunday, DayOfWeek.Monday }, "Two new recipes, Monday and Sunday."];
+        yield return [new[] { DayOfWeek.Monday, DayOfWeek.Sunday }, "Two new recipes, Sunday and Monday."];
+        yield return [new[] { DayOfWeek.Saturday, DayOfWeek.Sunday }, "Two new recipes, Sunday and Saturday."];
     }
 
     [Theory]
     [MemberData(nameof(NewRecipeWeeks))]
     public void TheMealIntroCountsTheNewRecipesAndNamesTheirDaysInWeekOrder(DayOfWeek[] days, string expected)
     {
-        var week = new MealWeekFacts(new DateOnly(2026, 11, 16), days, []);
+        var week = new MealWeekFacts(new DateOnly(2026, 11, 15), days, []);
 
-        Assert.Equal($"Dinners for the week of Nov 16. {expected}", SeatFacts.MealSheetIntro(week).Fallback);
+        Assert.Equal($"Dinners for the week of Nov 15. {expected}", SeatFacts.MealSheetIntro(week).Fallback);
     }
 
     [Fact]
@@ -231,7 +232,7 @@ public class SeatFactsTests
     {
         Assert.Equal(
         [
-            "The dinner sheet is for the week of Nov 16.",
+            "The dinner sheet is for the week of Nov 15.",
             "One new recipe, on Thursday.",
             "Dinner is out on Friday.",
         ], SeatFacts.MealSheetIntro(NovemberWeek()).Facts);
@@ -240,7 +241,7 @@ public class SeatFactsTests
     [Fact]
     public void AWeekWithNoNightsOutSaysNothingOfThem()
     {
-        var facts = SeatFacts.MealSheetIntro(new MealWeekFacts(new DateOnly(2026, 11, 16), [DayOfWeek.Thursday], [])).Facts;
+        var facts = SeatFacts.MealSheetIntro(new MealWeekFacts(new DateOnly(2026, 11, 15), [DayOfWeek.Thursday], [])).Facts;
         Assert.DoesNotContain(facts, fact => fact.Contains("out", StringComparison.OrdinalIgnoreCase));
     }
 

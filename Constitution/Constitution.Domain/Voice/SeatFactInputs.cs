@@ -68,5 +68,5 @@ public sealed record SignalFacts(
 /// <summary>A lift's load today against last time; only an increase is news.</summary>
 public sealed record ProgressionFacts(string Exercise, double LoadToday, double LoadLast, string Unit = "lb");
 
-/// <summary>The week of the dinner sheet: which Monday it starts, the nights with a new recipe, the nights out.</summary>
+/// <summary>The week of the dinner sheet: which Sunday it starts, the nights with a new recipe, the nights out.</summary>
 public sealed record MealWeekFacts(DateOnly WeekOf, IReadOnlyList<DayOfWeek> NewRecipeDays, IReadOnlyList<DayOfWeek> DinnerOutDays);

@@ -25,8 +25,6 @@ public sealed record GrocerySection(Aisle Aisle, IReadOnlyList<GroceryLine> Line
 /// </summary>
 public sealed class GroceryList
 {
-    private static readonly string[] DayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
     private GroceryList(IReadOnlyList<GrocerySection> sections) => Sections = sections;
 
     /// <summary>Only the sections that have a line, in shopping order.</summary>
@@ -55,7 +53,7 @@ public sealed class GroceryList
             foreach (var dinner in week.Dinners.Where(item => item.Kind == DinnerKind.Cooked))
             {
                 var card = recipes.FirstOrDefault(item => item.Id == dinner.Recipe)
-                    ?? throw new ArgumentException($"{DayNames[dinner.Day.DayNumber - week.WeekStart.DayNumber]}'s dinner names a card that is not in the box, so its groceries could not be listed.", nameof(recipes));
+                    ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}'s dinner names a card that is not in the box, so its groceries could not be listed.", nameof(recipes));
                 foreach (var ingredient in card.Ingredients)
                 {
                     Add(wanted, ingredient, card.Servings, headcount);

@@ -9,7 +9,7 @@ namespace Constitution.Tests.MealPlacement;
 
 /// <summary>
 /// C-5.3.3 for meals: the owner's edits win, silently. These run the real runner against the fake calendar, which can also play the
-/// owner, who moves and deletes events in the Google Calendar app. The week: Sam's chili on Monday, Lee's slow-cooker stew on
+/// owner, who moves and deletes events in the Google Calendar app. The week: Sam's chili on Sunday, Lee's slow-cooker stew on
 /// Tuesday (a cook block and a morning start) and Sam's pasta on Wednesday.
 /// </summary>
 public class MealOwnerEditTests
@@ -18,9 +18,9 @@ public class MealOwnerEditTests
 
     private static MealPlanWeek TheWeek => new(WeekOf(CookedOn(0, Chili, Sam, 45), CookedOn(1, Stew, Lee, 120), CookedOn(2, Pasta, Sam, 30)));
 
-    private static PlacementKey CookKey(string person, int evening) => MealCalendar.KeyOf(MealEventRole.Cook, person, Monday, Monday.AddDays(evening));
+    private static PlacementKey CookKey(string person, int evening) => MealCalendar.KeyOf(MealEventRole.Cook, person, Sunday, Sunday.AddDays(evening));
 
-    private static PlacementKey StartKey(string person, int evening) => MealCalendar.KeyOf(MealEventRole.StartSlowCooker, person, Monday, Monday.AddDays(evening));
+    private static PlacementKey StartKey(string person, int evening) => MealCalendar.KeyOf(MealEventRole.StartSlowCooker, person, Sunday, Sunday.AddDays(evening));
 
     private static async Task<Scenario> FirstRunAsync()
     {

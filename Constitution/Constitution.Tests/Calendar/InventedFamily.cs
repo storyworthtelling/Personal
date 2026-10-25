@@ -37,6 +37,9 @@ internal static class InventedFamily
     /// <summary>A Monday on daylight time, a week before the clocks go back.</summary>
     public static readonly DateOnly Monday = new(2026, 10, 26);
 
+    /// <summary>The Sunday the day before <see cref="Monday"/>: the first day of the planning week that contains it, on daylight time throughout.</summary>
+    public static readonly DateOnly Sunday = new(2026, 10, 25);
+
     /// <summary>The US-Eastern rules as a custom zone: forward the second Sunday of March at 2 am, back the first of November.</summary>
     public static readonly TimeZoneInfo Zone = TimeZoneInfo.CreateCustomTimeZone(
         "Invented Eastern",

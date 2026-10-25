@@ -9,7 +9,7 @@ namespace Constitution.Domain.Meals;
 /// calendar could not be read (<see cref="Stop"/>); otherwise every evening gets a typed dinner and a reason.
 ///
 /// <para><b>Order of placement.</b> Cook-this-soon cards take the earliest evenings that fit; then one stretch dish (a card not
-/// cooked for eight weeks) takes Thursday, else the next evening that fits; then each remaining evening takes the best card by
+/// cooked for eight weeks) takes Thursday, else the next evening that fits (the evenings after it in the week, then those before); then each remaining evening takes the best card by
 /// children's table, then variety across cuisines, then least recently cooked, then the seed.</para>
 ///
 /// <para><b>Guesses</b> (the brief is silent, listed in the progress row): a repeat is two dinners fewer than 14 days apart; the
@@ -25,8 +25,8 @@ public static class MealPlanner
     /// <summary>A card not cooked in this many days before the week is "not cooked lately" and may be the stretch dish.</summary>
     public const int StretchLookbackDays = 56;
 
-    /// <summary>Thursday, counting from the Monday the week starts on.</summary>
-    public const int ThursdayIndex = 3;
+    /// <summary>Thursday's place in the week, counting from the Sunday it starts on: the stretch dish is about the day, wherever the week opens.</summary>
+    public static readonly int ThursdayIndex = PlanningWeek.Position(DayOfWeek.Thursday);
 
     private const string OrdinaryReason = "From the box.";
 
@@ -146,7 +146,8 @@ public static class MealPlanner
                 return;
             }
 
-            int[] order = [3, 4, 5, 6, 0, 1, 2];
+            // Thursday first, then each evening after it in the week's order, then the evenings before it.
+            var order = Enumerable.Range(0, MealWeek.Evenings).Select(step => (ThursdayIndex + step) % MealWeek.Evenings).ToArray();
             foreach (var recipe in candidates)
             {
                 foreach (var index in order)

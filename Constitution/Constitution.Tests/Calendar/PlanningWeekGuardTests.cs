@@ -9,21 +9,6 @@ namespace Constitution.Tests.Calendar;
 /// </summary>
 public class PlanningWeekGuardTests
 {
-    // The dinners, groceries, documents, recipes, Today and the words they speak still count from Monday. They are the second
-    // half of the move to Sunday weeks; the entry for a folder goes when that folder is converted.
-    private static readonly string[] NotYet =
-    [
-        "Constitution.Domain/Meals/",
-        "Constitution.Domain/Groceries/",
-        "Constitution.Domain/Documents/",
-        "Constitution.Domain/Recipes/",
-        "Constitution.Domain/Today/",
-        "Constitution.Domain/Voice/",
-        "Constitution.Domain/ReadBack/",
-        "Constitution.Domain/Placement/MealPlacement.cs",
-        "Constitution.Android/MealsTab/",
-    ];
-
     private static readonly Regex[] Shapes =
     [
         new(@"DayOfWeek\.Monday", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)),
@@ -45,8 +30,7 @@ public class PlanningWeekGuardTests
                 || path.StartsWith("Constitution.Android/", StringComparison.Ordinal);
             if (!inShippedCode
                 || path.EndsWith("/PlanningWeek.cs", StringComparison.Ordinal)
-                || path.EndsWith("/KeyAssignments.cs", StringComparison.Ordinal)
-                || NotYet.Any(prefix => path.StartsWith(prefix, StringComparison.Ordinal)))
+                || path.EndsWith("/KeyAssignments.cs", StringComparison.Ordinal))
             {
                 continue;
             }

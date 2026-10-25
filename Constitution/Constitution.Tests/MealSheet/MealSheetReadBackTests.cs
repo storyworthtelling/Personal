@@ -9,7 +9,7 @@ namespace Constitution.Tests.MealSheet;
 public class MealSheetReadBackTests
 {
     private static readonly DayOfWeek[] Week =
-        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+        [DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday];
 
     private static ExpectedDocument Expected() => ExpectedDocument.ForMealSheet(MealSheetSamples.Model(), "Sam");
 
@@ -19,11 +19,11 @@ public class MealSheetReadBackTests
         var document = Expected();
 
         Assert.Equal(DeliveryKind.Meals, document.Kind);
-        Assert.Equal(MealSheetSamples.Monday, document.Day);
+        Assert.Equal(MealSheetSamples.Sunday, document.Day);
         Assert.Equal("Sam", document.Person);
         Assert.True(document.ReadsInk);
         Assert.Null(document.Session);
-        Assert.Equal(DeliveredName.For(DeliveryKind.Meals, MealSheetSamples.Monday), document.Name);
+        Assert.Equal(DeliveredName.For(DeliveryKind.Meals, MealSheetSamples.Sunday), document.Name);
         Assert.Equal(1, document.Pages.Single().Number);
     }
 
@@ -37,9 +37,11 @@ public class MealSheetReadBackTests
         Assert.Equal(Week.Select(MealSheetIds.DinnerYes), rules.Select(r => r.YesBoxId));
         Assert.Equal(Week.Select(MealSheetIds.DinnerReason), rules.Select(r => r.ReasonId));
         Assert.All(rules, r => Assert.Equal(MealSheetSamples.Deadline, r.Deadline));
-        Assert.Contains("Monday", rules[0].Subject);
-        Assert.Contains("Lentil soup", rules[0].Subject);
-        Assert.Contains("Corner noodle house", rules[4].Subject);
+        Assert.Contains("Sunday", rules[0].Subject);
+        Assert.Contains("Veggie fried rice", rules[0].Subject);
+        Assert.Contains("Monday", rules[1].Subject);
+        Assert.Contains("Lentil soup", rules[1].Subject);
+        Assert.Contains("Corner noodle house", rules[5].Subject);
     }
 
     [Fact]
@@ -77,8 +79,8 @@ public class MealSheetReadBackTests
         var page = Expected().Pages.Single();
         var rule = (MealItemRule)page.Rules[0];
 
-        Assert.Equal(MealSheetIds.DinnerYesMonday, rule.YesBoxId);
-        Assert.Equal(MealSheetIds.DinnerReasonMonday, rule.ReasonId);
+        Assert.Equal(MealSheetIds.DinnerYesSunday, rule.YesBoxId);
+        Assert.Equal(MealSheetIds.DinnerReasonSunday, rule.ReasonId);
         Assert.Equal(new DateTimeOffset(2026, 11, 22, 8, 0, 0, TimeSpan.FromHours(-5)), rule.Deadline);
     }
 
@@ -87,7 +89,7 @@ public class MealSheetReadBackTests
     {
         var model = MealSheetSamples.Model() with
         {
-            Week = Constitution.Domain.Meals.MealWeek.NotPlanned(MealSheetSamples.Monday, Constitution.Domain.Meals.MealStop.BoxTooSmall, "Too few cards."),
+            Week = Constitution.Domain.Meals.MealWeek.NotPlanned(MealSheetSamples.Sunday, Constitution.Domain.Meals.MealStop.BoxTooSmall, "Too few cards."),
         };
 
         Assert.Throws<ArgumentException>(() => ExpectedDocument.ForMealSheet(model, "Sam"));

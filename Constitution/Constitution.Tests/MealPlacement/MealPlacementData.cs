@@ -10,8 +10,8 @@ using MealCalendar = Constitution.Domain.Placement.MealPlacement;
 namespace Constitution.Tests.MealPlacement;
 
 /// <summary>
-/// The invented week the meal placement tests stand on: the Meals tests' Monday 26 October 2026 (daylight time, UTC-4, until
-/// the clocks go back on the Sunday), with Sam and Lee, dinner from 6 to 7 pm, Sam at work from 8 to 4 and Lee from 8 to
+/// The invented week the meal placement tests stand on: the Meals tests' Sunday 25 October 2026 to Saturday 31 October, all on
+/// daylight time (UTC-4; the clocks go back the Sunday after), with Sam and Lee, dinner from 6 to 7 pm, Sam at work from 8 to 4 and Lee from 8 to
 /// 3:30 on weekdays. Weeks are written by hand rather than asked of the planner, so each test controls exactly the evening it is
 /// about; the cook assignment tests and the property test do run the real planner's weeks through. Every expected instant is
 /// written out on the clock.
@@ -26,7 +26,7 @@ internal static class MealPlacementData
 
     public static readonly IReadOnlyList<Recipe> Cards = [Chili, Pasta, Stew];
 
-    public static readonly int Week = PlacementKey.WeekIndexOf(Monday);
+    public static readonly int Week = PlacementKey.WeekIndexOf(Sunday);
 
     public static PlanningRules House => Rules();
 
@@ -40,16 +40,15 @@ internal static class MealPlacementData
         null,
         false);
 
-    /// <summary>The wall-clock time on the evening <paramref name="dayOffset"/> days after the Monday; the Sunday is on standard time.</summary>
-    public static DateTimeOffset Clock(int dayOffset, int hour, int minute = 0) =>
-        dayOffset < 6 ? Edt(10, 26 + dayOffset, hour, minute) : Est(11, 1, hour, minute);
+    /// <summary>The wall-clock time on the evening <paramref name="dayOffset"/> days after the week's Sunday (0 is Sunday, 6 is Saturday).</summary>
+    public static DateTimeOffset Clock(int dayOffset, int hour, int minute = 0) => Edt(10, 25 + dayOffset, hour, minute);
 
     public static DateTimeOffset DinnerStart(int dayOffset) => Clock(dayOffset, 18);
 
     /// <summary>A cooked dinner whose block ends exactly at the family dinner, the way the planner writes it.</summary>
     public static DinnerChoice CookedOn(int dayOffset, Recipe card, string cook, int minutes) =>
         DinnerChoice.Cooked(
-            Monday.AddDays(dayOffset),
+            Sunday.AddDays(dayOffset),
             card.Id,
             cook,
             DinnerStart(dayOffset) - TimeSpan.FromMinutes(minutes),
@@ -61,13 +60,13 @@ internal static class MealPlacementData
     /// <summary>A planned week from the evenings given; every other evening is a plain nothing.</summary>
     public static MealWeek WeekOf(params DinnerChoice[] placed) =>
         MealWeek.Planned(
-            Monday,
+            Sunday,
             Enumerable.Range(0, MealWeek.Evenings).Select(offset =>
-                placed.FirstOrDefault(dinner => dinner.Day == Monday.AddDays(offset))
-                ?? DinnerChoice.NothingPlanned(Monday.AddDays(offset), "Nothing is planned.")));
+                placed.FirstOrDefault(dinner => dinner.Day == Sunday.AddDays(offset))
+                ?? DinnerChoice.NothingPlanned(Sunday.AddDays(offset), "Nothing is planned.")));
 
     public static List<BusyTime> PeopleFor(PlanningRules rules, HouseholdCalendarSnapshot calendars) =>
-        rules.Adults.Select(adult => BusyTime.For(adult.Name, Monday, Monday.AddDays(6), rules, calendars)).ToList();
+        rules.Adults.Select(adult => BusyTime.For(adult.Name, Sunday, Sunday.AddDays(6), rules, calendars)).ToList();
 
     /// <summary>The week handed to the engine, meals first, with whatever else the test wants requested after them.</summary>
     public static PlacementRequest RequestFor(
@@ -89,15 +88,15 @@ internal static class MealPlacementData
     {
         var names = sessions.SelectMany(session => session.Participants).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
         var plans = names
-            .Select(name => new WeeklyPlan(name, Monday, sessions.Where(session => session.Participants.Contains(name)).ToList(), null))
+            .Select(name => new WeeklyPlan(name, Sunday, sessions.Where(session => session.Participants.Contains(name)).ToList(), null))
             .ToList();
-        return new HouseholdWorkoutPlan(Monday, plans, []);
+        return new HouseholdWorkoutPlan(Sunday, plans, []);
     }
 
     /// <summary>A workout proposed at <paramref name="proposed"/> inside the gap, a non-sweaty strength session of the given length.</summary>
     public static PlannedSession Workout(int dayOffset, (int Hour, int Minute) gapFrom, (int Hour, int Minute) gapTo, (int Hour, int Minute) proposed, int minutes, string person) =>
         new(
-            Monday.AddDays(dayOffset),
+            Sunday.AddDays(dayOffset),
             Clock(dayOffset, proposed.Hour, proposed.Minute),
             new FreeGap(Clock(dayOffset, gapFrom.Hour, gapFrom.Minute), Clock(dayOffset, gapTo.Hour, gapTo.Minute)),
             PlacementFixture.Effort(minutes, sweaty: false),
@@ -116,7 +115,7 @@ internal static class MealPlacementData
         CalendarEntry.Timed(title, Clock(dayOffset, from.Hour, from.Minute), Clock(dayOffset, to.Hour, to.Minute));
 
     /// <summary>The local evening (0 to 6) an instant falls on.</summary>
-    public static int EveningOf(DateTimeOffset instant) => DateOnly.FromDateTime(instant.DateTime).DayNumber - Monday.DayNumber;
+    public static int EveningOf(DateTimeOffset instant) => DateOnly.FromDateTime(instant.DateTime).DayNumber - Sunday.DayNumber;
 
     /// <summary>True when the two half-open stretches share any time; touching is not overlapping.</summary>
     public static bool Overlap(DateTimeOffset firstStart, DateTimeOffset firstEnd, DateTimeOffset secondStart, DateTimeOffset secondEnd) =>

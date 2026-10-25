@@ -41,7 +41,7 @@ public class MealRulesTests
     public void AWeekThatIsNotPlannedHasNoEvenings()
     {
         var request = Request();
-        var stopped = MealWeek.NotPlanned(Monday, MealStop.BoxTooSmall, "Too few cards.");
+        var stopped = MealWeek.NotPlanned(Sunday, MealStop.BoxTooSmall, "Too few cards.");
 
         Assert.Contains(Check(request, stopped), v => v.Rule == MealRule.WrongEvenings);
     }
@@ -51,7 +51,7 @@ public class MealRulesTests
     {
         var request = Request();
         var other = MealPlanner.Plan(request);
-        var later = MealWeek.Planned(Monday.AddDays(7), other.Dinners.Select((d, i) => DinnerChoice.NothingPlanned(Monday.AddDays(7 + i), "None.")));
+        var later = MealWeek.Planned(Sunday.AddDays(7), other.Dinners.Select((d, i) => DinnerChoice.NothingPlanned(Sunday.AddDays(7 + i), "None.")));
 
         Assert.Contains(Check(request, later), v => v.Rule == MealRule.WrongEvenings);
     }
@@ -60,9 +60,9 @@ public class MealRulesTests
     public void ACardNotInTheBoxIsRefused()
     {
         var request = Request();
-        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Monday, "ghost-dish", Sam, 17, 0));
+        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Sunday, "ghost-dish", Sam, 17, 0));
 
-        Assert.Contains(Check(request, week), v => v.Rule == MealRule.NotInTheBox && v.Day == Monday);
+        Assert.Contains(Check(request, week), v => v.Rule == MealRule.NotInTheBox && v.Day == Sunday);
     }
 
     [Fact]
@@ -70,82 +70,83 @@ public class MealRulesTests
     {
         var request = Request();
         var planned = MealPlanner.Plan(request);
-        var week = Replace(planned, 1, CookedBy(Monday.AddDays(1), planned.Dinners[0].Recipe!.Value.Value, Lee, 17, 0));
+        var week = Replace(planned, 1, CookedBy(Sunday.AddDays(1), planned.Dinners[0].Recipe!.Value.Value, Lee, 17, 0));
 
         var found = Check(request, week).Where(v => v.Rule == MealRule.RepeatsWithinFourteenDays).ToList();
 
-        Assert.Equal([Monday.AddDays(1)], found.Select(v => v.Day));
+        Assert.Equal([Sunday.AddDays(1)], found.Select(v => v.Day));
     }
 
     [Fact]
     public void ARepeatOfRecentHistoryIsRefused()
     {
         var request = Request(history: Cooked(("tomato-pasta", 9)));
-        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Monday, "tomato-pasta", Sam, 17, 0));
+        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Sunday, "tomato-pasta", Sam, 17, 0));
 
-        Assert.Contains(Check(request, week), v => v.Rule == MealRule.RepeatsWithinFourteenDays && v.Day == Monday);
+        Assert.Contains(Check(request, week), v => v.Rule == MealRule.RepeatsWithinFourteenDays && v.Day == Sunday);
     }
 
     [Fact]
     public void ACookBlockOnBusyTimeIsRefused()
     {
-        var request = Request(sam: [On(Monday, "Dentist", 16, 30, 17, 45)]);
-        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Monday, "tomato-pasta", Sam, 17, 0));
+        var request = Request(sam: [On(Sunday, "Dentist", 16, 30, 17, 45)]);
+        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Sunday, "tomato-pasta", Sam, 17, 0));
 
-        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookBlockedTime && v.Day == Monday);
+        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookBlockedTime && v.Day == Sunday);
     }
 
     [Fact]
     public void ACookBlockOnWorkHoursIsRefused()
     {
         var request = Request();
-        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Monday, "tomato-pasta", Sam, 15, 0));
+        var monday = Sunday.AddDays(1);
+        var week = Replace(MealPlanner.Plan(request), 1, CookedBy(monday, "tomato-pasta", Sam, 15, 0));
 
-        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookBlockedTime && v.Day == Monday);
+        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookBlockedTime && v.Day == monday);
     }
 
     [Fact]
     public void ACookWhoIsOutAtDinnerIsRefused()
     {
-        var request = Request(sam: [On(Monday, "Concert", 18, 30, 21, 0)]);
-        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Monday, "tomato-pasta", Sam, 17, 0));
+        var request = Request(sam: [On(Sunday, "Concert", 18, 30, 21, 0)]);
+        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Sunday, "tomato-pasta", Sam, 17, 0));
 
-        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookNotAvailable && v.Day == Monday);
+        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookNotAvailable && v.Day == Sunday);
     }
 
     [Fact]
     public void ACookWhoIsNotAnAdultIsRefused()
     {
         var request = Request();
-        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Monday, "tomato-pasta", Robin, 17, 0));
+        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Sunday, "tomato-pasta", Robin, 17, 0));
 
-        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookNotAvailable && v.Day == Monday);
+        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookNotAvailable && v.Day == Sunday);
     }
 
     [Fact]
     public void ABlockThatEndsBeforeDinnerIsRefused()
     {
         var request = Request();
-        var early = DinnerChoice.Cooked(Monday, Id("tomato-pasta"), Sam, Edt(10, 26, 16, 30), Edt(10, 26, 17, 30), false, false, "Early.");
+        var early = DinnerChoice.Cooked(Sunday, Id("tomato-pasta"), Sam, Edt(10, 26, 16, 30), Edt(10, 26, 17, 30), false, false, "Early.");
         var week = Replace(MealPlanner.Plan(request), 0, early);
 
-        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookBlockMisplaced && v.Day == Monday);
+        Assert.Contains(Check(request, week), v => v.Rule == MealRule.CookBlockMisplaced && v.Day == Sunday);
     }
 
     [Fact]
     public void ADishAnAdultSaidNeverAgainToIsRefusedWhileThatAdultIsHome()
     {
         var request = Request(neverAgain: Never("tomato-pasta", Sam));
-        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Monday, "tomato-pasta", Lee, 17, 0));
+        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Sunday, "tomato-pasta", Lee, 17, 0));
 
-        Assert.Contains(Check(request, week), v => v.Rule == MealRule.VetoedDish && v.Day == Monday);
+        Assert.Contains(Check(request, week), v => v.Rule == MealRule.VetoedDish && v.Day == Sunday);
     }
 
     [Fact]
     public void ThatDishIsFineOnTheEveningTheAdultIsAway()
     {
-        var request = Request(sam: [On(Monday, "Concert", 18, 30, 21, 0)], neverAgain: Never("tomato-pasta", Sam));
-        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Monday, "tomato-pasta", Lee, 17, 0));
+        var request = Request(sam: [On(Sunday, "Concert", 18, 30, 21, 0)], neverAgain: Never("tomato-pasta", Sam));
+        var week = Replace(MealPlanner.Plan(request), 0, CookedBy(Sunday, "tomato-pasta", Lee, 17, 0));
 
         Assert.DoesNotContain(Check(request, week), v => v.Rule == MealRule.VetoedDish);
     }
@@ -156,8 +157,8 @@ public class MealRulesTests
         var request = Request(neverAgain: Never("tomato-pasta", Robin), childrenHome: AllEvenings());
         var planned = MealPlanner.Plan(request);
 
-        var plain = Replace(planned, 0, CookedBy(Monday, "tomato-pasta", Sam, 17, 0));
-        var different = Replace(planned, 0, CookedBy(Monday, "tomato-pasta", Sam, 17, 0, childrenDifferently: true));
+        var plain = Replace(planned, 0, CookedBy(Sunday, "tomato-pasta", Sam, 17, 0));
+        var different = Replace(planned, 0, CookedBy(Sunday, "tomato-pasta", Sam, 17, 0, childrenDifferently: true));
 
         Assert.Contains(Check(request, plain), v => v.Rule == MealRule.VetoedDish);
         Assert.DoesNotContain(Check(request, different), v => v.Rule == MealRule.VetoedDish);
@@ -168,7 +169,7 @@ public class MealRulesTests
     {
         var request = Request();
         var planned = MealPlanner.Plan(request);
-        var week = Replace(Replace(Replace(planned, 0, DinnerChoice.Leftovers(Monday, "Last night's.")), 1, DinnerChoice.EatOut(Monday.AddDays(1), "Out.")), 2, DinnerChoice.NothingPlanned(Monday.AddDays(2), "Free."));
+        var week = Replace(Replace(Replace(planned, 0, DinnerChoice.Leftovers(Sunday, "Last night's.")), 1, DinnerChoice.EatOut(Sunday.AddDays(1), "Out.")), 2, DinnerChoice.NothingPlanned(Sunday.AddDays(2), "Free."));
 
         Assert.Empty(Check(request, week));
     }

@@ -5,7 +5,7 @@ namespace Constitution.Domain.Meals;
 
 /// <summary>
 /// Everything the dinner planner reads, all passed in: no clock, no storage, no calendar fetch (the head fills it).
-/// A week is 7 evenings from a Monday.
+/// A week is 7 evenings from the Sunday the planning week opens on (<see cref="PlanningWeek"/>), Sunday through Saturday.
 /// </summary>
 public sealed record MealWeekRequest
 {
@@ -36,7 +36,7 @@ public sealed record MealWeekRequest
         EnsureValid();
     }
 
-    /// <summary>The Monday the week starts on.</summary>
+    /// <summary>The Sunday the week starts on.</summary>
     public DateOnly WeekStart { get; init; }
 
     /// <summary>Every card in the box.</summary>
@@ -74,11 +74,7 @@ public sealed record MealWeekRequest
     /// <summary>Throws <see cref="ArgumentException"/> naming what is wrong. Run by the constructor and again by the planner (a <c>with</c> skips the constructor).</summary>
     public void EnsureValid()
     {
-        if (WeekStart.DayOfWeek != DayOfWeek.Monday)
-        {
-            throw new ArgumentException("A meal week starts on a Monday.", nameof(WeekStart));
-        }
-
+        PlanningWeek.RequireStart(WeekStart, nameof(WeekStart));
         ArgumentNullException.ThrowIfNull(Recipes);
         ArgumentNullException.ThrowIfNull(Rules);
         ArgumentNullException.ThrowIfNull(AdultTime);

@@ -78,20 +78,33 @@ internal sealed class ThisWeekPage : LinearLayout
         return column;
     }
 
-    // One ruled line: the day, the dish (today's in bold), then the cook and the small markers.
+    // One ruled line: the day, the dish (today's in bold, an earlier day dimmed), then the cook and the small markers. The
+    // lines arrive in the planning week's order, Sunday through Saturday, and are added in that order.
     private static View Row(Context context, WeekLine line)
     {
         var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
         var day = ScrapContent.IndexLine(context, line.DayLabel, line.IsToday);
         var dish = ScrapContent.IndexLine(context, line.Dish, line.IsToday);
         dish.Ellipsize = TextUtils.TruncateAt.End;
+        var gone = line.IsPast && !line.IsToday;
+        if (gone)
+        {
+            day.SetTextColor(PaperTheme.InkMuted);
+            dish.SetTextColor(PaperTheme.InkMuted);
+        }
         row.AddView(day, new LayoutParams(PaperTheme.Dp(context, DayLabelWidthDp), ViewGroup.LayoutParams.WrapContent));
         row.AddView(dish, new LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
 
         var trailing = string.Join(" · ", new[] { line.Cook }.Concat(line.Markers).Where(part => !string.IsNullOrWhiteSpace(part)));
         if (trailing.Length > 0)
         {
-            row.AddView(ScrapContent.IndexLine(context, trailing, line.IsToday), new LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
+            var small = ScrapContent.IndexLine(context, trailing, line.IsToday);
+            if (gone)
+            {
+                small.SetTextColor(PaperTheme.InkMuted);
+            }
+
+            row.AddView(small, new LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
         }
 
         return row;

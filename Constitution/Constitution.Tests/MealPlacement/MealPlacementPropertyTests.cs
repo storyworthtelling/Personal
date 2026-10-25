@@ -29,7 +29,7 @@ public class MealPlacementPropertyTests
         var count = random.Next(0, most);
         for (var index = 0; index < count; index++)
         {
-            var day = Monday.AddDays(random.Next(0, 7));
+            var day = Sunday.AddDays(random.Next(0, 7));
             var from = random.Next(5, 21);
             var to = Math.Min(23, from + random.Next(1, 4));
             var minute = random.Next(0, 2) * 30;

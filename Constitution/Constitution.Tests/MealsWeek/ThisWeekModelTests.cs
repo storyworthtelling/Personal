@@ -6,7 +6,7 @@ namespace Constitution.Tests.MealsWeek;
 /// <summary>C-6.7.1: tonight and the approved week on two cards (book p.13). Invented facts throughout.</summary>
 public class ThisWeekModelTests
 {
-    private static readonly DateOnly Tuesday = WeekFixture.Monday.AddDays(1);
+    private static readonly DateOnly Tuesday = WeekFixture.Sunday.AddDays(2);
 
     private static MealsWeekModel Build(DateOnly today, MealWeekSnapshot? snapshot = null) =>
         MealsWeekModel.Build(new MealWeekScreenRead.Ready(snapshot ?? WeekFixture.Friday()), today);
@@ -19,15 +19,15 @@ public class ThisWeekModelTests
         Assert.Equal(7, model.Days.Count);
         Assert.Single(model.Days, line => line.IsToday);
         Assert.Equal("Tue", model.Days.Single(line => line.IsToday).DayLabel);
-        Assert.Equal(WeekFixture.Monday.AddDays(1), model.Days.Single(line => line.IsToday).Day);
+        Assert.Equal(WeekFixture.Sunday.AddDays(2), model.Days.Single(line => line.IsToday).Day);
     }
 
     [Fact]
-    public void TheWeekIsDrawnMondayToSunday()
+    public void TheWeekIsDrawnSundayToSaturday()
     {
         var model = Build(Tuesday);
 
-        Assert.Equal(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], model.Days.Select(line => line.DayLabel));
+        Assert.Equal(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], model.Days.Select(line => line.DayLabel));
     }
 
     [Fact]
@@ -36,8 +36,9 @@ public class ThisWeekModelTests
         var model = Build(Tuesday);
 
         Assert.True(model.Days[0].IsPast);
-        Assert.False(model.Days[1].IsPast);
+        Assert.True(model.Days[1].IsPast);
         Assert.False(model.Days[2].IsPast);
+        Assert.False(model.Days[3].IsPast);
     }
 
     [Fact]
@@ -65,15 +66,15 @@ public class ThisWeekModelTests
     {
         var model = Build(Tuesday);
 
-        Assert.Equal(["slow cooker"], model.Days[2].Markers);
-        Assert.Equal(["new"], model.Days[3].Markers);
-        Assert.Empty(model.Days[0].Markers);
+        Assert.Equal(["slow cooker"], model.Days[3].Markers);
+        Assert.Equal(["new"], model.Days[4].Markers);
+        Assert.Empty(model.Days[1].Markers);
     }
 
     [Fact]
     public void AnEveningOutIsReadAsOut()
     {
-        var friday = Build(Tuesday).Days[4];
+        var friday = Build(Tuesday).Days[5];
 
         Assert.True(friday.IsOut);
         Assert.Equal("Out · Corner noodle house", friday.Dish);
@@ -83,7 +84,7 @@ public class ThisWeekModelTests
     [Fact]
     public void AnEveningOutWithoutAPlaceStillSaysOut()
     {
-        var friday = Build(Tuesday, WeekFixture.Snapshot()).Days[4];
+        var friday = Build(Tuesday, WeekFixture.Snapshot()).Days[5];
 
         Assert.Equal("Out", friday.Dish);
         Assert.Equal("Everyone is out on Friday.", friday.ReasonLine);
@@ -92,7 +93,7 @@ public class ThisWeekModelTests
     [Fact]
     public void LeftoversCarryTheirReason()
     {
-        var sunday = Build(Tuesday).Days[6];
+        var sunday = Build(Tuesday).Days[0];
 
         Assert.Equal("Leftovers", sunday.Dish);
         Assert.Equal("Saturday's meatballs, again.", sunday.ReasonLine);
@@ -103,14 +104,14 @@ public class ThisWeekModelTests
     {
         var model = Build(Tuesday);
 
-        Assert.Equal("Sam", model.Days[0].Cook);
-        Assert.Equal("Robin", model.Days[2].Cook);
+        Assert.Equal("Sam", model.Days[1].Cook);
+        Assert.Equal("Robin", model.Days[3].Cook);
     }
 
     [Fact]
     public void ApprovedSundayHeadsTheWeekCard()
     {
-        var sunday = WeekFixture.Monday.AddDays(-1);
+        var sunday = WeekFixture.Sunday;
         var model = Build(Tuesday, WeekFixture.Snapshot() with { ApprovedOn = sunday });
 
         Assert.Equal("This week · approved Sunday", model.WeekHeading);
@@ -122,13 +123,13 @@ public class ThisWeekModelTests
     {
         var snapshot = new MealWeekSnapshot(WeekFixture.Week(), new Dictionary<Constitution.Domain.Recipes.RecipeId, DishFacts>());
 
-        Assert.Equal("A card no longer in the box", Build(Tuesday, snapshot).Days[0].Dish);
+        Assert.Equal("A card no longer in the box", Build(Tuesday, snapshot).Days[1].Dish);
     }
 
     [Fact]
     public void ATodayOutsideTheWeekHasNoTonight()
     {
-        var model = Build(WeekFixture.Monday.AddDays(9));
+        var model = Build(WeekFixture.Sunday.AddDays(9));
 
         Assert.Null(model.Tonight);
         Assert.Equal(MealsWeekModel.NothingTonightSentence, model.TonightSentence);
@@ -138,8 +139,8 @@ public class ThisWeekModelTests
     [Fact]
     public void NothingPlannedTonightSaysSoWithItsReason()
     {
-        var week = MealWeek.Planned(WeekFixture.Monday,
-            Enumerable.Range(0, 7).Select(day => Constitution.Domain.Meals.DinnerChoice.NothingPlanned(WeekFixture.Monday.AddDays(day), "Nobody is home.")));
+        var week = MealWeek.Planned(WeekFixture.Sunday,
+            Enumerable.Range(0, 7).Select(day => Constitution.Domain.Meals.DinnerChoice.NothingPlanned(WeekFixture.Sunday.AddDays(day), "Nobody is home.")));
         var model = Build(Tuesday, WeekFixture.Snapshot(week));
 
         Assert.Equal("Tonight", model.Tonight!.Kicker);
@@ -156,7 +157,7 @@ public class ThisWeekModelTests
     [Fact]
     public void ANoteOfTheWeekIsCarried()
     {
-        var week = MealWeek.Planned(WeekFixture.Monday, WeekFixture.Week().Dinners, ["No stretch dish this week."]);
+        var week = MealWeek.Planned(WeekFixture.Sunday, WeekFixture.Week().Dinners, ["No stretch dish this week."]);
 
         Assert.Equal(["No stretch dish this week."], Build(Tuesday, WeekFixture.Snapshot(week)).Notes);
     }
@@ -175,7 +176,7 @@ public class ThisWeekModelTests
     [Fact]
     public void ATooSmallBoxIsSaidInTheWeeksOwnWords()
     {
-        var week = MealWeek.NotPlanned(WeekFixture.Monday, MealStop.BoxTooSmall, "The box holds 6 cards; a week needs 10.");
+        var week = MealWeek.NotPlanned(WeekFixture.Sunday, MealStop.BoxTooSmall, "The box holds 6 cards; a week needs 10.");
         var model = Build(Tuesday, WeekFixture.Snapshot(week));
 
         Assert.Equal(WeekState.NotEnoughRecipes, model.State);
@@ -186,7 +187,7 @@ public class ThisWeekModelTests
     [Fact]
     public void AnUnreadableCalendarIsNeverNothingOn()
     {
-        var week = MealWeek.NotPlanned(WeekFixture.Monday, MealStop.CalendarUnreadable, "A calendar could not be read.");
+        var week = MealWeek.NotPlanned(WeekFixture.Sunday, MealStop.CalendarUnreadable, "A calendar could not be read.");
         var model = Build(Tuesday, WeekFixture.Snapshot(week));
 
         Assert.Equal(WeekState.CalendarUnreadable, model.State);
@@ -207,10 +208,10 @@ public class ThisWeekModelTests
     {
         var model = Build(Tuesday);
 
-        Assert.Equal("Yesterday", model.Days[0].RelativeLabel);
-        Assert.Equal("Today", model.Days[1].RelativeLabel);
-        Assert.Equal("Tomorrow", model.Days[2].RelativeLabel);
-        Assert.Equal("Friday", model.Days[4].RelativeLabel);
+        Assert.Equal("Yesterday", model.Days[1].RelativeLabel);
+        Assert.Equal("Today", model.Days[2].RelativeLabel);
+        Assert.Equal("Tomorrow", model.Days[3].RelativeLabel);
+        Assert.Equal("Friday", model.Days[5].RelativeLabel);
     }
 
     [Fact]

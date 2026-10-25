@@ -3,7 +3,7 @@ namespace Constitution.Domain.Meals;
 /// <summary>Which rule a week breaks.</summary>
 public enum MealRule
 {
-    /// <summary>Not seven evenings from the Monday, in order, or not planned at all.</summary>
+    /// <summary>Not seven evenings from the Sunday, in order, or not planned at all.</summary>
     WrongEvenings,
 
     /// <summary>A cooked dinner names a card that is not in the box.</summary>
