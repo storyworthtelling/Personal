@@ -3,6 +3,7 @@ using Android.Content;
 using Android.OS;
 using Android.Views;
 using Codex.Ui;
+using Constitution.Domain.Diagnostics;
 using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Recipes;
@@ -39,6 +40,8 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     private readonly Handler handler = new(Looper.MainLooper!);
     private readonly CuisineMoveUndo undo = new();
     private readonly ScanDiscardUndo scanUndo = new();
+    private readonly TypedEntryUndo typedUndo = new();
+    private readonly TypedEntry typed = new();
     private readonly ScanRecipeLauncher scanLauncher;
     private readonly Dictionary<RecipeId, CookSoonState> cooks = [];
 
@@ -48,6 +51,9 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     private ScanConfirmModel? scan;
     private ScanReadPage? scanPage;
     private bool scanBusy;
+    private bool typing;
+    private InstallRole role = InstallRole.Unknown;
+    private RecipePickerModel? picker;
     private RecipeBoxRead? read;
     private IMealWeekSource weekSource = new NoMealWeekSource();
     private MealWeekScreenRead? weekRead;
@@ -86,6 +92,20 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         set => wordJudge = value;
     }
 
+    /// <summary>
+    /// Whose phone this is, which decides the scan row (Plate on the owner's, the camera on the partner's). Set by whoever reads the
+    /// household file; until it is known the owner's row is offered, and Plate answers or says it is absent.
+    /// </summary>
+    public InstallRole Role
+    {
+        get => role;
+        set
+        {
+            role = value;
+            picker = null;
+        }
+    }
+
     /// <summary>Where the approved week comes from; set by whoever wires the weekly meal run's saved week.</summary>
     public IMealWeekSource WeekSource
     {
@@ -99,6 +119,10 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     /// </summary>
     public event Action<string>? PrimaryActionRequested;
 
+    // No phone can read a photograph of a card yet (C-6.5.2 waits on a dependency decision), and the paste row waits on written
+    // permission (PC8, D82), so the picker is built without either and says so in its rows.
+    private RecipePickerModel Picker() => picker ??= RecipePickerModel.For(role, cameraCanRead: false, pasteAllowed: false);
+
     public override string? Subtitle => notice;
 
     protected override string LoadingSentence => "Reading the recipe box.";
@@ -109,6 +133,11 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     {
         boxPage = null;
         scanPage = null;
+        if (typing)
+        {
+            return new PickerTypedPage(Host, typed);
+        }
+
         if (scan is not null)
         {
             scanPage = new ScanReadPage(Host, scan, OnChoose, OnOther, OnTitle);
@@ -182,9 +211,16 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
     public override View? BuildBottomBar()
     {
+        if (typing)
+        {
+            var letGo = PaperUi.SecondaryButton(Host, TypedEntry.LetGoAction, LetGoOfTyping);
+            var check = PaperUi.PrimaryButton(Host, TypedEntry.CheckAction, CheckTyping);
+            return PaperUi.BottomBar(Host, letGo, check);
+        }
+
         if (scan is not null)
         {
-            var again = PaperUi.SecondaryButton(Host, scan.ScanAgainAction, StartScan);
+            var again = PaperUi.SecondaryButton(Host, scan.ScanAgainAction, ScanAgain);
             again.Enabled = !scanBusy;
             var looksRight = PaperUi.PrimaryButton(Host, scan.KeepAction, KeepScan);
             looksRight.Enabled = !scanBusy;
@@ -203,8 +239,16 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
         var action = RecipeBoxScreenModel.Build(ready.Snapshot.Cards, null).PrimaryAction;
         var button = PaperUi.PrimaryButton(Host, action, () => OnPrimary(action));
-        button.Enabled = action == RecipeBoxText.ScanAction ? !scanBusy : PrimaryActionRequested is not null;
-        return PaperUi.BottomBar(Host, button);
+        button.Enabled = action != RecipeBoxText.ScanAction || !scanBusy;
+        if (action == RecipeBoxText.ScanAction)
+        {
+            // Short of ten the scan is the page's one invitation; typing is still always there beside it.
+            var typeIt = PaperUi.SecondaryButton(Host, RecipePickerText.TypeInTitle, OpenTyping);
+            return PaperUi.BottomBar(Host, typeIt, button);
+        }
+
+        var bar = PaperUi.BottomBar(Host, button);
+        return Picker().IsOpen ? new PickerSheet(Host, Picker().Rows, OnPick, bar) : bar;
     }
 
     // "I ate something else" stays in the bar on this view (book p.13). It is built with F-6.6; until then it is drawn disabled, as on Today.
@@ -224,6 +268,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     {
         view = chosen;
         selection = CardSelection.None;
+        Picker().Close();
         RaiseChanged();
     }
 
@@ -380,12 +425,102 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         {
             StartScan();
         }
+        else
+        {
+            Picker().Toggle();
+            RaiseChanged();
+        }
 
         PrimaryActionRequested?.Invoke(action);
     }
 
+    // Scan again: a scanned draft asks Plate once more; a typed one reopens the three fields with its words still in them.
+    private void ScanAgain()
+    {
+        if (scan?.Origin == ScanOrigin.Typed)
+        {
+            OpenTyping();
+            return;
+        }
+
+        StartScan();
+    }
+
+    // A row of the picker was tapped. A row that cannot be used leaves the picker open and says why in the header.
+    private void OnPick(PickerSource source)
+    {
+        var choice = Picker().Choose(source);
+        Begin(choice);
+    }
+
+    private void Begin(PickerChoice choice)
+    {
+        switch (choice.Started)
+        {
+            case PickerSource.Plate:
+                LaunchPlate();
+                break;
+            case PickerSource.TypeIn:
+                OpenTyping();
+                break;
+            default:
+                // Nothing started: the row's own sentence says why, and a row that is not there says nothing.
+                notice = choice.Sentence;
+                RaiseChanged();
+                break;
+        }
+    }
+
+    // ---- typing a card in ----
+
+    private void OpenTyping()
+    {
+        notice = null;
+        typing = true;
+        RaiseChanged();
+    }
+
+    // Let go: the fields empty at once and the dog-ear holds the words for its window; a fold turned brings them back.
+    private void LetGoOfTyping()
+    {
+        ConnectionNoticeBoard.With(board =>
+        {
+            typedUndo.Begin(board, typed, DateTimeOffset.UtcNow);
+            return true;
+        });
+        typing = false;
+        notice = null;
+        RaiseChanged();
+        ScheduleExpiry();
+    }
+
+    // Check the card: the three fields become the same words a scan gives and take the same checking step.
+    private void CheckTyping()
+    {
+        var read = typed.Read();
+        if (read.Payload is not { } payload)
+        {
+            notice = read.Sentence;
+            RaiseChanged();
+            return;
+        }
+
+        typing = false;
+        TakeDraft(ScanConfirmModel.From(payload, null, ScanOrigin.Typed), null);
+    }
+
     // Opens Plate. A draft already on the page stays until a new read replaces it, so backing out of Plate loses nothing.
     private void StartScan()
+    {
+        if (scanBusy)
+        {
+            return;
+        }
+
+        Begin(Picker().ScanChoice());
+    }
+
+    private void LaunchPlate()
     {
         if (scanBusy)
         {
@@ -419,6 +554,11 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
                 break;
             case ScanReturn.Refused refused:
                 notice = refused.Sentence;
+                RaiseChanged();
+                break;
+            case ScanReturn.Cancelled:
+                // Said in a sentence, so a button that seemed to do nothing does not look broken. A draft on the page is untouched.
+                notice = ScanReturns.CancelledSentence(scan is not null);
                 RaiseChanged();
                 break;
         }
@@ -527,6 +667,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         {
             // The card is in the box now; the page goes back to the box and reads it again, so the card shows in its pile.
             scan = null;
+            typed.Clear();
             notice = null;
             view = MealsView.RecipeBox;
             Load();
@@ -582,6 +723,17 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     /// <summary>The shell turned the fold and the board gave back this act: the card goes back to where it was filed.</summary>
     public void UndoTurned(string actKey)
     {
+        if (typedUndo.Reverse(actKey) is { } words)
+        {
+            // The words that were let go come back into the fields, and the page with them.
+            typed.Title = words.Title;
+            typed.IngredientsText = words.IngredientsText;
+            typed.StepsText = words.StepsText;
+            typing = true;
+            handler.RemoveCallbacksAndMessages(null);
+            return;
+        }
+
         if (scanUndo.Reverse(actKey) is { } brought)
         {
             // The draft the owner scanned over comes back; the read that replaced it is let go.
@@ -625,7 +777,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
     private void ScheduleExpiry()
     {
-        if (undo.Pending is null && scanUndo.Pending is null)
+        if (undo.Pending is null && scanUndo.Pending is null && typedUndo.Pending is null)
         {
             return;
         }
@@ -643,5 +795,6 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         var now = DateTimeOffset.UtcNow;
         undo.Expire(now);
         scanUndo.Expire(now);
+        typedUndo.Expire(now);
     }
 }
