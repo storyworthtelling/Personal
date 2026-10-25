@@ -34,7 +34,7 @@ internal static class GroceryData
 
     public static readonly IReadOnlyList<Recipe> Cards = [Chili, Chicken, Pasta];
 
-    /// <summary>Chili on Monday, chicken on Tuesday, pasta on Wednesday; the rest of the week is nothing.</summary>
+    /// <summary>Chili on Sunday, chicken on Monday, pasta on Tuesday; the rest of the week is nothing.</summary>
     public static MealWeek ThreeDinners() => MealPlacementData.WeekOf(
         MealPlacementData.CookedOn(0, Chili, Sam, 45),
         MealPlacementData.CookedOn(1, Chicken, Lee, 45),

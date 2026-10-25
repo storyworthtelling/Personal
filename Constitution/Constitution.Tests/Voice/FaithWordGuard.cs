@@ -81,7 +81,7 @@ internal static class SeatSweep
         }
 
         var week = Enum.GetValues<DayOfWeek>();
-        foreach (var weekOf in new[] { new DateOnly(2026, 11, 16), new DateOnly(2026, 12, 21), new DateOnly(2027, 4, 5) })
+        foreach (var weekOf in new[] { new DateOnly(2026, 11, 15), new DateOnly(2026, 12, 20), new DateOnly(2027, 4, 4) })
         {
             requests.Add(SeatFacts.MealSheetIntro(new MealWeekFacts(weekOf, [], [])));
             foreach (var day in week)

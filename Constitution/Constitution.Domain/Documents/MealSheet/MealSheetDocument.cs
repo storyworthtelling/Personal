@@ -5,7 +5,7 @@ using Constitution.Domain.Time;
 namespace Constitution.Domain.Documents;
 
 /// <summary>
-/// Page 1 of the weekly meal sheet (book p.7, treatment B): a row per evening, each with a YES box under which "YES" is
+/// Page 1 of the weekly meal sheet (book p.7, treatment B): a row per evening in the planning week's order (Sunday to Saturday), each with a YES box under which "YES" is
 /// written, the day, the dish, who cooks and when, any outlined-word marker, and the shaded "No, because" field at the
 /// other end of the row. Every box comes from <see cref="InkTargets"/> and every id from <see cref="MealSheetIds"/>, so
 /// the ink reader reads the instances the painter drew. Silence approves at <see cref="MealSheetModel.Deadline"/>;
@@ -120,8 +120,8 @@ public static class MealSheetDocument
 
     private static void Footer(PageDraft draft, MealSheetModel model)
     {
-        var monday = model.Week.WeekStart.ToDateTime(TimeOnly.MinValue).ToString("MMM d", CultureInfo.InvariantCulture);
-        draft.Line(PrintedRole.Small, PageDraft.Left, 578f, 300f, $"Constitution · Meals · week of {monday} · both tablets", name: "footer");
+        var weekOf = model.Week.WeekStart.ToDateTime(TimeOnly.MinValue).ToString("MMM d", CultureInfo.InvariantCulture);
+        draft.Line(PrintedRole.Small, PageDraft.Left, 578f, 300f, $"Constitution · Meals · week of {weekOf} · both tablets", name: "footer");
         draft.Line(
             PrintedRole.Small, PageDraft.RightEdge - 100f, 578f, 100f,
             $"1 of {model.Pages.ToString(CultureInfo.InvariantCulture)}", PrintedAlign.Right, name: "page-number");

@@ -10,7 +10,7 @@ namespace Constitution.Tests.MealSheet;
 public class MealSheetPageTests
 {
     private static readonly DayOfWeek[] Week =
-        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+        [DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday];
 
     private static string Rendered(InkPageLayout page)
     {
@@ -65,7 +65,7 @@ public class MealSheetPageTests
 
         Assert.Equal("Dinners", page.Title);
         Assert.Contains("WEEKLY MEAL SHEET · 1 OF 5", text);
-        Assert.Contains("Constitution · Meals · week of Nov 16 · both tablets", text);
+        Assert.Contains("Constitution · Meals · week of Nov 15 · both tablets", text);
         Assert.Equal("1 of 5", page.Printed.Single(i => i.Name == "page-number").Text);
     }
 
@@ -140,7 +140,7 @@ public class MealSheetPageTests
     public void ALongCookNameWrapsAndStillFits()
     {
         var dinners = MealSheetSamples.Dinners().ToList();
-        var day = MealSheetSamples.Monday.AddDays(6);
+        var day = MealSheetSamples.Sunday.AddDays(6);
         var start = new DateTimeOffset(day.Year, day.Month, day.Day, 18, 5, 0, TimeSpan.FromHours(-5));
         dinners[6] = DinnerChoice.Cooked(day, MealSheetSamples.Id("veggie-fried-rice"), "Alexandria-Josephine", start, start.AddHours(1), false, false, "Planned.");
         var page = MealSheetSamples.Page(MealSheetSamples.Model(dinners));
@@ -174,8 +174,8 @@ public class MealSheetPageTests
     public void LeftoversAndNothingPlannedRows()
     {
         var dinners = MealSheetSamples.Dinners().ToList();
-        dinners[5] = DinnerChoice.Leftovers(MealSheetSamples.Monday.AddDays(5), "Thursday's pan makes enough.");
-        dinners[6] = DinnerChoice.NothingPlanned(MealSheetSamples.Monday.AddDays(6), "Company comes.");
+        dinners[5] = DinnerChoice.Leftovers(MealSheetSamples.Sunday.AddDays(5), "Thursday's pan makes enough.");
+        dinners[6] = DinnerChoice.NothingPlanned(MealSheetSamples.Sunday.AddDays(6), "Company comes.");
         var page = MealSheetSamples.Page(MealSheetSamples.Model(dinners));
         var text = Rendered(page);
 
@@ -293,7 +293,7 @@ public class MealSheetPageTests
     [Fact]
     public void AWeekThatWasNotPlannedHasNoSheet()
     {
-        var model = MealSheetSamples.Model() with { Week = MealWeek.NotPlanned(MealSheetSamples.Monday, MealStop.BoxTooSmall, "Fewer than ten cards.") };
+        var model = MealSheetSamples.Model() with { Week = MealWeek.NotPlanned(MealSheetSamples.Sunday, MealStop.BoxTooSmall, "Fewer than ten cards.") };
 
         Assert.Throws<ArgumentException>(() => MealSheetDocument.Build(model));
     }
@@ -311,10 +311,10 @@ public class MealSheetPageTests
     public void TheIdsAreFrozenLiterals()
     {
         Assert.Equal(
-            ["dinner-mon-yes", "dinner-tue-yes", "dinner-wed-yes", "dinner-thu-yes", "dinner-fri-yes", "dinner-sat-yes", "dinner-sun-yes"],
+            ["dinner-sun-yes", "dinner-mon-yes", "dinner-tue-yes", "dinner-wed-yes", "dinner-thu-yes", "dinner-fri-yes", "dinner-sat-yes"],
             Week.Select(MealSheetIds.DinnerYes));
         Assert.Equal(
-            ["dinner-mon-why", "dinner-tue-why", "dinner-wed-why", "dinner-thu-why", "dinner-fri-why", "dinner-sat-why", "dinner-sun-why"],
+            ["dinner-sun-why", "dinner-mon-why", "dinner-tue-why", "dinner-wed-why", "dinner-thu-why", "dinner-fri-why", "dinner-sat-why"],
             Week.Select(MealSheetIds.DinnerReason));
     }
 }

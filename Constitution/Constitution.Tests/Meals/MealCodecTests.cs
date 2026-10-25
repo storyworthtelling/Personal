@@ -20,12 +20,18 @@ public class MealCodecTests
     [Fact]
     public void TheCookBlockKeepsItsOffset()
     {
-        var week = MealPlanner.Plan(Request());
+        // A week begins on a Sunday, so the clocks go back on the first evening of a week and not within one: each week keeps
+        // the offset it was planned in, daylight time before the change and standard time from it.
+        var before = MealPlanner.Plan(Request());
+        var after = MealPlanner.Plan(Request(weekStart: Sunday.AddDays(7)));
 
-        var read = Assert.IsType<MealWeekRead.Read>(MealWeekCodec.Read(MealWeekCodec.Write(week)));
+        var readBefore = Assert.IsType<MealWeekRead.Read>(MealWeekCodec.Read(MealWeekCodec.Write(before)));
+        var readAfter = Assert.IsType<MealWeekRead.Read>(MealWeekCodec.Read(MealWeekCodec.Write(after)));
 
-        Assert.Equal(TimeSpan.FromHours(-4), read.Week.Dinners[0].CookEnd!.Value.Offset);
-        Assert.Equal(TimeSpan.FromHours(-5), read.Week.Dinners[6].CookEnd!.Value.Offset);
+        Assert.Equal(TimeSpan.FromHours(-4), readBefore.Week.Dinners[0].CookEnd!.Value.Offset);
+        Assert.Equal(TimeSpan.FromHours(-4), readBefore.Week.Dinners[6].CookEnd!.Value.Offset);
+        Assert.Equal(TimeSpan.FromHours(-5), readAfter.Week.Dinners[0].CookEnd!.Value.Offset);
+        Assert.Equal(TimeSpan.FromHours(-5), readAfter.Week.Dinners[6].CookEnd!.Value.Offset);
     }
 
     [Fact]
@@ -33,15 +39,15 @@ public class MealCodecTests
     {
         var dinners = new[]
         {
-            DinnerChoice.Leftovers(Monday, "Last night's."),
-            DinnerChoice.EatOut(Monday.AddDays(1), "Out."),
-            DinnerChoice.NothingPlanned(Monday.AddDays(2), "Free."),
-            DinnerChoice.Cooked(Monday.AddDays(3), Id("onion-tart"), Lee, Edt(10, 29, 17), Edt(10, 29, 18), true, true, "New."),
-            DinnerChoice.NothingPlanned(Monday.AddDays(4), "Free."),
-            DinnerChoice.NothingPlanned(Monday.AddDays(5), "Free."),
-            DinnerChoice.NothingPlanned(Monday.AddDays(6), "Free."),
+            DinnerChoice.Leftovers(Sunday, "Last night's."),
+            DinnerChoice.EatOut(Sunday.AddDays(1), "Out."),
+            DinnerChoice.NothingPlanned(Sunday.AddDays(2), "Free."),
+            DinnerChoice.Cooked(Sunday.AddDays(3), Id("onion-tart"), Lee, Edt(10, 29, 17), Edt(10, 29, 18), true, true, "New."),
+            DinnerChoice.NothingPlanned(Sunday.AddDays(4), "Free."),
+            DinnerChoice.NothingPlanned(Sunday.AddDays(5), "Free."),
+            DinnerChoice.NothingPlanned(Sunday.AddDays(6), "Free."),
         };
-        var week = MealWeek.Planned(Monday, dinners, ["A note."]);
+        var week = MealWeek.Planned(Sunday, dinners, ["A note."]);
 
         var read = Assert.IsType<MealWeekRead.Read>(MealWeekCodec.Read(MealWeekCodec.Write(week)));
 
@@ -54,7 +60,7 @@ public class MealCodecTests
     [Fact]
     public void AStoppedWeekRoundTrips()
     {
-        var week = MealWeek.NotPlanned(Monday, MealStop.CalendarUnreadable, "A calendar could not be read.");
+        var week = MealWeek.NotPlanned(Sunday, MealStop.CalendarUnreadable, "A calendar could not be read.");
 
         var read = Assert.IsType<MealWeekRead.Read>(MealWeekCodec.Read(MealWeekCodec.Write(week)));
 
@@ -67,10 +73,10 @@ public class MealCodecTests
     public void TheStoredWordsAreFrozenLiterals()
     {
         var json = MealWeekCodec.Write(MealPlanner.Plan(Request()));
-        var stopped = MealWeekCodec.Write(MealWeek.NotPlanned(Monday, MealStop.BoxTooSmall, "Few."));
+        var stopped = MealWeekCodec.Write(MealWeek.NotPlanned(Sunday, MealStop.BoxTooSmall, "Few."));
 
         Assert.Contains("\"kind\":\"cooked\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"weekStart\":\"2026-10-26\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"weekStart\":\"2026-10-25\"", json, StringComparison.Ordinal);
         Assert.Contains("\"stop\":\"boxTooSmall\"", stopped, StringComparison.Ordinal);
         Assert.DoesNotContain("rigin", json, StringComparison.Ordinal);
     }
@@ -102,7 +108,7 @@ public class MealCodecTests
     [Fact]
     public void UnknownFieldsAreTolerated()
     {
-        var json = MealWeekCodec.Write(MealWeek.NotPlanned(Monday, MealStop.BoxTooSmall, "Few.")).Replace("{\"version\"", "{\"later\":{\"x\":1},\"version\"", StringComparison.Ordinal);
+        var json = MealWeekCodec.Write(MealWeek.NotPlanned(Sunday, MealStop.BoxTooSmall, "Few.")).Replace("{\"version\"", "{\"later\":{\"x\":1},\"version\"", StringComparison.Ordinal);
 
         Assert.IsType<MealWeekRead.Read>(MealWeekCodec.Read(json));
     }
@@ -123,7 +129,7 @@ public class MealCodecTests
     {
         var json = MealHistoryCodec.Write(Cooked(("tomato-pasta", 3)));
 
-        Assert.Equal("{\"version\":1,\"meals\":[{\"recipe\":\"tomato-pasta\",\"day\":\"2026-10-23\"}]}", json);
+        Assert.Equal("{\"version\":1,\"meals\":[{\"recipe\":\"tomato-pasta\",\"day\":\"2026-10-22\"}]}", json);
     }
 
     [Theory]

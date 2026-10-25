@@ -24,7 +24,7 @@ public class MealWeekPropertyTests
         var count = random.Next(0, 9);
         for (var index = 0; index < count; index++)
         {
-            var day = Monday.AddDays(random.Next(0, 7));
+            var day = Sunday.AddDays(random.Next(0, 7));
             var from = random.Next(14, 21);
             var to = Math.Min(23, from + random.Next(1, 4));
             var minute = random.Next(0, 2) * 30;
@@ -47,10 +47,10 @@ public class MealWeekPropertyTests
                 .Select(index => Dish("dish-" + index, Cuisines.All[random.Next(Cuisines.All.Count)], forKids: random.Next(3) == 0, minutes: random.Next(5, 200)))
                 .ToList();
             var history = Enumerable.Range(0, random.Next(0, 22))
-                .Select(_ => new CookedMeal(cards[random.Next(cards.Count)].Id, Monday.AddDays(-random.Next(1, 40))))
+                .Select(_ => new CookedMeal(cards[random.Next(cards.Count)].Id, Sunday.AddDays(-random.Next(1, 40))))
                 .ToList();
             var soon = cards.Where(_ => random.Next(6) == 0).Select(card => card.Id);
-            var children = Enumerable.Range(0, 7).Where(_ => random.Next(2) == 0).Select(offset => Monday.AddDays(offset)).ToHashSet();
+            var children = Enumerable.Range(0, 7).Where(_ => random.Next(2) == 0).Select(offset => Sunday.AddDays(offset)).ToHashSet();
             var vetoes = cards.Where(_ => random.Next(8) == 0).ToDictionary(card => card.Id, _ => (IReadOnlySet<string>)new HashSet<string> { random.Next(3) switch { 0 => Sam, 1 => Lee, _ => Robin } });
             var request = Request(RandomEntries(random), RandomEntries(random), RandomEntries(random), cards, children, soon, history, vetoes, null, seed);
 

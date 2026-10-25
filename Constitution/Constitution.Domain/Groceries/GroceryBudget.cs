@@ -48,7 +48,7 @@ public sealed record GroceryBudgetStatus
 /// </summary>
 public static class GroceryBudget
 {
-    /// <summary>The month a week's groceries are counted in: the month its Monday falls in, as <c>yyyy-MM</c>.</summary>
+    /// <summary>The month a week's groceries are counted in: the month the day falls in, as <c>yyyy-MM</c>. Callers pass the week's first day, the Sunday it opens on.</summary>
     public static string MonthOf(DateOnly day) => day.ToString("yyyy-MM", CultureInfo.InvariantCulture);
 
     /// <exception cref="ArgumentException">The month is not <c>yyyy-MM</c>.</exception>

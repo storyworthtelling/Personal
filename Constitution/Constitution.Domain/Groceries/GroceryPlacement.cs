@@ -12,7 +12,7 @@ public sealed record GroceryTripOptions
     /// <summary>Nine in the morning to five in the afternoon, before the family dinner.</summary>
     public static readonly DayPart DefaultDaytime = new(new TimeOnly(9, 0), TimeSpan.FromHours(8));
 
-    /// <summary>The trip reaches back at most this many days from Monday (Friday, Saturday, Sunday).</summary>
+    /// <summary>The trip reaches back at most this many days from the Sunday the week opens on (the Thursday, Friday and Saturday before it).</summary>
     public const int DefaultDaysBefore = 3;
 
     private TimeSpan length = DefaultLength;
@@ -52,7 +52,7 @@ public sealed record GroceryTripOptions
 /// anywhere in its windows, or a calendar nobody could read (which is never taken as free time). Then the next adult is asked, and if
 /// nobody has room the trip stays with the one whose week it is, so the engine says plainly that it could not be placed.
 ///
-/// <para>The trip goes <b>after approval and before Monday</b>: one window per day from the day of approval to the Sunday, the
+/// <para>The trip goes <b>after approval and before the week opens</b>: one window per day from the day of approval to the Saturday, the
 /// daytime of each day cut to start no earlier than the approval, tried latest day first (the freshest shop). Its identity is
 /// "groceries", the same every week, so the key (person, week, identity) never holds a date and a trip the owner moves is found again.</para>
 /// </summary>
@@ -63,11 +63,11 @@ public static class GroceryPlacement
 
     public const string Title = "Groceries";
 
-    /// <param name="weekStart">The Monday of the week being shopped for. Its week number decides whose turn it is.</param>
-    /// <param name="people">Each adult's busy time, covering the days before the Monday. Anyone not here cannot shop.</param>
+    /// <param name="weekStart">The Sunday the week being shopped for opens on (<see cref="PlanningWeek"/>). Its week number decides whose turn it is.</param>
+    /// <param name="people">Each adult's busy time, covering the days before the Sunday. Anyone not here cannot shop.</param>
     /// <param name="approvedAt">When the week was approved; the trip is never before it.</param>
-    /// <returns>The request, or null when no daytime is left between approval and Monday.</returns>
-    /// <exception cref="ArgumentException">The week does not begin on a Monday.</exception>
+    /// <returns>The request, or null when no daytime is left between approval and the week.</returns>
+    /// <exception cref="ArgumentException">The week does not begin on a Sunday.</exception>
     public static HouseholdEventRequest? Request(
         DateOnly weekStart,
         PlanningRules rules,
@@ -77,10 +77,7 @@ public static class GroceryPlacement
     {
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(people);
-        if (weekStart.DayOfWeek != DayOfWeek.Monday)
-        {
-            throw new ArgumentException("A shopping week begins on a Monday.", nameof(weekStart));
-        }
+        PlanningWeek.RequireStart(weekStart, nameof(weekStart));
 
         var chosen = options ?? new GroceryTripOptions();
         var windows = Windows(weekStart, rules, approvedAt, chosen);

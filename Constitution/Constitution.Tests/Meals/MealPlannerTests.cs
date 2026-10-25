@@ -18,7 +18,7 @@ public class MealPlannerTests
 
         Assert.True(week.IsPlanned);
         Assert.Equal(7, week.Dinners.Count);
-        Assert.Equal(Enumerable.Range(0, 7).Select(offset => Monday.AddDays(offset)), week.Dinners.Select(dinner => dinner.Day));
+        Assert.Equal(Enumerable.Range(0, 7).Select(offset => Sunday.AddDays(offset)), week.Dinners.Select(dinner => dinner.Day));
         Assert.All(Cooks(week), dinner => Assert.Contains(request.Recipes, recipe => recipe.Id == dinner.Recipe));
         Assert.Equal(7, Cooks(week).Count());
     }
@@ -54,7 +54,7 @@ public class MealPlannerTests
     [Fact]
     public void NoStretchWhenEveryCardWasCookedLately()
     {
-        var history = Box().Select((recipe, index) => new CookedMeal(recipe.Id, Monday.AddDays(-15 - index))).ToList();
+        var history = Box().Select((recipe, index) => new CookedMeal(recipe.Id, Sunday.AddDays(-15 - index))).ToList();
 
         var week = MealPlanner.Plan(Request(history: history));
 
@@ -98,7 +98,7 @@ public class MealPlannerTests
     [Fact]
     public void ADishAlreadyPlannedForAWeekAheadBlocksToo()
     {
-        var future = new List<CookedMeal> { new(Id("roast-chicken"), Monday.AddDays(10)) };
+        var future = new List<CookedMeal> { new(Id("roast-chicken"), Sunday.AddDays(10)) };
 
         var week = MealPlanner.Plan(Request(soon: [Id("roast-chicken")], history: future));
 
@@ -161,7 +161,7 @@ public class MealPlannerTests
     [Fact]
     public void ACookIsNeverPlacedOnBlockedTime()
     {
-        var monday = Monday;
+        var monday = Sunday;
         var request = Request(
             sam: [On(monday, "Dentist", 16, 30, 18, 0)],
             lee: [On(monday, "Class", 17, 0, 18, 0)]);
@@ -174,7 +174,7 @@ public class MealPlannerTests
     [Fact]
     public void WhoeverIsFreeCooks()
     {
-        var request = Request(sam: [On(Monday, "Dentist", 16, 30, 18, 0)]);
+        var request = Request(sam: [On(Sunday, "Dentist", 16, 30, 18, 0)]);
 
         var week = MealPlanner.Plan(request);
 
@@ -194,7 +194,7 @@ public class MealPlannerTests
     [Fact]
     public void WhenNobodyIsFreeNothingIsPlannedAndItSaysWhy()
     {
-        var blocked = new[] { On(Monday, "Away", 15, 0, 17, 59) };
+        var blocked = new[] { On(Sunday, "Away", 15, 0, 17, 59) };
 
         var week = MealPlanner.Plan(Request(sam: blocked, lee: blocked));
 
@@ -206,7 +206,7 @@ public class MealPlannerTests
     [Fact]
     public void WhenNobodyIsHomeNothingIsPlanned()
     {
-        var out2 = new[] { On(Monday, "Away", 17, 30, 20, 0) };
+        var out2 = new[] { On(Sunday, "Away", 17, 30, 20, 0) };
 
         var week = MealPlanner.Plan(Request(sam: out2, lee: out2));
 
@@ -217,7 +217,7 @@ public class MealPlannerTests
     [Fact]
     public void LeftoversFollowACookedEvening()
     {
-        var blocked = new[] { On(Monday.AddDays(1), "Away", 15, 0, 17, 59) };
+        var blocked = new[] { On(Sunday.AddDays(1), "Away", 15, 0, 17, 59) };
 
         var week = MealPlanner.Plan(Request(sam: blocked, lee: blocked));
 
@@ -229,7 +229,7 @@ public class MealPlannerTests
     [Fact]
     public void LeftoversNeverFollowLeftovers()
     {
-        var blocked = Enumerable.Range(1, 2).Select(offset => On(Monday.AddDays(offset), "Away", 15, 0, 17, 59)).ToList();
+        var blocked = Enumerable.Range(1, 2).Select(offset => On(Sunday.AddDays(offset), "Away", 15, 0, 17, 59)).ToList();
 
         var week = MealPlanner.Plan(Request(sam: blocked, lee: blocked));
 
@@ -240,7 +240,7 @@ public class MealPlannerTests
     [Fact]
     public void TheRulesNeverPlanEatingOut()
     {
-        var blocked = Enumerable.Range(0, 7).Select(offset => On(Monday.AddDays(offset), "Away", 15, 0, 17, 59)).ToList();
+        var blocked = Enumerable.Range(0, 7).Select(offset => On(Sunday.AddDays(offset), "Away", 15, 0, 17, 59)).ToList();
 
         var week = MealPlanner.Plan(Request(sam: blocked, lee: blocked));
 
@@ -273,7 +273,7 @@ public class MealPlannerTests
     public void ACalendarThatMissesPartOfTheWeekPlansNothing()
     {
         var rules = Rules();
-        var shortWindow = rules.Adults.Select(adult => BusyTime.For(adult.Name, Monday, Monday.AddDays(3), rules, Calendars())).ToList();
+        var shortWindow = rules.Adults.Select(adult => BusyTime.For(adult.Name, Sunday, Sunday.AddDays(3), rules, Calendars())).ToList();
 
         var week = MealPlanner.Plan(Request() with { AdultTime = shortWindow });
 
@@ -316,12 +316,12 @@ public class MealPlannerTests
     {
         var recipes = Box();
         var vetoes = recipes.ToDictionary(recipe => recipe.Id, recipe => (IReadOnlySet<string>)new HashSet<string> { Sam });
-        var samOut = new[] { On(Monday.AddDays(1), "Concert", 17, 0, 21, 0) };
+        var samOut = new[] { On(Sunday.AddDays(1), "Concert", 17, 0, 21, 0) };
 
         var week = MealPlanner.Plan(Request(sam: samOut, neverAgain: vetoes));
 
         var cooked = Cooks(week).ToList();
-        Assert.Equal([Monday.AddDays(1)], cooked.Select(dinner => dinner.Day));
+        Assert.Equal([Sunday.AddDays(1)], cooked.Select(dinner => dinner.Day));
         Assert.Equal(Lee, cooked[0].Cook);
     }
 
@@ -373,7 +373,8 @@ public class MealPlannerTests
 
         Assert.Equal(DinnerKind.NothingPlanned, week.Dinners[0].Kind);
         Assert.Equal(DinnerKind.NothingPlanned, week.Dinners[1].Kind);
-        Assert.Equal(DinnerKind.Cooked, week.Dinners[2].Kind);
+        Assert.Equal(DinnerKind.NothingPlanned, week.Dinners[2].Kind);
+        Assert.Equal(DinnerKind.Cooked, week.Dinners[3].Kind);
     }
 
     [Fact]
@@ -413,11 +414,11 @@ public class MealPlannerTests
     }
 
     [Fact]
-    public void AWeekMustStartOnAMonday()
+    public void AWeekMustStartOnASunday()
     {
-        var tuesday = Monday.AddDays(1);
+        var monday = Sunday.AddDays(1);
 
-        Assert.Throws<ArgumentException>(() => new MealWeekRequest(tuesday, Box(), Rules(), AdultTime(Rules(), Calendars())));
+        Assert.Throws<ArgumentException>(() => new MealWeekRequest(monday, Box(), Rules(), AdultTime(Rules(), Calendars())));
     }
 
     [Fact]

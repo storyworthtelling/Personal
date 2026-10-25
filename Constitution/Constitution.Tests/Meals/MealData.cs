@@ -8,8 +8,8 @@ namespace Constitution.Tests.MealPlanning;
 /// <summary>Invented dishes and an invented week for the dinner planner tests. Nothing here is a real recipe or a real evening.</summary>
 internal static class MealData
 {
-    /// <summary>The Sunday before the week starts, at noon: nothing has passed.</summary>
-    public static readonly DateTimeOffset SundayNoon = Edt(10, 25, 12);
+    /// <summary>The Saturday before the week starts, at noon: nothing has passed.</summary>
+    public static readonly DateTimeOffset SaturdayNoon = Edt(10, 24, 12);
 
     public static Recipe Dish(string id, Cuisine cuisine, bool forKids = false, int minutes = 40) => new(
         new RecipeId(id),
@@ -38,7 +38,7 @@ internal static class MealData
         Dish("veggie-stew", Cuisine.Other),
     ];
 
-    public static IReadOnlySet<DateOnly> AllEvenings() => Enumerable.Range(0, 7).Select(offset => Monday.AddDays(offset)).ToHashSet();
+    public static IReadOnlySet<DateOnly> AllEvenings() => Enumerable.Range(0, 7).Select(offset => Sunday.AddDays(offset)).ToHashSet();
 
     /// <summary>A request over an invented week. Calendars are plain lists of entries; the rest is optional.</summary>
     public static MealWeekRequest Request(
@@ -53,26 +53,28 @@ internal static class MealData
         decimal? budget = null,
         int seed = 1,
         DateTimeOffset? now = null,
-        HouseholdCalendarSnapshot? calendars = null)
+        HouseholdCalendarSnapshot? calendars = null,
+        DateOnly? weekStart = null)
     {
+        var start = weekStart ?? Sunday;
         var rules = Rules();
         var snapshot = calendars ?? Calendars(sam, lee, family);
         return new MealWeekRequest(
-            Monday,
+            start,
             recipes ?? Box(),
             rules,
-            AdultTime(rules, snapshot),
+            AdultTime(rules, snapshot, start),
             childrenHome ?? new HashSet<DateOnly>(),
             soon?.ToHashSet() ?? new HashSet<RecipeId>(),
             history,
             neverAgain,
             budget,
             seed,
-            now ?? SundayNoon);
+            now ?? SaturdayNoon);
     }
 
-    public static List<BusyTime> AdultTime(PlanningRules rules, IHouseholdCalendars calendars) =>
-        rules.Adults.Select(adult => BusyTime.For(adult.Name, Monday, Monday.AddDays(6), rules, calendars)).ToList();
+    public static List<BusyTime> AdultTime(PlanningRules rules, IHouseholdCalendars calendars, DateOnly? weekStart = null) =>
+        rules.Adults.Select(adult => BusyTime.For(adult.Name, weekStart ?? Sunday, (weekStart ?? Sunday).AddDays(6), rules, calendars)).ToList();
 
     public static CalendarEntry On(DateOnly day, string title, int fromHour, int fromMinute, int toHour, int toMinute) =>
         CalendarEntry.Timed(title, Edt(day.Month, day.Day, fromHour, fromMinute), Edt(day.Month, day.Day, toHour, toMinute));
@@ -80,7 +82,7 @@ internal static class MealData
     public static RecipeId Id(string value) => new(value);
 
     public static IReadOnlyList<CookedMeal> Cooked(params (string Recipe, int DaysBeforeMonday)[] meals) =>
-        meals.Select(meal => new CookedMeal(Id(meal.Recipe), Monday.AddDays(-meal.DaysBeforeMonday))).ToList();
+        meals.Select(meal => new CookedMeal(Id(meal.Recipe), Sunday.AddDays(-meal.DaysBeforeMonday))).ToList();
 
     public static IReadOnlyDictionary<RecipeId, IReadOnlySet<string>> Never(string recipe, params string[] people) =>
         new Dictionary<RecipeId, IReadOnlySet<string>> { [Id(recipe)] = people.ToHashSet() };

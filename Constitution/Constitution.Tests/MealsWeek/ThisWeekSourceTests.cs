@@ -105,6 +105,24 @@ public class ThisWeekSourceTests
     }
 
     [Fact]
+    public void EarlierDaysAreDimmedFromTheModel()
+    {
+        var page = Read("Constitution.Android/MealsTab/ThisWeekPage.cs");
+
+        Assert.Contains("line.IsPast", page, StringComparison.Ordinal);
+        Assert.Contains("PaperTheme.InkMuted", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheWeekIsListedInTheOrderTheModelGivesIt()
+    {
+        var page = Read("Constitution.Android/MealsTab/ThisWeekPage.cs");
+
+        Assert.Contains("foreach (var line in model.Days)", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("OrderBy", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AReceiptIsDrawnForAnEveningOut()
     {
         var page = Read("Constitution.Android/Today/TodayPage.cs");

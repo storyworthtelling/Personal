@@ -36,7 +36,7 @@ public sealed record WeekLine(
 
 /// <summary>
 /// The Meals tab's first view as a pure model (C-6.7.1, book p.13): tonight on a large card, then the week on one card, a ruled
-/// line a day with today's in bold. Every sentence is here; the head paints. The week reads Monday to Sunday as drawn.
+/// line a day with today's in bold. Every sentence is here; the head paints. The week reads in the planning week's order, Sunday to Saturday.
 /// </summary>
 public sealed class MealsWeekModel
 {

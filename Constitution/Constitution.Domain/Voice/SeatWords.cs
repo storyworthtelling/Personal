@@ -1,3 +1,4 @@
+using Constitution.Domain.Calendar;
 using System.Globalization;
 
 namespace Constitution.Domain.Voice;
@@ -28,10 +29,10 @@ internal static class SeatWords
 
     public static string Meridiem(TimeOnly time) => time.Hour < 12 ? "AM" : "PM";
 
-    /// <summary>Days in the order of the week, Monday first, each once: "Tuesday, Thursday and Saturday".</summary>
+    /// <summary>Days in the order of the planning week, Sunday first, each once: "Sunday, Tuesday and Thursday".</summary>
     public static string Days(IEnumerable<DayOfWeek> days)
     {
-        var names = days.Distinct().OrderBy(day => ((int)day + 6) % 7)
+        var names = days.Distinct().OrderBy(PlanningWeek.Position)
             .Select(day => day.ToString()).ToList();
         return names.Count <= 1
             ? string.Concat(names)

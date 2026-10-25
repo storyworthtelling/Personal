@@ -73,7 +73,7 @@ public class MealFallbackTests
         var request = Request();
         var planned = MealPlanner.Plan(request);
         var bad = MealWeek.Planned(
-            Monday,
+            Sunday,
             planned.Dinners.Select((dinner, index) => index == 1 ? DinnerChoice.Cooked(dinner.Day, planned.Dinners[0].Recipe!.Value, Sam, Edt(10, 27, 17), Edt(10, 27, 18), false, false, "Again.") : dinner));
         var log = new FakeLog();
 
@@ -90,7 +90,7 @@ public class MealFallbackTests
     public async Task AnAuthoredWeekThatIsNotAWeekIsReplaced()
     {
         var request = Request();
-        var empty = MealWeek.NotPlanned(Monday, MealStop.BoxTooSmall, "Nothing.");
+        var empty = MealWeek.NotPlanned(Sunday, MealStop.BoxTooSmall, "Nothing.");
 
         var outcome = await new MealWithFallback(new FakeAuthor(_ => new MealAuthorResult.Authored(empty)), new FakeLog()).PlanAsync(request, CancellationToken.None);
 

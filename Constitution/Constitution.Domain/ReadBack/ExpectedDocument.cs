@@ -134,7 +134,7 @@ public sealed partial class ExpectedDocument
     }
 
     /// <summary>
-    /// The rules of the dinners page as <see cref="MealSheetDocument"/> draws it: one <see cref="MealItemRule"/> per evening,
+    /// The rules of the dinners page as <see cref="MealSheetDocument"/> draws it: one <see cref="MealItemRule"/> per evening in the sheet's own order (the planning week's, Sunday to Saturday),
     /// tick or written reason, approved by silence at the model's deadline. Later pages of the sheet add their own rules.
     /// </summary>
     public static ExpectedDocument ForMealSheet(MealSheetModel model, string person)

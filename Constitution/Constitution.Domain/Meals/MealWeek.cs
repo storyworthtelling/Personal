@@ -1,3 +1,5 @@
+using Constitution.Domain.Calendar;
+
 namespace Constitution.Domain.Meals;
 
 /// <summary>Why no dinners were planned at all. A closed list; the sentence beside it is the plain-words version.</summary>
@@ -11,7 +13,7 @@ public enum MealStop
 }
 
 /// <summary>
-/// The week's dinners: seven evenings from a Monday, or nothing and the reason. This is the page model; it carries no origin
+/// The week's dinners: seven evenings from the Sunday the planning week opens on (<see cref="PlanningWeek"/>), or nothing and the reason. This is the page model; it carries no origin
 /// (see <see cref="MealOutcome"/>). Notes are week-level plain sentences ("no stretch dish this week").
 /// </summary>
 public sealed record MealWeek
@@ -45,11 +47,7 @@ public sealed record MealWeek
     {
         ArgumentNullException.ThrowIfNull(dinners);
         var list = dinners.ToList();
-        if (weekStart.DayOfWeek != DayOfWeek.Monday)
-        {
-            throw new ArgumentException("A meal week starts on a Monday.", nameof(weekStart));
-        }
-
+        PlanningWeek.RequireStart(weekStart, nameof(weekStart));
         if (list.Count != Evenings || list.Select((dinner, index) => dinner.Day == weekStart.AddDays(index)).Contains(false))
         {
             throw new ArgumentException("A planned week has one dinner for each of the seven evenings, in order.", nameof(dinners));

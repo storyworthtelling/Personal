@@ -8,8 +8,8 @@ namespace Constitution.Tests.MealsWeek;
 /// <summary>C-4.1.3: tonight's dinner on an index card, or a receipt when eating out (book p.11, D46). Invented facts.</summary>
 public class DinnerCardTests
 {
-    private static readonly DateOnly Tuesday = WeekFixture.Monday.AddDays(1);
-    private static readonly DateOnly Friday = WeekFixture.Monday.AddDays(4);
+    private static readonly DateOnly Tuesday = WeekFixture.Sunday.AddDays(2);
+    private static readonly DateOnly Friday = WeekFixture.Sunday.AddDays(5);
 
     private static DinnerClipping? For(DateOnly day) =>
         DinnerClipping.For(new MealWeekScreenRead.Ready(WeekFixture.Friday()), day);
@@ -51,7 +51,7 @@ public class DinnerCardTests
     [Fact]
     public void LeftoversAreAnIndexCard()
     {
-        var card = For(WeekFixture.Monday.AddDays(6))!;
+        var card = For(WeekFixture.Sunday)!;
 
         Assert.Equal(ScrapKind.IndexCard, card.Paper);
         Assert.Equal("Dinner", card.Kicker);
@@ -63,7 +63,7 @@ public class DinnerCardTests
     {
         Assert.Null(DinnerClipping.For(new MealWeekScreenRead.NoPlanYet(), Tuesday));
         Assert.Null(DinnerClipping.For(new MealWeekScreenRead.Unavailable("Not readable."), Tuesday));
-        Assert.Null(For(WeekFixture.Monday.AddDays(20)));
+        Assert.Null(For(WeekFixture.Sunday.AddDays(20)));
     }
 
     [Fact]

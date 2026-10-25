@@ -62,8 +62,8 @@ public class MealPlacementEngineTests
 
         Assert.Equal(7, plan.ToCreate.Count);
         Assert.Empty(plan.Unplaced);
-        var chiliOnMonday = Assert.Single(plan.ToCreate, item => item.Title == "Cook: chili" && item.Person == Sam && EveningOf(item.Start) == 0);
-        Assert.Equal((Clock(0, 17, 15), Clock(0, 18)), (chiliOnMonday.Start, chiliOnMonday.End));
+        var chiliOnTheFirstEvening = Assert.Single(plan.ToCreate, item => item.Title == "Cook: chili" && item.Person == Sam && EveningOf(item.Start) == 0);
+        Assert.Equal((Clock(0, 17, 15), Clock(0, 18)), (chiliOnTheFirstEvening.Start, chiliOnTheFirstEvening.End));
         Assert.All(plan.ToCreate, item => Assert.Equal(DinnerStart(EveningOf(item.Start)), item.End));
     }
 
@@ -82,7 +82,7 @@ public class MealPlacementEngineTests
     [Fact]
     public void ABlockNeverOverlapsBusyTime()
     {
-        // The planner found Monday free; since then a call has been put over the block. Nothing is squeezed in.
+        // The planner found Sunday free; since then a call has been put over the block. Nothing is squeezed in.
         var calendars = Calendars(sam: [Entry("Call", 0, (17, 30), (17, 45))]);
 
         var plan = Plan(RequestFor(WeekOf(CookedOn(0, Chili, Sam, 45), CookedOn(1, Pasta, Lee, 30)), calendars));
@@ -99,7 +99,7 @@ public class MealPlacementEngineTests
         // Work until half past five is never-placed time, not a calendar entry.
         var late = Rules(work: WorkSchedule.Read(LateShift));
 
-        var plan = Plan(RequestFor(WeekOf(CookedOn(0, Chili, Sam, 45)), rules: late));
+        var plan = Plan(RequestFor(WeekOf(CookedOn(1, Chili, Sam, 45)), rules: late));
 
         var refused = Assert.Single(plan.Unplaced);
         Assert.Equal(UnplacedReason.NoRoom, refused.Reason);
@@ -111,10 +111,10 @@ public class MealPlacementEngineTests
     {
         var late = Rules(work: WorkSchedule.Read(LateShift));
 
-        var plan = Plan(RequestFor(WeekOf(CookedOn(0, Pasta, Sam, 30)), rules: late));
+        var plan = Plan(RequestFor(WeekOf(CookedOn(1, Pasta, Sam, 30)), rules: late));
 
         var made = Assert.Single(plan.ToCreate);
-        Assert.Equal((Clock(0, 17, 30), Clock(0, 18)), (made.Start, made.End));
+        Assert.Equal((Clock(1, 17, 30), Clock(1, 18)), (made.Start, made.End));
     }
 
     [Fact]
@@ -244,7 +244,7 @@ public class MealPlacementEngineTests
 
         var request = MealCalendar.Request(week, House, Cards, people, PlanOfSessions([session]), Slow(Stew));
 
-        Assert.Equal(Monday, request.WeekStart);
+        Assert.Equal(Sunday, request.WeekStart);
         Assert.Same(people, request.People);
         Assert.Equal(MealCalendar.Requests(week, House, Cards, Slow(Stew)).Select(item => item.Identity), request.HouseholdEvents.Select(item => item.Identity));
         Assert.NotNull(request.Workouts);

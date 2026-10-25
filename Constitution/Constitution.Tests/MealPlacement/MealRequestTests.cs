@@ -28,7 +28,7 @@ public class MealRequestTests
     [Fact]
     public void ACookedDinnerIsOneCookEvent()
     {
-        var made = Assert.Single(Requests(WeekOf(CookedOn(1, Chili, Sam, 45))));
+        var made = Assert.Single(Requests(WeekOf(CookedOn(2, Chili, Sam, 45))));
 
         Assert.Equal("Cook: chili", made.Title);
         Assert.Equal(new[] { Sam }, made.People);
@@ -43,8 +43,8 @@ public class MealRequestTests
     {
         var week = WeekOf(
             CookedOn(0, Pasta, Lee, 30),
-            DinnerChoice.Leftovers(Monday.AddDays(1), "Leftovers from the evening before."),
-            DinnerChoice.EatOut(Monday.AddDays(2), "Dinner out."));
+            DinnerChoice.Leftovers(Sunday.AddDays(1), "Leftovers from the evening before."),
+            DinnerChoice.EatOut(Sunday.AddDays(2), "Dinner out."));
 
         var made = Assert.Single(Requests(week));
 
@@ -54,7 +54,7 @@ public class MealRequestTests
     [Fact]
     public void AWeekNotPlannedMakesNoEvents()
     {
-        var week = MealWeek.NotPlanned(Monday, MealStop.BoxTooSmall, "The recipe box has 3 of 10 cards, so no dinners are planned yet.");
+        var week = MealWeek.NotPlanned(Sunday, MealStop.BoxTooSmall, "The recipe box has 3 of 10 cards, so no dinners are planned yet.");
 
         Assert.Empty(Requests(week));
     }
@@ -62,7 +62,7 @@ public class MealRequestTests
     [Fact]
     public void TheBlockEndsExactlyAtDinnerEveryEvening()
     {
-        // The Sunday is the first evening on standard time; the dinner is still six on the clock.
+        // Every evening from the Sunday to the Saturday has its block ending at six on the clock.
         var week = WeekOf(
             CookedOn(0, Chili, Sam, 45),
             CookedOn(1, Pasta, Lee, 30),
@@ -127,7 +127,7 @@ public class MealRequestTests
     public void TheKeyIsTheEveningAndTheRole()
     {
         // Frozen: this text is stored on the owner's events, so changing it strands every meal already written.
-        var request = RequestFor(WeekOf(CookedOn(1, Stew, Lee, 120)), options: Slow(Stew));
+        var request = RequestFor(WeekOf(CookedOn(2, Stew, Lee, 120)), options: Slow(Stew));
 
         var keys = PlacementEngine.Wanted(request).Select(item => item.Key.Value).Order().ToList();
 
@@ -143,9 +143,9 @@ public class MealRequestTests
 
         var wanted = PlacementEngine.Wanted(request);
 
-        Assert.Contains(wanted, item => item.Key == MealCalendar.KeyOf(MealEventRole.Cook, Sam, Monday, Monday.AddDays(3)));
-        Assert.Contains(wanted, item => item.Key == MealCalendar.KeyOf(MealEventRole.Cook, Lee, Monday, Monday.AddDays(4)));
-        Assert.Contains(wanted, item => item.Key == MealCalendar.KeyOf(MealEventRole.StartSlowCooker, Lee, Monday, Monday.AddDays(4)));
+        Assert.Contains(wanted, item => item.Key == MealCalendar.KeyOf(MealEventRole.Cook, Sam, Sunday, Sunday.AddDays(3)));
+        Assert.Contains(wanted, item => item.Key == MealCalendar.KeyOf(MealEventRole.Cook, Lee, Sunday, Sunday.AddDays(4)));
+        Assert.Contains(wanted, item => item.Key == MealCalendar.KeyOf(MealEventRole.StartSlowCooker, Lee, Sunday, Sunday.AddDays(4)));
     }
 
     [Fact]
@@ -177,13 +177,13 @@ public class MealRequestTests
     public void TheIdentityRepeatsFromWeekToWeek()
     {
         // The same evening of the next week is the same identity: only the week number in the key moves.
-        var next = new DateOnly(2026, 11, 2);
+        var next = new DateOnly(2026, 11, 1);
         var week = MealWeek.Planned(
             next,
-            Enumerable.Range(0, 7).Select(offset => offset == 1
-                ? DinnerChoice.Cooked(next.AddDays(1), Chili.Id, Sam, Est(11, 3, 17, 15), Est(11, 3, 18), false, false, "From the box.")
+            Enumerable.Range(0, 7).Select(offset => offset == 2
+                ? DinnerChoice.Cooked(next.AddDays(2), Chili.Id, Sam, Est(11, 3, 17, 15), Est(11, 3, 18), false, false, "From the box.")
                 : DinnerChoice.NothingPlanned(next.AddDays(offset), "Nothing is planned.")));
-        var thisWeek = Requests(WeekOf(CookedOn(1, Chili, Sam, 45)));
+        var thisWeek = Requests(WeekOf(CookedOn(2, Chili, Sam, 45)));
 
         var nextWeek = MealCalendar.Requests(week, House, Cards);
 
@@ -196,7 +196,7 @@ public class MealRequestTests
     [Fact]
     public void ASlowCookerMealAddsAMorningStart()
     {
-        var made = Requests(WeekOf(CookedOn(2, Stew, Lee, 120)), Slow(Stew));
+        var made = Requests(WeekOf(CookedOn(3, Stew, Lee, 120)), Slow(Stew));
 
         Assert.Equal(2, made.Count);
         var cook = made[0];
@@ -211,7 +211,7 @@ public class MealRequestTests
     [Fact]
     public void TheMorningWindowsComeInOrderOfPreference()
     {
-        var start = Requests(WeekOf(CookedOn(2, Stew, Lee, 120)), Slow(Stew))[1];
+        var start = Requests(WeekOf(CookedOn(3, Stew, Lee, 120)), Slow(Stew))[1];
 
         Assert.Equal(3, start.Windows.Count);
         Assert.Equal((Edt(10, 28, 7), Edt(10, 28, 9)), (start.Windows[0].Start, start.Windows[0].End));
@@ -251,7 +251,7 @@ public class MealRequestTests
     {
         var options = Slow(Stew) with { SlowCookerMornings = [new DayPart(new TimeOnly(15, 0), TimeSpan.FromHours(3))] };
 
-        var start = Requests(WeekOf(CookedOn(0, Stew, Sam, 120)), options)[1];
+        var start = Requests(WeekOf(CookedOn(1, Stew, Sam, 120)), options)[1];
 
         var window = Assert.Single(start.Windows);
         Assert.Equal((Edt(10, 26, 15), Edt(10, 26, 16)), (window.Start, window.End));
@@ -280,7 +280,7 @@ public class MealRequestTests
     [Fact]
     public void ABlockNotEndingAtDinnerIsRefused()
     {
-        var early = DinnerChoice.Cooked(Monday, Chili.Id, Sam, Edt(10, 26, 16, 30), Edt(10, 26, 17, 15), false, false, "From the box.");
+        var early = DinnerChoice.Cooked(Sunday, Chili.Id, Sam, Edt(10, 26, 16, 30), Edt(10, 26, 17, 15), false, false, "From the box.");
 
         var refusal = Assert.Throws<ArgumentException>(() => Requests(WeekOf(early)));
 

@@ -127,9 +127,10 @@ public sealed record MealPlacementOptions
 /// </summary>
 public static class MealPlacement
 {
-    private static readonly string[] DayWords = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-
-    private static readonly string[] DayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    // The frozen spelling of a weekday in a key, indexed by DayOfWeek's own numbering (Sunday is 0, the way .NET defines it).
+    // It is the evening's weekday and never its place in the planning week, so the text of a key does not depend on which
+    // day opens the week.
+    private static readonly string[] DayWords = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
     private const string CookWord = "cook";
     private const string SlowCookerWord = "slowcooker";
@@ -161,8 +162,8 @@ public static class MealPlacement
         var starts = new List<HouseholdEventRequest>();
         foreach (var dinner in week.Dinners.Where(item => item.Kind == DinnerKind.Cooked))
         {
-            var evening = dinner.Day.DayNumber - week.WeekStart.DayNumber;
-            var name = DayNames[evening];
+            var weekday = dinner.Day.DayOfWeek;
+            var name = weekday.ToString();
             var adult = rules.FindAdult(dinner.Cook!)
                 ?? throw new ArgumentException($"{name}'s cook is not one of the household's adults, so no cook block was made.", nameof(week));
             var card = recipes.FirstOrDefault(item => item.Id == dinner.Recipe)
@@ -175,7 +176,7 @@ public static class MealPlacement
 
             var cookStart = dinner.CookStart!.Value;
             blocks.Add(new HouseholdEventRequest(
-                Identity(MealEventRole.Cook, evening),
+                Identity(MealEventRole.Cook, weekday),
                 CookTitle + card.Title,
                 dinnerStart - cookStart,
                 [adult.Name],
@@ -184,7 +185,7 @@ public static class MealPlacement
             if (chosen.SlowCookerCards.Contains(card.Id))
             {
                 starts.Add(new HouseholdEventRequest(
-                    Identity(MealEventRole.StartSlowCooker, evening),
+                    Identity(MealEventRole.StartSlowCooker, weekday),
                     SlowCookerTitle,
                     chosen.SlowCookerStartLength,
                     [adult.Name],
@@ -216,13 +217,14 @@ public static class MealPlacement
     /// <exception cref="ArgumentOutOfRangeException">The day is not one of the seven evenings of the week.</exception>
     public static PlacementKey KeyOf(MealEventRole role, string person, DateOnly weekStart, DateOnly day)
     {
+        PlanningWeek.RequireStart(weekStart, nameof(weekStart));
         var evening = day.DayNumber - weekStart.DayNumber;
         if (evening is < 0 or >= MealWeek.Evenings)
         {
             throw new ArgumentOutOfRangeException(nameof(day), day, "The day is not in that week.");
         }
 
-        return PlacementKey.ForHousehold(person, PlacementKey.WeekIndexOf(weekStart), Identity(role, evening));
+        return PlacementKey.ForHousehold(person, PlacementKey.WeekIndexOf(weekStart), Identity(role, day.DayOfWeek));
     }
 
     private static List<PlacementWindow> MorningWindows(DateOnly day, DateTimeOffset cookStart, PlanningRules rules, MealPlacementOptions options, string name)
@@ -248,10 +250,10 @@ public static class MealPlacement
 
     // The frozen spelling of an identity: the role's word and the weekday, never the date. Written out so that renaming an enum
     // member cannot rename a key already stored on the owner's calendar.
-    private static string Identity(MealEventRole role, int evening) => role switch
+    private static string Identity(MealEventRole role, DayOfWeek weekday) => role switch
     {
-        MealEventRole.Cook => CookWord + "-" + DayWords[evening],
-        MealEventRole.StartSlowCooker => SlowCookerWord + "-" + DayWords[evening],
+        MealEventRole.Cook => CookWord + "-" + DayWords[(int)weekday],
+        MealEventRole.StartSlowCooker => SlowCookerWord + "-" + DayWords[(int)weekday],
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "This kind of meal event has no frozen name in the calendar key. Give it one on purpose."),
     };
 }

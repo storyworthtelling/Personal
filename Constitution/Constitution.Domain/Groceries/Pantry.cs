@@ -6,8 +6,6 @@ namespace Constitution.Domain.Groceries;
 /// <summary>What the household has on hand, and which of its standing staples are out. Immutable; every change returns a new pantry.</summary>
 public sealed class Pantry
 {
-    private static readonly string[] DayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
     private readonly Dictionary<string, Staple> byKey;
 
     private Pantry(Dictionary<string, Staple> byKey)
@@ -75,7 +73,7 @@ public sealed class Pantry
         foreach (var dinner in week.Dinners.Where(item => item.Kind == DinnerKind.Cooked && uncookedDays.Contains(item.Day)))
         {
             var card = recipes.FirstOrDefault(item => item.Id == dinner.Recipe)
-                ?? throw new ArgumentException($"{DayNames[dinner.Day.DayNumber - week.WeekStart.DayNumber]}'s dinner names a card that is not in the box, so its stock could not be worked out.", nameof(recipes));
+                ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}'s dinner names a card that is not in the box, so its stock could not be worked out.", nameof(recipes));
             foreach (var ingredient in card.Ingredients)
             {
                 Reckon(next, ingredient.Name);
