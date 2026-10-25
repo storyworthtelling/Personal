@@ -52,6 +52,7 @@ internal sealed class PageDraft
         PrintedRole.Small => 15f,
         PrintedRole.Label => 14f,
         PrintedRole.Mono => 12.2f,
+        PrintedRole.Time => 24.4f,
         _ => 17f,
     };
 
@@ -63,6 +64,7 @@ internal sealed class PageDraft
         PrintedRole.Heading or PrintedRole.Choice => 4.5f,
         PrintedRole.Small => 4.2f,
         PrintedRole.Mono => 2.46f,
+        PrintedRole.Time => 4.92f,
         PrintedRole.Label => 3.9f,
         _ => 4.8f,
     };
@@ -109,15 +111,18 @@ internal sealed class PageDraft
         (start.ToString("dddd", CultureInfo.InvariantCulture) + " " + TimeFormats.Clock12(start)).ToUpperInvariant();
 
     /// <summary>The 91 point ruled column on the right, with its edge, its label and its dotted lines (p.5).</summary>
-    public void NotesColumn()
+    public void NotesColumn() => NotesColumn(NotesTop);
+
+    /// <summary>The same column starting lower, where a full-width line above it needs the room (the recipe's steps page).</summary>
+    public void NotesColumn(float top)
     {
-        var notes = InkTargets.NotesMargin(WorkoutIds.Notes, NotesTop, NotesBottom);
+        var notes = InkTargets.NotesMargin(WorkoutIds.Notes, top, NotesBottom);
         Target(notes);
         Rule("notes-edge", notes.Bounds.Left, notes.Bounds.Top, 0f, notes.Bounds.Height, notes.Id);
-        Line(PrintedRole.Label, notes.Bounds.Left + 10f, NotesTop + 16f, notes.Bounds.Width - 10f, "NOTES", owner: notes.Id, name: "notes-label");
+        Line(PrintedRole.Label, notes.Bounds.Left + 10f, top + 16f, notes.Bounds.Width - 10f, "NOTES", owner: notes.Id, name: "notes-label");
 
         var count = 0;
-        for (var y = NotesTop + 40f; y <= NotesBottom - 20f; y += 22f)
+        for (var y = top + 40f; y <= NotesBottom - 18f; y += 22f)
         {
             printed.Add(new PrintedItem(
                 $"notes-dots-{++count}", PrintedRole.Dotted,

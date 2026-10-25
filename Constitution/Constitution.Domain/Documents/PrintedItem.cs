@@ -34,6 +34,9 @@ public enum PrintedRole
 
     /// <summary>Cascadia Code on the Mono rung: quantities and clock times, set so a column of them lines up.</summary>
     Mono,
+
+    /// <summary>Cascadia Code on the Title rung: a recipe step's clock time, read at a glance from across the counter.</summary>
+    Time,
 }
 
 public enum PrintedAlign

@@ -325,12 +325,11 @@ public class RecipePageTests
     }
 
     [Fact]
-    public void MuchTooManyIngredientsAreRefusedNotSquashed()
+    public void ManyIngredientsFlowOnRatherThanBeingSquashed()
     {
         var many = Enumerable.Range(1, 20).Select(i => Line("1 tsp", $"spice number {i}")).ToList();
 
-        var ex = Assert.Throws<ArgumentException>(() => Page(RecipeSamples.Chicken(ingredients: many)));
-        Assert.Contains("20 ingredients", ex.Message);
+        Assert.True(RecipeDocument.Build(RecipeSamples.Chicken(ingredients: many)).Count >= 2);
     }
 
     [Fact]
