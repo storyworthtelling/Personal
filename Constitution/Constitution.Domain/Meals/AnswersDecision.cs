@@ -11,9 +11,6 @@ public enum MealItemOutcome
 
     /// <summary>Somebody said no. The line needs a revised sheet.</summary>
     Denied,
-
-    /// <summary>The deadline has passed and no tablet's ink was read for the line, so there is no silence to approve.</summary>
-    Unheard,
 }
 
 /// <summary>Why a line is approved.</summary>
@@ -41,7 +38,8 @@ public sealed record MealItemDecision(
     MealItemOutcome Outcome,
     MealApprovalBasis Basis,
     IReadOnlyList<MealDenial> Denials,
-    IReadOnlyList<MealAnswer> Ignored);
+    IReadOnlyList<MealAnswer> Ignored,
+    bool NothingWasRead = false);
 
 /// <summary>
 /// The verdict on the whole sheet, line by line: the typed result the planner would consume. <see cref="IsFinal"/> says the
@@ -74,13 +72,14 @@ public sealed class MealDecision
 
     public IReadOnlyList<MealItemDecision> Pending => Of(MealItemOutcome.Pending);
 
-    public IReadOnlyList<MealItemDecision> Unheard => Of(MealItemOutcome.Unheard);
+    /// <summary>The lines approved at the deadline though no tablet was read for them at all: a notice's raw material (D103).</summary>
+    public IReadOnlyList<MealItemDecision> ApprovedUnread => Items.Where(item => item.NothingWasRead).ToList();
 
     /// <summary>Any no means the sheet is sent again, replaced on both tablets.</summary>
     public bool NeedsRevisedSheet => Denied.Count > 0;
 
     /// <summary>Every line is approved or denied: nothing waits on the clock or on a tablet.</summary>
-    public bool IsSettled => Pending.Count == 0 && Unheard.Count == 0;
+    public bool IsSettled => Pending.Count == 0;
 
     public MealItemDecision? Item(string itemId) => Items.FirstOrDefault(item => string.Equals(item.ItemId, itemId, StringComparison.Ordinal));
 

@@ -158,11 +158,65 @@ public class ApprovalTests
     }
 
     [Fact]
-    public void NobodyHeardIsNotApproved()
+    public void AnUnreadLineIsApprovedAtTheDeadline()
     {
-        // Silence approves at a read; a line no tablet was read for has had none.
         var item = Only(MealDeadline.Decide([], Deadline, After(60), [Tuesday]));
-        Assert.Equal(MealItemOutcome.Unheard, item.Outcome);
+        Assert.Equal(MealItemOutcome.Approved, item.Outcome);
+        Assert.Equal(MealApprovalBasis.Silence, item.Basis);
+        Assert.True(item.NothingWasRead);
+    }
+
+    [Fact]
+    public void ASilentReadIsNotMarkedUnread()
+    {
+        var item = Only(Decide(After(1), Silent(Sam, Tuesday, Before(30))));
+        Assert.False(item.NothingWasRead);
+    }
+
+    [Fact]
+    public void ALateDenialDoesNotReverseUnread()
+    {
+        var atTheDeadline = Only(MealDeadline.Decide([], Deadline, Deadline, [Tuesday]));
+        var afterLate = Only(MealDeadline.Decide([Deny(Lee, Tuesday, "no", After(30))], Deadline, After(60), [Tuesday]));
+
+        Assert.Equal(MealItemOutcome.Approved, atTheDeadline.Outcome);
+        Assert.Equal(MealItemOutcome.Approved, afterLate.Outcome);
+        Assert.Equal(MealApprovalBasis.Silence, afterLate.Basis);
+        Assert.True(afterLate.NothingWasRead);
+        Assert.Single(afterLate.Ignored);
+    }
+
+    [Fact]
+    public void AnUnreadLineWaitsBeforeTheDeadlineAndIsNotFlagged()
+    {
+        var item = Only(MealDeadline.Decide([], Deadline, Before(1), [Tuesday]));
+        Assert.Equal(MealItemOutcome.Pending, item.Outcome);
+        Assert.False(item.NothingWasRead);
+    }
+
+    [Fact]
+    public void ADenialReadOnTimeBeatsNoRead()
+    {
+        var decision = MealDeadline.Decide([Deny(Lee, Tuesday, "no", Before(30))], Deadline, After(1), [Tuesday, Wednesday]);
+        Assert.Equal(MealItemOutcome.Denied, decision.Item(Tuesday)!.Outcome);
+        Assert.False(decision.Item(Tuesday)!.NothingWasRead);
+        Assert.Equal([Wednesday], decision.ApprovedUnread.Select(item => item.ItemId));
+    }
+
+    [Fact]
+    public void UnreadIsOrderIndependent()
+    {
+        var answers = new[] { Tick(Sam, Tuesday, Before(30)), Deny(Lee, Thursday, "no", Before(20)), Silent(Sam, Thursday, After(5)) };
+        var expected = string.Join(";", MealDeadline.Decide(answers, Deadline, After(60), [Tuesday, Wednesday, Thursday]).ApprovedUnread.Select(item => item.ItemId));
+        Assert.Equal(Wednesday, expected);
+
+        var random = new Random(11);
+        for (var round = 0; round < 25; round++)
+        {
+            var shuffled = answers.OrderBy(_ => random.Next()).ToArray();
+            var decision = MealDeadline.Decide(shuffled, Deadline, After(60), [Tuesday, Wednesday, Thursday]);
+            Assert.Equal(expected, string.Join(";", decision.ApprovedUnread.Select(item => item.ItemId)));
+        }
     }
 
     [Fact]
@@ -176,20 +230,22 @@ public class ApprovalTests
     public void AnExpectedLineWithNoAnswerJoinsTheOthers()
     {
         var decision = MealDeadline.Decide([Tick(Sam, Tuesday, Before(30))], Deadline, After(1), [Tuesday, Wednesday]);
-        Assert.Equal([Tuesday], decision.ApprovedItemIds);
-        Assert.Equal(Wednesday, Assert.Single(decision.Unheard).ItemId);
-        Assert.False(decision.IsSettled);
+        Assert.Equal([Tuesday, Wednesday], decision.ApprovedItemIds);
+        Assert.Equal(Wednesday, Assert.Single(decision.ApprovedUnread).ItemId);
+        Assert.True(decision.IsSettled);
     }
 
     [Fact]
-    public void OnlyLateReadingsStillDecide()
+    public void OnlyLateReadingsNeverDecide()
     {
         var silent = Only(Decide(After(120), Silent(Sam, Tuesday, After(30)), Silent(Lee, Tuesday, After(40))));
         var denied = Only(Decide(After(120), Silent(Sam, Tuesday, After(30)), Deny(Lee, Tuesday, "no", After(40))));
 
         Assert.Equal(MealItemOutcome.Approved, silent.Outcome);
         Assert.Equal(MealApprovalBasis.Silence, silent.Basis);
-        Assert.Equal(MealItemOutcome.Denied, denied.Outcome);
+        Assert.Equal(MealItemOutcome.Approved, denied.Outcome);
+        Assert.Equal(MealApprovalBasis.Silence, denied.Basis);
+        Assert.Equal(2, denied.Ignored.Count);
     }
 
     [Fact]
@@ -233,7 +289,7 @@ public class ApprovalTests
     }
 
     [Fact]
-    public void ASheetWithNothingPendingOrUnheardIsSettled()
+    public void ASheetWithNothingPendingIsSettled()
     {
         Assert.True(Decide(After(1), Tick(Sam, Tuesday, Before(30)), Deny(Lee, Wednesday, "no", Before(30))).IsSettled);
         Assert.False(Decide(Before(1), Tick(Sam, Tuesday, Before(30))).IsSettled);
