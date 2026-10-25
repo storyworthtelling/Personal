@@ -22,6 +22,7 @@ public static class ReadBackWireNames
         DeliveryKind.Workout => "Workout",
         DeliveryKind.Meals => "Meals",
         DeliveryKind.Digest => "Digest",
+        DeliveryKind.Recipe => "Recipe",
         _ => throw Unnamed(kind),
     };
 
@@ -30,6 +31,7 @@ public static class ReadBackWireNames
         "Workout" => DeliveryKind.Workout,
         "Meals" => DeliveryKind.Meals,
         "Digest" => DeliveryKind.Digest,
+        "Recipe" => DeliveryKind.Recipe,
         _ => null,
     };
 

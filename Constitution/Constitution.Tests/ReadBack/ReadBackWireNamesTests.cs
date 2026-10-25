@@ -23,7 +23,7 @@ public sealed class ReadBackWireNamesTests : IDisposable
     public void TheDeliveryKindsAreFrozen()
     {
         Assert.Equal(
-            [("Workout", DeliveryKind.Workout), ("Meals", DeliveryKind.Meals), ("Digest", DeliveryKind.Digest)],
+            [("Workout", DeliveryKind.Workout), ("Meals", DeliveryKind.Meals), ("Digest", DeliveryKind.Digest), ("Recipe", DeliveryKind.Recipe)],
             Enum.GetValues<DeliveryKind>().Select(kind => (ReadBackWireNames.Of(kind), kind)).ToArray());
         Assert.All(Enum.GetValues<DeliveryKind>(), kind => Assert.Equal(kind, ReadBackWireNames.DeliveryKindOf(ReadBackWireNames.Of(kind))));
     }

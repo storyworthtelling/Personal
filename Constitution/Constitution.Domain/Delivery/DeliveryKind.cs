@@ -11,4 +11,7 @@ public enum DeliveryKind
 
     /// <summary>The weekly digest.</summary>
     Digest,
+
+    /// <summary>Tonight's recipe, with the rating page the next morning's read-back reads.</summary>
+    Recipe,
 }

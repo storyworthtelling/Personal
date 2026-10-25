@@ -1,6 +1,7 @@
 using Constitution.Domain.Delivery;
 using Constitution.Domain.Documents;
 using Constitution.Domain.Ink;
+using Constitution.Domain.Meals;
 using Constitution.Domain.Workouts;
 
 namespace Constitution.Domain.ReadBack;
@@ -14,7 +15,7 @@ namespace Constitution.Domain.ReadBack;
 /// can be closed (<see cref="DayClose"/>). The same ids ("done", "feel") appear on every exercise page, which is
 /// harmless for that purpose: any page's tick settles the day, and no page's silence can hide another's.</para>
 /// </summary>
-public sealed class ExpectedDocument
+public sealed partial class ExpectedDocument
 {
     public ExpectedDocument(DeliveryKind kind, DateOnly day, string? subject, string person, SessionKind? session, IReadOnlyList<ExpectedPage> pages)
     {
@@ -62,6 +63,13 @@ public sealed class ExpectedDocument
                 if (session is not null || Pages.Count == 0)
                 {
                     throw new ArgumentException("A meals document has pages to read and no session.", nameof(pages));
+                }
+
+                break;
+            case DeliveryKind.Recipe:
+                if (session is not null || Pages.Count == 0)
+                {
+                    throw new ArgumentException("A recipe has its rating page to read and no session.", nameof(pages));
                 }
 
                 break;
@@ -124,6 +132,39 @@ public sealed class ExpectedDocument
 
         return new ExpectedDocument(DeliveryKind.Workout, day, subject, person, session, pages);
     }
+
+    /// <summary>
+    /// The rules of the dinners page as <see cref="MealSheetDocument"/> draws it: one <see cref="MealItemRule"/> per evening,
+    /// tick or written reason, approved by silence at the model's deadline. Later pages of the sheet add their own rules.
+    /// </summary>
+    public static ExpectedDocument ForMealSheet(MealSheetModel model, string person)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        var map = MealSheetDocument.Build(model)[0].Map;
+        var rules = new List<InkRule>();
+        foreach (var dinner in model.Week.Dinners)
+        {
+            var weekday = dinner.Day.DayOfWeek;
+            var yes = MealSheetIds.DinnerYes(weekday);
+            var reason = MealSheetIds.DinnerReason(weekday);
+            if (map.TryGet(yes) is not null && map.TryGet(reason) is not null)
+            {
+                rules.Add(new MealItemRule($"{weekday}'s dinner: {DinnerWords(model, dinner)}", yes, reason, model.Deadline));
+            }
+        }
+
+        return new ExpectedDocument(DeliveryKind.Meals, model.Week.WeekStart, null, person, null, [new ExpectedPage(1, new InkReadout(map), rules)]);
+    }
+
+    private static string DinnerWords(MealSheetModel model, DinnerChoice dinner) => dinner.Kind switch
+    {
+        DinnerKind.Cooked when dinner.Recipe is { } card && model.Dishes.TryGetValue(card, out var dish) => dish.Title.Trim(),
+        DinnerKind.EatOut when model.Outings is not null && model.Outings.TryGetValue(dinner.Day, out var outing) => "out at " + outing.Place.Trim(),
+        DinnerKind.EatOut => "eating out",
+        DinnerKind.Leftovers => "leftovers",
+        _ => "nothing planned",
+    };
 
     // Soreness is a separate fact from whether the session was done, and a question about it must not hold the day open.
     private static IReadOnlyList<string> SessionTargetIds(IEnumerable<ExpectedPage> pages) =>
