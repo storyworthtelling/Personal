@@ -1,3 +1,4 @@
+using Constitution.Domain.Groceries;
 using Constitution.Domain.Meals;
 using Constitution.Domain.Recipes;
 
@@ -50,4 +51,12 @@ public sealed record MealSheetModel(
     string? Voice = null,
     bool VoiceIsOwners = true,
     int Pages = 5,
-    MealSheetDailyMeals? Daily = null);
+    MealSheetDailyMeals? Daily = null,
+    MealSheetGroceries? Groceries = null,
+    HolidayAsk? AskAhead = null);
+
+/// <summary>
+/// What the groceries page prints (book p.7): the week's list by store section, the standing staples to tick, and the budget in
+/// words. The list is the preview only; the Keep note is the separate hand-off (D81, D90).
+/// </summary>
+public sealed record MealSheetGroceries(GroceryList List, Pantry Pantry, GroceryBudgetStatus Budget);

@@ -165,6 +165,25 @@ public sealed partial class ExpectedDocument
             pages.Add(new ExpectedPage(number, new InkReadout(pageMap), itemRules));
         }
 
+        // The groceries pages (page 4 onward when the daily meals are there): every standing staple is a plain box, "need more" when ticked, and the blank
+        // lines take a word that becomes a new staple. A page with none of them on it (a continuation of the list alone) has nothing to read.
+        if (model.Groceries is { } groceries)
+        {
+            var slots = MealSheetGroceryPages.Slots(groceries);
+            var first = 1 + (model.Daily is null ? 0 : 2);
+            var last = layouts.Count - (model.AskAhead is null ? 0 : 1);
+            for (var index = first; index < last; index++)
+            {
+                var pageMap = layouts[index].Map;
+                var stapleRules = slots.Where(slot => pageMap.TryGet(slot.Id) is not null)
+                    .Select(slot => (InkRule)new StapleRule(slot.Subject, slot.Id)).ToList();
+                if (stapleRules.Count > 0)
+                {
+                    pages.Add(new ExpectedPage(index + 1, new InkReadout(pageMap), stapleRules));
+                }
+            }
+        }
+
         return new ExpectedDocument(DeliveryKind.Meals, model.Week.WeekStart, null, person, null, pages);
     }
 
