@@ -195,7 +195,7 @@ public static class MealSheetDocument
                 var start = dinner.CookStart!.Value.DateTime;
                 var cook = dish.Marker == MealMarker.SlowCooker
                     ? $"{dinner.Cook} starts it {TimeFormats.Clock12(start)}"
-                    : $"{dinner.Cook} cooks";
+                    : $"{dinner.Cook} cooks from {TimeFormats.Clock12(start)}";
                 var kids = dinner.ChildrenEatDifferently && !string.IsNullOrWhiteSpace(dish.KidsMeal) ? $"Kids: {dish.KidsMeal!.Trim()}" : null;
                 var marker = dish.Marker switch
                 {
