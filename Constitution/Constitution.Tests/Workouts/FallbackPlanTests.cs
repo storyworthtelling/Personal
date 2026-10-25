@@ -293,14 +293,14 @@ public class FallbackPlanTests
     public void ASessionOverBusyTimeIsCaught()
     {
         var (request, plan, _) = SamsWeek();
-        var onMonday = SamOf(plan).Sessions.First();
+        var onAWorkday = SamOf(plan).Sessions.First(item => item.Day.DayOfWeek != DayOfWeek.Sunday);
         // Sam works 8 to 4 on weekdays, so the middle of the working day is busy whatever gap is claimed.
-        var wide = onMonday.Gap with { Start = At(DayIndex(onMonday), 9), End = At(DayIndex(onMonday), 11) };
-        var overWork = onMonday with { Gap = wide, Start = At(DayIndex(onMonday), 9) };
+        var wide = onAWorkday.Gap with { Start = At(DayIndex(onAWorkday), 9), End = At(DayIndex(onAWorkday), 11) };
+        var overWork = onAWorkday with { Gap = wide, Start = At(DayIndex(onAWorkday), 9) };
 
-        var found = PlanRules.Violations(request, Swapped(plan, onMonday, overWork));
+        var found = PlanRules.Violations(request, Swapped(plan, onAWorkday, overWork));
 
-        Assert.Contains(new PlanViolation(Sam, onMonday.Day, PlanRule.BusyTime), found);
+        Assert.Contains(new PlanViolation(Sam, onAWorkday.Day, PlanRule.BusyTime), found);
     }
 
     [Fact]
@@ -342,11 +342,11 @@ public class FallbackPlanTests
     public void AHardSessionOnASundayIsCaught()
     {
         var (request, plan, strength) = SamsWeek();
-        var sunday = strength with { Day = Day(6), Gap = new FreeGap(At(6, 9), At(6, 11)), Start = At(6, 9) };
+        var sunday = strength with { Day = Day(0), Gap = new FreeGap(At(0, 9), At(0, 11)), Start = At(0, 9) };
 
         var found = PlanRules.Violations(request, Swapped(plan, strength, sunday));
 
-        Assert.Contains(new PlanViolation(Sam, Day(6), PlanRule.SundayNotGentle), found);
+        Assert.Contains(new PlanViolation(Sam, Day(0), PlanRule.SundayNotGentle), found);
     }
 
     [Fact]

@@ -8,7 +8,7 @@ namespace Constitution.Infrastructure.Workouts;
 /// <para>The week's plan has to be made from the week's start on every run (placement numbers a session among its kind in the
 /// plan it is handed, so a plan re-made mid-week without the days already gone would renumber, and a key already written
 /// would then stand for the wrong day). That keeps the days that are over in the plan, and a session of one of them that was
-/// never written (a phone that was off on Monday) would otherwise be written into the past. The refusal comes back as an
+/// never written (a phone that was off on Sunday) would otherwise be written into the past. The refusal comes back as an
 /// ordinary failed write, so placement does not record the key as written and nothing is touched on the calendar.</para>
 /// </summary>
 public sealed class PastWriteGuard(ICalendarWriter inner, Func<DateTimeOffset> clock) : ICalendarWriter

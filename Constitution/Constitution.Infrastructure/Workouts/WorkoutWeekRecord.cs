@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Codex.Domain.Music;
+using Constitution.Domain.Calendar;
 using Constitution.Domain.Placement;
 using Constitution.Domain.Workouts;
 using Constitution.Domain.Workouts.Pipeline;
@@ -191,7 +192,7 @@ public static class WorkoutWeekReportCodec
 
     private static bool IsWhole(StoredWorkoutWeek? week) =>
         week is not null
-        && week.WeekStart.DayOfWeek == DayOfWeek.Monday
+        && PlanningWeek.IsStart(week.WeekStart)
         && week.Sessions is not null && week.Sessions.All(item => item is { Person: not null, Kind: not null, Participants: not null, Together: not null, Exercises: not null })
         && week.Reasons is not null && week.Reasons.All(item => item is { Person: not null, Line: not null })
         && week.Assignments is not null && week.Assignments.All(item => item is { Person: not null, Kind: not null })

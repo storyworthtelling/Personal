@@ -69,8 +69,8 @@ internal static class LeaseRig
 
     public static TimeSpan Settle => LeaseTerms.SettleWindow;
 
-    /// <summary>Monday 26 October 2026, 8 am on the household clock (daylight time; the clocks go back on the Sunday).</summary>
-    public static DateTimeOffset OpeningMonday => InventedFamily.Edt(10, 26, 8);
+    /// <summary>Sunday 25 October 2026, 8 am on the household clock (daylight time; the clocks go back a week later, on the next Sunday).</summary>
+    public static DateTimeOffset OpeningSunday => InventedFamily.Edt(10, 25, 8);
 
     public static (LeasePhone Owner, LeasePhone Partner) Phones() =>
         (new LeasePhone(Sam, RosterRole.Owner), new LeasePhone(Lee, RosterRole.Partner));

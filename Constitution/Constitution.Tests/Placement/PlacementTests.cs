@@ -366,10 +366,10 @@ public class PlacementTests
         var plan = PlaceWeek(
             calendars,
             PlanOf(
-                Planned(0, (16, 0), (18, 0), Effort(40), Sam),
-                Planned(2, (16, 0), (18, 0), Effort(20, false, SessionKind.Mobility), Sam),
-                Planned(4, (16, 0), (18, 0), Effort(40), Lee)),
-            Household("shop-a", "Groceries", 30, 5, (9, 0), (12, 0), Sam, Lee));
+                Planned(1, (16, 0), (18, 0), Effort(40), Sam),
+                Planned(3, (16, 0), (18, 0), Effort(20, false, SessionKind.Mobility), Sam),
+                Planned(5, (16, 0), (18, 0), Effort(40), Lee)),
+            Household("shop-a", "Groceries", 30, 6, (9, 0), (12, 0), Sam, Lee));
         Assert.True(plan.ToCreate.Count >= 5, "The plan placed too little to say anything about its keys.");
 
         var dates = Enumerable.Range(0, 800).Select(offset => new DateOnly(2026, 1, 1).AddDays(offset)).ToList();
@@ -431,7 +431,7 @@ public class PlacementTests
             calendars,
             PlanOf(Planned(1, (16, 0), (18, 0), Effort(40), Sam), Planned(2, (16, 0), (18, 0), Effort(20, false, SessionKind.Mobility), Lee)),
             Cook(Lee, 3, (16, 0), (17, 30), 45),
-            Household("shop-a", "Groceries", 30, 5, (9, 0), (12, 0), Sam, Lee));
+            Household("shop-a", "Groceries", 30, 6, (9, 0), (12, 0), Sam, Lee));
         Assert.True(plan.ToCreate.Count >= 5, "The plan placed too little to say anything about its titles.");
 
         foreach (var outcome in plan.Outcomes)
@@ -469,8 +469,8 @@ public class PlacementTests
             calendars,
             null,
             Cook(Lee, 3, (16, 0), (17, 30), 45),
-            Household("shop-a", "  Groceries ", 30, 5, (9, 0), (12, 0), Sam),
-            Household("cooker-a", "Start the slow cooker", 10, 4, (7, 0), (7, 30), Lee));
+            Household("shop-a", "  Groceries ", 30, 6, (9, 0), (12, 0), Sam),
+            Household("cooker-a", "Start the slow cooker", 10, 5, (7, 0), (7, 30), Lee));
 
         Assert.Equal(
             ["Cook: chili", "Groceries", "Start the slow cooker"],
@@ -502,10 +502,10 @@ public class PlacementTests
         var request = PlaceRequest(
             calendars,
             planned,
-            // Not Tuesday: the family calendar has the piano lesson from four to half past five.
+            // Not Monday: the family calendar has the piano lesson from four to half past five.
             Cook(Lee, 2, (16, 0), (17, 30), 45),
-            Household("shop-a", "Groceries", 60, 5, (9, 0), (12, 0), Sam, Lee),
-            Household("cooker-a", "Start the slow cooker", 10, 4, (7, 0), (8, 0), Lee));
+            Household("shop-a", "Groceries", 60, 6, (9, 0), (12, 0), Sam, Lee),
+            Household("cooker-a", "Start the slow cooker", 10, 5, (7, 0), (8, 0), Lee));
 
         var plan = PlacementEngine.Plan(request, Fresh);
 

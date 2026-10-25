@@ -12,7 +12,9 @@ namespace Constitution.Domain.Workouts;
 /// best set of days with a free gap, no two next to each other and none next to a recent hard day; "best" is
 /// the most room, and when two choices are equal the earlier one wins. As many as the calendar allows are
 /// placed, so a crowded week gives fewer sessions rather than a worse one. The mobility day goes on a free day
-/// that is not already taken, preferring the day after a hard one. Nothing here names a weekday except Sunday.</para>
+/// that is not already taken, preferring the day after a hard one. Nothing here names a weekday except Sunday, which is
+/// the household's first day (<see cref="PlanningWeek"/>) and holds a gentle walk and nothing else. A hard session on the last
+/// Saturday before the week meets the week only through <c>LastHardSessionDay</c>, and the Sunday it is next to is gentle anyway.</para>
 /// </summary>
 internal sealed class WeekPlanner
 {
@@ -20,7 +22,6 @@ internal sealed class WeekPlanner
     private const int MostEveningsTogether = 2;
     private const double RoomCapMinutes = 60;
     private const double AfterHardBonus = 15;
-    private const int DaysPerWeekIndex = 7;
     private const string NoRoom = "There was no free gap of 30 minutes or more in waking hours this week.";
 
     private readonly WorkoutPlanRequest request;
@@ -37,7 +38,7 @@ internal sealed class WeekPlanner
         days = Enumerable.Range(0, DaysInWeek).Select(request.WeekStart.AddDays).ToArray();
         people = request.People.Select(week => new Person(week)).ToList();
         // Alternates the treadmill and the road, and turns the exercises over, from one week to the next.
-        weekIndex = request.WeekStart.DayNumber / DaysPerWeekIndex;
+        weekIndex = PlanningWeek.IndexOf(request.WeekStart);
     }
 
     public HouseholdWorkoutPlan Plan()
@@ -66,7 +67,7 @@ internal sealed class WeekPlanner
         var joint = new Dictionary<int, PlannedSession>();
         var names = people.Select(person => person.Name).ToList();
 
-        // A family walk, on the Sunday the whole family is free before the children's routine begins.
+        // A family walk, on the Sunday (the week's first day) when the whole family is free before the children's routine begins.
         for (var day = 0; day < DaysInWeek; day++)
         {
             var shared = IntersectAll(people.Select(person => person.Solo[day]));

@@ -23,7 +23,7 @@ public sealed class VisionPageInkProbeTests : IDisposable
 
     private static readonly Session Cardio = new(SessionKind.OutdoorCardio, TimeSpan.FromMinutes(35), true, [new("Warm-up walk"), new("Brisk walk"), new("Cool-down walk")]);
 
-    private static readonly string Name = DeliveredName.For(DeliveryKind.Workout, Day(0), Sam);
+    private static readonly string Name = DeliveredName.For(DeliveryKind.Workout, MondayDay(0), Sam);
 
     private sealed class Vision(Func<ExpectedDocument, InkDocumentRead> answer) : IInkVision
     {

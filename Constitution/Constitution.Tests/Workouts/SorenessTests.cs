@@ -531,7 +531,7 @@ public class SorenessTests
         var model = sore.PageModel(Sam, Day(3))!;
 
         Assert.Equal("left knee", model.Place);
-        Assert.Equal("Nov 3", model.Since);
+        Assert.Equal("Nov 2", model.Since);
         Assert.Equal(3, model.DaysSore);
         Assert.False(model.DoctorNoteDue);
     }
@@ -644,7 +644,7 @@ public class SorenessTests
         var note = Assert.Single(root.GetProperty("notes").EnumerateArray());
         Assert.Equal(["area", "doctorNotePrinted", "noted", "person", "place"], note.EnumerateObject().Select(item => item.Name).Order().ToArray());
         Assert.Equal("knee", note.GetProperty("area").GetString());
-        Assert.Equal("2026-11-03", note.GetProperty("noted").GetString());
+        Assert.Equal("2026-11-02", note.GetProperty("noted").GetString());
     }
 
     [Theory]

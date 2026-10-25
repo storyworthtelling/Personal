@@ -64,7 +64,7 @@ public static class LeaseWriter
     /// <summary>
     /// Does what a decision asked: writes the claim for a Take, withdraws it for a Release, and leaves the
     /// document alone for a Plan or a DoNotPlan. The decision's own week is the one written, so a pass that
-    /// crosses the Monday boundary cannot claim the wrong week.
+    /// crosses the Sunday boundary cannot claim the wrong week.
     /// </summary>
     public static HouseholdDocument Apply(HouseholdDocument document, LeaseDecision decision, HybridLogicalClock clock, string install, RosterRole role, DateTimeOffset now, TimeZoneInfo householdZone, TimeSpan lease)
     {

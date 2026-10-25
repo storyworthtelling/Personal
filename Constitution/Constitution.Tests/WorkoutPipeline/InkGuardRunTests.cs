@@ -100,17 +100,17 @@ public sealed class InkGuardRunTests : IDisposable
     {
         rig.BothAreEstablished();
         var sunday = new Session(SessionKind.GentleWalk, TimeSpan.FromMinutes(30), false, [new Exercise("Easy walk")]);
-        rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, 6, 14, sunday)));
-        var request = rig.Request(Est(11, 8, 6)) with { Equipment = EquipmentSet.Of([]) };
+        rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, -1, 14, sunday)));
+        var request = rig.Request(Est(11, 1, 6)) with { Equipment = EquipmentSet.Of([]) };
         await rig.PlannedAsync(request);
-        rig.Conditions.Read = ConditionsRead.Of(WorkoutWeekRunTests.RainAcross(6, 6, 18));
+        rig.Conditions.Read = ConditionsRead.Of(WorkoutWeekRunTests.RainAcross(-1, 6, 18));
         rig.InkProbe.Answer = InkProbe.HasInk;
 
-        var report = await rig.PlannedAsync(request with { Now = Est(11, 8, 10) });
+        var report = await rig.PlannedAsync(request with { Now = Est(11, 1, 10) });
 
         Assert.Equal(DocumentVerdict.Kept, Assert.Single(report.Documents).Verdict);
-        Assert.Equal([NameOf(Sam, 6)], rig.Tablet.Titles.Values);
-        Assert.NotNull(rig.Delivered.Find(NameOf(Sam, 6)));
+        Assert.Equal([NameOf(Sam, -1)], rig.Tablet.Titles.Values);
+        Assert.NotNull(rig.Delivered.Find(NameOf(Sam, -1)));
         Assert.Single(rig.Expected.Outstanding());
     }
 
@@ -187,5 +187,5 @@ public sealed class InkGuardRunTests : IDisposable
 // The title a page is delivered under, for the tests of this file.
 internal static class DeliveryNaming
 {
-    public static string NameOf(string person, int dayOffset) => DeliveredName.For(DeliveryKind.Workout, Day(dayOffset), person);
+    public static string NameOf(string person, int dayOffset) => DeliveredName.For(DeliveryKind.Workout, MondayDay(dayOffset), person);
 }

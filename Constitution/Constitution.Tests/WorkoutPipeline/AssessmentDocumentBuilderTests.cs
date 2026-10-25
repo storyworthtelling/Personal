@@ -93,8 +93,8 @@ public class AssessmentDocumentBuilderTests
     {
         var session = Of(PlannedTest.TimedWalk);
 
-        Assert.Equal("The other sessions are on Wednesday and Friday.", Build(session, 1, 3, Day(2), Day(4)).Schedule);
-        Assert.Equal("The other session is on Friday.", Build(session, 1, 2, Day(4)).Schedule);
+        Assert.Equal("The other sessions are on Wednesday and Friday.", Build(session, 1, 3, Day(3), Day(5)).Schedule);
+        Assert.Equal("The other session is on Friday.", Build(session, 1, 2, Day(5)).Schedule);
         Assert.Equal("This is the only session this week.", Build(session, 1, 1).Schedule);
     }
 

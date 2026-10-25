@@ -72,20 +72,20 @@ public class WorkoutPlannerTests
     [Fact]
     public void ASessionIsSizedToItsGapNotTheOtherWayRound()
     {
-        // 35 free minutes: the 40-minute strength session shrinks to 35 rather than overrunning.
-        var calendars = Calendars(sam: [.. OnlyFree(0, (17, 25), (18, 0)), .. BlockDays(1, 2, 3, 4, 5, 6)]);
+        // 35 free minutes on Monday: the 40-minute strength session shrinks to 35 rather than overrunning.
+        var calendars = Calendars(sam: [.. OnlyFree(1, (17, 25), (18, 0)), .. BlockDays(0, 2, 3, 4, 5, 6)]);
 
         var session = Assert.Single(SamOf(Plan(calendars, bothAdults: false)).Sessions);
 
         Assert.Equal(TimeSpan.FromMinutes(35), session.Session.Duration);
-        Assert.Equal(At(0, 18, 0), session.End);
+        Assert.Equal(At(1, 18, 0), session.End);
     }
 
     [Fact]
     public void AGapOfWholeHoursStillGetsABeginnerSizedSession()
     {
         // Saturday is the only free day, free from 6:30 to 6 pm: eleven hours does not become an eleven-hour workout.
-        var session = SamOf(Plan(Calendars(sam: BlockDays(0, 1, 2, 3, 4, 6)), bothAdults: false)).Sessions.Single();
+        var session = SamOf(Plan(Calendars(sam: BlockDays(0, 1, 2, 3, 4, 5)), bothAdults: false)).Sessions.Single();
 
         Assert.True(session.Session.Duration <= TimeSpan.FromMinutes(45));
     }
@@ -144,30 +144,30 @@ public class WorkoutPlannerTests
     public void NothingFallsOutsideWakingHours()
     {
         // Saturday is the only free day and is free all day; the planner must not offer the small hours.
-        var saturday = SamOf(Plan(Calendars(sam: BlockDays(0, 1, 2, 3, 4, 6)), bothAdults: false)).SessionsOn(Day(5)).Single();
+        var saturday = SamOf(Plan(Calendars(sam: BlockDays(0, 1, 2, 3, 4, 5)), bothAdults: false)).SessionsOn(Day(6)).Single();
 
-        Assert.Equal(At(5, 6, 30), saturday.Gap.Start);
-        Assert.Equal(At(5, 18, 0), saturday.Gap.End);
+        Assert.Equal(At(6, 6, 30), saturday.Gap.Start);
+        Assert.Equal(At(6, 18, 0), saturday.Gap.End);
     }
 
     [Fact]
     public void TheWakingHoursAreTheCallersToChange()
     {
-        var calendars = Calendars(sam: BlockDays(0, 1, 2, 3, 4, 6));
+        var calendars = Calendars(sam: BlockDays(0, 1, 2, 3, 4, 5));
         var request = Request(calendars, bothAdults: false) with { Settings = new WorkoutSettings { WakingStart = new TimeOnly(9, 0), WakingEnd = new TimeOnly(12, 0) } };
 
-        var saturday = WorkoutPlanner.Plan(request).PlanFor(Sam)!.SessionsOn(Day(5)).Single();
+        var saturday = WorkoutPlanner.Plan(request).PlanFor(Sam)!.SessionsOn(Day(6)).Single();
 
-        Assert.Equal(At(5, 9, 0), saturday.Gap.Start);
-        Assert.Equal(At(5, 12, 0), saturday.Gap.End);
+        Assert.Equal(At(6, 9, 0), saturday.Gap.Start);
+        Assert.Equal(At(6, 12, 0), saturday.Gap.End);
     }
 
     [Fact]
     public void AWeekWithAClockChangeKeepsWakingHoursOnTheWallClock()
     {
-        // The week of 26 October ends with the clocks going back (Sunday 1 November, a 25-hour day):
+        // The week of 1 November opens with the clocks going back (that Sunday is a 25-hour day):
         // the family walk still opens at 6:30 and ends at dinner, 6 pm, both on standard time (UTC-5).
-        var request = Request(Calendars(), weekShift: -7, now: Est(10, 20, 12));
+        var request = Request(Calendars(), now: Est(10, 30, 12));
 
         var walk = Assert.Single(WorkoutPlanner.Plan(request).JointSessions);
 
@@ -478,20 +478,20 @@ public class WorkoutPlannerTests
     [Fact]
     public void ASundayCarriesNoMobilityEvenWhenTheWeekIsOtherwiseFull()
     {
-        // Every weekday is spoken for: the only free day is Sunday.
-        var week = SamOf(Plan(Calendars(sam: BlockDays(0, 1, 2, 3, 4, 5)), bothAdults: false));
+        // Every other day is spoken for: the only free day is Sunday, the week's first.
+        var week = SamOf(Plan(Calendars(sam: BlockDays(1, 2, 3, 4, 5, 6)), bothAdults: false));
 
         var sunday = Assert.Single(week.Sessions);
-        Assert.Equal(Day(6), sunday.Day);
+        Assert.Equal(Day(0), sunday.Day);
         Assert.Equal(SessionKind.GentleWalk, sunday.Session.Kind);
     }
 
     [Fact]
     public void ASundayWalkIsThirtyMinutesAlone()
     {
-        var calendars = Calendars(lee: BlockDay(6));
+        var calendars = Calendars(lee: BlockDay(0));
 
-        var sunday = SamOf(Plan(calendars)).SessionsOn(Day(6)).Single();
+        var sunday = SamOf(Plan(calendars)).SessionsOn(Day(0)).Single();
 
         Assert.False(sunday.IsJoint);
         Assert.Equal([Sam], sunday.Participants);
@@ -602,25 +602,49 @@ public class WorkoutPlannerTests
         var plan = Plan(Calendars());
 
         var walk = Assert.Single(plan.JointSessions, item => item.Together == Together.FamilyWalk);
-        Assert.Equal(Day(6), walk.Day);
+        Assert.Equal(Day(0), walk.Day);
         Assert.Equal(SessionKind.GentleWalk, walk.Session.Kind);
         Assert.Equal([Sam, Lee], walk.Participants);
-        Assert.Equal([walk], SamOf(plan).SessionsOn(Day(6)));
-        Assert.Equal([walk], LeeOf(plan).SessionsOn(Day(6)));
+        Assert.Equal([walk], SamOf(plan).SessionsOn(Day(0)));
+        Assert.Equal([walk], LeeOf(plan).SessionsOn(Day(0)));
         // The children are awake: it ends before their routine begins at 7:15 pm.
-        Assert.True(walk.Gap.End <= At(6, 19, 15));
-        Assert.True(walk.End <= At(6, 19, 15));
+        Assert.True(walk.Gap.End <= At(0, 19, 15));
+        Assert.True(walk.End <= At(0, 19, 15));
         Assert.Contains(walk, plan.FamilyCalendarSessions);
+    }
+
+    [Fact]
+    public void AHardSaturdayKeepsSundayGentle()
+    {
+        // The week opens on Sunday; a hard session on the Saturday before it is next to that Sunday, which holds only a gentle walk.
+        var recovery = RecoveryInputs.Fresh with { LastHardSessionDay = WeekStart.AddDays(-1) };
+
+        var sam = SamOf(Plan(Calendars(), bothAdults: false, sam: recovery));
+
+        Assert.All(sam.SessionsOn(Day(0)), session => Assert.Equal(SessionKind.GentleWalk, session.Session.Kind));
+        Assert.DoesNotContain(sam.Sessions, session => SessionKinds.IsHard(session.Session.Kind) && session.Day == Day(0));
+    }
+
+    [Fact]
+    public void MondayMayFollowAHardSaturday()
+    {
+        // Saturday is two days before Monday, so Monday may hold a hard session: the week boundary adds no extra rest.
+        var recovery = RecoveryInputs.Fresh with { LastHardSessionDay = WeekStart.AddDays(-1) };
+        var calendars = Calendars(sam: BlockDays(0, 2, 3, 4, 5, 6));
+
+        var sam = SamOf(Plan(calendars, bothAdults: false, sam: recovery));
+
+        Assert.Contains(sam.SessionsOn(Day(1)), session => SessionKinds.IsHard(session.Session.Kind));
     }
 
     [Fact]
     public void AFamilyWalkNeedsBothAdultsFreeOnSunday()
     {
-        var plan = Plan(Calendars(lee: BlockDay(6)));
+        var plan = Plan(Calendars(lee: BlockDay(0)));
 
         Assert.Empty(plan.JointSessions);
-        Assert.Single(SamOf(plan).SessionsOn(Day(6)));
-        Assert.Empty(LeeOf(plan).SessionsOn(Day(6)));
+        Assert.Single(SamOf(plan).SessionsOn(Day(0)));
+        Assert.Empty(LeeOf(plan).SessionsOn(Day(0)));
     }
 
     [Fact]
@@ -629,8 +653,8 @@ public class WorkoutPlannerTests
         var plan = Plan(Calendars());
 
         var walk = plan.JointSessions.Single();
-        Assert.Same(walk, SamOf(plan).SessionsOn(Day(6)).Single());
-        Assert.Same(walk, LeeOf(plan).SessionsOn(Day(6)).Single());
+        Assert.Same(walk, SamOf(plan).SessionsOn(Day(0)).Single());
+        Assert.Same(walk, LeeOf(plan).SessionsOn(Day(0)).Single());
     }
 
     [Fact]

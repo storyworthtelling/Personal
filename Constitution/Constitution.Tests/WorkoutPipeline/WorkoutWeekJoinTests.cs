@@ -15,46 +15,56 @@ public class WorkoutWeekJoinTests
 
     private static HouseholdSetupRead Configured() => new HouseholdSetupRead.Configured(HouseholdData.Setup() with { ZoneId = null });
 
+    private static DateOnly WeekOf(DateTimeOffset now) =>
+        Assert.IsType<WorkoutWeekPreparation.Ready>(Prepare(Configured(), now)).Request.WeekStart;
+
     [Fact]
-    public void MondayIsItsOwnWeek()
+    public void SundayIsItsOwnWeek()
     {
-        Assert.Equal(new DateOnly(2026, 10, 26), WorkoutWeekJoin.MondayOf(Edt(10, 26, 0, 5), Zone));
+        Assert.Equal(new DateOnly(2026, 10, 25), WeekOf(Edt(10, 25, 0, 5)));
     }
 
     [Fact]
-    public void SundayNightIsStillTheOldWeek()
+    public void SaturdayNightIsStillTheOldWeek()
     {
-        Assert.Equal(new DateOnly(2026, 10, 26), WorkoutWeekJoin.MondayOf(Est(11, 1, 23, 30), Zone));
+        Assert.Equal(new DateOnly(2026, 10, 25), WeekOf(Edt(10, 31, 23, 30)));
     }
 
     [Fact]
-    public void MondayMorningStartsTheNewWeek()
+    public void SundayMorningStartsTheNewWeek()
     {
-        Assert.Equal(new DateOnly(2026, 11, 2), WorkoutWeekJoin.MondayOf(Est(11, 2, 0, 30), Zone));
+        Assert.Equal(new DateOnly(2026, 11, 1), WeekOf(Edt(11, 1, 0, 30)));
+    }
+
+    [Fact]
+    public void MondayIsInsideTheSundayWeek()
+    {
+        Assert.Equal(new DateOnly(2026, 10, 25), WeekOf(Edt(10, 26, 0, 5)));
     }
 
     [Fact]
     public void AnInstantInUtcIsReadOnTheOwnersClock()
     {
-        var lateSunday = new DateTimeOffset(2026, 11, 2, 4, 30, 0, TimeSpan.Zero);
-        var earlyMonday = new DateTimeOffset(2026, 11, 2, 5, 30, 0, TimeSpan.Zero);
+        var lateSaturday = new DateTimeOffset(2026, 11, 1, 3, 30, 0, TimeSpan.Zero);
+        var earlySunday = new DateTimeOffset(2026, 11, 1, 4, 30, 0, TimeSpan.Zero);
 
-        Assert.Equal(new DateOnly(2026, 10, 26), WorkoutWeekJoin.MondayOf(lateSunday, Zone));
-        Assert.Equal(new DateOnly(2026, 11, 2), WorkoutWeekJoin.MondayOf(earlyMonday, Zone));
+        Assert.Equal(new DateOnly(2026, 10, 25), WeekOf(lateSaturday));
+        Assert.Equal(new DateOnly(2026, 11, 1), WeekOf(earlySunday));
     }
 
     [Fact]
-    public void TheSpringForwardWeekKeepsItsMonday()
+    public void TheSpringForwardWeekKeepsItsSunday()
     {
-        Assert.Equal(new DateOnly(2026, 3, 2), WorkoutWeekJoin.MondayOf(Edt(3, 8, 23, 30), Zone));
-        Assert.Equal(new DateOnly(2026, 3, 9), WorkoutWeekJoin.MondayOf(Edt(3, 9, 0, 30), Zone));
+        Assert.Equal(new DateOnly(2026, 3, 1), WeekOf(Est(3, 7, 23, 30)));
+        Assert.Equal(new DateOnly(2026, 3, 8), WeekOf(Est(3, 8, 0, 30)));
+        Assert.Equal(new DateOnly(2026, 3, 8), WeekOf(Edt(3, 8, 12, 30)));
     }
 
     [Fact]
-    public void TheFallBackSundayKeepsItsMonday()
+    public void TheFallBackSundayOpensItsOwnWeek()
     {
-        Assert.Equal(new DateOnly(2026, 10, 26), WorkoutWeekJoin.MondayOf(Edt(11, 1, 1, 30), Zone));
-        Assert.Equal(new DateOnly(2026, 10, 26), WorkoutWeekJoin.MondayOf(Est(11, 1, 1, 30), Zone));
+        Assert.Equal(new DateOnly(2026, 11, 1), WeekOf(Edt(11, 1, 1, 30)));
+        Assert.Equal(new DateOnly(2026, 11, 1), WeekOf(Est(11, 1, 1, 30)));
     }
 
     [Fact]
@@ -68,13 +78,13 @@ public class WorkoutWeekJoinTests
     }
 
     [Fact]
-    public void AConfiguredSetupGivesTheMondayAndTheClock()
+    public void ASetupGivesTheSundayAndTheClock()
     {
         var now = Est(11, 4, 6, 45);
 
         var ready = Assert.IsType<WorkoutWeekPreparation.Ready>(Prepare(Configured(), now));
 
-        Assert.Equal(new DateOnly(2026, 11, 2), ready.Request.WeekStart);
+        Assert.Equal(new DateOnly(2026, 11, 1), ready.Request.WeekStart);
         Assert.Equal(now, ready.Request.Now);
         Assert.Equal(Zone.GetUtcOffset(now), ready.Request.Now.Offset);
     }

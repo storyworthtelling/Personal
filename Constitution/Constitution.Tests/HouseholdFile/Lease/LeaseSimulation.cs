@@ -36,7 +36,7 @@ internal sealed class LeaseSimulation
     private readonly Random random;
     private readonly SimPhone[] phones;
     private readonly PriorityQueue<int, (int Minute, int Tie)> queue = new();
-    private readonly DateTimeOffset start = Edt(10, 19, 6);
+    private readonly DateTimeOffset start = Edt(10, 18, 6);
     private HouseholdDocument file = HouseholdDocument.Empty;
 
     private LeaseSimulation(int seed)
@@ -199,14 +199,14 @@ internal sealed class LeaseSimulation
         // Passes cluster where claims collide. A phone that is up wakes as the week opens when that is within a
         // gap's reach; a phone that was dark comes back as a week opens half the time (the owner returning at the
         // minute the partner is deciding it is silent); and passes often land on the half hour.
-        var nextMonday = MinutesToNextMonday(minute);
-        if (!dark && nextMonday - minute <= MaxGapMinutes && random.Next(100) < 70)
+        var nextWeek = MinutesToNextWeek(minute);
+        if (!dark && nextWeek - minute <= MaxGapMinutes && random.Next(100) < 70)
         {
-            next = nextMonday + random.Next(0, 3);
+            next = nextWeek + random.Next(0, 3);
         }
         else if (dark && random.Next(2) == 0)
         {
-            next = MinutesToNextMonday(next - 1) + random.Next(0, 3);
+            next = MinutesToNextWeek(next - 1) + random.Next(0, 3);
         }
         else if (random.Next(2) == 0)
         {
@@ -216,7 +216,7 @@ internal sealed class LeaseSimulation
         Schedule(index, next);
     }
 
-    private int MinutesToNextMonday(int minute)
+    private int MinutesToNextWeek(int minute)
     {
         var week = LeaseWeek.IndexOf(start.AddMinutes(minute), Zone);
         return (int)(LeaseWeek.StartOf(week + 1, Zone) - start).TotalMinutes;

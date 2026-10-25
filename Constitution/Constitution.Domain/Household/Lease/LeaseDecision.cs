@@ -32,7 +32,7 @@ public enum LeaseReason
 
     /// <summary>
     /// Another install holds the week and has gone quiet past the lease. A standing claim stays its holder's
-    /// until the Monday, because the holder may already have planned; the lease changes hands at the boundary.
+    /// until the week turns over on Sunday, because the holder may already have planned; the lease changes hands at the boundary.
     /// </summary>
     HolderGoneQuiet,
 

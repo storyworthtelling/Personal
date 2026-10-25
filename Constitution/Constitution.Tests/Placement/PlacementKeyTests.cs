@@ -43,11 +43,13 @@ public class PlacementKeyTests
     [Fact]
     public void TheWeekIndexIsTheWeekNumber()
     {
-        var monday = new DateOnly(2026, 11, 2);
+        // The household's week runs Sunday to Saturday: Sunday 1 November opens week 105703, and the Monday after it is in it.
+        var sunday = new DateOnly(2026, 11, 1);
 
-        Assert.Equal(105703, PlacementKey.WeekIndexOf(monday));
-        Assert.Equal(PlacementKey.WeekIndexOf(monday), PlacementKey.WeekIndexOf(monday.AddDays(6)));
-        Assert.Equal(PlacementKey.WeekIndexOf(monday) + 1, PlacementKey.WeekIndexOf(monday.AddDays(7)));
+        Assert.Equal(105703, PlacementKey.WeekIndexOf(sunday));
+        Assert.Equal(105703, PlacementKey.WeekIndexOf(sunday.AddDays(1)));
+        Assert.Equal(PlacementKey.WeekIndexOf(sunday), PlacementKey.WeekIndexOf(sunday.AddDays(6)));
+        Assert.Equal(PlacementKey.WeekIndexOf(sunday) + 1, PlacementKey.WeekIndexOf(sunday.AddDays(7)));
     }
 
     [Fact]

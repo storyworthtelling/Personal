@@ -13,7 +13,7 @@ using static Constitution.Tests.Workouts.WorkoutFixture;
 namespace Constitution.Tests.WorkoutPipeline;
 
 /// <summary>
-/// The weekly run with every seam faked, on the invented household: Sam and Lee, the week of Monday 2 November 2026 on
+/// The weekly run with every seam faked, on the invented household: Sam and Lee, the household week of Sunday 1 November 2026, run on its Monday morning, on
 /// standard time. The calendar the run reads never holds the events it wrote (that is the seam's rule), so what the run
 /// wrote lives on <see cref="Writer"/> only.
 /// </summary>
@@ -114,11 +114,11 @@ internal sealed class WeekRig : IDisposable
 
     /// <summary>The free stretch of the person's day that holds this hour.</summary>
     public FreeGap GapAt(string person, int dayOffset, int hour) =>
-        BusyOf(person).FreeGaps(At(dayOffset, 6, 30), At(dayOffset, 21, 30), TimeSpan.FromMinutes(30))
-            .First(gap => gap.Start <= At(dayOffset, hour) && At(dayOffset, hour) < gap.End);
+        BusyOf(person).FreeGaps(MondayAt(dayOffset, 6, 30), MondayAt(dayOffset, 21, 30), TimeSpan.FromMinutes(30))
+            .First(gap => gap.Start <= MondayAt(dayOffset, hour) && MondayAt(dayOffset, hour) < gap.End);
 
     public PlannedSession Session(string person, int dayOffset, int hour, Session session) =>
-        new(Day(dayOffset), At(dayOffset, hour), GapAt(person, dayOffset, hour), session, [person], Together.None);
+        new(MondayDay(dayOffset), MondayAt(dayOffset, hour), GapAt(person, dayOffset, hour), session, [person], Together.None);
 
     /// <summary>A week for both adults from the sessions given; whoever has none gets an empty week with its reason.</summary>
     public static HouseholdWorkoutPlan PlanOfSessions(params PlannedSession[] sessions)

@@ -257,9 +257,11 @@ public class SkipLedgerTests
     }
 
     [Fact]
-    public void LastWeekRunsFromTheMondayBackToTheSunday()
+    public void LastWeekRunsFromSundayToSaturday()
     {
-        // Day -7 is last week's first day and day -1 its last; day -8 and day 0 are neither.
+        // Day -7 is last week's first day, a Sunday, and day -1 its last, a Saturday; day -8 and day 0 are neither.
+        Assert.Equal(DayOfWeek.Sunday, Day(-7).DayOfWeek);
+        Assert.Equal(DayOfWeek.Saturday, Day(-1).DayOfWeek);
         var ledger = SkipLedger.Empty
             .Settle(Marks(-8), AllEmpty())
             .Settle(Marks(-7), AllEmpty())
@@ -339,7 +341,7 @@ public class SkipLedgerTests
         var ledger = SkipLedger.Empty.Settle(Marks(0), AllEmpty());
 
         Assert.Equal(
-            "{\"version\":1,\"records\":[{\"person\":\"Sam\",\"day\":\"2026-11-02\",\"kind\":\"strength\",\"outcome\":\"skipped\"}]}",
+            "{\"version\":1,\"records\":[{\"person\":\"Sam\",\"day\":\"2026-11-01\",\"kind\":\"strength\",\"outcome\":\"skipped\"}]}",
             ledger.ToJson());
     }
 
@@ -422,7 +424,7 @@ public class SkipLedgerTests
         Assert.False(read.WholeFileUnreadable);
         Assert.Equal(4, read.UnreadableEntries);
         Assert.Equal(
-            [new SessionRecord(Sam, Day(0), SessionKind.Strength, SessionOutcome.Done), new SessionRecord(Lee, Day(4), SessionKind.Mobility, SessionOutcome.Skipped)],
+            [new SessionRecord(Sam, Day(1), SessionKind.Strength, SessionOutcome.Done), new SessionRecord(Lee, Day(5), SessionKind.Mobility, SessionOutcome.Skipped)],
             read.Ledger.Records.ToArray());
     }
 

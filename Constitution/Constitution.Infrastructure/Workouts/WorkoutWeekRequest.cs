@@ -10,7 +10,7 @@ namespace Constitution.Infrastructure.Workouts;
 /// What one run is asked: which week, when it is, who the household is, what is ticked in Settings, and whose pages this
 /// install delivers. The people planned are the rules' adults.
 /// </summary>
-/// <param name="WeekStart">The Monday of the week; any other day is refused (a session's key names its weekday within the week).</param>
+/// <param name="WeekStart">The first day of the household's week (a Sunday, see PlanningWeek); any other day is refused (a session's key names its weekday within the week).</param>
 /// <param name="Now">The moment of the run, on the household's clock offset. Nothing reads another clock.</param>
 /// <param name="DeliverFor">The adults whose pages this phone puts on its tablet (each phone is paired to its own tablet, D85). Every name must be one of the rules' adults.</param>
 public sealed record WorkoutWeekRequest(

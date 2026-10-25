@@ -43,7 +43,7 @@ public sealed record WorkoutSettings
 /// Everything <see cref="WorkoutPlanner.Plan"/> reads, passed in: no clock, no store, no hidden state.
 /// <see cref="Now"/> is the clock; nothing before it is planned.
 /// </summary>
-/// <param name="WeekStart">The first of seven consecutive days (a Monday in practice; only the date is used).</param>
+/// <param name="WeekStart">The first of seven consecutive days (a Sunday in practice, the household's first day; only the date is used).</param>
 /// <param name="Rules">The household rules; the zone and the children's bedtime come from here.</param>
 /// <param name="People">One entry per adult to plan for. Two or more allows joint sessions.</param>
 /// <param name="Equipment">What this install has ticked in Settings.</param>

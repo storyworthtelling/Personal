@@ -28,15 +28,6 @@ public abstract record WorkoutWeekPreparation
 /// <summary>Joins the household's setup, the equipment checklist, the owner's moves and the clock into the run's request. Pure.</summary>
 public static class WorkoutWeekJoin
 {
-    /// <summary>The Monday of the household's current week: the day on its own clock, then back to Monday. A DST change inside the week moves nothing, since days are dates.</summary>
-    public static DateOnly MondayOf(DateTimeOffset now, TimeZoneInfo zone)
-    {
-        ArgumentNullException.ThrowIfNull(zone);
-        var day = ZoneClock.DayOf(now, zone);
-        var sinceMonday = ((int)day.DayOfWeek + 6) % 7;
-        return day.AddDays(-sinceMonday);
-    }
-
     /// <summary>
     /// The request, or the typed reason to plan nothing: no household setup (not saved, or unreadable) is
     /// <see cref="NotPlannedBecause.NotConfigured"/> with the setup's own sentence, which quotes nothing the household wrote.
@@ -58,7 +49,7 @@ public static class WorkoutWeekJoin
         var made = SetupRules.From(configured.Setup, workScheduleJson, phoneZone);
         var onTheirClock = TimeZoneInfo.ConvertTime(now, made.Rules.Zone);
         var request = new WorkoutWeekRequest(
-            MondayOf(now, made.Rules.Zone),
+            PlanningWeek.StartOf(now, made.Rules.Zone),
             onTheirClock,
             made.Rules,
             equipment,

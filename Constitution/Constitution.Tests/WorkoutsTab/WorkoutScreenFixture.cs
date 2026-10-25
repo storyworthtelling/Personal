@@ -9,8 +9,8 @@ namespace Constitution.Tests.WorkoutsTab;
 
 /// <summary>
 /// The invented fortnight the Workouts tab tests stand on. Today is Tuesday 3 November 2026 at 7 am (standard time), so the
-/// window runs Wednesday 4th to Tuesday 10th across two plan weeks. Sam's week: Tue strength, Wed mobility, Thu strength,
-/// Fri rest, Sat treadmill, Sun a gentle walk; the next Monday strength and Tuesday mobility. Nothing in it breaks a rule.
+/// window runs Wednesday 4th to Tuesday 10th across two plan weeks (Sunday 1st and Sunday 8th). Sam's first week: Tue strength,
+/// Wed mobility, Thu strength, Fri rest, Sat treadmill; the second opens with Sunday's gentle walk, then Monday strength and Tuesday mobility. Nothing in it breaks a rule.
 /// </summary>
 internal static class WorkoutScreenFixture
 {
@@ -91,7 +91,7 @@ internal static class WorkoutScreenFixture
             WorkoutFixture.Request(shared, equipment, now: Now, bothAdults: false),
             new HouseholdWorkoutPlan(
                 WorkoutFixture.WeekStart,
-                [new WeeklyPlan(Sam, WorkoutFixture.WeekStart, [TueStrength(), WedMobility(), ThuStrength(), SatTreadmill(), SunWalk(sundayTogether)], null)],
+                [new WeeklyPlan(Sam, WorkoutFixture.WeekStart, [TueStrength(), WedMobility(), ThuStrength(), SatTreadmill()], null)],
                 []));
         var weeks = new List<WorkoutWeek> { week0 };
         if (nextWeek)
@@ -99,7 +99,7 @@ internal static class WorkoutScreenFixture
             var start = WorkoutFixture.WeekStart.AddDays(7);
             weeks.Add(new WorkoutWeek(
                 WorkoutFixture.Request(shared, equipment, now: Now, bothAdults: false, weekShift: 7),
-                new HouseholdWorkoutPlan(start, [new WeeklyPlan(Sam, start, [MonStrength(), NextTueMobility()], null)], [])));
+                new HouseholdWorkoutPlan(start, [new WeeklyPlan(Sam, start, [SunWalk(sundayTogether), MonStrength(), NextTueMobility()], null)], [])));
         }
 
         return new WorkoutsSnapshot(Sam, Tue, Now, weeks, Facts(), skips ?? SkipLedger.Empty);

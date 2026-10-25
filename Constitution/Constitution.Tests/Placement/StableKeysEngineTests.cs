@@ -257,19 +257,19 @@ public class StableKeysEngineTests
     [InlineData(4)]
     [InlineData(5)]
     [InlineData(6)]
-    public void AWeekThatDoesNotBeginOnAMondayIsRefused(int dayOffset)
+    public void ABadWeekStartIsRefused(int dayOffset)
     {
         var request = Request(KeyAssignments.Empty, Strength(2)) with { WeekStart = Day(dayOffset) };
 
         var plan = Assert.Throws<ArgumentException>(() => PlacementEngine.Plan(request, Fresh));
         var wanted = Assert.Throws<ArgumentException>(() => PlacementEngine.Wanted(request));
 
-        Assert.Contains("Monday", plan.Message, StringComparison.Ordinal);
-        Assert.Contains("Monday", wanted.Message, StringComparison.Ordinal);
+        Assert.Contains("Sunday", plan.Message, StringComparison.Ordinal);
+        Assert.Contains("Sunday", wanted.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void AMondayIsAccepted()
+    public void ASundayIsAccepted()
     {
         var plan = PlacementEngine.Plan(Request(KeyAssignments.Empty, Strength(2)), Fresh);
 

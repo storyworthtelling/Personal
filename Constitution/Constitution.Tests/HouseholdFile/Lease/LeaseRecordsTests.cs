@@ -184,9 +184,9 @@ public class LeaseRecordsTests
     [Fact]
     public void ATakeUsesTheWeekOfNowOnTheHouseholdClock()
     {
-        // 03:30 UTC on Monday 2 November is still Sunday evening at home: the claim is for the week that is ending.
-        var sundayAtHome = new DateTimeOffset(2026, 11, 2, 3, 30, 0, TimeSpan.Zero);
-        var document = LeaseWriter.Take(HouseholdDocument.Empty, new HybridLogicalClock(), Sam, RosterRole.Owner, sundayAtHome, Zone, Lease);
+        // 03:30 UTC on Sunday 1 November is still Saturday evening at home: the claim is for the week that is ending.
+        var saturdayAtHome = new DateTimeOffset(2026, 11, 1, 3, 30, 0, TimeSpan.Zero);
+        var document = LeaseWriter.Take(HouseholdDocument.Empty, new HybridLogicalClock(), Sam, RosterRole.Owner, saturdayAtHome, Zone, Lease);
 
         Assert.NotNull(document.Live(LeaseKeys.ClaimKey(LeaseWeek.IndexOf(Edt(10, 27, 9), Zone))));
     }

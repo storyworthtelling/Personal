@@ -133,7 +133,7 @@ public sealed class WeekRecordSnapshotTests
     {
         var (_, record) = await Planned();
 
-        Assert.IsType<WorkoutsRead.Ready>(WeekRecordSnapshot.From(record, Inputs(Est(11, 8, 23, 30))));
+        Assert.IsType<WorkoutsRead.Ready>(WeekRecordSnapshot.From(record, Inputs(Est(11, 7, 23, 30))));
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public sealed class WeekRecordSnapshotTests
     {
         using var rig = new WeekRig();
         rig.BothAreEstablished();
-        var shared = rig.Session(Sam, 6, 14, Walk) with { Participants = [Sam, Lee], Together = Together.AfterBedtime };
+        var shared = rig.Session(Sam, -1, 14, Walk) with { Participants = [Sam, Lee], Together = Together.AfterBedtime };
         rig.AuthorWith(_ => new HouseholdWorkoutPlan(WeekStart, [new WeeklyPlan(Sam, WeekStart, [shared], null), new WeeklyPlan(Lee, WeekStart, [shared], null)], [shared]));
         var record = WorkoutWeekRecordBuilder.From(await rig.PlannedAsync(), KeyAssignments.Empty, Est(11, 2, 5, 30), new DateOnly(2026, 11, 2));
 
