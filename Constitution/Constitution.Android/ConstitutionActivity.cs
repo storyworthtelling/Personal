@@ -21,6 +21,7 @@ using Constitution.ReadBack;
 using Constitution.WorkoutWeek;
 using Constitution.Services;
 using Constitution.Settings;
+using Constitution.WeeklyMeals;
 using Constitution.Waiting;
 using Constitution.WorkoutsTab;
 
@@ -90,12 +91,16 @@ public abstract class ConstitutionActivity : Activity
         mealsArea.Source = new HouseholdRecipeBox(household.Service);
         mealsArea.Keeper = new HouseholdRecipeKeeper(household.Service);
         mealsArea.Role = HouseholdInstallRoles.For(household.Role);
+
+        // The weekly meal run's saved week: Meals reads it for This week, Today for tonight's dinner card.
+        var savedMealWeek = MealWeekServices.Source(this);
+        mealsArea.WeekSource = savedMealWeek;
         household.Service.Changed += OnHouseholdChanged;
         bodyArea.SignalRequested += OpenSignal;
         firstRun = new FirstRunPage(this, RenderPage);
         ateFlow = new AteSomethingElseFlow(this, () => mealsArea?.Role ?? InstallRole.Unknown, () => mealsArea.CameraAllowed(), mealsArea.AskForCamera);
         mealsArea.Ate = ateFlow;
-        var todayArea = new TodayArea(this) { Ate = ateFlow };
+        var todayArea = new TodayArea(this) { Ate = ateFlow, MealWeek = savedMealWeek };
         var areas = new IConstitutionArea[]
         {
             todayArea,
