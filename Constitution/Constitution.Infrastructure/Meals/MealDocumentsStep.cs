@@ -121,6 +121,7 @@ public static class MealDocumentsStep
                 History = request.History,
                 SlowCookerCards = request.SlowCookerCards,
                 KidsMeals = request.KidsMeals,
+                Daily = request.Daily,
             });
             pdf = ConstitutionDocumentRenderer.Render(MealSheetDocument.Build(model));
             expected = ExpectedDocument.ForMealSheet(model, person);

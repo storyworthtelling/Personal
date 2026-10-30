@@ -4,6 +4,7 @@ using Constitution.Domain.Groceries;
 using Constitution.Domain.Meals;
 using Constitution.Domain.Meals.Pipeline;
 using Constitution.Domain.Meals.Screens;
+using Constitution.Domain.Meals.Templates;
 using Constitution.Domain.Placement;
 using Constitution.Domain.Workouts.Pipeline;
 using Constitution.Household;
@@ -104,7 +105,9 @@ public static class MealWeekServices
     /// The run's seams. No taste profile is kept anywhere yet, so the source says there is none. The documents step reuses the workout run's delivery side
     /// (<see cref="WorkoutWeekDeliverySeams"/>: the tablet client bound to this phone's pairing, the delivery service, the ink probe and the read-back's own
     /// record of expected documents), so a title means the same page to both, plus the meal run's own record of what it has sent. The holiday calendar is the
-    /// default that cannot be asked, so the sheet carries no ask-ahead page until a calendar reader exists.
+    /// default that cannot be asked, so the sheet carries no ask-ahead page until a calendar reader exists. The rotating templates read and keep their library in the
+    /// household file (<see cref="HouseholdTemplateLibrary"/>); no author is built yet (<see cref="NoTemplateAuthor"/>), so nothing is ever proposed and pages 2 and 3 are
+    /// printed only from templates already approved in the file.
     /// </summary>
     public static MealWeekSeams Assemble(Context appContext, CalendarSideSeams calendar)
     {
@@ -138,7 +141,8 @@ public static class MealWeekServices
             calendar.KeyAssignments,
             new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
             log,
-            documents);
+            documents,
+            new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), new NoTemplateAuthor()));
     }
 
     private static string FolderOf(Context appContext) => Path.Combine(NoBackupRoot(appContext), FolderName);

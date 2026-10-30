@@ -38,6 +38,11 @@ namespace Constitution.Infrastructure.Meals;
 /// meal sheet and each cooked dinner's recipe and put on this phone's tablet (<see cref="MealDocumentsStep"/>), after the week is saved and never when nothing was planned.
 /// A stop or a failure there is reported in <see cref="MealWeekReport.Documents"/> and never un-plans or un-saves the week.</para>
 ///
+/// <para><b>The rotating templates (D110).</b> When the run is given the library and an author (<see cref="MealWeekSeams.Templates"/>) as well as the means to deliver, the kept week
+/// goes through <see cref="MealTemplateStep"/> after placement and before the documents: it picks pages 2 and 3 from the approved templates, asks the author for new ones when
+/// the library is short, and saves the library with what it printed. The step is reached only after the lease, so the partner's phone never proposes or prints. A stop or a
+/// refusal there is reported in <see cref="MealWeekReport.Templates"/> and leaves the sheet at two pages; it never un-plans the week.</para>
+///
 /// <para>Anything the run cannot name is a bug and propagates with its stack.</para>
 /// </summary>
 public static class MealWeekRun
@@ -156,6 +161,14 @@ public static class MealWeekRun
             seams.Records.Save((record ?? MealWeekRecord.Empty).With(kept));
         }
 
+        // The rotating templates choose pages 2 and 3, and the library is saved with what they printed before any paper is made: a stop later never loses it.
+        // Only here, on the phone that plans the week and is about to build a sheet; a partner's phone never reaches this line.
+        MealTemplatesResult? templates = null;
+        if (seams.Documents is not null && seams.Templates is { } templateSeams)
+        {
+            templates = await MealTemplateStep.RunAsync(first, rules, inputs.Now, templateSeams, seams.Log, cancellation);
+        }
+
         // The documents follow the kept week, never the fresh one: an evening already over keeps the dinner it had, and the paper says what the calendar says.
         MealDocumentsResult? documents = null;
         if (seams.Documents is { } documentSeams)
@@ -167,6 +180,7 @@ public static class MealWeekRun
                     SlowCookerCards = inputs.Placement.SlowCookerCards,
                     KidsMeals = inputs.KidsMeals,
                     Ratings = TasteForTheWeek.LastRatings(taste),
+                    Daily = templates?.Daily,
                 },
                 documentSeams,
                 cancellation);
@@ -176,6 +190,7 @@ public static class MealWeekRun
             kept.Week, planned.Origin, planned.Reason, events, placement, trip is not null, save, earlierUnreadable)
         {
             Documents = documents,
+            Templates = templates,
         }));
     }
 

@@ -50,7 +50,7 @@ public static class TrailLines
     private static readonly HashSet<string> CountWords = new(StringComparer.Ordinal)
     {
         "reading", "readings", "record", "records", "usable", "field", "fields", "read", "not", "stored",
-        "pages", "documents", "questions", "sessions", "events", "people",
+        "pages", "documents", "questions", "sessions", "events", "people", "templates",
     };
 
     private static readonly HashSet<int> HttpStatuses = [200, 201, 204, 400, 401, 403, 404, 408, 429, 500, 502, 503, 504];
@@ -106,6 +106,7 @@ public static class TrailLines
         "date",
         "day",
         "days",
+        "deadline",
         "deleted",
         "delivered",
         "denied",
@@ -153,6 +154,7 @@ public static class TrailLines
         "late",
         "launch",
         "left",
+        "library",
         "line",
         "list",
         "loaded",
@@ -191,6 +193,7 @@ public static class TrailLines
         "parse",
         "partial",
         "passphrase",
+        "past",
         "people",
         "permission",
         "persist",
@@ -200,7 +203,9 @@ public static class TrailLines
         "plan",
         "planned",
         "planner",
+        "printed",
         "profile",
+        "proposed",
         "publish",
         "published",
         "questions",
@@ -263,6 +268,7 @@ public static class TrailLines
         "sync",
         "tablet",
         "taste",
+        "templates",
         "the",
         "this",
         "time",
