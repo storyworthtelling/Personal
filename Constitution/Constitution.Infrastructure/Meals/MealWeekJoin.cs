@@ -42,6 +42,8 @@ public static class MealWeekJoin
 
         var made = SetupRules.From(configured.Setup, workScheduleJson, phoneZone);
         var onTheirClock = TimeZoneInfo.ConvertTime(now, made.Rules.Zone);
-        return new MealWeekPreparation.Ready(new MealWeekRequestInputs(WeekFor(now, made.Rules.Zone), onTheirClock, made.Rules), made.Assumed);
+        return new MealWeekPreparation.Ready(
+            new MealWeekRequestInputs(WeekFor(now, made.Rules.Zone), onTheirClock, made.Rules) { DeliverFor = configured.Setup.DeliverFor },
+            made.Assumed);
     }
 }

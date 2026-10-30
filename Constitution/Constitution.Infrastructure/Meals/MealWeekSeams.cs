@@ -22,6 +22,7 @@ namespace Constitution.Infrastructure.Meals;
 /// <param name="KeyAssignments">The record of workout numbers issued, which placement keeps and reads.</param>
 /// <param name="Records">The planned weeks, for Today and the Meals tab.</param>
 /// <param name="Log">The Body trail's one-method seam.</param>
+/// <param name="Documents">What the documents step reaches (the tablet, the stores, the roster, the pantry); null plans the week and prints nothing.</param>
 public sealed record MealWeekSeams(
     Func<CancellationToken, Task<PlanningStanding>> Lease,
     IRecipeBoxSource Recipes,
@@ -33,4 +34,5 @@ public sealed record MealWeekSeams(
     IWrittenKeyStore WrittenKeys,
     IKeyAssignmentStore KeyAssignments,
     IMealWeekRecords Records,
-    IWorkoutWeekLog Log);
+    IWorkoutWeekLog Log,
+    MealDocumentSeams? Documents = null);

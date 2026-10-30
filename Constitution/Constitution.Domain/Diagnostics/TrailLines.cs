@@ -150,6 +150,7 @@ public static class TrailLines
         "kept",
         "key",
         "known",
+        "late",
         "launch",
         "left",
         "line",
@@ -186,6 +187,7 @@ public static class TrailLines
         "owner",
         "page",
         "pages",
+        "pantry",
         "parse",
         "partial",
         "passphrase",
@@ -225,6 +227,7 @@ public static class TrailLines
         "restore",
         "restored",
         "right",
+        "roster",
         "rules",
         "save",
         "saved",
@@ -297,6 +300,7 @@ public static class TrailLines
         "workout",
         "written",
         "wrong",
+        "yet",
     };
 
     /// <summary>The line, kept exactly as it was, or null when any part of it is not allowed.</summary>
