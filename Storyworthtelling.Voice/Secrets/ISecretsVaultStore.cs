@@ -29,7 +29,12 @@ public enum SecretsVaultStatus
 }
 
 // The outcome of a load. Vault is meaningful only when Status is Loaded; otherwise it is SecretsVault.Empty.
-public sealed record SecretsVaultLoadResult(SecretsVaultStatus Status, SecretsVault Vault)
+// FileOwnership is whether the vault file belongs to the signed-in account (the admin's) or was shared with
+// it. It decides who may write: the admin's install writes, everyone else reads. The default is None (no file
+// seen), which is claimable; DriveSecretsVaultStore reports Shared for any file that cannot say, so an unknown
+// file is never claimed.
+public sealed record SecretsVaultLoadResult(
+    SecretsVaultStatus Status, SecretsVault Vault, DriveFileOwnership FileOwnership = DriveFileOwnership.None)
 {
     public static SecretsVaultLoadResult Empty { get; } = new(SecretsVaultStatus.Empty, SecretsVault.Empty);
     public static SecretsVaultLoadResult WrongPassphrase { get; } = new(SecretsVaultStatus.WrongPassphrase, SecretsVault.Empty);

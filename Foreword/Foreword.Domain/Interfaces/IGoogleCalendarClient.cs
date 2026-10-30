@@ -1,3 +1,4 @@
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
 
 namespace Foreword.Domain.Interfaces;
@@ -5,12 +6,13 @@ namespace Foreword.Domain.Interfaces;
 public interface IGoogleCalendarClient
 {
     // All events across every calendar in the account's calendar list that overlap the
-    // given local day. Column is not yet assigned; the caller maps it.
-    Task<IReadOnlyList<CalendarEvent>> GetEventsForDay(DateOnly date);
+    // given local day, and the calendars that could not be read. Column is not yet assigned;
+    // the caller maps it.
+    Task<CalendarRead> GetEventsForDay(DateOnly date);
 
     // All events across every calendar overlapping the inclusive date range, used to build
-    // the seven-day outlook.
-    Task<IReadOnlyList<CalendarEvent>> GetEventsInRange(DateOnly start, DateOnly end);
+    // the seven-day outlook, and the calendars that could not be read.
+    Task<CalendarRead> GetEventsInRange(DateOnly start, DateOnly end);
 
     // Creates an event on the calendar mapped to the given column.
     Task AddEvent(CalendarEvent calendarEvent);

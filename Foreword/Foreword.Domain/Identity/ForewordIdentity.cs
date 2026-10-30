@@ -86,6 +86,10 @@ public static class PreferenceKeys
     // phone this is is inferred from it rather than asked.
     public const string HouseholdAccount = "HouseholdAccount";
 
+    // The calendars the last morning could not read, one name per line. Shown as a dog-ear until a morning
+    // reads them all; cleared by a morning that reads everything.
+    public const string UnreadableCalendars = "UnreadableCalendars";
+
     // What happened to the prayer document. Kept apart from LastDeliveryOutcome because prayer can
     // fail on its own — it reads a file the rest of the morning does not, behind a passphrase the
     // rest of the morning does not need — and folding it in would make one sentence say two things.
@@ -118,6 +122,6 @@ public static class PreferenceKeys
             .. Frozen, WorkScheduleJson, SeenCalendarIds, ScheduledDeliveryTime,
             MapsApiKey, HomeAddress, HomeLatitude, HomeLongitude, TasksJson, AwayJson,
             FeedsJson, NewsCount, OpinionCount, SeenComic, TasteJson, LastPrayerOutcome,
-            HouseholdAccount,
+            HouseholdAccount, UnreadableCalendars,
         ];
 }
