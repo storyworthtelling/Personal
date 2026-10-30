@@ -23,6 +23,7 @@ namespace Constitution.Infrastructure.Meals;
 /// <param name="Records">The planned weeks, for Today and the Meals tab.</param>
 /// <param name="Log">The Body trail's one-method seam.</param>
 /// <param name="Documents">What the documents step reaches (the tablet, the stores, the roster, the pantry); null plans the week and prints nothing.</param>
+/// <param name="Templates">What the rotating-templates step reaches (the library and the author); null leaves pages 2 and 3 off the sheet. Used only together with <paramref name="Documents"/>.</param>
 public sealed record MealWeekSeams(
     Func<CancellationToken, Task<PlanningStanding>> Lease,
     IRecipeBoxSource Recipes,
@@ -35,4 +36,5 @@ public sealed record MealWeekSeams(
     IKeyAssignmentStore KeyAssignments,
     IMealWeekRecords Records,
     IWorkoutWeekLog Log,
-    MealDocumentSeams? Documents = null);
+    MealDocumentSeams? Documents = null,
+    MealTemplateSeams? Templates = null);

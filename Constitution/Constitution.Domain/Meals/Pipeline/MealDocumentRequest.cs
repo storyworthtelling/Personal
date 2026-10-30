@@ -29,4 +29,7 @@ public sealed record MealDocumentRequest(MealWeek Week, IReadOnlyList<Recipe> Ca
 
     /// <summary>What each person last said of each dish, for the rating page's underline; nobody's when there is no profile.</summary>
     public LastRatings Ratings { get; init; } = LastRatings.None;
+
+    /// <summary>The breakfasts, lunches and lunchbox the rotating templates chose (D110); null leaves pages 2 and 3 off the sheet.</summary>
+    public MealSheetDailyMeals? Daily { get; init; }
 }

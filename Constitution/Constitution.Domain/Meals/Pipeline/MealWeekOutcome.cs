@@ -62,6 +62,9 @@ public sealed record MealWeekReport(
 
     /// <summary>What the documents step did (the sheet and the recipes), or null when the run was not given the means to deliver any.</summary>
     public MealDocumentsResult? Documents { get; init; }
+
+    /// <summary>What the rotating templates step did, or null when the run was not given the means to rotate any.</summary>
+    public MealTemplatesResult? Templates { get; init; }
 }
 
 /// <summary>The result of one run of the weekly meal run: planned, or the typed reason it was not.</summary>
