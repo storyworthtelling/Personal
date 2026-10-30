@@ -50,7 +50,7 @@ public static class TrailLines
     private static readonly HashSet<string> CountWords = new(StringComparer.Ordinal)
     {
         "reading", "readings", "record", "records", "usable", "field", "fields", "read", "not", "stored",
-        "pages", "documents", "questions", "sessions", "events", "people", "templates",
+        "pages", "documents", "questions", "sessions", "events", "people", "templates", "lines", "likes", "words",
     };
 
     private static readonly HashSet<int> HttpStatuses = [200, 201, 204, 400, 401, 403, 404, 408, 429, 500, 502, 503, 504];
@@ -307,7 +307,25 @@ public static class TrailLines
         "written",
         "wrong",
         "yet",
-    };
+            // The meal deadline step's trail (counts of lines, likes and unjudged words; never a dish or a name).
+        "answers",
+        "approved",
+        "decide",
+        "decided",
+        "decisions",
+        "fed",
+        "likes",
+        "lines",
+        "needed",
+        "notes",
+        "revised",
+        "stopped",
+        "taught",
+        "unjudged",
+        "unread",
+        "weeks",
+        "words",
+};
 
     /// <summary>The line, kept exactly as it was, or null when any part of it is not allowed.</summary>
     public static string? Filter(string line)

@@ -49,6 +49,7 @@ public static class MealWeekServices
     public const string HistoryFile = "cooked-history.json";
     public const string RecordFile = "planned-weeks.json";
     public const string DeliveredFile = "delivered-documents.json";
+    public const string DecisionFile = "decided-weeks.json";
 
     public static async Task<MealWeekOutcome> RunAsync(Context context, CancellationToken cancellation)
     {
@@ -143,6 +144,29 @@ public static class MealWeekServices
             log,
             documents,
             new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), TemplateAuthorServices.AuthorOf(appContext)));
+    }
+
+    /// <summary>
+    /// The seams of the deadline step (<see cref="MealDeadlineStep"/>), the part of the meal week that runs once the sheet's deadline has passed. The lease, the kept
+    /// weeks, the household file's answers, library and taste notes are this install's own; the record of decided weeks is a small file beside the kept weeks. <b>The taste
+    /// judge is <see cref="UnavailableTasteJudge"/>:</b> no Claude judge exists yet, so written words are recorded as unjudged and asked again on the next run. Nothing calls
+    /// the step yet (a worker is a later job), and nothing here holds a secret.
+    /// </summary>
+    public static MealDeadlineSeams AssembleDeadline(Context appContext)
+    {
+        ArgumentNullException.ThrowIfNull(appContext);
+
+        var household = ConstitutionHousehold.For(appContext);
+        var folder = FolderOf(appContext);
+        return new MealDeadlineSeams(
+            household.Planning.AskAsync,
+            new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
+            new FileMealDecisionRecords(Path.Combine(folder, DecisionFile)),
+            new HouseholdMealAnswers(household.Service),
+            new HouseholdTemplateLibrary(household.Service),
+            new HouseholdTasteNotes(household.Service),
+            new UnavailableTasteJudge(),
+            new BodyMealLog(new BodyLog(appContext)));
     }
 
     private static string FolderOf(Context appContext) => Path.Combine(NoBackupRoot(appContext), FolderName);
