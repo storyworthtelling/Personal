@@ -10,6 +10,10 @@ public class DayAgenda
     // page names them, so "where is my thing" is answered on the paper rather than in a log.
     public IReadOnlyList<string> HeldCalendars { get; init; } = [];
 
+    // Calendars the account lists but could not be read this morning. Their events are absent and the
+    // owner is told by a notice, not on the page, because the page has no room for a failure.
+    public IReadOnlyList<Foreword.Domain.Calendar.UnreadableCalendar> UnreadableCalendars { get; init; } = [];
+
     // The drives measured for today, and the house the morning starts from. On the agenda rather
     // than on each event because a drive has two ends and the columns do not share them: the same
     // field is a different drive from the office than it is from the school. A day nobody measured

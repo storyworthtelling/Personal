@@ -20,20 +20,28 @@ public sealed class DriveSecretsVaultStore : ISecretsVaultStore
 
     public async Task<SecretsVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken)
     {
+        // Read first, then ask for ownership: the same file either way. A file that cannot report it counts
+        // as shared, so the install reads it and is refused any write.
+        var ownership = file is IDriveFileOwnership owned
+            ? await owned.OwnershipAsync(cancellationToken)
+            : DriveFileOwnership.Shared;
+
         var (status, plaintext) = VaultEnvelope.Read(await file.ReadAsync(cancellationToken), passphrase);
         if (status != SecretsVaultStatus.Loaded)
         {
-            return new SecretsVaultLoadResult(status, SecretsVault.Empty);
+            return new SecretsVaultLoadResult(status, SecretsVault.Empty, ownership);
         }
 
         try
         {
             var vault = JsonSerializer.Deserialize<SecretsVault>(plaintext!, VaultEnvelope.SerializerOptions);
-            return vault is null ? SecretsVaultLoadResult.Corrupt : SecretsVaultLoadResult.Loaded(vault);
+            return vault is null
+                ? new SecretsVaultLoadResult(SecretsVaultStatus.Corrupt, SecretsVault.Empty, ownership)
+                : new SecretsVaultLoadResult(SecretsVaultStatus.Loaded, vault, ownership);
         }
         catch (JsonException)
         {
-            return SecretsVaultLoadResult.Corrupt;
+            return new SecretsVaultLoadResult(SecretsVaultStatus.Corrupt, SecretsVault.Empty, ownership);
         }
     }
 

@@ -189,7 +189,7 @@ public partial class CalendarSplitPage : BinderPage
         try
         {
             var client = IPlatformApplication.Current!.Services.GetRequiredService<IGoogleCalendarClient>();
-            events = (await client.GetEventsForDay(DateOnly.FromDateTime(DateTime.Today)))
+            events = (await client.GetEventsForDay(DateOnly.FromDateTime(DateTime.Today))).Events
                 .Where(e => e.SourceCalendarId == calendarId)
                 .ToList();
         }

@@ -27,8 +27,7 @@ public sealed class TidalAccountSync(Context context)
     private readonly TidalAccountStore store = new(context);
 
     private static PersonalVaultAccess Vault() => new SecretsVaultAccess(
-        new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
-        () => ScoreIdentity.Account).Personal;
+        new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score").Personal;
 
     /// <summary>
     /// Restores a pairing this phone does not have. Never overwrites one it does: the

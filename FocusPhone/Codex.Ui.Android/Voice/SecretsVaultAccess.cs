@@ -25,14 +25,11 @@ public sealed class SecretsVaultAccess
     /// </summary>
     public PersonalVaultAccess Personal { get; }
 
-    /// <param name="signedInAccount">
-    /// The Google account this head is bound to. It decides whether this install may
-    /// write the shared vault — the second phone in the household reads it and never
-    /// writes — and it is read from the account rather than a setting, because a
-    /// setting could only ever agree with the account or be wrong.
-    /// </param>
-    public SecretsVaultAccess(
-        Func<Task<string>> accessToken, string applicationName, Func<string?>? signedInAccount = null)
+    /// <remarks>
+    /// Whether this install may write the shared vault is decided by the vault file's Drive ownership, read
+    /// by the store on every load — the second phone reads a file shared with it and never writes.
+    /// </remarks>
+    public SecretsVaultAccess(Func<Task<string>> accessToken, string applicationName)
     {
         Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
         {
@@ -47,8 +44,7 @@ public sealed class SecretsVaultAccess
 
         var store = new DriveSecretsVaultStore(new DriveTextFile(
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
-        Service = new SecretsVaultService(
-            store, () => VaultPassphraseStore.Passphrase, signedInAccount);
+        Service = new SecretsVaultService(store, () => VaultPassphraseStore.Passphrase);
 
         Personal = new PersonalVaultAccess(
             new DrivePersonalVaultStore(new DriveTextFile(

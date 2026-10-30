@@ -6,7 +6,8 @@ namespace Storyworthtelling.Voice.Tests.Secrets;
 
 public class SecretsVaultServiceTests
 {
-    private sealed class InMemoryTextFile : IDriveTextFile
+    // The vault file this account owns, so publishing is the admin's and not refused as read-only.
+    private sealed class InMemoryTextFile : IDriveTextFile, IDriveFileOwnership
     {
         public string? Content { get; set; }
         public Task<string?> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(Content);
@@ -15,6 +16,8 @@ public class SecretsVaultServiceTests
             Content = content;
             return Task.CompletedTask;
         }
+        public Task<DriveFileOwnership> OwnershipAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(DriveFileOwnership.Owned);
     }
 
     // A store whose write always throws, standing in for the real failure that left the cutover vault empty:

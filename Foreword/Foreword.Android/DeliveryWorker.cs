@@ -1,6 +1,7 @@
 using Android.Content;
 using AndroidX.Work;
 using Microsoft.Extensions.DependencyInjection;
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Delivery;
 using Foreword.Domain.Identity;
 using Foreword.Infrastructure.Delivery;
@@ -52,7 +53,8 @@ public class DeliveryWorker : Worker
             {
                 var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
                 daily.EnsureColumnCalendars().GetAwaiter().GetResult();
-                daily.DeliverDailyDocuments(today).GetAwaiter().GetResult();
+                var unreadable = daily.DeliverDailyDocuments(today).GetAwaiter().GetResult();
+                CredentialStore.UnreadableCalendars = UnreadableCalendarNotice.Store(unreadable);
 
                 // The third document, in its own try. Prayer is the one part of the morning that
                 // must not be able to take the other two down with it: it reads a file the other
