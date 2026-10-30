@@ -15,6 +15,8 @@ using Constitution.Domain.Household;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Settings;
 using Constitution.Health;
+using Constitution.Household;
+using Constitution.Infrastructure.Household;
 using Constitution.Infrastructure.SleepNumber;
 using Constitution.Infrastructure.Vault;
 using Constitution.Services;
@@ -84,10 +86,12 @@ public sealed class SettingsArea(Activity host)
 
         AddGroup(column, PillarsGroup, "Pillars", model.PillarsSummary, BuildPillars(model));
         AddGroup(column, EquipmentGroup, "Equipment", model.EquipmentSummary, BuildEquipment(model));
-        // The household file is not wired to this head yet, so there is no roster to read: the group says so and edits the setup file.
-        var household = HouseholdGroupModel.Build(null, RosterRole.Owner, householdStore.Read());
+        // The roster is the household file's, as the phone's copy last read it; with none (the file has not opened, or this phone has
+        // not met one) the group says so and the choices stay editable in the setup file. What the file is doing is said beneath.
+        var householdFile = ConstitutionHousehold.For(Host).Service;
+        var household = HouseholdGroupModel.Build(householdFile.Roster, householdFile.RosterRole, householdStore.Read());
         var householdChoices = householdStore.Read() is HouseholdSetupRead.Configured saved ? HouseholdChoices.From(saved.Setup) : new HouseholdChoices();
-        AddGroup(column, HouseholdGroup, "Household", household.Summary, HouseholdGroupView.Build(Host, household, householdChoices, householdStore, householdNote, note =>
+        AddGroup(column, HouseholdGroup, "Household", household.Summary, HouseholdGroupView.Build(Host, household, householdChoices, householdStore, householdNote ?? HouseholdStandingNote(householdFile.Standing), note =>
         {
             householdNote = note;
             RaiseChanged();
@@ -438,6 +442,10 @@ public sealed class SettingsArea(Activity host)
         return passphraseField;
     }
 
+    // The household file's standing as one sentence beneath the group; nothing is said while it is in step.
+    private static string? HouseholdStandingNote(HouseholdStanding standing) =>
+        standing.State is HouseholdFileState.Synced or HouseholdFileState.NotCompared ? null : standing.Sentence;
+
     private void CommitPassphrase()
     {
         var typed = passphraseField?.Text?.Trim();
@@ -456,6 +464,9 @@ public sealed class SettingsArea(Activity host)
     private async Task RestoreThenPublishAsync()
     {
         var result = await ConstitutionVaults.Create(Host).RestoreThenPublishAsync([], CancellationToken.None);
+
+        // A new passphrase or sign-in is also the moment the household file can be compared with Drive.
+        ConstitutionHousehold.For(Host).AskNow();
         if (result.Restore is { Filled.Count: > 0 })
         {
             Host.RunOnUiThread(RaiseChanged);

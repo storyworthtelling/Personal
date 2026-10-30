@@ -341,6 +341,9 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         cuisineCard?.Dismiss();
     }
 
+    /// <summary>Reads the box again, as when the household file has just changed under it (a pass brought records home, the role became known).</summary>
+    public void Reload() => Load();
+
     private void Load()
     {
         var number = Interlocked.Increment(ref loadNumber);

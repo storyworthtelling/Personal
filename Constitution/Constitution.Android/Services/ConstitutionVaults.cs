@@ -45,18 +45,24 @@ public static class ConstitutionVaults
         _ = runner.RestoreAsync(CancellationToken.None);
     }
 
+    /// <summary>
+    /// The Drive service over the signed-in account's token, built fresh for each call. The vault and the household file both
+    /// read and write through it, so there is one recipe for the client.
+    /// </summary>
+    public static Func<CancellationToken, Task<DriveService>> DriveFactory(VoiceGoogleAccount account) => async _ =>
+    {
+        var token = await account.GetAccessToken();
+        return new DriveService(new BaseClientService.Initializer
+        {
+            HttpClientInitializer = GoogleCredential.FromAccessToken(token),
+            ApplicationName = ApplicationName,
+            HttpClientFactory = new AndroidGoogleHttpClientFactory(),
+        });
+    };
+
     private static ConstitutionVaultSync BuildSync(Context context, VoiceGoogleAccount account, IConstitutionVaultLog log)
     {
-        Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
-        {
-            var token = await account.GetAccessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = ApplicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory(),
-            });
-        };
+        var driveFactory = DriveFactory(account);
 
         var shared = new DriveSecretsVaultStore(new DriveTextFile(
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));

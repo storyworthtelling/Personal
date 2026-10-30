@@ -14,6 +14,8 @@ using Constitution.Domain.Diagnostics;
 using Constitution.Domain.Layout;
 using Constitution.Domain.Waiting;
 using Constitution.FirstRun;
+using Constitution.Household;
+using Constitution.Infrastructure.Household;
 using Constitution.MealsTab;
 using Constitution.ReadBack;
 using Constitution.WorkoutWeek;
@@ -52,6 +54,9 @@ public abstract class ConstitutionActivity : Activity
     // Plate's answer to a recipe scan comes back to the activity, and Meals is the area that reads it.
     private MealsArea? mealsArea;
 
+    // The household file on this phone: the recipe box and the scan keeper read and write it, and its role says whose phone this is.
+    private ConstitutionHousehold household = null!;
+
     // "I ate something else": one camera flow for Today's bar and Meals' bar, so both cards say the same thing (book p.15).
     private AteSomethingElseFlow? ateFlow;
 
@@ -81,6 +86,11 @@ public abstract class ConstitutionActivity : Activity
         settingsArea = new SettingsArea(this);
         bodyArea = new BodyArea(this);
         mealsArea = new MealsArea(this);
+        household = ConstitutionHousehold.For(this);
+        mealsArea.Source = new HouseholdRecipeBox(household.Service);
+        mealsArea.Keeper = new HouseholdRecipeKeeper(household.Service);
+        mealsArea.Role = HouseholdInstallRoles.For(household.Role);
+        household.Service.Changed += OnHouseholdChanged;
         bodyArea.SignalRequested += OpenSignal;
         firstRun = new FirstRunPage(this, RenderPage);
         ateFlow = new AteSomethingElseFlow(this, () => mealsArea?.Role ?? InstallRole.Unknown, () => mealsArea.CameraAllowed(), mealsArea.AskForCamera);
@@ -127,6 +137,9 @@ public abstract class ConstitutionActivity : Activity
                 RenderPage();
             }
         }));
+
+        // The household file is compared with Drive when the app opens (and again each time it comes back), off the UI thread.
+        household.Opened();
 
         // Body's overnight read, under its frozen unique name; Keep means a relaunch changes nothing (C-7.1.3).
         BodySyncWorker.Schedule(this);
@@ -177,6 +190,8 @@ public abstract class ConstitutionActivity : Activity
         {
             area.Resume();
         }
+
+        household.Resumed();
 
         // Where background reads are not granted the app's own opening is the refresh (R5); off the UI thread.
         BodyServices.RefreshAtOpen(this);
@@ -437,6 +452,22 @@ public abstract class ConstitutionActivity : Activity
         ConnectionNoticeBoard.With(board => WaitingPageModel.Answer(board, item, choice));
         ReadBackWaiting.Answered(this, item.CauseKey, choice.Value);
         RenderPage();
+    }
+
+    // The household file changed under the screens (a pass brought records home, the role became known). Meals reads again with the
+    // role it now has; nothing else is redrawn, so a field being typed in on another page is never rebuilt out from under the typing.
+    private void OnHouseholdChanged()
+    {
+        RunOnUiThread(() =>
+        {
+            if (IsFinishing || IsDestroyed || mealsArea is null)
+            {
+                return;
+            }
+
+            mealsArea.Role = HouseholdInstallRoles.For(household.Role);
+            mealsArea.Reload();
+        });
     }
 
     // An undo fold was turned: the area that raised it reverses its act, then the page redraws.
