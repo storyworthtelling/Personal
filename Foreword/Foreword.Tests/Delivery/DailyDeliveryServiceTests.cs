@@ -40,8 +40,8 @@ public class DailyDeliveryServiceTests
 
     public DailyDeliveryServiceTests()
     {
-        calendar.Setup(c => c.GetEventsForDay(It.IsAny<DateOnly>())).ReturnsAsync([]);
-        calendar.Setup(c => c.GetEventsInRange(It.IsAny<DateOnly>(), It.IsAny<DateOnly>())).ReturnsAsync([]);
+        calendar.Setup(c => c.GetEventsForDay(It.IsAny<DateOnly>())).ReturnsAsync(CalendarRead.Nothing);
+        calendar.Setup(c => c.GetEventsInRange(It.IsAny<DateOnly>(), It.IsAny<DateOnly>())).ReturnsAsync(CalendarRead.Nothing);
         tasks.Setup(t => t.GetMyTasks()).ReturnsAsync([]);
         dayComposer.Setup(c => c.Compose(It.IsAny<DayDocument>())).Returns([1]);
         weather.Setup(w => w.GetReport(It.IsAny<DateOnly>())).ReturnsAsync(WeatherReport.Nothing);

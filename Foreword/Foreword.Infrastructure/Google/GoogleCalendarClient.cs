@@ -1,6 +1,7 @@
 using global::Google.Apis.Calendar.v3;
 using global::Google.Apis.Calendar.v3.Data;
 using Microsoft.Extensions.Options;
+using Foreword.Domain.Calendar;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
 using GoogleCalendar = global::Google.Apis.Calendar.v3.Data.Calendar;
@@ -22,10 +23,10 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         timeZone = TimeZoneInfo.FindSystemTimeZoneById(this.options.TimeZoneId);
     }
 
-    public Task<IReadOnlyList<CalendarEvent>> GetEventsForDay(DateOnly date) =>
+    public Task<CalendarRead> GetEventsForDay(DateOnly date) =>
         FetchEvents(date, date, resolveRecurrence: false);
 
-    public Task<IReadOnlyList<CalendarEvent>> GetEventsInRange(DateOnly start, DateOnly end) =>
+    public Task<CalendarRead> GetEventsInRange(DateOnly start, DateOnly end) =>
         FetchEvents(start, end, resolveRecurrence: true);
 
     public async Task AddEvent(CalendarEvent calendarEvent)
@@ -70,7 +71,9 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         return items.ToDictionary(c => c.Id, c => c.Summary ?? c.Id);
     }
 
-    private async Task<IReadOnlyList<CalendarEvent>> FetchEvents(DateOnly start, DateOnly end, bool resolveRecurrence)
+    // Each calendar is read on its own: one the account lists but cannot open is skipped and named by
+    // CalendarReads rather than failing the whole read.
+    private async Task<CalendarRead> FetchEvents(DateOnly start, DateOnly end, bool resolveRecurrence)
     {
         var service = factory.CreateCalendarService();
         var calendars = (await service.CalendarList.List().ExecuteAsync()).Items ?? [];
@@ -78,32 +81,34 @@ public class GoogleCalendarClient : IGoogleCalendarClient
         var timeMin = DayStart(start);
         var timeMax = DayStart(end.AddDays(1));
         var masterCache = new Dictionary<string, (RecurrenceFrequency, int?)>();
-        var results = new List<CalendarEvent>();
 
-        foreach (var calendar in calendars)
-        {
-            var request = service.Events.List(calendar.Id);
-            request.TimeMinDateTimeOffset = timeMin;
-            request.TimeMaxDateTimeOffset = timeMax;
-            request.SingleEvents = true;
-            request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
-            request.ShowDeleted = false;
-
-            var events = (await request.ExecuteAsync()).Items ?? [];
-            foreach (var googleEvent in events)
+        return await CalendarReads.CollectAsync(
+            calendars.Select(calendar => (calendar.Id, calendar.Summary ?? calendar.Id)),
+            async calendarId =>
             {
-                if (googleEvent.Start is null)
-                    continue;
+                var request = service.Events.List(calendarId);
+                request.TimeMinDateTimeOffset = timeMin;
+                request.TimeMaxDateTimeOffset = timeMax;
+                request.SingleEvents = true;
+                request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
+                request.ShowDeleted = false;
 
-                var (recurrence, count) = resolveRecurrence
-                    ? await ResolveRecurrence(service, calendar.Id, googleEvent, masterCache)
-                    : (RecurrenceFrequency.None, null);
+                var results = new List<CalendarEvent>();
+                var events = (await request.ExecuteAsync()).Items ?? [];
+                foreach (var googleEvent in events)
+                {
+                    if (googleEvent.Start is null)
+                        continue;
 
-                results.Add(ToCalendarEvent(googleEvent, calendar.Id, recurrence, count));
-            }
-        }
+                    var (recurrence, count) = resolveRecurrence
+                        ? await ResolveRecurrence(service, calendarId, googleEvent, masterCache)
+                        : (RecurrenceFrequency.None, null);
 
-        return results;
+                    results.Add(ToCalendarEvent(googleEvent, calendarId, recurrence, count));
+                }
+
+                return results;
+            });
     }
 
     private CalendarEvent ToCalendarEvent(Event e, string calendarId, RecurrenceFrequency recurrence, int? count)

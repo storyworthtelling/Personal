@@ -14,6 +14,9 @@
             <!-- One sentence saying what happened, before anything asks for attention. -->
             <Label x:Name="StatusLabel" Style="{StaticResource StatusLine}" />
 
+            <!-- The dog-ear for a calendar the last morning could not read. Withdrawn when every calendar reads. -->
+            <ContentView x:Name="NoticeCorner" HorizontalOptions="End" IsVisible="False" />
+
             <!-- A greeting in the owner's voice when a shared profile exists; hidden otherwise. -->
             <Label x:Name="WelcomeLabel"
                    Style="{StaticResource VoiceLabel}"
