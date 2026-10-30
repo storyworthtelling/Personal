@@ -229,12 +229,14 @@ public sealed class ReadBackService(
         }
 
         var pages = resolved.Value!;
+        var result = new DocumentResult(name, document.Kind, document.Day, document.Person, now, pages);
         if (ReadBackPolicy.WhyKept(pages) is { } why)
         {
-            return new DocumentReadBack.Unfinished(name, why);
+            // The page stays, but what was already said on it was said on time: a hook that records answers is told before the page is put back.
+            var observed = Now(name, ReadBackStage.Persist, () => (settled as IReadBackObserved)?.Observed(document, result), cancellation);
+            return Otherwise(observed, new DocumentReadBack.Unfinished(name, why));
         }
 
-        var result = new DocumentResult(name, document.Kind, document.Day, document.Person, now, pages);
         var saved = Now(name, ReadBackStage.Persist, () => Persist(document, result, sawInk ? new InkSighting(name, today) : null), cancellation);
         if (saved is not null)
         {
@@ -247,8 +249,8 @@ public sealed class ReadBackService(
             return asked;
         }
 
-        var settled = new DocumentReadBack.Settled(name, pages.Count, result.Questions.Count);
-        return await Trash(document, page.Id, settled, cancellation);
+        var done = new DocumentReadBack.Settled(name, pages.Count, result.Questions.Count);
+        return await Trash(document, page.Id, done, cancellation);
     }
 
     private static List<PageResolutions> Resolve(ExpectedDocument document, InkDocumentRead read, DateTimeOffset now) =>
