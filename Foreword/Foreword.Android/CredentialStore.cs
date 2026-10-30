@@ -184,6 +184,14 @@ public static class CredentialStore
     /// does not need, so "Delivered" for the day and the paper while the prayer sheet never went
     /// would be one sentence saying two things.
     /// </summary>
+    // The calendars the last morning could not read, one name per line (UnreadableCalendarNotice). Empty
+    // when the last morning read every calendar, which withdraws the notice.
+    public static string UnreadableCalendars
+    {
+        get => Preferences.Get(PreferenceKeys.UnreadableCalendars, string.Empty);
+        set => Preferences.Set(PreferenceKeys.UnreadableCalendars, value);
+    }
+
     public static string LastPrayerOutcome
     {
         get => Preferences.Get(PreferenceKeys.LastPrayerOutcome, string.Empty);

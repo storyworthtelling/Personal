@@ -32,7 +32,9 @@ public class DailyDeliveryService(
 {
     private const int OutlookDays = 6; // today + 6 = a seven-day window
 
-    public async Task DeliverDailyDocuments(DateOnly date)
+    // Returns the calendars that could not be read this morning, so the caller can tell the owner what
+    // was skipped. Empty when every calendar was read.
+    public async Task<IReadOnlyList<UnreadableCalendar>> DeliverDailyDocuments(DateOnly date)
     {
         var (carryovers, yesterdayDocIds) = await ReadBackYesterday(date);
 
@@ -57,6 +59,8 @@ public class DailyDeliveryService(
             await TrashDocs(yesterdayDocIds);
         else
             logger.LogWarning("Skipping trash of yesterday's documents because the upload failed for {Date}", date);
+
+        return agenda.UnreadableCalendars;
     }
 
     // Gives each column whose person has no Google account of their own a calendar to be filled
@@ -82,7 +86,12 @@ public class DailyDeliveryService(
 
     private async Task<DayAgenda> BuildAgenda(DateOnly date)
     {
-        var events = await googleCalendar.GetEventsForDay(date);
+        var read = await googleCalendar.GetEventsForDay(date);
+        foreach (var skipped in read.Unreadable)
+        {
+            logger.LogWarning("Skipped unreadable calendar {Name}: {Reason}", skipped.Name, skipped.Reason);
+        }
+        var events = read.Events;
 
         // An unmapped calendar is held rather than printed into the default column (D34), and named
         // on the page. Held BEFORE the columns are assigned: a calendar nobody has mapped has no
@@ -101,12 +110,19 @@ public class DailyDeliveryService(
         }
 
         var augmented = workAugmenter.Augment(columnMapper.Assign(split.Printed), date);
-        return new DayAgenda { Date = date, Events = augmented, HeldCalendars = split.Held };
+        return new DayAgenda
+        {
+            Date = date,
+            Events = augmented,
+            HeldCalendars = split.Held,
+            UnreadableCalendars = read.Unreadable,
+        };
     }
 
     private async Task<IReadOnlyList<CalendarEvent>> BuildOutlook(DateOnly date)
     {
-        var events = columnMapper.Assign(await googleCalendar.GetEventsInRange(date, date.AddDays(OutlookDays)));
+        var read = await googleCalendar.GetEventsInRange(date, date.AddDays(OutlookDays));
+        var events = columnMapper.Assign(read.Events);
         workAugmenter.MarkOffDays(events);
         return outlookSelector.SelectNonRoutine(events);
     }

@@ -1,5 +1,8 @@
+using Foreword.Domain.Calendar;
 using Microsoft.Extensions.DependencyInjection;
 using Foreword.Infrastructure.Delivery;
+using Storyworthtelling.Maui.State;
+using Storyworthtelling.Maui.Views;
 using Storyworthtelling.Voice;
 
 namespace Foreword.Android.Pages;
@@ -17,11 +20,18 @@ public partial class MainPage : BinderPage
 
     private readonly Button deliverNow = new() { Text = "Deliver now" };
 
+    private readonly DogEarState dogEarState = new();
+    private readonly DogEar dogEar;
+
     public MainPage(DriveVoiceOptions voiceOptions, VoicedMessenger voice)
     {
         InitializeComponent();
         this.voiceOptions = voiceOptions;
         this.voice = voice;
+
+        dogEar = new DogEar(dogEarState);
+        dogEar.NoticesOpened += OnNoticesOpened;
+        NoticeCorner.Content = dogEar;
 
         // Today is the app's root, so its tab is the one lit when nothing else is. The bar carries
         // the one thing this screen is for; Tasks and Settings used to sit here as quiet buttons,
@@ -35,6 +45,7 @@ public partial class MainPage : BinderPage
     {
         base.OnAppearing();
         StatusLabel.Text = CredentialStore.LastDeliverySummary;
+        RaiseUnreadableCalendarNotice();
         BuildFirstRun();
         DeliveryLogButton.IsVisible = System.IO.File.Exists(DeliveryLogPath) &&
                                       new System.IO.FileInfo(DeliveryLogPath).Length > 0;
@@ -46,6 +57,22 @@ public partial class MainPage : BinderPage
 
         _ = ShowWelcomeAsync();
     }
+
+    // The notice is the stored list of calendars the last morning skipped. It is raised from the store
+    // every time the page appears, so a morning that reads everything clears it without any other step.
+    private void RaiseUnreadableCalendarNotice()
+    {
+        var detail = UnreadableCalendarNotice.Detail(UnreadableCalendarNotice.Names(CredentialStore.UnreadableCalendars));
+        dogEarState.SetNotice(
+            UnreadableCalendarNotice.Key,
+            detail is null ? null : new DogEarNotice("A calendar was skipped", detail, DogEarHue.Caution));
+        NoticeCorner.IsVisible = detail is not null;
+        dogEar.Refresh();
+    }
+
+    // Opening the dog-ear turns the page to the notices the kit collects; the same state the corner shows.
+    private void OnNoticesOpened(IReadOnlyList<DogEarNotice> opened) =>
+        _ = Navigation.PushAsync(new WaitingPage(dogEarState));
 
     // A greeting composed fresh in the owner's voice, shown only once a shared voice profile exists. Pulls
     // the Claude key from the shared Drive config first (RefreshAsync); everything degrades to a hidden
@@ -123,7 +150,8 @@ public partial class MainPage : BinderPage
                 {
                     var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
                     await daily.EnsureColumnCalendars();
-                    await daily.DeliverDailyDocuments(today);
+                    var unreadable = await daily.DeliverDailyDocuments(today);
+                    CredentialStore.UnreadableCalendars = UnreadableCalendarNotice.Store(unreadable);
                 }
 
                 CredentialStore.LastDeliveryOutcome = $"Delivered ({newsStatus})";
