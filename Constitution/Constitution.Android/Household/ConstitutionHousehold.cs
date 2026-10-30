@@ -4,6 +4,7 @@ using Constitution.Domain;
 using Constitution.Infrastructure.Household;
 using Constitution.Infrastructure.Vault;
 using Constitution.Services;
+using Constitution.Settings;
 using Storyworthtelling.Household;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
@@ -182,6 +183,9 @@ public sealed class ConstitutionHousehold
     private void OnPassSettled(HouseholdStanding standing)
     {
         var now = DateTimeOffset.UtcNow;
+
+        // D109: a file that will not open also waits behind the dog-ear; it goes when the file opens again.
+        ConnectionNoticeBoard.With(board => HouseholdNotices.Apply(board, standing, now));
         loop.Update(schedule =>
         {
             switch (standing.State)

@@ -120,6 +120,11 @@ public sealed class WaitingPageModel
                 "Constitution couldn’t read a calendar or record it needs, so it has not planned the week, written to a calendar or sent a page. It looks again at the next run.",
                 null,
                 NoChips),
+            NoticeKind.HouseholdFileUnreadable => (
+                "The household file won’t open",
+                HouseholdNoticeCause.Explain(notice.CauseKey),
+                new WaitingButton("Open Settings", WaitingActionId.OpenSettings),
+                NoChips),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(notice), notice.Kind, "This notice kind has no Waiting copy; add it to WaitingPageModel."),
         };

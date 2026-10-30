@@ -429,11 +429,11 @@ public abstract class ConstitutionActivity : Activity
         TabLettering.Apply(binder, visible, -1);
     }
 
-    // PairAgain and SignInAgain go to Settings, where the connections are mended. The other acts have
+    // PairAgain, SignInAgain and OpenSettings go to Settings, where the connections are mended. The other acts have
     // no screen to go to yet (the scan, the box and Keep arrive with Releases C-E), so a tap does nothing.
     private void OnWaitingAction(WaitingActionId action)
     {
-        if (action is not (WaitingActionId.PairAgain or WaitingActionId.SignInAgain))
+        if (action is not (WaitingActionId.PairAgain or WaitingActionId.SignInAgain or WaitingActionId.OpenSettings))
         {
             return;
         }

@@ -44,4 +44,12 @@ public enum NoticeKind
     /// again at the next run, so there is nothing to press. Problem.
     /// </summary>
     WeekNotPlanned,
+
+    /// <summary>
+    /// The shared household file exists but will not open on this phone (the vault passphrase is missing or does not match, or the
+    /// file is damaged or newer than this app), so the recipe box refuses edits until it does (D108, D109). The owner has to act
+    /// (fix the passphrase, update the app), and the cause key carries which reason it is. Problem, like the other connection
+    /// failures that stop a feature until the owner mends them.
+    /// </summary>
+    HouseholdFileUnreadable,
 }

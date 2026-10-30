@@ -24,6 +24,9 @@ public enum WaitingActionId
 
     /// <summary>Send the grocery list to Keep.</summary>
     SendToKeep,
+
+    /// <summary>Open Settings, where the vault passphrase and the household are mended.</summary>
+    OpenSettings,
 }
 
 /// <summary>A row's single button: its label and the act it stands for.</summary>
