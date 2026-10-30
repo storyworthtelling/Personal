@@ -115,12 +115,18 @@ public class MmsDeliverReceiver : BroadcastReceiver
                 }
                 else
                 {
-                    PostDiagnostics.LogWarning("Mms", $"An MMS notification arrived but could not be read ({shape}).");
+                    PostDiagnostics.LogWarning("Mms", $"An MMS notification arrived but could not be read ({shape}). "
+                        + $"Layout: {MmsPduShape.Redacted(pdu ?? [])}");
                     PostDiagnostics.LogText("Mms", $"MMS notice unreadable ({shape})");
                 }
                 return;
             }
 
+            if (pdu is { Length: > 0 } && pdu[0] != 0x8C)
+            {
+                // Confirms what wraps the notice on this phone, by shape alone.
+                PostDiagnostics.LogText("Mms", $"MMS notice read past a wrapper: {MmsPduShape.Redacted(pdu, limit: 24)}");
+            }
             PostDiagnostics.LogText("Mms", TextTrail.MmsAnnounced());
             MmsDownloader.RequestDownload(context, notification);
         }
