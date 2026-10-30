@@ -25,6 +25,7 @@ public sealed record MmsNotification(string TransactionId, string ContentLocatio
 /// </summary>
 public static class MmsNotificationParser
 {
+    private const int FieldMessageType = 0x8C;
     private const int MessageTypeNotificationInd = 0x82;
 
     public static MmsNotification? Parse(byte[]? pdu) => Parse(pdu, DateTimeOffset.UtcNow);
@@ -36,6 +37,22 @@ public static class MmsNotificationParser
         {
             return null;
         }
+        // The notice proper starts at Message-Type = notification-ind. On the owner's phone
+        // something comes before it (every real notice read as a text header first), so
+        // each place that pair appears is tried in turn; it cannot occur inside a text run.
+        for (var start = 0; start < pdu.Length - 1; start++)
+        {
+            if (pdu[start] == FieldMessageType && pdu[start + 1] == MessageTypeNotificationInd
+                && ParseAt(start == 0 ? pdu : pdu[start..], receivedAt) is { } notification)
+            {
+                return notification;
+            }
+        }
+        return null;
+    }
+
+    private static MmsNotification? ParseAt(byte[] pdu, DateTimeOffset receivedAt)
+    {
         var headers = MmsRetrieveConfParser.ReadHeaders(pdu);
         if (headers?.MessageType != MessageTypeNotificationInd
             || string.IsNullOrEmpty(headers.TransactionId)
@@ -72,5 +89,35 @@ public static class MmsPduShape
         var type = MessageType(pdu) is { } value ? $"0x{value:X2}" : "unknown";
         var line = $"{pdu.Length} bytes; type {type}; fields {string.Join(' ', seen)}";
         return headers is null ? line + "; ends early" : line;
+    }
+
+    /// <summary>
+    /// The PDU's bytes with every run of printable text replaced by its length, and every
+    /// other octet in hex: enough to see what wraps a notice and where it begins, with no
+    /// number, address, subject or link left in it.
+    /// </summary>
+    public static string Redacted(byte[] pdu, int limit = 96)
+    {
+        var parts = new List<string>();
+        var at = 0;
+        var end = Math.Min(pdu.Length, limit);
+        while (at < end)
+        {
+            var run = 0;
+            while (at + run < end && pdu[at + run] is >= 0x20 and <= 0x7E)
+            {
+                run++;
+            }
+            if (run > 0)
+            {
+                parts.Add($"<text {run}>");
+                at += run;
+                continue;
+            }
+            parts.Add(pdu[at].ToString("X2"));
+            at++;
+        }
+        var line = string.Join(' ', parts);
+        return pdu.Length > limit ? $"{line} … ({pdu.Length} bytes)" : line;
     }
 }
