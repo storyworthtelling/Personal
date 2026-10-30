@@ -61,30 +61,86 @@ public class AteSomethingElseFlowTests
         Assert.NotNull(recorded);
     }
 
+    // D107: the two tests that pinned the detail line (uncertainty in words, confidence in words) are replaced by these.
     [Fact]
-    public async Task TheUncertaintyIsInPlainWordsBesideTheFigure()
+    public async Task NoDetailLineOnTheCard()
     {
         var (model, _) = await RunToTheEnd(new AteOutcome.Read(Reading()));
 
-        var detail = model.LineFor(AteMeal.Dinner, new DateOnly(2026, 11, 17))!.Detail!;
+        var line = model.LineFor(AteMeal.Dinner, new DateOnly(2026, 11, 17))!;
 
-        Assert.Contains("guess", detail, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("one photo", detail, StringComparison.Ordinal);
-        Assert.Contains("750", detail, StringComparison.Ordinal);
-        Assert.Contains("1,050", detail, StringComparison.Ordinal);
-        Assert.Contains("pasta with tomato sauce", detail, StringComparison.Ordinal);
-        Assert.Contains("Protein", detail, StringComparison.Ordinal);
+        Assert.DoesNotContain(typeof(AteLine).GetProperties(), property => property.Name == "Detail");
+        Assert.Equal("You had something else · about 900 kcal", line.Text);
+        Assert.DoesNotContain("guess", line.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("750", line.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("pasta", line.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheRecordStillHoldsRangeAndConfidence()
+    {
+        var (model, recorded) = await RunToTheEnd(new AteOutcome.Read(Reading(confidence: AteConfidence.Good)));
+
+        Assert.Equal(750, recorded!.Reading.KcalLow);
+        Assert.Equal(1050, recorded.Reading.KcalHigh);
+        Assert.Equal(AteConfidence.Good, recorded.Reading.Confidence);
+        Assert.Equal("pasta with tomato sauce", recorded.Reading.What);
+        Assert.Equal(25, recorded.Reading.ProteinLow);
+        Assert.NotNull(model.LineFor(AteMeal.Dinner, recorded.Day));
+    }
+
+    [Fact]
+    public void OnlyTheDinnerCardExists()
+    {
+        var model = new AteSomethingElseModel();
+        var day = new DateOnly(2026, 11, 17);
+        model.Load([Estimate(AteMeal.Breakfast), Estimate(AteMeal.Lunch), Estimate()]);
+
+        Assert.Null(model.LineFor(AteMeal.Breakfast, day));
+        Assert.Null(model.LineFor(AteMeal.Lunch, day));
+        Assert.NotNull(model.LineFor(AteMeal.Dinner, day));
+        Assert.Equal([AteMeal.Dinner], model.MealsWithALine(day));
     }
 
     [Theory]
-    [InlineData(AteConfidence.Low, "hard to judge")]
-    [InlineData(AteConfidence.Fair, "fair guess")]
-    [InlineData(AteConfidence.Good, "good look")]
-    public async Task ConfidenceIsSaidInWords(AteConfidence confidence, string phrase)
+    [InlineData(8, "Noted for breakfast.")]
+    [InlineData(13, "Noted for lunch.")]
+    public async Task BreakfastAndLunchGiveOnlyTheStatusSentence(int hour, string sentence)
     {
-        var (model, _) = await RunToTheEnd(new AteOutcome.Read(Reading(confidence: confidence)));
+        using var rig = new PhotoRig();
+        var model = new AteSomethingElseModel();
+        var when = new DateTimeOffset(2026, 11, 17, hour, 5, 0, TimeSpan.FromHours(-5));
+        model.StartCapture(when);
+        var read = await model.EstimateAsync(new FakeEstimator(_ => Task.FromResult<AteOutcome>(new AteOutcome.Read(Reading()))), rig.CacheRoot, rig.PhotoPath, rig.Delete);
 
-        Assert.Contains(phrase, model.LineFor(AteMeal.Dinner, new DateOnly(2026, 11, 17))!.Detail!, StringComparison.Ordinal);
+        var recorded = model.Finish(read);
+
+        Assert.NotNull(recorded);
+        Assert.Equal(sentence, model.StatusFor(model.Day));
+        Assert.Empty(model.MealsWithALine(model.Day));
+        Assert.Null(model.LineFor(AteMeal.Breakfast, model.Day));
+        Assert.Null(model.LineFor(AteMeal.Lunch, model.Day));
+        Assert.Equal(750, recorded!.Reading.KcalLow);
+    }
+
+    [Fact]
+    public async Task ADinnerPhotoHasNoStatusSentenceBeyondItsCard()
+    {
+        var (model, _) = await RunToTheEnd(new AteOutcome.Read(Reading()));
+
+        Assert.Null(model.StatusFor(model.Day));
+    }
+
+    [Fact]
+    public async Task AMorningFailureIsStillSaidInTheStatusLine()
+    {
+        using var rig = new PhotoRig();
+        var model = new AteSomethingElseModel();
+        model.StartCapture(new DateTimeOffset(2026, 11, 17, 8, 0, 0, TimeSpan.FromHours(-5)));
+        var read = await model.EstimateAsync(new FakeEstimator(_ => Task.FromResult<AteOutcome>(new AteOutcome.NoMeal())), rig.CacheRoot, rig.PhotoPath, rig.Delete);
+        model.Finish(read);
+
+        Assert.Equal(AteText.NoMealSentence, model.StatusFor(model.Day));
     }
 
     [Fact]

@@ -27,7 +27,7 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
 
     public const string DinnerScrapId = "today-dinner";
 
-    public TodayPage(Context context, TodayTopLine topLine, TodayClipping? clipping, string folio, DinnerClipping? dinner = null, IReadOnlyDictionary<AteMeal, AteLine>? ate = null) : base(context)
+    public TodayPage(Context context, TodayTopLine topLine, TodayClipping? clipping, string folio, DinnerClipping? dinner = null, IReadOnlyDictionary<AteMeal, AteLine>? ate = null, string? status = null) : base(context)
     {
         Orientation = Orientation.Vertical;
         ate ??= new Dictionary<AteMeal, AteLine>();
@@ -52,10 +52,16 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
             scraps.Add(new ScrapEntry(dinner.Paper, DinnerScrapId, DinnerContent(context, dinner, ate)));
         }
 
-        // "I ate something else" (book p.15): its line is on the meal's card; a meal with no card here gets a small one of its own.
+        // "I ate something else" (book p.15, D107): the line is on the dinner card; a receipt dinner gets a card beside it, no other meal has one.
         scraps.AddRange(AteCards.Extras(context, ate, dinner?.Paper == ScrapKind.IndexCard));
 
         host.SetScraps(scraps);
+
+        if (status is not null)
+        {
+            // A breakfast or lunch photo has no card (D107): one plain sentence above the scraps says it was noted.
+            AddView(PageFurniture.StatusSentence(context, status));
+        }
 
         var scroll = new ScrollView(context);
         scroll.AddView(host, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));

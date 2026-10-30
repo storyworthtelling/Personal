@@ -9,8 +9,8 @@ namespace Constitution.MealsTab;
 
 /// <summary>
 /// The line "I ate something else" writes on a meal's card (book p.15). A status ("Estimating your dinner…") is in the teal progress
-/// voice; the result is "You had something else · about" in the card's own ink with the figure in mono, and under it, smaller and muted,
-/// the guess in plain words (the range, how sure). Nothing here listens for a tap and nothing is a toast.
+/// voice; the result is "You had something else · about" in the card's own ink with the figure in mono and nothing beneath it (D107).
+/// Nothing here listens for a tap and nothing is a toast.
 /// </summary>
 internal static class AteLineView
 {
@@ -28,11 +28,6 @@ internal static class AteLineView
         row.AddView(Text(context, line.Lead, PaperTheme.SansRegular(context), DesignTokens.TypeSp.Secondary, PaperTheme.Ink));
         row.AddView(Text(context, line.Figure ?? string.Empty, PaperTheme.Mono(context), DesignTokens.TypeSp.Mono, PaperTheme.Ink));
         column.AddView(row);
-        if (line.Detail is not null)
-        {
-            column.AddView(Text(context, line.Detail, PaperTheme.SansRegular(context), DesignTokens.TypeSp.Label, PaperTheme.InkMuted));
-        }
-
         return column;
     }
 

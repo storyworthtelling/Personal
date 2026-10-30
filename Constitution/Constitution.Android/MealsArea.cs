@@ -208,7 +208,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
 
         var model = MealsWeekModel.Build(weekRead, DateOnly.FromDateTime(DateTime.Now));
-        return model.State == WeekState.Planned ? new ThisWeekPage(Host, model, AteCards.Lines(Ate, DateOnly.FromDateTime(DateTime.Now))) : PageFurniture.Sentence(Host, model.Status);
+        return model.State == WeekState.Planned ? new ThisWeekPage(Host, model, AteCards.Lines(Ate, DateOnly.FromDateTime(DateTime.Now)), AteCards.Status(Ate, DateOnly.FromDateTime(DateTime.Now))) : PageFurniture.Sentence(Host, model.Status);
     }
 
     private View BoxBody(RecipeBoxSnapshot snapshot)

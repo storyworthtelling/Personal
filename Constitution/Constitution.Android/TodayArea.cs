@@ -113,7 +113,7 @@ public sealed class TodayArea(Activity host)
 
     public override string? Subtitle => TodayModel.Header(DateTime.Now);
 
-    protected override View BuildPage() => new TodayPage(Host, TodayModel.TopLine(plan), TodayModel.Clipping(plan), TodayModel.Folio(DateOnly.FromDateTime(DateTime.Now)), TodayModel.Dinner(plan), AteCards.Lines(ate, DateOnly.FromDateTime(DateTime.Now)));
+    protected override View BuildPage() => new TodayPage(Host, TodayModel.TopLine(plan), TodayModel.Clipping(plan), TodayModel.Folio(DateOnly.FromDateTime(DateTime.Now)), TodayModel.Dinner(plan), AteCards.Lines(ate, DateOnly.FromDateTime(DateTime.Now)), AteCards.Status(ate, DateOnly.FromDateTime(DateTime.Now)));
 
     public override View? BuildBottomBar() => TodayActionBar.Build(Host, ate);
 }

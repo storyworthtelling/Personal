@@ -4,7 +4,7 @@ namespace Constitution.Domain.Meals;
 
 /// <summary>
 /// Every word "I ate something else" says (book p.15). Plain sentences, no exclamation, nothing voiced and nothing that quotes the
-/// model; the figure and its range are numbers the reading was checked into, and the uncertainty is said in words beside them.
+/// model; the figure is the only number drawn; the range and the confidence are kept in the record and not drawn (D107).
 /// </summary>
 public static class AteText
 {
@@ -31,26 +31,8 @@ public static class AteText
 
     public static string Figure(int kcal) => kcal.ToString("N0", CultureInfo.InvariantCulture) + " kcal";
 
-    /// <summary>What the estimate rests on and how far to trust it, in plain words, under the figure.</summary>
-    public static string Detail(AteReading reading)
-    {
-        ArgumentNullException.ThrowIfNull(reading);
-        var range = reading.KcalLow.ToString("N0", CultureInfo.InvariantCulture) + " to " + reading.KcalHigh.ToString("N0", CultureInfo.InvariantCulture);
-        var text = $"Looks like {reading.What}. A guess from one photo: anywhere from {range} kcal.";
-        if (reading.ProteinLow is { } low && reading.ProteinHigh is { } high)
-        {
-            text += $" Protein roughly {low} to {high} g.";
-        }
-
-        return text + " " + ConfidenceWords(reading.Confidence);
-    }
-
-    public static string ConfidenceWords(AteConfidence confidence) => confidence switch
-    {
-        AteConfidence.Good => "A good look at the plate, though portions are still a guess.",
-        AteConfidence.Fair => "A fair guess; portions are hard to judge from a photo.",
-        _ => "Not very sure; the dish and the portion are hard to judge from this photo.",
-    };
+    /// <summary>The one sentence a breakfast or lunch photo gets, in place of a card (D107).</summary>
+    public static string Noted(AteMeal meal) => $"Noted for {AteMeals.Word(meal)}.";
 
     public static string Sentence(AteOutcome outcome) => outcome switch
     {
