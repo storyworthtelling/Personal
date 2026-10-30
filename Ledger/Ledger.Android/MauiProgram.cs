@@ -192,14 +192,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
             new DriveSecretsVaultStore(new DriveTextFile(
                 DriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
-        // The signed-in account is what lets VaultOwnership refuse a write by the install that does not
-        // own the vault: left off, the service cannot tell whose phone it is and publishes freely, so
-        // her blank Plaid section could replace the owner's. Guarded by HouseholdGateSourceTests (R-G1).
+        // Whether this install may write the vault is decided by the vault file's Drive ownership, read by the
+        // store on every load: the admin's install owns the file, the other install has it shared with it.
+        // Her blank Plaid section therefore cannot replace the owner's. Guarded by HouseholdGateSourceTests (R-G1).
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(
                 sp.GetRequiredService<ISecretsVaultStore>(),
-                () => SettingsStore.VaultPassphrase,
-                () => SettingsStore.GoogleAccountEmail));
+                () => SettingsStore.VaultPassphrase));
         builder.Services.AddScoped<VaultSync>();
         // One restore at a time, process-wide: the launch and a passphrase save both bring the vault's
         // banks back, and the Accounts page asks this gate whether banks are on their way (task 2.6).

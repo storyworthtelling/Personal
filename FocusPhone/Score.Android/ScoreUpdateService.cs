@@ -228,8 +228,7 @@ public static class ScoreUpdateService
         try
         {
             var access = new SecretsVaultAccess(
-                new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
-                () => ScoreIdentity.Account);
+                new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score");
             var vault = await access.Service.LoadAsync(CancellationToken.None);
             return vault.Status == SecretsVaultStatus.Loaded ? vault.Vault.GitHubUpdateToken : null;
         }

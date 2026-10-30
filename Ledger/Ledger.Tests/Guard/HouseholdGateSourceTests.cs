@@ -11,29 +11,25 @@ namespace Index.Tests.Guard;
 /// </summary>
 public class HouseholdGateSourceTests
 {
-    // ---- R-G1: the vault service is built knowing who is signed in ----
+    // ---- R-G1: the vault's write gate is the vault file's Drive ownership, not a signed-in account ----
 
     /// <summary>
-    /// <c>SecretsVaultService</c>'s third argument is the only thing that lets
-    /// <c>VaultOwnership</c> run at all: left off, the service treats every install as "cannot tell"
-    /// and publishes exactly as it did before ownership existed, so her phone can write her empty Plaid
-    /// section over the owner's. Nothing fails when it is missing — the vault simply stops being
-    /// protected — which is why it is read here rather than trusted.
-    ///
-    /// The behavioural half already exists and is not duplicated:
-    /// <c>Storyworthtelling.Voice.Tests/Secrets/VaultOwnershipPublishTests.AnotherPersonsInstallDoesNotWrite</c>
-    /// proves a non-owning account's <c>PublishAsync</c> is refused (ReadOnly, zero saves) once the
-    /// account is supplied.
+    /// Who may write the shared vault is decided from the vault file's Drive ownership, which the Drive
+    /// store reads on every load. The service must therefore be built from the store alone: passing a
+    /// signed-in account would re-open the gate to whichever phone happens to be signed in, which is how
+    /// her blank Plaid section could replace the owner's. The behavioural half is
+    /// <c>Storyworthtelling.Voice.Tests/Secrets/VaultOwnershipPublishTests.ASharedFileIsReadOnlyAndNeverWritten</c>.
     /// </summary>
     [Fact]
-    public void TheVaultServiceIsConstructedWithTheSignedInAccount()
+    public void TheVaultServiceIsBuiltFromTheDriveStoreAlone()
     {
         var program = Source("Ledger.Android/MauiProgram.cs");
 
         var construction = Regex.Match(program, @"new SecretsVaultService\((?<args>[^;]*)\);", RegexOptions.Singleline);
         Assert.True(construction.Success, "MauiProgram no longer constructs a SecretsVaultService.");
 
-        Assert.Contains("SettingsStore.GoogleAccountEmail", construction.Groups["args"].Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("GoogleAccountEmail", construction.Groups["args"].Value, StringComparison.Ordinal);
+        Assert.Contains("new DriveSecretsVaultStore(new DriveTextFile(", program, StringComparison.Ordinal);
     }
 
     // ---- R-G5: her Snowball render survives the Extra field's change event ----

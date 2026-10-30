@@ -221,8 +221,11 @@ public class HouseholdGateTests
     {
         public SecretsVault Vault { get; set; } = SecretsVault.Empty;
 
+        // The vault file's Drive ownership, which is what decides who may write it.
+        public DriveFileOwnership Ownership { get; set; } = DriveFileOwnership.Owned;
+
         public Task<SecretsVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken) =>
-            Task.FromResult(SecretsVaultLoadResult.Loaded(Vault));
+            Task.FromResult(new SecretsVaultLoadResult(SecretsVaultStatus.Loaded, Vault, Ownership));
 
         public Task SaveAsync(SecretsVault vault, string passphrase, CancellationToken cancellationToken)
         {
@@ -248,7 +251,7 @@ public class HouseholdGateTests
     {
         var store = new MemoryVaultStore { Vault = OwnersVault() };
         var before = PlaidJson(store.Vault);
-        var service = new SecretsVaultService(store, () => Passphrase, () => OwnerEmail);
+        var service = new SecretsVaultService(store, () => Passphrase);
 
         // Exactly what her install's VaultSync would publish: blank local credentials, no banks.
         var result = await service.PublishAsync(
