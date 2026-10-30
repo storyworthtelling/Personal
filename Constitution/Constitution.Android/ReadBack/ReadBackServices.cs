@@ -1,7 +1,11 @@
 using Android.Content;
 using Codex.Ui.Voice;
-using Constitution.Services;
+using Constitution.Household;
+using Constitution.Infrastructure.Meals;
 using Constitution.Infrastructure.ReadBack;
+using Constitution.Infrastructure.Workouts;
+using Constitution.Services;
+using Constitution.WorkoutDelivery;
 using Microsoft.Extensions.Options;
 using Storyworthtelling.Handwriting;
 using Storyworthtelling.Remarkable;
@@ -39,6 +43,7 @@ public sealed class ReadBackServices
         var appContext = context.ApplicationContext ?? context;
         var tablet = new RemarkableAnnotatedPageSource(TabletOf(appContext));
         var vision = VisionOf(appContext);
+        var hooks = SettledOf(appContext);
 
         var service = new ReadBackService(
             ExpectedOf(appContext),
@@ -49,8 +54,22 @@ public sealed class ReadBackServices
             InkProofOf(appContext),
             new ReadBackNoticeBoard(),
             new ReadBackLog(appContext),
-            () => DateTimeOffset.Now);
+            () => DateTimeOffset.Now,
+            hooks);
         return new ReadBackServices(service, StatusOf(appContext));
+    }
+
+    /// <summary>
+    /// Who is told when a page is read, in this order: first what the workouts taught the plan (the ladders, the soreness, the baselines, over the
+    /// skip ledger the read-back itself keeps), then what the meal documents said, written into the household file this phone holds. Each is told
+    /// whatever the other did; a failure in either keeps the page and the next morning tries again.
+    /// </summary>
+    public static SettledHooks SettledOf(Context context)
+    {
+        var appContext = context.ApplicationContext ?? context;
+        return new SettledHooks(
+            new FileWorkoutLearning(LedgerOf(appContext), WorkoutWeekPaths.Learning(Root(appContext))),
+            new MealReadBackSettled(ConstitutionHousehold.For(appContext).Service));
     }
 
     /// <summary>

@@ -10,6 +10,7 @@ using Constitution.Infrastructure.Body;
 using Constitution.Infrastructure.Calendar;
 using Constitution.Infrastructure.Workouts;
 using Constitution.ReadBack;
+using Constitution.WorkoutDelivery;
 using Constitution.Services;
 
 namespace Constitution.WorkoutWeek;
@@ -32,7 +33,7 @@ public static class WorkoutWeekCalendarSeams
     public const string SetupFile = "planning-setup.json";
     public const string WrittenKeysFile = "written-keys.json";
     public const string IssuedNumbersFile = "issued-numbers.json";
-    public const string LearningFolder = "learning";
+    public const string LearningFolder = WorkoutWeekPaths.LearningFolder;
 
     private const string ApplicationName = "Constitution";
 
