@@ -15,7 +15,7 @@ namespace Storyworthtelling.Voice;
 // app to its own copy) — Storyboarder's DeviceAccountTokenProvider requests it; the other apps must do the
 // same, and the owner registers the scope on each OAuth client. Not yet verified against live Drive; a
 // token without the scope (or any failure) just degrades the store to neutral copy.
-public sealed class DriveTextFile : IDriveTextFile
+public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership
 {
     private readonly Func<CancellationToken, Task<DriveService>> serviceFactory;
     private readonly string fileName;
@@ -49,6 +49,21 @@ public sealed class DriveTextFile : IDriveTextFile
         using var stream = new MemoryStream();
         await service.Files.Get(id).DownloadAsync(stream, cancellationToken);
         return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    // Whether the file this account resolves to is its own or was shared with it. Resolved the same way
+    // as the read and write above, so the answer is about the file those calls actually touch.
+    public async Task<DriveFileOwnership> OwnershipAsync(CancellationToken cancellationToken)
+    {
+        using var service = await serviceFactory(cancellationToken);
+        var id = await FindId(service, cancellationToken);
+        if (id is null)
+            return DriveFileOwnership.None;
+
+        var get = service.Files.Get(id);
+        get.Fields = "id,ownedByMe";
+        var file = await get.ExecuteAsync(cancellationToken);
+        return file.OwnedByMe == true ? DriveFileOwnership.Owned : DriveFileOwnership.Shared;
     }
 
     public async Task WriteAsync(string content, CancellationToken cancellationToken)

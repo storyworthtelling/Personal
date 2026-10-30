@@ -305,8 +305,7 @@ public class TidalPairingActivity : Activity
     private async Task<(string ClientId, string ClientSecret)?> ReadCredentialsAsync()
     {
         var vaultAccess = new SecretsVaultAccess(
-            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
-            () => ScoreIdentity.Account);
+            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score");
         var vaultResult = await vaultAccess.Service.LoadAsync(CancellationToken.None);
 
         return vaultResult.Status == SecretsVaultStatus.Loaded
