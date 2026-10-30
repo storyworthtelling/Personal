@@ -106,7 +106,7 @@ public static class MealWeekServices
     /// (<see cref="WorkoutWeekDeliverySeams"/>: the tablet client bound to this phone's pairing, the delivery service, the ink probe and the read-back's own
     /// record of expected documents), so a title means the same page to both, plus the meal run's own record of what it has sent. The holiday calendar is the
     /// default that cannot be asked, so the sheet carries no ask-ahead page until a calendar reader exists. The rotating templates read and keep their library in the
-    /// household file (<see cref="HouseholdTemplateLibrary"/>); no author is built yet (<see cref="NoTemplateAuthor"/>), so nothing is ever proposed and pages 2 and 3 are
+    /// household file (<see cref="HouseholdTemplateLibrary"/>); the Claude author (<see cref="TemplateAuthorServices"/>) proposes new lines when a key is set; with no key nothing is proposed and pages 2 and 3 are
     /// printed only from templates already approved in the file.
     /// </summary>
     public static MealWeekSeams Assemble(Context appContext, CalendarSideSeams calendar)
@@ -142,7 +142,7 @@ public static class MealWeekServices
             new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
             log,
             documents,
-            new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), new NoTemplateAuthor()));
+            new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), TemplateAuthorServices.AuthorOf(appContext)));
     }
 
     private static string FolderOf(Context appContext) => Path.Combine(NoBackupRoot(appContext), FolderName);

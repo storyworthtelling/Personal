@@ -22,12 +22,12 @@ public class TemplateWiringGuardTests
     }
 
     [Fact]
-    public void TheHeadHandsOverTheHouseholdLibraryAndNoAuthorYet()
+    public void TheHeadHandsOverTheHouseholdLibraryAndTheClaudeAuthor()
     {
         var services = Text("Android/MealWeek/MealWeekServices.cs");
 
         Assert.Contains("new HouseholdTemplateLibrary(household.Service)", services, StringComparison.Ordinal);
-        Assert.Contains("new NoTemplateAuthor()", services, StringComparison.Ordinal);
+        Assert.Contains("TemplateAuthorServices.AuthorOf(", services, StringComparison.Ordinal);
     }
 
     [Fact]
