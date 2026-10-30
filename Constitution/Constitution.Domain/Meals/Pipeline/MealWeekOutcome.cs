@@ -59,6 +59,9 @@ public sealed record MealWeekReport(
 {
     /// <summary>True when the calendar side could not be used at all (a record unreadable) and nothing was written.</summary>
     public bool PlacementBlocked => Placement?.BlockedBecause is not null;
+
+    /// <summary>What the documents step did (the sheet and the recipes), or null when the run was not given the means to deliver any.</summary>
+    public MealDocumentsResult? Documents { get; init; }
 }
 
 /// <summary>The result of one run of the weekly meal run: planned, or the typed reason it was not.</summary>

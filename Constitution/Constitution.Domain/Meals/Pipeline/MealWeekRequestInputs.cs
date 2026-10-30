@@ -29,4 +29,13 @@ public sealed record MealWeekRequestInputs(DateOnly WeekStart, DateTimeOffset No
     public MealPlacementOptions Placement { get; init; } = new();
 
     public GroceryTripOptions Groceries { get; init; } = new();
+
+    /// <summary>
+    /// The adults whose pages this phone puts on its tablet (each phone is paired to its own tablet, D85). Empty means this phone has no tablet to
+    /// deliver to, and the documents step says so rather than guessing.
+    /// </summary>
+    public IReadOnlyList<string> DeliverFor { get; init; } = [];
+
+    /// <summary>The children's different dinner by evening. <b>No source exists yet</b>: the head leaves it empty, which prints no kids' page.</summary>
+    public IReadOnlyDictionary<DateOnly, KidsMealFacts> KidsMeals { get; init; } = new Dictionary<DateOnly, KidsMealFacts>();
 }

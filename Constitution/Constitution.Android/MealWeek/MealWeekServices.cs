@@ -1,11 +1,13 @@
 using Android.Content;
 using Constitution.Body;
+using Constitution.Domain.Groceries;
 using Constitution.Domain.Meals;
 using Constitution.Domain.Meals.Pipeline;
 using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Placement;
 using Constitution.Domain.Workouts.Pipeline;
 using Constitution.Household;
+using Constitution.Infrastructure.Budgets;
 using Constitution.Infrastructure.Household;
 using Constitution.Infrastructure.Meals;
 using Constitution.Infrastructure.Workouts;
@@ -32,6 +34,10 @@ namespace Constitution.WeeklyMeals;
 /// busy time, so a trip or a cook block is never put on a workout. Meals are placed first when both runs are due, and the engine places what is already
 /// on the calendar first, so a workout run after this one goes around the cook blocks (it reads them as busy now).</para>
 ///
+/// <para><b>The paper (part two).</b> After the week is kept, the same run turns it into the meal sheet and each cook's recipe and puts them on this phone's tablet
+/// (<see cref="MealDocumentsStep"/>); the tablet, the delivery service, the ink probe and the read-back's record are the workout run's own
+/// (<see cref="WorkoutWeekDeliverySeams"/>). A recipe goes an hour before its cook block, so it waits for a later call: there is no scheduled one yet.</para>
+///
 /// <para><b>Not yet here:</b> a worker to call <see cref="RunAsync"/> (a later job), a taste profile store (the source says there is none,
 /// which plans without one), a source for the evenings the children eat at home, the Cook this soon mark, and an approval step. Nothing is swallowed
 /// here: a seam's exception propagates to whoever calls. Device-gated: nothing here has met Google Calendar or a phone.</para>
@@ -41,6 +47,7 @@ public static class MealWeekServices
     public const string FolderName = "meal-week";
     public const string HistoryFile = "cooked-history.json";
     public const string RecordFile = "planned-weeks.json";
+    public const string DeliveredFile = "delivered-documents.json";
 
     public static async Task<MealWeekOutcome> RunAsync(Context context, CancellationToken cancellation)
     {
@@ -93,7 +100,12 @@ public static class MealWeekServices
         return new MealWeekRecordSource(new FileMealWeekRecords(Path.Combine(FolderOf(context.ApplicationContext ?? context), RecordFile)));
     }
 
-    /// <summary>The run's seams. No taste profile is kept anywhere yet, so the source says there is none.</summary>
+    /// <summary>
+    /// The run's seams. No taste profile is kept anywhere yet, so the source says there is none. The documents step reuses the workout run's delivery side
+    /// (<see cref="WorkoutWeekDeliverySeams"/>: the tablet client bound to this phone's pairing, the delivery service, the ink probe and the read-back's own
+    /// record of expected documents), so a title means the same page to both, plus the meal run's own record of what it has sent. The holiday calendar is the
+    /// default that cannot be asked, so the sheet carries no ask-ahead page until a calendar reader exists.
+    /// </summary>
     public static MealWeekSeams Assemble(Context appContext, CalendarSideSeams calendar)
     {
         ArgumentNullException.ThrowIfNull(appContext);
@@ -102,6 +114,18 @@ public static class MealWeekServices
         var household = ConstitutionHousehold.For(appContext);
         var folder = FolderOf(appContext);
         var log = new BodyMealLog(new BodyLog(appContext));
+        var delivery = WorkoutWeekDeliverySeams.Create(appContext);
+        var documents = new MealDocumentSeams(
+            delivery.Delivery,
+            delivery.Tablet,
+            delivery.InkProbe,
+            delivery.Expected,
+            new FileDeliveredMealDocuments(Path.Combine(folder, DeliveredFile)),
+            new HouseholdMealRoster(household.Service),
+            new HouseholdMealPantry(household.Service),
+            new FileMonthlyBudgets(Path.Combine(NoBackupRoot(appContext), FileMonthlyBudgets.FileName)),
+            new UnavailableHolidayCalendar(),
+            log);
         return new MealWeekSeams(
             household.Planning.AskAsync,
             new HouseholdRecipeBox(household.Service),
@@ -113,7 +137,8 @@ public static class MealWeekServices
             calendar.WrittenKeys,
             calendar.KeyAssignments,
             new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
-            log);
+            log,
+            documents);
     }
 
     private static string FolderOf(Context appContext) => Path.Combine(NoBackupRoot(appContext), FolderName);

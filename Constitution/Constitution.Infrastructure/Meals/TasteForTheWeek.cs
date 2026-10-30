@@ -17,4 +17,11 @@ public static class TasteForTheWeek
             ? TastePlannerInputs.From(held.Profile, held.People, request.Recipes).Apply(request)
             : request;
     }
+
+    /// <summary>What each person last said of each dish, for the rating page; nobody's when there is no profile.</summary>
+    public static LastRatings LastRatings(MealTasteRead taste)
+    {
+        ArgumentNullException.ThrowIfNull(taste);
+        return taste is MealTasteRead.Held held ? TasteLastRatings.From(held.Profile) : Constitution.Domain.Meals.Pipeline.LastRatings.None;
+    }
 }

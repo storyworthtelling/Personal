@@ -34,6 +34,10 @@ namespace Constitution.Infrastructure.Meals;
 /// confirmed cooked, which the read-back will settle later; this run never writes it. To keep the planner from serving the same dish two weeks
 /// running it is shown the dinners of the weeks it planned before this one (<see cref="PlannedHistory"/>), as a stand-in that is never stored as fact.</para>
 ///
+/// <para><b>Part two: the paper.</b> When the run is given the means to deliver (<see cref="MealWeekSeams.Documents"/>), the kept week is then turned into the
+/// meal sheet and each cooked dinner's recipe and put on this phone's tablet (<see cref="MealDocumentsStep"/>), after the week is saved and never when nothing was planned.
+/// A stop or a failure there is reported in <see cref="MealWeekReport.Documents"/> and never un-plans or un-saves the week.</para>
+///
 /// <para>Anything the run cannot name is a bug and propagates with its stack.</para>
 /// </summary>
 public static class MealWeekRun
@@ -152,8 +156,27 @@ public static class MealWeekRun
             seams.Records.Save((record ?? MealWeekRecord.Empty).With(kept));
         }
 
+        // The documents follow the kept week, never the fresh one: an evening already over keeps the dinner it had, and the paper says what the calendar says.
+        MealDocumentsResult? documents = null;
+        if (seams.Documents is { } documentSeams)
+        {
+            documents = await MealDocumentsStep.RunAsync(
+                new MealDocumentRequest(kept.Week, cards, rules, inputs.Now, inputs.DeliverFor)
+                {
+                    History = request.History,
+                    SlowCookerCards = inputs.Placement.SlowCookerCards,
+                    KidsMeals = inputs.KidsMeals,
+                    Ratings = TasteForTheWeek.LastRatings(taste),
+                },
+                documentSeams,
+                cancellation);
+        }
+
         return Finish(seams, new MealWeekOutcome.Planned(new MealWeekReport(
-            kept.Week, planned.Origin, planned.Reason, events, placement, trip is not null, save, earlierUnreadable)));
+            kept.Week, planned.Origin, planned.Reason, events, placement, trip is not null, save, earlierUnreadable)
+        {
+            Documents = documents,
+        }));
     }
 
     private static MealWeekOutcome Stop(MealWeekSeams seams, MealNotPlannedBecause because, string sentence) =>
