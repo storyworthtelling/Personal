@@ -3,8 +3,11 @@ using System.Text;
 using System.Text.Json;
 using Constitution.Domain.Delivery;
 using Constitution.Domain.Documents;
+using Constitution.Domain.Household;
 using Constitution.Domain.Ink;
+using Constitution.Domain.Meals;
 using Constitution.Domain.ReadBack;
+using Constitution.Domain.Recipes;
 using Constitution.Domain.Workouts;
 
 namespace Constitution.Infrastructure.ReadBack;
@@ -19,6 +22,13 @@ internal static class ExpectedDocumentCodec
 {
     private const int Version = 1;
     private const string DayFormat = "yyyy-MM-dd";
+
+    // A recipe's rating rows, stored as ids only (never a name or a dish). Frozen literals: a file already on a phone is read by
+    // these words. Absent in a file written before the rows were carried, and then read as none.
+    private const string RatingRowsName = "ratingRows";
+    private const string RowGroupName = "group";
+    private const string RowPersonName = "person";
+    private const string RowRecipeName = "recipe";
 
     public static string Encode(IEnumerable<OutstandingDocument> documents)
     {
@@ -95,6 +105,21 @@ internal static class ExpectedDocumentCodec
         }
 
         writer.WriteEndArray();
+        if (document.RatingRows.Count > 0)
+        {
+            writer.WriteStartArray(RatingRowsName);
+            foreach (var row in document.RatingRows)
+            {
+                writer.WriteStartObject();
+                writer.WriteString(RowGroupName, row.Group);
+                writer.WriteString(RowPersonName, row.Person.Value);
+                writer.WriteString(RowRecipeName, row.Recipe.Value);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        }
+
         writer.WriteEndObject();
     }
 
@@ -172,8 +197,25 @@ internal static class ExpectedDocumentCodec
         var pages = item.GetProperty("pages").EnumerateArray().Select(ReadPage).ToList();
         var document = new ExpectedDocument(
             kind, DateOnly.ParseExact(Text(item, "day"), DayFormat, CultureInfo.InvariantCulture),
-            Optional(item, "subject"), Text(item, "person"), session, pages);
+            Optional(item, "subject"), Text(item, "person"), session, pages, ReadRatingRows(item));
         return new OutstandingDocument(document, item.GetProperty("saved").GetBoolean());
+    }
+
+    private static List<TasteRatingRow> ReadRatingRows(JsonElement item)
+    {
+        if (!item.TryGetProperty(RatingRowsName, out var rows))
+        {
+            return [];
+        }
+
+        if (rows.ValueKind != JsonValueKind.Array)
+        {
+            throw new FormatException("The manifest's rating rows are not a list.");
+        }
+
+        return rows.EnumerateArray()
+            .Select(row => new TasteRatingRow(Text(row, RowGroupName), new PersonId(Text(row, RowPersonName)), new RecipeId(Text(row, RowRecipeName))))
+            .ToList();
     }
 
     private static ExpectedPage ReadPage(JsonElement page)

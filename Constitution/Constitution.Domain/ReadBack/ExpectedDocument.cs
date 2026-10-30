@@ -17,9 +17,19 @@ namespace Constitution.Domain.ReadBack;
 /// </summary>
 public sealed partial class ExpectedDocument
 {
-    public ExpectedDocument(DeliveryKind kind, DateOnly day, string? subject, string person, SessionKind? session, IReadOnlyList<ExpectedPage> pages)
+    public ExpectedDocument(DeliveryKind kind, DateOnly day, string? subject, string person, SessionKind? session, IReadOnlyList<ExpectedPage> pages, IReadOnlyList<TasteRatingRow>? ratingRows = null)
     {
         ArgumentNullException.ThrowIfNull(pages);
+        RatingRows = (ratingRows ?? []).ToList();
+        if (RatingRows.Count > 0 && kind != DeliveryKind.Recipe)
+        {
+            throw new ArgumentException("Only a recipe's rating page has rating rows to carry.", nameof(ratingRows));
+        }
+
+        if (RatingRows.Select(row => row.Group).Distinct(StringComparer.Ordinal).Count() != RatingRows.Count)
+        {
+            throw new ArgumentException("Two rating rows cannot share a circle group; the reply could not say which person was meant.", nameof(ratingRows));
+        }
         if (string.IsNullOrWhiteSpace(person))
         {
             throw new ArgumentException("A document belongs to someone; the read-back records its answers under them.", nameof(person));
@@ -89,6 +99,14 @@ public sealed partial class ExpectedDocument
     public SessionKind? Session { get; }
 
     public IReadOnlyList<ExpectedPage> Pages { get; }
+
+    /// <summary>
+    /// A recipe's rating rows as the page was built: for each circle group, the person and the card it rates. Carried so the
+    /// hook that records a rating names them by id and does not look them up again by printed name and title, which a renamed
+    /// person, a kids' dish with its own card title or two cards of one title would make ambiguous. Empty for every other kind of
+    /// document, and for a recipe stored before the rows were carried (the hook then falls back to the words).
+    /// </summary>
+    public IReadOnlyList<TasteRatingRow> RatingRows { get; }
 
     /// <summary>The title delivery uploaded it under, which is the title it is found by.</summary>
     public string Name => DeliveredName.For(Kind, Day, Subject);

@@ -155,7 +155,7 @@ public sealed class MealReadBackSettled(HouseholdFileService household) : IReadB
                 var rows = new List<TasteRatingRow>();
                 foreach (var rule in circled)
                 {
-                    if (RowOf(rule, held) is { } row)
+                    if (RowFor(rule, document, held) is { } row)
                     {
                         rows.Add(row);
                     }
@@ -205,9 +205,26 @@ public sealed class MealReadBackSettled(HouseholdFileService household) : IReadB
         }
     }
 
-    // The stored document keeps a row's group and its printed words, not the person's id or the card's: they are found again here by
-    // name and by title, and a row is only ever matched when both are unique. Carrying the ids on the expected document would make this
-    // lookup unnecessary.
+    // The carried row when the document has one for this group (and then ONLY that: a carried id that has gone from the file is reported,
+    // never replaced by whoever now has the same name); the lookup by words only when the document carries no row for the group.
+    private static TasteRatingRow? RowFor(RatingRule rule, ExpectedDocument document, HouseholdDocument held) =>
+        document.RatingRows.Any(row => string.Equals(row.Group, rule.Group, StringComparison.Ordinal))
+            ? CarriedRowOf(rule, document, held)
+            : RowOf(rule, held);
+
+    // A document stored since the rating rows were carried names the person and the card by id, exactly as the page was built: no lookup, so a
+    // renamed person, a kids' dish whose card title differs from the printed dish, or two cards of one title cannot make the row ambiguous.
+    // The ids must still be on the roster and in the box: a rating is never written for someone who has gone or a card that has been removed.
+    private static TasteRatingRow? CarriedRowOf(RatingRule rule, ExpectedDocument document, HouseholdDocument held)
+    {
+        var carried = document.RatingRows.First(row => string.Equals(row.Group, rule.Group, StringComparison.Ordinal));
+        var onRoster = RosterView.From(held).Entries.Any(entry => entry.Id == carried.Person);
+        var inTheBox = HouseholdRecords.Read(held, RecipeMaps.Recipe).Items.Any(card => card.Id == carried.Recipe);
+        return onRoster && inTheBox ? carried : null;
+    }
+
+    // The fallback, for a document stored before the rows were carried: a row's group and its printed words are all it kept, so the person
+    // and the card are found again by name and by title, and a row is only ever matched when both are unique.
     private static TasteRatingRow? RowOf(RatingRule rule, HouseholdDocument held)
     {
         var match = RatingSubject.Match(rule.Subject);
