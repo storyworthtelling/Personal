@@ -15,7 +15,10 @@ public enum EventLeftOut
     /// <summary>Google reports it cancelled.</summary>
     Cancelled,
 
-    /// <summary>The app wrote it (it carries the private <c>constitutionKey</c>): read back as busy time, the week would never settle.</summary>
+    /// <summary>
+    /// The reading run wrote it (it carries the private <c>constitutionKey</c>, and a key of that run's <see cref="KeyFamily"/> when the run names
+    /// one): read back as busy time, its week would never settle. An event of the other run's family is somebody's time and is kept.
+    /// </summary>
     OurOwn,
 }
 
@@ -44,8 +47,11 @@ public abstract record EventMapping
 /// (<c>IHouseholdCalendarsSource</c>). Pure: no network, so each rule has a test on a plain <c>Event</c>.
 ///
 /// <list type="bullet">
-///   <item>An event with the private <c>constitutionKey</c> property is the app's own and is dropped, whatever else it is. The property is checked
-///   among the <i>private</i> properties only, which is where the app writes it.</item>
+///   <item>An event with the private <c>constitutionKey</c> property is the reading run's own and is dropped, whatever else it is. The property is
+///   checked among the <i>private</i> properties only, which is where the app writes it. <b>Whose own is told by the key</b> (<see cref="KeyFamilies"/>):
+///   a run that names its family (<c>ownFamily</c>) drops only keys of that family, so the workout run sees the meal run's cook blocks, slow-cooker
+///   starts and Groceries trip as the busy time they are, and the meal run sees the workouts. A key of no family (unparseable, a kind no run owns
+///   yet) is kept by both: unknown means somebody's time. With no family named every keyed event is dropped, as before the families existed.</item>
 ///   <item>A cancelled event is left out. So is one the calendar's owner declined: the attendee who is the calendar itself (flagged <c>self</c> by
 ///   Google, which means "the calendar this copy is on", or carrying the calendar's own address) said declined. Never handed over as free.</item>
 ///   <item>Transparent is free; anything else, tentative and unanswered included, takes the time.</item>
@@ -60,11 +66,21 @@ public static class GoogleEventMapper
     private const string Transparent = "transparent";
     private const string UnusableReason = "An event on a calendar could not be understood.";
 
-    public static EventMapping Map(GoogleEvent googleEvent, string calendarId)
+    /// <param name="googleEvent">The event as Google sent it.</param>
+    /// <param name="calendarId">The calendar the copy is on, to tell the owner's own answer from a guest's.</param>
+    /// <param name="ownFamily">The reading run's family: only keys of this family are its own and dropped. Null drops every keyed event. Never <see cref="KeyFamily.Unknown"/>, which no run owns.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="ownFamily"/> is <see cref="KeyFamily.Unknown"/>: dropping the unknown would be dropping somebody's time.</exception>
+    public static EventMapping Map(GoogleEvent googleEvent, string calendarId, KeyFamily? ownFamily = null)
     {
         ArgumentNullException.ThrowIfNull(googleEvent);
+        if (ownFamily == KeyFamily.Unknown)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ownFamily), ownFamily, "No run owns the unknown family, and dropping its events would drop somebody's time.");
+        }
 
-        if (googleEvent.ExtendedProperties?.Private__ is { } properties && properties.ContainsKey(PlacementKey.Property))
+        if (googleEvent.ExtendedProperties?.Private__ is { } properties
+            && properties.TryGetValue(PlacementKey.Property, out var storedKey)
+            && (ownFamily is null || KeyFamilies.Of(storedKey) == ownFamily))
         {
             return new EventMapping.LeftOut(EventLeftOut.OurOwn);
         }
