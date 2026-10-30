@@ -30,6 +30,7 @@ public static class NoticeKinds
         NoticeKind.KeepHandoff => FoldRole.Reference,
         NoticeKind.NoPenMarks => FoldRole.Caution,
         NoticeKind.WeekNotPlanned => FoldRole.Problem,
+        NoticeKind.HouseholdFileUnreadable => FoldRole.Problem,
         _ => throw new ArgumentOutOfRangeException(
             nameof(kind), kind, "This notice kind has no role; add it to NoticeKinds.RoleOf and the role table in ConstitutionNoticeTests."),
     };

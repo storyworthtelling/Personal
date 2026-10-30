@@ -30,6 +30,7 @@ public class ConstitutionNoticeTests
         (NoticeKind.KeepHandoff, FoldRole.Reference),
         (NoticeKind.NoPenMarks, FoldRole.Caution),
         (NoticeKind.WeekNotPlanned, FoldRole.Problem),
+        (NoticeKind.HouseholdFileUnreadable, FoldRole.Problem),
     ];
 
     // ---- EachKindHasItsRole -------------------------------------------------------------------
