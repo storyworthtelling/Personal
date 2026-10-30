@@ -1,4 +1,5 @@
 using Constitution.Domain.Calendar;
+using Constitution.Domain.Placement;
 using Constitution.Domain.Workouts.Pipeline;
 using Google.Apis.Calendar.v3;
 
@@ -8,7 +9,12 @@ namespace Constitution.Infrastructure.Calendar;
 /// <see cref="IHouseholdCalendarsSource"/> over the Google Calendar API v3, with the account the app already signs in with (its full
 /// <c>calendar</c> scope). Reads each adult's own calendar, the family calendar and the children's calendars for the window, with recurring events
 /// expanded into their occurrences (<c>singleEvents</c>), page by page, and hands each event through <see cref="GoogleEventMapper"/>, which holds the
-/// rules the seam states (the app's own events dropped; declined and cancelled events left out, never free).
+/// rules the seam states (the reading run's own events dropped; declined and cancelled events left out, never free).
+///
+/// <para><b>Whose events are dropped.</b> The workout run and the meal run write to the same calendars, and each must drop only its own earlier
+/// events and see the other's as busy time (see <see cref="GoogleEventMapper"/>). <c>ownFamily</c> names the reading run's family, told from each
+/// event's key; null drops every keyed event, as the source did before the families existed. A run that forgets to say is blind to the other:
+/// the head names it in the one place that builds this source, and a guard test fails if another caller appears.</para>
 ///
 /// <para><b>Fail closed.</b> A calendar that cannot be read is <see cref="CalendarRead.Unreadable"/> with a plain sentence, never an empty list: a
 /// Google refusal (not shared yet), a network failure, an event that cannot be understood, a sign-in that gives no token, a calendar id the household has not
@@ -20,7 +26,8 @@ namespace Constitution.Infrastructure.Calendar;
 /// </summary>
 public sealed class GoogleHouseholdCalendars(
     Func<CancellationToken, Task<CalendarService>> service,
-    Func<HouseholdSetupRead> setup) : IHouseholdCalendarsSource
+    Func<HouseholdSetupRead> setup,
+    KeyFamily? ownFamily = null) : IHouseholdCalendarsSource
 {
     private const int PageSize = 250;
     private const int MostPages = 40;
@@ -32,6 +39,10 @@ public sealed class GoogleHouseholdCalendars(
 
     private readonly Func<CancellationToken, Task<CalendarService>> service = service ?? throw new ArgumentNullException(nameof(service));
     private readonly Func<HouseholdSetupRead> setup = setup ?? throw new ArgumentNullException(nameof(setup));
+
+    private readonly KeyFamily? ownFamily = ownFamily == KeyFamily.Unknown
+        ? throw new ArgumentOutOfRangeException(nameof(ownFamily), ownFamily, "No run owns the unknown family, and dropping its events would drop somebody's time.")
+        : ownFamily;
 
     public async Task<HouseholdCalendarSnapshot> ReadAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellation)
     {
@@ -100,7 +111,7 @@ public sealed class GoogleHouseholdCalendars(
         return CalendarRead.Of(merged);
     }
 
-    private static async Task<CalendarRead> ReadOneAsync(CalendarService calendar, string calendarId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellation)
+    private async Task<CalendarRead> ReadOneAsync(CalendarService calendar, string calendarId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellation)
     {
         var entries = new List<CalendarEntry>();
         string? pageToken = null;
@@ -122,7 +133,7 @@ public sealed class GoogleHouseholdCalendars(
                 var events = await request.ExecuteAsync(cancellation);
                 foreach (var googleEvent in events.Items ?? [])
                 {
-                    switch (GoogleEventMapper.Map(googleEvent, calendarId))
+                    switch (GoogleEventMapper.Map(googleEvent, calendarId, ownFamily))
                     {
                         case EventMapping.Kept kept:
                             entries.Add(kept.Entry);

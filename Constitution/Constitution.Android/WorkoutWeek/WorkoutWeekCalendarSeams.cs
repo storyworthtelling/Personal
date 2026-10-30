@@ -36,7 +36,13 @@ public static class WorkoutWeekCalendarSeams
 
     private const string ApplicationName = "Constitution";
 
-    public static CalendarSideSeams Create(Context context)
+    /// <param name="context">The app's context.</param>
+    /// <param name="ownFamily">
+    /// Which run is reading the calendars, so which events it drops as its own earlier work. The workout run (and the Workouts tab, which re-derives its
+    /// week) reads as <see cref="KeyFamily.Workout"/> and so sees the meal run's cook blocks, slow-cooker starts and Groceries trip as busy time; the
+    /// meal run passes <see cref="KeyFamily.HouseholdMeal"/> and sees the workouts. Everything else about the seams is the one set of records both share.
+    /// </param>
+    public static CalendarSideSeams Create(Context context, KeyFamily ownFamily = KeyFamily.Workout)
     {
         ArgumentNullException.ThrowIfNull(context);
         var appContext = context.ApplicationContext ?? context;
@@ -61,7 +67,7 @@ public static class WorkoutWeekCalendarSeams
             : new NoRecoveryRead();
 
         return new CalendarSideSeams(
-            new GoogleHouseholdCalendars(service, setup),
+            new GoogleHouseholdCalendars(service, setup, ownFamily),
             new GoogleCalendarWriter(service, setup, ZoneOf(setup(), workScheduleJson)),
             new GoogleWorkoutEventEditor(service, setup),
             new FileWrittenKeys(Path.Combine(directory, WrittenKeysFile)),

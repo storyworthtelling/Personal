@@ -22,6 +22,14 @@ namespace Constitution.WorkoutWeek;
 /// not plan leaves the last report where it is. The run puts its own value-free line in the Body trail when it finishes, so this
 /// door adds one only for the week it never started.</para>
 ///
+/// <para><b>One placement run at a time.</b> The meal run writes to the same calendars through the same records of written keys and issued numbers
+/// (<see cref="Constitution.WeeklyMeals.MealWeekServices"/>), and each loads a record, writes, then saves it again, so the two take turns through
+/// <see cref="RunGate.Shared"/>. A run that cannot get its turn within <see cref="RunGate.DefaultWait"/> does not start and writes nothing:
+/// <see cref="TryRunAsync"/> says so as a typed <see cref="GateResult{T}.Busy"/>, and <see cref="RunAsync"/> (whose contract returns the outcome and lets
+/// anything else propagate) throws <see cref="RunGateBusyException"/> for the worker to log by name. It reads the calendars as the workout family, so the
+/// meal run's cook blocks, slow-cooker starts and Groceries trip are busy time to it; meals are placed first when both are due, and a workout run after
+/// them goes around what is there.</para>
+///
 /// <para>The signature of <see cref="RunAsync"/> is the contract the worker calls. Device-gated: nothing here has met Google Calendar,
 /// the reMarkable cloud or a phone.</para>
 /// </summary>
@@ -29,7 +37,25 @@ public static class WorkoutWeekServices
 {
     public static async Task<WorkoutWeekOutcome> RunAsync(Context context, CancellationToken cancellation)
     {
+        var turn = await TryRunAsync(context, cancellation);
+        return turn switch
+        {
+            GateResult<WorkoutWeekOutcome>.Ran ran => ran.Outcome,
+            GateResult<WorkoutWeekOutcome>.Busy busy => throw new RunGateBusyException(busy.Sentence),
+            _ => throw new InvalidOperationException("The run gate gave an answer this door does not know."),
+        };
+    }
+
+    /// <summary>The run, once it has its turn at the calendars; <see cref="GateResult{T}.Busy"/> when another placement run held them for the whole wait.</summary>
+    public static Task<GateResult<WorkoutWeekOutcome>> TryRunAsync(Context context, CancellationToken cancellation)
+    {
         ArgumentNullException.ThrowIfNull(context);
+        cancellation.ThrowIfCancellationRequested();
+        return RunGate.Shared.RunAsync(token => RunAloneAsync(context, token), RunGate.DefaultWait, cancellation);
+    }
+
+    private static async Task<WorkoutWeekOutcome> RunAloneAsync(Context context, CancellationToken cancellation)
+    {
         cancellation.ThrowIfCancellationRequested();
 
         var appContext = context.ApplicationContext ?? context;
