@@ -24,7 +24,7 @@ internal sealed class ThisWeekPage : LinearLayout
 
     private const int DayLabelWidthDp = DesignTokens.Space.X8;
 
-    public ThisWeekPage(Context context, MealsWeekModel model, IReadOnlyDictionary<AteMeal, AteLine>? ate = null) : base(context)
+    public ThisWeekPage(Context context, MealsWeekModel model, IReadOnlyDictionary<AteMeal, AteLine>? ate = null, string? status = null) : base(context)
     {
         Orientation = Orientation.Vertical;
         ate ??= new Dictionary<AteMeal, AteLine>();
@@ -47,13 +47,19 @@ internal sealed class ThisWeekPage : LinearLayout
             scraps.Add(new ScrapEntry(ScrapKind.IndexCard, TonightScrapId, none));
         }
 
-        // "I ate something else" (book p.15): the dinner's line is on tonight's card; any other meal's line gets a card of its own.
+        // "I ate something else" (book p.15, D107): the dinner's line is on tonight's card; no other meal has a card.
         scraps.AddRange(AteCards.Extras(context, ate, dinnerIsAnIndexCard: true));
 
         scraps.Add(new ScrapEntry(ScrapKind.IndexCard, WeekScrapId, WeekCard(context, model)));
 
         var host = new ScrapHost(context);
         host.SetScraps(scraps);
+        if (status is not null)
+        {
+            // A breakfast or lunch photo has no card (D107): one plain sentence above the scraps says it was noted.
+            AddView(PageFurniture.StatusSentence(context, status));
+        }
+
         var scroll = new ScrollView(context);
         scroll.AddView(host, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
         AddView(scroll, new LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));

@@ -127,4 +127,24 @@ public partial class AteHeadSourceTests
         Assert.Contains("BitmapFactory", scaler, StringComparison.Ordinal);
         Assert.Contains("Compress", scaler, StringComparison.Ordinal);
     }
+
+    // D107: the head draws the dinner card's one line and nothing under it, and no card for breakfast or lunch.
+    [Fact]
+    public void TheCardLineHasNoDetailLineAndNoOtherMealCards()
+    {
+        var line = Source("Constitution.Android/MealsTab/AteLineView.cs");
+        var cards = Source("Constitution.Android/MealsTab/AteCards.cs");
+
+        Assert.DoesNotContain("Detail", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("InkMuted", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("AteMeals.Title", cards, StringComparison.Ordinal);
+        Assert.DoesNotContain("IndexLabel", cards, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BothPagesSayTheStatusSentenceInline()
+    {
+        Assert.Contains("AteCards.Status", Source("Constitution.Android/Today/TodayPage.cs") + Source("Constitution.Android/TodayArea.cs"), StringComparison.Ordinal);
+        Assert.Contains("AteCards.Status", Source("Constitution.Android/MealsTab/ThisWeekPage.cs") + Source("Constitution.Android/MealsArea.cs"), StringComparison.Ordinal);
+    }
 }

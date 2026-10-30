@@ -72,7 +72,10 @@ public sealed class AteSomethingElseFlow
     /// <summary>What a meal's card says on a day, or null when it says nothing of this.</summary>
     public AteLine? LineFor(AteMeal meal, DateOnly day) => model.LineFor(meal, day);
 
-    /// <summary>The meals that have a line today, in the day's order.</summary>
+    /// <summary>The one sentence a breakfast or lunch photo gets (D107), or null.</summary>
+    public string? StatusFor(DateOnly day) => model.StatusFor(day);
+
+    /// <summary>The meals that have a card today: the dinner only.</summary>
     public IReadOnlyList<AteMeal> MealsWithALine(DateOnly day) => model.MealsWithALine(day);
 
     /// <summary>

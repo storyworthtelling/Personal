@@ -12,8 +12,8 @@ public enum AtePhase
     Said,
 }
 
-/// <summary>One line on a meal's card: a status in the teal voice, or the result with its figure in mono and the uncertainty beneath.</summary>
-public sealed record AteLine(string Lead, string? Figure, string? Detail, bool IsStatus)
+/// <summary>One line on the dinner card: a status in the teal voice, or the result with its figure in mono and nothing beneath (D107).</summary>
+public sealed record AteLine(string Lead, string? Figure, bool IsStatus)
 {
     public string Text => Lead + Figure;
 }
@@ -147,31 +147,57 @@ public sealed class AteSomethingElseModel
         Phase = AtePhase.Idle;
     }
 
-    /// <summary>What the card for this meal on this day says now, or null when it says nothing of this.</summary>
+    /// <summary>
+    /// What the dinner card says on a day now, or null when it says nothing (D107). Only the dinner has a card; breakfast and lunch are
+    /// recorded but never drawn, and speak through <see cref="StatusFor"/> instead.
+    /// </summary>
     public AteLine? LineFor(AteMeal card, DateOnly onDay)
     {
+        if (card != AteMeal.Dinner)
+        {
+            return null;
+        }
+
         if (meal == card && day == onDay)
         {
             if (Phase == AtePhase.Estimating)
             {
-                return new AteLine(AteText.Estimating(card), null, null, true);
+                return new AteLine(AteText.Estimating(card), null, true);
             }
 
             if (Phase == AtePhase.Said && sentence is not null)
             {
-                return new AteLine(sentence, null, null, true);
+                return new AteLine(sentence, null, true);
             }
         }
 
         var kept = estimates.FirstOrDefault(item => item.Day == onDay && item.Meal == card);
-        return kept is null
-            ? null
-            : new AteLine(AteText.ResultLead, AteText.Figure(kept.Reading.KcalAbout), AteText.Detail(kept.Reading), false);
+        return kept is null ? null : new AteLine(AteText.ResultLead, AteText.Figure(kept.Reading.KcalAbout), false);
     }
 
-    /// <summary>The meals that have something to say on a day, in the order the day has them.</summary>
+    /// <summary>The meals that have a card on a day: the dinner, when it has something to say.</summary>
     public IReadOnlyList<AteMeal> MealsWithALine(DateOnly onDay) =>
         Enum.GetValues<AteMeal>().Where(card => LineFor(card, onDay) is not null).ToList();
+
+    /// <summary>
+    /// The one plain sentence for a breakfast or lunch photo (D107): estimating, a failure, or "Noted for lunch." once it is recorded.
+    /// Null for a dinner photo (its card speaks) and for any day other than the capture's.
+    /// </summary>
+    public string? StatusFor(DateOnly onDay)
+    {
+        if (meal is not { } which || which == AteMeal.Dinner || day != onDay)
+        {
+            return null;
+        }
+
+        return Phase switch
+        {
+            AtePhase.Estimating => AteText.Estimating(which),
+            AtePhase.Said => sentence,
+            AtePhase.Shown => AteText.Noted(which),
+            _ => null,
+        };
+    }
 }
 
 /// <summary>
