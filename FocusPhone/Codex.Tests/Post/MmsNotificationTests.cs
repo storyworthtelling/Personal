@@ -294,4 +294,60 @@ public class MmsNotificationTests
         Assert.Equal("4 bytes; type 0x86; fields 8C 8D", MmsPduShape.Describe(pdu));
         Assert.Equal(0x86, MmsPduShape.MessageType(pdu));
     }
+
+    // The owner's phone hands Post the notice with something in front of it: every one of
+    // 47 real notices read as "a text header, then 8D 89", never starting at 8C. Whatever the
+    // prefix is, the notice itself begins at Message-Type = notification-ind, so that is
+    // where the reading starts.
+    [Fact]
+    public void FindsTheNoticeBehindATextPrefix()
+    {
+        var bytes = new List<byte>();
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("application/vnd.wap.mms-message"));
+        bytes.Add(0x00);
+        bytes.AddRange([0xB4, 0x84]);
+        bytes.AddRange(Finish(Start()));
+
+        var notice = MmsNotificationParser.Parse([.. bytes]);
+
+        Assert.Equal("txn-9", notice?.TransactionId);
+        Assert.Equal("http://mmsc.carrier.example/9", notice?.ContentLocation);
+    }
+
+    [Fact]
+    public void FindsTheNoticeBehindAWspPushHeader()
+    {
+        // TID, PDU type Push, headers length, Content-Type application/vnd.wap.mms-message,
+        // X-Wap-Application-Id: x-wap-application:mms.ua.
+        byte[] wsp = [0x01, 0x06, 0x04, 0xBE, 0xAF, 0x84, 0x00];
+        byte[] pdu = [.. wsp, .. Finish(Start())];
+
+        Assert.Equal("txn-9", MmsNotificationParser.Parse(pdu)?.TransactionId);
+    }
+
+    // The layout for the log: text runs as their length only, binary octets as hex, so the
+    // shape of the prefix can be seen without a number, a subject or a link in it.
+    [Fact]
+    public void Redacted_ShowsTheShapeAndNoText()
+    {
+        var bytes = new List<byte>();
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("+15550100001"));
+        bytes.Add(0x00);
+        bytes.AddRange([0x8C, 0x82, 0x98]);
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("abc"));
+        bytes.Add(0x00);
+
+        var redacted = MmsPduShape.Redacted([.. bytes]);
+
+        Assert.Equal("<text 12> 00 8C 82 98 <text 3> 00", redacted);
+        Assert.DoesNotContain("5550100001", redacted);
+    }
+
+    [Fact]
+    public void Redacted_StopsAtItsLimit()
+    {
+        var pdu = Enumerable.Repeat((byte)0x81, 100).ToArray();
+
+        Assert.EndsWith("… (100 bytes)", MmsPduShape.Redacted(pdu, limit: 8));
+    }
 }
