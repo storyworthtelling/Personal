@@ -146,7 +146,9 @@ public class RecipeSettleTests
         using var rig = new MealRig();
         var twin = Noodles() with { Id = new RecipeId("buttered-noodles-two") };
         rig.Edit(document => HouseholdRecords.Put(document, RecipeMaps.Recipe, twin, RosterData.At(6000), RosterData.OwnerWriter));
-        var document = Recipe();
+        // A document stored before the rating rows were carried: only the words are left to find the card by.
+        var carried = Recipe();
+        var document = new Constitution.Domain.ReadBack.ExpectedDocument(carried.Kind, carried.Day, carried.Subject, carried.Person, carried.Session, carried.Pages);
 
         Assert.ThrowsAny<InvalidOperationException>(
             () => rig.Hook.Settled(document, RecipeResult(document, NextMorning, Circle(1, "Fine"), Circle(3, "Loved"))));
