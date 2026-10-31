@@ -100,4 +100,52 @@ public class BrandAssetsTests : IDisposable
             root, "Storyboarder", "Folio.Infrastructure", "Resources", "owner.png"));
         Assert.Equal(Tokens.Accent, medallion.GetPixel(medallion.Width / 2, medallion.Height / 2));
     }
+
+    // The approved Constitution painting (POS.6), IconStudio's source for that icon and cover.
+    [Fact]
+    public void ConstitutionCoverIsTheApprovedSize()
+    {
+        var path = Path.Combine(RepoRoot(), "Branding", "constitution-cover.jpg");
+        Assert.True(File.Exists(path), $"{path} is not committed.");
+
+        using var codec = SKCodec.Create(path);
+        Assert.NotNull(codec);
+        Assert.Equal(SKEncodedImageFormat.Jpeg, codec.EncodedFormat);
+        Assert.Equal(864, codec.Info.Width);
+        Assert.Equal(1184, codec.Info.Height);
+    }
+
+    // C-1.3.3: Constitution's icon IS its cover (page 3, icon B): the approved painting, cropped
+    // closer to the two runners, full bleed on the cerulean cloth, no keyline.
+    [Fact]
+    public void ConstitutionResourcesAreGenerated()
+    {
+        var spec = Assert.Single(IconSpecs.All, s => s.App == "Constitution");
+        Assert.Equal("Constitution/Constitution.Android/Resources", spec.ResourceRoot);
+        Assert.Equal("appicon", spec.Name);
+        Assert.Equal(Tokens.ConstitutionClothHex, spec.BackgroundHex);
+        Assert.Equal("Branding/constitution-cover.jpg", spec.PlateImage);
+        Assert.Equal(Glyphs.FullBleedInset, spec.PlateInset);
+        Assert.Equal("FocusPhone/Flyleaf.Android/Resources/drawable/cover_constitution.png", spec.CoverImage);
+        Assert.Equal(new SourceCrop(40, 190, 784, 784), spec.Crop);
+
+        var repo = RepoRoot();
+        var resources = Path.Combine(repo, "Constitution", "Constitution.Android", "Resources");
+        Assert.True(File.Exists(Path.Combine(resources, "mipmap-anydpi-v26", "appicon.xml")));
+        Assert.True(File.Exists(Path.Combine(resources, "mipmap-xxxhdpi", "appicon_foreground.png")));
+        Assert.True(File.Exists(Path.Combine(resources, "mipmap-mdpi", "appicon.png")));
+        Assert.True(File.Exists(Path.Combine(repo, spec.CoverImage!)));
+    }
+
+    [Fact]
+    public void ConstitutionPlateDrawsNoKeyline()
+    {
+        using var bitmap = new SKBitmap(64, 64);
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.Transparent);
+            Glyphs.ConstitutionPlate(canvas, 64);
+        }
+        Assert.All(bitmap.Pixels, pixel => Assert.Equal(0, pixel.Alpha));
+    }
 }

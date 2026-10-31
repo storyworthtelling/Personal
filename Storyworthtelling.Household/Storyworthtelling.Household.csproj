@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The shared household-file engine: the hybrid logical clock, records that carry a stamp and a
+    tombstone, the deterministic merge, the encrypted Drive store and its never-overwrite-a-file-it-
+    cannot-open rule, and the sync schedule and loop around them. Extracted from Pulp, which was the
+    only place the rules existed, so that Pulp and Constitution share one tested engine and a fix to
+    one is a fix to both.
+
+    Kind-agnostic: a record is a kind, an id and an open bag of string fields. What kinds exist and
+    what their fields mean belong to the app; an unknown kind is kept, merged and written back
+    untouched. Pure .NET, no Android APIs, net10.0 like the other shared libraries. Sealing and the
+    Drive file seam come from Storyworthtelling.Voice.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Household</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+  </ItemGroup>
+
+</Project>

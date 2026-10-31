@@ -233,7 +233,7 @@ both are 3:4, so nothing is cropped (TF §1.4).
 | PC5 | **A registered "Dose" rung** in `PaperTypeScale` for the 54 pt dose (p.5), recorded in DESIGN.md §19 | The no-literal guard would otherwise fail (TF §1.5, G6) |
 | PC6 | **Index's card rule tokens and 22 dp pitch move into the shared `MaterialTokens.cs`**, and Index re-points | "The same object in both apps" (p.11) then holds by construction (TF §1.2) |
 | PC7 | **A planning lease record** in the household file (who plans, with a heartbeat), so the partner's install takes over only while the owner's is silent | Two planners must never plan the same week (R8) |
-| PC8 | **Page 14's "Paste an NYT Cooking link" row is built only if the NYT spike succeeds.** Otherwise the picker shows the scan row alone, and the change goes back to the owner as a book revision | D82: raise, don't substitute |
+| PC8 | **Page 14's "Paste an NYT Cooking link" row is not built** (spike C-11.4.1, D96: no official recipe API; permission needed). The picker shows the scan row alone, and the change goes back to the owner as a book revision; revisit only on written permission | D82: raise, don't substitute |
 | PC9 | **Weather and air quality extend `Storyworthtelling.Google`** with the hourly forecast and Google's Air Quality API, on the same key | The bad-weather swap needs the slot's forecast, not current conditions (TF §1.6, G10) |
 | PC10 | **The weekly Keep hand-off is a Reference notice on the Waiting page**: "This week's groceries are ready", with one button, Send to Keep, which opens Keep's share sheet with the list. It appears once the sheet is approved. | Confirmed by D90 |
 
@@ -503,7 +503,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
     resolves it (C-2.2.1), and trashes it only after the result is saved.
   - Given a document found with no annotations rendered, then Diagnostics records "document found,
     nothing read" and the page is not trashed (R3).
-  - Given the digest, then it is trashed after three days (R4).
+  - Given the digest, then only its four planner-note lines are read, once, from Sunday (owner decision, D170), and it is trashed after three days (R4).
   - The worker's Java name and unique work name are in the frozen set (C-1.1.3).
 - *Tests first:* `ReadBackServiceTests` (fake reMarkable + fake extractor): `TrashesOnlyAfterSaving`,
   `LowConfidenceGoesToWaiting`, `MissingAnnotationsAreReportedNotSilent`, `DigestGoesAfterThreeDays`.
@@ -726,7 +726,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
 **C-2.6.2 · Body, every signal, every week**
 - *Story:* As the owner, I want every signal on two pages against my own last 12 weeks, so that the
   digest is the honest trend the app exists for.
-- *Acceptance:* Given eight signals, then each gets one small neutral-ink line of weekly averages
+- *Acceptance:* Given nine signals, then each gets one small neutral-ink line of weekly averages
   over the owner's last 12 weeks, the latest week as a dot with its value and the change in words,
   dotted gaps for missing stretches (D39); the patterns block is headed "not causes" and is the
   **only** place in Constitution a correlation appears.
@@ -1297,7 +1297,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
 - *Tests first:* `MealFallbackTests.FavouritesWeekObeysTheRules`.
 - *Design / spec:* brief §failure table · *Depends:* C-6.3.1 · **S · D · Tests · L2 · medium**
 
-**C-6.3.4 · The NYT stretch dish (gated)**
+**C-6.3.4 · The NYT stretch dish (gated) — CLOSED UNBUILT (D96)**
 - *Story:* As the household, I want one NYT recipe a week that suits us, if NYT allows it, so that we
   try something new.
 - *Acceptance:* Built **only if** the spike (C-11.4.1) finds an official API or written permission
@@ -1988,7 +1988,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
 - **Design / spec:** TF §6; R1, R3, R5, R12.
 - **Risks:** a spike that finds "no" late; this is why they're in Release A.
 
-**C-11.4.1 · NYT: an official route, or none**
+**C-11.4.1 · NYT: an official route, or none** — *outcome: PERMISSION NEEDED, treated as NO; see `spikes/nyt-recipes.md`, D96*
 - *Story:* As the household, I want to know early whether NYT will allow its recipes in our planner,
   so that the box and the sheet are built for the answer.
 - *Acceptance:* Given developer.nytimes.com and NYT's terms, then the spike records whether any
@@ -2130,7 +2130,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
 | G10 | a document carries meaning by colour | `DocumentGreyscaleTests` | C-2.1.3 |
 | G11 | a seventh voice seat appears, or an error reaches one | `VoicedOccasionTests` | C-9.2.1 |
 | G12 | a Body chart can carry a norm, score, streak, target or good/bad colour | `HonestChartTests` | C-7.3.2 |
-| G13 | Body data reaches any outbound path but its own backup | `BodyStaysHomeTests` | C-7.4.2 |
+| G13 | Body data reaches any outbound path but its own backup and the voice-seat facts (D98) | `BodyStaysHomeTests` | C-7.4.2 |
 | G14 | a store writes over a file it cannot decrypt | `BodyBackupTests`, `Storyworthtelling.Household.Tests` | C-7.4.1, C-6.1.1 |
 | G15 | two installs plan one week, or interleaved writes fail to converge | `PlanningLeaseTests`, household tests | C-6.1.3, C-6.1.1 |
 | G16 | a placement overlaps busy time or double-books | `PlacementPropertyTests` | C-5.3.4 |

@@ -39,7 +39,7 @@ public class AdaptiveIconRendererTests : IDisposable
     [Fact]
     public void SpecsCoverAllApps()
     {
-        Assert.Equal(8, IconSpecs.All.Count);
+        Assert.Equal(9, IconSpecs.All.Count);
 
         // Counted by where the resources land, not by what the app is called. The
         // phase renames rebrand one head at a time — Launcher became Flyleaf, Audio
@@ -87,11 +87,18 @@ public class AdaptiveIconRendererTests : IDisposable
             .OfType<string>()
             .Distinct();
 
+        // A cropped plate's stand-in must be big enough to hold the crop (Constitution's is a
+        // 784 px square out of a portrait painting), so seed it as large as the crop needs.
+        var sizes = IconSpecs.All
+            .Where(spec => spec.PlateImage is not null && spec.Crop is not null)
+            .ToDictionary(spec => spec.PlateImage!, spec => Math.Max(spec.Crop!.X + spec.Crop.Width, spec.Crop.Y + spec.Crop.Height));
+
         foreach (var relative in artwork)
         {
             var path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            using var bitmap = new SKBitmap(8, 8);
+            var size = sizes.GetValueOrDefault(relative, 8);
+            using var bitmap = new SKBitmap(size, size);
             bitmap.Erase(SKColors.Teal);
             using var image = SKImage.FromBitmap(bitmap);
             using var data = image.Encode(SKEncodedImageFormat.Png, 100);
@@ -385,7 +392,7 @@ public class AdaptiveIconRendererTests : IDisposable
         // way: its keyline and flourish are cream, not ink, and carry no terracotta at all. Pulp
         // draws nothing over its painting, so it has no line at all.
         foreach (var spec in IconSpecs.All.Where(
-            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio" or "Index" or "Pulp")))
+            s => s.App is not ("Score" or "Post" or "Plate" or "Foreword" or "Folio" or "Index" or "Pulp" or "Constitution")))
         {
             using var bitmap = Foreground(spec);
             var (ink, accent) = CountPalettePixels(bitmap);
@@ -554,6 +561,109 @@ public class AdaptiveIconRendererTests : IDisposable
             Assert.True(stray == 0,
                 $"{spec.App}'s shelf cover has {stray} pixels that are not the painting — the shelf "
                 + "draws its own rule, band and brackets, so anything baked in doubles them.");
+        }
+    }
+
+    private static string RepoRootPath()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Tools", "IconStudio")))
+        {
+            dir = dir.Parent;
+        }
+        return dir!.FullName;
+    }
+
+    // A 40 x 20 painting whose left half is red and right half blue, so which source rectangle
+    // was drawn can be read off the written cover.
+    private void SeedHalvesPainting(string relative, int width = 40, int height = 20)
+    {
+        var path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var bitmap = new SKBitmap(width, height);
+        for (var x = 0; x < width; x++)
+        {
+            for (var y = 0; y < height; y++)
+            {
+                bitmap.SetPixel(x, y, x < width / 2 ? SKColors.Red : SKColors.Blue);
+            }
+        }
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        File.WriteAllBytes(path, data.ToArray());
+    }
+
+    private static IconSpec CropProbe(SourceCrop? crop) => new(
+        "CropProbe", "CropProbe/Resources", "appicon", false, (_, _) => { },
+        PlateImage: "Branding/crop-probe.png", CoverImage: "CropProbe/cover.png", Crop: crop);
+
+    [Fact]
+    public void CropReplacesTheCentreSquare()
+    {
+        SeedHalvesPainting("Branding/crop-probe.png");
+
+        // Centre square of 40 x 20 is x 10..30 (half red, half blue). The crop is the right half.
+        AdaptiveIconRenderer.Write(root, CropProbe(new SourceCrop(20, 0, 20, 20)));
+        using var cropped = SKBitmap.Decode(Path.Combine(root, "CropProbe", "cover.png"));
+        Assert.Equal(SKColors.Blue, cropped.GetPixel(2, cropped.Height / 2));
+        Assert.Equal(SKColors.Blue, cropped.GetPixel(cropped.Width - 3, cropped.Height / 2));
+
+        AdaptiveIconRenderer.Write(root, CropProbe(null));
+        using var centred = SKBitmap.Decode(Path.Combine(root, "CropProbe", "cover.png"));
+        Assert.Equal(SKColors.Red, centred.GetPixel(2, centred.Height / 2));
+    }
+
+    [Theory]
+    [InlineData(0, 0, 20, 10)]    // not square
+    [InlineData(30, 0, 20, 20)]   // runs past the right edge
+    [InlineData(0, 5, 20, 20)]    // runs past the bottom edge
+    [InlineData(-1, 0, 20, 20)]   // starts left of the image
+    [InlineData(0, 0, 0, 0)]      // empty
+    public void CropMustBeSquareAndInsideTheImage(int x, int y, int width, int height)
+    {
+        SeedHalvesPainting("Branding/crop-probe.png");
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => AdaptiveIconRenderer.Write(root, CropProbe(new SourceCrop(x, y, width, height))));
+
+        Assert.Contains("CropProbe", error.Message);
+        Assert.Contains($"{x},{y} {width}x{height}", error.Message);
+    }
+
+    // Regenerating every existing spec (none sets a Crop) must reproduce what is committed, byte
+    // for byte, from the committed Branding art. Compared file by file against the repository.
+    [Fact]
+    public void SpecsWithoutACropAreUnchanged()
+    {
+        var repo = RepoRootPath();
+        // Only Constitution crops (C-1.3.3); every other spec must still be uncropped.
+        Assert.All(IconSpecs.All.Where(spec => spec.App != "Constitution"), spec => Assert.Null(spec.Crop));
+
+        CopyDirectory(Path.Combine(repo, "Branding"), Path.Combine(root, "Branding"));
+        CopyDirectory(Path.Combine(repo, "Fonts"), Path.Combine(root, "Fonts"));
+
+        var compared = 0;
+        foreach (var spec in IconSpecs.All.Where(spec => spec.Crop is null))
+        {
+            foreach (var written in AdaptiveIconRenderer.Write(root, spec))
+            {
+                var committed = Path.Combine(repo, Path.GetRelativePath(root, written));
+                Assert.True(File.Exists(committed), $"{spec.App}: {committed} is not committed.");
+                Assert.True(File.ReadAllBytes(committed).AsSpan().SequenceEqual(File.ReadAllBytes(written)),
+                    $"{spec.App}: regenerating changed {Path.GetRelativePath(root, written)}.");
+                compared++;
+            }
+        }
+        Assert.True(compared > 100, $"only {compared} files compared; the guard is not looking at the resources.");
+    }
+
+    private static void CopyDirectory(string from, string to)
+    {
+        foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(to, Path.GetRelativePath(from, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
         }
     }
 

@@ -9,6 +9,7 @@ on:
       - 'FocusPhone/Codex.Ui.Android/**'
       - 'FocusPhone/Codex.Domain/**'
       - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Household/**'
       - 'Storyworthtelling.Updates/**'
       - 'Tools/IconStudio/**'
       - 'Fonts/**'
@@ -126,6 +127,23 @@ jobs:
           }
           echo "ok: ApplicationId present"
           echo "=== END APP ID CHECK ==="
+
+      # Fatal: a Release build only carries the permissions the head declares, and a missing
+      # INTERNET permission fails every network call silently.
+      - name: PERMISSION CHECK
+        working-directory: Pulp
+        run: |
+          set -e
+          echo "=== PERMISSION CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          APK=$(ls -1 Pulp.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
+          echo "--- $APK"
+          "$AAPT2" dump permissions "$APK" | grep -q "android.permission.INTERNET" || {
+            echo "FAIL: Pulp's APK does not declare android.permission.INTERNET."
+            exit 1
+          }
+          echo "ok: INTERNET declared"
+          echo "=== END PERMISSION CHECK ==="
 
       # Fatal: two heads shipped the DEFAULT launcher icon for months because the wiring is easy
       # to get wrong and silent when it is.

@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Pulp's rules, pure .NET with no package references: every layer can see it, including the
+  <!-- Pulp's rules, pure .NET with no package references of its own: every layer can see it, including the
        desktop test build, which is what lets the guards run with no Android workload installed. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,4 +7,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <!-- The household engine (clock, records, merge, stores, sync loop) is the shared library's; Pulp keeps
+       its own kinds, edits and sync wording on top of it. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Storyworthtelling.Household\Storyworthtelling.Household.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Storyworthtelling.Household" />
+  </ItemGroup>
 </Project>

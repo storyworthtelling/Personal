@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Constitution</RootNamespace>
+    <!-- Frozen: must equal ConstitutionIdentity.ApplicationId (guarded by ConstitutionInvariantsTests). -->
+    <ApplicationId>com.storyworthtelling.constitution</ApplicationId>
+    <ApplicationTitle>Constitution</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Body's overnight read rides a WorkManager worker (C-7.1.3), at the version the sibling heads use. -->
+  <ItemGroup>
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+  </ItemGroup>
+
+  <!-- The partner's phone reads a photographed recipe card page in the app (C-6.5.2, D105). On-device text recognition, the same
+       package and version Plate carries, so the card is read on the phone and no image leaves it. -->
+  <ItemGroup>
+    <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" Version="116.0.1.9" />
+    <!-- With ML Kit in the graph two transitive AndroidX packages are wanted newer than Work.Runtime's own ranges allow (NU1107):
+         Concurrent.Futures (>= 1.3.0.4, Work.Runtime's Ktx caps it below 1.2.1) and Lifecycle.LiveData.Core (>= 2.11.0.1, LiveData
+         caps it below 2.9.2). Referencing each directly is the fix NuGet prescribes, as Index does for the first of the pair. -->
+    <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" Version="1.3.0.4" />
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core" Version="2.11.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Constitution.Domain\Constitution.Domain.csproj" />
+    <ProjectReference Include="..\Constitution.Infrastructure\Constitution.Infrastructure.csproj" />
+    <!-- The Paper & Ink theme, PaperUi factories and the eight shared fonts. -->
+    <ProjectReference Include="..\..\FocusPhone\Codex.Ui.Android\Codex.Ui.Android.csproj" />
+    <!-- The update channel's shared decisions: which APKs this app installs on the phone it wakes on. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+  </ItemGroup>
+</Project>

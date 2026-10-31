@@ -694,6 +694,23 @@ public class FrozenInvariantsTests
         EnumerateRepoFiles("*.cs").Count(file =>
             File.ReadAllText(file).Contains(literal, StringComparison.Ordinal));
 
+    /// <summary>
+    /// Constitution is a sibling repo app: Flyleaf shelves it cover-out and the lockdown clears it
+    /// only because its id carries the owner prefix. Both values are read and asserted found, so
+    /// the guard cannot pass vacuously.
+    /// </summary>
+    [Fact]
+    public void ConstitutionPackageMatchesItsHead()
+    {
+        var identity = File.ReadAllText(
+            Path.Combine(RepoRoot(), "Constitution", "Constitution.Domain", "ConstitutionIdentity.cs"));
+        var declared = Regex.Match(identity, @"public const string ApplicationId = ""([^""]*)""");
+        Assert.True(declared.Success, "ConstitutionIdentity.ApplicationId was not found.");
+        Assert.False(string.IsNullOrWhiteSpace(PolicyContext.ConstitutionPackage));
+        Assert.Equal(declared.Groups[1].Value, PolicyContext.ConstitutionPackage);
+        Assert.StartsWith(PolicyContext.OwnerPackagePrefix, PolicyContext.ConstitutionPackage, StringComparison.Ordinal);
+    }
+
     // ---- repo helpers (root = the ancestor holding .github; survives the rename) ----
 
     private static string RepoRoot()

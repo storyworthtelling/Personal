@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Workouts: a dumbbell. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp" android:height="96dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+  <path android:fillColor="#00000000" android:strokeColor="#FF000000"
+      android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round"
+      android:pathData="M3,9.5 V14.5 M6.5,7 V17 M17.5,7 V17 M21,9.5 V14.5 M6.5,12 H17.5"/>
+</vector>

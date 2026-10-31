@@ -42,7 +42,7 @@ public class HouseholdRoleMemoryTests
 
         Assert.True(rights.CanAddOrRemoveViewers);
         Assert.True(rights.CanEditServices);
-        Assert.False(HouseholdSync.MayCreateFile(HouseholdFileRole.Unknown));
+        Assert.False(Storyworthtelling.Household.HouseholdSync.MayCreateFile(HouseholdFileRole.Unknown));
     }
 
     [Fact]

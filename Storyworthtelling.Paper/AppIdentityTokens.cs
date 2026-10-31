@@ -57,6 +57,17 @@ public static class AppIdentityTokens
     public const string PulpDeepHex = "#493113";
     public const string PulpClothHex = "#F7AC4D";
 
+    // Constitution: cerulean, OKLCH hue 230°, sampled from the binding cloth (Post's route). A light
+    // binding (the ground tier) with the rule, flourishes and title in ink. The Document profile gets
+    // the muted cerulean alone: a header rule that nothing on the page depends on seeing.
+    public const string ConstitutionFillHex = "#A4C1D0";
+    public const string ConstitutionGroundHex = "#82ACC1";
+    public const string ConstitutionMarkHex = "#1B6A89";
+    public const string ConstitutionTextHex = "#15546E";
+    public const string ConstitutionDeepHex = "#143B4C";
+    public const string ConstitutionClothHex = "#82ACC1";
+    public const string ConstitutionDocumentHex = "#476F83";
+
     public static SKColor ForewordFill { get; } = SKColor.Parse(ForewordFillHex);
     public static SKColor ForewordGround { get; } = SKColor.Parse(ForewordGroundHex);
     public static SKColor ForewordSunrise { get; } = SKColor.Parse(ForewordSunriseHex);
@@ -75,4 +86,12 @@ public static class AppIdentityTokens
     public static SKColor PulpText { get; } = SKColor.Parse(PulpTextHex);
     public static SKColor PulpDeep { get; } = SKColor.Parse(PulpDeepHex);
     public static SKColor PulpCloth { get; } = SKColor.Parse(PulpClothHex);
+
+    public static SKColor ConstitutionFill { get; } = SKColor.Parse(ConstitutionFillHex);
+    public static SKColor ConstitutionGround { get; } = SKColor.Parse(ConstitutionGroundHex);
+    public static SKColor ConstitutionMark { get; } = SKColor.Parse(ConstitutionMarkHex);
+    public static SKColor ConstitutionText { get; } = SKColor.Parse(ConstitutionTextHex);
+    public static SKColor ConstitutionDeep { get; } = SKColor.Parse(ConstitutionDeepHex);
+    public static SKColor ConstitutionCloth { get; } = SKColor.Parse(ConstitutionClothHex);
+    public static SKColor ConstitutionDocument { get; } = SKColor.Parse(ConstitutionDocumentHex);
 }

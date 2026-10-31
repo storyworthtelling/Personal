@@ -30,14 +30,14 @@ public sealed class DriveHouseholdStoreTests
         VaultEnvelope.Write(HouseholdDocumentCodec.Serialize(document), passphrase);
 
     private static DriveHouseholdStore Store(FakeDrive drive, string passphrase = Passphrase, bool mayCreate = true) =>
-        new(drive, () => passphrase, () => mayCreate);
+        new(drive, PulpIdentity.HouseholdFileName, () => passphrase, () => mayCreate);
 
     private static HouseholdDocument Opened(FakeDrive drive) =>
         HouseholdDocumentCodec.Deserialize(VaultEnvelope.Read(drive.Content, Passphrase).Plaintext!);
 
     [Fact]
     public void TheFileNameIsTheFrozenOne() =>
-        Assert.Equal(PulpIdentity.HouseholdFileName, DriveHouseholdStore.FileName);
+        Assert.Equal(PulpIdentity.HouseholdFileName, Store(new FakeDrive()).FileName);
 
     [Fact]
     public async Task AnAbsentFileLoadsAsAnEmptyHousehold()
