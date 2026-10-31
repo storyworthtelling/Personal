@@ -162,10 +162,9 @@ internal sealed class PulpVault
         editor.Apply();
     }
 
-    // The signed-in account decides whether this install may write the household vault: the second
-    // phone reads it and never writes (VaultOwnership), whichever page it saves from.
-    private SecretsVaultAccess Access() =>
-        new(account.GetAccessToken, ApplicationName, () => VoiceGoogleAccount.Email);
+    // The vault file's Drive ownership decides whether this install may write the household vault:
+    // the second phone has it shared, reads it and never writes (VaultOwnership), whichever page it saves from.
+    private SecretsVaultAccess Access() => new(account.GetAccessToken, ApplicationName);
 
     private static ISharedPreferences Prefs() =>
         Application.Context.GetSharedPreferences(PrefsName, FileCreationMode.Private)!;
