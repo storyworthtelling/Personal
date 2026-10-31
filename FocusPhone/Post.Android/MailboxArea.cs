@@ -293,9 +293,19 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     /// </summary>
     public override View? BuildBottomBar()
     {
-        if (openContactKey is null || !openSelection.IsActive)
+        if (openContactKey is null)
         {
             return null;
+        }
+
+        if (!openSelection.IsActive)
+        {
+            // An open correspondence acts on the whole of it, as the list row's card does.
+            return openItems.Count == 0
+                ? null
+                : PaperUi.BottomBar(Host,
+                    PaperUi.SecondaryButton(Host, "File", FileOpenCorrespondence),
+                    PaperUi.DestructiveButton(Host, "Delete", DeleteOpenCorrespondence));
         }
 
         return PaperUi.BottomBar(Host,
@@ -1137,7 +1147,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         if (openListView is not null)
         {
-            openListView.Adapter = new PaperListAdapter(Host, BuildOpenRows(), openSelection.IsActive);
+            openListView.Adapter = new PaperListAdapter(Host, BuildOpenRows(), openSelection.IsActive, url => LinkOpener.Open(Host, url));
         }
 
         // The shell reads Title fresh only on a render, so a rename mid-load (the contact
@@ -1155,7 +1165,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         .Select(item => new PaperListRow(
             TimelineItemFormatter.Describe(item),
             $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.LocalDateTime, DateTime.Now)}",
-            Picked: openSelection.Contains(item.SourceId)))
+            Picked: openSelection.Contains(item.SourceId),
+            Links: item.Kind != TimelineItemKind.Email))
         .ToList();
 
     // Repaints the list, the chooser row, and the channel-action row in place after a
@@ -1166,7 +1177,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     {
         if (openListView is not null)
         {
-            openListView.Adapter = new PaperListAdapter(Host, BuildOpenRows(), openSelection.IsActive);
+            openListView.Adapter = new PaperListAdapter(Host, BuildOpenRows(), openSelection.IsActive, url => LinkOpener.Open(Host, url));
         }
         BuildChooserRow();
         BuildActionRow();
@@ -1265,6 +1276,61 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         openSelection.Cancel();
         ScheduleBulkDelete(items, CountMessage(items.Count, "deleted"), null, LoadOpenThread);
+    }
+
+    // The pinned File / Delete of an open correspondence: all of it, then back to the list,
+    // where the undo window is shown.
+    private void FileOpenCorrespondence()
+    {
+        var row = OpenCorrespondenceRow();
+        CloseThread();
+        FileCorrespondence(row);
+    }
+
+    private void DeleteOpenCorrespondence()
+    {
+        var row = OpenCorrespondenceRow();
+        CloseThread();
+        DeleteCorrespondence(row);
+    }
+
+    private ThreadRow OpenCorrespondenceRow() => new(openContactKey!, openTitle, string.Empty, false, openItems);
+
+    /// <summary>
+    /// File or delete one message the owner has open in the reader, handed over because the
+    /// reader is its own screen: the Mailbox owns the undo window and the delete routing.
+    /// </summary>
+    public void ApplyReaderAction(string sourceId, ReaderAction action)
+    {
+        TimelineItem? item = null;
+        try
+        {
+            using var database = TimelineDatabase.Open(Host);
+            item = database.Cache.LoadRecent(limit: 2_000).FirstOrDefault(candidate => candidate.SourceId == sourceId);
+        }
+        catch (Exception e)
+        {
+            PostDiagnostics.LogWarning("Mailbox", "Could not find the message the reader asked to act on", e);
+        }
+        if (item is null)
+        {
+            return;
+        }
+
+        var items = new List<TimelineItem> { item };
+        if (action == ReaderAction.Delete)
+        {
+            ScheduleBulkDelete(items, "Deleted.", null, ReloadThreads);
+            return;
+        }
+        Filing.File(Host, item, DateTimeOffset.UtcNow);
+        ReloadThreads();
+        DogEar.Show(Host, Overlay, "Filed.", onUndo: () =>
+        {
+            Filing.Unfile(Host, item.SourceId);
+            ReloadThreads();
+        });
+        Syncs.After(Host, PostAction.Filed);
     }
 
     private static string CountMessage(int count, string verb) => count == 1 ? $"1 {verb}." : $"{count} {verb}.";
