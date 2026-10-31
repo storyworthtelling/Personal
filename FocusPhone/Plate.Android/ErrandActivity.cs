@@ -231,8 +231,9 @@ public class ErrandActivity : AppCompatActivity
 
     protected override void OnDestroy()
     {
-        // Backstop: whatever way the owner leaves, no frame of a page is left in the cache.
+        // Backstop: whatever way the owner leaves, no frame of a page and no picture taken for another app is left in the cache.
         DiscardFrame(new Java.IO.File(CacheDir, ReadFrameName));
+        DiscardFrame(new Java.IO.File(CacheDir, CaptureFrameName));
         base.OnDestroy();
     }
 
@@ -259,7 +260,7 @@ public class ErrandActivity : AppCompatActivity
         // Always to a cache file first. The caller may have named a destination of its own
         // (EXTRA_OUTPUT), which is an arbitrary content URI CameraX cannot write into
         // directly — so the bytes are captured once and then put wherever they belong.
-        var file = new Java.IO.File(CacheDir, "errand-capture.jpg");
+        var file = new Java.IO.File(CacheDir, CaptureFrameName);
         var options = new ImageCapture.OutputFileOptions.Builder(file).Build();
         capture.TakePicture(options, ContextCompat.GetMainExecutor(this),
             new ErrandCaptureCallback(this, file));
@@ -307,6 +308,11 @@ public class ErrandActivity : AppCompatActivity
             // a half-written file it would then try to read.
             ShowStatus($"That one did not save: {e.Message}");
         }
+        finally
+        {
+            // The picture was only ever on its way somewhere: copied to the caller's destination or the roll, or not, it is not kept here.
+            DiscardFrame(file);
+        }
     }
 
     private void Copy(Java.IO.File from, Android.Net.Uri to)
@@ -338,6 +344,8 @@ public class ErrandActivity : AppCompatActivity
     }
 
     private const string ReadFrameName = "errand-read.jpg";
+
+    private const string CaptureFrameName = "errand-capture.jpg";
 
     /// <summary>
     /// A read frame is only ever the input to recognition. Once the words are out (or recognition failed) it is
@@ -540,8 +548,11 @@ public class ErrandActivity : AppCompatActivity
             host.RunOnUiThread(() => host.Delivered(file));
 
         public void OnError(ImageCaptureException? exception) =>
-            host.RunOnUiThread(() => host.ShowStatus(
-                $"That one did not save: {exception?.Message}"));
+            host.RunOnUiThread(() =>
+            {
+                host.DiscardFrame(file);
+                host.ShowStatus($"That one did not save: {exception?.Message}");
+            });
     }
 
     private sealed class ReadCallback(ErrandActivity host, Java.IO.File file)
