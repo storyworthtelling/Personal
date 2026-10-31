@@ -1,3 +1,4 @@
+using Constitution.Domain.Documents;
 using Constitution.Domain.Ink;
 using Constitution.Domain.Notices;
 using Constitution.Domain.ReadBack;
@@ -44,7 +45,8 @@ public sealed class ReadBackService(
     INoticeBoardAccess notices,
     IReadBackLog log,
     Func<DateTimeOffset> clock,
-    IReadBackSettled? settled = null)
+    IReadBackSettled? settled = null,
+    IPlannerNotes? plannerNotes = null)
 {
     private readonly record struct Step<T>(T? Value, DocumentReadBack.Failed? Failure);
 
@@ -109,6 +111,17 @@ public sealed class ReadBackService(
 
     private async Task<DocumentReadBack> Digest(ExpectedDocument document, DateOnly today, CancellationToken cancellation)
     {
+        // Owner decision amending C-2.2.3: the planner's four ruled lines are read once, from Sunday, and the page still goes on day three. A failure here is the
+        // read's own and is tried again next run; it does not stop the trash rule below from being reached on a later day.
+        if (document.ReadsPlannerNotes && plannerNotes is not null
+            && DigestPlannerNotes.IsDue(document.Day, today) && !plannerNotes.Has(document.Person, document.Day))
+        {
+            if (await ReadPlannerNotes(document, plannerNotes, cancellation) is { } failed)
+            {
+                return failed;
+            }
+        }
+
         if (!ReadBackPolicy.DigestIsDue(document.Day, today))
         {
             return new DocumentReadBack.DigestKept(document.Name);
@@ -128,6 +141,48 @@ public sealed class ReadBackService(
         }
 
         return await Trash(document, located.Value, new DocumentReadBack.DigestTrashed(document.Name), cancellation);
+    }
+
+    // Reads only the four note lines (the document names no other target), keeps what was written (the rules, and so the resolutions, are in the lines' order), and marks the digest read. Null when it went through.
+    private async Task<DocumentReadBack.Failed?> ReadPlannerNotes(ExpectedDocument document, IPlannerNotes sink, CancellationToken cancellation)
+    {
+        var name = document.Name;
+        var downloaded = await AttemptAsync(name, ReadBackStage.Download, () => tablet.Download(name), cancellation);
+        if (downloaded.Failure is not null)
+        {
+            return downloaded.Failure;
+        }
+
+        if (downloaded.Value is not { } page)
+        {
+            // Not on the tablet: nothing to read, and the trash rule below finds it gone in its own time.
+            return null;
+        }
+
+        var readStep = await AttemptAsync(name, ReadBackStage.Read, () => vision.Read(document, page.PdfBytes, cancellation), cancellation);
+        if (readStep.Failure is not null)
+        {
+            return readStep.Failure;
+        }
+
+        var read = readStep.Value!;
+        var notesPage = document.Pages[0];
+        if (!read.PageFor(notesPage.Number).WasRead)
+        {
+            return null;
+        }
+
+        var resolved = Attempt(name, ReadBackStage.Resolve, () => Resolve(document, read, clock()), cancellation);
+        if (resolved.Failure is not null)
+        {
+            return resolved.Failure;
+        }
+
+        var notes = resolved.Value!.SelectMany(item => item.Resolutions).OfType<InkResolution.Needed>()
+            .Where(item => !string.IsNullOrWhiteSpace(item.Text))
+            .Select(item => item.Text!.Trim())
+            .ToList();
+        return Now(name, ReadBackStage.Persist, () => sink.Save(document.Person, document.Day, notes), cancellation);
     }
 
     // ---- a result already saved: raise its questions again, then trash ----

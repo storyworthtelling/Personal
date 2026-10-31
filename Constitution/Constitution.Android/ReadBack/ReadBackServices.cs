@@ -55,7 +55,8 @@ public sealed class ReadBackServices
             new ReadBackNoticeBoard(),
             new ReadBackLog(appContext),
             () => DateTimeOffset.Now,
-            hooks);
+            hooks,
+            Constitution.SaturdayDigest.DigestServices.PlannerNotesOf(appContext));
         return new ReadBackServices(service, StatusOf(appContext));
     }
 

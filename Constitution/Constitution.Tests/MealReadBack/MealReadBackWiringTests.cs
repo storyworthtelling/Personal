@@ -21,7 +21,7 @@ public class MealReadBackWiringTests
         var order = new[] { "new SettledHooks(", "new FileWorkoutLearning(", "new MealReadBackSettled(" };
         Assert.All(order, part => Assert.Contains(part, source, StringComparison.Ordinal));
         Assert.True(source.IndexOf("new FileWorkoutLearning(", StringComparison.Ordinal) < source.IndexOf("new MealReadBackSettled(", StringComparison.Ordinal));
-        Assert.Matches(new Regex(@"DateTimeOffset\.Now,\s*\w+\);", RegexOptions.None, TimeSpan.FromSeconds(1)), source);
+        Assert.Matches(new Regex(@"DateTimeOffset\.Now,\s*\w+(,\s*[\w.]+\(\w+\))?\);", RegexOptions.None, TimeSpan.FromSeconds(1)), source);
     }
 
     [Fact]

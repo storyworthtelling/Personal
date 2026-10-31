@@ -107,6 +107,7 @@ public static class MealPlanner
                 choices[index] ??= Fill(index);
             }
 
+            notes.AddRange(request.PlannerNotes.Select(note => "Your note: " + note));
             return MealWeek.Planned(request.WeekStart, choices.Select(choice => choice!), notes);
         }
 

@@ -134,7 +134,8 @@ public class SaturdayDigestRunTests
         Assert.Equal(DigestFixture.Saturday, recorded.Day);
         Assert.Equal("Sam", recorded.Person);
         Assert.Equal(delivered.Name, recorded.Name);
-        Assert.Empty(recorded.Pages);
+        Assert.True(recorded.ReadsPlannerNotes);
+        Assert.Single(recorded.Pages);
         Assert.False(ReadBackPolicy.DigestIsDue(recorded.Day, DigestFixture.Saturday.AddDays(2)));
         Assert.True(ReadBackPolicy.DigestIsDue(recorded.Day, DigestFixture.Saturday.AddDays(3)));
     }

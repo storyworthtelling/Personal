@@ -50,9 +50,11 @@ public sealed partial class ExpectedDocument
         switch (kind)
         {
             case DeliveryKind.Digest:
-                if (Pages.Count > 0 || session is not null)
+                // Owner decision amending C-2.2.3: the digest is read for one thing only, the planner's four ruled lines on its last page.
+                if (session is not null || Pages.Count > 1 || Pages.Any(page => !IsPlannerNotesPage(page)))
                 {
-                    throw new ArgumentException("The digest is never read: it holds no pages and no session.", nameof(pages));
+                    throw new ArgumentException(
+                        "The digest holds no session and, at most, the one page of planner notes (only the four note lines, nothing about the body).", nameof(pages));
                 }
 
                 break;
@@ -112,7 +114,28 @@ public sealed partial class ExpectedDocument
     public string Name => DeliveredName.For(Kind, Day, Subject);
 
     /// <summary>False for the digest, which is only ever trashed.</summary>
-    public bool ReadsInk => Pages.Count > 0;
+    public bool ReadsInk => Kind != DeliveryKind.Digest && Pages.Count > 0;
+
+    /// <summary>True for a digest that carries its planner-notes page, read once at Sunday's run (owner decision amending C-2.2.3).</summary>
+    public bool ReadsPlannerNotes => Kind == DeliveryKind.Digest && Pages.Count > 0;
+
+    private static bool IsPlannerNotesPage(ExpectedPage page) =>
+        page.Rules.Count == DigestIds.PlannerNotes.Count
+        && page.Rules.All(rule => rule is StapleRule staple && DigestIds.PlannerNotes.Contains(staple.LineId))
+        && page.Rules.Cast<StapleRule>().Select(rule => rule.LineId).Distinct().Count() == DigestIds.PlannerNotes.Count;
+
+    /// <summary>
+    /// The digest as the read-back holds it: delivered on <paramref name="saturday"/>, with its last page's four ruled lines to be read at Sunday's run, and nothing else on it read
+    /// (no Body value is ever a target). The page is the one <c>DigestMeals.NextWeekPage</c> draws, so the ids are the painter's own.
+    /// </summary>
+    public static ExpectedDocument ForDigest(InkPageLayout notesPage, DateOnly saturday, string person)
+    {
+        ArgumentNullException.ThrowIfNull(notesPage);
+        var rules = DigestIds.PlannerNotes
+            .Select((id, index) => (InkRule)new StapleRule($"Note {index + 1}", id))
+            .ToList();
+        return new ExpectedDocument(DeliveryKind.Digest, saturday, null, person, null, [new ExpectedPage(5, new InkReadout(notesPage.Map), rules)]);
+    }
 
     /// <summary>The session as the ledger sees it; null for a document that is not a session.</summary>
     public SessionMarks? Marks { get; }

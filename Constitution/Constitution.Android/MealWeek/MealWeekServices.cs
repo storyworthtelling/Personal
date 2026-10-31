@@ -284,6 +284,7 @@ public static class MealWeekServices
             Publisher: new HouseholdWeekPlanPublisher(household.Service),
             Answers: new HouseholdMealAnswers(household.Service),
             AteEstimates: new FileAteEstimates(Path.Combine(appContext.NoBackupFilesDir!.AbsolutePath, "intake", "intake-estimates.json")),
+            PlannerNotes: Constitution.SaturdayDigest.DigestServices.PlannerNotesOf(appContext),
             Decisions: DecisionRecords(appContext));
     }
 
