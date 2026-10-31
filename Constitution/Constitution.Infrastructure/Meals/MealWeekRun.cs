@@ -32,7 +32,8 @@ namespace Constitution.Infrastructure.Meals;
 ///
 /// <para><b>What is not recorded as cooked.</b> The cooked history (<see cref="IMealHistoryStore"/>) is written only when a dinner is
 /// confirmed cooked, which the read-back will settle later; this run never writes it. To keep the planner from serving the same dish two weeks
-/// running it is shown the dinners of the weeks it planned before this one (<see cref="PlannedHistory"/>), as a stand-in that is never stored as fact.</para>
+/// running it is shown the dinners of the weeks it planned before this one, as a stand-in that is never stored as fact, less those the household said did not happen: a dinner an adult
+/// denied on the sheet, or one an "I ate something else" took the evening from (<see cref="CookedHistory"/>, D130).</para>
 ///
 /// <para><b>Part two: the paper.</b> When the run is given the means to deliver (<see cref="MealWeekSeams.Documents"/>), the kept week is then turned into the
 /// meal sheet and each cooked dinner's recipe and put on this phone's tablet (<see cref="MealDocumentsStep"/>), after the week is saved and never when nothing was planned.
@@ -122,7 +123,7 @@ public static class MealWeekRun
             busy,
             inputs.ChildrenHome,
             inputs.CookThisSoon,
-            PlannedHistory.Merge(history.Meals, record, first),
+            Remembered(history.Meals, record, first, seams),
             null,
             null,
             inputs.Seed ?? PlanningWeek.IndexOf(first),
@@ -215,6 +216,26 @@ public static class MealWeekRun
             ExtraLinesUnreadable = extraLinesUnreadable,
             Publication = publication,
         }));
+    }
+
+    // What the planner is shown of the past (D130): the confirmed dinners, then the earlier saved weeks' cooked dinners less those a "no" or an "I ate something else" took
+    // out. An answer file or an estimate file that cannot be read gives no answers, which is the planned weeks as they were: the planner then only avoids more, never less.
+    private static IReadOnlyList<CookedMeal> Remembered(IReadOnlyList<CookedMeal> confirmed, MealWeekRecord? record, DateOnly weekStart, MealWeekSeams seams)
+    {
+        var answers = new List<MealAnswer>();
+        if (seams.Answers is { } source)
+        {
+            foreach (var week in record?.Weeks.Where(item => item.WeekStart < weekStart) ?? [])
+            {
+                if (source.Read(week.WeekStart) is MealAnswersRead.Held held)
+                {
+                    answers.AddRange(held.Answers);
+                }
+            }
+        }
+
+        var estimates = seams.AteEstimates?.Read() is { Unreadable: false } read ? read.Items : [];
+        return CookedHistory.Build(confirmed, record, answers, estimates, weekStart).Meals;
     }
 
     private static MealWeekOutcome Stop(MealWeekSeams seams, MealNotPlannedBecause because, string sentence) =>

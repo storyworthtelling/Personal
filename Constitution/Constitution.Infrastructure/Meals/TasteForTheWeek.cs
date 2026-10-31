@@ -4,8 +4,8 @@ using Constitution.Domain.Meals.Pipeline;
 namespace Constitution.Infrastructure.Meals;
 
 /// <summary>
-/// What the planner can be given of the taste profile today: the cards a person has said never again to, added to the request's own.
-/// The household's appetite for each card is not used: the request has no ranking input, and the planner is not changed here.
+/// What the planner is given of the taste profile: the cards a person has said never again to, added to the request's own, and the household's appetite for each
+/// card as the ranking among cards that fit (D131). With no profile the request comes back as it was.
 /// </summary>
 public static class TasteForTheWeek
 {

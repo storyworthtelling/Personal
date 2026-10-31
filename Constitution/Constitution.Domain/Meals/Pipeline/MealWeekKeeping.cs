@@ -35,29 +35,13 @@ public static class MealWeekKeeping
 }
 
 /// <summary>
-/// The planner's memory of weeks it planned itself. Nothing yet says a planned dinner was cooked, so this is a stand-in, kept out of
-/// the cooked history on purpose: planned dinners of earlier weeks are shown to the planner so it does not serve the same dish two
-/// weeks running, and are never written into the history file as if they had happened.
+/// The planner's memory of weeks it planned itself, taken with no answers to go by: every cooked dinner of an earlier week stands in as planned, kept out of
+/// the cooked history on purpose and never written into the history file as if it had happened. The run itself uses <see cref="CookedHistory"/>, which is this
+/// plus what the household answered (D130).
 /// </summary>
 public static class PlannedHistory
 {
     /// <summary>The cooked history plus every cooked dinner of a saved week that began before <paramref name="weekStart"/>, one entry per card and evening.</summary>
-    public static IReadOnlyList<CookedMeal> Merge(IReadOnlyList<CookedMeal> cooked, MealWeekRecord? record, DateOnly weekStart)
-    {
-        ArgumentNullException.ThrowIfNull(cooked);
-        var merged = cooked.ToList();
-        var seen = merged.Select(meal => (meal.Recipe, meal.Day)).ToHashSet();
-        foreach (var week in record?.Weeks.Where(item => item.WeekStart < weekStart) ?? [])
-        {
-            foreach (var dinner in week.Week.Dinners.Where(item => item.Kind == DinnerKind.Cooked))
-            {
-                if (seen.Add((dinner.Recipe!.Value, dinner.Day)))
-                {
-                    merged.Add(new CookedMeal(dinner.Recipe.Value, dinner.Day));
-                }
-            }
-        }
-
-        return merged;
-    }
+    public static IReadOnlyList<CookedMeal> Merge(IReadOnlyList<CookedMeal> cooked, MealWeekRecord? record, DateOnly weekStart) =>
+        CookedHistory.Build(cooked, record, [], [], weekStart).Meals;
 }
