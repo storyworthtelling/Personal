@@ -46,10 +46,10 @@ public class BudgetReceiver : BroadcastReceiver
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            // A receiver must not throw: it shares a process with the work that matters more. The stack goes to logcat; the
+            // A receiver must not throw: it shares a process with the work that matters more. logcat gets the type name only (D163); the
             // trail keeps the type, so the owner's diagnostics can say a budget was lost without saying what it held.
             trail.Outcome($"budget broadcast not kept: {e.GetType().Name}");
-            Android.Util.Log.Error("Budget", e.ToString());
+            Android.Util.Log.Error("Budget", e.GetType().Name);
         }
     }
 }
