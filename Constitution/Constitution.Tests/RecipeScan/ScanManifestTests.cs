@@ -96,7 +96,7 @@ public class ScanManifestTests
             .ToList();
 
         Assert.Equal(
-            new[] { "android.permission.CAMERA", RecipeReadContract.Permission }.Order(StringComparer.Ordinal).ToList(),
+            new[] { "android.permission.CAMERA", "android.permission.POST_NOTIFICATIONS", RecipeReadContract.Permission }.Order(StringComparer.Ordinal).ToList(),
             news.Order(StringComparer.Ordinal).ToList());
         Assert.Contains("android.permission.INTERNET", requested);
         Assert.Equal(1, requested.Count(name => name == RecipeReadContract.Permission));

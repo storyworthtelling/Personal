@@ -24,6 +24,8 @@ public class ConstitutionInvariantsTests
         "com.storyworthtelling.constitution.WorkoutWeekWorker",
         // Added with the hourly meal-week worker (P13): a deliberate edit.
         "com.storyworthtelling.constitution.MealWeekWorker",
+        // Added with the Saturday digest (Release E): a deliberate edit.
+        "com.storyworthtelling.constitution.DigestWorker",
     ];
 
     private static readonly string[] ExpectedActivities =
@@ -57,6 +59,8 @@ public class ConstitutionInvariantsTests
         "constitution-meal-week",
         // Added with the recipe-hour request (D120): a second hourly request of the same worker, aimed at thirty-five past, a deliberate edit.
         "constitution-meal-recipe-hour",
+        // Added with the Saturday digest (Release E): a deliberate edit.
+        "constitution-saturday-digest",
     ];
 
     private static readonly string[] ExpectedPreferenceKeys =

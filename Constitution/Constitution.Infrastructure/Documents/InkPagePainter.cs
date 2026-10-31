@@ -88,6 +88,19 @@ internal static class InkPagePainter
             return;
         }
 
+        if (item.Role is PrintedRole.MarkFilled or PrintedRole.MarkOpen)
+        {
+            var square = SKRect.Create(item.Bounds.Left, item.Bounds.Top, item.Bounds.Width, item.Bounds.Height);
+            canvas.DrawRect(square, item.Role == PrintedRole.MarkFilled ? ink.Ink : ink.TargetStroke);
+            return;
+        }
+
+        if (item.Role == PrintedRole.Chart)
+        {
+            DrawChart(canvas, item, ink);
+            return;
+        }
+
         if (item.Role is PrintedRole.Band or PrintedRole.Slot)
         {
             return;
@@ -109,5 +122,41 @@ internal static class InkPagePainter
 
         var colour = item.Role == PrintedRole.Small ? ink.Soft : ink.Ink;
         canvas.DrawText(item.Text, x, item.Bounds.Bottom - font.Metrics.Descent, font, colour);
+    }
+
+    /// <summary>The digest's weekly line: solid where there are readings, dotted across weeks with none, and the latest week as a dot (D39).</summary>
+    private static void DrawChart(SKCanvas canvas, PrintedItem item, DocumentInk ink)
+    {
+        if (item.Points is null)
+        {
+            return;
+        }
+
+        var chart = DigestChartGeometry.Compute(item.Points, item.Bounds.Width, item.Bounds.Height);
+        float X(double x) => item.Bounds.Left + (float)x;
+        float Y(double y) => item.Bounds.Top + (float)y;
+
+        foreach (var run in chart.Runs)
+        {
+            for (var index = 0; index + 1 < run.Count; index++)
+            {
+                canvas.DrawLine(X(run[index].X), Y(run[index].Y), X(run[index + 1].X), Y(run[index + 1].Y), ink.ChartStroke);
+            }
+
+            if (run.Count == 1)
+            {
+                canvas.DrawCircle(X(run[0].X), Y(run[0].Y), 1.5f, ink.Ink);
+            }
+        }
+
+        foreach (var bridge in chart.Bridges)
+        {
+            canvas.DrawLine(X(bridge.From.X), Y(bridge.From.Y), X(bridge.To.X), Y(bridge.To.Y), ink.DottedStroke);
+        }
+
+        if (chart.Dot is { } dot)
+        {
+            canvas.DrawCircle(X(dot.X), Y(dot.Y), 3f, ink.Ink);
+        }
     }
 }

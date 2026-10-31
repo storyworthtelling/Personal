@@ -82,6 +82,15 @@ public static class ConstitutionIdentity
     /// </summary>
     public const string MealWeekWorkerName = ApplicationId + ".MealWeekWorker";
 
+    /// <summary>
+    /// The Saturday digest worker's registered Java name (Release E). Frozen for the same reason as <see cref="ReadBackWorkerName"/>:
+    /// WorkManager persists a scheduled row by Java class name and periodic work is enqueued with <c>Keep</c>.
+    /// </summary>
+    public const string DigestWorkerName = ApplicationId + ".DigestWorker";
+
+    /// <summary>The Saturday digest worker's unique work name; frozen for the same reason as <see cref="DigestWorkerName"/>.</summary>
+    public const string DigestWorkName = "constitution-saturday-digest";
+
     /// <summary>The meal-week worker's unique work name; frozen for the same reason as <see cref="ReadBackWorkName"/>.</summary>
     public const string MealWeekWorkName = "constitution-meal-week";
 
@@ -197,10 +206,10 @@ public static class ConstitutionIdentity
     public static IReadOnlyList<string> DeclaredPermissions { get; } = [BudgetPermission];
 
     /// <summary>Every registered worker Java name, for the guard to enumerate.</summary>
-    public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName, WorkoutWeekWorkerName, MealWeekWorkerName];
+    public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName, WorkoutWeekWorkerName, MealWeekWorkerName, DigestWorkerName];
 
     /// <summary>Every unique work name, for the guard to enumerate.</summary>
-    public static IReadOnlyList<string> WorkNames { get; } = [ReadBackWorkName, BodySyncWorkName, WorkoutWeekWorkName, MealWeekWorkName, MealRecipeHourWorkName];
+    public static IReadOnlyList<string> WorkNames { get; } = [ReadBackWorkName, BodySyncWorkName, WorkoutWeekWorkName, MealWeekWorkName, MealRecipeHourWorkName, DigestWorkName];
 
     /// <summary>Every preference file name and key, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> PreferenceKeys { get; } = [

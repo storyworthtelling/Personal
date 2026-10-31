@@ -24,6 +24,7 @@ using Constitution.WorkoutWeek;
 using Constitution.Services;
 using Constitution.Settings;
 using Constitution.WeeklyMeals;
+using Constitution.SaturdayDigest;
 using Constitution.Waiting;
 using Constitution.WorkoutsTab;
 
@@ -169,6 +170,10 @@ public abstract class ConstitutionActivity : Activity
         // The week's workouts planned each morning before the read-back (P13), and once on open when the last plan is stale.
         WorkoutWeekWorker.Schedule(this);
         WorkoutWeekWorker.RunOnOpen(this);
+
+        // The Saturday digest (Release E): an hourly look that does anything only on Saturday morning and the Sunday after.
+        DigestWorker.Schedule(this);
+        DigestWorker.RunOnOpen(this);
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
