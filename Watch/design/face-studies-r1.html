@@ -45,8 +45,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--glass); out
 .study dt { font-family: var(--font-label); font-size: 12px; color: var(--muted); padding-top: 2px; }
 .study dd { margin: 0; color: var(--ink); }
 .big canvas { width: 100%; max-width: 320px; aspect-ratio: 1; display: block; }
-.minis { display: flex; flex-wrap: wrap; gap: 18px; align-items: end; margin-top: 14px; }
+.minis { display: grid; grid-template-columns: repeat(4, 150px); gap: 16px; margin-top: 16px; }
+@media (max-width: 760px) { .minis { grid-template-columns: repeat(2, 150px); } }
 .mini { display: grid; justify-items: center; gap: 6px; }
+.mini canvas { width: 150px; height: 150px; display: block; }
+.big .cap { font-family: var(--font-label); font-size: 11px; color: var(--muted); text-align: center; margin-top: 6px; max-width: 320px; }
 .mini span { font-family: var(--font-label); font-size: 11px; color: var(--muted); text-align: center; }
 .ruler { display: grid; gap: 6px; }
 .ruler .bar { height: 10px; border: 1px solid var(--muted); border-top: none; }
@@ -59,8 +62,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--glass); out
 <div class="wrap">
   <header>
     <h1>Watch face studies, round 1</h1>
-    <p>Ten ways to tell the time on the wrist without looking at anything else. Each face shows time
-    and date only, nothing anxious, and has a very dim always-on view. These are studies for choosing
+    <p>Ten ways to tell the time on the wrist without looking at anything else. Each face is shown live and at
+    2:22 am, 7:15 am, 1:41 pm and 7:50 pm. Each shows time and date only, with nothing
+    anxious on it, and has a very dim always-on view. These are studies for choosing
     a direction, not finished designs. They share nothing with Paper &amp; Ink.</p>
   </header>
 
@@ -68,21 +72,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--glass); out
     <label for="time">Time <input id="time" type="range" min="0" max="1439" step="1"></label>
     <output id="timeOut" for="time">--</output>
     <button id="live" type="button" aria-pressed="true">Live time</button>
-    <button id="ambient" type="button" aria-pressed="false">Show always-on in the large view</button>
-    <label for="scale">Real-size calibration <input id="scale" type="range" min="0.6" max="1.6" step="0.01" value="1"></label>
-  </div>
-
-  <div class="ruler" aria-hidden="true">
-    <div class="bar" id="cardBar"></div>
-    <span>Real size: drag the calibration slider until this bar matches the short side of a bank card (54 mm). The watch outlines below then show true size.</span>
+    <button id="ambient" type="button" aria-pressed="false">Show always-on</button>
   </div>
 
   <main id="studies" class="wrap"></main>
 
-  <p class="note">Real sizes are approximate. Pixel Watch 2 (41 mm case) is drawn with a 30 mm display. The
-  newer Pixel Watch is drawn at 41 mm and 45 mm with roughly 32 mm and 36 mm displays and thinner
-  bezels. All of these get checked on the real watches. The sunrise and sunset in study 2 are
-  invented fixed times. A real face would read the day's times on the watch, and nothing leaves it.</p>
+  <p class="note">The sunrise and sunset in study 2 are invented fixed times. A real face would read the day's
+  times on the watch, and nothing leaves it.</p>
 </div>
 
 <script>
@@ -370,80 +366,55 @@ const studies = [
 }
 ];
 
-// ---- watches (approximate, for real-size views) ----
-const WATCHES = [
-  { label: "Pixel Watch 2 · 41 mm", caseMm: 41, displayMm: 30 },
-  { label: "Newer Pixel Watch · 41 mm", caseMm: 41, displayMm: 32 },
-  { label: "Newer Pixel Watch · 45 mm", caseMm: 45, displayMm: 36 },
-];
+const FIXED = [[2, 22], [7, 15], [13, 41], [19, 50]];
+let ambient = false, live = true, manualMinutes = 0;
 
-const PX_PER_MM = 96 / 25.4;
-let calib = 1, ambientBig = false, live = true, manualMinutes = 0;
-try { const s = parseFloat(localStorage.getItem("faceCalib")); if (s >= 0.6 && s <= 1.6) calib = s; } catch (e) { /* storage unavailable: default scale */ }
+function label(h, m) { return ((h % 12) || 12) + ":" + String(m).padStart(2, "0") + (h < 12 ? " am" : " pm"); }
 
-function timeNow() {
+function timeNow(fixed) {
   const d = new Date();
+  if (fixed) { d.setHours(fixed[0], fixed[1], 0, 0); return { h: fixed[0], m: fixed[1], s: 0, date: dateLine(d), d }; }
   if (!live) { d.setHours(Math.floor(manualMinutes / 60), manualMinutes % 60, 0, 0); }
   return { h: d.getHours(), m: d.getMinutes(), s: live ? d.getSeconds() + d.getMilliseconds() / 1000 : 0, date: dateLine(d), d };
 }
 
-function paint(canvas, study, amb, withCase, displayRatio) {
-  const dpr = window.devicePixelRatio || 1, cssW = canvas.clientWidth || parseFloat(canvas.style.width);
+function paint(canvas, study, amb, fixed) {
+  const dpr = window.devicePixelRatio || 1, cssW = canvas.clientWidth;
   const W = Math.round(cssW * dpr); if (canvas.width !== W) { canvas.width = W; canvas.height = W; }
   const c = canvas.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, W);
-  const outerR = W / 2, R = withCase ? outerR * displayRatio : outerR;
-  if (withCase) {
-    const g = c.createRadialGradient(outerR * 0.7, outerR * 0.6, outerR * 0.2, outerR, outerR, outerR);
-    g.addColorStop(0, "hsl(210 6% 42%)"); g.addColorStop(1, "hsl(210 6% 18%)");
-    c.fillStyle = g; c.beginPath(); c.arc(outerR, outerR, outerR, 0, TAU); c.fill();
-  }
-  c.fillStyle = "#000"; c.beginPath(); c.arc(outerR, outerR, R, 0, TAU); c.fill();
-  c.save(); c.beginPath(); c.arc(outerR, outerR, R, 0, TAU); c.clip();
-  c.translate(outerR - R, outerR - R); study.draw(c, R, timeNow(), amb); c.restore();
+  const R = W / 2;
+  c.fillStyle = "#000"; c.beginPath(); c.arc(R, R, R, 0, TAU); c.fill();
+  c.save(); c.beginPath(); c.arc(R, R, R, 0, TAU); c.clip(); study.draw(c, R, timeNow(fixed), amb); c.restore();
 }
 
 const root = document.getElementById("studies"); const views = [];
 studies.forEach((s, i) => {
   const sec = document.createElement("section"); sec.className = "study"; sec.id = s.id;
-  sec.innerHTML = `<div class="big"><canvas role="img" aria-label="${s.title}, main view"></canvas></div>
+  sec.innerHTML = `<div class="big"><canvas role="img" aria-label="${s.title}, live time"></canvas><div class="cap">Live, or the time slider</div></div>
     <div><div class="num">Study ${i + 1} of ${studies.length}</div><h2>${s.title}</h2><p>${s.idea}</p>
     <dl><dt>Reading it</dt><dd>${s.read}</dd><dt>Cost</dt><dd>${s.cost}</dd></dl>
     <div class="minis"></div></div>`;
   root.appendChild(sec);
-  views.push({ canvas: sec.querySelector(".big canvas"), study: s, kind: "big" });
+  views.push({ canvas: sec.querySelector(".big canvas"), study: s, fixed: null });
   const minis = sec.querySelector(".minis");
-  const amb = document.createElement("div"); amb.className = "mini";
-  amb.innerHTML = `<canvas style="width:120px;height:120px" role="img" aria-label="${s.title}, always-on"></canvas><span>Always-on, enlarged</span>`;
-  minis.appendChild(amb); views.push({ canvas: amb.querySelector("canvas"), study: s, kind: "amb" });
-  WATCHES.forEach(w => { const m = document.createElement("div"); m.className = "mini";
-    m.innerHTML = `<canvas role="img" aria-label="${s.title} on ${w.label}, real size"></canvas><span>${w.label}<br>real size</span>`;
-    minis.appendChild(m); views.push({ canvas: m.querySelector("canvas"), study: s, kind: "real", watch: w }); });
+  FIXED.forEach(f => { const m = document.createElement("div"); m.className = "mini";
+    m.innerHTML = `<canvas role="img" aria-label="${s.title} at ${label(f[0], f[1])}"></canvas><span>${label(f[0], f[1])}</span>`;
+    minis.appendChild(m); views.push({ canvas: m.querySelector("canvas"), study: s, fixed: f }); });
 });
 
-function sizeReal() {
-  views.filter(v => v.kind === "real").forEach(v => { const px = v.watch.caseMm * PX_PER_MM * calib; v.canvas.style.width = px + "px"; v.canvas.style.height = px + "px"; });
-  document.getElementById("cardBar").style.width = (54 * PX_PER_MM * calib) + "px";
-}
-
 function frame() {
-  const t = timeNow();
-  document.getElementById("timeOut").textContent = ((t.h % 12) || 12) + ":" + String(t.m).padStart(2, "0") + (t.h < 12 ? " am" : " pm");
+  const t = timeNow(null);
+  document.getElementById("timeOut").textContent = label(t.h, t.m);
   if (live) document.getElementById("time").value = t.h * 60 + t.m;
-  views.forEach(v => {
-    if (v.kind === "big") paint(v.canvas, v.study, ambientBig, false, 1);
-    else if (v.kind === "amb") paint(v.canvas, v.study, true, false, 1);
-    else paint(v.canvas, v.study, false, true, v.watch.displayMm / v.watch.caseMm);
-  });
+  views.forEach(v => paint(v.canvas, v.study, ambient, v.fixed));
 }
 
 const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 document.getElementById("time").addEventListener("input", e => { live = false; manualMinutes = +e.target.value; document.getElementById("live").setAttribute("aria-pressed", "false"); frame(); });
 document.getElementById("live").addEventListener("click", e => { live = true; e.currentTarget.setAttribute("aria-pressed", "true"); frame(); });
-document.getElementById("ambient").addEventListener("click", e => { ambientBig = !ambientBig; e.currentTarget.setAttribute("aria-pressed", String(ambientBig)); frame(); });
-document.getElementById("scale").value = calib;
-document.getElementById("scale").addEventListener("input", e => { calib = +e.target.value; try { localStorage.setItem("faceCalib", String(calib)); } catch (err) { /* storage unavailable */ } sizeReal(); frame(); });
+document.getElementById("ambient").addEventListener("click", e => { ambient = !ambient; e.currentTarget.setAttribute("aria-pressed", String(ambient)); frame(); });
 window.addEventListener("resize", frame);
-sizeReal(); frame();
+frame();
 setInterval(() => { if (live) frame(); }, reduce ? 60000 : 1000);
 if (document.fonts) document.fonts.ready.then(frame);
 </script>
