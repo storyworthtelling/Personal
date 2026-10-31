@@ -72,6 +72,7 @@ public class PostActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         areas =
@@ -309,6 +310,7 @@ public class PostActivity : Activity
     private void RenderContent()
     {
         RefreshHeader();
+        TapWatch.Screen(Active.Title);
 
         content.RemoveAllViews();
         content.AddView(Active.BuildView(), new FrameLayout.LayoutParams(

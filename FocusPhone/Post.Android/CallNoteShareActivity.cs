@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.OS;
 using Codex.Domain.Post;
+using Codex.Ui;
 
 namespace Post;
 
@@ -30,6 +31,7 @@ public class CallNoteShareActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
 
         var shared = Intent?.GetStringExtra(Intent.ExtraText);
         var note = CallNote.FromShare(shared, DateTimeOffset.UtcNow);

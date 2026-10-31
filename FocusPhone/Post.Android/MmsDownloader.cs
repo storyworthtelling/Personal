@@ -163,10 +163,14 @@ public class MmsDownloadReceiver : BroadcastReceiver
         var stub = intent.GetStringExtra(MmsDownloader.ExtraStub) is { } stubText ? Android.Net.Uri.Parse(stubText) : null;
         try
         {
+            if (resultCode == Result.Ok)
+            {
+                PostDiagnostics.LogInfo("Mms", PostLogLines.MmsDownloaded((int)resultCode));
+            }
             if (resultCode != Result.Ok)
             {
                 MmsStubSweep.RecordAttempt(context, stub);
-                PostDiagnostics.LogWarning("Mms", $"MMS download did not complete (result {resultCode}).");
+                PostDiagnostics.LogWarning("Mms", PostLogLines.MmsDownloaded((int)resultCode));
                 PostDiagnostics.LogText("Mms", $"MMS download did not complete (result {resultCode}); will retry");
                 return;
             }
