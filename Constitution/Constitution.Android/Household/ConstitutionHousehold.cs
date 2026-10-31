@@ -83,7 +83,7 @@ public sealed class ConstitutionHousehold
 
     public HouseholdFileService Service { get; }
 
-    /// <summary>The weekly runs ask this before they plan; nothing calls it yet.</summary>
+    /// <summary>The weekly meal run asks this before it plans (<c>MealWeekServices</c>, through the shared lease); the workout run does not ask it.</summary>
     public HouseholdPlanningStanding Planning { get; }
 
     /// <summary>

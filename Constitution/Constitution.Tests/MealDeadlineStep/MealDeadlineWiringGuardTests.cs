@@ -2,7 +2,7 @@ using Constitution.Tests.Diagnostics;
 
 namespace Constitution.Tests.MealDeadlineStep;
 
-/// <summary>What the head hands the deadline step and what nothing yet calls, read from the source because the head cannot be loaded here.</summary>
+/// <summary>What the head hands the deadline step and the one place that calls it, read from the source because the head cannot be loaded here.</summary>
 public class MealDeadlineWiringGuardTests
 {
     private static string Text(string suffix) =>

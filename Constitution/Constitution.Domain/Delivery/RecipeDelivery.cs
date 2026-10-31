@@ -28,7 +28,7 @@ public sealed record RecipeDeliveryPlan(IReadOnlyList<string> Tablets, RecipeSlo
 /// <para><b>An hour is an hour of elapsed time</b>, so across a clock change it is the instant sixty minutes earlier, not the
 /// same wall-clock reading less one. If that moment has already passed the recipe goes at once, unless the block has begun
 /// (mirroring <see cref="Workouts.Pipeline.RedeliveryRules"/>: a page never appears once its slot has started), and in no
-/// case once dinner is on the table. Not wired to the weekly run: this is the decision, the delayed job is the caller's.</para>
+/// case once dinner is on the table. This is the decision only; <c>MealDocumentsStep</c> asks it on every pass of the meal worker (the recipes-only pass included, D120), and the worker's half-hourly passes are the delayed job.</para>
 /// </summary>
 public static class RecipeDelivery
 {

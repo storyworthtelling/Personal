@@ -16,8 +16,9 @@ namespace Constitution.Infrastructure.Meals;
 /// cooked dinner. Every stage is a pure function or a seam that already existed; this joins them and decides what a failure at each means.
 ///
 /// <para><b>Whose tablet.</b> Each phone is paired to its own tablet (D85), so this install sends the sheet to its tablet and only the recipes whose cook is
-/// the adult that tablet belongs to. The other adult's install sends hers from the same saved week; the sheet is the same on both, and sending it twice
-/// on one tablet is impossible because a send is idempotent (below). Only the first adult in <see cref="MealDocumentRequest.DeliverFor"/> is served: a phone has one tablet.</para>
+/// the adult that tablet belongs to. The other adult's install sends hers from the same saved week: the phone that holds the planning lease publishes the kept week to the household
+/// file as a <c>week-plan</c> record, and the other phone reads that record and hands it to this same step (<c>MealSharedWeekRun</c>, D126 to D129). The sheet is the same on both,
+/// and sending it twice on one tablet is impossible because a send is idempotent (below). Only the first adult in <see cref="MealDocumentRequest.DeliverFor"/> is served: a phone has one tablet.</para>
 ///
 /// <para><b>When.</b> The sheet is sent when the week is planned, while the deadline is ahead (after it silence has approved the week). A recipe goes an
 /// hour before its cook block and never once the block has begun (<see cref="RecipeDelivery"/>, <see cref="MealRedeliveryRules"/>): a run earlier than that

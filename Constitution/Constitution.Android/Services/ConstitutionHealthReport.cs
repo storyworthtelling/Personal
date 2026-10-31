@@ -11,8 +11,8 @@ namespace Constitution.Services;
 /// Reads the credential-health report the HTTP choke points write
 /// (<see cref="CredentialHealthStore"/>, the shared native-head store every FocusPhone head uses,
 /// in this app's own private preferences) and states it to a <see cref="NoticeBoard"/> through
-/// <see cref="ConnectionNotices"/>, so a notice goes when its cause does. Not wired to a screen yet;
-/// the Waiting page is later.
+/// <see cref="ConnectionNotices"/>, so a notice goes when its cause does. Settings and the Body tab read the report (<see cref="Read"/>, <see cref="HealthOf"/>) for their credential
+/// lines; <see cref="Apply"/>, which states every tracked credential to the board at once, has no caller yet.
 /// </summary>
 public static class ConstitutionHealthReport
 {
