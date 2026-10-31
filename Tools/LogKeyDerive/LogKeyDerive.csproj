@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Derives the log key from the vault passphrase for the reader's environment secret (LOG-LOOP-PLAN.md
+    §6.2): reads the passphrase from stdin, prints the hex key, logs nothing. Run it on the owner's own
+    machine; the passphrase never leaves it, and only the derived key goes into SWT_LOG_KEY.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>LogKeyDerive</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
+  </ItemGroup>
+</Project>
