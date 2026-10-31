@@ -12,12 +12,41 @@ public static class ConnectionNoticeBoard
     private static readonly object Gate = new();
     private static readonly NoticeBoard Board = new();
 
-    /// <summary>Runs <paramref name="use"/> on the board, one caller at a time.</summary>
-    public static T With<T>(Func<NoticeBoard, T> use)
+    private static Action<IReadOnlyList<Notice>>? observer;
+
+    /// <summary>
+    /// Sets the one watcher told what is waiting after every use of the board (the notification poster, C-9.1.3).
+    /// Null removes it. It is called outside the lock, with a snapshot, so it can do slow work.
+    /// </summary>
+    public static void Observe(Action<IReadOnlyList<Notice>>? watcher)
     {
         lock (Gate)
         {
-            return use(Board);
+            observer = watcher;
         }
+    }
+
+    /// <summary>Runs <paramref name="use"/> on the board, one caller at a time.</summary>
+    public static T With<T>(Func<NoticeBoard, T> use)
+    {
+        T result;
+        IReadOnlyList<Notice>? snapshot = null;
+        Action<IReadOnlyList<Notice>>? watcher;
+        lock (Gate)
+        {
+            result = use(Board);
+            watcher = observer;
+            if (watcher is not null)
+            {
+                snapshot = Board.Waiting();
+            }
+        }
+
+        if (watcher is not null && snapshot is not null)
+        {
+            watcher(snapshot);
+        }
+
+        return result;
     }
 }

@@ -34,6 +34,7 @@ public class WorkoutWeekWorker : Worker
     public override Result DoWork()
     {
         var context = ApplicationContext!;
+        Constitution.Waiting.NoticePoster.Attach(context);
         try
         {
             // WorkManager calls this on its own background thread, so waiting here blocks nothing the owner sees.
