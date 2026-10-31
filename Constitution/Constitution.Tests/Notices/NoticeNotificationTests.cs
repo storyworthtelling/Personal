@@ -1,3 +1,4 @@
+using Constitution.Domain;
 using Constitution.Domain.Notices;
 
 namespace Constitution.Tests.Notices;
@@ -38,7 +39,7 @@ public class NoticeNotificationTests
     {
         Assert.Equal("problem", NoticeNotifications.ProblemRole);
         Assert.Equal("reference", NoticeNotifications.ReferenceRole);
-        Assert.Equal("com.storyworthtelling.constitution.NOTICE_ROLE", NoticeNotifications.RoleExtraKey);
+        Assert.Equal(ConstitutionIdentity.ApplicationId + ".NOTICE_ROLE", NoticeNotifications.RoleExtraKey);
         Assert.Equal("problem", NoticeNotifications.For(NoticeKind.ReMarkableDelivery)!.RoleWire);
         Assert.Equal("problem", NoticeNotifications.For(NoticeKind.HealthConnectRevoked)!.RoleWire);
         Assert.Equal("problem", NoticeNotifications.For(NoticeKind.BedOffline)!.RoleWire);

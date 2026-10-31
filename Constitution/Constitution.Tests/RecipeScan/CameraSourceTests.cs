@@ -75,6 +75,11 @@ public class CameraSourceTests
             .SelectMany(text => Regex.Matches(text, @"RequestPermissions\(([^;]*)\)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).Select(match => match.Groups[1].Value))
             .ToList();
 
+        // The notification permission (C-9.1.3, D155) is the one ask besides the camera's and Health Connect's.
+        var notices = asks.Where(ask => ask.Contains("PostNotifications", StringComparison.Ordinal)).ToList();
+        Assert.Single(notices);
+        asks = asks.Except(notices).ToList();
+
         Assert.Equal(2, asks.Count);
         Assert.Contains(asks, ask => ask.Contains("Android.Manifest.Permission.Camera", StringComparison.Ordinal));
     }
