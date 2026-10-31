@@ -17,11 +17,11 @@ namespace Folio.Android.Pages;
 ///
 /// <para><b>The wood is the owner's own hand-drawn crayon-and-pencil wood grain</b> — a photo of a real
 /// drawing (crayon-colored ground, loose wobbly wood-grain lines sketched over it in colored pencil),
-/// cropped to just the drawn area and tiled rather than stretched (<c>Assets/desk-wood-tile.png</c>):
+/// cropped to just the drawn area and tiled vertically at full width (<c>Assets/desk-wood-tile.png</c>):
 /// one small image repeated across the well, the same cached-and-reused shape as
 /// <c>Storyworthtelling.Paper.PaperGrain</c>'s shader tile, so the desk stays consistent with
 /// DESIGN.md §2 rather than embedding one giant per-screen raster. The source photo's own uneven
-/// lighting was flattened and its edges healed for seamless repetition (an image model was tried
+/// lighting was flattened and its edges healed for seamless repetition (the heal is a narrow cross-fade, not a wide blur, so no smeared cross runs through the wood) (an image model was tried
 /// first and kept returning a clean engraved-line illustration no prompt could talk it out of — this
 /// is the owner's real drawing instead). It is loaded once from the native Android asset (this head
 /// has no <c>&lt;SingleProject&gt;</c>, so MAUI's <c>Resources/Raw</c> convention is not reliable here
@@ -31,29 +31,23 @@ namespace Folio.Android.Pages;
 /// </summary>
 public sealed class DeskDrawable : IDrawable
 {
-    /// <summary>
-    /// The tile's on-screen width in device-independent units, at the source photo's own aspect
-    /// ratio (910×525). Fixed rather than derived from the source image's pixel size, so the grain
-    /// reads at desk scale (close to <see cref="DeskFillerDrawable"/>'s own pencil-and-cup scale)
-    /// regardless of how large the photographed tile itself is.
-    /// </summary>
-    private const float TileWidth = 340f;
-    private const float TileHeight = TileWidth * 525f / 910f;
-
+    // The tile is scaled so that ONE copy spans the whole width of the well, at the image's own
+    // aspect ratio. Horizontally it therefore never repeats at all (there is no vertical seam to see),
+    // and the only repeat left is the vertical one, whose top and bottom edges join each other.
     private static readonly Lazy<Microsoft.Maui.Graphics.IImage?> Tile = new(LoadTile);
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
-        if (Tile.Value is { } tile)
+        if (Tile.Value is { } tile && tile.Width > 0)
         {
+            var width = dirtyRect.Width;
+            var height = width * tile.Height / tile.Width;
+
             canvas.SaveState();
             canvas.ClipRectangle(dirtyRect);
-            for (var y = dirtyRect.Top; y < dirtyRect.Bottom; y += TileHeight)
+            for (var y = dirtyRect.Top; y < dirtyRect.Bottom; y += height)
             {
-                for (var x = dirtyRect.Left; x < dirtyRect.Right; x += TileWidth)
-                {
-                    canvas.DrawImage(tile, x, y, TileWidth, TileHeight);
-                }
+                canvas.DrawImage(tile, dirtyRect.Left, y, width, height);
             }
             canvas.RestoreState();
             return;
