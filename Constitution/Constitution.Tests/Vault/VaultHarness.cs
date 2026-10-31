@@ -152,10 +152,43 @@ internal static class Invented
         JsonSerializer.Serialize(vault with { HealthConnectChoicesJson = string.Empty }, VaultEnvelope.SerializerOptions);
 }
 
+/// <summary>
+/// One phone's view of the household's shared Drive file. The vault store asks the file whose it is, so this answers the
+/// way Drive does: Owned for the account that owns the file, Shared for any other, None when there is no file yet (the
+/// first publisher then becomes its owner).
+/// </summary>
+internal sealed class PhoneSharedDrive(TestCloud cloud, Func<string?> account) : IDriveTextFile, IDriveFileOwnership
+{
+    public Task<string?> ReadAsync(CancellationToken cancellationToken) => cloud.SharedDrive.ReadAsync(cancellationToken);
+
+    public async Task WriteAsync(string content, CancellationToken cancellationToken)
+    {
+        await cloud.SharedDrive.WriteAsync(content, cancellationToken);
+        if (string.IsNullOrEmpty(cloud.SharedOwner))
+        {
+            cloud.SharedOwner = account() ?? string.Empty;
+        }
+    }
+
+    public Task<DriveFileOwnership> OwnershipAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(cloud.SharedOwner))
+        {
+            return Task.FromResult(DriveFileOwnership.None);
+        }
+
+        var mine = string.Equals(cloud.SharedOwner, account(), StringComparison.OrdinalIgnoreCase);
+        return Task.FromResult(mine ? DriveFileOwnership.Owned : DriveFileOwnership.Shared);
+    }
+}
+
 /// <summary>The household's shared Drive file, and the helpers that put a vault into it and read one back.</summary>
 internal sealed class TestCloud
 {
     public InMemoryDrive SharedDrive { get; } = new();
+
+    /// <summary>The account that owns the shared file on Drive; empty until someone creates it.</summary>
+    public string SharedOwner { get; set; } = string.Empty;
 
     /// <summary>
     /// A phone bound to this household's shared Drive. Pass a person's existing Drive to model that
@@ -163,8 +196,11 @@ internal sealed class TestCloud
     /// </summary>
     public TestPhone NewPhone(string? account, InMemoryDrive? personalDrive = null) => new(this, account, personalDrive);
 
-    public void SeedShared(SecretsVault vault, string passphrase) =>
+    public void SeedShared(SecretsVault vault, string passphrase)
+    {
+        SharedOwner = vault.OwnerAccount;
         SharedDrive.Content = VaultEnvelope.Write(JsonSerializer.Serialize(vault, VaultEnvelope.SerializerOptions), passphrase);
+    }
 
     public string SharedPlaintext(string passphrase) => TestCloud.Open(SharedDrive, passphrase);
 
@@ -189,7 +225,7 @@ internal sealed class TestPhone
         Account = account;
         PersonalDrive = personalDrive ?? new InMemoryDrive();
         Sync = new ConstitutionVaultSync(
-            new DriveSecretsVaultStore(cloud.SharedDrive),
+            new DriveSecretsVaultStore(new PhoneSharedDrive(cloud, () => Account)),
             new DrivePersonalVaultStore(PersonalDrive),
             () => Account,
             Local,
