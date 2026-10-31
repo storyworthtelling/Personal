@@ -173,6 +173,24 @@ internal static class MealSheetGroceryPages
             flow.Advance(AisleGap);
         }
 
+        if (list.ExtraLines.Count > 0)
+        {
+            // D111: plain lines that are not ingredients, each on its own line after the aisles ("Tuesday dinner").
+            var extraLabel = GroceryList.ExtraHeading.ToUpperInvariant();
+            flow.Need(HeadingPitch + LinePitch, extraLabel + " · CONTINUED");
+            flow.Draft.Line(PrintedRole.Label, PageDraft.Left, flow.Y + 10f, PageDraft.FullWidth, extraLabel, name: "extra-heading");
+            flow.Advance(HeadingPitch);
+            var extraNumber = 0;
+            foreach (var extra in list.ExtraLines)
+            {
+                flow.Need(LinePitch, extraLabel + " · CONTINUED");
+                flow.Draft.Line(PrintedRole.Body, PageDraft.Left, flow.Y + 12.2f, PageDraft.FullWidth, extra, name: $"list-extra-{++extraNumber}");
+                flow.Advance(LinePitch);
+            }
+
+            flow.Advance(AisleGap);
+        }
+
         flow.Advance(BlockGap - AisleGap);
     }
 

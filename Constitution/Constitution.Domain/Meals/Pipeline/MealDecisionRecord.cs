@@ -10,8 +10,6 @@ namespace Constitution.Domain.Meals.Pipeline;
 /// <param name="Approved">Lines approved (ticked or by silence).</param>
 /// <param name="Denied">Lines somebody said no to.</param>
 /// <param name="ApprovedUnread">Lines approved at the deadline though no tablet was read for them (D103).</param>
-/// <param name="NeedsRevisedSheet">A denied dinner or line still has an evening ahead, so the printed sheet no longer says what the household chose. Nothing here builds that sheet.</param>
-/// <param name="ReplanWithout">The cards of the denied dinners that still have an evening ahead: the veto a replan of those evenings needs (<see cref="ReplanVeto"/>).</param>
 /// <param name="EvidencePending">Some written words were not judged (no judge answered); the next run asks again.</param>
 public sealed record MealDecisionEntry(
     DateOnly Week,
@@ -19,9 +17,42 @@ public sealed record MealDecisionEntry(
     int Approved,
     int Denied,
     int ApprovedUnread,
-    bool NeedsRevisedSheet,
-    IReadOnlyList<RecipeId> ReplanWithout,
-    bool EvidencePending);
+    bool EvidencePending)
+{
+    /// <summary>
+    /// <b>Read for older records, never written (D111).</b> A denied dinner no longer asks for a revised sheet: its evening is left unplanned and a line goes on
+    /// the shopping list. An entry the first build wrote still reads with this as it was.
+    /// </summary>
+    public bool NeedsRevisedSheet { get; init; }
+
+    /// <summary>Read for older records, never written (D111): there is no replan, so no card needs vetoing.</summary>
+    public IReadOnlyList<RecipeId> ReplanWithout { get; init; } = [];
+
+    /// <summary>
+    /// The evenings whose dinner the household denied while the evening was today or ahead, as frozen weekday words ("tuesday"), in week order (D111). Each was
+    /// left unplanned in the kept week and is one plain line on the shopping list (<see cref="ExtraLines"/>).
+    /// </summary>
+    public IReadOnlyList<string> DeniedEvenings { get; init; } = [];
+
+    /// <summary>
+    /// The cooked evenings among them: the card and the cook block's planned times, so a judge that answers late still knows which dish the words were about and a
+    /// calendar retry still knows where placement wrote the block (the kept week no longer says: the evening is unplanned).
+    /// </summary>
+    public IReadOnlyList<DeniedDish> DeniedDishes { get; init; } = [];
+
+    /// <summary>The denied evenings whose cook block could not be taken off the calendar yet (it could not be looked into, or the edit failed); the next run tries again until the evening has passed.</summary>
+    public IReadOnlyList<string> EventsPending { get; init; } = [];
+
+    /// <summary>Whether a cook block still waits to come off the calendar for an evening that is today or ahead.</summary>
+    public bool RemovalsDue(DateOnly today) =>
+        EventsPending.Any(word => DeniedEveningWords.TryDay(word, out var day) && Week.AddDays((int)day) >= today);
+
+    /// <summary>The shopping-list lines this week's denials add: "Tuesday dinner", one per denied evening. No dish and no ingredient.</summary>
+    public IReadOnlyList<string> ExtraLines => DeniedEveningWords.Lines(DeniedEvenings);
+}
+
+/// <summary>A denied cooked evening: the weekday word, the card it had and where its cook block was placed. A card id and two moments; never a name.</summary>
+public sealed record DeniedDish(string Evening, RecipeId Card, DateTimeOffset Start, DateTimeOffset End);
 
 /// <summary>The weeks the deadline step has decided, oldest first, the latest <see cref="Kept"/> only.</summary>
 public sealed record MealDecisionRecord(IReadOnlyList<MealDecisionEntry> Entries)

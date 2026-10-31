@@ -32,7 +32,8 @@ public static class MealDeadlineRules
     /// The written words of every denied dinner as evidence for the judge, one per denying adult who wrote any. A tick, a silence and a denial without
     /// words are not evidence. The item id names a weekday; the week gives the card.
     /// </summary>
-    public static IReadOnlyList<TasteEvidence> DinnerEvidence(MealDecision decision, StoredMealWeek week, DateOnly day)
+    /// <param name="marked">The cooked evenings an earlier run left unplanned (D111), whose cards the kept week no longer names.</param>
+    public static IReadOnlyList<TasteEvidence> DinnerEvidence(MealDecision decision, StoredMealWeek week, DateOnly day, IReadOnlyList<DeniedDish>? marked = null)
     {
         ArgumentNullException.ThrowIfNull(decision);
         ArgumentNullException.ThrowIfNull(week);
@@ -51,7 +52,9 @@ public static class MealDeadlineRules
                     new PersonId(denial.Person),
                     TasteEvidenceKind.Denial,
                     words.Length > TasteEvidence.MaxWordsLength ? words[..TasteEvidence.MaxWordsLength] : words,
-                    dinner.Kind == DinnerKind.Cooked ? dinner.Recipe : null,
+                    dinner.Kind == DinnerKind.Cooked
+                        ? dinner.Recipe
+                        : marked?.FirstOrDefault(dish => dish.Evening == DeniedEveningWords.Of(dinner.Day.DayOfWeek))?.Card,
                     day));
             }
         }
@@ -60,30 +63,52 @@ public static class MealDeadlineRules
     }
 
     /// <summary>
-    /// Whether the printed sheet still shows a line somebody refused: a denied dinner whose evening is today or ahead, or a denied line of pages 2 and 3
-    /// while the week runs. A refused dinner that is already over needs nothing.
+    /// D111: the dinners the household denied whose evening is today or ahead, as the kept week has them, in week order. Not a dish test: a denied evening the
+    /// plan already left empty is still an evening whose dinner somebody has to see to.
     /// </summary>
-    public static bool NeedsRevisedSheet(MealDecision decision, StoredMealWeek week, DateOnly today)
-    {
-        ArgumentNullException.ThrowIfNull(decision);
-        ArgumentNullException.ThrowIfNull(week);
-        return decision.Denied.Any(item => DinnerOf(week, item.ItemId) is { } dinner
-            ? dinner.Day >= today
-            : today <= week.WeekStart.AddDays(MealWeek.Evenings - 1));
-    }
-
-    /// <summary>The denied dinners that still have an evening ahead (today counts), by card: what a replan of them must not serve.</summary>
-    public static IReadOnlyList<RecipeId> DeniedAhead(MealDecision decision, StoredMealWeek week, DateOnly today)
+    public static IReadOnlyList<DinnerChoice> DeniedEveningsAhead(MealDecision decision, StoredMealWeek week, DateOnly today)
     {
         ArgumentNullException.ThrowIfNull(decision);
         ArgumentNullException.ThrowIfNull(week);
         return decision.Denied
             .Select(item => DinnerOf(week, item.ItemId))
             .OfType<DinnerChoice>()
-            .Where(dinner => dinner.Kind == DinnerKind.Cooked && dinner.Day >= today)
-            .Select(dinner => dinner.Recipe!.Value)
-            .Distinct()
+            .Where(dinner => dinner.Day >= today)
+            .DistinctBy(dinner => dinner.Day)
+            .OrderBy(dinner => dinner.Day)
             .ToList();
+    }
+
+    /// <summary>D111: the week with each of these evenings left unplanned ("Not approved."), every other evening and the dishes the rest still name untouched.</summary>
+    public static StoredMealWeek LeaveUnplanned(StoredMealWeek week, IReadOnlyList<DateOnly> days)
+    {
+        ArgumentNullException.ThrowIfNull(week);
+        ArgumentNullException.ThrowIfNull(days);
+        var changed = false;
+        var dinners = new List<DinnerChoice>();
+        foreach (var dinner in week.Week.Dinners)
+        {
+            if (days.Contains(dinner.Day) && dinner.Kind != DinnerKind.NothingPlanned)
+            {
+                dinners.Add(DinnerChoice.NothingPlanned(dinner.Day, DeniedEveningWords.NotApprovedReason));
+                changed = true;
+            }
+            else
+            {
+                dinners.Add(dinner);
+            }
+        }
+
+        if (!changed)
+        {
+            return week;
+        }
+
+        var named = dinners.Where(dinner => dinner.Recipe is not null).Select(dinner => dinner.Recipe!.Value).ToHashSet();
+        return new StoredMealWeek(
+            MealWeek.Planned(week.WeekStart, dinners, week.Week.Notes),
+            week.PlannedAt,
+            week.Dishes.Where(dish => named.Contains(dish.Recipe)).ToList());
     }
 
     private static DinnerChoice? DinnerOf(StoredMealWeek week, string itemId) =>
@@ -148,9 +173,8 @@ public static class MealDeadlineTrail
             return $"meal deadline asked again, {report.Lasting} likes taught, {report.Unjudged} words unjudged";
         }
 
-        var tail = report.NeedsRevisedSheet ? ", revised sheet needed" : string.Empty;
         return $"meal deadline decided, {report.Approved} lines approved, {report.Denied} lines denied, {report.ApprovedUnread} lines unread, "
-            + $"{report.LateSetAside} lines late, {report.TemplatesFed} templates fed, {report.LikesTaught} likes taught, {report.Unjudged} words unjudged{tail}";
+            + $"{report.LateSetAside} lines late, {report.TemplatesFed} templates fed, {report.LikesTaught} likes taught, {report.Unjudged} words unjudged";
     }
 
     private static string NothingWords(MealDeadlineNothingBecause because)

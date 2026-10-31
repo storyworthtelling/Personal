@@ -1,6 +1,5 @@
 using Constitution.Domain.Diagnostics;
 using Constitution.Domain.Meals.Pipeline;
-using Constitution.Domain.Recipes;
 
 namespace Constitution.Tests.MealDeadlineStep;
 
@@ -9,8 +8,8 @@ public class MealDeadlineTrailTests
 {
     private const string Stamp = "[Oct 25, 3:05 pm] INFO Body — ";
 
-    private static MealDeadlineReport Report(bool revised = false, bool retry = false, int unjudged = 0) =>
-        new(new DateOnly(2026, 10, 25), 6, 1, 2, 1, 1, 2, 1, 0, unjudged, revised, revised ? [new RecipeId("lentil-curry")] : [], retry);
+    private static MealDeadlineReport Report(bool denied = false, bool retry = false, int unjudged = 0) =>
+        new(new DateOnly(2026, 10, 25), 6, 1, 2, 1, 1, 2, 1, 0, unjudged, denied ? ["tuesday"] : [], denied ? [new EveningRemoval("tuesday", Constitution.Domain.Workouts.Screens.FollowOutcome.Unavailable)] : [], retry);
 
     public static IEnumerable<object[]> EveryPhrase()
     {
@@ -26,7 +25,7 @@ public class MealDeadlineTrailTests
         }
 
         yield return [new MealDeadlineOutcome.Decided(Report())];
-        yield return [new MealDeadlineOutcome.Decided(Report(revised: true, unjudged: 2))];
+        yield return [new MealDeadlineOutcome.Decided(Report(denied: true, unjudged: 2))];
         yield return [new MealDeadlineOutcome.Decided(Report(retry: true))];
     }
 
@@ -43,10 +42,10 @@ public class MealDeadlineTrailTests
     [Fact]
     public void ADecidedLineHoldsTheCounts()
     {
-        var phrase = MealDeadlineTrail.LogPhrase(new MealDeadlineOutcome.Decided(Report(revised: true, unjudged: 2)));
+        var phrase = MealDeadlineTrail.LogPhrase(new MealDeadlineOutcome.Decided(Report(denied: true, unjudged: 2)));
 
         Assert.Equal(
-            "meal deadline decided, 6 lines approved, 1 lines denied, 2 lines unread, 1 lines late, 1 templates fed, 2 likes taught, 2 words unjudged, revised sheet needed",
+            "meal deadline decided, 6 lines approved, 1 lines denied, 2 lines unread, 1 lines late, 1 templates fed, 2 likes taught, 2 words unjudged",
             phrase);
     }
 

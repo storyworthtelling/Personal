@@ -7,8 +7,9 @@ using Constitution.Domain.Recipes;
 namespace Constitution.Domain.Meals.Pipeline;
 
 /// <summary>
-/// The decided weeks as JSON: <c>{"version":1,"decisions":[{"week","decidedAt","approved","denied","approvedUnread","needsRevisedSheet","replanWithout":[card ids],
-/// "evidencePending"}]}</c>. The names are frozen. A text that is not this record is unreadable with a fixed sentence quoting nothing, never an empty record.
+/// The decided weeks as JSON: <c>{"version":1,"decisions":[{"week","decidedAt","approved","denied","approvedUnread","evidencePending","deniedEvenings":[weekday words],
+/// "deniedDishes":[{"evening","card","start","end"}],"eventsPending":[weekday words]}]}</c>. The names are frozen. <c>needsRevisedSheet</c> and <c>replanWithout</c>, which the first build
+/// wrote, are still read and are no longer written (D111). A text that is not this record is unreadable with a fixed sentence quoting nothing, never an empty record.
 /// </summary>
 public static class MealDecisionRecordCodec
 {
@@ -33,15 +34,21 @@ public static class MealDecisionRecordCodec
                 writer.WriteNumber("approved", entry.Approved);
                 writer.WriteNumber("denied", entry.Denied);
                 writer.WriteNumber("approvedUnread", entry.ApprovedUnread);
-                writer.WriteBoolean("needsRevisedSheet", entry.NeedsRevisedSheet);
-                writer.WriteStartArray("replanWithout");
-                foreach (var card in entry.ReplanWithout)
+                writer.WriteBoolean("evidencePending", entry.EvidencePending);
+                Words(writer, "deniedEvenings", entry.DeniedEvenings);
+                writer.WriteStartArray("deniedDishes");
+                foreach (var dish in entry.DeniedDishes)
                 {
-                    writer.WriteStringValue(card.Value);
+                    writer.WriteStartObject();
+                    writer.WriteString("evening", dish.Evening);
+                    writer.WriteString("card", dish.Card.Value);
+                    writer.WriteString("start", dish.Start.ToString("o", CultureInfo.InvariantCulture));
+                    writer.WriteString("end", dish.End.ToString("o", CultureInfo.InvariantCulture));
+                    writer.WriteEndObject();
                 }
 
                 writer.WriteEndArray();
-                writer.WriteBoolean("evidencePending", entry.EvidencePending);
+                Words(writer, "eventsPending", entry.EventsPending);
                 writer.WriteEndObject();
             }
 
@@ -50,6 +57,17 @@ public static class MealDecisionRecordCodec
         }
 
         return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static void Words(Utf8JsonWriter writer, string name, IReadOnlyList<string> words)
+    {
+        writer.WriteStartArray(name);
+        foreach (var word in words)
+        {
+            writer.WriteStringValue(word);
+        }
+
+        writer.WriteEndArray();
     }
 
     public static MealDecisionRecordRead Decode(string? json)
@@ -107,8 +125,35 @@ public static class MealDecisionRecordCodec
             element.GetProperty("approved").GetInt32(),
             element.GetProperty("denied").GetInt32(),
             element.GetProperty("approvedUnread").GetInt32(),
-            element.GetProperty("needsRevisedSheet").GetBoolean(),
-            element.GetProperty("replanWithout").EnumerateArray().Select(card => new RecipeId(card.GetString() ?? throw new FormatException("replanWithout"))).ToList(),
-            element.GetProperty("evidencePending").GetBoolean());
+            element.GetProperty("evidencePending").GetBoolean())
+        {
+            NeedsRevisedSheet = element.TryGetProperty("needsRevisedSheet", out var revised) && revised.GetBoolean(),
+            ReplanWithout = element.TryGetProperty("replanWithout", out var cards)
+                ? cards.EnumerateArray().Select(card => new RecipeId(card.GetString() ?? throw new FormatException("replanWithout"))).ToList()
+                : [],
+            DeniedEvenings = WordsFrom(element, "deniedEvenings"),
+            DeniedDishes = element.TryGetProperty("deniedDishes", out var dishes)
+                ? dishes.EnumerateArray().Select(dish => new DeniedDish(
+                    KnownWord(dish.GetProperty("evening").GetString(), "deniedDishes"),
+                    new RecipeId(dish.GetProperty("card").GetString() ?? throw new FormatException("deniedDishes")),
+                    Moment(dish, "start"),
+                    Moment(dish, "end"))).ToList()
+                : [],
+            EventsPending = WordsFrom(element, "eventsPending"),
+        };
     }
+
+    private static DateTimeOffset Moment(JsonElement element, string name) =>
+        DateTimeOffset.TryParseExact(element.GetProperty(name).GetString(), "o", CultureInfo.InvariantCulture, DateTimeStyles.None, out var at)
+            ? at
+            : throw new FormatException(name);
+
+    // A weekday word this version does not know is an unreadable record, never a guess: read as nothing, a denied evening would lose its shopping line.
+    private static IReadOnlyList<string> WordsFrom(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var words)
+            ? words.EnumerateArray().Select(word => KnownWord(word.GetString(), name)).ToList()
+            : [];
+
+    private static string KnownWord(string? word, string field) =>
+        DeniedEveningWords.TryDay(word, out _) ? word! : throw new FormatException(field);
 }

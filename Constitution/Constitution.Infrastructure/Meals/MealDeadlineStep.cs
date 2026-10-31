@@ -2,6 +2,7 @@ using Constitution.Domain.Calendar;
 using Constitution.Domain.Meals;
 using Constitution.Domain.Meals.Pipeline;
 using Constitution.Domain.Meals.Templates;
+using Constitution.Domain.Workouts.Screens;
 using Constitution.Domain.Workouts.Pipeline;
 using Constitution.Infrastructure.Household;
 
@@ -16,6 +17,7 @@ namespace Constitution.Infrastructure.Meals;
 /// <param name="Notes">The taste notes the household file keeps.</param>
 /// <param name="Judge">Decides whether written words are a lasting lesson; <see cref="UnavailableTasteJudge"/> until a real one is built.</param>
 /// <param name="Log">The Body trail's one-method seam.</param>
+/// <param name="Calendar">The calendar side that takes a denied evening's cook block off (<see cref="DeniedEveningCalendar"/>); null means none was handed over, and the removal is a typed "not removed" tried again next run.</param>
 public sealed record MealDeadlineSeams(
     Func<CancellationToken, Task<PlanningStanding>> Lease,
     IMealWeekRecords Weeks,
@@ -24,7 +26,8 @@ public sealed record MealDeadlineSeams(
     ITemplateLibraryStore Library,
     IMealTasteNotes Notes,
     ITasteJudge Judge,
-    IWorkoutWeekLog Log);
+    IWorkoutWeekLog Log,
+    MealDeadlineCalendar? Calendar = null);
 
 /// <summary>
 /// What happens on the planner's phone once the meal sheet's deadline (Sunday 8:00 on the owner's clock, D104) has passed. The meal run built and sent the
@@ -51,9 +54,11 @@ public sealed record MealDeadlineSeams(
 /// <para><b>Fail closed.</b> A decision record, saved weeks, template library or household file that is there and cannot be read stops the step with its own typed
 /// reason, and so does an answer record for the week this build cannot read: read as silence, a refused dinner would be approved. A seam's exception propagates.</para>
 ///
-/// <para><b>What it does not do.</b> It does not replan an evening or build a revised sheet. It records <see cref="MealDecisionEntry.NeedsRevisedSheet"/> and the
-/// cards a replan must not serve (<see cref="MealDecisionEntry.ReplanWithout"/>, for <see cref="ReplanVeto"/>): the printed sheet's deadline has passed, so
-/// <see cref="MealRedeliveryRules"/> would refuse to replace it, and the cook blocks on the calendar would need placing again.</para>
+/// <para><b>A denied dinner (D111).</b> There is no replan and no revised sheet. For each denied dinner whose evening is today or ahead, the evening is left unplanned
+/// in the kept week ("Not approved.", every other evening untouched), its cook block is taken off the calendar when it is still where placement wrote it
+/// (<see cref="DeniedEveningCalendar"/>: an owner-moved event is left alone, silently), and the decision record names the evening
+/// (<see cref="MealDecisionEntry.DeniedEvenings"/>) so the shopping list carries one plain line, "Tuesday dinner" (<see cref="MealDecisionEntry.ExtraLines"/>). A removal
+/// that could not be made is recorded and tried again by later runs until the evening has passed; it never stops the decision.</para>
 /// </summary>
 public static class MealDeadlineStep
 {
@@ -121,7 +126,7 @@ public static class MealDeadlineStep
         var earlier = decided.For(newest.WeekStart);
         var target = earlier is null
             ? newest
-            : passed.Where(week => decided.For(week.WeekStart) is { EvidencePending: true }).MaxBy(week => week.WeekStart);
+            : passed.Where(week => decided.For(week.WeekStart) is { } entry && (entry.EvidencePending || entry.RemovalsDue(ZoneClock.DayOf(inputs.Now, zone)))).MaxBy(week => week.WeekStart);
         if (target is null)
         {
             return Nothing(MealDeadlineNothingBecause.AlreadyDecided, "Every week whose deadline has passed is already decided.");
@@ -129,6 +134,11 @@ public static class MealDeadlineStep
 
         var existing = decided.For(target.WeekStart);
         var week = target.WeekStart;
+
+        if (existing is { EvidencePending: false })
+        {
+            return await RetryRemovalsAsync(inputs, seams, decided, existing, cancellation);
+        }
 
         IReadOnlyList<MealAnswer> answers;
         switch (seams.Answers.Read(week))
@@ -171,7 +181,7 @@ public static class MealDeadlineStep
         var likes = retry ? [] : feedback.Likes;
         var fed = library is null || retry ? 0 : feedback.Library.Templates.Count(template => template.FeedbackWeek == week && library.Find(template.Id)?.FeedbackWeek != week);
 
-        var evidence = MealDeadlineRules.DinnerEvidence(decision, target, today).Concat(feedback.Evidence).ToList();
+        var evidence = MealDeadlineRules.DinnerEvidence(decision, target, today, existing?.DeniedDishes).Concat(feedback.Evidence).ToList();
         var learned = await TasteLearner.LearnAsync(evidence, seams.Judge, cancellation);
 
         var notes = likes.Concat(learned.Notes).ToList();
@@ -186,11 +196,45 @@ public static class MealDeadlineStep
         }
 
         var unjudged = learned.Outcomes.Count(outcome => outcome == TasteOutcome.Unjudged);
-        var replan = MealDeadlineRules.DeniedAhead(decision, target, today);
-        var revised = MealDeadlineRules.NeedsRevisedSheet(decision, target, today);
-        var entry = existing is null
-            ? new MealDecisionEntry(week, inputs.Now, decision.ApprovedItemIds.Count, decision.Denied.Count, decision.ApprovedUnread.Count, revised, replan, unjudged > 0)
-            : existing with { EvidencePending = unjudged > 0 };
+        MealDecisionEntry entry;
+        IReadOnlyList<EveningRemoval> removals;
+        if (existing is null)
+        {
+            var ahead = MealDeadlineRules.DeniedEveningsAhead(decision, target, today);
+            var cooked = ahead.Where(dinner => dinner.Kind == DinnerKind.Cooked).ToList();
+            var dishes = cooked
+                .Select(dinner => new DeniedDish(DeniedEveningWords.Of(dinner.Day.DayOfWeek), dinner.Recipe!.Value, dinner.CookStart!.Value, dinner.CookEnd!.Value))
+                .ToList();
+            var found = new List<EveningRemoval>();
+            for (var index = 0; index < dishes.Count; index++)
+            {
+                found.Add(new EveningRemoval(
+                    dishes[index].Evening,
+                    await DeniedEveningCalendar.RemoveAsync(seams.Calendar, week, dishes[index], [cooked[index].Cook!], true, cancellation)));
+            }
+
+            removals = found;
+
+            // The evening is marked unplanned just before the decision is saved: the cook and the card are only in the kept week until then.
+            if (ahead.Count > 0)
+            {
+                var marked = MealDeadlineRules.LeaveUnplanned(target, ahead.Select(dinner => dinner.Day).ToList());
+                seams.Weeks.Save(kept.With(marked));
+            }
+
+            entry = new MealDecisionEntry(week, inputs.Now, decision.ApprovedItemIds.Count, decision.Denied.Count, decision.ApprovedUnread.Count, unjudged > 0)
+            {
+                DeniedEvenings = ahead.Select(dinner => DeniedEveningWords.Of(dinner.Day.DayOfWeek)).ToList(),
+                DeniedDishes = dishes,
+                EventsPending = removals.Where(removal => removal.NotRemoved).Select(removal => removal.Evening).ToList(),
+            };
+        }
+        else
+        {
+            removals = await RetryAsync(inputs, seams, existing, cancellation);
+            entry = existing with { EvidencePending = unjudged > 0, EventsPending = StillPending(existing, removals) };
+        }
+
         seams.Decisions.Save(decided.With(entry));
 
         return new MealDeadlineOutcome.Decided(new MealDeadlineReport(
@@ -204,10 +248,47 @@ public static class MealDeadlineStep
             learned.Outcomes.Count(outcome => outcome == TasteOutcome.Lasting),
             learned.Outcomes.Count(outcome => outcome == TasteOutcome.OneOff),
             unjudged,
-            entry.NeedsRevisedSheet,
-            entry.ReplanWithout,
+            entry.DeniedEvenings,
+            removals,
             retry));
     }
+
+    // The week was already decided and only a cook block waits to come off the calendar: no answer is read and no word is judged again.
+    private static async Task<MealDeadlineOutcome> RetryRemovalsAsync(
+        MealDeadlineInputs inputs, MealDeadlineSeams seams, MealDecisionRecord decided, MealDecisionEntry existing, CancellationToken cancellation)
+    {
+        var removals = await RetryAsync(inputs, seams, existing, cancellation);
+        var entry = existing with { EventsPending = StillPending(existing, removals) };
+        seams.Decisions.Save(decided.With(entry));
+        return new MealDeadlineOutcome.Decided(new MealDeadlineReport(existing.Week, existing.Approved, existing.Denied, existing.ApprovedUnread, 0, 0, 0, 0, 0, 0, existing.DeniedEvenings, removals, true));
+    }
+
+    private static async Task<IReadOnlyList<EveningRemoval>> RetryAsync(MealDeadlineInputs inputs, MealDeadlineSeams seams, MealDecisionEntry existing, CancellationToken cancellation)
+    {
+        var today = ZoneClock.DayOf(inputs.Now, inputs.Rules.Zone);
+        var adults = inputs.Rules.Adults.Select(adult => adult.Name).ToList();
+        var removals = new List<EveningRemoval>();
+        foreach (var word in existing.EventsPending)
+        {
+            if (!DeniedEveningWords.TryDay(word, out var weekday) || existing.Week.AddDays((int)weekday) < today)
+            {
+                continue;
+            }
+
+            if (existing.DeniedDishes.FirstOrDefault(item => item.Evening == word) is not { } dish)
+            {
+                continue;
+            }
+
+            removals.Add(new EveningRemoval(word, await DeniedEveningCalendar.RemoveAsync(seams.Calendar, existing.Week, dish, adults, false, cancellation)));
+        }
+
+        return removals;
+    }
+
+    // What is still waiting: what this run could not remove. An evening that has passed, or one this run did not try, is let go.
+    private static IReadOnlyList<string> StillPending(MealDecisionEntry existing, IReadOnlyList<EveningRemoval> removals) =>
+        existing.EventsPending.Where(word => removals.Any(removal => removal.Evening == word && removal.NotRemoved)).ToList();
 
     private static TemplateLibrary Undone(TemplateLibrary library, DateOnly week) =>
         new(library.Templates.Select(template => template.FeedbackWeek == week ? template with { FeedbackWeek = null } : template).ToList(), library.Prints);

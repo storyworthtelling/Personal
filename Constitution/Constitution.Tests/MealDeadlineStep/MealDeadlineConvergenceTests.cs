@@ -32,7 +32,7 @@ public class MealDeadlineConvergenceTests
 
     private static async Task<string> SignatureAsync(DeadlineRig rig, IEnumerable<MealAnswer> answers)
     {
-        rig.Decisions.Json = null;
+        rig.Redecide();
         rig.Notes.Kept.Clear();
         rig.Library.Answer = new TemplateLibraryRead.Held(Proposed(), 0);
         rig.Answers.All.Clear();
@@ -47,7 +47,7 @@ public class MealDeadlineConvergenceTests
             .Select(template => $"{template.Id}:{template.Status}:{template.Approval}");
         var asked = rig.Judge.Asked.Select(item => $"{item.Person.Value}:{item.Recipe?.Value}:{item.Words}").Order(StringComparer.Ordinal);
         return string.Join('|', report.Approved, report.Denied, report.ApprovedUnread, report.LateSetAside, report.TemplatesFed, report.LikesTaught,
-            report.NeedsRevisedSheet, string.Join(',', report.ReplanWithout.Select(card => card.Value).Order(StringComparer.Ordinal)),
+            string.Join(',', report.DeniedEvenings), string.Join(',', entry.ExtraLines),
             string.Join(',', notes), string.Join(',', templates), string.Join(',', asked), entry.Approved, entry.Denied);
     }
 
@@ -77,7 +77,7 @@ public class MealDeadlineConvergenceTests
         for (var seed = 1; seed <= MealAnswerSimulation.SeedCount; seed++)
         {
             var truth = MealAnswerRecords.Read(MealAnswerSimulation.Run(seed).Truth, Week).Answers;
-            rig.Decisions.Json = null;
+            rig.Redecide();
             rig.Notes.Kept.Clear();
             rig.Library.Answer = new TemplateLibraryRead.Held(Proposed(), 0);
             rig.Answers.All.Clear();

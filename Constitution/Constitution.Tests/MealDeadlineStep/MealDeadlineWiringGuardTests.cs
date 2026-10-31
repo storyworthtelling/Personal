@@ -40,13 +40,34 @@ public class MealDeadlineWiringGuardTests
     }
 
     [Fact]
-    public void TheStepNeverReachesTheCalendarOrThePaper()
+    public void TheStepNeverReachesThePaperOrPlacesAnything()
     {
         var step = Text("Infrastructure/Meals/MealDeadlineStep.cs");
 
         Assert.DoesNotContain("MealDocumentsStep.RunAsync(", step, StringComparison.Ordinal);
         Assert.DoesNotContain("PlacementRunner", step, StringComparison.Ordinal);
         Assert.DoesNotContain("ICalendarWriter", step, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreateAsync(", step, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheOnlyCalendarDoorTheStepHasOnlyLooksUpAndRemoves()
+    {
+        var door = Text("Infrastructure/Meals/DeniedEveningCalendar.cs");
+
+        Assert.Contains("FindAsync(", door, StringComparison.Ordinal);
+        Assert.Contains("RemoveAsync(", door, StringComparison.Ordinal);
+        Assert.DoesNotContain("CreateAsync(", door, StringComparison.Ordinal);
+        Assert.DoesNotContain("MoveAsync(", door, StringComparison.Ordinal);
+        Assert.DoesNotContain("PlacementRunner", door, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheHeadHandsTheStepTheMealCalendar()
+    {
+        var services = Text("Android/MealWeek/MealWeekServices.cs");
+
+        Assert.Contains("new MealDeadlineCalendar(", services, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -56,8 +77,9 @@ public class MealDeadlineWiringGuardTests
 
         var notes = step.IndexOf("seams.Notes.Save(", StringComparison.Ordinal);
         var library = step.IndexOf("seams.Library.Save(", StringComparison.Ordinal);
-        var decision = step.IndexOf("seams.Decisions.Save(", StringComparison.Ordinal);
+        var week = step.IndexOf("seams.Weeks.Save(", StringComparison.Ordinal);
+        var decision = step.IndexOf("seams.Decisions.Save(", week, StringComparison.Ordinal);
 
-        Assert.True(notes >= 0 && notes < library && library < decision);
+        Assert.True(notes >= 0 && notes < library && library < week && week < decision);
     }
 }
