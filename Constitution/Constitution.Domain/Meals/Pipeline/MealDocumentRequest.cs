@@ -33,6 +33,9 @@ public sealed record MealDocumentRequest(MealWeek Week, IReadOnlyList<Recipe> Ca
     /// <summary>Plain shopping-list lines the sheet's groceries page adds after the aisles ("Tuesday dinner", D111); empty unless a denied evening put one there.</summary>
     public IReadOnlyList<string> ExtraLines { get; init; } = [];
 
+    /// <summary>Only each cooked dinner's recipe: no sheet, and no pantry read. Used by the pass that sends a week in progress its recipes in their hour.</summary>
+    public bool RecipesOnly { get; init; }
+
     /// <summary>The breakfasts, lunches and lunchbox the rotating templates chose (D110); null leaves pages 2 and 3 off the sheet.</summary>
     public MealSheetDailyMeals? Daily { get; init; }
 }

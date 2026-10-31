@@ -55,6 +55,8 @@ public class ConstitutionInvariantsTests
         "constitution-workout-week",
         // Added with the hourly meal-week worker (P13): a deliberate edit.
         "constitution-meal-week",
+        // Added with the recipe-hour request (D120): a second hourly request of the same worker, aimed at thirty-five past, a deliberate edit.
+        "constitution-meal-recipe-hour",
     ];
 
     private static readonly string[] ExpectedPreferenceKeys =

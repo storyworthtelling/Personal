@@ -86,6 +86,12 @@ public static class ConstitutionIdentity
     public const string MealWeekWorkName = "constitution-meal-week";
 
     /// <summary>
+    /// The meal worker's second unique work name (D120): the same worker, enqueued a second time at thirty-five past the hour so that a pass lands every half hour and two of them
+    /// inside any recipe's hour. Frozen for the same reason as <see cref="MealWeekWorkName"/>: the work is enqueued with <c>Keep</c>, so a phone that has it keeps the row.
+    /// </summary>
+    public const string MealRecipeHourWorkName = "constitution-meal-recipe-hour";
+
+    /// <summary>
     /// The app's SharedPreferences file name. It is where an upgraded phone finds what the owner
     /// set; rename it and every setting is silently not found.
     /// </summary>
@@ -194,7 +200,7 @@ public static class ConstitutionIdentity
     public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName, WorkoutWeekWorkerName, MealWeekWorkerName];
 
     /// <summary>Every unique work name, for the guard to enumerate.</summary>
-    public static IReadOnlyList<string> WorkNames { get; } = [ReadBackWorkName, BodySyncWorkName, WorkoutWeekWorkName, MealWeekWorkName];
+    public static IReadOnlyList<string> WorkNames { get; } = [ReadBackWorkName, BodySyncWorkName, WorkoutWeekWorkName, MealWeekWorkName, MealRecipeHourWorkName];
 
     /// <summary>Every preference file name and key, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> PreferenceKeys { get; } = [

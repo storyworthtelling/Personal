@@ -169,10 +169,10 @@ public static class MealPassStampCodec
     }
 }
 
-/// <summary>Which of the two parts of the pass has something to do.</summary>
-public sealed record MealPassWork(bool PlanWeek, bool Deadline)
+/// <summary>Which parts of the pass have something to do. <paramref name="RecipeHour"/> is a recipe in its hour for this phone's tablet that is not on it yet (<see cref="MealRecipeHour"/>).</summary>
+public sealed record MealPassWork(bool PlanWeek, bool Deadline, bool RecipeHour = false)
 {
-    public bool Any => PlanWeek || Deadline;
+    public bool Any => PlanWeek || Deadline || RecipeHour;
 }
 
 /// <summary>When the meal pass wakes and how often it looks again.</summary>
@@ -184,17 +184,28 @@ public static class MealPassSchedule
     /// <summary>The minute past each hour the pass is aimed at, on the household's clock: after the hour has turned, so Sunday's 8:00 deadline is behind it by 8:05.</summary>
     public const int MinutePastTheHour = 5;
 
+    /// <summary>
+    /// The minute past each hour the second request is aimed at (D120): thirty minutes after the first, so together the two are a pass every half hour, and a recipe's window of
+    /// an hour always holds two of them. One that is late, or that the phone skipped, does not lose the page.
+    /// </summary>
+    public const int RecipeMinutePastTheHour = 35;
+
     /// <summary>The first pass of each day that plans: six o'clock on the household's clock, before the workout run's quarter to seven.</summary>
     public static readonly TimeOnly PlanFrom = new(6, 0);
 
     /// <summary>How long from <paramref name="now"/> until the household's clock next reads <see cref="MinutePastTheHour"/> past an hour. Exactly on it waits the whole <see cref="Interval"/>.</summary>
-    public static TimeSpan DelayUntilNext(DateTimeOffset now, TimeZoneInfo zone)
+    public static TimeSpan DelayUntilNext(DateTimeOffset now, TimeZoneInfo zone) => DelayUntil(now, zone, MinutePastTheHour);
+
+    /// <summary>How long from <paramref name="now"/> until the household's clock next reads <see cref="RecipeMinutePastTheHour"/> past an hour. Exactly on it waits the whole <see cref="Interval"/>.</summary>
+    public static TimeSpan DelayUntilNextRecipeLook(DateTimeOffset now, TimeZoneInfo zone) => DelayUntil(now, zone, RecipeMinutePastTheHour);
+
+    private static TimeSpan DelayUntil(DateTimeOffset now, TimeZoneInfo zone, int minutePastTheHour)
     {
         ArgumentNullException.ThrowIfNull(zone);
 
         var local = TimeZoneInfo.ConvertTime(now, zone);
         var into = TimeSpan.FromTicks(local.TimeOfDay.Ticks % Interval.Ticks);
-        var target = TimeSpan.FromMinutes(MinutePastTheHour);
+        var target = TimeSpan.FromMinutes(minutePastTheHour);
         return into < target ? target - into : target + Interval - into;
     }
 }
@@ -218,13 +229,19 @@ public static class MealPassPlan
         };
     }
 
+    /// <summary>
+    /// <paramref name="tabletPerson"/> is the adult whose tablet this phone has (null: none, so no recipe is ever due) and <paramref name="delivered"/> looks a page up in the record of
+    /// what has gone to the tablet; it is called only when a recipe's hour is open, so a pass outside every hour reads nothing more than before.
+    /// </summary>
     public static MealPassWork Decide(
         MealPassTrigger trigger,
         DateTimeOffset now,
         TimeZoneInfo zone,
         MealPassStampRead stamp,
         MealWeekRecordRead weeks,
-        MealDecisionRecordRead decisions)
+        MealDecisionRecordRead decisions,
+        string? tabletPerson = null,
+        Func<string, DeliveredMealDocument?>? delivered = null)
     {
         ArgumentNullException.ThrowIfNull(zone);
         ArgumentNullException.ThrowIfNull(stamp);
@@ -233,7 +250,8 @@ public static class MealPassPlan
 
         // A stamp that cannot be read is no stamp: the cost is one extra, idempotent run.
         var held = (stamp as MealPassStampRead.Held)?.Stamp ?? MealPassStamp.Empty;
-        return new MealPassWork(PlanDue(trigger, now, zone, held), DeadlineDue(now, zone, held, weeks, decisions));
+        var recipes = MealRecipeHour.DueWeeks(weeks, now, tabletPerson, delivered ?? (_ => null)).Count > 0;
+        return new MealPassWork(PlanDue(trigger, now, zone, held), DeadlineDue(now, zone, held, weeks, decisions), recipes);
     }
 
     private static bool PlanDue(MealPassTrigger trigger, DateTimeOffset now, TimeZoneInfo zone, MealPassStamp stamp)
@@ -307,6 +325,9 @@ public enum MealPassPart
 {
     Plan,
     Deadline,
+
+    /// <summary>A recipe in its hour (D120).</summary>
+    Recipes,
 }
 
 /// <summary>What went wrong with a part, in the words the trail knows.</summary>
@@ -340,11 +361,21 @@ public static class MealPassTrail
                     return "meal week busy, try again later";
                 }
 
+                if (part == MealPassPart.Recipes)
+                {
+                    return "meal recipes busy, try again later";
+                }
+
                 return "meal deadline busy, try again later";
             case MealPassProblem.Failed:
                 if (part == MealPassPart.Plan)
                 {
                     return $"meal week failed: {failureType}";
+                }
+
+                if (part == MealPassPart.Recipes)
+                {
+                    return $"meal recipes failed: {failureType}";
                 }
 
                 return $"meal deadline failed: {failureType}";

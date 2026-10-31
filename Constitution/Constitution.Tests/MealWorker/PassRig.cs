@@ -31,6 +31,18 @@ internal sealed class PassRig
         _ => Task.FromResult<GateResult<MealDeadlineOutcome>>(
             new GateResult<MealDeadlineOutcome>.Ran(new MealDeadlineOutcome.NothingToDecide(MealDeadlineNothingBecause.AlreadyDecided, "Done.")));
 
+    /// <summary>The adult whose tablet this phone has; null means none, so no recipe is ever due.</summary>
+    public string? Person { get; set; }
+
+    /// <summary>What the tablet record holds, by delivered name. Each look is written to the diary.</summary>
+    public Dictionary<string, DeliveredMealDocument> DeliveredRecords { get; } = [];
+
+    /// <summary>When set, looking a page up in the record of deliveries throws it.</summary>
+    public Exception? DeliveredFails { get; set; }
+
+    public Func<CancellationToken, Task<GateResult<MealRecipesOutcome>>> Recipes { get; set; } =
+        _ => Task.FromResult<GateResult<MealRecipesOutcome>>(new GateResult<MealRecipesOutcome>.Ran(new MealRecipesOutcome.Nothing("None.")));
+
     public MealPassSeams Seams => new(
         new Records(this),
         new Decided(this),
@@ -45,7 +57,14 @@ internal sealed class PassRig
             Diary.Add("decide");
             return await Decide(token);
         },
-        new Log(this));
+        new Log(this),
+        new Delivered(this),
+        Person,
+        async token =>
+        {
+            Diary.Add("recipes");
+            return await Recipes(token);
+        });
 
     public Task<MealPassResult> RunAsync(DateTimeOffset now, MealPassTrigger trigger = MealPassTrigger.Scheduled, CancellationToken cancellation = default) =>
         MealWeekPass.RunAsync(trigger, now, Zone, Seams, cancellation);
@@ -98,6 +117,24 @@ internal sealed class PassRig
             rig.Saved.Add(stamp);
             rig.StampRead = new MealPassStampRead.Held(stamp);
         }
+    }
+
+    private sealed class Delivered(PassRig rig) : IDeliveredMealDocuments
+    {
+        public DeliveredMealDocument? Find(string name)
+        {
+            rig.Diary.Add("read delivered");
+            if (rig.DeliveredFails is { } failure)
+            {
+                throw failure;
+            }
+
+            return rig.DeliveredRecords.GetValueOrDefault(name);
+        }
+
+        public void Record(DeliveredMealDocument delivered) => throw new InvalidOperationException("The pass never records a delivery.");
+
+        public void Remove(string name) => throw new InvalidOperationException("The pass never removes a delivery.");
     }
 
     private sealed class Log(PassRig rig) : IWorkoutWeekLog

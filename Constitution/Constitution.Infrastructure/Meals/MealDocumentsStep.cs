@@ -21,8 +21,11 @@ namespace Constitution.Infrastructure.Meals;
 ///
 /// <para><b>When.</b> The sheet is sent when the week is planned, while the deadline is ahead (after it silence has approved the week). A recipe goes an
 /// hour before its cook block and never once the block has begun (<see cref="RecipeDelivery"/>, <see cref="MealRedeliveryRules"/>): a run earlier than that
-/// reports <see cref="MealDocumentVerdict.NotYet"/> with the moment, and a later run (there is no scheduled one yet) sends it. A page already on the tablet is replaced
+/// reports <see cref="MealDocumentVerdict.NotYet"/> with the moment, and a later run sends it: the pass that finds a recipe in its hour (<see cref="MealDocumentRequest.RecipesOnly"/>, D120). A page already on the tablet is replaced
 /// only while its slot has not begun, and only if it is still blank (<see cref="MealDocumentDelivery"/>).</para>
+///
+/// <para><b>Recipes only (D120).</b> A request with <see cref="MealDocumentRequest.RecipesOnly"/> skips the sheet and the pantry and decides each cooked dinner's recipe by exactly the same rules, so the
+/// worker can send the week in progress its recipes in their hour without touching a sheet that is past its deadline.</para>
 ///
 /// <para><b>Idempotent.</b> The page is judged by a fingerprint of its bytes, which a render repeats exactly. A run on a week that has not changed finds
 /// every page unchanged and sends, trashes and records nothing. A page is recorded for the read-back, and as delivered, only after the tablet took it; a refused
@@ -72,29 +75,33 @@ public static class MealDocumentsStep
 
         var roster = (MealRosterRead.Ready)read;
 
-        Pantry pantry;
+        // A recipes-only request has no sheet to build, so the pantry (the sheet's grocery page) is not needed and an unreadable one stops nothing.
+        var pantry = Pantry.Empty;
         string? pantrySentence = null;
         var unreadable = 0;
-        switch (seams.Pantry.Read())
+        if (!request.RecipesOnly)
         {
-            case MealPantryRead.Ready ready:
-                pantry = ready.Pantry;
-                unreadable = ready.UnreadableRecords;
-                break;
-            case MealPantryRead.NoneYet none:
-                pantry = Pantry.Empty;
-                pantrySentence = none.Sentence;
-                break;
-            case MealPantryRead.Unreadable damaged:
-                return new MealDocumentsResult.Stopped(MealDocumentsStoppedBecause.PantryUnreadable, damaged.Reason);
-            default:
-                throw new InvalidOperationException("The pantry came back as neither a pantry nor a reason.");
+            switch (seams.Pantry.Read())
+            {
+                case MealPantryRead.Ready ready:
+                    pantry = ready.Pantry;
+                    unreadable = ready.UnreadableRecords;
+                    break;
+                case MealPantryRead.NoneYet none:
+                    pantrySentence = none.Sentence;
+                    break;
+                case MealPantryRead.Unreadable damaged:
+                    return new MealDocumentsResult.Stopped(MealDocumentsStoppedBecause.PantryUnreadable, damaged.Reason);
+                default:
+                    throw new InvalidOperationException("The pantry came back as neither a pantry nor a reason.");
+            }
         }
 
-        var documents = new List<MealDocumentOutcome>
+        var documents = new List<MealDocumentOutcome>();
+        if (!request.RecipesOnly)
         {
-            await SheetAsync(request, seams, person, roster.People.Count, pantry, cancellation),
-        };
+            documents.Add(await SheetAsync(request, seams, person, roster.People.Count, pantry, cancellation));
+        }
 
         foreach (var dinner in request.Week.Dinners.Where(item => item.Kind == DinnerKind.Cooked))
         {
