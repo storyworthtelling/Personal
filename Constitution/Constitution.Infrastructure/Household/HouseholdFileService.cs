@@ -160,9 +160,12 @@ public sealed class HouseholdFileService
             var settled = await PassAsync(cancellationToken);
             Set(settled);
             PassSettled?.Invoke(settled);
-            if (settled.State == HouseholdFileState.Synced)
+            if (settled.State == HouseholdFileState.Synced && await BeatIfDueAsync(cancellationToken))
             {
-                await BeatIfDueAsync(cancellationToken);
+                // A heartbeat nobody else can see is no heartbeat (D148): the pass that wrote it sends it up, since a worker has no loop to do it later.
+                settled = await PassAsync(cancellationToken);
+                Set(settled);
+                PassSettled?.Invoke(settled);
             }
 
             return settled;
@@ -256,25 +259,26 @@ public sealed class HouseholdFileService
     }
 
     // The heartbeat is the lease's: written for a known role only (the lease has no unknown role to write), when it is due.
-    private async Task BeatIfDueAsync(CancellationToken cancellationToken)
+    private async Task<bool> BeatIfDueAsync(CancellationToken cancellationToken)
     {
         var role = seams.Role();
         if (role == HouseholdFileRole.Unknown || Volatile.Read(ref latest) is not { } document)
         {
-            return;
+            return false;
         }
 
         var id = InstallId;
         var now = seams.Now();
         if (!LeaseWriter.NeedsHeartbeat(document, id, now))
         {
-            return;
+            return false;
         }
 
         var rosterRole = RosterEditor.RoleFor(role);
         await EditAsync(
             (current, clock, writer) => LeaseWriter.Beat(current, clock, writer, rosterRole, now, LeaseTerms.DefaultLeaseLength),
             cancellationToken);
+        return true;
     }
 
     /// <summary>Counts the cards a read could not open once per change, as a count only.</summary>

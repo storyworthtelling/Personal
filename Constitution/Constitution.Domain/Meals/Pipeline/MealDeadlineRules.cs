@@ -210,6 +210,8 @@ public static class MealDeadlineTrail
                 return "library not saved";
             case MealDeadlineStoppedBecause.NotConfigured:
                 return "not configured";
+            case MealDeadlineStoppedBecause.PlanningNotReady:
+                return "planning not ready yet";
             default:
                 throw new ArgumentOutOfRangeException(nameof(because), because, "This reason has no trail words; add them here.");
         }

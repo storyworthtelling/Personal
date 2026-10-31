@@ -43,6 +43,9 @@ public enum MealDeadlineStoppedBecause
 
     /// <summary>This phone has no household setup that can be read, so there are no rules to read the deadline by (the worker found a kept week and no setup).</summary>
     NotConfigured,
+
+    /// <summary>The household file was not just synced, or this phone's planning claim has not settled: the answers it would read may be stale, so nothing is decided, and the next pass asks again (D148).</summary>
+    PlanningNotReady,
 }
 
 /// <summary>What a deciding run did. Counts and card ids only.</summary>

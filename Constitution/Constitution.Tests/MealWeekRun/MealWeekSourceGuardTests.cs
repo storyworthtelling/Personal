@@ -86,7 +86,9 @@ public class MealWeekSourceGuardTests
         Assert.Contains("WorkoutWeekCalendarSeams.Create(", services, StringComparison.Ordinal);
         Assert.Contains("calendar.WrittenKeys", services, StringComparison.Ordinal);
         Assert.Contains("calendar.KeyAssignments", services, StringComparison.Ordinal);
-        Assert.Contains("household.Planning.AskAsync", services, StringComparison.Ordinal);
+
+        // The lease seam is the claiming one (D148). What it DOES is proved behaviourally in PlanningClaim/; this only stops the read-only seam coming back.
+        Assert.DoesNotContain("Planning.AskAsync", services, StringComparison.Ordinal);
     }
 
     [Fact]

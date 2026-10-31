@@ -5,18 +5,21 @@ using Storyworthtelling.Household;
 namespace Constitution.Infrastructure.Household;
 
 /// <summary>The answer to "may this install plan this week?", with the decision behind it and a plain sentence for it.</summary>
-public sealed record PlanningStanding(bool MayPlan, LeaseDecision? Decision, string Sentence);
+public sealed record PlanningStanding(bool MayPlan, LeaseDecision? Decision, string Sentence, bool Waiting = false);
 
 /// <summary>
 /// What the weekly runs ask before they plan (C-6.1.3): this install's lease standing for the week that contains now, read from the
 /// phone's copy of the household file. <see cref="AskAsync"/> writes nothing. <see cref="ClaimAsync"/> does what the decision asked
 /// (a claim for an unclaimed week, a release of an old one) and asks again, so the run takes the week as it opens and plans once the
-/// claim has settled. No planner calls this yet. An unknown role never plans: the lease has no unknown role, so it is not asked, and
+/// claim has settled. An unknown role never plans: the lease has no unknown role, so it is not asked, and
 /// a file that will not open is the library's null document, which fails closed.
 /// </summary>
 public sealed class HouseholdPlanningStanding(HouseholdFileService service)
 {
     public const string RoleUnknownSentence = "The household file has not said whose phone this is yet, so this phone does not plan the week.";
+
+    public const string NotSyncedSentence =
+        "The household file was not just compared with Drive, so this phone does not plan or decide until it has been; the next pass tries again.";
 
     public async Task<PlanningStanding> AskAsync(CancellationToken cancellationToken)
     {
@@ -53,14 +56,59 @@ public sealed class HouseholdPlanningStanding(HouseholdFileService service)
             return asked;
         }
 
+        await WriteAsync(decision, cancellationToken);
+        return await AskAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// What the weekly passes ask (D148): this phone opens the week before it is asked whether it plans. It compares the household file with Drive first (a phone that
+    /// cannot say it just did is <see cref="PlanningStanding.Waiting"/>, claims nothing and plans nothing), takes or lets go of the claim the decision asks for, sends the
+    /// claim up so the other phone can see it, and asks again. A claim stands for <see cref="LeaseTerms.SettleWindow"/> before its holder plans, so the answer the first
+    /// pass of a week gets is "waiting" and a later pass plans. The decision itself is <see cref="PlanningLease"/>'s: a partner never takes a week from a live owner.
+    /// </summary>
+    public async Task<PlanningStanding> OpenTheWeekAsync(CancellationToken cancellationToken)
+    {
+        if (service.Role == HouseholdFileRole.Unknown)
+        {
+            return new PlanningStanding(false, null, RoleUnknownSentence, true);
+        }
+
+        var synced = await service.SyncAsync(cancellationToken);
+        if (synced.State != HouseholdFileState.Synced)
+        {
+            return new PlanningStanding(false, null, NotSyncedSentence, true);
+        }
+
+        var asked = await AskAsync(cancellationToken);
+        if (asked.Decision is { Verdict: LeaseVerdict.Take or LeaseVerdict.Release } decision)
+        {
+            await WriteAsync(decision, cancellationToken);
+            var published = await service.SyncAsync(cancellationToken);
+            if (published.State != HouseholdFileState.Synced)
+            {
+                return new PlanningStanding(false, null, NotSyncedSentence, true);
+            }
+
+            asked = await AskAsync(cancellationToken);
+        }
+
+        return asked with { Waiting = WaitingFor(asked.Decision) };
+    }
+
+    private Task WriteAsync(LeaseDecision decision, CancellationToken cancellationToken)
+    {
         var rosterRole = service.RosterRole;
         var now = service.Now;
         var zone = service.Zone;
-        await service.EditAsync(
+        return service.EditAsync(
             (document, clock, writer) => LeaseWriter.Apply(document, decision, clock, writer, rosterRole, now, zone, LeaseTerms.DefaultLeaseLength),
             cancellationToken);
-        return await AskAsync(cancellationToken);
     }
+
+    // Not final: this phone is, or will shortly be, the planner (a claim to settle, a beat to publish) or the owner who would claim first is alive. Everything else is an answer.
+    private static bool WaitingFor(LeaseDecision? decision) => decision is null
+        || decision.Verdict is LeaseVerdict.Take or LeaseVerdict.Release
+        || decision.Reason is LeaseReason.ClaimNotSettled or LeaseReason.OwnHeartbeatStale or LeaseReason.OwnerIsAlive;
 
     private static string SentenceFor(LeaseDecision decision) => decision.Verdict switch
     {

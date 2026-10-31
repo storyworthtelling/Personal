@@ -9,6 +9,9 @@ public enum MealNotPlannedBecause
     /// <summary>The lease says another phone holds this week's planning, or this phone cannot yet say it does. Not an error: the partner's install is meant to land here.</summary>
     NotThePlanner,
 
+    /// <summary>This phone is, or will be, the planner but cannot say so yet: the household file was not just synced, or its claim has not stood long enough. Not final: a later pass asks again (D148).</summary>
+    PlanningNotReady,
+
     /// <summary>The rules name no adult to plan for.</summary>
     NoOneToPlan,
 
