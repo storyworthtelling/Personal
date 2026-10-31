@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -757,7 +758,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // source delete is owed. The owner deals with a PERSON on this screen, not with one
     // message, which is why the Mailbox's unit is the thread and the correspondence
     // screen's is the message.
-    private void FileCorrespondence(ThreadRow row)
+    private void FileCorrespondence(ThreadRow row) =>
+        KeyActs.Run(TapWatch.Action(PostKeyActions.File, KeyActs.Local), () => FileCorrespondenceNow(row));
+
+    private void FileCorrespondenceNow(ThreadRow row)
     {
         var now = DateTimeOffset.UtcNow;
         var filed = row.Items;
@@ -1235,7 +1239,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // Bulk-files everything picked, exactly as filing a whole correspondence does for
     // every one of its items: the ghost is kept and the source delete is owed per item,
     // batched into one fold rather than one per item.
-    private void FileSelected()
+    private void FileSelected() =>
+        KeyActs.Run(TapWatch.Action(PostKeyActions.File, KeyActs.Local), () => FileSelectedNow());
+
+    private void FileSelectedNow()
     {
         var picked = new HashSet<string>(openSelection.Items);
         var items = openItems.Where(item => picked.Contains(item.SourceId)).ToList();
@@ -1323,7 +1330,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             ScheduleBulkDelete(items, "Deleted.", null, ReloadThreads);
             return;
         }
-        Filing.File(Host, item, DateTimeOffset.UtcNow);
+        KeyActs.Run(TapWatch.Action(PostKeyActions.File, KeyActs.Local), () => Filing.File(Host, item, DateTimeOffset.UtcNow));
         ReloadThreads();
         DogEar.Show(Host, Overlay, "Filed.", onUndo: () =>
         {
@@ -1341,8 +1348,14 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // closes, each item is deleted at the source through the same per-kind routing
     // (CommitDelete) a single-item delete already uses. onUndo takes back anything else the
     // delete was accompanied by (spam's judgement), before the views refresh.
+    // Every delete the owner makes funnels through here, so this is where the key action is declared.
     private void ScheduleBulkDelete(
-        IReadOnlyList<TimelineItem> items, string message, Action? onUndo, params Action[] refresh)
+        IReadOnlyList<TimelineItem> items, string message, Action? onUndo, params Action[] refresh) =>
+        KeyActs.Run(TapWatch.Action(PostKeyActions.Delete, KeyActs.Local),
+            () => ScheduleBulkDeleteNow(items, message, onUndo, refresh));
+
+    private void ScheduleBulkDeleteNow(
+        IReadOnlyList<TimelineItem> items, string message, Action? onUndo, Action[] refresh)
     {
         var now = DateTimeOffset.Now;
         var window = TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
@@ -1612,7 +1625,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     // Filing one message: the ghost is kept and the source delete is owed. The correspondence
     // screen's unit is the message; the Mailbox's is the whole correspondence.
-    private void FileWithUndo(TimelineItem item)
+    private void FileWithUndo(TimelineItem item) =>
+        KeyActs.Run(TapWatch.Action(PostKeyActions.File, KeyActs.Local), () => FileWithUndoNow(item));
+
+    private void FileWithUndoNow(TimelineItem item)
     {
         Filing.File(Host, item, DateTimeOffset.UtcNow);
         LoadOpenThread();
@@ -1850,14 +1866,16 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 {
                     return;
                 }
+                var sending = TapWatch.Action(PostKeyActions.SendSms, TimeSpan.FromSeconds(60));
                 try
                 {
-                    SmsSender.Send(Host, number, text);
+                    SmsSender.Send(Host, number, text, sending);
                     LoadOpenThread();
                     Syncs.After(Host, PostAction.Sent);
                 }
                 catch (Exception e)
                 {
+                    sending.Failed($"{e.GetType().Name}: {e.Message}");
                     Android.Util.Log.Warn("Post", $"Native SMS send failed: {e}");
                     PostDiagnostics.LogWarning("Sms", "Sending a text failed", e);
                     DogEar.ShowNotices(Host, Overlay,
@@ -1962,13 +1980,16 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // not from this call site.
     private void SendGroupMms(IReadOnlyList<string> recipients, string? text, IReadOnlyList<MmsOutboundPart> media)
     {
+        // An MMS can sit on the network for a minute or more before the platform answers.
+        var sending = TapWatch.Action(PostKeyActions.SendMms, TimeSpan.FromMinutes(3));
         try
         {
-            MmsSender.Send(Host, recipients, text, media);
+            MmsSender.Send(Host, recipients, text, media, sending);
             Syncs.After(Host, PostAction.Sent);
         }
         catch (MmsAttachmentTooLargeException e)
         {
+            sending.Failed("the attachment is too large to send");
             PostDiagnostics.LogWarning("Mms", "Refused an oversized attachment", e);
             DogEar.ShowNotices(Host, Overlay,
             [
@@ -1979,6 +2000,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         catch (Exception e)
         {
+            sending.Failed($"{e.GetType().Name}: {e.Message}");
             Android.Util.Log.Warn("Post", $"Group MMS send failed: {e}");
             PostDiagnostics.LogWarning("Mms", "Sending a group text failed", e);
             DogEar.ShowNotices(Host, Overlay,

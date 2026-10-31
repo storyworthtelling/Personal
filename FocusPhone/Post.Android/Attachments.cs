@@ -49,9 +49,12 @@ internal static class Attachments
 
     private static void Open(Activity host, TimelineItem item, AttachmentRef attachment)
     {
+        var opening = TapWatch.Action(PostKeyActions.OpenAttachment, TimeSpan.FromSeconds(60));
         var plan = AttachmentPlan.For(attachment);
         if (plan == AttachmentAction.Refuse)
         {
+            // A refusal is the attachment working as designed, not a failure of the tap.
+            opening.Succeeded();
             // Said plainly rather than silently doing nothing: a tap that appears to do
             // nothing reads as a broken app, not as a refusal.
             DogEar.SetNotice(host, Overlay(host), NoticeKeys.Attachment, new DogEar.Notice(
@@ -81,10 +84,12 @@ internal static class Attachments
             }
 
             host.StartActivity(intent);
+            opening.Succeeded();
             FieldNotesStore.Record(host, notes => notes.WithAttachmentOpened(opened: true));
         }
         catch (Exception e)
         {
+            opening.Failed($"{e.GetType().Name}: {e.Message}");
             Android.Util.Log.Warn("Post", $"Could not open an attachment: {e}");
             PostDiagnostics.LogWarning("Attachments", $"Could not open {attachment.FileName}", e);
             DogEar.SetNotice(host, Overlay(host), NoticeKeys.Attachment, new DogEar.Notice(

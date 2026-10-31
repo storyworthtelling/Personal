@@ -116,7 +116,9 @@ public class EmailSyncWorker : Worker
             "focusphone-email-sync-once", ExistingWorkPolicy.Replace!, (OneTimeWorkRequest)request);
     }
 
-    public override Result DoWork()
+    public override Result DoWork() => PostDiagnostics.Worker(nameof(EmailSyncWorker), Sync);
+
+    private Result Sync()
     {
         try
         {

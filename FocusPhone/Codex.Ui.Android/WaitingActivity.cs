@@ -72,6 +72,7 @@ public class WaitingActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
 
         // The ordinary screen-open transition every Activity in the suite already uses. There is
         // no page-curl anywhere in the repo, native or MAUI, to match instead (confirmed by grep:
