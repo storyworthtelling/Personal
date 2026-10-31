@@ -31,16 +31,7 @@ public sealed class SecretsVaultAccess
     /// </remarks>
     public SecretsVaultAccess(Func<Task<string>> accessToken, string applicationName)
     {
-        Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
-        {
-            var token = await accessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = applicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory()
-            });
-        };
+        var driveFactory = DriveFactory(accessToken, applicationName);
 
         var store = new DriveSecretsVaultStore(new DriveTextFile(
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
@@ -51,6 +42,22 @@ public sealed class SecretsVaultAccess
                 driveFactory, DrivePersonalVaultStore.FileName, SharedDriveFileIds.Store)),
             () => VaultPassphraseStore.Passphrase);
     }
+
+    /// <summary>
+    /// A fresh, disposable DriveService per call over the head's access token, on the Android HTTP stack —
+    /// the factory shape every Drive seam here takes (the vault, the voice profile, the log folder).
+    /// </summary>
+    public static Func<CancellationToken, Task<DriveService>> DriveFactory(Func<Task<string>> accessToken, string applicationName) =>
+        async _ =>
+        {
+            var token = await accessToken();
+            return new DriveService(new BaseClientService.Initializer
+            {
+                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
+                ApplicationName = applicationName,
+                HttpClientFactory = new AndroidGoogleHttpClientFactory()
+            });
+        };
 
     // Routes the Google API client's HttpClient through AndroidMessageHandler (SELinux blocks the default
     // socket handler in an app process), matching the head's other Google clients.

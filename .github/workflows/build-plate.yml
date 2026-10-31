@@ -12,6 +12,7 @@ on:
       - 'FocusPhone/Codex.Tests/**'
       - 'Storyworthtelling.Updates/**'
       - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Diagnostics/**'
       - '.github/workflows/build-plate.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay

@@ -38,6 +38,7 @@ public class EmailComposeActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         to = Intent?.GetStringExtra(ExtraTo) ?? "";

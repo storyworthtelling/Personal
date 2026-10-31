@@ -109,8 +109,11 @@ public static class PaperUi
         return button;
     }
 
+    // Every PaperUi button's click runs through the tap watch (LOG-LOOP-PLAN.md §4.1): a handler that
+    // throws is logged with the taps before it, and the dead window starts when a slow handler returns.
     private static Button ButtonBase(Context context, string label, Action onClick, Color textColor, Typeface typeface)
     {
+        onClick = TapWatch.Wrap(label, onClick);
         var button = new Button(context)
         {
             Text = label,

@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Domain.Credentials;
 using Android.App;
 using Android.Content;
@@ -171,18 +172,26 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
 
     // Opens the system Google account picker and requests Drive consent, so the vault can
     // be read and written. The picker result returns through OnActivityResult.
+    //
+    // The sign-in is trailed (LOG-LOOP-PLAN.md §4.2): every way it can end is recorded with a reason
+    // sentence, including a picker or consent screen that never answers, which Resume checks for.
     private async Task SignInAsync(TextView status)
     {
+        var signingIn = TapWatch.Action(PostKeyActions.GmailSignIn, TimeSpan.FromMinutes(10));
         try
         {
-            var email = await voiceAccount.SignIn(Host);
+            var email = await voiceAccount.SignIn(Host, SignInFlowKinds.GmailApi, PostDiagnostics.LogSignIn);
             status.Text = $"Signed in as {email}.";
+            signingIn.Succeeded();
         }
         catch (Exception ex)
         {
             status.Text = $"Sign-in didn't complete. {ex.Message}";
+            signingIn.Failed($"{ex.GetType().Name}: {ex.Message}");
         }
     }
+
+    public override void Resume() => VoiceGoogleAccount.CheckPendingSignIn(DateTimeOffset.Now, resumed: true);
 
     private async void PublishGmailToVault()
     {

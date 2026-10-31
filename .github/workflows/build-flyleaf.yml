@@ -9,6 +9,7 @@ on:
       - 'FocusPhone/Score.Android/**'
       - 'FocusPhone/Codex.Ui.Android/**'
       - 'FocusPhone/Codex.Domain/**'
+      - 'Storyworthtelling.Diagnostics/**'
       - 'FocusPhone/Codex.Infrastructure/**'
       - 'FocusPhone/Codex.Tests/**'
       - 'Storyworthtelling.Updates/**'

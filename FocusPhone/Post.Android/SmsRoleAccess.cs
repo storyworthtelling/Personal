@@ -1,3 +1,5 @@
+using Codex.Ui;
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.App.Roles;
 using Android.Content;
@@ -40,16 +42,51 @@ public static class SmsRoleAccess
         var status = Status(host);
         var notice = SmsRole.Decide(status, account.SmsRoleHeldAtLastLaunch);
         account.SmsRoleHeldAtLastLaunch = SmsRole.Remember(status, account.SmsRoleHeldAtLastLaunch);
+
+        // The role on the record (LOG-LOOP-PLAN.md §4.5): once per process, and again whenever it
+        // changes — the check runs on every resume, and a line each time would bury the log.
+        if (loggedStatus != status)
+        {
+            loggedStatus = status;
+            PostDiagnostics.LogInfo("SmsRole", PostLogLines.SmsRole(status, notice));
+        }
+
+        // A request the owner made is answered by what the platform says now.
+        if (Interlocked.Exchange(ref pendingRequest, null) is { } request)
+        {
+            if (status == SmsRoleStatus.Held)
+            {
+                request.Succeeded();
+            }
+            else
+            {
+                request.Failed($"the role is still {status} after the request");
+            }
+        }
         return notice;
     }
 
+    private static SmsRoleStatus? loggedStatus;
+    private static KeyAction? pendingRequest;
+
     public static void Request(Activity host)
     {
+        var action = TapWatch.Action(PostKeyActions.RequestSmsRole, TimeSpan.FromMinutes(5));
         var roles = (RoleManager?)host.GetSystemService(Context.RoleService);
         if (roles is null || !roles.IsRoleAvailable(RoleManager.RoleSms!))
         {
+            action.Failed("this device does not offer the SMS role");
             return;
         }
-        host.StartActivityForResult(roles.CreateRequestRoleIntent(RoleManager.RoleSms!), RequestCode);
+        try
+        {
+            host.StartActivityForResult(roles.CreateRequestRoleIntent(RoleManager.RoleSms!), RequestCode);
+            pendingRequest = action;
+        }
+        catch (Exception e)
+        {
+            action.Failed($"the role request would not open: {e.GetType().Name}");
+            PostDiagnostics.LogWarning("SmsRole", "The SMS role request would not open", e);
+        }
     }
 }

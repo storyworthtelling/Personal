@@ -35,7 +35,8 @@ public class NativeTextAttachTests
     {
         var body = MethodBody("ShowNativeCompose");
 
-        Assert.Contains("SmsSender.Send(Host, number, text)", body);
+        // The fourth argument is the send's key action (LOG-LOOP-PLAN.md §4.1), which reports the radio's result.
+        Assert.Contains("SmsSender.Send(Host, number, text, sending)", body);
     }
 
     [Fact]

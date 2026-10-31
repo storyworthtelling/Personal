@@ -29,8 +29,31 @@ internal static class MmsSender
 
     internal const string ExtraFile = "com.storyworthtelling.focusphone.communication.extra.MMS_SENT_FILE";
 
+    // A send's key action by transaction id until the platform answers; in memory only, like SmsSender's.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Codex.Domain.Diagnostics.KeyAction> Pending = new();
+
+    internal const string ExtraTransaction = "com.storyworthtelling.focusphone.communication.extra.MMS_SENT_TRANSACTION";
+
+    /// <summary>The platform answered a send: report it to the key action that started it, if still here.</summary>
+    internal static void Answered(string? transactionId, int resultCode)
+    {
+        if (transactionId is null || !Pending.TryRemove(transactionId, out var action))
+        {
+            return;
+        }
+        if (resultCode == PostLogLines.ResultOk)
+        {
+            action.Succeeded();
+        }
+        else
+        {
+            action.Failed(PostLogLines.MmsSent(resultCode));
+        }
+    }
+
     public static void Send(
-        Context context, IReadOnlyList<string> recipients, string? text, IReadOnlyList<MmsOutboundPart> media)
+        Context context, IReadOnlyList<string> recipients, string? text, IReadOnlyList<MmsOutboundPart> media,
+        Codex.Domain.Diagnostics.KeyAction action)
     {
         var manager = SmsManager.Default
             ?? throw new InvalidOperationException("This device has no SMS manager.");
@@ -56,7 +79,9 @@ internal static class MmsSender
         // platform, and its Path is "/mms-outbox/…", not somewhere on disk.
         var completed = new Intent(context, typeof(MmsSendReceiver))
             .SetData(uri)
-            .PutExtra(ExtraFile, file.AbsolutePath);
+            .PutExtra(ExtraFile, file.AbsolutePath)
+            .PutExtra(ExtraTransaction, transactionId);
+        Pending[transactionId] = action;
         var pending = PendingIntent.GetBroadcast(
             context, transactionId.GetHashCode(), completed,
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
@@ -88,9 +113,15 @@ public class MmsSendReceiver : BroadcastReceiver
         var path = intent?.GetStringExtra(MmsSender.ExtraFile);
         try
         {
+            var code = (int)ResultCode;
+            MmsSender.Answered(intent?.GetStringExtra(MmsSender.ExtraTransaction), code);
+            if (ResultCode == Result.Ok)
+            {
+                PostDiagnostics.LogInfo("Mms", PostLogLines.MmsSent(code));
+            }
             if (ResultCode != Result.Ok)
             {
-                PostDiagnostics.LogWarning("Mms", $"MMS send did not complete (result {ResultCode}).");
+                PostDiagnostics.LogWarning("Mms", PostLogLines.MmsSent(code));
                 PendingMmsSendFailureStore.MarkFailed(context);
                 return;
             }

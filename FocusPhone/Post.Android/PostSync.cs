@@ -55,6 +55,7 @@ public static class PostSync
 
         var account = new AccountStore(context);
         var route = MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured);
+        LogRouteIfChanged(context, route);
         if (route == MailTransport.None)
         {
             return;
@@ -157,6 +158,7 @@ public static class PostSync
                 else
                 {
                     tombstones.AttemptFailed(sourceId, DateTimeOffset.UtcNow);
+                    LogIfStillFailing(tombstones, sourceId);
                 }
             }
             catch (Exception e)
@@ -164,11 +166,37 @@ public static class PostSync
                 tombstones.AttemptFailed(sourceId, DateTimeOffset.UtcNow);
                 Android.Util.Log.Warn("Post", $"Owed delete of {sourceId} failed: {e}");
                 PostDiagnostics.LogWarning("Filing", $"Owed delete of {sourceId} failed", e);
+                LogIfStillFailing(tombstones, sourceId);
             }
         }
 
         database.Filing.SaveTombstones(tombstones);
     }
+
+    // A filing delete that keeps failing (LOG-LOOP-PLAN.md §4.5), at the fold's own threshold and then
+    // every tenth try, so the half-hourly retry does not bury the log.
+    private static void LogIfStillFailing(Tombstones tombstones, string sourceId)
+    {
+        if (PostLogLines.OwedDeleteFailing(tombstones.FailedAttempts(sourceId)) is { } line)
+        {
+            PostDiagnostics.LogWarning("Filing", $"{line} ({sourceId})");
+        }
+    }
+
+    // The route mail takes (LOG-LOOP-PLAN.md §4.5), logged when it changes rather than on every sync.
+    private static void LogRouteIfChanged(Context context, MailTransport route)
+    {
+        var preferences = context.GetSharedPreferences(SyncPreferences, FileCreationMode.Private)!;
+        var last = preferences.GetString(LoggedRouteKey, null);
+        if (last == route.ToString())
+        {
+            return;
+        }
+        preferences.Edit()!.PutString(LoggedRouteKey, route.ToString())!.Apply();
+        PostDiagnostics.LogInfo("Mail", PostLogLines.MailRoute(route));
+    }
+
+    private const string LoggedRouteKey = "loggedMailRoute";
 
     private static async Task<bool> DeleteAtSourceAsync(
         Context context, AccountStore account, MailTransport route, TimelineItem item)
