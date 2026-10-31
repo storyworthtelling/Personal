@@ -91,6 +91,23 @@ public class SignInTrailTests
     }
 
     [Fact]
+    public void AResumeAfterSomethingCameBackIsNotNoReturn()
+    {
+        // The account picker answered before the app resumed; the consent step is still under way.
+        var trail = Gmail().LeftApp(T0.AddSeconds(1)).AccountChosen(T0.AddSeconds(5));
+
+        Assert.False(trail.CheckNoReturn(T0.AddSeconds(6), resumed: true).IsFinished);
+    }
+
+    [Fact]
+    public void AResumeWithOnlyFlyleafsHopSinceLeavingIsStillNoReturn()
+    {
+        var trail = Gmail().LeftApp(T0.AddSeconds(1)).Hop(T0.AddSeconds(10), "com.example.app", null);
+
+        Assert.True(trail.CheckNoReturn(T0.AddSeconds(30), resumed: true).IsFinished);
+    }
+
+    [Fact]
     public void TenMinutesWithNothingIsNoReturnAndLessIsStillWaiting()
     {
         var trail = Gmail().LeftApp(T0.AddSeconds(1));

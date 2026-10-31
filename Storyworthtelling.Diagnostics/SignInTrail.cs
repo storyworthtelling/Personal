@@ -166,8 +166,12 @@ public sealed partial class SignInTrail
         {
             return With(now, SignInStepKind.NoReturn, "timed out after 10 minutes", "timeout");
         }
-        var leftAt = Steps.LastOrDefault(s => s.Kind == SignInStepKind.LeftApp)?.At;
-        if (resumed && leftAt is not null && !Steps.Any(s => s.Kind == SignInStepKind.Returned))
+        // A resume is a no-return only if nothing but Flyleaf's hop has happened since the app was left:
+        // once an account picker or a redirect has answered, the app resuming is the flow going on.
+        var leftIndex = Steps.ToList().FindLastIndex(s => s.Kind == SignInStepKind.LeftApp);
+        var leftAt = leftIndex < 0 ? (DateTimeOffset?)null : Steps[leftIndex].At;
+        var nothingSince = leftIndex >= 0 && Steps.Skip(leftIndex + 1).All(s => s.Kind == SignInStepKind.Hop);
+        if (resumed && leftAt is not null && nothingSince)
         {
             return With(now, SignInStepKind.NoReturn,
                 string.Create(CultureInfo.InvariantCulture, $"resumed after {(int)(now - leftAt.Value).TotalSeconds} s with no redirect"),

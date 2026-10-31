@@ -26,6 +26,7 @@ public class CrashViewerActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         detail = Intent?.GetStringExtra(CrashReporter.ExtraCrashText) ?? detail;

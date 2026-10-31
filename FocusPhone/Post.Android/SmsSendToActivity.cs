@@ -1,6 +1,7 @@
 using Android.App;
 using Android.Content;
 using Android.OS;
+using Codex.Ui;
 
 namespace Post;
 
@@ -27,6 +28,7 @@ public class SmsSendToActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
 
         var number = Intent?.Data?.SchemeSpecificPart;
         if (!string.IsNullOrWhiteSpace(number))
