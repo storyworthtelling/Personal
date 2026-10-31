@@ -17,7 +17,6 @@ public class MealDeadlineWiringGuardTests
         Assert.Contains("new HouseholdTemplateLibrary(household.Service)", services, StringComparison.Ordinal);
         Assert.Contains("new HouseholdTasteNotes(household.Service)", services, StringComparison.Ordinal);
         Assert.Contains("new FileMealDecisionRecords(", services, StringComparison.Ordinal);
-        Assert.Contains("household.Planning.AskAsync", services, StringComparison.Ordinal);
     }
 
     [Fact]

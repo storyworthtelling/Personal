@@ -80,7 +80,9 @@ public static class MealDeadlineStep
         var standing = await seams.Lease(cancellation);
         if (!standing.MayPlan)
         {
-            return new MealDeadlineOutcome.NotThePlanner(standing.Sentence);
+            return standing.Waiting
+                ? Stop(MealDeadlineStoppedBecause.PlanningNotReady, standing.Sentence)
+                : new MealDeadlineOutcome.NotThePlanner(standing.Sentence);
         }
 
         MealDecisionRecord decided;

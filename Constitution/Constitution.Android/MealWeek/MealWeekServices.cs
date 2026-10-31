@@ -240,7 +240,7 @@ public static class MealWeekServices
         var log = new BodyMealLog(new BodyLog(appContext));
         var documents = AssembleDocuments(appContext);
         return new MealWeekSeams(
-            household.Planning.AskAsync,
+            household.Planning.OpenTheWeekAsync,
             new HouseholdRecipeBox(household.Service),
             new MealHistoryStore(Path.Combine(folder, HistoryFile)),
             new TasteFromHousehold(household.Service),
@@ -303,7 +303,7 @@ public static class MealWeekServices
         var folder = FolderOf(appContext);
         var calendar = WorkoutWeekCalendarSeams.Create(appContext, KeyFamily.HouseholdMeal);
         return new MealDeadlineSeams(
-            household.Planning.AskAsync,
+            household.Planning.OpenTheWeekAsync,
             new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
             DecisionRecords(appContext),
             new HouseholdMealAnswers(household.Service),

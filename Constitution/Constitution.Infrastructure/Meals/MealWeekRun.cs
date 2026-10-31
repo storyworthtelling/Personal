@@ -67,7 +67,7 @@ public static class MealWeekRun
         var standing = await seams.Lease(cancellation);
         if (!standing.MayPlan)
         {
-            return Stop(seams, MealNotPlannedBecause.NotThePlanner, standing.Sentence);
+            return Stop(seams, standing.Waiting ? MealNotPlannedBecause.PlanningNotReady : MealNotPlannedBecause.NotThePlanner, standing.Sentence);
         }
 
         var rules = inputs.Rules;

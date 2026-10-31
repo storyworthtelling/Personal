@@ -50,6 +50,8 @@ public static class MealWeekTrail
         {
             case MealNotPlannedBecause.NotThePlanner:
                 return "meal week not planned, not the planner this week";
+            case MealNotPlannedBecause.PlanningNotReady:
+                return "meal week not planned, planning not ready yet";
             case MealNotPlannedBecause.NoOneToPlan:
                 return "meal week not planned, no one to plan";
             case MealNotPlannedBecause.NotConfigured:
