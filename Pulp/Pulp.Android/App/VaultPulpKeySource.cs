@@ -30,9 +30,8 @@ public sealed class VaultPulpKeySource : IPulpKeySource
 
     /// <summary>
     /// Whether this phone's account owns the household file or has it shared to it, read off the
-    /// vault's owner (<see cref="VaultOwnership"/>) on each refresh — the same "the owner is whoever
-    /// uses it first" rule the vault keeps, so the two never disagree about whose Drive holds the
-    /// household. <see cref="HouseholdFileRole.Unknown"/> until a refresh reads the vault, which
+    /// vault file's Drive ownership (<see cref="VaultOwnership"/>) on each refresh — the same rule
+    /// the vault keeps, so the two never disagree about whose Drive holds the household. <see cref="HouseholdFileRole.Unknown"/> until a refresh reads the vault, which
     /// creates nothing.
     /// </summary>
     public HouseholdFileRole HouseholdRole => (HouseholdFileRole)Volatile.Read(ref householdRole);
@@ -57,7 +56,7 @@ public sealed class VaultPulpKeySource : IPulpKeySource
 
             SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
             Volatile.Write(ref keys, result.Vault.Pulp);
-            Volatile.Write(ref householdRole, (int)RoleOf(VaultOwnership.Decide(VoiceGoogleAccount.Email, result.Vault)));
+            Volatile.Write(ref householdRole, (int)RoleOf(VaultOwnership.Decide(result.FileOwnership)));
         }
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
