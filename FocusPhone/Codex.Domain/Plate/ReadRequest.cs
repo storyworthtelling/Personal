@@ -1,3 +1,6 @@
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using Codex.Domain.Policy;
 using Codex.Domain.Post;
 
 namespace Codex.Domain.Plate;
@@ -21,6 +24,31 @@ public static class ReadRequest
 {
     public const string ReadCard = "com.storyworthtelling.plate.action.READ_CARD";
     public const string ReadStatement = "com.storyworthtelling.plate.action.READ_STATEMENT";
+
+    // The recipe read (PBI C-11.2.1). Constitution holds these same words as literals of its own
+    // (Recipes/RecipeReadContract) and a guard there reads this file by content, so neither side can
+    // move without a test failing. The package comes from PolicyContext.PlatePackage, the one place the
+    // frozen id is allowed to be spelled (FrozenInvariantsTests); the guards resolve the same expression.
+
+    /// <summary>Read a recipe card over 1-N pages and return its words. Answered only by <see cref="RecipeActivity"/>.</summary>
+    public const string ReadRecipe = "com.storyworthtelling.plate.action.READ_RECIPE";
+
+    /// <summary>
+    /// The component the caller names. It is its own activity, behind <see cref="RecipePermission"/>, because the
+    /// camera filters on the errand activity must stay open to every app and a permission cannot be set per filter.
+    /// </summary>
+    public const string RecipeActivity = PolicyContext.PlatePackage + ".RecipeReadActivity";
+
+    /// <summary>The signature-level permission the caller must hold. Free: every head already shares one keystore.</summary>
+    public const string RecipePermission = PolicyContext.PlatePackage + ".READ_RECIPE";
+
+    public const string TitleExtra = "title";
+
+    /// <summary>The ingredient lines as a JSON array of strings, in card order.</summary>
+    public const string IngredientsExtra = "ingredients";
+
+    /// <summary>The step lines as a JSON array of strings, numbering removed, in card order.</summary>
+    public const string StepsExtra = "steps";
 
     public const string NameExtra = "name";
     public const string PhoneExtra = "phone";
@@ -54,6 +82,32 @@ public static class ReadRequest
     /// </summary>
     public static IReadOnlyDictionary<string, string>? StatementExtras(MoneyFacts facts) =>
         IndexHandoff.PayloadFor(facts, senderName: null) is { } payload ? IndexHandoff.Extras(payload) : null;
+
+    private static readonly JsonSerializerOptions WordsOnTheWire = new()
+    {
+        // A half stays a half in the text rather than becoming an escape; either reads back the same.
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <summary>
+    /// A recipe as plain strings and nothing else: a title, and the ingredient and step lines each as a JSON array of
+    /// strings. <b>No image, no file and no URI ever crosses</b> — the photograph is not kept by Plate and does not
+    /// leave it. An empty title is left out rather than sent blank. Null when there is neither an ingredient nor a step:
+    /// a title alone is not a recipe, and sending one would only give the owner something to throw away.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string>? RecipeExtras(RecipeReading reading)
+    {
+        if (reading.Ingredients.Count == 0 && reading.Steps.Count == 0)
+        {
+            return null;
+        }
+
+        var extras = new Dictionary<string, string>(StringComparer.Ordinal);
+        Add(extras, TitleExtra, reading.Title);
+        extras[IngredientsExtra] = JsonSerializer.Serialize(reading.Ingredients, WordsOnTheWire);
+        extras[StepsExtra] = JsonSerializer.Serialize(reading.Steps, WordsOnTheWire);
+        return extras;
+    }
 
     private static void Add(Dictionary<string, string> extras, string key, string value)
     {

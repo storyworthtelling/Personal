@@ -10,6 +10,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Pulp.Domain\Pulp.Domain.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Household\Storyworthtelling.Household.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Storyworthtelling.Household" />
   </ItemGroup>
 </Project>

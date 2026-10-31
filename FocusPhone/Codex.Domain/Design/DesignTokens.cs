@@ -204,6 +204,45 @@ public static class DesignTokens
             public const string Deep = "#493113";
             public const string Cloth = "#F7AC4D";
         }
+
+        /// <summary>
+        /// Constitution — cerulean, OKLCH 230 degrees, taken from the binding cloth (Post's
+        /// route) because the poster cover's own sky has no usable hue. 230 is the centre of one
+        /// of the two windows left on the wheel that clear every role and every sibling by 20
+        /// degrees, so no departure is recorded. The binding is the LIGHT ground tier with the
+        /// rule, flourishes and title in ink (Score's and Pulp's construction), so Cloth is the
+        /// Ground. Held identical to Tools/IconStudio/Tokens.cs and
+        /// Storyworthtelling.Paper/AppIdentityTokens.cs by TokenParityTests.
+        /// </summary>
+        public static class Constitution
+        {
+            public const string Fill = "#A4C1D0";
+            public const string Ground = "#82ACC1";
+            public const string Mark = "#1B6A89";
+            public const string Text = "#15546E";
+            public const string Deep = "#143B4C";
+            public const string Cloth = "#82ACC1";
+        }
+    }
+
+    // ---- Binder-tab cloths for apps that choose theirs by colour (DESIGN.md §9, D84) ----
+    /// <summary>
+    /// Per-area binder-tab cloths for an app whose owner chose them by colour rather than from
+    /// the semantic roles. Each inactive tab is cut from a deep cloth with paper lettering (D45);
+    /// the cloths may share a hue with each other or with a role (D84), because a tab is a divider,
+    /// not a state. Today is the app's identity (its Deep tier) and Settings is the neutral grey.
+    /// </summary>
+    public static class AreaCloths
+    {
+        /// <summary>Constitution's five tabs (book p.11, strip B; D40, D45).</summary>
+        public static class Constitution
+        {
+            public const string Today = "#143B4C";
+            public const string Workouts = "#9E434B";
+            public const string Meals = "#383E44";
+            public const string Body = "#38734A";
+            public const string Settings = "#C0BDB9";
+        }
     }
 
     /// <summary>

@@ -60,6 +60,17 @@ public sealed record SecretsVault
     [JsonPropertyName("Pulp")]
     public PulpSecrets Pulp { get; init; } = new();
 
+    // Constitution's one shared fact: the household's Sleep Number login. One bed account serves both
+    // adults, so it is a household fact and lives here. Per-install facts (Health Connect choices, the
+    // work schedule) are NOT here — restored from the first phone onto the second they would be
+    // Foreword Release I's bug again — they belong in PersonalVault.
+    //
+    // The WIRE KEY is "Constitution" and is frozen, pinned with [JsonPropertyName] for the same reason
+    // as Foreword's and Pulp's sections above: with no naming policy a property name is the key written
+    // to Drive, so a rename would load every existing vault's section as empty, silently.
+    [JsonPropertyName("Constitution")]
+    public ConstitutionSecrets Constitution { get; init; } = new();
+
     // Stable Drive file ids for the suite's well-known JSON files (voice profile/config, this vault, taste
     // profile, audio library), keyed by file name. Lets those files be MOVED in Drive without breaking the
     // apps (thread #13): the app resolves by remembered id first, falling back to a name search. Cross-app,
@@ -120,6 +131,20 @@ public sealed record PersonalVault
     public string CalendarMappingJson { get; init; } = string.Empty;
 
     public string WorkScheduleJson { get; init; } = string.Empty;
+
+    // Constitution's Health Connect choices: which signals this person agreed to share with the app.
+    // A per-install fact, so it is here and never in the shared vault — restored from the first phone
+    // onto the second it would hand one adult's choices to the other. Stored as the same JSON the app
+    // keeps on the phone, so restoring is a copy. The WIRE KEY is this property's name, with no naming
+    // policy, so it is frozen from the day it is first written.
+    public string HealthConnectChoicesJson { get; init; } = string.Empty;
+
+    // Constitution's bed side: which side of the household's Sleep Number bed is this person's, as the
+    // word "left" or "right", or "none" when they chose the bed is not theirs to read. Empty means never
+    // chosen. The household shares one bed login, so the side is the one fact that must differ between
+    // the two installs: here it is per person, and never in the shared vault. The WIRE KEY is this
+    // property's name, with no naming policy, so it is frozen from the day it is first written.
+    public string SleeperSide { get; init; } = string.Empty;
 
     public static PersonalVault Empty { get; } = new();
 }
@@ -191,3 +216,9 @@ public sealed record PulpSecrets(
     string StreamingAvailabilityKey = "",
     string OmdbKey = "",
     string YouTubeKey = "");
+
+// Constitution's household Sleep Number login: the account's sign-in name (an email address) and its
+// password. Written to Drive under the key "Constitution", with these two inner names exactly — see above.
+public sealed record ConstitutionSecrets(
+    string SleepNumberLogin = "",
+    string SleepNumberPassword = "");

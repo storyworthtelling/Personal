@@ -33,6 +33,12 @@ public class AppIdentityParityTests
     [InlineData("PulpTextHex", AppIdentityTokens.PulpTextHex)]
     [InlineData("PulpDeepHex", AppIdentityTokens.PulpDeepHex)]
     [InlineData("PulpClothHex", AppIdentityTokens.PulpClothHex)]
+    [InlineData("ConstitutionFillHex", AppIdentityTokens.ConstitutionFillHex)]
+    [InlineData("ConstitutionGroundHex", AppIdentityTokens.ConstitutionGroundHex)]
+    [InlineData("ConstitutionMarkHex", AppIdentityTokens.ConstitutionMarkHex)]
+    [InlineData("ConstitutionTextHex", AppIdentityTokens.ConstitutionTextHex)]
+    [InlineData("ConstitutionDeepHex", AppIdentityTokens.ConstitutionDeepHex)]
+    [InlineData("ConstitutionClothHex", AppIdentityTokens.ConstitutionClothHex)]
     public void TheValueMatchesIconStudio(string constant, string here)
     {
         var source = File.ReadAllText(Path.Combine(RepoRoot(), "Tools", "IconStudio", "Tokens.cs"));

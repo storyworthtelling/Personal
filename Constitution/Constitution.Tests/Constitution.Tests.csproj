@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Domain + Infrastructure + guards. Deliberately NOT the Android head: the guards read the
+       head's files by content, so the suite runs on a machine with no Android workload. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Constitution.Domain\Constitution.Domain.csproj" />
+    <ProjectReference Include="..\Constitution.Infrastructure\Constitution.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <!-- PdfPig reads a rendered document back (the same version Folio, Index, Foreword and Paper's tests use);
+         the native Skia asset is what lets the desktop test build draw a PDF at all. -->
+    <PackageReference Include="PdfPig" Version="0.1.10" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Pure head files with no Android type, compiled in so the real classes are exercised. -->
+  <ItemGroup>
+    <Compile Include="..\Constitution.Android\ReadBack\ReadBackPaths.cs" Link="Linked\ReadBackPaths.cs" />
+    <Compile Include="..\Constitution.Android\WorkoutWeek\WorkoutWeekPaths.cs" Link="Linked\WorkoutWeekPaths.cs" />
+    <Compile Include="..\Constitution.Android\WorkoutWeek\DeliverySeamAdapters.cs" Link="Linked\DeliverySeamAdapters.cs" />
+    <Compile Include="..\Constitution.Android\Settings\ConnectionNoticeBoard.cs" Link="Linked\ConnectionNoticeBoard.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

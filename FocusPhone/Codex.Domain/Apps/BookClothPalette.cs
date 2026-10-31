@@ -71,6 +71,9 @@ public static class BookClothPalette
             // Pulp: the amber cloth, the one place its bright identity lives. Light, so the marks
             // invert to ink, as Score's and Plate's do.
             [PolicyContext.PulpPackage] = DesignTokens.Identity.Pulp.Cloth,
+
+            // Constitution: its registered light cerulean binding cloth (the Ground tier), marks in ink.
+            [PolicyContext.ConstitutionPackage] = DesignTokens.Identity.Constitution.Cloth,
         };
 
     /// <summary>Whether the package was given a binding, rather than falling through to the hash.</summary>

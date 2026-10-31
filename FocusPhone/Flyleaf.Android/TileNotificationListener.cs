@@ -1,6 +1,7 @@
 using Android.Service.Notification;
 using Android.App;
 using Android.Content;
+using Codex.Domain.Apps;
 using Codex.Domain.Calls;
 
 namespace Flyleaf;
@@ -28,6 +29,13 @@ public class TileNotificationListener : NotificationListenerService
     /// serialized map so this stays as plain an Intent extra as the packages list already was.
     /// </summary>
     public const string ExtraPriorities = "priorities";
+
+    /// <summary>
+    /// Parallel to <see cref="ExtraPackages"/> — the role word a package's notifications carried
+    /// (<see cref="NotificationBookmark.RoleExtraKey"/>), or "" for none. Words only, never a count
+    /// (P13 C-10.2.2).
+    /// </summary>
+    public const string ExtraRoles = "roles";
 
     public override void OnListenerConnected()
     {
@@ -98,6 +106,7 @@ public class TileNotificationListener : NotificationListenerService
         // Highest urgency wins per package (a quiet download-progress notification shouldn't
         // mute a genuinely urgent one from the same app).
         var highest = new Dictionary<string, int>();
+        var roleWords = new Dictionary<string, List<string?>>();
         foreach (var sbn in active)
         {
             var package = sbn.PackageName;
@@ -106,6 +115,11 @@ public class TileNotificationListener : NotificationListenerService
                 continue;
             }
             var urgency = Urgency(sbn.Notification);
+            if (!roleWords.TryGetValue(package, out var words))
+            {
+                roleWords[package] = words = [];
+            }
+            words.Add(sbn.Notification?.Extras?.GetString(NotificationBookmark.RoleExtraKey));
             if (!highest.TryGetValue(package, out var current) || urgency > current)
             {
                 highest[package] = urgency;
@@ -115,10 +129,13 @@ public class TileNotificationListener : NotificationListenerService
         var packages = highest.Keys.ToArray();
         var priorities = packages.Select(package => highest[package]).ToArray();
 
+        var roles = packages.Select(package => NotificationBookmark.Strongest(package, roleWords[package]) ?? "").ToArray();
+
         var intent = new Intent(ActionNotificationsChanged);
         intent.SetPackage(PackageName);
         intent.PutExtra(ExtraPackages, packages);
         intent.PutExtra(ExtraPriorities, priorities);
+        intent.PutExtra(ExtraRoles, roles);
         SendBroadcast(intent);
     }
 

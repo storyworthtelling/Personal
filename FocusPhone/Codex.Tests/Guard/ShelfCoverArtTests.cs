@@ -36,6 +36,7 @@ public class ShelfCoverArtTests
         (PolicyContext.IndexPackage, "Index"),
         (PolicyContext.FolioPackage, "Folio"),
         (PolicyContext.PulpPackage, "Pulp"),
+        (PolicyContext.ConstitutionPackage, "Constitution"),
     ];
 
     /// <summary>
@@ -128,6 +129,7 @@ public class ShelfCoverArtTests
             _ when package == PolicyContext.IndexPackage => "IndexPackage",
             _ when package == PolicyContext.FolioPackage => "FolioPackage",
             _ when package == PolicyContext.PulpPackage => "PulpPackage",
+            _ when package == PolicyContext.ConstitutionPackage => "ConstitutionPackage",
             _ => null,
         };
 

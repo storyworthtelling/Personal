@@ -217,6 +217,32 @@ public class BookClothPaletteTests
         Assert.True(BookClothPalette.MarksInvertToInk(cloth));
     }
 
+    // Pins the thin margin (D12): Constitution's cerulean cloth has Rec. 601 luma 0.635 against
+    // the 0.6 threshold, so a small change to either the cloth or the formula flips the shelf's
+    // rule and title from ink to cream on a light cloth. The decision is made from the hex, as
+    // for every light binding; the cloth is the ladder's own Ground.
+    [Fact]
+    public void ConstitutionClothInvertsToInk()
+    {
+        var cloth = DesignTokens.Identity.Constitution.Cloth;
+
+        Assert.Equal(DesignTokens.Identity.Constitution.Ground, cloth);
+        Assert.True(BookClothPalette.MarksInvertToInk(cloth));
+
+        var (r, g, b) = Codex.Tests.Design.DesignTestHelpers.ParseHex(cloth);
+        var luma = ((0.299 * r) + (0.587 * g) + (0.114 * b)) / 255.0;
+        Assert.InRange(luma, 0.63, 0.64);
+    }
+
+    [Fact]
+    public void ConstitutionBindsItsCloth()
+    {
+        Assert.True(BookClothPalette.HasChosenBinding(PolicyContext.ConstitutionPackage));
+        Assert.Equal(
+            DesignTokens.Identity.Constitution.Cloth,
+            BookClothPalette.ForPackage(PolicyContext.ConstitutionPackage));
+    }
+
     private static IEnumerable<string> SuitePackagesNamedInPolicy() =>
         typeof(PolicyContext)
             .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)

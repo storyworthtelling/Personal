@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.storyworthtelling.constitution">
+  <application>
+    <!-- Health Connect on Android 14+ finds the permissions-rationale page through this alias:
+         VIEW_PERMISSION_USAGE with the HEALTH_PERMISSIONS category. Without it the permission
+         request opens nothing (C-7.1.1, TF 1.3). No .NET attribute expresses an activity-alias, so
+         it is written here; the activity it targets, and the legacy ACTION_SHOW_PERMISSIONS_RATIONALE
+         filter, come from HealthRationaleActivity's attributes. START_VIEW_PERMISSION_USAGE is held
+         by the system only, so no ordinary app can start the alias. The two names are frozen
+         (ConstitutionIdentity) and HealthManifestTests checks this file against them. -->
+    <activity-alias
+        android:name="com.storyworthtelling.constitution.ViewPermissionUsageActivity"
+        android:exported="true"
+        android:targetActivity="com.storyworthtelling.constitution.HealthRationaleActivity"
+        android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+        <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+      </intent-filter>
+    </activity-alias>
+  </application>
+</manifest>

@@ -22,11 +22,17 @@
   <ItemGroup>
     <ProjectReference Include="..\Pulp.Domain\Pulp.Domain.csproj" />
     <ProjectReference Include="..\Pulp.Infrastructure\Pulp.Infrastructure.csproj" />
+    <!-- The household engine (clock, records, merge, stores, sync loop) shared with Constitution. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Household\Storyworthtelling.Household.csproj" />
     <ProjectReference Include="..\..\FocusPhone\Codex.Domain\Codex.Domain.csproj" />
     <!-- The Paper & Ink theme, PaperUi factories and the eight shared fonts. -->
     <ProjectReference Include="..\..\FocusPhone\Codex.Ui.Android\Codex.Ui.Android.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <!-- The update channel's shared decisions: which APKs this app installs on the phone it wakes on. -->
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Storyworthtelling.Household" />
   </ItemGroup>
 </Project>

@@ -203,6 +203,50 @@ public class DesignTokensTests
         Assert.Equal(domain, declared.Groups[1].Value, ignoreCase: true);
     }
 
+    // Constitution's identity ladder: cerulean, OKLCH 230 degrees, taken from the binding cloth
+    // (D10). Pinned as literals because the hue is a decision: the centre of one of the two
+    // windows left that clear every role and every sibling by 20 degrees.
+    [Fact]
+    public void ConstitutionIdentityIsTheApprovedLadder()
+    {
+        Assert.Equal("#A4C1D0", DesignTokens.Identity.Constitution.Fill);
+        Assert.Equal("#82ACC1", DesignTokens.Identity.Constitution.Ground);
+        Assert.Equal("#1B6A89", DesignTokens.Identity.Constitution.Mark);
+        Assert.Equal("#15546E", DesignTokens.Identity.Constitution.Text);
+        Assert.Equal("#143B4C", DesignTokens.Identity.Constitution.Deep);
+        Assert.Equal("#82ACC1", DesignTokens.Identity.Constitution.Cloth);
+    }
+
+    // Constitution's tab cloths, as the owner approved them on book p.11 strip B (D40, D45).
+    // Pinned as literals because they are a decision. Meals' steel is registered nowhere else.
+    [Fact]
+    public void ConstitutionAreaClothsAreTheApprovedStripB()
+    {
+        Assert.Equal("#143B4C", DesignTokens.AreaCloths.Constitution.Today);
+        Assert.Equal("#9E434B", DesignTokens.AreaCloths.Constitution.Workouts);
+        Assert.Equal("#383E44", DesignTokens.AreaCloths.Constitution.Meals);
+        Assert.Equal("#38734A", DesignTokens.AreaCloths.Constitution.Body);
+        Assert.Equal("#C0BDB9", DesignTokens.AreaCloths.Constitution.Settings);
+    }
+
+    [Theory]
+    [InlineData("#1B6A89", 3.0)]  // marks and UI, incl. the lit binder tab
+    [InlineData("#15546E", 4.5)]  // identity-colored text at any size
+    [InlineData("#143B4C", 7.0)]  // the deep tier, body-text safe
+    public void ConstitutionIdentityTextTiersClearContrastOnPaper(string tier, double minimum)
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(tier, DesignTokens.Paper);
+        Assert.True(ratio >= minimum, $"{tier} on Paper is {ratio:F2}:1, below {minimum}:1");
+    }
+
+    // Light binding, like Score, Plate and Pulp: rule, flourishes and title are ink on the cloth.
+    [Fact]
+    public void ConstitutionInkFramingClearsContrastOnItsLightBinding()
+    {
+        var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, DesignTokens.Identity.Constitution.Cloth);
+        Assert.True(ratio >= 4.5, $"Ink on Constitution's cerulean cloth is {ratio:F2}:1, below AA.");
+    }
+
     // Foreword's and Folio's shelf bindings (D277) are copies of values registered elsewhere —
     // Foreword's sunrise in the printed-page identity tokens, Folio's cloth in IconStudio — and a
     // copy is only as good as the guard that holds it to its source.
@@ -245,6 +289,8 @@ public class DesignTokensTests
     [InlineData("Plate", "#613F62")] [InlineData("Plate", "#442D44")]
     [InlineData("Pulp", "#CCB8A2")] [InlineData("Pulp", "#BCA080")] [InlineData("Pulp", "#835618")]
     [InlineData("Pulp", "#684414")] [InlineData("Pulp", "#493113")]
+    [InlineData("Constitution", "#A4C1D0")] [InlineData("Constitution", "#82ACC1")] [InlineData("Constitution", "#1B6A89")]
+    [InlineData("Constitution", "#15546E")] [InlineData("Constitution", "#143B4C")]
     public void IdentityTiersStayClearOfEverySemanticRole(string app, string identityTier)
     {
         var (_, _, hue) = Oklch.FromHex(identityTier);
@@ -312,6 +358,7 @@ public class DesignTokensTests
     [InlineData("#D0BB91")] [InlineData("#E8ACAD")] [InlineData("#9BC7CD")]   // the seven roles
     [InlineData("#AFC0BC")] [InlineData("#B9B9D4")]                            // Score, Post
     [InlineData("#CCB8A2")]                                                    // Pulp
+    [InlineData("#A4C1D0")]                                                    // Constitution
     public void InkIsLegibleOnEveryBinderTabCloth(string cloth)
     {
         var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, cloth);

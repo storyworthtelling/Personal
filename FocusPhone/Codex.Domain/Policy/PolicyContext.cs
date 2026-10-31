@@ -54,6 +54,11 @@ public record PolicyContext(
     // Pulp.Domain holds the same value). Named here because the shelf draws it cover-out.
     public const string PulpPackage = "com.storyworthtelling.pulp";
 
+    // Constitution, the household's constitution app. Frozen from its first build
+    // (ConstitutionIdentity in Constitution.Domain holds the same value). A sibling repo app, so the
+    // owner prefix above is what clears it; named here so the shelf can recognise it.
+    public const string ConstitutionPackage = "com.storyworthtelling.constitution";
+
     public const string PlayStorePackage = "com.android.vending";
 
     // A protected system package: DevicePolicyManager.SetPackagesSuspended refuses to suspend
@@ -100,11 +105,14 @@ public record PolicyContext(
     // would suspend the ones that look like browsers — leaving the owner staring
     // at the managed-device "access denied by your workplace" wall. Each is
     // cleared by the categorizer and explicitly kept runnable by the policy plan.
-    // (Package ids: GitHub, Gemini — still the Bard id — Google Maps, reMarkable.)
+    // (Package ids: GitHub, Gemini — still the Bard id — Google Maps, reMarkable, Google Keep.)
     public const string GitHubPackage = "com.github.android";
     public const string GeminiPackage = "com.google.android.apps.bard";
     public const string MapsPackage = "com.google.android.apps.maps";
     public const string RemarkablePackage = "com.remarkable.mobile";
+    // Google Keep: the grocery list is shared to it from Constitution, so it has to run on the locked
+    // phone for "Send to Keep" to open anything (Constitution C-10.1.4).
+    public const string KeepPackage = "com.google.android.keep";
 
     public static readonly IReadOnlySet<string> AllowlistedPackages = new HashSet<string>
     {
@@ -112,6 +120,7 @@ public record PolicyContext(
         GeminiPackage,
         MapsPackage,
         RemarkablePackage,
+        KeepPackage,
     };
 
     // The system browser. Made runnable for ONE reason: those allowlisted apps sign in through an

@@ -190,6 +190,7 @@ public partial class BudgetPage : LedgerBinderPage
             // D149's "refresh on open, no cool-off" convention, applied to Budget's own cross-account
             // transaction pull (D63) rather than Accounts' balances.
             await budget.RefreshTransactionsAsync(yearMonth, CancellationToken.None);
+            await ConstitutionBudgetSender.SendIfChangedAsync(budget, yearMonth, CancellationToken.None);
         }
         finally
         {

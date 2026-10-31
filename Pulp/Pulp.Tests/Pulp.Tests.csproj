@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Pulp.Domain\Pulp.Domain.csproj" />
     <ProjectReference Include="..\Pulp.Infrastructure\Pulp.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Household\Storyworthtelling.Household.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,5 +26,6 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="Storyworthtelling.Household" />
   </ItemGroup>
 </Project>

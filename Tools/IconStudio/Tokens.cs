@@ -149,4 +149,24 @@ public static class Tokens
     public static readonly SKColor PulpText = SKColor.Parse(PulpTextHex);
     public static readonly SKColor PulpDeep = SKColor.Parse(PulpDeepHex);
     public static readonly SKColor PulpCloth = SKColor.Parse(PulpClothHex);
+
+    // Constitution: cerulean, OKLCH hue 230°, taken from the binding cloth (Post's route) because
+    // the poster cover's own sky is an aged green-blue with no usable hue. 230° is the centre of one
+    // of the two windows left on the wheel that clear every role and every sibling by 20° (23.0°
+    // from In-progress teal and Reference slate, 51.9° from Score), so no departure is recorded.
+    // The binding is the LIGHT ground tier with the rule, flourishes and title in ink (Score's and
+    // Pulp's construction), hence the cloth is the ground.
+    public const string ConstitutionFillHex = "#A4C1D0";
+    public const string ConstitutionGroundHex = "#82ACC1";
+    public const string ConstitutionMarkHex = "#1B6A89";
+    public const string ConstitutionTextHex = "#15546E";
+    public const string ConstitutionDeepHex = "#143B4C";
+    public const string ConstitutionClothHex = "#82ACC1";
+
+    public static readonly SKColor ConstitutionFill = SKColor.Parse(ConstitutionFillHex);
+    public static readonly SKColor ConstitutionGround = SKColor.Parse(ConstitutionGroundHex);
+    public static readonly SKColor ConstitutionMark = SKColor.Parse(ConstitutionMarkHex);
+    public static readonly SKColor ConstitutionText = SKColor.Parse(ConstitutionTextHex);
+    public static readonly SKColor ConstitutionDeep = SKColor.Parse(ConstitutionDeepHex);
+    public static readonly SKColor ConstitutionCloth = SKColor.Parse(ConstitutionClothHex);
 }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Index.Domain.External;
+using Index.Domain.Handoff;
 using Index.Domain.Model;
 using Index.Domain.Time;
 using Index.Domain.Worksheet;
@@ -452,6 +453,26 @@ public sealed class BudgetService
             amount.ActualAmount = totals.GetValueOrDefault(amount.CategoryId, 0m);
         }
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>The Groceries category's limit and spent-so-far for one month, as the payload Constitution
+    /// receives (budget contract, C-11.1). Null when the month, the active Groceries category or its row does
+    /// not exist, or the figures are not sendable. Reads the same stored row the Budget screen draws, so the two
+    /// cannot disagree.</summary>
+    public async Task<ConstitutionBudgetPayload?> GetGroceriesPayloadAsync(string yearMonth, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var month = await db.BudgetMonths.AsNoTracking().FirstOrDefaultAsync(m => m.YearMonth == yearMonth, cancellationToken);
+        var category = (await db.BudgetCategories.AsNoTracking().Where(c => c.IsActive).ToListAsync(cancellationToken))
+            .FirstOrDefault(c => string.Equals(c.Name, "Groceries", StringComparison.OrdinalIgnoreCase));
+        if (month is null || category is null)
+        {
+            return null;
+        }
+
+        var amount = await db.BudgetCategoryAmounts.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.BudgetMonthId == month.Id && a.CategoryId == category.Id, cancellationToken);
+        return amount is null ? null : ConstitutionBudgetPayload.FromFigures(yearMonth, amount.LimitAmount, amount.ActualAmount);
     }
 
     /// <summary>Every SPENDING transaction with no category, this month — the minimal "Uncategorized"

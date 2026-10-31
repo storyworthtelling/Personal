@@ -1,6 +1,6 @@
 name: Build shared libraries
 
-# The repo-root shared libraries (Storyworthtelling.Voice / .Remarkable / .Paper / .Google / .Updates / .Handwriting) are pure
+# The repo-root shared libraries (Storyworthtelling.Voice / .Remarkable / .Paper / .Google / .Updates / .Household / .Handwriting) are pure
 # net10.0 and belong to no app .sln — before this, only build-storyboarder exercised Voice/Remarkable, so a
 # shared-lib change that no app workflow's path filter covered went untested. This builds and tests them on
 # their own, on any shared-lib change, as the single source of truth for the shared foundations.
@@ -19,6 +19,8 @@ on:
       - 'Storyworthtelling.Google.Tests/**'
       - 'Storyworthtelling.Updates/**'
       - 'Storyworthtelling.Updates.Tests/**'
+      - 'Storyworthtelling.Household/**'
+      - 'Storyworthtelling.Household.Tests/**'
       - 'Storyworthtelling.Handwriting/**'
       - 'Storyworthtelling.Handwriting.Tests/**'
       - 'Storyworthtelling.Maui/**'
@@ -56,6 +58,7 @@ jobs:
             Storyworthtelling.Paper.Tests/Storyworthtelling.Paper.Tests.csproj \
             Storyworthtelling.Google.Tests/Storyworthtelling.Google.Tests.csproj \
             Storyworthtelling.Updates.Tests/Storyworthtelling.Updates.Tests.csproj \
+            Storyworthtelling.Household.Tests/Storyworthtelling.Household.Tests.csproj \
             Storyworthtelling.Handwriting.Tests/Storyworthtelling.Handwriting.Tests.csproj \
             Storyworthtelling.Maui.Tests/Storyworthtelling.Maui.Tests.csproj ; do
             if [ -f "$proj" ]; then

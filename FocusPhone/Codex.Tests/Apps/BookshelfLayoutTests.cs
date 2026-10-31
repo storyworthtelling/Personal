@@ -173,4 +173,24 @@ public class BookshelfLayoutTests
         Assert.Single(scene.Shelves);
         Assert.Equal(ShelfFace.CoverOut, scene.Shelves[0].Face);
     }
+
+    [Theory]
+    [InlineData(6, 360f)]
+    [InlineData(7, 360f)]
+    [InlineData(6, 400f)]
+    [InlineData(7, 400f)]
+    public void EveryWrappedRowHasALedge(int siblings, float width)
+    {
+        var keys = Enumerable.Range(0, siblings).Select(i => $"com.example.sibling{i}").ToArray();
+        var scene = BookshelfLayout.Build(width, M, [CoverShelf(keys)]);
+
+        Assert.True(scene.Shelves.Count > 1, "the siblings must wrap for this test to mean anything");
+        Assert.Equal(siblings, scene.Shelves.Sum(s => s.Items.Count));
+        Assert.All(scene.Shelves, shelf =>
+        {
+            Assert.True(shelf.Ledge.Width > 0 && shelf.Ledge.Height > 0, "a row without a ledge floats");
+            // Every book stands on its own row's ledge.
+            Assert.All(shelf.Items, it => Assert.Equal(shelf.Ledge.Top, it.Rect.Bottom, precision: 1));
+        });
+    }
 }

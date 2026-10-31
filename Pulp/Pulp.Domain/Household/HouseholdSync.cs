@@ -21,31 +21,6 @@ public enum HouseholdSyncState
     WaitingForShare,
 }
 
-/// <summary>Why a household file in Drive could not be opened.</summary>
-public enum HouseholdUnreadableReason
-{
-    NoPassphrase,
-    WrongPassphrase,
-    Damaged,
-    NewerFormat,
-}
-
-/// <summary>Whether this phone's account owns the household file or has it shared to it (finding §2.7).</summary>
-public enum HouseholdFileRole
-{
-    /// <summary>
-    /// Not known yet: the vault has not been read and no earlier read is remembered for this account
-    /// (<see cref="HouseholdRoleMemory"/>). Nothing is created in Drive, but permissions are the owner's.
-    /// </summary>
-    Unknown,
-
-    /// <summary>The owner's account: the file lives in its Drive, so it may create it.</summary>
-    Owner,
-
-    /// <summary>The other adult's account: it edits the file once the owner shares it, and never creates one.</summary>
-    SharedWith,
-}
-
 /// <summary>
 /// What a household screen may do on a phone, by whether it owns the file (D166). Both adults manage the
 /// children and the phone's own viewer; the services and adding or removing people stay the owner's. A
@@ -118,22 +93,6 @@ public static class HouseholdSyncText
     }
 }
 
-/// <summary>How one publish pass ended.</summary>
-public enum HouseholdPublishOutcome
-{
-    /// <summary>Drive already held everything this phone has; nothing was written.</summary>
-    AlreadyCurrent,
-
-    /// <summary>The merge was written and the re-read shows it landed.</summary>
-    Written,
-
-    /// <summary>Lost the race even on the second write; the phone keeps the merge and the next pass carries it.</summary>
-    LeftForNextPass,
-
-    /// <summary>No file is visible and this phone may not create one.</summary>
-    NotYetShared,
-}
-
 /// <summary>
 /// What the screens are told about the household's sync: a state, when it last landed, and the reason
 /// when it is not landing. A notice is raised only for an unreadable file — being offline or local-only
@@ -166,30 +125,12 @@ public sealed record HouseholdSyncStatus(
 }
 
 /// <summary>
-/// The sync policy (finding §2.7). The phone's own file is the working copy every screen reads and
-/// every edit lands in first; Drive is where the two phones meet. A pass pulls Drive, merges, pushes
-/// only if Drive is missing something, re-reads and follows <see cref="HouseholdPublish"/>. Nothing a
-/// pass does can lose a local edit: what it brings home is <see cref="Adopt">merged</see> into the
-/// phone's file as it stands when the pass returns, not written over it.
+/// Pulp's one piece of the sync policy: whether a pass may run at all, and the status that says why not.
+/// The rest of the policy (what a pass adopts, when it writes, who may create the file) is the shared
+/// engine's <see cref="Storyworthtelling.Household.HouseholdSync"/>.
 /// </summary>
 public static class HouseholdSync
 {
-    /// <summary>
-    /// What the phone keeps after a pass: its file as it stands now — including edits made while the
-    /// pass was on the network — merged with what the pass settled on. On a phone whose file is empty,
-    /// that is simply what Drive holds: the first run adopts the household.
-    /// </summary>
-    public static HouseholdDocument Adopt(HouseholdDocument localNow, HouseholdDocument published) =>
-        HouseholdMerge.Merge(localNow, published);
-
-    /// <summary>True when the merge holds something the file in Drive does not: only then is anything written.</summary>
-    public static bool NeedsWrite(HouseholdDocument merged, HouseholdDocument read)
-    {
-        ArgumentNullException.ThrowIfNull(merged);
-        ArgumentNullException.ThrowIfNull(read);
-        return !merged.ContentEquals(read);
-    }
-
     /// <summary>Null when a pass may run; otherwise the local-only status saying what is missing.</summary>
     public static HouseholdSyncStatus? Readiness(bool hasPassphrase, bool hasAccount)
     {
@@ -201,85 +142,5 @@ public static class HouseholdSync
         return hasAccount
             ? null
             : HouseholdSyncStatus.LocalOnly("No Google account is signed in, so the household stays on this phone until one is.");
-    }
-
-    /// <summary>Only the owner's account creates the file; any other would make a second household nobody merges with.</summary>
-    public static bool MayCreateFile(HouseholdFileRole role) => role == HouseholdFileRole.Owner;
-}
-
-/// <summary>
-/// When the next pass is due, with time passed in. Opening the app is due at once; an edit waits for
-/// <see cref="Debounce"/> of quiet, so a run of ticks is one pass; a Drive that could not be reached is
-/// retried with doubling backoff up to <see cref="LongestRetry"/>, and an edit does not bring that
-/// forward; an unreadable file stops passes until someone asks for one (a new passphrase, Sync now).
-/// Not thread-safe: the caller holds its own lock.
-/// </summary>
-public sealed class HouseholdSyncSchedule
-{
-    public static readonly TimeSpan Debounce = TimeSpan.FromSeconds(5);
-    public static readonly TimeSpan FirstRetry = TimeSpan.FromMinutes(1);
-    public static readonly TimeSpan LongestRetry = TimeSpan.FromHours(1);
-
-    private int failures;
-    private DateTimeOffset? retryAt;
-    private bool blocked;
-
-    /// <summary>When the next pass is due; null when nothing is waiting.</summary>
-    public DateTimeOffset? NextDue { get; private set; }
-
-    public void Opened(DateTimeOffset now) => Due(now);
-
-    public void Edited(DateTimeOffset now)
-    {
-        if (blocked)
-        {
-            return;
-        }
-
-        var debounced = now + Debounce;
-        NextDue = retryAt is { } retry && retry > debounced ? retry : debounced;
-    }
-
-    /// <summary>A pass begins; anything due is now its job. An edit after this schedules another.</summary>
-    public void Started(DateTimeOffset now) => NextDue = null;
-
-    public void Succeeded()
-    {
-        failures = 0;
-        retryAt = null;
-    }
-
-    public void Failed(DateTimeOffset now)
-    {
-        failures++;
-        var wait = TimeSpan.FromTicks(FirstRetry.Ticks * (1L << Math.Min(failures - 1, 16)));
-        retryAt = now + (wait > LongestRetry ? LongestRetry : wait);
-        NextDue = retryAt;
-    }
-
-    /// <summary>The file in Drive cannot be opened: no more passes until <see cref="Asked"/>.</summary>
-    public void Blocked()
-    {
-        blocked = true;
-        NextDue = null;
-    }
-
-    /// <summary>Someone asked for a pass (Sync now, a new passphrase): due at once, whatever was holding it.</summary>
-    public void Asked(DateTimeOffset now)
-    {
-        blocked = false;
-        failures = 0;
-        retryAt = null;
-        NextDue = now;
-    }
-
-    public bool IsDue(DateTimeOffset now) => NextDue is { } due && due <= now;
-
-    private void Due(DateTimeOffset now)
-    {
-        if (!blocked)
-        {
-            NextDue = now;
-        }
     }
 }

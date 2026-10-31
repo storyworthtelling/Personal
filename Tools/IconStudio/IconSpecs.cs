@@ -40,6 +40,10 @@ namespace IconStudio;
 /// band and the brackets, so Index's cover is window only too and no spec sets this now. The
 /// flourishes remain on the launcher icon, where the round mask crops them.
 /// </param>
+/// <param name="Crop">
+/// The part of <see cref="PlateImage"/> to draw, in source pixels. Must be square and inside the
+/// image. Null (every spec so far) keeps the largest centred square.
+/// </param>
 public sealed record IconSpec(
     string App,
     string ResourceRoot,
@@ -51,7 +55,11 @@ public sealed record IconSpec(
     string? PlateImage = null,
     float PlateInset = Glyphs.FullBleedInset,
     string? CoverImage = null,
-    bool CoverDrawsGlyph = false);
+    bool CoverDrawsGlyph = false,
+    SourceCrop? Crop = null);
+
+/// <summary>A rectangle in the source painting's own pixels. Integers, so a crop is exact and reproducible.</summary>
+public sealed record SourceCrop(int X, int Y, int Width, int Height);
 
 public static class IconSpecs
 {
@@ -116,5 +124,13 @@ public static class IconSpecs
         new("Pulp", "Pulp/Pulp.Android/Resources", "appicon", true, Glyphs.PulpPlate,
             Tokens.PulpClothHex, PlateImage: "Branding/pulp-cover.jpg",
             CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_pulp.png"),
+        // Constitution's icon IS its cover, like Pulp's: the approved painting full bleed on the
+        // cerulean cloth with no keyline (book page 3, icon B; D12). The painting is portrait
+        // (864x1184), so the crop is a closer square on the slope, rows 190-974 centred, which is
+        // what keeps the two runners large enough to read as two figures at 48 px.
+        new("Constitution", "Constitution/Constitution.Android/Resources", "appicon", false, Glyphs.ConstitutionPlate,
+            Tokens.ConstitutionClothHex, PlateImage: "Branding/constitution-cover.jpg",
+            CoverImage: "FocusPhone/Flyleaf.Android/Resources/drawable/cover_constitution.png",
+            Crop: new SourceCrop(40, 190, 784, 784)),
     ];
 }
