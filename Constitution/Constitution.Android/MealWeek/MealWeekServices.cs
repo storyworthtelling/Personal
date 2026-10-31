@@ -116,7 +116,8 @@ public static class MealWeekServices
         var folder = FolderOf(appContext);
         var prepared = Prepare(appContext) as MealWeekPreparation.Ready;
         var seams = new MealPassSeams(
-            new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
+            new WeeksTheHouseholdDecides(
+                new FileMealWeekRecords(Path.Combine(folder, RecordFile)), new HouseholdWeekPlans(ConstitutionHousehold.For(appContext).Service)),
             DecisionRecords(appContext),
             new FileMealPassStamps(Path.Combine(folder, StampFile)),
             token => TryRunAsync(appContext, token),
@@ -219,7 +220,11 @@ public static class MealWeekServices
     public static IMealWeekSource Source(Context context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return new MealWeekRecordSource(new FileMealWeekRecords(Path.Combine(FolderOf(context.ApplicationContext ?? context), RecordFile)));
+        var appContext = context.ApplicationContext ?? context;
+
+        // Her phone shows the week the planning phone published when it kept none of its own (D154).
+        return new MealWeekRecordSource(new WeeksTheHouseholdDecides(
+            new FileMealWeekRecords(Path.Combine(FolderOf(appContext), RecordFile)), new HouseholdWeekPlans(ConstitutionHousehold.For(appContext).Service)));
     }
 
     /// <summary>
@@ -304,7 +309,7 @@ public static class MealWeekServices
         var calendar = WorkoutWeekCalendarSeams.Create(appContext, KeyFamily.HouseholdMeal);
         return new MealDeadlineSeams(
             household.Planning.OpenTheWeekAsync,
-            new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
+            new WeeksTheHouseholdDecides(new FileMealWeekRecords(Path.Combine(folder, RecordFile)), new HouseholdWeekPlans(household.Service)),
             DecisionRecords(appContext),
             new HouseholdMealAnswers(household.Service),
             new HouseholdTemplateLibrary(household.Service),
