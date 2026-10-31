@@ -15,7 +15,7 @@ namespace Constitution.Infrastructure.Meals;
 /// <param name="Answers">The two adults' meal answers, from the household file.</param>
 /// <param name="Library">The rotating templates' library.</param>
 /// <param name="Notes">The taste notes the household file keeps.</param>
-/// <param name="Judge">Decides whether written words are a lasting lesson; <see cref="UnavailableTasteJudge"/> until a real one is built.</param>
+/// <param name="Judge">Decides whether written words are a lasting lesson; <see cref="UnavailableTasteJudge"/> when there is no key to ask with (the head hands the Claude judge, D133). It is asked through a <see cref="BoundedTasteJudge"/>.</param>
 /// <param name="Log">The Body trail's one-method seam.</param>
 /// <param name="Calendar">The calendar side that takes a denied evening's cook block off (<see cref="DeniedEveningCalendar"/>); null means none was handed over, and the removal is a typed "not removed" tried again next run.</param>
 public sealed record MealDeadlineSeams(
@@ -45,7 +45,9 @@ public sealed record MealDeadlineSeams(
 /// approves and teaches nothing, a written no rejects and its words go to the judge too.</para>
 ///
 /// <para><b>The judge.</b> Whether words are a lasting lesson is the <see cref="ITasteJudge"/>'s call. With none (<see cref="UnavailableTasteJudge"/>) every piece is
-/// unjudged; the week is recorded as having evidence pending, and the next run asks again (only the judging: the library and the likes are never repeated).</para>
+/// unjudged; the week is recorded as having evidence pending, and the next run asks again (only the judging: the library and the likes are never repeated). The asking is bounded (D133): a pass asks at most
+/// <see cref="TasteJudgeLimits.MostPerPass"/> questions and stops at the first sign the service cannot answer, and a week's words are let go after
+/// <see cref="TasteJudgeLimits.MostAttempts"/> passes that reached the judge (<see cref="MealDecisionEntry.JudgeAttempts"/>). A pass with no key uses none, so a key restored later still judges them.</para>
 ///
 /// <para><b>The order, and why.</b> Read everything, then judge (it changes nothing), then save the notes, then the library, then the record of the decision last.
 /// A stop at any save leaves the week undecided, and the next run decides it again with nothing lost: the notes save is idempotent, and the library is only saved once
@@ -169,7 +171,8 @@ public static class MealDeadlineStep
         var fed = library is null || retry ? 0 : feedback.Library.Templates.Count(template => template.FeedbackWeek == week && library.Find(template.Id)?.FeedbackWeek != week);
 
         var evidence = MealDeadlineRules.DinnerEvidence(decision, target, today, existing?.DeniedDishes).Concat(feedback.Evidence).ToList();
-        var learned = await TasteLearner.LearnAsync(evidence, seams.Judge, cancellation);
+        var judge = new BoundedTasteJudge(seams.Judge, TasteJudgeLimits.MostPerPass);
+        var learned = await TasteLearner.LearnAsync(evidence, judge, cancellation);
 
         var notes = likes.Concat(learned.Notes).ToList();
         if (notes.Count > 0 && seams.Notes.Save(notes) is MealNotesSave.Refused)
@@ -183,6 +186,9 @@ public static class MealDeadlineStep
         }
 
         var unjudged = learned.Outcomes.Count(outcome => outcome == TasteOutcome.Unjudged);
+
+        // A pass that reached the judge and left words unsettled uses one of the week's attempts; at the last one the words are let go rather than asked again for ever (D133).
+        var (attempts, pending) = TasteJudgeLimits.After(existing?.JudgeAttempts ?? 0, judge.Asked > 0 && !judge.SawNoKey, unjudged);
         MealDecisionEntry entry;
         IReadOnlyList<EveningRemoval> removals;
         if (existing is null)
@@ -209,8 +215,9 @@ public static class MealDeadlineStep
                 seams.Weeks.Save(kept.With(marked));
             }
 
-            entry = new MealDecisionEntry(week, inputs.Now, decision.ApprovedItemIds.Count, decision.Denied.Count, decision.ApprovedUnread.Count, unjudged > 0)
+            entry = new MealDecisionEntry(week, inputs.Now, decision.ApprovedItemIds.Count, decision.Denied.Count, decision.ApprovedUnread.Count, pending)
             {
+                JudgeAttempts = attempts,
                 DeniedEvenings = ahead.Select(dinner => DeniedEveningWords.Of(dinner.Day.DayOfWeek)).ToList(),
                 DeniedDishes = dishes,
                 EventsPending = removals.Where(removal => removal.NotRemoved).Select(removal => removal.Evening).ToList(),
@@ -219,7 +226,7 @@ public static class MealDeadlineStep
         else
         {
             removals = await RetryAsync(inputs, seams, existing, cancellation);
-            entry = existing with { EvidencePending = unjudged > 0, EventsPending = StillPending(existing, removals) };
+            entry = existing with { EvidencePending = pending, JudgeAttempts = attempts, EventsPending = StillPending(existing, removals) };
         }
 
         seams.Decisions.Save(decided.With(entry));

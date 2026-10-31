@@ -25,6 +25,9 @@ public sealed record MealDecisionEntry(
     /// </summary>
     public bool NeedsRevisedSheet { get; init; }
 
+    /// <summary>How many passes asked the judge for this week's words and still left some unjudged (D133). Bounded by <see cref="TasteJudgeLimits.MostAttempts"/>; a pass with no key does not count.</summary>
+    public int JudgeAttempts { get; init; }
+
     /// <summary>Read for older records, never written (D111): there is no replan, so no card needs vetoing.</summary>
     public IReadOnlyList<RecipeId> ReplanWithout { get; init; } = [];
 
