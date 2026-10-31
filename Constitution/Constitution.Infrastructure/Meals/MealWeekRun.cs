@@ -130,6 +130,12 @@ public static class MealWeekRun
             inputs.Now);
         request = TasteForTheWeek.Apply(taste, request);
 
+        // What the owner wrote on Saturday's digest, if anything (owner decision amending C-2.2.3). None leaves the request, and so the week, exactly as it was.
+        if (seams.PlannerNotes?.For(first) is { Count: > 0 } plannerNotes)
+        {
+            request = request with { PlannerNotes = plannerNotes };
+        }
+
         var planned = await seams.Planner.PlanAsync(request, cancellation);
         var week = planned.Week;
         if (week.Stop is { } stopped)

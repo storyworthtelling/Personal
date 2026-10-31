@@ -107,4 +107,14 @@ public class DigestBodyTests
         var pages = DigestBody.Pages(series, [], DigestFixture.Saturday, 2, 5);
         Assert.All(pages.SelectMany(page => page.Printed), item => Assert.NotEqual(PrintedRole.Voice, item.Role));
     }
+
+    [Fact]
+    public void NineSignalsAndThePlanSaysNine()
+    {
+        // Owner decision: nine is right (seven from Health Connect, strength and calories); the plan's C-2.6.2 text followed.
+        Assert.Equal(9, BodySignals.All.Count);
+        var plan = File.ReadAllText(Path.Combine(ConstitutionSource.Root(), "CONSTITUTION-P13-PLAN.md"));
+        Assert.Contains("Given nine signals, then each gets one small neutral-ink line", plan, StringComparison.Ordinal);
+        Assert.DoesNotContain("Given eight signals", plan, StringComparison.Ordinal);
+    }
 }

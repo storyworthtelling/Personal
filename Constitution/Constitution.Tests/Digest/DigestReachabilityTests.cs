@@ -56,15 +56,12 @@ public class DigestReachabilityTests
     }
 
     [Fact]
-    public void NothingReadsThePlannerNotesYet()
+    public void ThePlannerNotesAreReadAndReachThePlanner()
     {
-        // Owner decision pending (D160): the lines print, and nothing in the head or the run reads them.
-        foreach (var relative in new[] { "SaturdayDigest/DigestServices.cs", "SaturdayDigest/DigestWorker.cs" })
-        {
-            Assert.DoesNotMatch(@"DigestPlannerNotes|PlannerNotes\b", Head(relative));
-        }
-
-        Assert.DoesNotMatch(@"DigestPlannerNotes|DigestIds", Source("Constitution.Infrastructure/Documents/SaturdayDigestRun.cs"));
+        // Owner decision amending C-2.2.3: the read-back reads them, and the meal run's seams carry them to the planner.
+        Assert.Contains("DigestServices.PlannerNotesOf(", Head("ReadBack/ReadBackServices.cs"), StringComparison.Ordinal);
+        Assert.Contains("PlannerNotes: ", Head("MealWeek/MealWeekServices.cs"), StringComparison.Ordinal);
+        Assert.Contains("ExpectedDocument.ForDigest(", Source("Constitution.Infrastructure/Documents/SaturdayDigestRun.cs"), StringComparison.Ordinal);
     }
 
     private static string Source(string relative) => File.ReadAllText(Path.Combine(ConstitutionSource.Root(), relative));

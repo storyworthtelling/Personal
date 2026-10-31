@@ -503,7 +503,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
     resolves it (C-2.2.1), and trashes it only after the result is saved.
   - Given a document found with no annotations rendered, then Diagnostics records "document found,
     nothing read" and the page is not trashed (R3).
-  - Given the digest, then it is trashed after three days (R4).
+  - Given the digest, then only its four planner-note lines are read, once, from Sunday (owner decision, D170), and it is trashed after three days (R4).
   - The worker's Java name and unique work name are in the frozen set (C-1.1.3).
 - *Tests first:* `ReadBackServiceTests` (fake reMarkable + fake extractor): `TrashesOnlyAfterSaving`,
   `LowConfidenceGoesToWaiting`, `MissingAnnotationsAreReportedNotSilent`, `DigestGoesAfterThreeDays`.
@@ -726,7 +726,7 @@ Each PBI's last line reads **Size · Release · Verify · Agent level · Effort*
 **C-2.6.2 · Body, every signal, every week**
 - *Story:* As the owner, I want every signal on two pages against my own last 12 weeks, so that the
   digest is the honest trend the app exists for.
-- *Acceptance:* Given eight signals, then each gets one small neutral-ink line of weekly averages
+- *Acceptance:* Given nine signals, then each gets one small neutral-ink line of weekly averages
   over the owner's last 12 weeks, the latest week as a dot with its value and the change in words,
   dotted gaps for missing stretches (D39); the patterns block is headed "not causes" and is the
   **only** place in Constitution a correlation appears.

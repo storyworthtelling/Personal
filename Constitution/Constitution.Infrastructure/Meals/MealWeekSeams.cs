@@ -1,3 +1,4 @@
+using Constitution.Infrastructure.ReadBack;
 using Constitution.Domain.Meals;
 using Constitution.Domain.Meals.Pipeline;
 using Constitution.Domain.Placement;
@@ -45,4 +46,5 @@ public sealed record MealWeekSeams(
     IMealDecisionRecords? Decisions = null,
     IWeekPlanPublisher? Publisher = null,
     IMealAnswerSource? Answers = null,
-    IAteEstimates? AteEstimates = null);
+    IAteEstimates? AteEstimates = null,
+    IPlannerNotesSource? PlannerNotes = null);

@@ -91,14 +91,38 @@ public class ExpectedDocumentTests
     }
 
     [Fact]
-    public void ADigestHoldsNoPagesAndNoSession()
+    public void ADigestWithNoPageIsNeverRead()
     {
-        var page = Workout().Pages[0];
         var digest = Digest();
 
         Assert.False(digest.ReadsInk);
+        Assert.False(digest.ReadsPlannerNotes);
         Assert.Null(digest.Marks);
-        Assert.Throws<ArgumentException>(() => new ExpectedDocument(DeliveryKind.Digest, Day, null, Person, null, [page]));
+        Assert.Throws<ArgumentException>(() => new ExpectedDocument(DeliveryKind.Digest, Day, null, Person, null, [Workout().Pages[0]]));
+    }
+
+    [Fact]
+    public void ADigestMayCarryOnlyThePlannerNotesPage()
+    {
+        // Owner decision amending C-2.2.3: the four ruled lines are read at Sunday's run, and nothing else on the digest is.
+        var page = DigestMeals.NextWeekPage(new DigestNextWeek([], []), Day, 5, 5);
+        var digest = ExpectedDocument.ForDigest(page, Day, Person);
+
+        Assert.True(digest.ReadsPlannerNotes);
+        Assert.False(digest.ReadsInk);
+        Assert.Null(digest.Marks);
+        var read = Assert.Single(digest.Pages);
+        Assert.Equal(DigestIds.PlannerNotes, read.Rules.Cast<StapleRule>().Select(rule => rule.LineId));
+        Assert.Equal(DigestIds.PlannerNotes.Order(), read.AskedTargets.Select(target => target.Id).Order());
+    }
+
+    [Fact]
+    public void AnyOtherPageOnADigestIsRefused()
+    {
+        var notes = ExpectedDocument.ForDigest(DigestMeals.NextWeekPage(new DigestNextWeek([], []), Day, 5, 5), Day, Person).Pages[0];
+        var withExtraRule = new ExpectedPage(5, notes.Readout, [.. notes.Rules, new StapleRule("Sleep", "sleep")]);
+        Assert.Throws<ArgumentException>(() => new ExpectedDocument(DeliveryKind.Digest, Day, null, Person, null, [withExtraRule]));
+        Assert.Throws<ArgumentException>(() => new ExpectedDocument(DeliveryKind.Digest, Day, null, Person, null, [notes, notes]));
     }
 
     [Fact]

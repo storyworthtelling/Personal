@@ -41,6 +41,12 @@ public sealed record MealWeekRequest
     /// <summary>The Sunday the week starts on.</summary>
     public DateOnly WeekStart { get; init; }
 
+    /// <summary>
+    /// What the owner wrote on the Saturday digest's "Notes to the planner" lines, in the order written. Carried onto the planned week's notes and nothing more: the planner has no way to
+    /// act on free text yet. Empty plans byte for byte as before.
+    /// </summary>
+    public IReadOnlyList<string> PlannerNotes { get; init; } = [];
+
     /// <summary>Every card in the box.</summary>
     public IReadOnlyList<Recipe> Recipes { get; init; }
 

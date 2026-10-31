@@ -2,6 +2,7 @@ using Android.Content;
 using Constitution.Body;
 using Constitution.Domain.Documents;
 using Constitution.Infrastructure.Documents;
+using Constitution.Infrastructure.ReadBack;
 using Constitution.Infrastructure.Workouts;
 using Constitution.WorkoutDelivery;
 using Constitution.Infrastructure.Workouts;
@@ -21,6 +22,18 @@ public static class DigestServices
 {
     public const string FolderName = "saturday-digest";
     public const string StampFile = "digest-stamps.json";
+
+    public const string NotesFile = "planner-notes.json";
+
+    /// <summary>The planner notes read off Saturday's digest, kept for the meal run (owner decision amending C-2.2.3).</summary>
+    public static FilePlannerNotes PlannerNotesOf(Context context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var appContext = context.ApplicationContext ?? context;
+        var root = appContext.NoBackupFilesDir?.AbsolutePath
+            ?? throw new InvalidOperationException("The app has no private files folder to keep the planner notes in.");
+        return new FilePlannerNotes(Path.Combine(root, FolderName, NotesFile));
+    }
 
     public const string NoTablet = "There is no household setup on this phone naming whose tablet it is, so no Saturday digest was sent.";
 
