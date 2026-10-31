@@ -143,7 +143,15 @@ public static class MealWeekServices
             new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
             log,
             documents,
-            new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), TemplateAuthorServices.AuthorOf(appContext)));
+            new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), TemplateAuthorServices.AuthorOf(appContext)),
+            DecisionRecords(appContext));
+    }
+
+    /// <summary>The record of decided weeks, a small file beside the kept weeks: the deadline step writes it, and the sheet and the Meals tab's share read the denied evenings' shopping lines from it (D112).</summary>
+    public static IMealDecisionRecords DecisionRecords(Context appContext)
+    {
+        ArgumentNullException.ThrowIfNull(appContext);
+        return new FileMealDecisionRecords(Path.Combine(FolderOf(appContext.ApplicationContext ?? appContext), DecisionFile));
     }
 
     /// <summary>
@@ -162,7 +170,7 @@ public static class MealWeekServices
         return new MealDeadlineSeams(
             household.Planning.AskAsync,
             new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
-            new FileMealDecisionRecords(Path.Combine(folder, DecisionFile)),
+            DecisionRecords(appContext),
             new HouseholdMealAnswers(household.Service),
             new HouseholdTemplateLibrary(household.Service),
             new HouseholdTasteNotes(household.Service),

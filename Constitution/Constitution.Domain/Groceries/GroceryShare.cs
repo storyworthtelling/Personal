@@ -24,6 +24,9 @@ public static class GroceryShare
     /// <summary>Keep's package id; the same string as Flyleaf's allowlist, held equal by a parity test.</summary>
     public const string KeepPackage = "com.google.android.keep";
 
+    /// <summary>What the phone is told when Keep is not there; also what a refused start finds out (D112).</summary>
+    public const string KeepNotInstalledSentence = "Keep is not on this phone, so the list was not sent.";
+
     /// <summary>
     /// Decides the share. The package is always Keep's: under the lockdown a chooser would offer only whatever survived it,
     /// so a phone without Keep is told so rather than handed another app. The body is aisle headers over "quantity name"
@@ -40,7 +43,7 @@ public static class GroceryShare
 
         if (!keepIsInstalled)
         {
-            return new GroceryShareDecision(GroceryShareOutcome.KeepNotInstalled, KeepPackage, title, string.Empty, "Keep is not on this phone, so the list was not sent.");
+            return new GroceryShareDecision(GroceryShareOutcome.KeepNotInstalled, KeepPackage, title, string.Empty, KeepNotInstalledSentence);
         }
 
         var blocks = list.Sections.Select(section =>

@@ -22,7 +22,7 @@ public static class MealWeekTrail
                 var report = planned.Report;
                 var written = report.Placement?.Created.Count ?? 0;
                 var failed = report.Placement?.Failed.Count ?? 0;
-                return $"meal week planned, {written} events written, {failed} events failed, record {SaveWord(report.RecordSave)}{BlockedTail(report)}{EarlierTail(report)}";
+                return $"meal week planned, {written} events written, {failed} events failed, record {SaveWord(report.RecordSave)}{BlockedTail(report)}{EarlierTail(report)}{DecisionsTail(report)}";
             default:
                 throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "This outcome has no trail phrase; add one here.");
         }
@@ -101,6 +101,9 @@ public static class MealWeekTrail
 
         return string.Empty;
     }
+
+    private static string DecisionsTail(MealWeekReport report) =>
+        report.ExtraLinesUnreadable is null ? string.Empty : ", decisions unreadable";
 
     private static string ReasonWords(AuthorUnavailable reason)
     {

@@ -63,6 +63,9 @@ public sealed record MealWeekReport(
     /// <summary>What the documents step did (the sheet and the recipes), or null when the run was not given the means to deliver any.</summary>
     public MealDocumentsResult? Documents { get; init; }
 
+    /// <summary>Why the denied evenings' shopping lines could not be read (D112); null when they read, or when the run was given no record. The sheet was built without them.</summary>
+    public string? ExtraLinesUnreadable { get; init; }
+
     /// <summary>What the rotating templates step did, or null when the run was not given the means to rotate any.</summary>
     public MealTemplatesResult? Templates { get; init; }
 }

@@ -58,6 +58,9 @@ internal sealed class MealWeekRig
 
     public MealWeekSeams Seams { get; private set; }
 
+    /// <summary>The decision record a test hands the documents run; null by default, as in every earlier test.</summary>
+    public Constitution.Domain.Meals.Pipeline.IMealDecisionRecords? Decisions { get; set; }
+
     public MealWeekRequestInputs Inputs(DateOnly? week = null) => new(week ?? Sunday, Now, Rules());
 
     public async Task<MealWeekOutcome> RunAsync(MealWeekRequestInputs? inputs = null) =>

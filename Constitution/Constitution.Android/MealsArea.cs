@@ -5,6 +5,7 @@ using Android.OS;
 using Android.Views;
 using Codex.Ui;
 using Constitution.Domain.Diagnostics;
+using Constitution.Domain.Groceries;
 using Constitution.Domain.Meals.Screens;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Recipes;
@@ -71,6 +72,8 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     private string? notice;
     private int loadNumber;
     private AteSomethingElseFlow? ate;
+    private KeepShareRun? share;
+    private bool sharing;
 
     public MealsArea(Activity host)
         : base(host, "meals", Resource.Drawable.areameals)
@@ -92,6 +95,13 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
                 value.Changed += RaiseChanged;
             }
         }
+    }
+
+    /// <summary>Builds the grocery list Share the list hands to Keep (D112); null leaves the button disabled. Set by whoever wires the household file.</summary>
+    public KeepShareRun? Share
+    {
+        get => share;
+        set => share = value;
     }
 
     /// <summary>Where the cards come from and where a change goes; set by whoever wires the household file.</summary>
@@ -309,7 +319,52 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         var flow = Ate;
         var button = PaperUi.SecondaryButton(Host, MealsWeekModel.ActionLabel, () => flow?.Start());
         button.Enabled = flow is { CanStart: true };
-        return PaperUi.BottomBar(Host, button);
+        var shareButton = PaperUi.PrimaryButton(Host, KeepShareRun.ActionLabel, ShareList);
+        shareButton.Enabled = share is not null && read is RecipeBoxRead.Ready && !sharing;
+        return PaperUi.BottomBar(Host, button, shareButton);
+    }
+
+    // Share the list (D112): the reads and the build run off the UI thread, the one intent starts on it, and the answer is the page's inline line, never a toast.
+    private void ShareList()
+    {
+        if (share is not { } run || sharing || weekRead is not MealWeekScreenRead.Ready week || read is not RecipeBoxRead.Ready box)
+        {
+            return;
+        }
+
+        sharing = true;
+        notice = null;
+        RaiseChanged();
+        var kept = week.Snapshot.Week;
+        var cards = box.Snapshot.Cards;
+        _ = Task.Run(() =>
+        {
+            KeepSharePrepared prepared;
+            try
+            {
+                prepared = run.Prepare(kept, cards);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // The type only, never the message; the failure rides in the report with its stack.
+                prepared = new KeepSharePrepared.Settled(new KeepShareReport(
+                    KeepShareOutcome.ListNotBuilt, "The list could not be built just now (" + e.GetType().Name + "), so it was not sent.") { Failure = e });
+            }
+
+            Host.RunOnUiThread(() => ShareDone(prepared));
+        });
+    }
+
+    private void ShareDone(KeepSharePrepared prepared)
+    {
+        sharing = false;
+        notice = prepared switch
+        {
+            KeepSharePrepared.Ready ready => KeepShareRun.Finish(ready, KeepIntentSender.Start(Host, ready.Decision)).Sentence,
+            KeepSharePrepared.Settled settled => settled.Report.Sentence,
+            _ => throw new InvalidOperationException("The list came back as neither ready nor settled."),
+        };
+        RaiseChanged();
     }
 
     private void OnSwitch(MealsView chosen)

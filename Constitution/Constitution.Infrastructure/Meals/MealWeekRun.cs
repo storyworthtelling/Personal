@@ -43,6 +43,10 @@ namespace Constitution.Infrastructure.Meals;
 /// the library is short, and saves the library with what it printed. The step is reached only after the lease, so the partner's phone never proposes or prints. A stop or a
 /// refusal there is reported in <see cref="MealWeekReport.Templates"/> and leaves the sheet at two pages; it never un-plans the week.</para>
 ///
+/// <para><b>The denied evenings' shopping lines (D112).</b> When the run builds the documents it also reads the decision record (<see cref="MealWeekSeams.Decisions"/>) for the week and
+/// hands <see cref="MealDecisionEntry.ExtraLines"/> to the sheet. A record that cannot be read leaves the lines off and is reported in <see cref="MealWeekReport.ExtraLinesUnreadable"/> and the trail;
+/// it never stops the sheet. A sheet already past its deadline is not replaced (<see cref="MealRedeliveryRules"/>), so the line reaches the Meals tab's share, not the printed page.</para>
+///
 /// <para>Anything the run cannot name is a bug and propagates with its stack.</para>
 /// </summary>
 public static class MealWeekRun
@@ -170,9 +174,13 @@ public static class MealWeekRun
         }
 
         // The documents follow the kept week, never the fresh one: an evening already over keeps the dinner it had, and the paper says what the calendar says.
+        // The denied evenings' lines come from the decision record. A record that cannot be read leaves the lines off and is reported, never swallowed and never a stop (D112).
         MealDocumentsResult? documents = null;
+        string? extraLinesUnreadable = null;
         if (seams.Documents is { } documentSeams)
         {
+            var extra = MealExtraLines.Read(seams.Decisions, first);
+            extraLinesUnreadable = extra.UnreadableBecause;
             documents = await MealDocumentsStep.RunAsync(
                 new MealDocumentRequest(kept.Week, cards, rules, inputs.Now, inputs.DeliverFor)
                 {
@@ -181,6 +189,7 @@ public static class MealWeekRun
                     KidsMeals = inputs.KidsMeals,
                     Ratings = TasteForTheWeek.LastRatings(taste),
                     Daily = templates?.Daily,
+                    ExtraLines = extra.Lines,
                 },
                 documentSeams,
                 cancellation);
@@ -191,6 +200,7 @@ public static class MealWeekRun
         {
             Documents = documents,
             Templates = templates,
+            ExtraLinesUnreadable = extraLinesUnreadable,
         }));
     }
 
