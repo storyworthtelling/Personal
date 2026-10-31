@@ -405,7 +405,7 @@ public static class MmsRetrieveConfParser
             var end = Bounded(pos + length);
             var relative = Byte() == RelativeToken;
             var value = ReadLongInteger();
-            pos = end;
+            pos = SkipTo(end);
             return (relative, value);
         }
 
@@ -439,7 +439,7 @@ public static class MmsRetrieveConfParser
             {
                 from = WithoutTypeSuffix(ReadEncodedString());
             }
-            pos = Bounded(end);
+            pos = SkipTo(end);
             return string.IsNullOrEmpty(from) ? null : from;
         }
 
@@ -723,6 +723,13 @@ public static class MmsRetrieveConfParser
             pos = end;
             return bytes;
         }
+
+        // A declared Value-length can only move the reader forward. Real carriers declare one
+        // shorter than its content (a From of 8 over a 24-octet address, an Expiry of 3 over 5),
+        // and AOSP ignores the length and carries on from where the value ended; rewinding to the
+        // declared end lands mid-value and misreads everything after it.
+        private int SkipTo(int end) =>
+            end <= pdu.Length ? Math.Max(pos, end) : throw new MalformedPduException("A length runs past the end of the message");
 
         private int Bounded(int end) =>
             end <= pdu.Length && end >= pos
