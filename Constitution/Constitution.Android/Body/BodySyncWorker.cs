@@ -32,6 +32,7 @@ public class BodySyncWorker : Worker
     public override Result DoWork()
     {
         var context = ApplicationContext!;
+        Constitution.Waiting.NoticePoster.Attach(context);
         var log = new BodyLog(context);
         try
         {

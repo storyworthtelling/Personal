@@ -31,6 +31,7 @@ public class ReadBackWorker : Worker
     public override Result DoWork()
     {
         var context = ApplicationContext!;
+        Constitution.Waiting.NoticePoster.Attach(context);
         var log = new ReadBackLog(context);
         try
         {

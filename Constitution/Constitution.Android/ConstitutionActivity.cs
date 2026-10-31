@@ -84,6 +84,7 @@ public abstract class ConstitutionActivity : Activity
     {
         base.OnCreate(savedInstanceState);
         PaperTransitions.Apply(this);
+        NoticePoster.Attach(this);
 
         pillarStore = new PillarStore(this);
         settingsArea = new SettingsArea(this);
@@ -205,6 +206,7 @@ public abstract class ConstitutionActivity : Activity
         }
 
         household.Resumed();
+        NoticePoster.AskIfNeeded(this);
 
         // Where background reads are not granted the app's own opening is the refresh (R5); off the UI thread.
         BodyServices.RefreshAtOpen(this);
