@@ -191,6 +191,7 @@ public enum PersonProblem
     NameTooLong,
     ChildOnPickup,
     AddressShape,
+    NotOnTheRoster,
 }
 
 /// <summary>

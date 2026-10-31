@@ -21,6 +21,7 @@ using Constitution.Infrastructure.SleepNumber;
 using Constitution.Infrastructure.Vault;
 using Constitution.Services;
 using Constitution.Settings;
+using Constitution.WorkoutsTab;
 using Storyworthtelling.Remarkable;
 
 namespace Constitution;
@@ -37,7 +38,7 @@ namespace Constitution;
 /// is not built (spike D96). Success is an inline change of the text, never a toast.</para>
 /// </summary>
 public sealed class SettingsArea(Activity host)
-    : ConstitutionAreaBase(host, "settings", Resource.Drawable.area_settings)
+    : ConstitutionAreaBase(host, "settings", Resource.Drawable.area_settings), IUndoableArea
 {
     private const string PillarsGroup = "pillars";
     private const string EquipmentGroup = "equipment";
@@ -59,6 +60,16 @@ public sealed class SettingsArea(Activity host)
     private string? householdNote;
     private readonly Dictionary<string, string> rowNotes = [];
 
+    // The person sheet (opened from a person in the Household list): which person, what was typed, the one sentence it carries, and the
+    // model its pinned bar was built from. A removal is written at once and undone from the shared dog-ear within its window.
+    private readonly PersonRemovalUndo removalUndo = new();
+    private readonly Android.OS.Handler handler = new(Android.OS.Looper.MainLooper!);
+    private PersonId? openPerson;
+    private PersonSheetInput? sheetInput;
+    private PersonSheetModel? sheetModel;
+    private string? sheetStatus;
+    private bool sheetBusy;
+
     private EditText? passphraseField;
     private EditText? firstEntry;
     private EditText? secondEntry;
@@ -74,8 +85,23 @@ public sealed class SettingsArea(Activity host)
 
     public override void Pause() => CommitPassphrase();
 
+    public override View? BuildBottomBar() =>
+        openPerson is not null && sheetModel is not null ? PersonSheetView.BuildBar(Host, sheetModel, OnSheetAction, sheetBusy) : null;
+
     protected override View BuildPage()
     {
+        sheetModel = null;
+        if (openPerson is { } personId)
+        {
+            if (BuildPersonSheet(personId) is { } sheet)
+            {
+                return sheet;
+            }
+
+            // The person is no longer on the roster (a removal landed, or the file changed): back to the list.
+            CloseSheet();
+        }
+
         var inputs = ConnectionInputs();
         var model = SettingsModel.Build(pillarStore.Read(), equipmentStore.Read(), inputs);
         // A broken connection lights the dog-ear's notice; a mended one takes it away.
@@ -95,7 +121,7 @@ public sealed class SettingsArea(Activity host)
         {
             householdNote = note;
             RaiseChanged();
-        }));
+        }, OpenSheet));
         AddGroup(column, ConnectionsGroup, "Connections", model.ConnectionsSummary, BuildConnections(model));
 
         column.AddView(Spaced(PaperUi.Label(Host, "Vault passphrase"), DesignTokens.Space.X6, DesignTokens.Space.X1));
@@ -118,6 +144,145 @@ public sealed class SettingsArea(Activity host)
 
         scroll.AddView(column);
         return scroll;
+    }
+
+    // ---- the person sheet ----
+
+    private View? BuildPersonSheet(PersonId id)
+    {
+        var service = ConstitutionHousehold.For(Host).Service;
+        if (service.Roster is not { } roster || roster.Entries.FirstOrDefault(entry => entry.Id == id) is not { } entry)
+        {
+            return null;
+        }
+
+        sheetModel = PersonSheetModel.Build(roster, id, service.RosterRole);
+        if (sheetModel is null)
+        {
+            return null;
+        }
+
+        sheetInput ??= PersonSheetInput.From(entry);
+        return PersonSheetView.Build(Host, sheetModel, sheetInput, sheetStatus);
+    }
+
+    private void OpenSheet(PersonId id)
+    {
+        openPerson = id;
+        sheetInput = null;
+        sheetStatus = null;
+        sheetBusy = false;
+        RaiseChanged();
+    }
+
+    private void CloseSheet()
+    {
+        openPerson = null;
+        sheetInput = null;
+        sheetModel = null;
+        sheetStatus = null;
+        sheetBusy = false;
+    }
+
+    private void OnSheetAction(PersonSheetAction action)
+    {
+        if (openPerson is not { } id || sheetInput is not { } input || sheetBusy)
+        {
+            return;
+        }
+
+        var changes = new HouseholdRosterChanges(ConstitutionHousehold.For(Host).Service);
+        switch (action)
+        {
+            case PersonSheetAction.Back:
+                CloseSheet();
+                RaiseChanged();
+                break;
+            case PersonSheetAction.Save:
+                RunSheetChange($"Saving {input.Name.Trim()}.", () => changes.SaveAsync(id, input.Name, input.OnPickup, input.Address, CancellationToken.None),
+                    _ => "Saved.");
+                break;
+            case PersonSheetAction.Remove:
+                RunSheetChange($"Removing {sheetModel?.Title}.", () => changes.RemoveAsync(id, CancellationToken.None), BeginRemovalUndo);
+                break;
+        }
+    }
+
+    // The loading rule: a status sentence while the change is written off the UI thread, then the outcome in a sentence.
+    private void RunSheetChange(string working, Func<Task<RosterChangeResult>> change, Func<RosterChangeResult, string> onDone)
+    {
+        sheetBusy = true;
+        sheetStatus = working;
+        RaiseChanged();
+        _ = Task.Run(async () =>
+        {
+            var result = await change();
+            Host.RunOnUiThread(() =>
+            {
+                sheetBusy = false;
+                if (result.Done)
+                {
+                    sheetStatus = onDone(result);
+                }
+                else
+                {
+                    sheetStatus = result.Sentence;
+                }
+
+                RaiseChanged();
+            });
+        });
+    }
+
+    // The removal is already written. The corner folds for the undo window and the list says so; the sheet closes onto the list.
+    private string BeginRemovalUndo(RosterChangeResult result)
+    {
+        var removed = result.Removed!;
+        ConnectionNoticeBoard.With(board =>
+        {
+            removalUndo.Begin(board, removed, DateTimeOffset.UtcNow);
+            return true;
+        });
+        householdNote = PersonRemovalUndo.RemovedSentence(removed);
+        openGroup = HouseholdGroup;
+        CloseSheet();
+        handler.RemoveCallbacksAndMessages(null);
+        handler.PostDelayed(() => StandRemoval(removed), (long)NoticeBoard.UndoWindow.TotalMilliseconds + 1);
+        return string.Empty;
+    }
+
+    // The window closed: the removal stands, and the list stops promising a way back.
+    private void StandRemoval(RemovedPerson removed)
+    {
+        if (!removalUndo.Expire(DateTimeOffset.UtcNow))
+        {
+            return;
+        }
+
+        householdNote = PersonRemovalUndo.StandsSentence(removed);
+        RaiseChanged();
+    }
+
+    /// <summary>The shell turned the fold and the board gave back this act: the person is written back, newer than the removal.</summary>
+    public void UndoTurned(string actKey)
+    {
+        if (removalUndo.Reverse(actKey, DateTimeOffset.UtcNow) is not { } removed)
+        {
+            return;
+        }
+
+        handler.RemoveCallbacksAndMessages(null);
+        householdNote = $"Bringing {removed.Name} back.";
+        var changes = new HouseholdRosterChanges(ConstitutionHousehold.For(Host).Service);
+        _ = Task.Run(async () =>
+        {
+            var result = await changes.RestoreAsync(removed, CancellationToken.None);
+            Host.RunOnUiThread(() =>
+            {
+                householdNote = result.Done ? PersonRemovalUndo.RestoredSentence(removed) : result.Sentence;
+                RaiseChanged();
+            });
+        });
     }
 
     // ---- groups ----

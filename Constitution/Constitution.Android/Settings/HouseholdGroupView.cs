@@ -5,6 +5,7 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Constitution.Domain.Calendar;
+using Constitution.Domain.Household;
 using Constitution.Domain.Settings;
 using Constitution.Domain.Time;
 
@@ -20,9 +21,10 @@ public static class HouseholdGroupView
 {
     private const int StepMinutes = 15;
 
-    // onSaved receives the sentence to leave under the group; the page keeps it and redraws.
+    // onSaved receives the sentence to leave under the group; the page keeps it and redraws. onOpenPerson opens that person's sheet.
     public static View Build(
-        Context context, HouseholdGroupModel model, HouseholdChoices choices, HouseholdSetupStore store, string? note, Action<string> onSaved)
+        Context context, HouseholdGroupModel model, HouseholdChoices choices, HouseholdSetupStore store, string? note, Action<string> onSaved,
+        Action<PersonId> onOpenPerson)
     {
         var body = new LinearLayout(context) { Orientation = Orientation.Vertical };
         LinearLayout.LayoutParams Gap(int top) => new(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
@@ -44,6 +46,11 @@ public static class HouseholdGroupView
                 line.AddView(PaperUi.Secondary(context, muted));
             }
 
+            // A tap opens the person's sheet, on either install: the partner's is read-only.
+            var id = person.Id;
+            line.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
+            line.SetGravity(GravityFlags.CenterVertical);
+            line.Click += (_, _) => onOpenPerson(id);
             body.AddView(line, Gap(DesignTokens.Space.X2));
         }
 
