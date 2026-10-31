@@ -18,6 +18,7 @@ public class NoticeNotificationTests
     [
         NoticeKind.ReMarkableDelivery, NoticeKind.HealthConnectRevoked, NoticeKind.BedOffline,
         NoticeKind.ScanToCheck, NoticeKind.BoxUnderTen,
+        NoticeKind.WeekNotPlanned, NoticeKind.HouseholdFileUnreadable,
     ];
 
     [Fact]
@@ -46,6 +47,9 @@ public class NoticeNotificationTests
         // D91: a waiting scan's bookmark is slate, though its dog-ear stays teal.
         Assert.Equal("reference", NoticeNotifications.For(NoticeKind.ScanToCheck)!.RoleWire);
         Assert.Equal("reference", NoticeNotifications.For(NoticeKind.BoxUnderTen)!.RoleWire);
+        // Owner decision: the two other Problems post too, and light the ribbon rose.
+        Assert.Equal("problem", NoticeNotifications.For(NoticeKind.WeekNotPlanned)!.RoleWire);
+        Assert.Equal("problem", NoticeNotifications.For(NoticeKind.HouseholdFileUnreadable)!.RoleWire);
     }
 
     [Fact]

@@ -8,7 +8,7 @@ public sealed record NoticeNotificationPlan(IReadOnlyList<NoticeNotification> Po
 
 /// <summary>
 /// The brief's short list as ordinary Android notifications (C-9.1.3; D83, D91; PC1, PC2): a scan waiting,
-/// the box under ten, and the three errors (reMarkable delivery, Health Connect revoked, the bed offline).
+/// the box under ten, the three errors (reMarkable delivery, Health Connect revoked, the bed offline), and, by the owner's later decision, the week that could not be planned and the household file that will not open.
 /// The same path serves both phones. On the partner's it is an ordinary notification; on the owner's locked
 /// phone the lockdown suppresses the alert, so it shows only as Flyleaf's bookmark, coloured by the role
 /// extra each one carries.
@@ -41,6 +41,8 @@ public static class NoticeNotifications
         new(NoticeKind.BedOffline, 4103, ProblemRole, "The bed cannot be reached", "Open Constitution to see what to do."),
         new(NoticeKind.ScanToCheck, 4104, ReferenceRole, "A scanned page is waiting", "It needs a quick look before it is kept."),
         new(NoticeKind.BoxUnderTen, 4105, ReferenceRole, "The budget box is running low", "Worth knowing. Nothing to do."),
+        new(NoticeKind.WeekNotPlanned, 4106, ProblemRole, "The week could not be planned", "Open Constitution to see what to do."),
+        new(NoticeKind.HouseholdFileUnreadable, 4107, ProblemRole, "The household file will not open", "Open Constitution to see what to do."),
     ];
 
     /// <summary>The kinds that post, in table order.</summary>

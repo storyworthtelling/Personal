@@ -67,13 +67,5 @@ public class DigestReachabilityTests
         Assert.DoesNotMatch(@"DigestPlannerNotes|DigestIds", Source("Constitution.Infrastructure/Documents/SaturdayDigestRun.cs"));
     }
 
-    [Fact]
-    public void NoWeekNotPlannedOrHouseholdNoticePostsYet()
-    {
-        var domain = Source("Constitution.Domain/Notices/NoticeNotifications.cs");
-        Assert.DoesNotContain("WeekNotPlanned", domain, StringComparison.Ordinal);
-        Assert.DoesNotContain("HouseholdFileUnreadable", domain, StringComparison.Ordinal);
-    }
-
     private static string Source(string relative) => File.ReadAllText(Path.Combine(ConstitutionSource.Root(), relative));
 }
