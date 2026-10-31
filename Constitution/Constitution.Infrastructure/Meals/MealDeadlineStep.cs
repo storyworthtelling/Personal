@@ -111,26 +111,13 @@ public static class MealDeadlineStep
         }
 
         var zone = inputs.Rules.Zone;
-        var passed = kept.Weeks.Where(week => inputs.Now >= MealDeadline.ForWeek(week.WeekStart, zone)).ToList();
-        if (kept.Weeks.Count == 0)
+        var choice = MealDeadlineTarget.Choose(kept, decided, inputs.Now, zone);
+        if (choice is MealDeadlineChoice.Nothing nothing)
         {
-            return Nothing(MealDeadlineNothingBecause.NoWeekKept, "No planned week is kept, so there is no sheet to decide.");
+            return Nothing(nothing.Because, nothing.Sentence);
         }
 
-        if (passed.Count == 0)
-        {
-            return Nothing(MealDeadlineNothingBecause.BeforeTheDeadline, "The sheet's deadline has not passed yet.");
-        }
-
-        var newest = passed.MaxBy(week => week.WeekStart)!;
-        var earlier = decided.For(newest.WeekStart);
-        var target = earlier is null
-            ? newest
-            : passed.Where(week => decided.For(week.WeekStart) is { } entry && (entry.EvidencePending || entry.RemovalsDue(ZoneClock.DayOf(inputs.Now, zone)))).MaxBy(week => week.WeekStart);
-        if (target is null)
-        {
-            return Nothing(MealDeadlineNothingBecause.AlreadyDecided, "Every week whose deadline has passed is already decided.");
-        }
+        var target = ((MealDeadlineChoice.Decide)choice).Target;
 
         var existing = decided.For(target.WeekStart);
         var week = target.WeekStart;

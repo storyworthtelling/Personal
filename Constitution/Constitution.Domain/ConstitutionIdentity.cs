@@ -77,6 +77,15 @@ public static class ConstitutionIdentity
     public const string WorkoutWeekWorkName = "constitution-workout-week";
 
     /// <summary>
+    /// The hourly meal-week worker's registered Java name (P13). Frozen for the same reason as <see cref="ReadBackWorkerName"/>:
+    /// WorkManager persists the row by class name and the work is enqueued with <c>Keep</c>.
+    /// </summary>
+    public const string MealWeekWorkerName = ApplicationId + ".MealWeekWorker";
+
+    /// <summary>The meal-week worker's unique work name; frozen for the same reason as <see cref="ReadBackWorkName"/>.</summary>
+    public const string MealWeekWorkName = "constitution-meal-week";
+
+    /// <summary>
     /// The app's SharedPreferences file name. It is where an upgraded phone finds what the owner
     /// set; rename it and every setting is silently not found.
     /// </summary>
@@ -182,10 +191,10 @@ public static class ConstitutionIdentity
     public static IReadOnlyList<string> DeclaredPermissions { get; } = [BudgetPermission];
 
     /// <summary>Every registered worker Java name, for the guard to enumerate.</summary>
-    public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName, WorkoutWeekWorkerName];
+    public static IReadOnlyList<string> Workers { get; } = [ReadBackWorkerName, BodySyncWorkerName, WorkoutWeekWorkerName, MealWeekWorkerName];
 
     /// <summary>Every unique work name, for the guard to enumerate.</summary>
-    public static IReadOnlyList<string> WorkNames { get; } = [ReadBackWorkName, BodySyncWorkName, WorkoutWeekWorkName];
+    public static IReadOnlyList<string> WorkNames { get; } = [ReadBackWorkName, BodySyncWorkName, WorkoutWeekWorkName, MealWeekWorkName];
 
     /// <summary>Every preference file name and key, for the guard to enumerate.</summary>
     public static IReadOnlyList<string> PreferenceKeys { get; } = [

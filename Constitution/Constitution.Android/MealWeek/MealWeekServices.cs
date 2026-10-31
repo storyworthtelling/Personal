@@ -37,9 +37,13 @@ namespace Constitution.WeeklyMeals;
 ///
 /// <para><b>The paper (part two).</b> After the week is kept, the same run turns it into the meal sheet and each cook's recipe and puts them on this phone's tablet
 /// (<see cref="MealDocumentsStep"/>); the tablet, the delivery service, the ink probe and the read-back's record are the workout run's own
-/// (<see cref="WorkoutWeekDeliverySeams"/>). A recipe goes an hour before its cook block, so it waits for a later call: there is no scheduled one yet.</para>
+/// (<see cref="WorkoutWeekDeliverySeams"/>). A recipe goes an hour before its cook block, so it waits for a later call, and no scheduled call reaches it (D116).</para>
 ///
-/// <para><b>Not yet here:</b> a worker to call <see cref="RunAsync"/> (a later job), a taste profile store (the source says there is none,
+/// <para><b>The worker.</b> <see cref="MealWeekWorker"/> calls <see cref="PassAsync"/>, which looks at the stamp and the two kept records and runs only what is due: this
+/// run, then the deadline step (<see cref="TryDecideAsync"/>), each through <see cref="RunGate.Shared"/>. <b>Known gap (D116):</b> this run plans the week <i>after</i> the one that
+/// holds now, so the recipes it sends are for a week that has not begun; the week in progress is never the kept week of a run, and no pass yet sends its recipes in their hour.</para>
+///
+/// <para><b>Not yet here:</b> a taste profile store (the source says there is none,
 /// which plans without one), a source for the evenings the children eat at home, the Cook this soon mark, and an approval step. Nothing is swallowed
 /// here: a seam's exception propagates to whoever calls. Device-gated: nothing here has met Google Calendar or a phone.</para>
 /// </summary>
@@ -50,6 +54,7 @@ public static class MealWeekServices
     public const string RecordFile = "planned-weeks.json";
     public const string DeliveredFile = "delivered-documents.json";
     public const string DecisionFile = "decided-weeks.json";
+    public const string StampFile = "pass-stamp.json";
 
     public static async Task<MealWeekOutcome> RunAsync(Context context, CancellationToken cancellation)
     {
@@ -75,13 +80,7 @@ public static class MealWeekServices
         cancellation.ThrowIfCancellationRequested();
 
         var appContext = context.ApplicationContext ?? context;
-        var root = NoBackupRoot(appContext);
-        var workScheduleJson = new ConstitutionConnections(appContext).WorkScheduleJson;
-        var prepared = MealWeekJoin.Prepare(
-            PlanningSetupFile.Read(Path.Combine(WorkoutWeekPaths.Folder(root), WorkoutWeekCalendarSeams.SetupFile)),
-            string.IsNullOrWhiteSpace(workScheduleJson) ? null : workScheduleJson,
-            TimeZoneInfo.Local,
-            DateTimeOffset.Now);
+        var prepared = Prepare(appContext);
 
         if (prepared is MealWeekPreparation.Stop stop)
         {
@@ -93,6 +92,66 @@ public static class MealWeekServices
         var ready = (MealWeekPreparation.Ready)prepared;
         var seams = Assemble(appContext, WorkoutWeekCalendarSeams.Create(appContext, KeyFamily.HouseholdMeal));
         return await MealWeekRun.RunAsync(ready.Inputs, seams, cancellation);
+    }
+
+    /// <summary>
+    /// What a pass is for: the meal run, then the deadline step, whichever of them is due (<see cref="MealWeekPass"/>, which first reads the stamp and the two kept records and
+    /// runs nothing when nothing is due). Each part goes through <see cref="RunGate.Shared"/> by <see cref="TryRunAsync"/> and <see cref="TryDecideAsync"/>, so a busy gate is a
+    /// typed step and not a throw. The result is returned whole; the caller decides whether a fault fails the pass (<see cref="MealPassResult.ThrowIfFaulted"/>).
+    /// </summary>
+    public static async Task<MealPassResult> PassAsync(Context context, MealPassTrigger trigger, CancellationToken cancellation)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellation.ThrowIfCancellationRequested();
+
+        var appContext = context.ApplicationContext ?? context;
+        var folder = FolderOf(appContext);
+        var seams = new MealPassSeams(
+            new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
+            DecisionRecords(appContext),
+            new FileMealPassStamps(Path.Combine(folder, StampFile)),
+            token => TryRunAsync(appContext, token),
+            token => TryDecideAsync(appContext, token),
+            new BodyMealLog(new BodyLog(appContext)));
+        var zone = Prepare(appContext) is MealWeekPreparation.Ready ready ? ready.Inputs.Rules.Zone : TimeZoneInfo.Local;
+        return await MealWeekPass.RunAsync(trigger, DateTimeOffset.Now, zone, seams, cancellation);
+    }
+
+    /// <summary>The deadline step, once it has its turn at the calendars (it takes a denied evening's cook block off, through the same record of written keys); <see cref="GateResult{T}.Busy"/> when another placement run held them for the whole wait.</summary>
+    public static Task<GateResult<MealDeadlineOutcome>> TryDecideAsync(Context context, CancellationToken cancellation)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellation.ThrowIfCancellationRequested();
+        return RunGate.Shared.RunAsync(token => DecideAloneAsync(context, token), RunGate.DefaultWait, cancellation);
+    }
+
+    private static async Task<MealDeadlineOutcome> DecideAloneAsync(Context context, CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+
+        var appContext = context.ApplicationContext ?? context;
+        var prepared = Prepare(appContext);
+        if (prepared is MealWeekPreparation.Stop stop)
+        {
+            // A kept week and no household setup: the rules (and so the zone) are unknown, so nothing is decided. A typed stop, tried again once the setup reads.
+            var stopped = new MealDeadlineOutcome.Stopped(MealDeadlineStoppedBecause.NotConfigured, stop.Outcome.Sentence);
+            new BodyMealLog(new BodyLog(appContext)).Outcome(MealDeadlineTrail.LogPhrase(stopped));
+            return stopped;
+        }
+
+        var ready = (MealWeekPreparation.Ready)prepared;
+        return await MealDeadlineStep.RunAsync(new MealDeadlineInputs(ready.Inputs.Now, ready.Inputs.Rules), AssembleDeadline(appContext), cancellation);
+    }
+
+    // The household's own setup joined with the clock, read afresh each time: the file is small and local, and a pass must see the setup as it is now.
+    private static MealWeekPreparation Prepare(Context appContext)
+    {
+        var workScheduleJson = new ConstitutionConnections(appContext).WorkScheduleJson;
+        return MealWeekJoin.Prepare(
+            PlanningSetupFile.Read(Path.Combine(WorkoutWeekPaths.Folder(NoBackupRoot(appContext)), WorkoutWeekCalendarSeams.SetupFile)),
+            string.IsNullOrWhiteSpace(workScheduleJson) ? null : workScheduleJson,
+            TimeZoneInfo.Local,
+            DateTimeOffset.Now);
     }
 
     /// <summary>The saved weeks as the Meals tab and Today read them.</summary>
@@ -157,8 +216,8 @@ public static class MealWeekServices
     /// <summary>
     /// The seams of the deadline step (<see cref="MealDeadlineStep"/>), the part of the meal week that runs once the sheet's deadline has passed. The lease, the kept
     /// weeks, the household file's answers, library and taste notes are this install's own; the record of decided weeks is a small file beside the kept weeks; the calendar side (the meal key family's writer, the narrow editor and the written keys the meal run placed with) takes a denied evening's cook block off (D111). <b>The taste
-    /// judge is <see cref="UnavailableTasteJudge"/>:</b> no Claude judge exists yet, so written words are recorded as unjudged and asked again on the next run. Nothing calls
-    /// the step yet (a worker is a later job), and nothing here holds a secret.
+    /// judge is <see cref="UnavailableTasteJudge"/>:</b> no Claude judge exists yet, so written words are recorded as unjudged and asked again on the next run. The worker
+    /// reaches it through <see cref="TryDecideAsync"/>, and nothing here holds a secret.
     /// </summary>
     public static MealDeadlineSeams AssembleDeadline(Context appContext)
     {

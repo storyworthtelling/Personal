@@ -27,8 +27,9 @@ public class MealDeadlineWiringGuardTests
     }
 
     [Fact]
-    public void NothingInTheAppCallsTheStepYet()
+    public void OnlyTheMealServicesCallTheStep()
     {
+        // The meal worker's pass is the step's one caller, through MealWeekServices.TryDecideAsync and so through the shared run gate (D114).
         var callers = ConstitutionSource.Files(".cs")
             .Select(ConstitutionSource.Relative)
             .Where(path => !path.StartsWith("Constitution.Tests/", StringComparison.Ordinal) && !path.EndsWith("Infrastructure/Meals/MealDeadlineStep.cs", StringComparison.Ordinal))
@@ -36,7 +37,7 @@ public class MealDeadlineWiringGuardTests
                 .Contains("MealDeadlineStep.RunAsync(", StringComparison.Ordinal))
             .ToList();
 
-        Assert.Empty(callers);
+        Assert.Equal(["Constitution.Android/MealWeek/MealWeekServices.cs"], callers);
     }
 
     [Fact]

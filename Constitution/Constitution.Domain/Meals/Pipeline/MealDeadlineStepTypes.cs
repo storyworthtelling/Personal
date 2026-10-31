@@ -40,6 +40,9 @@ public enum MealDeadlineStoppedBecause
 
     /// <summary>The template library could not be written.</summary>
     LibraryNotSaved,
+
+    /// <summary>This phone has no household setup that can be read, so there are no rules to read the deadline by (the worker found a kept week and no setup).</summary>
+    NotConfigured,
 }
 
 /// <summary>What a deciding run did. Counts and card ids only.</summary>
