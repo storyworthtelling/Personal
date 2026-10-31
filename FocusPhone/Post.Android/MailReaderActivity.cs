@@ -67,11 +67,15 @@ public class MailReaderActivity : Activity
             PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea),
             new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
+        var buttons = new List<View>();
         if (item.Attachments.Count > 0)
         {
-            root.AddView(PaperUi.BottomBar(this, PaperUi.SecondaryButton(
-                this, Attachments.Label(item.Attachments), () => Attachments.Offer(this, host, item))));
+            buttons.Add(PaperUi.SecondaryButton(
+                this, Attachments.Label(item.Attachments), () => Attachments.Offer(this, host, item)));
         }
+        buttons.Add(PaperUi.SecondaryButton(this, "File", () => Hand(item, ReaderAction.File)));
+        buttons.Add(PaperUi.DestructiveButton(this, "Delete", () => Hand(item, ReaderAction.Delete)));
+        root.AddView(PaperUi.BottomBar(this, [.. buttons]));
 
         SetContentView(root);
         // 0, not edge: BinderFrame's own contentHost already pads the horizontal edge, and
@@ -82,6 +86,18 @@ public class MailReaderActivity : Activity
     // Names the tab PostActivity should land on once this screen finishes (see
     // PostActivity.PendingArea); ReorderToFront brings its existing instance forward rather
     // than creating a second one, or starts it fresh if it isn't running at all.
+    // File or delete is the Mailbox's to carry out (it owns the undo window), so the reader
+    // names the message and the act, then gets out of the way.
+    private void Hand(TimelineItem item, ReaderAction action)
+    {
+        PostActivity.PendingReaderAction = (item.SourceId, action);
+        PostActivity.PendingArea = PostShellAreas.Mailbox;
+        var intent = new Intent(this, typeof(PostActivity));
+        intent.AddFlags(ActivityFlags.ReorderToFront);
+        StartActivity(intent);
+        Finish();
+    }
+
     private void SwitchArea(int index)
     {
         PostActivity.PendingArea = index;
@@ -128,39 +144,7 @@ public class MailReaderActivity : Activity
         }
     }
 
-    // Every link in an email leaves. Flyleaf's restricted browser is where the suite's
-    // origin containment lives, so a link from a stranger meets the same rules as one the
-    // owner typed. Targeted explicitly at RestrictedBrowserActivity rather than left to an
-    // implicit VIEW intent — the device-owner persistent-preferred-activity pin that would
-    // otherwise route it there can be outranked by a host's verified Android App Links,
-    // which is how a link was observed opening in full Chrome instead.
-    private void OpenInRestrictedBrowser(string url)
-    {
-        var uri = Android.Net.Uri.Parse(url);
-        var intent = new Intent(Intent.ActionView, uri);
-        intent.SetComponent(new ComponentName(RestrictedBrowserHandoff.Package, RestrictedBrowserHandoff.Activity));
-        try
-        {
-            StartActivity(intent);
-        }
-        catch (ActivityNotFoundException)
-        {
-            // Flyleaf isn't installed under the expected id on this device — fall back to
-            // whatever the platform resolves rather than dropping the link entirely.
-            try
-            {
-                StartActivity(new Intent(Intent.ActionView, uri));
-            }
-            catch (Exception e)
-            {
-                PostDiagnostics.LogWarning("MailReader", $"Could not open a link from mail: {url}", e);
-            }
-        }
-        catch (Exception e)
-        {
-            PostDiagnostics.LogWarning("MailReader", $"Could not open a link from mail: {url}", e);
-        }
-    }
+    private void OpenInRestrictedBrowser(string url) => LinkOpener.Open(this, url);
 
     private TimelineItem? Load()
     {

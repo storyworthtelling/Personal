@@ -15,7 +15,7 @@ namespace Codex.Ui;
 /// otherwise — a list that is not picking has no picked rows to show.
 /// </param>
 public sealed record PaperListRow(
-    string Primary, string? Secondary = null, string? ArtworkPath = null, bool Picked = false);
+    string Primary, string? Secondary = null, string? ArtworkPath = null, bool Picked = false, bool Links = false);
 
 /// <summary>
 /// The DESIGN.md list-row recipe, replacing the stock SimpleListItem layouts:
@@ -27,15 +27,21 @@ public class PaperListAdapter : BaseAdapter
     private readonly Context context;
     private readonly IReadOnlyList<PaperListRow> rows;
     private readonly bool picking;
+    private readonly Action<string>? openLink;
 
+    /// <param name="openLink">
+    /// Where a tapped link in a row that asked for <see cref="PaperListRow.Links"/> goes.
+    /// The platform's own URL span would open the default browser; the caller decides instead.
+    /// </param>
     /// <param name="picking">
     /// Selection mode: the leading slot becomes a checkbox and cover art comes off.
     /// The art is dropped rather than squeezed beside the box — at this row height
     /// both crush the title, and while you are picking, the title is the thing you
     /// are reading.
     /// </param>
-    public PaperListAdapter(Context context, IReadOnlyList<PaperListRow> rows, bool picking = false)
+    public PaperListAdapter(Context context, IReadOnlyList<PaperListRow> rows, bool picking = false, Action<string>? openLink = null)
     {
+        this.openLink = openLink;
         this.context = context;
         this.rows = rows;
         this.picking = picking;
@@ -50,7 +56,7 @@ public class PaperListAdapter : BaseAdapter
     public override View GetView(int position, View? convertView, ViewGroup? parent)
     {
         var view = convertView as RowView ?? new RowView(context);
-        view.Bind(rows[position], picking);
+        view.Bind(rows[position], picking, openLink);
         return view;
     }
 
@@ -106,9 +112,21 @@ public class PaperListAdapter : BaseAdapter
             lines.AddView(secondary);
         }
 
-        public void Bind(PaperListRow row, bool picking)
+        public void Bind(PaperListRow row, bool picking, Action<string>? openLink)
         {
-            primary.Text = row.Primary;
+            if (row.Links && openLink is not null && !picking)
+            {
+                primary.TextFormatted = LinkText.Build(row.Primary, openLink);
+                primary.MovementMethod = new LinkText.TapOnlyMethod();
+                // Not clickable, so a tap that misses every link falls through to the row.
+                primary.Clickable = false;
+                primary.LongClickable = false;
+            }
+            else
+            {
+                primary.MovementMethod = null;
+                primary.Text = row.Primary;
+            }
             secondary.Text = row.Secondary;
             secondary.Visibility = row.Secondary is null ? ViewStates.Gone : ViewStates.Visible;
 

@@ -118,6 +118,11 @@ public class MmsDeliverReceiver : BroadcastReceiver
                     PostDiagnostics.LogWarning("Mms", $"An MMS notification arrived but could not be read ({shape}). "
                         + $"Layout: {MmsPduShape.Redacted(pdu ?? [])}");
                     PostDiagnostics.LogText("Mms", $"MMS notice unreadable ({shape})");
+                    if (pdu is { Length: > 0 })
+                    {
+                        // The carrier will not announce it again; keep it to read after an update.
+                        UnreadNoticeStore.Save(context, pdu);
+                    }
                 }
                 return;
             }
