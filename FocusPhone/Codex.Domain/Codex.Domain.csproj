@@ -6,6 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The log loop's shared core (LOG-LOOP-PLAN.md A5): dependency-free, so Domain stays free of
+         third-party code. DiagnosticLog seals into its LogOutbox instead of discarding a full log. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Resources\public_suffix_list.dat" />
   </ItemGroup>
 </Project>

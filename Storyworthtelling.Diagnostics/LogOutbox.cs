@@ -57,11 +57,17 @@ public sealed partial class LogOutbox
     /// Seals one live log into the outbox. Returns null when there is nothing to seal (no file, or an
     /// empty one), so an idle log costs no segment.
     /// </summary>
-    public SealedSegment? Seal(string liveFilePath)
+    public SealedSegment? Seal(string liveFilePath) => Seal(liveFilePath, Path.GetFileName(liveFilePath));
+
+    /// <summary>
+    /// Seals a file under another log's name — an old <c>diagnostic.log.1</c> backup left by the roll this
+    /// outbox replaced is sealed as <c>diagnostic.log</c>, so it is read and uploaded with its own log.
+    /// </summary>
+    public SealedSegment? Seal(string filePath, string logName)
     {
         lock (gate)
         {
-            var segment = SealLocked(liveFilePath);
+            var segment = SealLocked(filePath, logName);
             if (segment is not null)
             {
                 EnforceCap();
@@ -76,7 +82,7 @@ public sealed partial class LogOutbox
         lock (gate)
         {
             var sealedNow = liveFilePaths
-                .Select(SealLocked)
+                .Select(path => SealLocked(path, Path.GetFileName(path)))
                 .OfType<SealedSegment>()
                 .ToList();
             if (sealedNow.Count > 0)
@@ -125,7 +131,7 @@ public sealed partial class LogOutbox
     /// <summary>The owner's own Clear on a Diagnostics screen: that log's sealed segments go too.</summary>
     public void ClearLog(string logName) => Delete(SegmentsFor(logName));
 
-    private SealedSegment? SealLocked(string liveFilePath)
+    private SealedSegment? SealLocked(string liveFilePath, string logName)
     {
         if (!File.Exists(liveFilePath) || new FileInfo(liveFilePath).Length == 0)
         {
@@ -134,7 +140,6 @@ public sealed partial class LogOutbox
 
         System.IO.Directory.CreateDirectory(Directory);
         var sequence = NextSequence();
-        var logName = Path.GetFileName(liveFilePath);
         var target = Path.Combine(Directory, $"{sequence:000000}.{logName}{SealedSuffix}");
         File.Move(liveFilePath, target);
         return Describe(target);
