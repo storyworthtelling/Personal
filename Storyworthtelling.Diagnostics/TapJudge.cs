@@ -108,6 +108,9 @@ public sealed class TapJudge
 
     public IReadOnlyList<TapRecord> Recent => ring.ToList();
 
+    /// <summary>Whether anything is waiting to mature — the hook keeps ticking while this is true.</summary>
+    public bool HasPending => pendingDead.Count > 0 || bursts.Count > 0 || actions.Count > 0;
+
     public IReadOnlyList<TapVerdict> Tap(long atMs, string screen, string control, TapPoint point, bool enabled, bool isControl)
     {
         var verdicts = Settle(atMs);
@@ -131,7 +134,7 @@ public sealed class TapJudge
         var actionRunning = actions.Values.Any(a => a.DeadlineMs > atMs);
         if (enabled && isControl && !actionRunning && (firstOfBurst || !burst.HasDeadCandidate))
         {
-            pendingDead.Add(new PendingDead(atMs, screen, control, burst));
+            pendingDead.Add(new PendingDead(atMs, screen, control, burst, atMs));
             burst.HasDeadCandidate = true;
         }
         return verdicts;
@@ -182,6 +185,24 @@ public sealed class TapJudge
         return verdicts;
     }
 
+    /// <summary>
+    /// The click handler for this control returned. Its tap's dead window restarts here: a handler that
+    /// held the UI thread for seconds changes the screen only once it returns, and that is not a dead tap.
+    /// Re-armed before settling, so a handler longer than the window cannot mature its own tap.
+    /// </summary>
+    public IReadOnlyList<TapVerdict> HandlerFinished(long atMs, string screen, string control)
+    {
+        for (var i = 0; i < pendingDead.Count; i++)
+        {
+            var pending = pendingDead[i];
+            if (pending.Screen == screen && pending.Control == control && pending.AtMs <= atMs)
+            {
+                pendingDead[i] = pending with { WindowFromMs = atMs };
+            }
+        }
+        return Settle(atMs);
+    }
+
     /// <summary>Settles everything that has matured by <paramref name="atMs"/>.</summary>
     public IReadOnlyList<TapVerdict> Tick(long atMs) => Settle(atMs);
 
@@ -197,13 +218,14 @@ public sealed class TapJudge
     {
         var matured = new List<(long At, Func<TapVerdict?> Make)>();
 
-        foreach (var dead in pendingDead.Where(p => p.AtMs + DeadMs <= nowMs).ToList())
+        foreach (var dead in pendingDead.Where(p => p.WindowFromMs + DeadMs <= nowMs).ToList())
         {
             pendingDead.Remove(dead);
-            var startedInWindow = lastActionStartedMs >= dead.AtMs && lastActionStartedMs < dead.AtMs + DeadMs;
+            var end = dead.WindowFromMs + DeadMs;
+            var startedInWindow = lastActionStartedMs >= dead.AtMs && lastActionStartedMs < end;
             if (!startedInWindow)
             {
-                matured.Add((dead.AtMs + DeadMs, () => Verdict(TapVerdictKind.Dead, dead.AtMs + DeadMs, dead.Screen, dead.Control, 1, null)));
+                matured.Add((end, () => Verdict(TapVerdictKind.Dead, end, dead.Screen, dead.Control, 1, null)));
             }
         }
 
@@ -230,7 +252,7 @@ public sealed class TapJudge
     private TapVerdict Verdict(TapVerdictKind kind, long atMs, string screen, string control, int count, string? detail) =>
         new(kind, atMs, screen, control, count, detail, ring.Where(t => t.AtMs <= atMs).ToList());
 
-    private sealed record PendingDead(long AtMs, string Screen, string Control, Burst Burst);
+    private sealed record PendingDead(long AtMs, string Screen, string Control, Burst Burst, long WindowFromMs);
 
     private sealed record RunningAction(long StartedMs, long DeadlineMs, string Screen);
 

@@ -264,6 +264,31 @@ public class TapJudgeTests
     }
 
     [Fact]
+    public void TheDeadWindowStartsWhenASlowHandlerReturnsNotWhenTheFingerLifted()
+    {
+        var judge = Judge();
+        judge.Tap(0, "Settings", "Save", Spot, enabled: true, isControl: true);
+
+        // The handler held the UI thread for three seconds; the layout it caused lands just after.
+        judge.HandlerFinished(3_000, "Settings", "Save");
+        judge.ContentChanged(3_200, "Settings");
+
+        Assert.Empty(judge.Tick(30_000));
+    }
+
+    [Fact]
+    public void ASlowHandlerThatChangesNothingIsStillDeadAfterItReturns()
+    {
+        var judge = Judge();
+        judge.Tap(0, "Settings", "Save", Spot, enabled: true, isControl: true);
+        judge.HandlerFinished(3_000, "Settings", "Save");
+
+        Assert.Empty(judge.Tick(4_499));
+        var dead = Assert.Single(judge.Tick(4_500));
+        Assert.Equal(TapVerdictKind.Dead, dead.Kind);
+    }
+
+    [Fact]
     public void TheDefaultsAreThePlansStartingPoints()
     {
         Assert.Equal(TimeSpan.FromMilliseconds(1_500), TapJudge.DeadWindow);
