@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The log loop's shared core (LOG-LOOP-PLAN.md §3, §4.1-4.3, §6.2): the outbox that logs roll into
+    instead of being discarded, the weekly batch and its upload decisions, the derived log key, the tap
+    judge, the sign-in trail and its diagnosis, exit-reason phrases and worker cadence. Every head, native
+    or MAUI, must seal, clear, judge taps and read sign-in trails identically, and two copies of "when is
+    it safe to delete a log" is the drift that loses logs (plan A5).
+
+    Deliberately dependency-free: BCL only (System.IO, System.Text.Json, System.IO.Compression,
+    System.Security.Cryptography), so Codex.Domain can reference it and stay free of third-party code.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Diagnostics</RootNamespace>
+  </PropertyGroup>
+
+</Project>
