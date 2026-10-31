@@ -88,6 +88,15 @@ public class LogBatchCodecTests
     }
 
     [Fact]
+    public void TheJsonReadsBackAsTheSameBatch()
+    {
+        var batch = Sample();
+
+        Assert.Equal(LogBatchCodec.Sha256(batch), LogBatchCodec.Sha256(LogBatchCodec.FromJson(LogBatchCodec.Json(batch))));
+        Assert.Throws<LogBatchFormatException>(() => LogBatchCodec.FromJson("[]"));
+    }
+
+    [Fact]
     public void GarbageIsAFormatErrorNotAnEmptyBatch()
     {
         Assert.Throws<LogBatchFormatException>(() => LogBatchCodec.Decode("not base64 at all !!"));

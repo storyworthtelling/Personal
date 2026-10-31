@@ -58,6 +58,12 @@ public static class LogBatchCodec
             throw new LogBatchFormatException("The batch is not gzip.", e);
         }
 
+        return FromJson(json);
+    }
+
+    /// <summary>The batch from its JSON, as <see cref="Json"/> writes it — what the reader keeps on disk.</summary>
+    public static LogBatch FromJson(string json)
+    {
         try
         {
             var dto = JsonSerializer.Deserialize<Dto>(json, Options)

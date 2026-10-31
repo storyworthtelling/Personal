@@ -17,3 +17,7 @@ publish/
 # refresh a ~30MB, ~35%-churned diff — not worth it for a build that costs no
 # tokens to redo. Rebuild per session instead (see CLAUDE.md's Graphify section).
 graphify-out/
+
+# The log loop's plaintext (LOG-LOOP-PLAN.md §6.1): the reader writes it under $TMPDIR/log-loop/ and
+# refuses any path inside the repository; this is the second lock on the same door.
+log-loop/
