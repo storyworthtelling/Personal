@@ -73,15 +73,48 @@ public class PersonRemovalUndoTests
     }
 
     [Fact]
-    public void ASecondRemovalMakesTheFirstPermanent()
+    public void ASecondRemovalIsRefusedWhileTheFirstCanStillBeUndone()
+    {
+        var board = new NoticeBoard();
+        var undo = new PersonRemovalUndo();
+        var robin = Removed(SheetData.Robin);
+        undo.Begin(board, robin, T0);
+
+        var refusal = undo.RefusalFor(T0.AddSeconds(1));
+
+        Assert.Equal("Robin was just removed. Turn the corner to bring them back, or wait a moment, before removing someone else.", refusal);
+        Assert.Throws<InvalidOperationException>(() => undo.Begin(board, Removed(SheetData.Juniper), T0.AddSeconds(1)));
+        Assert.Same(robin, undo.Reverse(PersonRemovalUndo.ActKey(SheetData.Robin), T0.AddSeconds(2)));
+    }
+
+    [Fact]
+    public void ASecondRemovalIsAllowedOnceTheWindowHasClosed()
     {
         var board = new NoticeBoard();
         var undo = new PersonRemovalUndo();
         undo.Begin(board, Removed(SheetData.Robin), T0);
-        undo.Begin(board, Removed(SheetData.Juniper), T0.AddSeconds(1));
+        var late = T0 + NoticeBoard.UndoWindow + TimeSpan.FromMilliseconds(1);
 
-        Assert.Null(undo.Reverse(PersonRemovalUndo.ActKey(SheetData.Robin), T0.AddSeconds(2)));
+        Assert.Null(undo.RefusalFor(late));
+        undo.Begin(board, Removed(SheetData.Juniper), late);
+
         Assert.Equal("juniper", undo.Pending!.Id.Value);
+    }
+
+    [Fact]
+    public void NothingPendingRefusesNothing()
+    {
+        Assert.Null(new PersonRemovalUndo().RefusalFor(T0));
+    }
+
+    [Fact]
+    public void AnUndoneRemovalLeavesTheNextFree()
+    {
+        var undo = new PersonRemovalUndo();
+        undo.Begin(new NoticeBoard(), Removed(SheetData.Robin), T0);
+        undo.Reverse(PersonRemovalUndo.ActKey(SheetData.Robin), T0.AddSeconds(1));
+
+        Assert.Null(undo.RefusalFor(T0.AddSeconds(2)));
     }
 
     [Fact]

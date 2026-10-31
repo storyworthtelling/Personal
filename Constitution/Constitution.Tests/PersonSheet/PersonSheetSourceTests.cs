@@ -72,4 +72,14 @@ public class PersonSheetSourceTests
 
         Assert.Contains("onOpenPerson", group);
     }
+
+    [Fact]
+    public void ARemovalAsksTheUndoWhetherAnotherIsStillWaitingBeforeItWritesAnything()
+    {
+        var area = Read("Constitution.Android/SettingsArea.cs");
+        var remove = area[area.IndexOf("case PersonSheetAction.Remove:", StringComparison.Ordinal)..];
+
+        Assert.True(remove.IndexOf("removalUndo.RefusalFor(", StringComparison.Ordinal) is > 0 and var refused
+            && refused < remove.IndexOf("changes.RemoveAsync(", StringComparison.Ordinal));
+    }
 }
