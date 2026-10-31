@@ -141,6 +141,22 @@ public static class PolicyManager
             }
         }
 
+        // Show again anything an earlier build hid. Not gated on IsInstalled: a hidden package
+        // reports as not installed, which is exactly the state being undone. Harmless when the
+        // package is absent or already visible.
+        foreach (var package in plan.UnhiddenPackages)
+        {
+            try
+            {
+                dpm.SetApplicationHidden(admin, package, false);
+            }
+            catch (Java.Lang.Exception e)
+            {
+                Log.Warn(Tag, $"Could not un-hide {package}: {DescribeThrowable(e)}");
+                events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not un-hide {package}: {DescribeThrowable(e)}"));
+            }
+        }
+
         var installed = plan.SuspendedPackages
             .Where(p => IsInstalled(context, p))
             .ToArray();

@@ -3,6 +3,11 @@ namespace Codex.Domain.Policy;
 public record PolicyPlan(
     IReadOnlySet<string> UserRestrictions,
     IReadOnlySet<string> SuspendedPackages,
+    // Packages to show again with DevicePolicyManager.setApplicationHidden(false). A hide is stored
+    // on the device and outlives the build that set it, so a package an earlier build hid has to be
+    // released by an explicit, repeated instruction. A hidden package also reads as "not installed",
+    // so this is applied without the usual installed check.
+    IReadOnlySet<string> UnhiddenPackages,
     IReadOnlySet<string> RunnablePackages,
     IReadOnlyList<PermissionGrant> PermissionGrants,
     bool EnforceAutoTime,

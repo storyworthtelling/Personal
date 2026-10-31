@@ -135,6 +135,20 @@ public class PolicyPlanBuilderTests
         Assert.DoesNotContain("com.android.vending", plan.SuspendedPackages);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayStore_IsUnhidden_SoItLaunchesAgain_InEveryMode(bool adminModeActive)
+    {
+        // An earlier build hid the Play Store with setApplicationHidden. That state is stored on
+        // the device and outlives the code that set it, so removing the hide was not enough: the
+        // plan has to say, on every pass, that the Play Store is to be shown again.
+        var plan = PolicyPlanBuilder.Build(DefaultContext(adminModeActive: adminModeActive));
+
+        Assert.Contains(PolicyContext.PlayStorePackage, plan.UnhiddenPackages);
+        Assert.DoesNotContain(PolicyContext.PlayStorePackage, plan.SuspendedPackages);
+    }
+
     [Fact]
     public void SettingsPackage_IsNotSuspended_EvenIfDetectedAsABrowser()
     {
