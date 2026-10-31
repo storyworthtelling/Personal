@@ -29,6 +29,11 @@ This is a plan only; no application code is written here. Claims about existing 
 | O10 | **Dead-tap detection is automatic in the UI kits, plus declared expectations on key actions.** |
 | O11 | **Her phone joins** through a shared Drive folder, after the pilot. |
 | O12 | **Upload weekly**, just before the reader runs. |
+| O13 | **The reader gets its own read-only Drive key** (`SWT_DRIVE_READ_TOKEN`) and fetches files itself. |
+| O14 | **Auto-merge from the first run.** No report-only trial period. |
+| O15 | **One PR per app per week**, holding every log-derived fix for that app. |
+| O16 | **Every log-derived bug fix qualifies for auto-merge**, whatever its verification mark (test, compile or device) and whatever code it touches. |
+| O17 | **No never-auto list.** Lockdown, update channel, Index money, prayer, vault, body data and sign-in flows may all auto-merge. The risks in §6.4 are recorded as accepted. |
 
 ### Defaults kept by the assistant
 
@@ -392,13 +397,22 @@ So:
 - A corrupted or wrong-key file fails the GCM tag and is reported as `Corrupt` or `WrongKey`. It is
   never misread.
 
-Fallback if the owner declines the second secret (Q2): connector-only transport, with batches capped
-at 64 KB plaintext so each file relays as ~15 KB of base64.
+Chosen by the owner (O13). If the token is ever revoked, the fallback is connector-only transport, with
+batches capped at 64 KB plaintext so each file relays as ~15 KB of base64.
 
-### 5.3 Branches
+### 5.3 Branches and PRs
 
-One branch per fix: `claude/logfix-<yyyy-MM-dd>-<app>-<slug>`. It matches CI's `claude/**` filter,
-so branch pushes run tests only. No report branch: the report is an issue (§5.5).
+- **One branch and one PR per app per week (O15):** `claude/logfix-<yyyy-MM-dd>-<app>`, e.g.
+  `claude/logfix-2026-11-08-post`. It matches CI's `claude/**` filter, so pushes run that app's tests
+  only.
+- **No cap on fixes per PR.** Every finding the rubric marks **Fix** (§7.1) goes into its app's PR.
+  The CI cost is bounded by apps, not findings: at most nine PRs a week, one test run per push.
+- **Commit shape, per fix:** commit 1 adds the failing test, commit 2 fixes it. Both carry the
+  fingerprint in a trailer (`Log-Loop-Fingerprint: <sha256>`). That is how the gate maps every line
+  of the diff to a finding (§6.3).
+- If an app's PR from last week is still open (CI red, say), the run adds to that branch rather than
+  opening a second PR.
+- No report branch: the report is an issue (§5.5).
 
 ### 5.4 Trash, and failing partway
 
@@ -456,9 +470,13 @@ that. Tap lines now add button labels and screen content, and sign-in lines add 
    numbers, non-`example.com` addresses, non-`555-01xx` numbers, OAuth-code-shaped strings, `$`
    amounts in tests) on every `claude/**` push. Tested by `LogLoopLeakScanTests`.
 
-Residual risk: a paraphrase ("the owner's Chase card") passes the scan. That is why logging-defect
-fixes and anything touching personal-data fixtures never auto-merge (§7.3). If personal data lands
-in a commit anyway, the runbook says: stop, no covering commit, say so in the report (CLAUDE.md).
+Residual risk: a paraphrase ("the owner's Chase card") passes the scan, and with every log-derived
+fix auto-merging (O16) no person reads the PR before it lands. Layers 2 and 3 are the defence: the
+runbook makes the session reread its test fixtures, commit messages and PR body against the
+sanitizer's categories before pushing, and record that it did in the PR body. This is accepted with
+O16. If personal data lands in a commit anyway, the runbook says: stop, no covering commit, disable
+auto-merge on that PR if it has not merged, and say so in the report (CLAUDE.md). Removing it from
+history is the owner's decision.
 
 ### 6.2 The passphrase as an environment secret
 
@@ -493,76 +511,111 @@ different key).
 
 ### 6.3 Auto-merge
 
-**Rule:** never push to `main`; PR and wait. O3 makes one exception. **A PR is a log-derived bug fix
-only when all of these hold:**
+**Rule:** CLAUDE.md, Git Workflow: never push to `main`; open a PR and wait for approval.
+**Exception (O3, widened by O14–O17):** every log-derived bug fix auto-merges, from the first run, in
+any code. **What the gate still checks** is not whether a fix is risky but whether it really is a
+log-derived bug fix. That is the one thing the owner's exception depends on.
 
-1. Branch `claude/logfix-*`.
-2. The body has a `log-loop` block (§7.2) whose class is C1–C4 or C13 (§7.1), and the fingerprint
-   is in that week's report issue.
-3. The **first commit adds a test that CI shows red**, and the PR head shows it green. This is the
-   TDD evidence the gate reads.
-4. Mark **Test-verified** (§8).
-5. No path on the never-auto list (§6.4), no frozen-identifier guard file, no change to what is
-   logged (C10).
-6. ≤ 200 changed lines, ≤ 6 files, no new package reference.
-7. `log-loop-guard` and every affected app's `test` job are green.
+An app's weekly PR auto-merges when **all** hold:
 
-**Mixed PRs** (anything not needed for the fingerprinted bug) are never auto-merged; the runbook
-splits them. **Mechanism:** workflow `log-loop-automerge.yml` runs `LogLoopReader gate` and enables
-GitHub auto-merge only when all seven pass. This needs the repo setting "Allow auto-merge" on, and
-`main` protection requiring the test checks. The session never calls merge itself. Tests:
-`AutoMergeGateTests` (each condition failing alone blocks; mixed blocks; all passing allows).
+1. Branch `claude/logfix-*`, opened by the log-loop session.
+2. The PR body has one `log-loop` block per fix (§7.2). Each fingerprint appears in that week's
+   report issue with outcome **Fix**.
+3. **Every commit** carries a `Log-Loop-Fingerprint` trailer naming one of those fingerprints. A
+   commit without one (a refactor riding along, a tidy-up, a feature) holds the whole PR for the
+   owner's approval. This is what keeps non-log work under the normal rule.
+4. **Every fix has a test written first**: a commit adding or changing a test precedes the fix commit
+   for each fingerprint. This is CLAUDE.md's TDD rule, not an extra gate. For head code that can't
+   run here, the test is a source-level guard (the repo's existing pattern: `FrozenInvariantsTests`,
+   `EveryActivityIsWatchedTests`) or a pure-logic extraction.
+5. Every workflow whose path filter the PR touches has a green `test` job. The repo's existing guards
+   (`FrozenInvariantsTests`, `SnowballSheetTests`, `BodyStaysHomeTests`, `PrayerIsolationTests`,
+   Pulp and Constitution invariants, `NudgeNeverWriteTests`) are part of those jobs, so they still
+   bind.
+6. `log-loop-guard` is green: the leak scan (§6.1). A personal-data leak is not a code risk the
+   owner waived; it is the public-repo rule, and a hit always blocks.
 
-### 6.4 PRs in sensitive code: risks for the owner to accept or reject
+There are no size limits, no verification-mark requirement and no protected paths (O16, O17).
 
-Not blocking.
+**Mechanism:** workflow `log-loop-automerge.yml` (on `pull_request` and check completion) runs
+`LogLoopReader gate`. When conditions 1–4 hold, it enables GitHub auto-merge, which waits for 5–6.
+Repo settings needed: "Allow auto-merge" on, and `main` protection requiring the app test jobs and
+`log-loop-guard`. The session never calls merge itself. Tests: `AutoMergeGateTests` (a commit without
+a trailer holds the PR; an unknown fingerprint holds; a fix without a preceding test commit holds;
+a fully tagged PR passes; a red guard blocks through branch protection).
 
-**FocusPhone lockdown**
+**After merge.** A merged fix ships through `main`'s signed build and the `apps-latest` channel, so
+Flyleaf installs it on the locked phone within six hours, with no device check first. The
+safety net is the next week's logs:
 
-| Risk | Recommended check |
-|---|---|
-| A "button does nothing" or "app won't open" finding invites loosening policy: `PolicyPlanBuilder` (`FocusPhone/Codex.Domain/Policy/PolicyPlanBuilder.cs:51`), `PolicyContext.AllowlistedPackages` (`PolicyContext.cs:109`) | Never-auto for `Codex.Domain/Policy/**`, `Flyleaf.Android/PolicyManager.cs`, `LoginBrowserPolicy`; PR states whether the runnable set changes |
-| A sign-in "fix" that widens Chrome's allowlist or `SuiteRedirect` | Never-auto for `Codex.Domain/Web/**`; a test asserts the runnable set with `AdminModeActive=false` (`PolicyContext.cs:21`) is unchanged |
-| Frozen identifiers (`Codex.Tests/Guard/FrozenInvariantsTests.cs`, Constitution and Pulp invariants) | Never-auto for guard files and any `[Activity/Service/BroadcastReceiver(Name=…)]` edit |
-| Update channel installs silently to every head | Never-auto for `Storyworthtelling.Updates/**`, `Flyleaf.Android/UpdateService.cs` |
-| No device in the loop | Already blocked by condition 4 |
+- The report tracks each merged fingerprint: **Gone** (fixed), **Still present** (fix failed: the
+  run reopens it as a new fix on the same fingerprint), or **New since merge** (a fingerprint first
+  seen after a fix merged in that app, listed as a possible regression with the merge it followed).
+- A regression traced to a merged fix is itself a log-derived bug fix. Its fix, or a revert of the
+  merged commits, goes into that app's next PR and auto-merges like any other.
+
+### 6.4 Accepted risks in sensitive code (O17)
+
+The owner chose no extra checks and no protected paths. These risks are recorded as accepted, so a
+later reader knows they were seen, not missed. The PR body names any of these areas a fix touches,
+as information only.
+
+**FocusPhone lockdown and updates**
+
+- A "button does nothing" or "app won't open" finding can lead to a fix that loosens policy:
+  `PolicyPlanBuilder` (`FocusPhone/Codex.Domain/Policy/PolicyPlanBuilder.cs:51`),
+  `PolicyContext.AllowlistedPackages` (`PolicyContext.cs:109`), Admin-mode gating (`PolicyContext.cs:21`).
+- A sign-in fix can widen Chrome's allowlist or `SuiteRedirect` (`Codex.Domain/Web/`), opening the web
+  on the locked phone.
+- A frozen identifier can move. `FrozenInvariantsTests` would catch it, but only if the fix doesn't
+  also edit the guard. Nothing stops a log-derived fix from editing a guard.
+- The update channel (`Storyworthtelling.Updates`, `Flyleaf.Android/UpdateService.cs`) installs every
+  app silently. A broken fix there can stop updates, **including the update that would fix it**. Then
+  only a manual sideload recovers the phone.
+- Most lockdown fixes are only compile-verified (§8) and reach the phone untested on a device.
 
 **Index money**
 
-| Risk | Recommended check |
-|---|---|
-| Payoff picture changes (`SnowballEngine` vs the Python oracle, `Ledger/Ledger.Tests/Snowball/SnowballSheetTests.cs:28`) | Never-auto for `Ledger.Domain/Snowball/**`; a PR touching `sheet_expected.json` never auto-merges |
-| `decimal`/`CalendarDate` erosion | `log-loop-guard` flags new `double`/`float` in `Ledger.Domain` and `DateTime` where `CalendarDate` is used |
-| Real figures in fixtures (logs now carry them, O1) | §6.1; never-auto for `Ledger.Tests/Snowball/**` |
-| Plaid tokens | Never-auto for `AccountService` credential methods |
+- A fix can change payoff figures. `SnowballSheetTests` (`Ledger/Ledger.Tests/Snowball/SnowballSheetTests.cs:28`)
+  checks against the Python oracle, but a fix that regenerates `sheet_expected.json` would pass.
+- A `double` or `DateTime` can slip into code that relies on `decimal` and `CalendarDate`.
+- Logs now carry real figures (O1). A fixture built from them is caught only by the leak scan (§6.1).
 
-**Also proposed for never-auto:** `Foreword.*/Prayer/**`, `Storyworthtelling.Voice/Secrets/**`,
-`Constitution.*/Body/**` and `Constitution.*/Backup/**`, and anything implementing `IPrayerReader`.
+**Private data paths**
 
----
+- A prayer or body fix can change what is logged. The prayer and body guards (§4.6) still run, but a
+  fix may edit them.
+
+**Sign-in flows**
+
+- A fix to scopes, redirect handling or state checks changes how credentials are obtained, with no
+  device check before it ships.
 
 ## 7. Triage
 
 ### 7.1 Rubric
 
+Every **Fix** below goes into its app's weekly PR and auto-merges under §6.3. **Report** and
+**No action** never produce code.
+
 | Class | Evidence | Outcome |
 |---|---|---|
-| **C1 Crash** in our code | Crash entry, ANR, exit reason `CRASH`/`ANR` with our frames | **Fix** (auto-merge eligible) |
-| **C2 Logic error** | Broken own contract, impossible state, own-format parse failure | **Fix** (eligible) |
-| **C3 Unexpected third-party input** | Feed or PDU shape we don't handle | **Fix** with a synthetic reproduction (eligible); else **report** asking for a capture |
-| **C4 Retry or backoff wrong** | Re-sent with no wait, budget unspent, re-billing | **Fix** (eligible) |
+| **C1 Crash** in our code | Crash entry, ANR, exit reason `CRASH`/`ANR` with our frames | **Fix** |
+| **C2 Logic error** | Broken own contract, impossible state, own-format parse failure | **Fix** |
+| **C3 Unexpected third-party input** | Feed or PDU shape we don't handle | **Fix** with a synthetic reproduction; else **report** asking for a capture |
+| **C4 Retry or backoff wrong** | Re-sent with no wait, budget unspent, re-billing | **Fix** |
 | **C5 Transient network** | DNS, timeout, offline, reset | **No action**, unless ≥ 20% of a source's attempts that week fail, then **report** |
 | **C6 Upstream outage or rate limit** | 429, 5xx, Plaid `INSTITUTION_DOWN` | **No action**; > 3 days running, **report** |
 | **C7 Carrier or platform rejection** | MMS refused, role lost, system kill | **Report**; fix only if our handling is wrong (then C2) |
 | **C8 Credential rejected** | 401/403, `ITEM_LOGIN_REQUIRED` | **Report** (owner action) |
 | **C9 Owner action pending** | No passphrase, no profile | **No action**, listed once |
-| **C10 Logging defect** | Missing context, or sensitive data where it shouldn't be | **Fix**, never auto-merge |
+| **C10 Logging defect** | Missing context, or sensitive data where it shouldn't be | **Fix** |
 | **C11 Cost or performance** | Token counts, retry storms | **Report** with numbers |
 | **C12 Unclassifiable** | | **Report** |
-| **C13 Dead or failing control** | `DEAD TAP` / `ACTION FAILED` / `TAP THREW` with a code cause: handler not wired, exception, disabled state wrong, navigation dropped | **Fix** (eligible if test-verified); if the cause can't be found from code, **report** with screen + control |
-| **C14 Repeated presses on a working control** | `REPEATED TAP` where each press did act | **Report** as UX (slow feedback, ambiguous state). The fix is a design change: normal PR |
-| **C15 Presses on non-controls** | `TAPS ON NON-CONTROL` | **Report** as UX (looks tappable). Normal PR, DESIGN.md applies |
-| **C16 Sign-in did not return a token** | `NoReturn`, `ProviderError`, `StateMismatch`, `ExchangeFailed`, blocked `Hop` | By diagnosis: our bug (wrong scope, redirect, state handling, blocked scheme) → **fix**, never auto-merge (sign-in and policy are never-auto); provider or portal configuration → **report** with the exact owner checklist; user cancelled → **no action** |
+| **C13 Dead or failing control** | `DEAD TAP` / `ACTION FAILED` / `TAP THREW` with a code cause: handler not wired, exception, disabled state wrong, navigation dropped | **Fix**; if the cause can't be found from code, **report** with screen + control |
+| **C14 Repeated presses on a working control** | `REPEATED TAP` where each press did act | **Report** as UX (slow feedback, ambiguous state). Not a bug: a design change goes through a normal PR outside the loop |
+| **C15 Presses on non-controls** | `TAPS ON NON-CONTROL` | **Report** as UX (looks tappable). Not a bug: a normal PR outside the loop, DESIGN.md applies |
+| **C16 Sign-in did not return a token** | `NoReturn`, `ProviderError`, `StateMismatch`, `ExchangeFailed`, blocked `Hop` | By diagnosis: our bug (wrong scope, redirect, state handling, blocked scheme) → **fix**; provider or portal configuration → **report** with the exact owner checklist; user cancelled → **no action** |
 
 ### 7.2 Linking a PR to its log
 
@@ -594,15 +647,17 @@ Each finding and PR carries one mark:
 | **Compile-verified** | Head code builds locally (`setup-android-build.sh`), behaviour needs a phone | Click wiring in an Activity or XAML page, receivers, WorkManager, `PolicyManager`, `TidalPairingActivity` |
 | **Device-pending** | Matches a CLAUDE.md "pending on-device" item, or depends on a carrier, provider page or Health Connect | Role consent under lockdown, MMSC, TIDAL portal settings, Plaid OAuth banks, lock-task |
 
-Most dead-tap fixes will be **Compile-verified**: the handler lives in a head. Only those whose cause
-sits in pure code are auto-merge eligible. The report says so per item.
+The mark no longer decides whether a fix merges (O16). It is recorded per fix in the PR body and the
+report, so the owner knows which merged fixes have only been compiled, and which still need a phone
+to prove. Most dead-tap fixes will be **Compile-verified**, since the handler lives in a head.
+Device-pending fixes are listed in the report until the next week's logs show the fingerprint gone.
 
 ---
 
 ## 9. Phasing
 
-**CI.** Branch pushes run only each app's `test` job (CLAUDE.md, "CI minutes are the budget"). Cap
-fix PRs at 5 per weekly run (Q3). `log-loop-guard` is small (no Android SDK). Implementation PRs
+**CI.** Branch pushes run only each app's `test` job (CLAUDE.md, "CI minutes are the budget"). At most
+one PR per app per week (O15), so at most nine test runs per push cycle. `log-loop-guard` is small (no Android SDK). Implementation PRs
 for this plan touch shared libraries that many workflows watch, so batch them: one PR per phase, not
 per type.
 
@@ -639,12 +694,13 @@ Tests first:
   `LogLoopReaderTests`, `LogExcerptSanitizerTests`, `LogLoopLeakScanTests`,
   `OutputOutsideRepoTests`, `AutoMergeGateTests`; `Tools/LogKeyDerive`.
 - `.claude/log-loop/RUNBOOK.md`; the environment, secrets and trigger (owner steps).
-- **Auto-merge off**: the gate runs report-only and posts its verdict as a PR comment.
+- **Auto-merge on from the first run (O14)**: `log-loop-automerge.yml`, the repo's "Allow
+  auto-merge" setting and `main` branch protection land in this phase, before the first scheduled run.
 
 **Exit:** four weekly runs complete. Post's logs are uploaded, cleared on the phone and trashed in
 Drive. At least one deliberately broken button on a test build shows up as `DEAD TAP`, and one
-cancelled Gmail sign-in as `NoReturn` with a diagnosis. No leak-scan hit. The owner agrees with
-≥ 90% of the gate's would-merge verdicts.
+cancelled Gmail sign-in as `NoReturn` with a diagnosis. No leak-scan hit. Every auto-merged fix's
+fingerprint is **Gone** or explained in the following week's report.
 
 ### Phase 2: the other native heads (Flyleaf, Score, Plate, Pulp, Constitution)
 
@@ -657,7 +713,7 @@ cancelled Gmail sign-in as `NoReturn` with a diagnosis. No leak-scan hit. The ow
   `BodyStaysHomeTests`; `FlyleafDiagnosticsTests` (a policy-pass failure lands in the log);
   `RedirectHopTrailTests` (`SuiteRedirect` hand-back and block both logged with the flow id).
 - **Exit:** every native head in two consecutive reports. One TIDAL sign-in that never returns is
-  diagnosed end to end through Flyleaf's hop. Auto-merge on for Post if the owner agrees (Q1).
+  diagnosed end to end through Flyleaf's hop.
 
 ### Phase 3: MAUI heads (Index, Folio, Foreword)
 
@@ -676,12 +732,19 @@ cancelled Gmail sign-in as `NoReturn` with a diagnosis. No leak-scan hit. The ow
 
 ---
 
-## 10. Open questions
+## 10. Decisions taken, and tuning defaults
 
-| # | Question | Recommended default |
+No owner decision is open. The questions from earlier drafts were answered as O13–O17.
+
+These values are starting points, not decisions; they are constants in code and are tuned from the
+logs themselves after the first runs:
+
+| Constant | Start | Where |
 |---|---|---|
-| Q1 | When to turn on auto-merge | After Phase 1's four runs, Post only; then app by app |
-| Q2 | Add the read-only Drive token (`SWT_DRIVE_READ_TOKEN`) so the reader fetches files itself? | **Yes.** It adds no exposure the connector doesn't already have, and weekly batches are too big to relay through the model |
-| Q3 | Fix PRs per run | **5**, by occurrence count; the rest are reported |
-| Q4 | Accept the never-auto list (§6.4) | Yes, as written |
-| Q5 | Dead-tap window 1.5 s, repeat threshold 3 taps in 4 s | Keep; both are constants in `TapJudge`, tuned after the pilot from the logs themselves |
+| Dead-tap window | 1.5 s | `TapJudge` |
+| Repeated-tap threshold | 3 taps in 4 s, within 48 px | `TapJudge` |
+| Sign-in no-return timeout | 10 min | `SignInTrail` |
+| Upload window | Saturday 18:00 local | `UploadWindow` |
+| Outbox cap per app | 8 MB | `LogOutbox` |
+| Batch size | 256 KB plaintext | `LogBatch` |
+| Network-failure report threshold | ≥ 20% of a source's attempts | rubric C5 |
