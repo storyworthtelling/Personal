@@ -33,6 +33,9 @@ public static class FollowWords
     /// <summary>The skip could not be written down yet; the day stays struck through and it is tried again.</summary>
     public const string SkipNotKept = "The skip could not be saved yet. It will try again.";
 
+    /// <summary>The change never started: the meal run, the workout run or the deadline step held the calendars for the whole wait. Nothing was written.</summary>
+    public const string GateBusy = "Another plan is being written; try again in a minute.";
+
     public const string CalendarUnchanged = "The calendar did not change. It will try again.";
 
     public const string CalendarPartlyChanged = "Only part of the calendar changed. Look it over.";

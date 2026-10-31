@@ -3,6 +3,7 @@ using Android.OS;
 using Android.Views;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Workouts.Screens;
+using Constitution.Infrastructure.Workouts;
 using Constitution.Settings;
 using Constitution.WorkoutsTab;
 
@@ -41,7 +42,7 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
 
     private IWorkoutsSource source = new NoWorkoutsSource();
     private WorkoutCalendarFollow? calendar;
-    private WorkoutChanges? changes;
+    private GatedWorkoutChanges? changes;
     private WorkoutsRead? read;
     private WorkoutCardView? card;
     private DateOnly? pressed;
@@ -77,7 +78,8 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
         }
     }
 
-    private WorkoutChanges Changes => changes ??= new WorkoutChanges(source, calendar);
+    // Every change takes its turn on the shared gate with the meal run, the workout run and the deadline step, and waits for it off the UI thread.
+    private GatedWorkoutChanges Changes => changes ??= new GatedWorkoutChanges(new WorkoutChanges(source, calendar), RunGate.Shared, RunGate.DefaultWait);
 
     public override string? Subtitle => read is WorkoutsRead.Ready ? WorkoutsTabModel.StatusWith(notice) : null;
 

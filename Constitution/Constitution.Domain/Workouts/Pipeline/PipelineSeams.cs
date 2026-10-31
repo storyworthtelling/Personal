@@ -9,11 +9,15 @@ namespace Constitution.Domain.Workouts.Pipeline;
 ///
 /// <para><b>Two rules the implementation must keep, and nothing downstream can check them.</b></para>
 /// <list type="number">
-///   <item><b>Drop every event that carries the <c>constitutionKey</c> private extended property</b>
-///   (<see cref="Constitution.Domain.Placement.PlacementKey.Property"/>). Those are the workouts this app wrote itself.
-///   Left in, the planner reads its own earlier placements as busy time, the next run plans around them, the plan
-///   changes, and the keys (which count sessions in the plan) move: the week would never settle. Dropping them is what
-///   lets a re-run on an unchanged week come out identical.</item>
+///   <item><b>Drop the events this run's own family wrote; keep every other event as an ordinary entry.</b> An event carries the
+///   <c>constitutionKey</c> private extended property (<see cref="Constitution.Domain.Placement.PlacementKey.Property"/>) when this app
+///   wrote it, and the key says which family wrote it (<see cref="Constitution.Domain.Placement.KeyFamily"/>). The workout run drops the
+///   workout family's events: left in, the planner reads its own earlier placements as busy time, the next run plans around them, the plan
+///   changes, and the keys (which count sessions in the plan) move: the week would never settle. Dropping them is what lets a re-run on an
+///   unchanged week come out identical. The meal run drops the household meal family's events the same way. <b>Another family's event is
+///   kept</b>: a workout run reads a cook block, a slow-cooker start or the Groceries trip as busy time (and a meal run reads a workout), so
+///   the two runs place around each other whichever goes first. A key of no known family is kept too, since dropping it would drop somebody's
+///   time. With no family named, every keyed event is dropped (the older behaviour).</item>
 ///   <item><b>Never hand a declined or cancelled event over as <see cref="Availability.Free"/>: leave it out.</b>
 ///   The trip detector reads the entry whatever its availability (Google's all-day events default to free, and a
 ///   holiday marked free is still a holiday), so a declined "Holiday" or a cancelled "Conference" handed over as free

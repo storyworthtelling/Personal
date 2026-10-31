@@ -153,7 +153,9 @@ public readonly record struct PlacementKey
 
     /// <summary>
     /// What a workout key says: whose, which kind, which week, which number. False for a household key or text that is not a key.
-    /// The one place a key is taken apart, and it is the key's own file: callers elsewhere compare keys and never parse them.
+    /// The one place a workout key is taken apart, and it is the key's own file: callers elsewhere compare keys and never parse them.
+    /// <see cref="KeyFamily"/> asks this to tell a workout key; the household half of its answer (a cook block, a slow-cooker start or the
+    /// Groceries trip, by the identity inside a <c>household</c> key) is read in <c>KeyFamily.cs</c> itself, as a second, narrower reading.
     /// </summary>
     internal static bool TryWorkoutParts(PlacementKey key, out string person, out SessionKind kind, out int week, out int ordinal)
     {

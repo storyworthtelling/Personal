@@ -3,8 +3,10 @@ namespace Constitution.Domain.Workouts.Screens;
 /// <summary>
 /// What a change did, for the tab to show. <see cref="Kept"/> is whether it was written down; <see cref="Sentence"/> is the one plain line
 /// the tab says about it (null when there is nothing to say); <see cref="Failure"/> is what stopped it, kept for the trail, never shown.
+/// <see cref="Busy"/> is true only when the change never started because another plan was being written for the whole wait: nothing was
+/// written, the sentence is <see cref="FollowWords.GateBusy"/>, and it is not a fault.
 /// </summary>
-public sealed record ChangeResult(bool Kept, string? Sentence, Exception? Failure = null);
+public sealed record ChangeResult(bool Kept, string? Sentence, Exception? Failure = null, bool Busy = false);
 
 /// <summary>
 /// The owner's swaps and skips on the Workouts tab, taken through their steps in the order that keeps them honest (S2): the change is

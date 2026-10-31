@@ -59,7 +59,7 @@ public static class DiagnosticsExport
             ]);
     }
 
-    // Body's sync and the morning read-back record how their last run ended; the other parts have no worker recording yet.
+    // Body's sync and the morning read-back record how their last run ended; the other components (morning delivery, household sync, calendar write) have no outcome recorded for them yet.
     private static DiagnosticsOutcome OutcomeOf(Context context, DiagnosticsComponent component) => component switch
     {
         DiagnosticsComponent.BodySync => BodyServices.Create(context).Status.LastOutcome(),
