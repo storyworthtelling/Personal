@@ -12,6 +12,7 @@ on:
       # The shared owner's-voice library ships in the APK (referenced by Infrastructure), so a change
       # to it must rebuild Folio too.
       - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Voice.Tests/**'
       # The shared reMarkable delivery library also ships in the APK (Infrastructure references it).
       - 'Storyworthtelling.Remarkable/**'

@@ -24,4 +24,10 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The log loop's pure core. Voice carries it to Drive (IDriveLogFolder, LogUploader) because the
+         Drive seam and VaultEnvelope already live here; Diagnostics itself stays dependency-free. -->
+    <ProjectReference Include="..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
+  </ItemGroup>
+
 </Project>
