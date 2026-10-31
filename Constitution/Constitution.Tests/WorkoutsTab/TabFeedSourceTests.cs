@@ -92,7 +92,9 @@ public class TabFeedSourceTests
         }
 
         var declared = Regex.Matches(Read("Constitution.Android/ManifestPermissions.cs"), @"UsesPermission\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
-        Assert.Single(declared);
+        // Internet, and the notification permission the notices need (C-9.1.3, D155); this feed added neither.
+        Assert.Equal(2, declared.Count);
+        Assert.Contains("POST_NOTIFICATIONS", Read("Constitution.Android/ManifestPermissions.cs"), StringComparison.Ordinal);
     }
 
     [Fact]

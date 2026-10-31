@@ -23,7 +23,7 @@ public sealed record NoticeNotificationPlan(IReadOnlyList<NoticeNotification> Po
 public static class NoticeNotifications
 {
     /// <summary>The Intent extra the role travels in. Frozen; Flyleaf reads this exact key.</summary>
-    public const string RoleExtraKey = "com.storyworthtelling.constitution.NOTICE_ROLE";
+    public const string RoleExtraKey = ConstitutionIdentity.ApplicationId + ".NOTICE_ROLE";
 
     /// <summary>The three errors: bookmark rose.</summary>
     public const string ProblemRole = "problem";

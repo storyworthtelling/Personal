@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Codex.Domain.Apps;
+using Codex.Domain.Policy;
 using Xunit;
 
 namespace Codex.Tests.Guard;
@@ -25,7 +26,14 @@ public class NoticeRoleContractTests
     {
         var source = File.ReadAllText(Path.Combine(
             RepoRoot(), "Constitution", "Constitution.Domain", "Notices", "NoticeNotifications.cs"));
-        Assert.Equal(NotificationBookmark.RoleExtraKey, Literal(source, "RoleExtraKey"));
+        // The key is built from Constitution's application id (which a guard there keeps out of copies), so
+        // the id and the suffix are each read and the pair must equal Flyleaf's key.
+        var identity = File.ReadAllText(Path.Combine(
+            RepoRoot(), "Constitution", "Constitution.Domain", "ConstitutionIdentity.cs"));
+        var suffix = Regex.Match(source, @"public const string RoleExtraKey = ConstitutionIdentity\.ApplicationId \+ ""([^""]*)"";");
+        Assert.True(suffix.Success, "RoleExtraKey is expected as ConstitutionIdentity.ApplicationId plus a literal suffix.");
+        Assert.Equal(PolicyContext.ConstitutionPackage, Literal(identity, "ApplicationId"));
+        Assert.Equal(NotificationBookmark.RoleExtraKey, PolicyContext.ConstitutionPackage + suffix.Groups[1].Value);
         Assert.Equal(NotificationBookmark.ProblemWire, Literal(source, "ProblemRole"));
         Assert.Equal(NotificationBookmark.ReferenceWire, Literal(source, "ReferenceRole"));
     }

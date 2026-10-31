@@ -86,8 +86,10 @@ public partial class AteHeadSourceTests
             .Order()
             .ToList();
 
-        // Internet, the camera (D105), Plate's recipe read, and the eight read-only Health Connect permissions: nothing more.
-        Assert.Equal(11, declared.Count);
+        // Internet, the camera (D105), Plate's recipe read, the eight read-only Health Connect permissions, and the
+        // notification permission for the brief's short list (C-9.1.3, D155): nothing more.
+        Assert.Equal(12, declared.Count);
+        Assert.Contains(declared, name => name.Contains("POST_NOTIFICATIONS", StringComparison.Ordinal));
         Assert.DoesNotContain(declared, name => name.Contains("WRITE", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(declared, name => name.Contains("STORAGE", StringComparison.OrdinalIgnoreCase) || name.Contains("MEDIA", StringComparison.OrdinalIgnoreCase));
     }

@@ -68,6 +68,8 @@ public class ScanManifestTests
             .Where(argument => !argument.StartsWith("\"android.permission.health.", StringComparison.Ordinal))
             .Where(argument => argument != "Name = RecipeReadContract.Permission")
             .Where(argument => argument != "Name = Android.Manifest.Permission.Camera")
+            // C-9.1.3: the brief's short list posts as notifications, which Android 13 refuses without it (D155).
+            .Where(argument => argument != "\"android.permission.POST_NOTIFICATIONS\"")
             .ToList();
 
         Assert.True(others.Count == 0, "A permission nobody listed:\n" + string.Join("\n", others));
