@@ -11,11 +11,13 @@ using Constitution.Body;
 using Constitution.Domain.Body;
 using Constitution.Domain.Areas;
 using Constitution.Domain.Diagnostics;
+using Constitution.Domain.Groceries;
 using Constitution.Domain.Layout;
 using Constitution.Domain.Waiting;
 using Constitution.FirstRun;
 using Constitution.Household;
 using Constitution.Infrastructure.Household;
+using Constitution.Infrastructure.Meals;
 using Constitution.MealsTab;
 using Constitution.ReadBack;
 using Constitution.WorkoutWeek;
@@ -95,6 +97,7 @@ public abstract class ConstitutionActivity : Activity
         // The weekly meal run's saved week: Meals reads it for This week, Today for tonight's dinner card.
         var savedMealWeek = MealWeekServices.Source(this);
         mealsArea.WeekSource = savedMealWeek;
+        mealsArea.Share = new KeepShareRun(new HouseholdMealPantry(household.Service), new HouseholdMealRoster(household.Service), MealWeekServices.DecisionRecords(this));
         household.Service.Changed += OnHouseholdChanged;
         bodyArea.SignalRequested += OpenSignal;
         firstRun = new FirstRunPage(this, RenderPage);

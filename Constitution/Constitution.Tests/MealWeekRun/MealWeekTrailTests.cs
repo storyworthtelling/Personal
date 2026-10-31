@@ -32,6 +32,7 @@ public class MealWeekTrailTests
         yield return [new MealWeekOutcome.Planned(Report())];
         yield return [new MealWeekOutcome.Planned(Report(save: MealRecordSave.Unchanged))];
         yield return [new MealWeekOutcome.Planned(Report(earlier: true))];
+        yield return [new MealWeekOutcome.Planned(Report() with { ExtraLinesUnreadable = "The record could not be read." })];
         yield return [new MealWeekOutcome.Planned(Report(new PlacementRun(null, [], [], "The record could not be read.")))];
     }
 
@@ -89,6 +90,14 @@ public class MealWeekTrailTests
         var phrase = MealWeekTrail.LogPhrase(new MealWeekOutcome.Planned(Report(new PlacementRun(null, [], [], "Could not read."), MealRecordSave.Unchanged, earlier: true)));
 
         Assert.Equal("meal week planned, 0 events written, 0 events failed, record unchanged, placement blocked, earlier record unreadable", phrase);
+    }
+
+    [Fact]
+    public void AnUnreadableDecisionRecordIsSaidWithoutItsReason()
+    {
+        var phrase = MealWeekTrail.LogPhrase(new MealWeekOutcome.Planned(Report() with { ExtraLinesUnreadable = "The record could not be read." }));
+
+        Assert.Equal("meal week planned, 0 events written, 0 events failed, record saved, decisions unreadable", phrase);
     }
 
     [Fact]
