@@ -85,7 +85,7 @@ public static class DigestBody
     {
         var id = BodySignals.Id(series.Signal);
         draft.Line(PrintedRole.Strong, PageDraft.Left, top + 14f, 150f, BodySignals.Name(series.Signal), name: $"signal-{id}");
-        draft.Add(new PrintedItem($"chart-{id}", PrintedRole.Slot, new InkRect(PageDraft.Left, top + 22f, 150f, 44f), null, null));
+        draft.Add(new PrintedItem($"chart-{id}", PrintedRole.Chart, new InkRect(PageDraft.Left, top + 22f, 150f, 44f), null, null, Points: series.Weeks));
         draft.Line(PrintedRole.Mono, PageDraft.Left + 158f, top + 40f, 112f, series.LatestText ?? "no readings", name: $"latest-{id}");
         if (series.ChangeWords is { } words)
         {

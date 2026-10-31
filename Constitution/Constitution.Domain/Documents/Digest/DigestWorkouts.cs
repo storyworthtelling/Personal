@@ -59,7 +59,7 @@ public static class DigestWorkouts
         {
             var session = day.Session!;
             var name = day.Mark == DigestMark.Filled ? $"mark-filled-{++filled}" : $"mark-open-{++open}";
-            var role = day.Mark == DigestMark.Filled ? PrintedRole.Band : PrintedRole.Rule;
+            var role = day.Mark == DigestMark.Filled ? PrintedRole.MarkFilled : PrintedRole.MarkOpen;
             draft.Add(new PrintedItem(name, role, new InkRect(PageDraft.Left, baseline - 11f, 12f, 12f), null, null));
             draft.Line(PrintedRole.Label, PageDraft.Left + 20f, baseline, 40f, day.Day.ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant());
             var text = $"{session.Name} · {session.PlannedMinutes} min" + (string.IsNullOrWhiteSpace(session.RatingSummary) ? "" : $" · {session.RatingSummary}");

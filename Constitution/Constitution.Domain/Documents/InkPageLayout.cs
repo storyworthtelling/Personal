@@ -81,7 +81,7 @@ public sealed class InkPageLayout
             foreach (var item in printed)
             {
                 // A shaded ground and a reserved slot are not print: no pen mark is confused with them.
-                if (item.Role is PrintedRole.Band or PrintedRole.Slot)
+                if (item.Role is PrintedRole.Band or PrintedRole.Slot or PrintedRole.Chart or PrintedRole.MarkFilled or PrintedRole.MarkOpen)
                 {
                     continue;
                 }

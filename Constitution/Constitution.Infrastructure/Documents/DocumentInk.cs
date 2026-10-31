@@ -42,6 +42,9 @@ internal sealed class DocumentInk : IDisposable
     /// <summary>The notes column's rules: the same hairline, dotted so they read as lines to write on and not as dividers.</summary>
     public SKPaint DottedStroke { get; } = Dotted();
 
+    /// <summary>The digest's weekly line: the ink itself at a pen's weight, neutral, never coloured.</summary>
+    public SKPaint ChartStroke { get; } = Stroke(PaperColorTokens.Ink, 1.2f);
+
     public SKPaint HeaderRule { get; } = new()
     {
         Color = AppIdentityTokens.ConstitutionDocument,
@@ -72,7 +75,7 @@ internal sealed class DocumentInk : IDisposable
             font.Dispose();
         }
 
-        foreach (var paint in new[] { Ink, Soft, Shade, Bright, TargetStroke, DividerStroke, DottedStroke, HeaderRule })
+        foreach (var paint in new[] { Ink, Soft, Shade, Bright, TargetStroke, DividerStroke, DottedStroke, ChartStroke, HeaderRule })
         {
             paint.Dispose();
         }

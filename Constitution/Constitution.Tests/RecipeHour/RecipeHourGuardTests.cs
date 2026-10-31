@@ -27,7 +27,7 @@ public class RecipeHourGuardTests
     public void TheWorkerClassAndItsRegisteredNameAreUnchanged()
     {
         Assert.Equal(ConstitutionIdentity.ApplicationId + ".MealWeekWorker", ConstitutionIdentity.MealWeekWorkerName);
-        Assert.Equal(4, ConstitutionIdentity.Workers.Count);
+        Assert.Equal(5, ConstitutionIdentity.Workers.Count);
         Assert.Equal("constitution-meal-week", ConstitutionIdentity.MealWeekWorkName);
     }
 

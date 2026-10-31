@@ -216,6 +216,29 @@ public static class MealWeekServices
             DateTimeOffset.Now);
     }
 
+    /// <summary>
+    /// The adult whose tablet this phone has, and the household's zone, from the household setup read afresh; null when there is no setup or no adult is named. The Saturday digest
+    /// (Release E) goes to this adult's tablet.
+    /// </summary>
+    public static (string Person, TimeZoneInfo Zone)? TabletOwnerOf(Context context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var appContext = context.ApplicationContext ?? context;
+        return Prepare(appContext) is MealWeekPreparation.Ready ready
+            && MealRecipeHour.TabletPerson(ready.Inputs.Rules, ready.Inputs.DeliverFor) is { } person
+                ? (person, ready.Inputs.Rules.Zone)
+                : null;
+    }
+
+    /// <summary>The kept meal weeks beside the ones the household file published, as the recipes entry reads them: the file the digest's meals pages come from.</summary>
+    public static IKeptWeeks KeptWeeksOf(Context context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var appContext = context.ApplicationContext ?? context;
+        return new KeptWeeksBesideTheHousehold(
+            new FileMealWeekRecords(Path.Combine(FolderOf(appContext), RecordFile)), new HouseholdWeekPlans(ConstitutionHousehold.For(appContext).Service));
+    }
+
     /// <summary>The saved weeks as the Meals tab and Today read them.</summary>
     public static IMealWeekSource Source(Context context)
     {

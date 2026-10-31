@@ -67,10 +67,14 @@ public static class DigestMeals
 
         baseline += 16f;
         draft.Line(PrintedRole.Strong, PageDraft.Left, baseline, PageDraft.FullWidth, NotesHeading, name: "planner-heading");
-        var top = baseline + 12f;
+        var top = baseline + 24f;
+        var line = 0;
         foreach (var id in DigestIds.PlannerNotes)
         {
-            draft.Target(InkTargets.WriteLine(id, PageDraft.Left, top, PageDraft.FullWidth, "a note to the planner"));
+            // Each line is named in words printed beside it (a target nobody names cannot be told from a smudge), and starts after the name.
+            line++;
+            draft.Line(PrintedRole.Small, PageDraft.Left, top + 17f, 44f, $"Note {line}", owner: id, name: $"planner-label-{line}");
+            draft.Target(InkTargets.WriteLine(id, PageDraft.Left + 52f, top, PageDraft.FullWidth - 52f, "a note to the planner"));
             top += InkTargets.WriteLineHeight + InkTargets.MinimumClearance;
         }
 

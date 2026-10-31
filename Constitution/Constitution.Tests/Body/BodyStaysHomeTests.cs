@@ -628,6 +628,7 @@ internal static class BodyOutbound
         new AllowedPath("Backup/", "the private, encrypted Body backup: the only place Body leaves the install (C-7.4.1, D98)", MayLeave: true),
         new AllowedPath("Body/", "the install's own Body store and readers: they hold Body here and have no way out"),
         .. SeatFactBuilderFiles.Select(file => new AllowedPath(file, "a voice-seat fact builder: the facts a seat needs and no more (D98)")),
+        new AllowedPath("Documents/LiveDigestSources.cs", "reads the install's own Body store for the Saturday digest and holds it in memory with no way out; the digest reaches only the owner's own tablet, through the renderer and delivery service, which never name Body (D165)"),
     ];
 
     /// <summary>Every type in the payload namespaces, plus the individually registered roots.</summary>

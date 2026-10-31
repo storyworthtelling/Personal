@@ -37,6 +37,15 @@ public enum PrintedRole
 
     /// <summary>Cascadia Code on the Title rung: a recipe step's clock time, read at a glance from across the counter.</summary>
     Time,
+
+    /// <summary>The digest's weekly line: drawn from <see cref="PrintedItem.Points"/> inside its bounds. Not print: no pen mark is confused with it.</summary>
+    Chart,
+
+    /// <summary>A small filled square: a done day on the digest. Not print.</summary>
+    MarkFilled,
+
+    /// <summary>A small open square: a day that was skipped or never read, on the digest. Not print.</summary>
+    MarkOpen,
 }
 
 public enum PrintedAlign
@@ -51,4 +60,5 @@ public enum PrintedAlign
 /// <paramref name="OwnerId"/> is the target (or lane group) it belongs to, if any.
 /// </summary>
 public sealed record PrintedItem(
-    string Name, PrintedRole Role, InkRect Bounds, string? Text, string? OwnerId, PrintedAlign Align = PrintedAlign.Left);
+    string Name, PrintedRole Role, InkRect Bounds, string? Text, string? OwnerId, PrintedAlign Align = PrintedAlign.Left,
+    IReadOnlyList<double?>? Points = null);
