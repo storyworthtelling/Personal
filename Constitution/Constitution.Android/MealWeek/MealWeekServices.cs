@@ -37,11 +37,13 @@ namespace Constitution.WeeklyMeals;
 ///
 /// <para><b>The paper (part two).</b> After the week is kept, the same run turns it into the meal sheet and each cook's recipe and puts them on this phone's tablet
 /// (<see cref="MealDocumentsStep"/>); the tablet, the delivery service, the ink probe and the read-back's record are the workout run's own
-/// (<see cref="WorkoutWeekDeliverySeams"/>). A recipe goes an hour before its cook block, so it waits for a later call, and no scheduled call reaches it (D116).</para>
+/// (<see cref="WorkoutWeekDeliverySeams"/>). A recipe goes an hour before its cook block, so the run that plans a week cannot send it; the recipes of the week in progress are sent by
+/// <see cref="TryRecipesAsync"/> (D120, closing D116).</para>
 ///
 /// <para><b>The worker.</b> <see cref="MealWeekWorker"/> calls <see cref="PassAsync"/>, which looks at the stamp and the two kept records and runs only what is due: this
-/// run, then the deadline step (<see cref="TryDecideAsync"/>), each through <see cref="RunGate.Shared"/>. <b>Known gap (D116):</b> this run plans the week <i>after</i> the one that
-/// holds now, so the recipes it sends are for a week that has not begun; the week in progress is never the kept week of a run, and no pass yet sends its recipes in their hour.</para>
+/// run, then the deadline step (<see cref="TryDecideAsync"/>), each through <see cref="RunGate.Shared"/>. This run plans the week <i>after</i> the one that
+/// holds now, so it never reaches a recipe of the week in progress; <b>the recipes entry does (D120)</b>: <see cref="TryRecipesAsync"/> takes the week already kept, plans nothing, places nothing and
+/// sends no sheet, and the pass asks for it only while a recipe is inside its hour and not yet on the tablet.</para>
 ///
 /// <para><b>Not yet here:</b> a taste profile store (the source says there is none,
 /// which plans without one), a source for the evenings the children eat at home, the Cook this soon mark, and an approval step. Nothing is swallowed
@@ -95,9 +97,9 @@ public static class MealWeekServices
     }
 
     /// <summary>
-    /// What a pass is for: the meal run, then the deadline step, whichever of them is due (<see cref="MealWeekPass"/>, which first reads the stamp and the two kept records and
-    /// runs nothing when nothing is due). Each part goes through <see cref="RunGate.Shared"/> by <see cref="TryRunAsync"/> and <see cref="TryDecideAsync"/>, so a busy gate is a
-    /// typed step and not a throw. The result is returned whole; the caller decides whether a fault fails the pass (<see cref="MealPassResult.ThrowIfFaulted"/>).
+    /// What a pass is for: the recipes of the week in progress (only while one is inside its hour), the meal run, then the deadline step, whichever of them is due (<see cref="MealWeekPass"/>,
+    /// which first reads the stamp and the two kept records, and the record of deliveries only while a recipe's hour is open, and runs nothing when nothing is due). Each part goes through
+    /// <see cref="RunGate.Shared"/> by <see cref="TryRecipesAsync"/>, <see cref="TryRunAsync"/> and <see cref="TryDecideAsync"/>, so a busy gate is a typed step and not a throw. The result is returned whole; the caller decides whether a fault fails the pass (<see cref="MealPassResult.ThrowIfFaulted"/>).
     /// </summary>
     public static async Task<MealPassResult> PassAsync(Context context, MealPassTrigger trigger, CancellationToken cancellation)
     {
@@ -106,15 +108,55 @@ public static class MealWeekServices
 
         var appContext = context.ApplicationContext ?? context;
         var folder = FolderOf(appContext);
+        var prepared = Prepare(appContext) as MealWeekPreparation.Ready;
         var seams = new MealPassSeams(
             new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
             DecisionRecords(appContext),
             new FileMealPassStamps(Path.Combine(folder, StampFile)),
             token => TryRunAsync(appContext, token),
             token => TryDecideAsync(appContext, token),
-            new BodyMealLog(new BodyLog(appContext)));
-        var zone = Prepare(appContext) is MealWeekPreparation.Ready ready ? ready.Inputs.Rules.Zone : TimeZoneInfo.Local;
+            new BodyMealLog(new BodyLog(appContext)),
+            new FileDeliveredMealDocuments(Path.Combine(folder, DeliveredFile)),
+            prepared is null ? null : MealRecipeHour.TabletPerson(prepared.Inputs.Rules, prepared.Inputs.DeliverFor),
+            token => TryRecipesAsync(appContext, token));
+        var zone = prepared?.Inputs.Rules.Zone ?? TimeZoneInfo.Local;
         return await MealWeekPass.RunAsync(trigger, DateTimeOffset.Now, zone, seams, cancellation);
+    }
+
+    /// <summary>
+    /// The recipes of the week in progress, once it has its turn (D120): the documents step on the kept week, for each cooked dinner of this phone's adult whose recipe is inside its hour and
+    /// not yet on the tablet. It plans nothing, writes nothing to a calendar and changes no kept week; <see cref="GateResult{T}.Busy"/> when another placement run held the gate for the
+    /// whole wait (the next pass inside the hour tries again). It goes through the gate like the other parts because the tablet and the read-back's record are shared with the workout run.
+    /// </summary>
+    public static Task<GateResult<MealRecipesOutcome>> TryRecipesAsync(Context context, CancellationToken cancellation)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellation.ThrowIfCancellationRequested();
+        return RunGate.Shared.RunAsync(token => RecipesAloneAsync(context, token), RunGate.DefaultWait, cancellation);
+    }
+
+    private static async Task<MealRecipesOutcome> RecipesAloneAsync(Context context, CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+
+        var appContext = context.ApplicationContext ?? context;
+        var log = new BodyMealLog(new BodyLog(appContext));
+        if (Prepare(appContext) is not MealWeekPreparation.Ready ready)
+        {
+            // No household setup: no rules and no tablet to name. A typed stop, tried again once the setup reads.
+            var stopped = new MealRecipesOutcome.Stopped(MealRecipesStoppedBecause.NotConfigured, "There is no household setup on this phone, so no recipe was sent.");
+            log.Outcome(MealRecipesTrail.LogPhrase(stopped));
+            return stopped;
+        }
+
+        var folder = FolderOf(appContext);
+        var seams = new MealRecipeSeams(
+            new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
+            new HouseholdRecipeBox(ConstitutionHousehold.For(appContext).Service),
+            new NoMealTaste(),
+            AssembleDocuments(appContext),
+            log);
+        return await MealRecipeHourRun.RunAsync(ready.Inputs, seams, cancellation);
     }
 
     /// <summary>The deadline step, once it has its turn at the calendars (it takes a denied evening's cook block off, through the same record of written keys); <see cref="GateResult{T}.Busy"/> when another placement run held them for the whole wait.</summary>
@@ -177,18 +219,7 @@ public static class MealWeekServices
         var household = ConstitutionHousehold.For(appContext);
         var folder = FolderOf(appContext);
         var log = new BodyMealLog(new BodyLog(appContext));
-        var delivery = WorkoutWeekDeliverySeams.Create(appContext);
-        var documents = new MealDocumentSeams(
-            delivery.Delivery,
-            delivery.Tablet,
-            delivery.InkProbe,
-            delivery.Expected,
-            new FileDeliveredMealDocuments(Path.Combine(folder, DeliveredFile)),
-            new HouseholdMealRoster(household.Service),
-            new HouseholdMealPantry(household.Service),
-            new FileMonthlyBudgets(Path.Combine(NoBackupRoot(appContext), FileMonthlyBudgets.FileName)),
-            new UnavailableHolidayCalendar(),
-            log);
+        var documents = AssembleDocuments(appContext);
         return new MealWeekSeams(
             household.Planning.AskAsync,
             new HouseholdRecipeBox(household.Service),
@@ -204,6 +235,29 @@ public static class MealWeekServices
             documents,
             new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), TemplateAuthorServices.AuthorOf(appContext)),
             DecisionRecords(appContext));
+    }
+
+    /// <summary>
+    /// What the documents step reaches: the workout run's tablet side (<see cref="WorkoutWeekDeliverySeams"/>) and the meal run's own record of what it has sent, the roster and pantry over the
+    /// household file, Index's budget and the holiday calendar that cannot be asked. Shared by the weekly run and the recipes entry, so a title and a fingerprint mean the same page to both.
+    /// </summary>
+    public static MealDocumentSeams AssembleDocuments(Context appContext)
+    {
+        ArgumentNullException.ThrowIfNull(appContext);
+
+        var household = ConstitutionHousehold.For(appContext);
+        var delivery = WorkoutWeekDeliverySeams.Create(appContext);
+        return new MealDocumentSeams(
+            delivery.Delivery,
+            delivery.Tablet,
+            delivery.InkProbe,
+            delivery.Expected,
+            new FileDeliveredMealDocuments(Path.Combine(FolderOf(appContext), DeliveredFile)),
+            new HouseholdMealRoster(household.Service),
+            new HouseholdMealPantry(household.Service),
+            new FileMonthlyBudgets(Path.Combine(NoBackupRoot(appContext), FileMonthlyBudgets.FileName)),
+            new UnavailableHolidayCalendar(),
+            new BodyMealLog(new BodyLog(appContext)));
     }
 
     /// <summary>The record of decided weeks, a small file beside the kept weeks: the deadline step writes it, and the sheet and the Meals tab's share read the denied evenings' shopping lines from it (D112).</summary>

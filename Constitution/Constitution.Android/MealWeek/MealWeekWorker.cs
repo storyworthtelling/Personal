@@ -11,10 +11,11 @@ namespace Constitution.WeeklyMeals;
 /// The meal side's background pass (P13): once an hour, and once when the app opens, it asks <see cref="MealPassPlan"/> what is due and does only that. A pass
 /// with nothing due reads three small local files and stops (no household file, calendar, tablet or network, no trail line); a due one runs the weekly meal run
 /// (plan the coming week, place it, send the sheet) and then the Sunday-8:00 deadline step, each through the one run gate the workout run uses. All the work is
-/// <see cref="MealWeekServices.PassAsync"/>; this is the WorkManager door to it.
+/// <see cref="MealWeekServices.PassAsync"/>; this is the WorkManager door to it. The pass also sends the week in progress a recipe inside its hour (D120), which is why this worker
+/// is enqueued twice, half an hour apart.
 ///
-/// <para><b>Both names are frozen</b> (<see cref="ConstitutionIdentity.MealWeekWorkerName"/>, <see cref="ConstitutionIdentity.MealWeekWorkName"/>), for the reason the workout
-/// worker's are: WorkManager persists the row by Java class name and the work is enqueued with <c>Keep</c>. A guard reads this file by content.</para>
+/// <para><b>Three names are frozen</b> (<see cref="ConstitutionIdentity.MealWeekWorkerName"/>, <see cref="ConstitutionIdentity.MealWeekWorkName"/>, and the second request's
+/// <see cref="ConstitutionIdentity.MealRecipeHourWorkName"/>), for the reason the workout worker's are: WorkManager persists the row by Java class name and the work is enqueued with <c>Keep</c>. A guard reads this file by content.</para>
 ///
 /// <para><b>Errors.</b> The pass types everything it can (a busy gate, an unreadable household file, a calendar that would not answer are all outcomes, not throws);
 /// what is left is a bug or a full disk. Each part's failure is kept, logged by type name only, and the other part still runs; the worker then fails the pass
@@ -48,23 +49,33 @@ public class MealWeekWorker : Worker
     }
 
     /// <summary>
-    /// Queues the hourly pass under the frozen unique name, first at five past the next hour on the household's clock (<see cref="MealPassSchedule"/>).
-    /// <c>Keep</c> means a relaunch never disturbs the pending run. Called from the activity at start, before the workout worker's.
+    /// Queues the two hourly requests of this worker under their frozen unique names, both with <c>Keep</c> so a relaunch never disturbs a pending run: the first at five past the next
+    /// hour on the household's clock (<see cref="MealPassSchedule.DelayUntilNext"/>) and the second at thirty-five past (<see cref="MealPassSchedule.DelayUntilNextRecipeLook"/>, D120).
+    /// Together they are a pass every half hour, which is what puts two of them inside any recipe's hour: the hourly one alone leaves a single pass in the window with a minute to spare at
+    /// worst, and WorkManager is not exact. Each runs the whole pass, which is cheap when nothing is due, so the second needs no worker of its own. Called from the activity at start,
+    /// before the workout worker's.
     /// </summary>
     public static void Schedule(Context context)
+    {
+        var manager = WorkManager.GetInstance(context);
+        var hourly = Request(MealPassSchedule.DelayUntilNext(DateTimeOffset.Now, TimeZoneInfo.Local), ConstitutionIdentity.MealWeekWorkName);
+        var recipes = Request(MealPassSchedule.DelayUntilNextRecipeLook(DateTimeOffset.Now, TimeZoneInfo.Local), ConstitutionIdentity.MealRecipeHourWorkName);
+
+        manager.EnqueueUniquePeriodicWork(ConstitutionIdentity.MealWeekWorkName, ExistingPeriodicWorkPolicy.Keep!, hourly);
+        manager.EnqueueUniquePeriodicWork(ConstitutionIdentity.MealRecipeHourWorkName, ExistingPeriodicWorkPolicy.Keep!, recipes);
+    }
+
+    private static PeriodicWorkRequest Request(TimeSpan firstDelay, string tag)
     {
         var constraints = new Constraints.Builder()
             .SetRequiredNetworkType(NetworkType.Connected!)!
             .Build()!;
-        var delay = (long)MealPassSchedule.DelayUntilNext(DateTimeOffset.Now, TimeZoneInfo.Local).TotalMilliseconds;
         var request = new PeriodicWorkRequest.Builder(typeof(MealWeekWorker), MealPassSchedule.Interval)
             .SetConstraints(constraints)!
-            .SetInitialDelay(delay, Java.Util.Concurrent.TimeUnit.Milliseconds!)!
-            .AddTag(ConstitutionIdentity.MealWeekWorkName)!
+            .SetInitialDelay((long)firstDelay.TotalMilliseconds, Java.Util.Concurrent.TimeUnit.Milliseconds!)!
+            .AddTag(tag)!
             .Build();
-
-        WorkManager.GetInstance(context)
-            .EnqueueUniquePeriodicWork(ConstitutionIdentity.MealWeekWorkName, ExistingPeriodicWorkPolicy.Keep!, (PeriodicWorkRequest)request);
+        return (PeriodicWorkRequest)request;
     }
 
     /// <summary>
