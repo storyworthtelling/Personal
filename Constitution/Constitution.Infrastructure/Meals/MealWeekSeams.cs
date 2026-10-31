@@ -24,6 +24,7 @@ namespace Constitution.Infrastructure.Meals;
 /// <param name="Log">The Body trail's one-method seam.</param>
 /// <param name="Documents">What the documents step reaches (the tablet, the stores, the roster, the pantry); null plans the week and prints nothing.</param>
 /// <param name="Templates">What the rotating-templates step reaches (the library and the author); null leaves pages 2 and 3 off the sheet. Used only together with <paramref name="Documents"/>.</param>
+/// <param name="Publisher">Where the kept week is put in the household file for the other phone (D126); null publishes nothing. Reached only after the lease and the save, so only the planning phone ever writes a week-plan record.</param>
 /// <param name="Decisions">The weeks the deadline step has decided, read for the shopping-list lines a denied evening adds (D112); null leaves the sheet's list without any. Used only together with <paramref name="Documents"/>.</param>
 public sealed record MealWeekSeams(
     Func<CancellationToken, Task<PlanningStanding>> Lease,
@@ -39,4 +40,5 @@ public sealed record MealWeekSeams(
     IWorkoutWeekLog Log,
     MealDocumentSeams? Documents = null,
     MealTemplateSeams? Templates = null,
-    IMealDecisionRecords? Decisions = null);
+    IMealDecisionRecords? Decisions = null,
+    IWeekPlanPublisher? Publisher = null);

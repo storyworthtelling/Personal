@@ -169,10 +169,13 @@ public static class MealPassStampCodec
     }
 }
 
-/// <summary>Which parts of the pass have something to do. <paramref name="RecipeHour"/> is a recipe in its hour for this phone's tablet that is not on it yet (<see cref="MealRecipeHour"/>).</summary>
-public sealed record MealPassWork(bool PlanWeek, bool Deadline, bool RecipeHour = false)
+/// <summary>
+/// Which parts of the pass have something to do. <paramref name="RecipeHour"/> is a recipe in its hour for this phone's tablet that is not on it yet (<see cref="MealRecipeHour"/>).
+/// <paramref name="SharedWeek"/> is a page of a week another phone published (the lease holder's) waiting for this phone's tablet (<see cref="SharedWeeks"/>, D127).
+/// </summary>
+public sealed record MealPassWork(bool PlanWeek, bool Deadline, bool RecipeHour = false, bool SharedWeek = false)
 {
-    public bool Any => PlanWeek || Deadline || RecipeHour;
+    public bool Any => PlanWeek || Deadline || RecipeHour || SharedWeek;
 }
 
 /// <summary>When the meal pass wakes and how often it looks again.</summary>
@@ -223,7 +226,8 @@ public static class MealPassPlan
 
         return outcome switch
         {
-            MealWeekOutcome.Planned => true,
+            // A week the lease holder kept but could not share is only tried: the other phone has nothing to send from until it is in the household file (D128).
+            MealWeekOutcome.Planned planned => planned.Report.Publication is not WeekPlanPublication.NotPublished,
             MealWeekOutcome.NotPlanned notPlanned => notPlanned.Because == MealNotPlannedBecause.NotThePlanner,
             _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "This kind of outcome has no answer on whether it settles; add one here."),
         };
@@ -232,6 +236,7 @@ public static class MealPassPlan
     /// <summary>
     /// <paramref name="tabletPerson"/> is the adult whose tablet this phone has (null: none, so no recipe is ever due) and <paramref name="delivered"/> looks a page up in the record of
     /// what has gone to the tablet; it is called only when a recipe's hour is open, so a pass outside every hour reads nothing more than before.
+    /// <paramref name="shared"/> are the weeks another phone published (null: none read, so nothing shared is ever due).
     /// </summary>
     public static MealPassWork Decide(
         MealPassTrigger trigger,
@@ -241,7 +246,8 @@ public static class MealPassPlan
         MealWeekRecordRead weeks,
         MealDecisionRecordRead decisions,
         string? tabletPerson = null,
-        Func<string, DeliveredMealDocument?>? delivered = null)
+        Func<string, DeliveredMealDocument?>? delivered = null,
+        IReadOnlyList<SharedWeekPlan>? shared = null)
     {
         ArgumentNullException.ThrowIfNull(zone);
         ArgumentNullException.ThrowIfNull(stamp);
@@ -251,7 +257,8 @@ public static class MealPassPlan
         // A stamp that cannot be read is no stamp: the cost is one extra, idempotent run.
         var held = (stamp as MealPassStampRead.Held)?.Stamp ?? MealPassStamp.Empty;
         var recipes = MealRecipeHour.DueWeeks(weeks, now, tabletPerson, delivered ?? (_ => null)).Count > 0;
-        return new MealPassWork(PlanDue(trigger, now, zone, held), DeadlineDue(now, zone, held, weeks, decisions), recipes);
+        var sharedDue = shared is not null && SharedWeeks.Due(shared, now, tabletPerson, delivered ?? (_ => null)).Count > 0;
+        return new MealPassWork(PlanDue(trigger, now, zone, held), DeadlineDue(now, zone, held, weeks, decisions), recipes, sharedDue);
     }
 
     private static bool PlanDue(MealPassTrigger trigger, DateTimeOffset now, TimeZoneInfo zone, MealPassStamp stamp)

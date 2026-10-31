@@ -68,6 +68,9 @@ public sealed record MealWeekReport(
 
     /// <summary>What the rotating templates step did, or null when the run was not given the means to rotate any.</summary>
     public MealTemplatesResult? Templates { get; init; }
+
+    /// <summary>Whether the kept week reached the household file for the other phone (D126). A failure here never fails the run; a pass tries again (D128).</summary>
+    public WeekPlanPublication Publication { get; init; } = new WeekPlanPublication.NotAttempted();
 }
 
 /// <summary>The result of one run of the weekly meal run: planned, or the typed reason it was not.</summary>
