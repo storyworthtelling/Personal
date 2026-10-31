@@ -2,6 +2,8 @@ using Constitution.Domain.Household;
 using Constitution.Domain.Meals;
 using Constitution.Domain.Meals.Pipeline;
 using Constitution.Domain.Meals.Templates;
+using Constitution.Domain.Placement;
+using Constitution.Domain.Workouts.Screens;
 using Constitution.Tests.MealTaste;
 using Constitution.Tests.TemplatesInTheRun;
 using Family = Constitution.Tests.Calendar.InventedFamily;
@@ -84,7 +86,7 @@ public class MealDeadlineStepTests
         Assert.Equal(8, report.Approved);
         Assert.Equal(8, report.ApprovedUnread);
         Assert.Equal(0, report.Denied);
-        Assert.False(report.NeedsRevisedSheet);
+        Assert.Empty(report.DeniedEvenings);
         Assert.Empty(rig.Notes.Kept);
     }
 
@@ -110,7 +112,7 @@ public class MealDeadlineStepTests
 
         Assert.Equal(0, report.Denied);
         Assert.Equal(1, report.LateSetAside);
-        Assert.False(report.NeedsRevisedSheet);
+        Assert.Empty(report.DeniedEvenings);
     }
 
     // ---- a denied dinner ----
@@ -167,35 +169,339 @@ public class MealDeadlineStepTests
     }
 
     [Fact]
-    public async Task ADeniedEveningAheadNeedsARevisedSheetAndNamesItsDish()
+    public async Task ADeniedEveningAheadIsLeftUnplannedAndRecorded()
     {
         var rig = await PlannedAsync();
-        var (line, card, _) = rig.CookedDinner(1);
+        var (line, _, day) = rig.CookedDinner(1);
+        var before = rig.Kept;
         rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
 
         var report = await rig.DecidedAsync();
 
-        Assert.True(report.NeedsRevisedSheet);
-        Assert.Equal(card, Assert.Single(report.ReplanWithout));
+        Assert.Equal([DeniedEveningWords.Of(day.DayOfWeek)], report.DeniedEvenings);
         var entry = Assert.Single(rig.Decisions.Held().Entries);
-        Assert.True(entry.NeedsRevisedSheet);
-        Assert.Equal(card, Assert.Single(entry.ReplanWithout));
+        Assert.Equal(report.DeniedEvenings, entry.DeniedEvenings);
+        Assert.Equal([DeniedEveningWords.Line(report.DeniedEvenings[0])], entry.ExtraLines);
+        Assert.False(entry.NeedsRevisedSheet);
+        Assert.Empty(entry.ReplanWithout);
+        var left = rig.Kept.Week.Dinners.Single(item => item.Day == day);
+        Assert.Equal(DinnerKind.NothingPlanned, left.Kind);
+        Assert.Equal(DeniedEveningWords.NotApprovedReason, left.Reason);
+        foreach (var dinner in before.Week.Dinners.Where(item => item.Day != day))
+        {
+            Assert.Equal(dinner, rig.Kept.Week.Dinners.Single(item => item.Day == dinner.Day));
+        }
+
+        Assert.Equal(before.PlannedAt, rig.Kept.PlannedAt);
     }
 
     [Fact]
-    public async Task ADeniedEveningThatIsOverNeedsNothing()
+    public async Task OnlyTheDeniedEveningChangesInTheSavedWeek()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        var untouched = MealDeadlineRules.LeaveUnplanned(rig.Kept, [day]);
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        await rig.DecidedAsync();
+
+        Assert.Equal(MealWeekRecordCodec.Encode(new MealWeekRecord([untouched])), MealWeekRecordCodec.Encode(new MealWeekRecord([rig.Kept])));
+    }
+
+    [Fact]
+    public async Task ANoWithNothingDeniedLeavesTheSavedWeekByteForByte()
+    {
+        var rig = await PlannedAsync();
+        var json = rig.Weeks.Json;
+        var saves = rig.Weeks.Saves;
+        rig.Answers.All.Add(Tick(Sam, rig.CookedDinner().Line, Before(60)));
+
+        await rig.DecidedAsync();
+
+        Assert.Equal(json, rig.Weeks.Json);
+        Assert.Equal(saves, rig.Weeks.Saves);
+    }
+
+    [Fact]
+    public async Task ADeniedEveningThatIsOverIsLeftAlone()
     {
         var rig = await PlannedAsync();
         var (line, _, day) = rig.CookedDinner();
         rig.Now = Family.Edt(10, 28, 12);
+        var json = rig.Weeks.Json;
         rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
 
         var report = await rig.DecidedAsync();
 
         Assert.True(day < new DateOnly(2026, 10, 28));
         Assert.Equal(1, report.Denied);
-        Assert.False(report.NeedsRevisedSheet);
-        Assert.Empty(report.ReplanWithout);
+        Assert.Empty(report.DeniedEvenings);
+        Assert.Empty(report.EventRemovals);
+        Assert.Equal(json, rig.Weeks.Json);
+        Assert.Empty(rig.Decisions.Held().For(Week)!.ExtraLines);
+    }
+
+    [Fact]
+    public async Task TodaysDeniedEveningCounts()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner();
+        rig.Now = Family.Edt(day.Month, day.Day, 15);
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        var report = await rig.DecidedAsync();
+
+        Assert.Equal([DeniedEveningWords.Of(day.DayOfWeek)], report.DeniedEvenings);
+    }
+
+    [Fact]
+    public async Task EveryDeniedEveningGetsItsOwnLineInWeekOrder()
+    {
+        var rig = await PlannedAsync();
+        var (lineA, _, dayA) = rig.CookedDinner(0);
+        var (lineB, _, dayB) = rig.CookedDinner(2);
+        rig.Answers.All.Add(Deny(Lee, lineB, "no", Before(60)));
+        rig.Answers.All.Add(Deny(Sam, lineA, "no", Before(60)));
+        rig.Answers.All.Add(Deny(Lee, lineA, "no", Before(50)));
+
+        var report = await rig.DecidedAsync();
+
+        Assert.Equal([DeniedEveningWords.Of(dayA.DayOfWeek), DeniedEveningWords.Of(dayB.DayOfWeek)], report.DeniedEvenings);
+        Assert.Equal(2, rig.Decisions.Held().For(Week)!.ExtraLines.Count);
+        Assert.Equal(2, rig.Kept.Week.Dinners.Count(item => item.Reason == DeniedEveningWords.NotApprovedReason));
+    }
+
+    [Fact]
+    public async Task ADeniedEveningStaysDecidedWhenTheJudgeIsAskedAgain()
+    {
+        var rig = await PlannedAsync();
+        var (line, card, _) = rig.CookedDinner(1);
+        rig.Answers.All.Add(Deny(Sam, line, "too heavy", Before(60)));
+        await rig.DecidedAsync();
+        rig.Judge = new FakeTasteJudge(_ => new TasteJudgement.OneOff());
+
+        var again = await rig.DecidedAsync();
+
+        Assert.True(again.WasRetry);
+        Assert.Equal(card, Assert.Single(rig.Judge.Asked).Recipe);
+        Assert.Equal(1, Assert.Single(rig.Decisions.Held().Entries).DeniedEvenings.Count);
+        Assert.Equal(1, rig.Kept.Week.Dinners.Count(item => item.Reason == DeniedEveningWords.NotApprovedReason));
+    }
+
+    // ---- the cook block on the calendar (D111) ----
+
+    [Fact]
+    public async Task ADeniedEveningsCookBlockIsTakenOffTheCalendar()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        var key = rig.CookKey(day);
+        Assert.NotNull(rig.Planning.Writer.By(key, rig.CookOf(day)));
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        var report = await rig.DecidedAsync();
+
+        var removal = Assert.Single(report.EventRemovals);
+        Assert.Equal(FollowOutcome.Removed, removal.Outcome);
+        Assert.Null(rig.Planning.Writer.By(key, rig.CookOf(day)));
+        Assert.Empty(rig.Decisions.Held().For(Week)!.EventsPending);
+    }
+
+    [Fact]
+    public async Task OnlyTheDeniedEveningsBlockGoes()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        var others = rig.Planning.Writer.All.Where(item => item.Key != rig.CookKey(day)).Select(item => item.Id).ToList();
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        await rig.DecidedAsync();
+
+        Assert.Equal(others.Order(StringComparer.Ordinal), rig.Planning.Writer.All.Select(item => item.Id).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task AnEventTheOwnerMovedIsLeftAloneSilently()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        var key = rig.CookKey(day);
+        var held = rig.Planning.Writer.By(key, rig.CookOf(day))!;
+        rig.Planning.Writer.OwnerMoves(key, rig.CookOf(day), held.Start.AddHours(1), held.End.AddHours(1));
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        var report = await rig.DecidedAsync();
+
+        Assert.Equal(FollowOutcome.OwnerHadMovedIt, Assert.Single(report.EventRemovals).Outcome);
+        Assert.NotNull(rig.Planning.Writer.By(key, rig.CookOf(day)));
+        Assert.Equal(0, rig.Editor.Removes);
+        Assert.Empty(rig.Decisions.Held().For(Week)!.EventsPending);
+        Assert.Single(report.DeniedEvenings);
+    }
+
+    [Fact]
+    public async Task AnEventTheOwnerDeletedIsNotOnTheCalendarAndNothingIsRemoved()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        rig.Planning.Writer.OwnerDeletes(rig.CookKey(day), rig.CookOf(day));
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        var report = await rig.DecidedAsync();
+
+        Assert.Equal(FollowOutcome.NotOnCalendar, Assert.Single(report.EventRemovals).Outcome);
+        Assert.Equal(0, rig.Editor.Removes);
+    }
+
+    [Fact]
+    public async Task ARemovedEventIsRecordedAsWrittenSoNoLaterRunMakesItAgain()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        var key = rig.CookKey(day);
+        rig.Planning.Keys.Json = null;
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        await rig.DecidedAsync();
+
+        Assert.True(Assert.IsType<WrittenKeysRead>(rig.Planning.Keys.Load()).Keys.Contains(key));
+    }
+
+    [Fact]
+    public async Task ALaterPlacementOfTheSameWeekDoesNotRecreateARemovedBlock()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        var key = rig.CookKey(day);
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+        await rig.DecidedAsync();
+        var creates = rig.Planning.Writer.CreateCalls;
+
+        rig.Planning.Now = Family.Edt(10, 25, 16);
+        await rig.Planning.PlannedAsync();
+
+        Assert.Null(rig.Planning.Writer.By(key, rig.CookOf(day)));
+        Assert.True(rig.Planning.Writer.CreateCalls >= creates);
+    }
+
+    [Fact]
+    public async Task ACalendarThatCannotBeLookedIntoIsATypedNotRemovedAndTheStepStillDecides()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        rig.Planning.Writer.UnavailablePeople.Add(rig.CookOf(day));
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        var report = await rig.DecidedAsync();
+
+        var removal = Assert.Single(report.EventRemovals);
+        Assert.Equal(FollowOutcome.Unavailable, removal.Outcome);
+        Assert.True(removal.NotRemoved);
+        Assert.Equal([DeniedEveningWords.Of(day.DayOfWeek)], rig.Decisions.Held().For(Week)!.EventsPending);
+        Assert.Equal(DinnerKind.NothingPlanned, rig.Kept.Week.Dinners.Single(item => item.Day == day).Kind);
+        Assert.Single(rig.Decisions.Held().Entries);
+    }
+
+    [Fact]
+    public async Task AFailedEditIsATypedNotRemoved()
+    {
+        var rig = await PlannedAsync();
+        var (line, _, day) = rig.CookedDinner(1);
+        rig.Editor.FailWith = "The calendar refused the edit.";
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        var report = await rig.DecidedAsync();
+
+        Assert.Equal(FollowOutcome.Failed, Assert.Single(report.EventRemovals).Outcome);
+        Assert.NotNull(rig.Planning.Writer.By(rig.CookKey(day), rig.CookOf(day)));
+    }
+
+    [Fact]
+    public async Task ANoCalendarSeamIsNotRemovedToo()
+    {
+        var rig = await PlannedAsync();
+        rig.CalendarWired = false;
+        var (line, _, _) = rig.CookedDinner(1);
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+
+        var report = await rig.DecidedAsync();
+
+        Assert.Equal(FollowOutcome.Unavailable, Assert.Single(report.EventRemovals).Outcome);
+        Assert.Single(rig.Decisions.Held().For(Week)!.EventsPending);
+    }
+
+    [Fact]
+    public async Task ANextRunRetriesARemovalUntilItWorks()
+    {
+        var rig = await PlannedAsync();
+        rig.Judge = new FakeTasteJudge(_ => new TasteJudgement.OneOff());
+        var (line, _, day) = rig.CookedDinner(1);
+        rig.Planning.Writer.UnavailablePeople.Add(rig.CookOf(day));
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+        await rig.DecidedAsync();
+        rig.Planning.Writer.UnavailablePeople.Clear();
+        rig.Now = rig.Now.AddHours(2);
+        var reads = rig.Answers.Reads;
+
+        var second = await rig.DecidedAsync();
+
+        Assert.Equal(FollowOutcome.Removed, Assert.Single(second.EventRemovals).Outcome);
+        Assert.Null(rig.Planning.Writer.By(rig.CookKey(day), rig.CookOf(day)));
+        Assert.Empty(rig.Decisions.Held().For(Week)!.EventsPending);
+        Assert.Equal(DeniedEveningWords.Of(day.DayOfWeek), Assert.Single(rig.Decisions.Held().For(Week)!.DeniedEvenings));
+        Assert.Equal(reads, rig.Answers.Reads);
+        var third = await rig.RunAsync();
+        Assert.Equal(MealDeadlineNothingBecause.AlreadyDecided, Assert.IsType<MealDeadlineOutcome.NothingToDecide>(third).Because);
+    }
+
+    [Fact]
+    public async Task ARetryStopsOnceTheEveningHasPassed()
+    {
+        var rig = await PlannedAsync();
+        rig.Judge = new FakeTasteJudge(_ => new TasteJudgement.OneOff());
+        var (line, _, day) = rig.CookedDinner(1);
+        rig.Planning.Writer.UnavailablePeople.Add(rig.CookOf(day));
+        rig.Answers.All.Add(Deny(Lee, line, "no", Before(60)));
+        await rig.DecidedAsync();
+        rig.Now = Family.Edt(day.Month, day.Day, 23).AddHours(2);
+        var asks = rig.Planning.Writer.FindCalls;
+
+        var outcome = await rig.RunAsync();
+
+        Assert.Equal(MealDeadlineNothingBecause.AlreadyDecided, Assert.IsType<MealDeadlineOutcome.NothingToDecide>(outcome).Because);
+        Assert.Equal(asks, rig.Planning.Writer.FindCalls);
+    }
+
+    [Fact]
+    public async Task ARemovalRetryDoesNotAskTheJudgeAgain()
+    {
+        var rig = await PlannedAsync();
+        rig.Judge = new FakeTasteJudge(_ => new TasteJudgement.OneOff());
+        var (line, _, day) = rig.CookedDinner(1);
+        rig.Planning.Writer.UnavailablePeople.Add(rig.CookOf(day));
+        rig.Answers.All.Add(Deny(Lee, line, "too heavy", Before(60)));
+        await rig.DecidedAsync();
+        rig.Planning.Writer.UnavailablePeople.Clear();
+
+        await rig.DecidedAsync();
+
+        Assert.Single(rig.Judge.Asked);
+    }
+
+    [Fact]
+    public async Task ADeniedTemplateLineDoesNotTouchAnyEveningOrTheCalendar()
+    {
+        var rig = await PlannedAsync();
+        var json = rig.Weeks.Json;
+        var snapshot = rig.Planning.Writer.Snapshot();
+        rig.Answers.All.Add(Deny(Lee, TickedLine, "we are out of oats", Before(60)));
+
+        var report = await rig.DecidedAsync();
+
+        Assert.Empty(report.DeniedEvenings);
+        Assert.Empty(report.EventRemovals);
+        Assert.Equal(json, rig.Weeks.Json);
+        Assert.Equal(snapshot, rig.Planning.Writer.Snapshot());
     }
 
     [Fact]
@@ -314,8 +620,7 @@ public class MealDeadlineStepTests
         Assert.Equal(TickedTemplate, asked.Recipe!.Value.Value);
         Assert.Equal("we are out of oats", asked.Words);
         Assert.Equal(1, report.TemplatesFed);
-        Assert.True(report.NeedsRevisedSheet);
-        Assert.Empty(report.ReplanWithout);
+        Assert.Empty(report.DeniedEvenings);
     }
 
     [Fact]
@@ -435,15 +740,20 @@ public class MealDeadlineStepTests
     }
 
     [Fact]
-    public async Task TheStepNeverTouchesTheKeptWeeks()
+    public async Task TheStepOnlyEverSavesTheKeptWeeksForADeniedEveningAhead()
     {
         var rig = await PlannedAsync();
         var saves = rig.Weeks.Saves;
-        rig.Answers.All.Add(Deny(Sam, rig.CookedDinner().Line, "no", Before(60)));
+        rig.Answers.All.Add(Tick(Sam, rig.CookedDinner().Line, Before(60)));
+        rig.Answers.All.Add(Deny(Sam, TickedLine, "no", Before(60)));
+        await rig.DecidedAsync();
+        Assert.Equal(saves, rig.Weeks.Saves);
 
+        rig.Redecide();
+        rig.Answers.All.Add(Deny(Sam, rig.CookedDinner().Line, "no", Before(60)));
         await rig.DecidedAsync();
 
-        Assert.Equal(saves, rig.Weeks.Saves);
+        Assert.Equal(saves + 1, rig.Weeks.Saves);
     }
 
     // ---- the trail ----

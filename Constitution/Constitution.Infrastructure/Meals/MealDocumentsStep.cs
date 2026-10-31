@@ -122,6 +122,7 @@ public static class MealDocumentsStep
                 SlowCookerCards = request.SlowCookerCards,
                 KidsMeals = request.KidsMeals,
                 Daily = request.Daily,
+                ExtraLines = request.ExtraLines,
             });
             pdf = ConstitutionDocumentRenderer.Render(MealSheetDocument.Build(model));
             expected = ExpectedDocument.ForMealSheet(model, person);

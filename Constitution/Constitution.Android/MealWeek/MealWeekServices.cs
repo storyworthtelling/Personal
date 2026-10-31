@@ -148,7 +148,7 @@ public static class MealWeekServices
 
     /// <summary>
     /// The seams of the deadline step (<see cref="MealDeadlineStep"/>), the part of the meal week that runs once the sheet's deadline has passed. The lease, the kept
-    /// weeks, the household file's answers, library and taste notes are this install's own; the record of decided weeks is a small file beside the kept weeks. <b>The taste
+    /// weeks, the household file's answers, library and taste notes are this install's own; the record of decided weeks is a small file beside the kept weeks; the calendar side (the meal key family's writer, the narrow editor and the written keys the meal run placed with) takes a denied evening's cook block off (D111). <b>The taste
     /// judge is <see cref="UnavailableTasteJudge"/>:</b> no Claude judge exists yet, so written words are recorded as unjudged and asked again on the next run. Nothing calls
     /// the step yet (a worker is a later job), and nothing here holds a secret.
     /// </summary>
@@ -158,6 +158,7 @@ public static class MealWeekServices
 
         var household = ConstitutionHousehold.For(appContext);
         var folder = FolderOf(appContext);
+        var calendar = WorkoutWeekCalendarSeams.Create(appContext, KeyFamily.HouseholdMeal);
         return new MealDeadlineSeams(
             household.Planning.AskAsync,
             new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
@@ -166,7 +167,8 @@ public static class MealWeekServices
             new HouseholdTemplateLibrary(household.Service),
             new HouseholdTasteNotes(household.Service),
             new UnavailableTasteJudge(),
-            new BodyMealLog(new BodyLog(appContext)));
+            new BodyMealLog(new BodyLog(appContext)),
+            new MealDeadlineCalendar(calendar.CalendarWriter, calendar.EventEditor, calendar.WrittenKeys));
     }
 
     private static string FolderOf(Context appContext) => Path.Combine(NoBackupRoot(appContext), FolderName);

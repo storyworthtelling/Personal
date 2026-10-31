@@ -1,5 +1,6 @@
 using Constitution.Domain.Calendar;
 using Constitution.Domain.Recipes;
+using Constitution.Domain.Workouts.Screens;
 
 namespace Constitution.Domain.Meals.Pipeline;
 
@@ -53,9 +54,17 @@ public sealed record MealDeadlineReport(
     int Lasting,
     int OneOff,
     int Unjudged,
-    bool NeedsRevisedSheet,
-    IReadOnlyList<RecipeId> ReplanWithout,
+    IReadOnlyList<string> DeniedEvenings,
+    IReadOnlyList<EveningRemoval> EventRemovals,
     bool WasRetry);
+
+/// <summary>What became of the cook block of one denied evening (D111). <see cref="Outcome"/> is the calendar follow's own typed answer; an owner-moved event is left alone.</summary>
+/// <param name="Evening">The weekday word of the evening.</param>
+public sealed record EveningRemoval(string Evening, FollowOutcome Outcome)
+{
+    /// <summary>True when the event could not be taken off (the calendar could not be looked into, or the edit failed), so a later run tries again.</summary>
+    public bool NotRemoved => Outcome is FollowOutcome.Unavailable or FollowOutcome.Failed;
+}
 
 /// <summary>The result of one run of the deadline step.</summary>
 public abstract record MealDeadlineOutcome

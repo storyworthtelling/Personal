@@ -25,22 +25,35 @@ public sealed record GrocerySection(Aisle Aisle, IReadOnlyList<GroceryLine> Line
 /// </summary>
 public sealed class GroceryList
 {
-    private GroceryList(IReadOnlyList<GrocerySection> sections) => Sections = sections;
+    private GroceryList(IReadOnlyList<GrocerySection> sections, IReadOnlyList<string> extraLines)
+    {
+        Sections = sections;
+        ExtraLines = extraLines;
+    }
+
+    /// <summary>The heading over <see cref="ExtraLines"/>, after the aisles. Not "Other", which is already an aisle.</summary>
+    public const string ExtraHeading = "Also";
+
+    /// <summary>
+    /// Plain lines that are not ingredients ("Tuesday dinner", D111), each its own line after the aisles. Merged by text and never scaled; empty unless the caller asked for some.
+    /// </summary>
+    public IReadOnlyList<string> ExtraLines { get; }
 
     /// <summary>Only the sections that have a line, in shopping order.</summary>
     public IReadOnlyList<GrocerySection> Sections { get; }
 
     public IReadOnlyList<GroceryLine> Lines => Sections.SelectMany(section => section.Lines).ToList();
 
-    public bool IsEmpty => Sections.Count == 0;
+    public bool IsEmpty => Sections.Count == 0 && ExtraLines.Count == 0;
 
     /// <param name="week">The approved week.</param>
     /// <param name="recipes">The box, for the ingredients of each cooked dinner.</param>
     /// <param name="pantry">What is on hand and which staples are out.</param>
     /// <param name="headcount">Who is at the table; every card is scaled to it.</param>
+    /// <param name="extraLines">Plain lines that are not ingredients ("Tuesday dinner", D111): each its own line after the aisles, merged by text, never scaled.</param>
     /// <exception cref="ArgumentOutOfRangeException">The headcount is not at least one.</exception>
     /// <exception cref="ArgumentException">A cooked dinner names a card that is not in the box.</exception>
-    public static GroceryList From(MealWeek week, IReadOnlyList<Recipe> recipes, Pantry pantry, int headcount)
+    public static GroceryList From(MealWeek week, IReadOnlyList<Recipe> recipes, Pantry pantry, int headcount, IReadOnlyList<string>? extraLines = null)
     {
         ArgumentNullException.ThrowIfNull(week);
         ArgumentNullException.ThrowIfNull(recipes);
@@ -88,7 +101,12 @@ public sealed class GroceryList
                     .ToList()))
             .Where(section => section.Lines.Count > 0)
             .ToList();
-        return new GroceryList(sections);
+        var extras = (extraLines ?? [])
+            .Select(line => line?.Trim() ?? string.Empty)
+            .Where(line => line.Length > 0)
+            .DistinctBy(line => line, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return new GroceryList(sections, extras);
     }
 
     private static void Add(List<Wanted> wanted, Ingredient ingredient, int? cardServings, int headcount)

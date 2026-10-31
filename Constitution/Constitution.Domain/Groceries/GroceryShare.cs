@@ -44,7 +44,12 @@ public static class GroceryShare
         }
 
         var blocks = list.Sections.Select(section =>
-            Aisles.Label(section.Aisle) + "\n" + string.Join("\n", section.Lines.Select(Text)));
+            Aisles.Label(section.Aisle) + "\n" + string.Join("\n", section.Lines.Select(Text))).ToList();
+        if (list.ExtraLines.Count > 0)
+        {
+            blocks.Add(GroceryList.ExtraHeading + "\n" + string.Join("\n", list.ExtraLines));
+        }
+
         return new GroceryShareDecision(GroceryShareOutcome.Send, KeepPackage, title, string.Join("\n\n", blocks), string.Empty);
     }
 

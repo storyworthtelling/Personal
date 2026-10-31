@@ -22,6 +22,9 @@ public sealed record MealSheetBuildRequest(
 
     public IReadOnlyDictionary<DateOnly, KidsMealFacts> KidsMeals { get; init; } = new Dictionary<DateOnly, KidsMealFacts>();
 
+    /// <summary>Plain lines for the shopping list that are not ingredients ("Tuesday dinner", D111); empty unless a denied evening put one there.</summary>
+    public IReadOnlyList<string> ExtraLines { get; init; } = [];
+
     /// <summary>The breakfasts, lunches and lunchbox the rotating templates chose (D110); null leaves pages 2 and 3 out.</summary>
     public MealSheetDailyMeals? Daily { get; init; }
 }
@@ -73,7 +76,7 @@ public static class MealSheetBuilder
                 : new MealSheetDish(card.Title, marker, kids);
         }
 
-        var list = GroceryList.From(week, request.Cards, request.Pantry, request.Headcount);
+        var list = GroceryList.From(week, request.Cards, request.Pantry, request.Headcount, request.ExtraLines);
         var budget = GroceryBudget.Read(request.Budgets, GroceryBudget.MonthOf(week.WeekStart));
         var ask = HolidayAskAhead.Decide(request.Holidays, week.WeekStart);
         return new MealSheetModel(

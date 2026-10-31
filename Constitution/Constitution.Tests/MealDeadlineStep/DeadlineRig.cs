@@ -3,7 +3,10 @@ using Constitution.Domain.Documents;
 using Constitution.Domain.Meals;
 using Constitution.Domain.Meals.Pipeline;
 using Constitution.Domain.Meals.Templates;
+using Constitution.Domain.Placement;
 using Constitution.Domain.Recipes;
+using Constitution.Domain.Workouts.Screens;
+using Constitution.Tests.Placement;
 using Constitution.Infrastructure.Household;
 using Constitution.Infrastructure.Meals;
 using Constitution.Tests.MealWeekRun;
@@ -53,6 +56,26 @@ internal sealed class DeadlineRig
 
     public MemoryRecords Weeks => Planning.Records;
 
+    public bool CalendarWired { get; set; } = true;
+
+    private string? plannedWeeks;
+
+    /// <summary>Forgets the decision and puts the kept weeks back as the meal run left them, so a test can decide the same week again (the app never does).</summary>
+    public void Redecide()
+    {
+        Decisions.Json = null;
+        Weeks.Json = plannedWeeks;
+    }
+
+    public FakeEditor Editor { get; private set; } = null!;
+
+    /// <summary>The key the meal run wrote the cook block of this evening under.</summary>
+    public PlacementKey CookKey(DateOnly day) => Constitution.Domain.Placement.MealPlacement.KeyOf(MealEventRole.Cook, CookOf(day), Week, day);
+
+    public string CookOf(DateOnly day) => cooks[day];
+
+    private readonly Dictionary<DateOnly, string> cooks = [];
+
     public MealDeadlineSeams Seams => new(
         _ =>
         {
@@ -65,7 +88,8 @@ internal sealed class DeadlineRig
         Library,
         Notes,
         Judge is not null ? Judge : new UnavailableTasteJudge(),
-        Log);
+        Log,
+        CalendarWired ? new MealDeadlineCalendar(Planning.Writer, Editor, Planning.Keys) : null);
 
     /// <summary>A planned week kept in the records, and a library of proposed templates one of which the sheet printed.</summary>
     public static async Task<DeadlineRig> PlannedAsync()
@@ -74,7 +98,14 @@ internal sealed class DeadlineRig
         await planning.PlannedAsync();
         var proposed = new MealTemplate(TickedTemplate, MealTemplateSlot.BoxFruit, "oats for box fruit");
         var library = new TemplateLibrary([proposed], [new TemplatePrint(Week, TickedLine, TickedTemplate)]);
-        return new DeadlineRig { Planning = planning, Library = new FakeTemplateStore(library) };
+        var rig = new DeadlineRig { Planning = planning, Library = new FakeTemplateStore(library), Editor = new FakeEditor(planning.Writer) };
+        rig.plannedWeeks = planning.Records.Json;
+        foreach (var dinner in rig.Kept.Week.Dinners.Where(item => item.Kind == DinnerKind.Cooked))
+        {
+            rig.cooks[dinner.Day] = dinner.Cook!;
+        }
+
+        return rig;
     }
 
     public StoredMealWeek Kept => Weeks.Held().For(Week)!;
@@ -100,6 +131,29 @@ internal sealed class DeadlineRig
         Assert.Equal(0, Decisions.Saves);
         Assert.Equal(0, Notes.Saves);
         Assert.Equal(0, Library.Saves);
+    }
+}
+
+/// <summary>The narrow edit door over the fake calendar: it removes by event id, and can be told to refuse.</summary>
+internal sealed class FakeEditor(FakeCalendar calendar) : IWorkoutEventEditor
+{
+    public string? FailWith { get; set; }
+
+    public int Removes { get; private set; }
+
+    public Task<EventEdit> MoveAsync(string person, string eventId, PlacementKey newKey, DateTimeOffset start, DateTimeOffset end, CancellationToken cancellationToken) =>
+        throw new InvalidOperationException("The deadline step never moves an event.");
+
+    public Task<EventEdit> RemoveAsync(string person, string eventId, CancellationToken cancellationToken)
+    {
+        Removes++;
+        if (FailWith is not null)
+        {
+            return Task.FromResult(EventEdit.Failed(FailWith));
+        }
+
+        calendar.Remove(eventId);
+        return Task.FromResult(EventEdit.Done());
     }
 }
 

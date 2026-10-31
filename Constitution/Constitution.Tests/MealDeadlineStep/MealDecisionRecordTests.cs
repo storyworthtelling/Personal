@@ -9,13 +9,18 @@ namespace Constitution.Tests.MealDeadlineStep;
 /// <summary>The decided weeks: JSON with frozen names, unreadable is typed and never empty, and the file keeps nothing it cannot read.</summary>
 public class MealDecisionRecordTests
 {
-    private static MealDecisionEntry Entry(DateOnly week, bool pending = false, params string[] cards) =>
-        new(week, Edt(10, 25, 15), 5, 2, 3, true, cards.Select(card => new RecipeId(card)).ToList(), pending);
+    private static MealDecisionEntry Entry(DateOnly week, bool pending = false, params string[] evenings) =>
+        new(week, Edt(10, 25, 15), 5, 2, 3, pending)
+        {
+            DeniedEvenings = evenings,
+            DeniedDishes = evenings.Select(evening => new DeniedDish(evening, new RecipeId(evening + "-card"), Edt(10, 27, 17), Edt(10, 27, 18))).ToList(),
+            EventsPending = evenings.Take(1).ToList(),
+        };
 
     [Fact]
     public void ARecordComesBackAsItWas()
     {
-        var record = MealDecisionRecord.Empty.With(Entry(Sunday, true, "lentil-curry", "corn-tacos")).With(Entry(Sunday.AddDays(7)));
+        var record = MealDecisionRecord.Empty.With(Entry(Sunday, true, "tuesday", "thursday")).With(Entry(Sunday.AddDays(7)));
 
         var back = Assert.IsType<MealDecisionRecordRead.Held>(MealDecisionRecordCodec.Decode(MealDecisionRecordCodec.Encode(record))).Record;
 
@@ -24,36 +29,65 @@ public class MealDecisionRecordTests
         Assert.Equal(5, first.Approved);
         Assert.Equal(2, first.Denied);
         Assert.Equal(3, first.ApprovedUnread);
-        Assert.True(first.NeedsRevisedSheet);
         Assert.True(first.EvidencePending);
-        Assert.Equal(["lentil-curry", "corn-tacos"], first.ReplanWithout.Select(card => card.Value));
+        Assert.Equal(["tuesday", "thursday"], first.DeniedEvenings);
+        Assert.Equal(["tuesday-card", "thursday-card"], first.DeniedDishes.Select(dish => dish.Card.Value));
+        Assert.Equal(Edt(10, 27, 17), first.DeniedDishes[0].Start);
+        Assert.Equal(Edt(10, 27, 18), first.DeniedDishes[0].End);
+        Assert.Equal(["tuesday"], first.EventsPending);
+        Assert.Equal(["Tuesday dinner", "Thursday dinner"], first.ExtraLines);
         Assert.Equal(Edt(10, 25, 15), first.DecidedAt);
     }
 
     [Fact]
     public void TheStoredNamesAreFrozen()
     {
-        var json = MealDecisionRecordCodec.Encode(MealDecisionRecord.Empty.With(Entry(Sunday, true, "lentil-curry")));
+        var json = MealDecisionRecordCodec.Encode(MealDecisionRecord.Empty.With(Entry(Sunday, true, "tuesday")));
 
         using var document = JsonDocument.Parse(json);
         Assert.Equal(1, document.RootElement.GetProperty("version").GetInt32());
         var entry = document.RootElement.GetProperty("decisions")[0];
         Assert.Equal(
-            ["week", "decidedAt", "approved", "denied", "approvedUnread", "needsRevisedSheet", "replanWithout", "evidencePending"],
+            ["week", "decidedAt", "approved", "denied", "approvedUnread", "evidencePending", "deniedEvenings", "deniedDishes", "eventsPending"],
             entry.EnumerateObject().Select(property => property.Name));
         Assert.Equal("2026-10-25", entry.GetProperty("week").GetString());
-        Assert.Equal("lentil-curry", entry.GetProperty("replanWithout")[0].GetString());
+        Assert.Equal("tuesday", entry.GetProperty("deniedEvenings")[0].GetString());
+        Assert.Equal("tuesday", entry.GetProperty("deniedDishes")[0].GetProperty("evening").GetString());
+        Assert.Equal("tuesday-card", entry.GetProperty("deniedDishes")[0].GetProperty("card").GetString());
+        Assert.Equal(["evening", "card", "start", "end"], entry.GetProperty("deniedDishes")[0].EnumerateObject().Select(property => property.Name));
+        Assert.Equal("tuesday", entry.GetProperty("eventsPending")[0].GetString());
     }
 
     [Fact]
-    public void AHandWrittenFileOfTheFirstVersionReads()
+    public void TheRetiredReplanFieldsAreNeverWrittenAgain()
+    {
+        var json = MealDecisionRecordCodec.Encode(MealDecisionRecord.Empty.With(Entry(Sunday, false, "tuesday") with { NeedsRevisedSheet = true, ReplanWithout = [new RecipeId("corn-tacos")] }));
+
+        Assert.DoesNotContain("needsRevisedSheet", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("replanWithout", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AHandWrittenFileOfTheFirstVersionStillReads()
     {
         const string json = """{"version":1,"decisions":[{"week":"2026-10-25","decidedAt":"2026-10-25T15:00:00.0000000-04:00","approved":6,"denied":1,"approvedUnread":0,"needsRevisedSheet":true,"replanWithout":["corn-tacos"],"evidencePending":false}]}""";
 
         var entry = Assert.Single(Assert.IsType<MealDecisionRecordRead.Held>(MealDecisionRecordCodec.Decode(json)).Record.Entries);
 
+        Assert.True(entry.NeedsRevisedSheet);
         Assert.Equal(new RecipeId("corn-tacos"), Assert.Single(entry.ReplanWithout));
         Assert.False(entry.EvidencePending);
+        Assert.Empty(entry.DeniedEvenings);
+        Assert.Empty(entry.EventsPending);
+        Assert.Empty(entry.ExtraLines);
+    }
+
+    [Fact]
+    public void AWordThisVersionDoesNotKnowIsUnreadableNotGuessed()
+    {
+        const string json = """{"version":1,"decisions":[{"week":"2026-10-25","decidedAt":"2026-10-25T15:00:00.0000000-04:00","approved":6,"denied":1,"approvedUnread":0,"evidencePending":false,"deniedEvenings":["someday"],"deniedDishes":[],"eventsPending":[]}]}""";
+
+        Assert.IsType<MealDecisionRecordRead.Unreadable>(MealDecisionRecordCodec.Decode(json));
     }
 
     [Theory]
