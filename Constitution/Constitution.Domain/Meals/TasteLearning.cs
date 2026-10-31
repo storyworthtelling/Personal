@@ -47,8 +47,11 @@ public abstract record TasteJudgement
     /// <summary>Said once, about tonight; it teaches nothing.</summary>
     public sealed record OneOff : TasteJudgement;
 
-    /// <summary>No judge answered. The reason reuses the workouts' closed list.</summary>
-    public sealed record Unavailable(AuthorUnavailable Reason) : TasteJudgement;
+    /// <summary>
+    /// No judge answered. The reason reuses the workouts' closed list; the detail is a specific sentence of what happened (a status, a type name; never the request, the words
+    /// or a key), and the cause keeps the failure's own stack when there was one.
+    /// </summary>
+    public sealed record Unavailable(AuthorUnavailable Reason, string? Detail = null, Exception? Cause = null) : TasteJudgement;
 }
 
 /// <summary>

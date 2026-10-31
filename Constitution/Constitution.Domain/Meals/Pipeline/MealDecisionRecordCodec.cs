@@ -7,7 +7,7 @@ using Constitution.Domain.Recipes;
 namespace Constitution.Domain.Meals.Pipeline;
 
 /// <summary>
-/// The decided weeks as JSON: <c>{"version":1,"decisions":[{"week","decidedAt","approved","denied","approvedUnread","evidencePending","deniedEvenings":[weekday words],
+/// The decided weeks as JSON: <c>{"version":1,"decisions":[{"week","decidedAt","approved","denied","approvedUnread","evidencePending","judgeAttempts"?,"deniedEvenings":[weekday words],
 /// "deniedDishes":[{"evening","card","start","end"}],"eventsPending":[weekday words]}]}</c>. The names are frozen. <c>needsRevisedSheet</c> and <c>replanWithout</c>, which the first build
 /// wrote, are still read and are no longer written (D111). A text that is not this record is unreadable with a fixed sentence quoting nothing, never an empty record.
 /// </summary>
@@ -35,6 +35,11 @@ public static class MealDecisionRecordCodec
                 writer.WriteNumber("denied", entry.Denied);
                 writer.WriteNumber("approvedUnread", entry.ApprovedUnread);
                 writer.WriteBoolean("evidencePending", entry.EvidencePending);
+                if (entry.JudgeAttempts > 0)
+                {
+                    writer.WriteNumber("judgeAttempts", entry.JudgeAttempts);
+                }
+
                 Words(writer, "deniedEvenings", entry.DeniedEvenings);
                 writer.WriteStartArray("deniedDishes");
                 foreach (var dish in entry.DeniedDishes)
@@ -127,6 +132,7 @@ public static class MealDecisionRecordCodec
             element.GetProperty("approvedUnread").GetInt32(),
             element.GetProperty("evidencePending").GetBoolean())
         {
+            JudgeAttempts = element.TryGetProperty("judgeAttempts", out var attempts) ? attempts.GetInt32() : 0,
             NeedsRevisedSheet = element.TryGetProperty("needsRevisedSheet", out var revised) && revised.GetBoolean(),
             ReplanWithout = element.TryGetProperty("replanWithout", out var cards)
                 ? cards.EnumerateArray().Select(card => new RecipeId(card.GetString() ?? throw new FormatException("replanWithout"))).ToList()

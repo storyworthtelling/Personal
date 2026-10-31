@@ -49,8 +49,10 @@ namespace Constitution.WeeklyMeals;
 /// recipes part also serves this phone's tablet from the weeks the lease holder published (<see cref="MealSharedWeekRun"/>: no lease, no calendar, no saved week, no write), so the partner's phone
 /// is no longer silent. The pass learns of such a week from the household file's local copy (<see cref="SharedPlansOf"/>).</para>
 ///
-/// <para><b>Not yet here:</b> a taste profile store (the source says there is none,
-/// which plans without one), a source for the evenings the children eat at home, the Cook this soon mark, and an approval step. Nothing is swallowed
+/// <para><b>The taste profile (D133)</b> is read from the household file each time (<see cref="TasteFromHousehold"/>: the roster, the box, the ratings the read-back writes and the notes the deadline step
+/// teaches); with none kept it plans without one, as before.</para>
+///
+/// <para><b>Not yet here:</b> a source for the evenings the children eat at home, the Cook this soon mark, and an approval step. Nothing is swallowed
 /// here: a seam's exception propagates to whoever calls. Device-gated: nothing here has met Google Calendar or a phone.</para>
 /// </summary>
 public static class MealWeekServices
@@ -164,9 +166,9 @@ public static class MealWeekServices
         // lease holder published to the household file for this phone's tablet (D127). Neither can plan, place or save; the second only reads the file.
         var own = await MealRecipeHourRun.RunAsync(
             ready.Inputs,
-            new MealRecipeSeams(new KeptWeeksBesideTheHousehold(new FileMealWeekRecords(Path.Combine(folder, RecordFile)), plans), box, new NoMealTaste(), documents, log),
+            new MealRecipeSeams(new KeptWeeksBesideTheHousehold(new FileMealWeekRecords(Path.Combine(folder, RecordFile)), plans), box, new TasteFromHousehold(household.Service), documents, log),
             cancellation);
-        var theirs = await MealSharedWeekRun.RunAsync(ready.Inputs, new MealSharedSeams(plans, box, new NoMealTaste(), documents, log), cancellation);
+        var theirs = await MealSharedWeekRun.RunAsync(ready.Inputs, new MealSharedSeams(plans, box, new TasteFromHousehold(household.Service), documents, log), cancellation);
         return MealRecipesOutcomes.Combine(own, theirs);
     }
 
@@ -221,7 +223,7 @@ public static class MealWeekServices
     }
 
     /// <summary>
-    /// The run's seams. No taste profile is kept anywhere yet, so the source says there is none. The documents step reuses the workout run's delivery side
+    /// The run's seams. The taste profile is the household file's (<see cref="TasteFromHousehold"/>; none kept plans without one). The documents step reuses the workout run's delivery side
     /// (<see cref="WorkoutWeekDeliverySeams"/>: the tablet client bound to this phone's pairing, the delivery service, the ink probe and the read-back's own
     /// record of expected documents), so a title means the same page to both, plus the meal run's own record of what it has sent. The holiday calendar is the
     /// default that cannot be asked, so the sheet carries no ask-ahead page until a calendar reader exists. The rotating templates read and keep their library in the
@@ -241,7 +243,7 @@ public static class MealWeekServices
             household.Planning.AskAsync,
             new HouseholdRecipeBox(household.Service),
             new MealHistoryStore(Path.Combine(folder, HistoryFile)),
-            new NoMealTaste(),
+            new TasteFromHousehold(household.Service),
             calendar.Calendars,
             new MealWithFallback(new NoMealAuthor(), new TrailMealLog(log)),
             calendar.CalendarWriter,
@@ -290,8 +292,8 @@ public static class MealWeekServices
     /// <summary>
     /// The seams of the deadline step (<see cref="MealDeadlineStep"/>), the part of the meal week that runs once the sheet's deadline has passed. The lease, the kept
     /// weeks, the household file's answers, library and taste notes are this install's own; the record of decided weeks is a small file beside the kept weeks; the calendar side (the meal key family's writer, the narrow editor and the written keys the meal run placed with) takes a denied evening's cook block off (D111). <b>The taste
-    /// judge is <see cref="UnavailableTasteJudge"/>:</b> no Claude judge exists yet, so written words are recorded as unjudged and asked again on the next run. The worker
-    /// reaches it through <see cref="TryDecideAsync"/>, and nothing here holds a secret.
+    /// judge is the Claude judge (<see cref="TasteJudgeServices"/>, D133):</b> with no key, or while the service cannot answer, written words are recorded as unjudged and asked again on a later pass, a bounded number of times
+    /// (<see cref="TasteJudgeLimits"/>). The worker reaches it through <see cref="TryDecideAsync"/>, and nothing here holds a secret.
     /// </summary>
     public static MealDeadlineSeams AssembleDeadline(Context appContext)
     {
@@ -307,7 +309,7 @@ public static class MealWeekServices
             new HouseholdMealAnswers(household.Service),
             new HouseholdTemplateLibrary(household.Service),
             new HouseholdTasteNotes(household.Service),
-            new UnavailableTasteJudge(),
+            TasteJudgeServices.JudgeOf(appContext, new HouseholdRecipeBox(household.Service)),
             new BodyMealLog(new BodyLog(appContext)),
             new MealDeadlineCalendar(calendar.CalendarWriter, calendar.EventEditor, calendar.WrittenKeys));
     }

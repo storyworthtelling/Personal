@@ -21,9 +21,12 @@ public class MealDeadlineWiringGuardTests
     }
 
     [Fact]
-    public void TheHeadSaysThereIsNoJudgeYet()
+    public void TheHeadHandsOverTheClaudeJudge()
     {
-        Assert.Contains("new UnavailableTasteJudge()", Text("Android/MealWeek/MealWeekServices.cs"), StringComparison.Ordinal);
+        var services = Text("Android/MealWeek/MealWeekServices.cs");
+
+        Assert.Contains("TasteJudgeServices.JudgeOf(", services, StringComparison.Ordinal);
+        Assert.DoesNotContain("new UnavailableTasteJudge()", services, StringComparison.Ordinal);
     }
 
     [Fact]
