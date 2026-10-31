@@ -33,7 +33,7 @@ public static class HouseholdRoleReader
             return HouseholdRoleRead.None;
         }
 
-        var role = VaultOwnership.Decide(account, loaded.Vault) switch
+        var role = VaultOwnership.Decide(loaded.FileOwnership) switch
         {
             SharedVaultAccess.ReadWrite or SharedVaultAccess.Claimable => HouseholdFileRole.Owner,
             SharedVaultAccess.ReadOnly => HouseholdFileRole.SharedWith,

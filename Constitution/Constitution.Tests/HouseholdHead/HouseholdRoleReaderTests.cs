@@ -1,5 +1,6 @@
 using Constitution.Infrastructure.Household;
 using Storyworthtelling.Household;
+using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
 
 namespace Constitution.Tests.HouseholdHead;
@@ -21,13 +22,16 @@ public class HouseholdRoleReaderTests
 
     private static SecretsVault OwnedBy(string account) => SecretsVault.Empty with { OwnerAccount = account };
 
+    private static SecretsVaultLoadResult LoadedWith(SecretsVault vault, DriveFileOwnership ownership) =>
+        new(SecretsVaultStatus.Loaded, vault, ownership);
+
     private static Task<HouseholdRoleRead> Read(SecretsVaultLoadResult result, string? passphrase = "invented-passphrase", string? account = "sam@example.com") =>
         HouseholdRoleReader.ReadAsync(new FixedVault(result), passphrase, account, CancellationToken.None);
 
     [Fact]
     public async Task TheVaultsOwnerIsTheOwner()
     {
-        var read = await Read(SecretsVaultLoadResult.Loaded(OwnedBy("Sam@Example.com")));
+        var read = await Read(LoadedWith(OwnedBy("Sam@Example.com"), DriveFileOwnership.Owned));
 
         Assert.Equal(HouseholdFileRole.Owner, read.Role);
     }
@@ -35,7 +39,7 @@ public class HouseholdRoleReaderTests
     [Fact]
     public async Task AnotherAccountIsSharedWith()
     {
-        var read = await Read(SecretsVaultLoadResult.Loaded(OwnedBy("lee@example.com")));
+        var read = await Read(LoadedWith(OwnedBy("lee@example.com"), DriveFileOwnership.Shared));
 
         Assert.Equal(HouseholdFileRole.SharedWith, read.Role);
     }
