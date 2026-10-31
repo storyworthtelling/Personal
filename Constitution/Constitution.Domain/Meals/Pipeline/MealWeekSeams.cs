@@ -38,11 +38,15 @@ public abstract record MealWeekRecordRead
     public sealed record Unreadable(string Reason) : MealWeekRecordRead;
 }
 
-/// <summary>Where the planned weeks are kept for Today's dinner card and the Meals tab.</summary>
-public interface IMealWeekRecords
+/// <summary>The kept weeks, read only: a part that must not be able to save one is given this and not <see cref="IMealWeekRecords"/>.</summary>
+public interface IKeptWeeks
 {
     MealWeekRecordRead Load();
+}
 
+/// <summary>Where the planned weeks are kept for Today's dinner card and the Meals tab.</summary>
+public interface IMealWeekRecords : IKeptWeeks
+{
     /// <summary>Keeps the weeks. A file already there that cannot be read is set aside first, never written over.</summary>
     void Save(MealWeekRecord record);
 }

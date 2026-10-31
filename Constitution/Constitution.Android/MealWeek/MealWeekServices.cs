@@ -45,6 +45,10 @@ namespace Constitution.WeeklyMeals;
 /// holds now, so it never reaches a recipe of the week in progress; <b>the recipes entry does (D120)</b>: <see cref="TryRecipesAsync"/> takes the week already kept, plans nothing, places nothing and
 /// sends no sheet, and the pass asks for it only while a recipe is inside its hour and not yet on the tablet.</para>
 ///
+/// <para><b>The other phone's week (D126-D128).</b> The run publishes the week it kept to the household file (<see cref="HouseholdWeekPlanPublisher"/>, planning phone only), and the
+/// recipes part also serves this phone's tablet from the weeks the lease holder published (<see cref="MealSharedWeekRun"/>: no lease, no calendar, no saved week, no write), so the partner's phone
+/// is no longer silent. The pass learns of such a week from the household file's local copy (<see cref="SharedPlansOf"/>).</para>
+///
 /// <para><b>Not yet here:</b> a taste profile store (the source says there is none,
 /// which plans without one), a source for the evenings the children eat at home, the Cook this soon mark, and an approval step. Nothing is swallowed
 /// here: a seam's exception propagates to whoever calls. Device-gated: nothing here has met Google Calendar or a phone.</para>
@@ -118,7 +122,8 @@ public static class MealWeekServices
             new BodyMealLog(new BodyLog(appContext)),
             new FileDeliveredMealDocuments(Path.Combine(folder, DeliveredFile)),
             prepared is null ? null : MealRecipeHour.TabletPerson(prepared.Inputs.Rules, prepared.Inputs.DeliverFor),
-            token => TryRecipesAsync(appContext, token));
+            token => TryRecipesAsync(appContext, token),
+            () => SharedPlansOf(appContext));
         var zone = prepared?.Inputs.Rules.Zone ?? TimeZoneInfo.Local;
         return await MealWeekPass.RunAsync(trigger, DateTimeOffset.Now, zone, seams, cancellation);
     }
@@ -150,14 +155,26 @@ public static class MealWeekServices
         }
 
         var folder = FolderOf(appContext);
-        var seams = new MealRecipeSeams(
-            new FileMealWeekRecords(Path.Combine(folder, RecordFile)),
-            new HouseholdRecipeBox(ConstitutionHousehold.For(appContext).Service),
-            new NoMealTaste(),
-            AssembleDocuments(appContext),
-            log);
-        return await MealRecipeHourRun.RunAsync(ready.Inputs, seams, cancellation);
+        var household = ConstitutionHousehold.For(appContext);
+        var plans = new HouseholdWeekPlans(household.Service);
+        var box = new HouseholdRecipeBox(household.Service);
+        var documents = AssembleDocuments(appContext);
+
+        // Two halves of one part: this phone's own kept weeks (without a week the other phone has published, which is theirs to deliver), then the weeks the
+        // lease holder published to the household file for this phone's tablet (D127). Neither can plan, place or save; the second only reads the file.
+        var own = await MealRecipeHourRun.RunAsync(
+            ready.Inputs,
+            new MealRecipeSeams(new KeptWeeksBesideTheHousehold(new FileMealWeekRecords(Path.Combine(folder, RecordFile)), plans), box, new NoMealTaste(), documents, log),
+            cancellation);
+        var theirs = await MealSharedWeekRun.RunAsync(ready.Inputs, new MealSharedSeams(plans, box, new NoMealTaste(), documents, log), cancellation);
+        return MealRecipesOutcomes.Combine(own, theirs);
     }
+
+    // The weeks another phone published, read once per pass from this phone's copy of the household file (a local read). Never throws: a file that will not open is "none".
+    private static IReadOnlyList<SharedWeekPlan> SharedPlansOf(Context appContext) =>
+        new HouseholdWeekPlans(ConstitutionHousehold.For(appContext).Service).Read() is WeekPlansRead.Held held
+            ? SharedWeeks.FromOthers(held.Set, held.Me)
+            : [];
 
     /// <summary>The deadline step, once it has its turn at the calendars (it takes a denied evening's cook block off, through the same record of written keys); <see cref="GateResult{T}.Busy"/> when another placement run held them for the whole wait.</summary>
     public static Task<GateResult<MealDeadlineOutcome>> TryDecideAsync(Context context, CancellationToken cancellation)
@@ -234,7 +251,8 @@ public static class MealWeekServices
             log,
             documents,
             new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), TemplateAuthorServices.AuthorOf(appContext)),
-            DecisionRecords(appContext));
+            Publisher: new HouseholdWeekPlanPublisher(household.Service),
+            Decisions: DecisionRecords(appContext));
     }
 
     /// <summary>

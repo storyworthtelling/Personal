@@ -27,7 +27,9 @@ public abstract record MealPassStep<T>
 
 /// <summary>
 /// Everything the pass reaches outside itself. <paramref name="Delivered"/> and <paramref name="TabletPerson"/> are what the recipe-hour look reads (the record of what has
-/// gone to the tablet, read only while an hour is open, and the adult whose tablet this is; null when none); <paramref name="Recipes"/> is the documents-only run (D120).
+/// gone to the tablet, read only while an hour is open, and the adult whose tablet this is; null when none); <paramref name="Recipes"/> is the documents-only run (D120), which also serves the
+/// weeks the lease holder published (D127). <paramref name="SharedPlans"/> are those weeks, read once per pass from this phone's copy of the household file (a local read, no network); it never
+/// throws, and null (the older callers) means none are read, so nothing shared is ever due.
 /// </summary>
 public sealed record MealPassSeams(
     IMealWeekRecords Weeks,
@@ -38,7 +40,8 @@ public sealed record MealPassSeams(
     IWorkoutWeekLog Log,
     IDeliveredMealDocuments Delivered,
     string? TabletPerson,
-    Func<CancellationToken, Task<GateResult<MealRecipesOutcome>>> Recipes);
+    Func<CancellationToken, Task<GateResult<MealRecipesOutcome>>> Recipes,
+    Func<IReadOnlyList<SharedWeekPlan>>? SharedPlans = null);
 
 /// <summary>What one pass did. <see cref="Recipes"/> is the recipe-hour part (D120).</summary>
 public sealed record MealPassResult(
@@ -116,7 +119,8 @@ public static class MealWeekPass
         cancellation.ThrowIfCancellationRequested();
 
         var read = seams.Stamps.Load();
-        var work = MealPassPlan.Decide(trigger, now, zone, read, seams.Weeks.Load(), seams.Decisions.Load(), seams.TabletPerson, Lookup(seams.Delivered));
+        var work = MealPassPlan.Decide(
+            trigger, now, zone, read, seams.Weeks.Load(), seams.Decisions.Load(), seams.TabletPerson, Lookup(seams.Delivered), seams.SharedPlans?.Invoke());
         var stamp = (read as MealPassStampRead.Held)?.Stamp ?? MealPassStamp.Empty;
         MealPassStep<MealWeekOutcome> plan = new MealPassStep<MealWeekOutcome>.Skipped();
         MealPassStep<MealDeadlineOutcome> deadline = new MealPassStep<MealDeadlineOutcome>.Skipped();
@@ -125,7 +129,7 @@ public static class MealWeekPass
 
         // First, because it is the one part with a clock on it: a recipe has an hour, and a plan or a deadline that waits on the gate must not spend it.
         // It keeps no stamp: the record of what has gone to the tablet is what says it is done, and the next pass reads that.
-        if (work.RecipeHour)
+        if (work.RecipeHour || work.SharedWeek)
         {
             recipes = await AttemptAsync(seams.Recipes, MealPassPart.Recipes, seams.Log, cancellation);
         }

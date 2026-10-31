@@ -9,12 +9,12 @@ namespace Constitution.Infrastructure.Meals;
 /// Everything the recipes run reaches outside itself, named once (D120). It is a <see cref="MealWeekSeams"/> with the planning side taken away: there is no lease, no history,
 /// no calendar and no record of written keys to reach, and the kept weeks can only be read. The documents side is the weekly run's own <see cref="MealDocumentSeams"/>.
 /// </summary>
-/// <param name="Weeks">The kept weeks, read only.</param>
+/// <param name="Weeks">The kept weeks, read only by its type (<see cref="IKeptWeeks"/> has no save).</param>
 /// <param name="Recipes">The recipe box over the household file.</param>
 /// <param name="Taste">The taste profile, for the rating page's underline.</param>
 /// <param name="Documents">The tablet, the record of deliveries, the roster and the rest of what the documents step reaches.</param>
 /// <param name="Log">The Body trail's one-method seam.</param>
-public sealed record MealRecipeSeams(IMealWeekRecords Weeks, IRecipeBoxSource Recipes, IMealTasteSource Taste, MealDocumentSeams Documents, IWorkoutWeekLog Log);
+public sealed record MealRecipeSeams(IKeptWeeks Weeks, IRecipeBoxSource Recipes, IMealTasteSource Taste, MealDocumentSeams Documents, IWorkoutWeekLog Log);
 
 /// <summary>
 /// The documents-only entry for the week in progress (D120, closing D116). The weekly run plans the week <i>after</i> the one that holds now, so a recipe of the week in

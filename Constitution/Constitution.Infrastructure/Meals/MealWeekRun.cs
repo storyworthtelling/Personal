@@ -47,6 +47,11 @@ namespace Constitution.Infrastructure.Meals;
 /// hands <see cref="MealDecisionEntry.ExtraLines"/> to the sheet. A record that cannot be read leaves the lines off and is reported in <see cref="MealWeekReport.ExtraLinesUnreadable"/> and the trail;
 /// it never stops the sheet. A sheet already past its deadline is not replaced (<see cref="MealRedeliveryRules"/>), so the line reaches the Meals tab's share, not the printed page.</para>
 ///
+/// <para><b>The other phone's copy (D126).</b> When the run is given a publisher (<see cref="MealWeekSeams.Publisher"/>), the kept week is then put in the household file as a
+/// <c>week-plan</c> record with the deadline, the denied evenings' lines and the template pages, so the phone that does not hold the lease can send its own adult's tablet the same
+/// sheet and recipes. Only this run publishes, and only after the lease said this phone plans: the partner's phone gets "not the planner" before any of it. A publish that did not happen is
+/// <see cref="MealWeekReport.Publication"/> and is not settled by the pass, so the next one runs again; it never un-plans or un-saves the week.</para>
+///
 /// <para>Anything the run cannot name is a bug and propagates with its stack.</para>
 /// </summary>
 public static class MealWeekRun
@@ -173,13 +178,20 @@ public static class MealWeekRun
             templates = await MealTemplateStep.RunAsync(first, rules, inputs.Now, templateSeams, seams.Log, cancellation);
         }
 
+        // The kept week goes to the household file for the other phone, with the shopping lines a denied evening added and the template pages just chosen. Only here, after the lease and the save:
+        // the partner's phone never reaches this line, and a publish that did not happen is a typed answer in the report that the next pass retries (D126, D128), never a failed run.
+        var shared = MealExtraLines.Read(seams.Decisions, first);
+        var publication = seams.Publisher is { } publisher
+            ? await publisher.PublishAsync(new SharedWeekPlan(kept, MealDeadline.ForWeek(first, zone), shared.Lines, templates?.Daily), cancellation)
+            : new WeekPlanPublication.NotAttempted();
+
         // The documents follow the kept week, never the fresh one: an evening already over keeps the dinner it had, and the paper says what the calendar says.
         // The denied evenings' lines come from the decision record. A record that cannot be read leaves the lines off and is reported, never swallowed and never a stop (D112).
         MealDocumentsResult? documents = null;
         string? extraLinesUnreadable = null;
         if (seams.Documents is { } documentSeams)
         {
-            var extra = MealExtraLines.Read(seams.Decisions, first);
+            var extra = shared;
             extraLinesUnreadable = extra.UnreadableBecause;
             documents = await MealDocumentsStep.RunAsync(
                 new MealDocumentRequest(kept.Week, cards, rules, inputs.Now, inputs.DeliverFor)
@@ -201,6 +213,7 @@ public static class MealWeekRun
             Documents = documents,
             Templates = templates,
             ExtraLinesUnreadable = extraLinesUnreadable,
+            Publication = publication,
         }));
     }
 
