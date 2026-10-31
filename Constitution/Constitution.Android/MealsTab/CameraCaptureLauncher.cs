@@ -71,12 +71,18 @@ internal sealed class CameraCaptureLauncher(Activity host, int answerCode = Came
     public void Discard() => Delete(PhotoPath);
 
     /// <summary>Clears the capture folder of anything left behind, such as a photograph taken just before the phone ended the app.</summary>
-    public void Sweep()
+    public void Sweep() => SweepLeftovers(host);
+
+    /// <summary>
+    /// The sweep without a launcher: the app runs it once as it opens (D162), so a photograph of a card left by a phone that ended the app is gone even if no capture is ever started again.
+    /// A file that stays is on the trail as the one fixed phrase for a photograph not deleted; the next capture, or the next start, tries again.
+    /// </summary>
+    public static void SweepLeftovers(Context context)
     {
-        var folder = new Java.IO.File(CameraCaptureCache.FolderIn(host.CacheDir!.AbsolutePath));
-        foreach (var stray in folder.ListFiles() ?? [])
+        var stayed = CameraCaptureCache.Sweep(context.CacheDir!.AbsolutePath, Delete);
+        if (stayed.Count > 0)
         {
-            Delete(stray.AbsolutePath);
+            new Constitution.Services.ConstitutionVaultLog(context).Outcome(RecipeCameraTrail.LogPhrase(CameraEvent.PhotoKept, null));
         }
     }
 

@@ -23,6 +23,24 @@ public static class CameraCaptureCache
     /// <summary>Where the photograph of a page is written.</summary>
     public static string PathIn(string cacheRoot) => Path.Combine(FolderIn(cacheRoot), PageFileName);
 
+    /// <summary>
+    /// Clears the capture folder of anything left in it (D162): a photograph taken just before the phone ended the app. Only files directly in the capture folder are touched; a missing folder is
+    /// nothing to do. Returns the paths <paramref name="delete"/> could not remove, so the caller can say so rather than report the folder clear.
+    /// </summary>
+    public static IReadOnlyList<string> Sweep(string cacheRoot, Func<string, bool> delete)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(cacheRoot);
+        ArgumentNullException.ThrowIfNull(delete);
+
+        var folder = FolderIn(cacheRoot);
+        if (!Directory.Exists(folder))
+        {
+            return [];
+        }
+
+        return Directory.EnumerateFiles(folder).Where(stray => !delete(stray)).ToList();
+    }
+
     /// <summary>True only for a file directly inside the capture folder, spelled without any way back out of it.</summary>
     public static bool IsCaptureFile(string cacheRoot, string path)
     {
