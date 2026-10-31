@@ -4,7 +4,8 @@ using Folio.Domain.Readiness;
 namespace Folio.Infrastructure.Services;
 
 /// <summary>One draft of a book, as the book page lists it.</summary>
-public sealed record BookDraft(Guid Id, int Number, DateTimeOffset Created, int WordCount);
+/// <param name="ReportReady">Whether this draft's own report is rendered and still on the device.</param>
+public sealed record BookDraft(Guid Id, int Number, DateTimeOffset Created, int WordCount, bool ReportReady = false);
 
 /// <summary>
 /// A whole book: its drafts, how ready each of them was, and what there is to open.
