@@ -3,10 +3,10 @@ using Constitution.Domain.Recipes;
 namespace Constitution.Domain.Meals;
 
 /// <summary>
-/// What the committed dinner planner can be given from the taste profile, without editing the planner. Two things:
-/// <see cref="NeverAgain"/>, which <see cref="MealWeekRequest.NeverAgain"/> already accepts (a card and the people, by
-/// roster name, who said it), and <see cref="Appetite"/>, a ranking the planner has <b>no input for yet</b> — it is held
-/// here, with <see cref="Ranked"/>, for the day the request grows one.
+/// What the dinner planner is given from the taste profile. Two things:
+/// <see cref="NeverAgain"/>, which <see cref="MealWeekRequest.NeverAgain"/> accepts (a card and the people, by
+/// roster name, who said it), and <see cref="Appetite"/>, the ranking input <see cref="MealWeekRequest.Appetite"/> (D131):
+/// the planner orders cards that already pass every rule by it.
 /// </summary>
 public sealed class TastePlannerInputs
 {
@@ -48,15 +48,16 @@ public sealed class TastePlannerInputs
     }
 
     /// <summary>
-    /// The request with these never-agains added to its own (a union, names compared without case). The request is not
-    /// changed; with nothing to add the same request comes back.
+    /// The request with these never-agains added to its own (a union, names compared without case) and these scores as its ranking. The request is not
+    /// changed; with nothing to add (no never-again and no score but zero, which is what an empty profile gives) the same request comes back.
     /// </summary>
     public MealWeekRequest Apply(MealWeekRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var scored = Appetite.Any(pair => pair.Value != 0m);
         if (NeverAgain.Count == 0)
         {
-            return request;
+            return scored ? request with { Appetite = Appetite } : request;
         }
 
         var merged = new Dictionary<RecipeId, IReadOnlySet<string>>();
@@ -77,7 +78,7 @@ public sealed class TastePlannerInputs
             }
         }
 
-        return request with { NeverAgain = merged };
+        return request with { NeverAgain = merged, Appetite = scored ? Appetite : request.Appetite };
     }
 
     /// <summary>The cards best first by household appetite, ties by id. A card the profile never saw scores zero.</summary>

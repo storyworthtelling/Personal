@@ -10,7 +10,8 @@ namespace Constitution.Domain.Meals;
 ///
 /// <para><b>Order of placement.</b> Cook-this-soon cards take the earliest evenings that fit; then one stretch dish (a card not
 /// cooked for eight weeks) takes Thursday, else the next evening that fits (the evenings after it in the week, then those before); then each remaining evening takes the best card by
-/// children's table, then variety across cuisines, then least recently cooked, then the seed.</para>
+/// children's table, then variety across cuisines, then least recently cooked, then the household's taste score (<see cref="MealWeekRequest.Appetite"/>, higher first),
+/// then the seed. The score is a ranking among cards that already fit every rule; it is never a reason to admit one, and with none given the week is what it was before it existed.</para>
 ///
 /// <para><b>Guesses</b> (the brief is silent, listed in the progress row): a repeat is two dinners fewer than 14 days apart; the
 /// block is the card's timed minutes held to 30 to 120 and ends where the family dinner starts; a cook is an adult home at dinner
@@ -138,6 +139,7 @@ public static class MealPlanner
                 .Where(recipe => !request.CookThisSoon.Contains(recipe.Id) && !choices.Any(choice => choice?.Recipe == recipe.Id))
                 .Where(recipe => MealFacts.LastCooked(recipe.Id, request.History) <= cutoff)
                 .OrderBy(recipe => MealFacts.LastCooked(recipe.Id, request.History))
+                .ThenByDescending(recipe => Appetite(recipe))
                 .ThenBy(recipe => MealFacts.Hash(request.Seed, "stretch", recipe.Id.Value))
                 .ToList();
             if (candidates.Count == 0)
@@ -177,6 +179,7 @@ public static class MealPlanner
                 .ThenBy(pair => NextToSameCuisine(index, pair.Recipe) ? 1 : 0)
                 .ThenBy(pair => choices.Count(choice => choice?.Recipe is { } id && byId[id].Cuisine == pair.Recipe.Cuisine))
                 .ThenBy(pair => MealFacts.LastCooked(pair.Recipe.Id, request.History))
+                .ThenByDescending(pair => Appetite(pair.Recipe))
                 .ThenBy(pair => MealFacts.Hash(request.Seed, evening.Day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), pair.Recipe.Id.Value))
                 .FirstOrDefault();
             if (best.Recipe is not null)
@@ -198,6 +201,9 @@ public static class MealPlanner
                 evening.Day,
                 AnyoneCanCook(index) ? "Every card was cooked in the last two weeks or is one someone has said never again to." : "No one is free to cook before dinner.");
         }
+
+        // The taste score, higher first; a card the profile has no opinion of scores zero, so with no scores at all this key is the same for every card and orders nothing.
+        private decimal Appetite(Recipe recipe) => request.Appetite.GetValueOrDefault(recipe.Id);
 
         private bool AnyoneCanCook(int index)
         {

@@ -58,6 +58,12 @@ internal sealed class MealWeekRig
 
     public MealWeekSeams Seams { get; private set; }
 
+    /// <summary>Gives the run the household's meal answers to read earlier weeks by.</summary>
+    public void SetAnswers(Constitution.Domain.Meals.Pipeline.IMealAnswerSource answers) => Seams = Seams with { Answers = answers };
+
+    /// <summary>Gives the run this install's "I ate something else" estimates.</summary>
+    public void SetAte(Constitution.Domain.Meals.IAteEstimates ate) => Seams = Seams with { AteEstimates = ate };
+
     /// <summary>The decision record a test hands the documents run; null by default, as in every earlier test.</summary>
     public Constitution.Domain.Meals.Pipeline.IMealDecisionRecords? Decisions { get; set; }
 

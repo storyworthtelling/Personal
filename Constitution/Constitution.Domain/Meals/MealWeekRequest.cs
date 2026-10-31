@@ -20,7 +20,8 @@ public sealed record MealWeekRequest
         IReadOnlyDictionary<RecipeId, IReadOnlySet<string>>? neverAgain = null,
         decimal? budgetSoFar = null,
         int seed = 0,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        IReadOnlyDictionary<RecipeId, decimal>? appetite = null)
     {
         WeekStart = weekStart;
         Recipes = recipes;
@@ -33,6 +34,7 @@ public sealed record MealWeekRequest
         BudgetSoFar = budgetSoFar;
         Seed = seed;
         Now = now ?? DateTimeOffset.MinValue;
+        Appetite = appetite ?? new Dictionary<RecipeId, decimal>();
         EnsureValid();
     }
 
@@ -71,6 +73,12 @@ public sealed record MealWeekRequest
     /// <summary>The clock, passed in: evenings before its local day are not planned. <see cref="DateTimeOffset.MinValue"/> means nothing has passed.</summary>
     public DateTimeOffset Now { get; init; }
 
+    /// <summary>
+    /// How much the household is likely to want each card, higher first (the taste profile's score). Empty, or a card missing from it, means no opinion: the planner
+    /// then orders exactly as it did before this input existed. It only orders cards that already pass every rule; it never admits one the rules refuse.
+    /// </summary>
+    public IReadOnlyDictionary<RecipeId, decimal> Appetite { get; init; }
+
     /// <summary>Throws <see cref="ArgumentException"/> naming what is wrong. Run by the constructor and again by the planner (a <c>with</c> skips the constructor).</summary>
     public void EnsureValid()
     {
@@ -82,6 +90,7 @@ public sealed record MealWeekRequest
         ArgumentNullException.ThrowIfNull(CookThisSoon);
         ArgumentNullException.ThrowIfNull(History);
         ArgumentNullException.ThrowIfNull(NeverAgain);
+        ArgumentNullException.ThrowIfNull(Appetite);
         if (Recipes.GroupBy(recipe => recipe.Id).Any(group => group.Count() > 1))
         {
             throw new ArgumentException("Two cards share an id.", nameof(Recipes));

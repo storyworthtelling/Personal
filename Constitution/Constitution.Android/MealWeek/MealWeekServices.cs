@@ -252,6 +252,8 @@ public static class MealWeekServices
             documents,
             new MealTemplateSeams(new HouseholdTemplateLibrary(household.Service), TemplateAuthorServices.AuthorOf(appContext)),
             Publisher: new HouseholdWeekPlanPublisher(household.Service),
+            Answers: new HouseholdMealAnswers(household.Service),
+            AteEstimates: new FileAteEstimates(Path.Combine(appContext.NoBackupFilesDir!.AbsolutePath, "intake", "intake-estimates.json")),
             Decisions: DecisionRecords(appContext));
     }
 
