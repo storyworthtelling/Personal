@@ -66,4 +66,14 @@ public class OutputOutsideRepoTests
 
         Assert.Contains("log-loop/", ignore);
     }
+
+    [Fact]
+    public void TheRunbookFolderIsNotIgnoredByTheSameRule()
+    {
+        var git = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+            "git", ["-C", Support.RepoRoot(), "check-ignore", "-q", ".claude/log-loop/RUNBOOK.md"]) { UseShellExecute = false })!;
+        git.WaitForExit();
+
+        Assert.Equal(1, git.ExitCode); // 1: not ignored
+    }
 }

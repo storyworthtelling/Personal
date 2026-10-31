@@ -1,8 +1,9 @@
 namespace LogLoopReader.Tests;
 
 // §6.3: a claude/logfix-* PR auto-merges when — and only when — it really is a log-derived bug fix: every
-// fingerprint is a Fix in a report issue, every commit names one, and each fix has its test first. Green
-// tests and the leak guard (conditions 5 and 6) are branch protection's job, which this gate leaves to it.
+// fingerprint is a Fix in a report issue, every commit names one, and each fix has its test first; and only
+// once every check on the head commit has finished green, log-loop-guard among them (conditions 5 and 6),
+// because auto-merge itself waits only for the checks branch protection requires.
 public class AutoMergeGateTests
 {
     private const string Fp1 = "1111111111111111111111111111111111111111111111111111111111111111";
@@ -19,12 +20,21 @@ public class AutoMergeGateTests
     private static GateCommit Commit(string sha, string? fingerprint, params string[] files) =>
         new(sha, "Fix something\n\n" + (fingerprint is null ? string.Empty : $"Log-Loop-Fingerprint: {fingerprint}\n"), files, 1);
 
+    private static readonly IReadOnlyList<GateCheck> Green =
+    [
+        new("test", "completed", "success"),
+        new("log-loop-guard", "completed", "success"),
+        new("build", "completed", "skipped"),
+    ];
+
     private static GateInput Input(
         IReadOnlyList<GateCommit>? commits = null, string? body = null, IReadOnlyList<ReportIssue>? reports = null,
-        string branch = "claude/logfix-2026-11-08-post", bool fork = false, string author = Owner) => new(
+        string branch = "claude/logfix-2026-11-08-post", bool fork = false, string author = Owner,
+        IReadOnlyList<GateCheck>? checks = null) => new(
         branch, fork, author, [Owner], body ?? Block(Fp1),
         commits ?? [Commit("a1", Fp1, "FocusPhone/Codex.Tests/Post/MailboxTests.cs"), Commit("b2", Fp1, "FocusPhone/Post.Android/MailboxArea.cs")],
-        reports ?? [Report(Owner, Fp1)]);
+        reports ?? [Report(Owner, Fp1)],
+        checks ?? Green);
 
     [Fact]
     public void AFullyTaggedPrWithItsTestFirstPasses()
@@ -158,6 +168,28 @@ public class AutoMergeGateTests
     }
 
     [Fact]
+    public void ARedGuardBlocks()
+    {
+        var decision = AutoMergeGate.Decide(Input(checks: [new("test", "completed", "success"), new("log-loop-guard", "completed", "failure")]));
+
+        Assert.False(decision.Enable);
+        Assert.Contains(decision.Reasons, r => r.Contains("log-loop-guard"));
+    }
+
+    [Fact]
+    public void ARedOrUnfinishedTestJobHolds()
+    {
+        Assert.False(AutoMergeGate.Decide(Input(checks: [new("test", "completed", "failure"), new("log-loop-guard", "completed", "success")])).Enable);
+        Assert.False(AutoMergeGate.Decide(Input(checks: [new("test", "in_progress", null), new("log-loop-guard", "completed", "success")])).Enable);
+    }
+
+    [Fact]
+    public void NoGuardRunYetHolds()
+    {
+        Assert.False(AutoMergeGate.Decide(Input(checks: [new("test", "completed", "success")])).Enable);
+    }
+
+    [Fact]
     public void TheGateReadsItsInputFromJson()
     {
         const string json = """
@@ -165,7 +197,8 @@ public class AutoMergeGateTests
          "body":"<!-- log-loop\nfingerprint: 1111111111111111111111111111111111111111111111111111111111111111\n-->",
          "commits":[{"sha":"a1","message":"t\n\nLog-Loop-Fingerprint: 1111111111111111111111111111111111111111111111111111111111111111","files":["X.Tests/ATests.cs"],"parents":1},
                     {"sha":"b2","message":"f\n\nLog-Loop-Fingerprint: 1111111111111111111111111111111111111111111111111111111111111111","files":["X/A.cs"],"parents":1}],
-         "reports":[{"title":"Log loop — week of 2026-11-08","author":"invented-owner","body":"<!-- log-loop-report\nweek: 2026-11-08\nfix: 1111111111111111111111111111111111111111111111111111111111111111\n-->"}]}
+         "reports":[{"title":"Log loop — week of 2026-11-08","author":"invented-owner","body":"<!-- log-loop-report\nweek: 2026-11-08\nfix: 1111111111111111111111111111111111111111111111111111111111111111\n-->"}],
+         "checks":[{"name":"test","status":"completed","conclusion":"success"},{"name":"log-loop-guard","status":"completed","conclusion":"success"}]}
         """;
 
         Assert.True(AutoMergeGate.Decide(GateInput.FromJson(json)).Enable);

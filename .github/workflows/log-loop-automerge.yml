@@ -1,0 +1,133 @@
+name: Log loop auto-merge
+
+# LOG-LOOP-PLAN.md §6.3 (O3, widened by O14–O17): a log-derived bug fix auto-merges from the first run, in
+# any code. This workflow runs `LogLoopReader gate` on each claude/logfix-* PR and enables GitHub auto-merge
+# only when the gate holds: the branch and author are the session's, every fingerprint in the PR body is a
+# Fix in a "Log loop — week of" report, every commit carries a Log-Loop-Fingerprint trailer, each fix has
+# its test commit first, and every check on the head commit has finished green with log-loop-guard among
+# them. Otherwise it disables auto-merge, and the PR waits for the owner like any other.
+#
+# Safety: every trigger here runs the workflow and the gate FROM MAIN. pull_request_target and workflow_run
+# take their definition from the default branch, and the checkout below names it explicitly, so a PR can
+# never rewrite the gate that judges it. Nothing from the PR is checked out or executed.
+#
+# The merge token: a merge performed through GITHUB_TOKEN triggers no workflows, so main's signed build and
+# the apps-latest channel would not run for a merged fix. LOG_LOOP_MERGE_TOKEN (a fine-grained token with
+# contents and pull-requests write on this repository) enables auto-merge as the owner so the merge does
+# trigger them; without it the gate still works and the summary says the build must be started by hand.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  issues:
+    types: [opened, edited]
+  workflow_run:
+    workflows:
+      - Build Android APK
+      - Build Constitution APK
+      - Build Flyleaf APKs
+      - Build Index APK
+      - Build Plate APK
+      - Build Post APK
+      - Build Pulp APK
+      - Build shared libraries
+      - Build Folio APK
+      - Log loop guard
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+  checks: read
+
+concurrency:
+  group: log-loop-automerge
+  cancel-in-progress: false
+
+jobs:
+  log-loop-gate:
+    name: log-loop-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main (never the PR)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Judge each log-fix PR
+        env:
+          READ_TOKEN: ${{ github.token }}
+          MERGE_TOKEN: ${{ secrets.LOG_LOOP_MERGE_TOKEN || github.token }}
+          HAS_MERGE_TOKEN: ${{ secrets.LOG_LOOP_MERGE_TOKEN != '' }}
+          TRUSTED: ${{ vars.LOG_LOOP_AUTHORS || github.repository_owner }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          export GH_TOKEN="$READ_TOKEN"
+          dotnet build Tools/LogLoopReader/LogLoopReader.csproj -v q
+
+          case "$EVENT" in
+            pull_request_target) numbers="$PR_NUMBER" ;;
+            workflow_run) numbers=$(gh pr list --repo "$REPO" --state open --head "$RUN_BRANCH" --json number --jq '.[].number') ;;
+            *) numbers=$(gh pr list --repo "$REPO" --state open --limit 100 --json number,headRefName \
+                 --jq '.[] | select(.headRefName | startswith("claude/logfix-")) | .number') ;;
+          esac
+
+          reports=$(gh api "repos/$REPO/issues?state=all&per_page=100" --paginate \
+            --jq '.[] | select(.pull_request == null) | select(.title | startswith("Log loop — week of ")) | {title, author: .user.login, body: (.body // "")}' \
+            | jq -s .)
+          trusted=$(jq -cn --arg t "$TRUSTED" '$t | split(",") | map(gsub("^ +| +$"; ""))')
+
+          for n in $numbers; do
+            pr=$(gh api "repos/$REPO/pulls/$n")
+            branch=$(jq -r .head.ref <<<"$pr")
+            case "$branch" in claude/logfix-*) ;; *) continue ;; esac
+            sha=$(jq -r .head.sha <<<"$pr")
+
+            commits=$(gh api "repos/$REPO/pulls/$n/commits" --paginate \
+              --jq '.[] | {sha: .sha, message: .commit.message, parents: (.parents | length)}' | jq -s .)
+            commits=$(jq -c '.[]' <<<"$commits" | while read -r c; do
+              s=$(jq -r .sha <<<"$c")
+              files=$(gh api "repos/$REPO/commits/$s" --jq '[.files[].filename]')
+              jq -c --argjson f "$files" '. + {files: $f}' <<<"$c"
+            done | jq -s .)
+            # This job's own run is excluded: it is in progress while it judges.
+            checks=$(gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" --paginate \
+              --jq '.check_runs[] | select(.name != "log-loop-gate") | {name, status, conclusion}' | jq -s .)
+
+            jq -n --argjson pr "$pr" --argjson commits "$commits" --argjson reports "$reports" \
+                  --argjson checks "$checks" --argjson trusted "$trusted" '{
+              branch: $pr.head.ref,
+              fromFork: ($pr.head.repo.full_name != $pr.base.repo.full_name),
+              prAuthor: $pr.user.login,
+              trustedAuthors: $trusted,
+              body: ($pr.body // ""),
+              commits: $commits,
+              reports: $reports,
+              checks: $checks
+            }' > "$RUNNER_TEMP/gate-$n.json"
+
+            decision=$(dotnet run --project Tools/LogLoopReader --no-build -- gate --input "$RUNNER_TEMP/gate-$n.json")
+            {
+              echo "### PR #$n ($branch)"
+              jq -r 'if .enable then "Gate holds: auto-merge enabled." else "Held for the owner:\n" + (.reasons | map("- " + .) | join("\n")) end' <<<"$decision"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "$(jq -r .enable <<<"$decision")" = "true" ]; then
+              GH_TOKEN="$MERGE_TOKEN" gh pr merge "$n" --repo "$REPO" --auto --merge
+              if [ "$HAS_MERGE_TOKEN" != "true" ]; then
+                echo "LOG_LOOP_MERGE_TOKEN is not set: the merge will not start main's signed build; run it by hand." >> "$GITHUB_STEP_SUMMARY"
+              fi
+            else
+              GH_TOKEN="$MERGE_TOKEN" gh pr merge "$n" --repo "$REPO" --disable-auto 2>/dev/null || true
+            fi
+          done

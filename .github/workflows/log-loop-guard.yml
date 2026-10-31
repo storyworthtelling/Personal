@@ -1,0 +1,49 @@
+name: Log loop guard
+
+# LOG-LOOP-PLAN.md §6.1, layer 4 — the content-free half of the leak scan, on every claude/** push and every
+# PR to main. It holds no log plaintext, so it looks only for shapes in the ADDED lines: a Luhn-valid
+# card-like number, an address outside example.com, a phone number that is not a 555 number, an OAuth-code-
+# or token-shaped string, and (on claude/logfix-* branches only) a dollar amount in a test. A hit is not a
+# code risk the owner waived; it is the public-repository rule, and it always blocks. Branch protection
+# requires this job on main, and the auto-merge gate waits for it.
+#
+# It also runs the reader's own tests, since the gate and the scans are the reader's code.
+on:
+  push:
+    branches: ['claude/**']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  log-loop-guard:
+    name: log-loop-guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test the reader (fetch, digest, sanitize, leakscan, gate)
+        run: dotnet test Tools/LogLoopReader.Tests/LogLoopReader.Tests.csproj
+
+      - name: Scan the added lines
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git diff origin/main...HEAD > "$RUNNER_TEMP/added.diff"
+          dotnet run --project Tools/LogLoopReader --no-build -- \
+            leakscan --ci --diff "$RUNNER_TEMP/added.diff" --branch "$BRANCH"

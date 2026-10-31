@@ -8,6 +8,9 @@ public sealed record GateCommit(string Sha, string Message, IReadOnlyList<string
 
 public sealed record ReportIssue(string Title, string Author, string Body);
 
+/// <summary>One check run on the PR's head commit, as the checks API reports it.</summary>
+public sealed record GateCheck(string Name, string Status, string? Conclusion);
+
 /// <summary>What the workflow gathers about a PR for the gate, from the GitHub API.</summary>
 public sealed record GateInput(
     string Branch,
@@ -16,7 +19,8 @@ public sealed record GateInput(
     IReadOnlyList<string> TrustedAuthors,
     string Body,
     IReadOnlyList<GateCommit> Commits,
-    IReadOnlyList<ReportIssue> Reports)
+    IReadOnlyList<ReportIssue> Reports,
+    IReadOnlyList<GateCheck>? Checks = null)
 {
     private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
@@ -30,12 +34,18 @@ public sealed record GateDecision(bool Enable, IReadOnlyList<string> Reasons);
 /// Whether a PR is a log-derived bug fix that may auto-merge (LOG-LOOP-PLAN.md §6.3, O3 widened by
 /// O14–O17). It checks conditions 1–4 — the branch and author, the log-loop blocks against the week's
 /// report, a fingerprint trailer on every commit, and each fix's test commit first. Conditions 5 and 6
-/// (every touched app's tests green, log-loop-guard green) are branch protection's, which auto-merge waits
-/// for. Anything that does not hold keeps the PR under the normal rule: it waits for the owner.
+/// (every touched app's tests green, log-loop-guard green) are also branch protection's, which auto-merge waits
+/// for — and, because auto-merge waits only for the checks branch protection requires while the app test
+/// jobs are path-filtered pushes that cannot all be required, the gate itself also waits for every check
+/// on the head commit to finish green, <c>log-loop-guard</c> among them. Anything that does not hold keeps
+/// the PR under the normal rule: it waits for the owner.
 /// </summary>
 public static partial class AutoMergeGate
 {
     public const string ReportTitlePrefix = "Log loop — week of ";
+
+    /// <summary>The leak guard's job name, which branch protection also requires.</summary>
+    public const string GuardCheck = "log-loop-guard";
 
     public static GateDecision Decide(GateInput input)
     {
@@ -118,6 +128,20 @@ public static partial class AutoMergeGate
             {
                 reasons.Add($"fingerprint {Short(fingerprint)} has a test and no fix");
             }
+        }
+
+        var checks = input.Checks ?? [];
+        foreach (var check in checks.Where(c => c.Status != "completed"))
+        {
+            reasons.Add($"check {check.Name} has not finished");
+        }
+        foreach (var check in checks.Where(c => c.Status == "completed" && c.Conclusion is not ("success" or "skipped" or "neutral")))
+        {
+            reasons.Add($"check {check.Name} ended {check.Conclusion ?? "without a conclusion"}");
+        }
+        if (!checks.Any(c => c.Name == GuardCheck && c.Status == "completed" && c.Conclusion == "success"))
+        {
+            reasons.Add($"{GuardCheck} has not passed on the head commit");
         }
 
         return new GateDecision(reasons.Count == 0, reasons);

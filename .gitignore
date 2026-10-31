@@ -21,3 +21,5 @@ graphify-out/
 # The log loop's plaintext (LOG-LOOP-PLAN.md §6.1): the reader writes it under $TMPDIR/log-loop/ and
 # refuses any path inside the repository; this is the second lock on the same door.
 log-loop/
+# …but the runbook folder is reviewed like code, so it is never ignored.
+!.claude/log-loop/
