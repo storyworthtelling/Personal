@@ -9,7 +9,7 @@ using Storyworthtelling.Maui;
 namespace Folio.Android.Pages;
 
 /// <summary>One draft in the list under the chart.</summary>
-public sealed record DraftRow(int Number, string Date, string Words);
+public sealed record DraftRow(Guid Id, int Number, string Date, string Words, bool ReportReady);
 
 /// <summary>What the book page needs to draw itself.</summary>
 public sealed record BookPageModel(
@@ -39,9 +39,11 @@ public sealed record BookPageModel(
         [.. book.Drafts.OrderByDescending(draft => draft.Number).Select(Row)]);
 
     private static DraftRow Row(BookDraft draft) => new(
+        draft.Id,
         draft.Number,
         draft.Created.ToLocalTime().ToString("d MMM", CultureInfo.CurrentCulture),
-        draft.WordCount > 0 ? draft.WordCount.ToString("N0", CultureInfo.CurrentCulture) : "—");
+        draft.WordCount > 0 ? draft.WordCount.ToString("N0", CultureInfo.CurrentCulture) : "—",
+        draft.ReportReady);
 
     // "Literary · 94,200 words, inside the genre norm" — the genre only when one was inferred.
     private static string MeasureLine(BookRecord book)
@@ -80,6 +82,12 @@ public class BookPage : FolioBinderPage
 
     private readonly VerticalStackLayout body = new();
     private readonly BookRecord record;
+    private readonly Button openButton;
+    private readonly Dictionary<Guid, Label> marks = [];
+
+    // Which draft's report "Open report" opens. The newest draft is the default; tapping another
+    // draft in the list below picks that one instead.
+    private Guid selectedDraft;
 
     public BookPage(BookRecord book) : this(BookPageModel.From(book), book)
     {
@@ -88,6 +96,7 @@ public class BookPage : FolioBinderPage
     private BookPage(BookPageModel model, BookRecord book)
     {
         record = book;
+        selectedDraft = book.LatestDraftId;
 
         Content = new ScrollView
         {
@@ -105,10 +114,11 @@ public class BookPage : FolioBinderPage
         };
         draft.Clicked += (_, _) => _ = NewDraft();
 
-        var open = new Button { Text = "Open report", IsEnabled = book.ReportReady };
-        open.Clicked += (_, _) => _ = OpenReport();
+        openButton = new Button();
+        openButton.Clicked += (_, _) => _ = OpenReport();
+        SelectDraft(book.LatestDraftId);
 
-        SetBar(open, draft);
+        SetBar(openButton, draft);
     }
 
     /// <summary>
@@ -121,12 +131,25 @@ public class BookPage : FolioBinderPage
     /// </summary>
     private async Task OpenReport()
     {
-        if (!await ReportFile.OpenAsync(record.LatestDraftId, record.Title))
+        if (!await ReportFile.OpenAsync(selectedDraft, record.Title))
         {
             // Said on the page, not in a dialog: the report has been delivered and cleared off the
             // device, or has not been rendered yet. Either way there is nothing here to open.
             Note("The report is not on this phone. It is in the Drive folder beside the manuscript.");
         }
+    }
+
+    // Points "Open report" at one draft's report, and marks that draft in the list. The button names
+    // the draft only when it is not the newest, so the default reads as plainly "Open report".
+    private void SelectDraft(Guid id)
+    {
+        selectedDraft = id;
+        var draft = record.Drafts.First(d => d.Id == id);
+        openButton.Text = id == record.LatestDraftId ? "Open report" : $"Open draft {draft.Number} report";
+        openButton.IsEnabled = draft.ReportReady;
+
+        foreach (var (draftId, mark) in marks)
+            mark.Text = draftId == id ? "●" : string.Empty;
     }
 
     private async Task NewDraft()
@@ -281,7 +304,7 @@ public class BookPage : FolioBinderPage
 
     // A draft: its number, when it arrived, and how long it was. The count is monospaced and
     // tabular so the column reads down as numbers rather than as words that happen to be digits.
-    private static View Row(DraftRow row, bool last)
+    private View Row(DraftRow row, bool last)
     {
         var line = new Grid
         {
@@ -313,10 +336,22 @@ public class BookPage : FolioBinderPage
             VerticalOptions = LayoutOptions.End,
         };
 
-        line.Children.Add(number);
+        var mark = new Label
+        {
+            FontSize = 11,
+            TextColor = PaperResources.Colour("InkMuted"),
+            VerticalOptions = LayoutOptions.Center,
+        };
+        marks[row.Id] = mark;
+        var pick = new TapGestureRecognizer();
+        pick.Tapped += (_, _) => SelectDraft(row.Id);
+        line.GestureRecognizers.Add(pick);
+
+        var label = new HorizontalStackLayout { Spacing = 6, Children = { number, mark } };
+        line.Children.Add(label);
         line.Children.Add(date);
         line.Children.Add(words);
-        Grid.SetColumn(number, 0);
+        Grid.SetColumn(label, 0);
         Grid.SetColumn(date, 1);
         Grid.SetColumn(words, 2);
 

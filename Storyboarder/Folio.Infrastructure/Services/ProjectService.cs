@@ -592,15 +592,33 @@ public sealed class ProjectService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    private sealed record DraftStub(Guid Id, Guid ProjectId, int DraftNumber, DateTimeOffset CreatedAtUtc, DateTimeOffset? ShelvedAtUtc);
+
+    /// <summary>
+    /// One entry per book: the newest live draft of each project. Drafts of one book are one book on
+    /// the desk and on the shelf, so which of the two it stands on is decided by its newest draft —
+    /// a book whose draft 2 is being read is on the desk even though draft 1 was shelved.
+    /// </summary>
+    private static async Task<List<DraftStub>> LatestDraftsAsync(FolioDbContext db, CancellationToken cancellationToken)
+    {
+        var drafts = await db.Novels
+            .Where(n => n.DeletedAtUtc == null)
+            .Select(n => new DraftStub(n.Id, n.ProjectId, n.DraftNumber, n.CreatedAtUtc, n.ShelvedAtUtc))
+            .ToListAsync(cancellationToken);
+        return [.. drafts
+            .GroupBy(n => n.ProjectId)
+            .Select(group => group.OrderByDescending(n => n.DraftNumber).ThenByDescending(n => n.CreatedAtUtc).First())];
+    }
+
     /// <summary>What is on the <b>shelf</b>: what the owner has put away.</summary>
     public async Task<IReadOnlyList<NovelStatus>> ListShelvedAsync(CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var ids = await db.Novels
-            .Where(n => n.ShelvedAtUtc != null && n.DeletedAtUtc == null)
+        var ids = (await LatestDraftsAsync(db, cancellationToken))
+            .Where(n => n.ShelvedAtUtc != null)
             .OrderByDescending(n => n.ShelvedAtUtc)
             .Select(n => n.Id)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         var statuses = new List<NovelStatus>(ids.Count);
         var now = clock.UtcNow;
@@ -701,11 +719,11 @@ public sealed class ProjectService
     public async Task<IReadOnlyList<NovelStatus>> ListAsync(CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var ids = await db.Novels
-            .Where(n => n.ShelvedAtUtc == null && n.DeletedAtUtc == null)
+        var ids = (await LatestDraftsAsync(db, cancellationToken))
+            .Where(n => n.ShelvedAtUtc == null)
             .OrderByDescending(n => n.CreatedAtUtc)
             .Select(n => n.Id)
-            .ToListAsync(cancellationToken);
+            .ToList();
         var statuses = new List<NovelStatus>(ids.Count);
         var now = clock.UtcNow;
         foreach (var id in ids)
@@ -826,7 +844,10 @@ public sealed class ProjectService
             latest.SeriesId is not null,
             seriesLength,
             [.. drafts.Select(draft =>
-                new BookDraft(draft.Id, draft.DraftNumber, draft.CreatedAtUtc, draft.WordCount))],
+                new BookDraft(
+                    draft.Id, draft.DraftNumber, draft.CreatedAtUtc, draft.WordCount,
+                    reports.Any(report => report.NovelId == draft.Id
+                        && report.PdfStatus == WorkStatus.Completed && report.PdfPath != null)))],
             readiness,
             latestReport is { PdfStatus: WorkStatus.Completed, PdfPath: not null },
             genre,
