@@ -86,6 +86,9 @@ public abstract class ConstitutionActivity : Activity
         PaperTransitions.Apply(this);
         NoticePoster.Attach(this);
 
+        // A photograph of a recipe card the phone left behind when it ended the app is cleared as the app opens (D162).
+        CameraCaptureLauncher.SweepLeftovers(this);
+
         pillarStore = new PillarStore(this);
         settingsArea = new SettingsArea(this);
         bodyArea = new BodyArea(this);
