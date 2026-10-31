@@ -325,6 +325,11 @@ public static class TrailLines
         "unread",
         "weeks",
         "words",
+            // The meal pass's own problems (a busy gate, a stamp that could not be written; never anything a run read).
+        "busy",
+        "later",
+        "pass",
+        "stamp",
 };
 
     /// <summary>The line, kept exactly as it was, or null when any part of it is not allowed.</summary>

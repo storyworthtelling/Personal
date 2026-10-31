@@ -22,6 +22,8 @@ public class ConstitutionInvariantsTests
         "com.storyworthtelling.constitution.BodySyncWorker",
         // Added with the weekly workout worker shell (P13): a deliberate edit, approved by the owner.
         "com.storyworthtelling.constitution.WorkoutWeekWorker",
+        // Added with the hourly meal-week worker (P13): a deliberate edit.
+        "com.storyworthtelling.constitution.MealWeekWorker",
     ];
 
     private static readonly string[] ExpectedActivities =
@@ -51,6 +53,8 @@ public class ConstitutionInvariantsTests
         "constitution-body-sync",
         // Added with the weekly workout worker shell (P13): a deliberate edit, approved by the owner.
         "constitution-workout-week",
+        // Added with the hourly meal-week worker (P13): a deliberate edit.
+        "constitution-meal-week",
     ];
 
     private static readonly string[] ExpectedPreferenceKeys =

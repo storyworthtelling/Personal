@@ -157,6 +157,11 @@ public abstract class ConstitutionActivity : Activity
         ReadBackWorker.Schedule(this);
         ReadBackWaiting.Restore(this);
 
+        // The meal week (planned, placed, sent) and its Sunday deadline settled by an hourly pass (P13), scheduled BEFORE the workout run: both go through
+        // the one run gate in the order they ask, and the workout run reads the cook blocks the meal run has put on the calendar as busy time.
+        MealWeekWorker.Schedule(this);
+        MealWeekWorker.RunOnOpen(this);
+
         // The week's workouts planned each morning before the read-back (P13), and once on open when the last plan is stale.
         WorkoutWeekWorker.Schedule(this);
         WorkoutWeekWorker.RunOnOpen(this);
