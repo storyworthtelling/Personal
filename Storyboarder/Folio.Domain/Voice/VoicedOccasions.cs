@@ -15,9 +15,6 @@ namespace Folio.Domain.Voice;
 /// </summary>
 public static class VoicedOccasions
 {
-    /// <summary>The line at the top of the desk when the app opens.</summary>
-    public const string Welcome = "welcome";
-
     /// <summary>A book's own line on the desk, about how far along it is.</summary>
     public const string DeskLine = "a one-line note on the desk about how this book is coming along";
 
@@ -27,5 +24,5 @@ public static class VoicedOccasions
     /// </summary>
     public const string EmptyDesk = "a line for an empty desk, inviting a first manuscript";
 
-    public static IReadOnlyList<string> All { get; } = [Welcome, DeskLine, EmptyDesk];
+    public static IReadOnlyList<string> All { get; } = [DeskLine, EmptyDesk];
 }

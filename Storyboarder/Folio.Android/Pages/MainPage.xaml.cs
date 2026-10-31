@@ -32,7 +32,6 @@ public partial class MainPage : FolioBinderPage
     private string emptyDeskLine = string.Empty;
     private readonly Dictionary<Guid, NovelStatus> statuses = [];
     private IDispatcherTimer? refreshTimer;
-    private string voice = string.Empty;
 
     public MainPage()
     {
@@ -57,7 +56,6 @@ public partial class MainPage : FolioBinderPage
         LastRunLabel.Text = SettingsStore.LastRunSummary;
 
         _ = RefreshAsync();
-        _ = ShowWelcomeAsync();
 
         refreshTimer = Dispatcher.CreateTimer();
         refreshTimer.Interval = TimeSpan.FromSeconds(5);
@@ -161,36 +159,6 @@ public partial class MainPage : FolioBinderPage
         {
             // Voiced copy is layered over neutral copy; a failure here leaves the desk exactly as drawn.
         }
-    }
-
-    // A greeting written in the owner's voice, composed fresh each time the page appears. Shown only when a
-    // voice profile has been learned; otherwise VoicedMessenger returns the empty fallback and the line
-    // stays hidden rather than showing generic copy. Never blocks or crashes the page.
-    private async Task ShowWelcomeAsync()
-    {
-        if (!SettingsStore.IsConfigured)
-        {
-            voice = string.Empty;
-            Redraw();
-            return;
-        }
-
-        string message;
-        try
-        {
-            var messenger = IPlatformApplication.Current!.Services.GetRequiredService<VoicedMessenger>();
-            var context = rows.Count == 0 ? "no manuscripts yet" : $"{rows.Count} manuscript(s) under review";
-            message = await messenger.ComposeAsync(
-                new MessageRequest(VoicedOccasions.Welcome, context, HighVisibility: true),
-                fallback: string.Empty, CancellationToken.None);
-        }
-        catch
-        {
-            message = string.Empty;
-        }
-
-        voice = message;
-        Redraw();
     }
 
     /// <summary>
@@ -417,8 +385,8 @@ public partial class MainPage : FolioBinderPage
     };
 
     /// <summary>
-    /// Lays the desk out from what is on it: the book being read now with its details on a note
-    /// card, then the ones waiting with their state on a post-it.
+    /// Lays the desk out from what is on it: a scrolling column of books, each with its details on an
+    /// index card beside it.
     ///
     /// <para>Rebuilt whole on each refresh rather than diffed. The list it replaced diffed because a
     /// CollectionView scrolls and loses its place when its items are swapped; a desk is a handful of
@@ -435,44 +403,28 @@ public partial class MainPage : FolioBinderPage
 
         if (onDesk.Count == 0)
         {
-            Desk.Add(new Label
+            // On a card, never on the bare wood: muted ink on the plank is unreadable (DeskDrawable).
+            Desk.Add(DeskPaper.Card(new Label
             {
                 Text = string.IsNullOrWhiteSpace(emptyDeskLine)
                     ? "Nothing on the desk. Add a manuscript and Folio starts reading."
                     : emptyDeskLine,
                 Style = PaperResources.Token<Style>("EmptyStateLabel"),
-            });
+            }));
             return;
         }
 
-        // What is being read is whatever is still running; failing that, a book that has stopped and needs
-        // the owner (it must not hide among the others); failing that, the newest thing here.
-        var reading =
-            onDesk.FirstOrDefault(pair => Active(pair.Status) && !pair.Status.NeedsAttention) is { Status: not null } running
-                ? running
-                : onDesk.FirstOrDefault(pair => Active(pair.Status)) is { Status: not null } stopped
-                    ? stopped
-                    : onDesk[0];
+        // One row per book, each a cover with its index card beside it — no headings, no second kind
+        // of entry. Order is the only thing that says what matters: whatever is still running first,
+        // then a book that has stopped and needs the owner (it must not hide among the others), then
+        // the rest as they came.
+        var ordered = onDesk
+            .OrderBy(pair => Active(pair.Status) && !pair.Status.NeedsAttention ? 0 : Active(pair.Status) ? 1 : 2)
+            .ToList();
 
-        Desk.Add(DeskPaper.Strip(reading.Row.Heading));
-        Desk.Add(Hero(reading.Row, reading.Status));
-
-        if (!string.IsNullOrWhiteSpace(voice))
+        for (var i = 0; i < ordered.Count; i++)
         {
-            Desk.Add(new Label
-            {
-                Text = voice,
-                Style = PaperResources.Token<Style>("VoiceLabel"),
-                Margin = new Thickness(2, 16, 2, 0),
-            });
-        }
-
-        var waiting = onDesk.Where(pair => pair.Row.Id != reading.Row.Id).ToList();
-        if (waiting.Count > 0)
-        {
-            Desk.Add(new BoxView { HeightRequest = 16, Color = Colors.Transparent });
-            Desk.Add(DeskPaper.Strip("Also on the desk"));
-            Desk.Add(Waiting(waiting));
+            Desk.Add(BookRow(ordered[i].Row, ordered[i].Status, i));
         }
 
         Desk.Add(new GraphicsView
@@ -487,7 +439,11 @@ public partial class MainPage : FolioBinderPage
     private static bool Active(NovelStatus status) =>
         status.Stage is not ("Completed" or "Failed" or "Cancelled");
 
-    private View Hero(ProjectRow row, NovelStatus status)
+    // Tilts cycle so a stack of books looks laid down by hand rather than ruled.
+    private static readonly double[] CoverTilts = [-1.6, 1.4, -0.9, 1.1];
+    private static readonly double[] CardTilts = [0.8, -0.7, 0.6, -0.9];
+
+    private View BookRow(ProjectRow row, NovelStatus status, int index)
     {
         // The facts first and always: what the book is doing, and — in red — what is wrong with it. The
         // owner's voice is a note under them, never a replacement for them (it used to replace them, and
@@ -526,17 +482,17 @@ public partial class MainPage : FolioBinderPage
         }
 
         var card = DeskPaper.Card([.. lines]);
-        card.Rotation = 0.8;
+        card.Rotation = CardTilts[index % CardTilts.Length];
         card.VerticalOptions = LayoutOptions.Start;
 
         var grid = new Grid
         {
             ColumnDefinitions = [new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star)],
             ColumnSpacing = 14,
-            Margin = new Thickness(0, 4, 0, 0),
+            Margin = new Thickness(0, index == 0 ? 4 : 18, 0, 0),
         };
 
-        var cover = new FlatBook(row.Title, Jacket(status), 118, 148, tilt: -1.6)
+        var cover = new FlatBook(row.Title, Jacket(status), 118, 148, tilt: CoverTilts[index % CoverTilts.Length])
         {
             VerticalOptions = LayoutOptions.Start,
         };
@@ -547,35 +503,6 @@ public partial class MainPage : FolioBinderPage
         Grid.SetColumn(cover, 0);
         Grid.SetColumn(card, 1);
         return grid;
-    }
-
-    private View Waiting(IReadOnlyList<(ProjectRow Row, NovelStatus Status)> books)
-    {
-        var tilts = new[] { 1.4, -2.2, 0.9 };
-        var noteTilts = new[] { -1.8, 1.2, -0.9 };
-        var strip = new HorizontalStackLayout { Spacing = 11, Margin = new Thickness(0, 10, 0, 0) };
-
-        for (var i = 0; i < books.Count; i++)
-        {
-            var (row, status) = books[i];
-            var note = DeskPaper.PostIt(
-                row.Title,
-                string.IsNullOrWhiteSpace(row.Problem) ? row.Summary : $"{row.Summary}\n{row.Problem}",
-                PaperResources.Colour(status.NeedsAttention || !string.IsNullOrWhiteSpace(row.Problem) ? "ProblemMark" : "InkSoft"));
-            note.Rotation = noteTilts[i % noteTilts.Length];
-
-            var cover = new FlatBook(row.Title, Jacket(status), 88, 110, tilts[i % tilts.Length]);
-            Press(cover, status);
-
-            strip.Children.Add(new VerticalStackLayout
-            {
-                WidthRequest = 88,
-                Spacing = 7,
-                Children = { cover, note },
-            });
-        }
-
-        return strip;
     }
 
     /// <summary>
