@@ -153,7 +153,7 @@ public sealed class ConstitutionVaultSync
         }
 
         // Ownership is the whole rule for the shared vault, so an install that cannot say which account
-        // it is cannot show it owns the vault. (SecretsVaultService would publish for an unidentified
+        // it is cannot show it owns the vault. (an unidentified install is refused here before the service is asked; the service decides by Drive file ownership, not by account
         // install, a deliberate hole for apps that predate ownership; Constitution has no such history,
         // and sign-in is the first thing first run asks for.)
         var account = signedInAccount();
@@ -164,7 +164,7 @@ public sealed class ConstitutionVaultSync
 
         // The service is the one choke point for "never over a vault it could not read" and for
         // VaultOwnership, and it is built for this call so the passphrase is not kept anywhere.
-        var service = new SecretsVaultService(sharedStore, () => passphrase, () => account);
+        var service = new SecretsVaultService(sharedStore, () => passphrase);
         try
         {
             var published = await service.PublishAsync(

@@ -479,7 +479,7 @@ public class ConstitutionVaultSyncTests
         var result = await Publish(phone);
 
         Assert.Equal(VaultWriteOutcome.Published, result.Shared);
-        Assert.Equal(Invented.OwnerAccount, cloud.ReadShared(Invented.Passphrase).OwnerAccount);
+        Assert.Equal(Invented.OwnerAccount, cloud.SharedOwner);
     }
 
     // ---- never over a vault it could not read ----
