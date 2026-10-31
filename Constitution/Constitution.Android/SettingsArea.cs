@@ -203,6 +203,14 @@ public sealed class SettingsArea(Activity host)
                     _ => "Saved.");
                 break;
             case PersonSheetAction.Remove:
+                // One way back at a time (D164): the first removal is already written, so a second one waits until its window closes or it is undone.
+                if (removalUndo.RefusalFor(DateTimeOffset.UtcNow) is { } refusal)
+                {
+                    sheetStatus = refusal;
+                    RaiseChanged();
+                    break;
+                }
+
                 RunSheetChange($"Removing {sheetModel?.Title}.", () => changes.RemoveAsync(id, CancellationToken.None), BeginRemovalUndo);
                 break;
         }
